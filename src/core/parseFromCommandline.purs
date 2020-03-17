@@ -8,7 +8,7 @@ import Effect (Effect)
 import Effect.Aff (runAff)
 import Effect.Class.Console (log)
 import Effect.Exception (Error)
-import Foreign.Generic (defaultOptions, genericEncodeJSON)
+import Foreign.Generic (encodeJSON)
 import Node.Yargs.Applicative (runY, yarg)
 import Node.Yargs.Setup (example, usage)
 import Perspectives.CoreTypes (MonadPerspectives)
@@ -30,7 +30,7 @@ parse relativePath = do
   result <- loadAndCompileArcFile relativePath ""
   case result of
     Left errors -> pure $ show errors
-    Right model -> pure $ genericEncodeJSON defaultOptions model
+    Right model -> pure $ encodeJSON model
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = log $ "An error condition: " <> (show e)

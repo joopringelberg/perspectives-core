@@ -39,8 +39,8 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType(..))
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>), (||))
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType)
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -180,7 +180,7 @@ allRoleBinders r = ArrayT do
 isMe :: RoleInstance -> MP Boolean
 isMe ri = do
   (IP.PerspectRol{isMe: me, binding: bnd, pspType}) <- getPerspectRol ri
-  if me || pspType == (EnumeratedRoleType "model:System$PerspectivesSystem$User")
+  if me
     then pure true
     else case bnd of
       Nothing -> pure false

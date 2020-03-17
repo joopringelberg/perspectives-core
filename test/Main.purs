@@ -29,6 +29,8 @@ import Test.SetupCouchdb as SCDB
 import Test.LocalAuthentication as LA
 import Test.SerialisedAsDeltas as SAD
 import Test.Sync.Channel as CHA
+import Test.PrepareTestUser as PTU
+import Test.ArrayT as ARRT
 import Test.Unit.Main (runTest)
 
 
@@ -58,3 +60,5 @@ main = runTest do
   LA.theSuite
   SAD.theSuite
   CHA.theSuite
+  PTU.theSuite
+  ARRT.theSuite

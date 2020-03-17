@@ -35,7 +35,8 @@ import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (##>), (##>>))
-import Perspectives.Couchdb.Databases (createDatabase, replicateContinuously)
+import Perspectives.Couchdb (selectOnField)
+import Perspectives.Couchdb.Databases (createDatabase, ensureAuthentication, replicateContinuously)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
@@ -45,7 +46,7 @@ import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.User (getCouchdbBaseURL, getHost)
+import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
 import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>))
 
 -- | Create a new database for the communication between `me` and another user.
@@ -55,14 +56,20 @@ import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<
 createChannel :: MonadPerspectivesTransaction ContextInstance
 createChannel = do
   channelName <- pure ("channel_" <> (show $ guid unit))
-  lift2 $ createDatabase channelName
+  lift2 $ ensureAuthentication (createDatabase channelName)
+  host <- lift2 getHost
+  port <- lift2 getPort
   eChannel <- constructContext $ ContextSerialization
     { id: "model:User$" <> channelName
     , prototype: Nothing
     , ctype: "sys:Channel"
     , rollen: fromFoldable [(Tuple "model:System$Channel$ConnectedPartner"
       [ RolSerialization
-        { properties: PropertySerialization empty,
+        { properties: PropertySerialization $ fromFoldable
+        [
+          Tuple "model:System$Channel$ConnectedPartner$Host" [host]
+        , Tuple "model:System$Channel$ConnectedPartner$Port" [(show port)]
+        ],
         binding: Just "usr:Me" }
        ])]
     , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
@@ -99,7 +106,7 @@ setMyAddress host port channel = do
 setYourAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setYourAddress host port channel =  do
   connectedPartner <- lift2 (getRoleFunction "sys:Channel$ConnectedPartner")
-  you <- lift2 (channel ##= filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not)))
+  you <- lift2 (channel ##= filter connectedPartner (lift <<< lift <<< isMe >=> pure <<< not))
   setProperty you (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$Host") [Value host]
   setProperty you (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$Port") [Value (show port)]
 
@@ -174,8 +181,8 @@ setChannelReplication channel = do
 
 postDbName :: MonadPerspectives String
 postDbName = do
-  userIdentifier <- getUserIdentifier
-  pure $ userIdentifier <> "_post/"
+  systemIdentifier <- getSystemIdentifier
+  pure $ systemIdentifier <> "_post/"
 
 -- | Push local channel to remote.
 setPushReplication :: String -> String -> String -> String -> MonadPerspectives Unit
@@ -185,7 +192,7 @@ setPushReplication channelDatabaseName host port author = do
     channelDatabaseName
     (base <> channelDatabaseName)
     (host <> ":" <> port <> "/" <> channelDatabaseName)
-    (Just $ fromFoldable [Tuple "author" author])
+    (Just $ selectOnField "author" author)
 
 -- | Push local channel to remote, pull remote channel on the RelayHost to local.
 setPushAndPullReplication :: String -> String -> String -> String -> MonadPerspectives Unit
@@ -197,13 +204,13 @@ setPushAndPullReplication channelDatabaseName host port author = do
     channelDatabaseName
     (base <> channelDatabaseName)
     (host <> ":" <> port <> "/" <> channelDatabaseName)
-    (Just $ fromFoldable [Tuple "author" me])
+    (Just $ selectOnField "author" me)
   -- Pull in all Transactions from the partner inwards.
   replicateContinuously
     channelDatabaseName
     (host <> ":" <> port <> "/" <> channelDatabaseName)
     (base <> channelDatabaseName)
-    (Just $ fromFoldable [Tuple "author" author])
+    (Just $ selectOnField "author" author)
 
 -- | Replicate source to target. Both databases are supposed to be local, so push or pull is unimportant.
 localReplication :: String -> String -> Maybe String -> MonadPerspectives Unit
@@ -213,4 +220,4 @@ localReplication source target author = do
     (source <> "_" <> target)
     (base <> source)
     (base <> target)
-    (maybe Nothing (\a -> Just $ fromFoldable [Tuple "author" a]) author)
+    (maybe Nothing (\a -> Just $ selectOnField "author" a) author)

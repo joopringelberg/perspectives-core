@@ -6,7 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Array (length, null)
 import Data.Either (Either(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, binding, getProperty, getRole)
 import Perspectives.LoadCRL (loadAndSaveCrlFile, loadAndSaveCrlFile)
@@ -260,11 +260,11 @@ theSuite = suite "Perspectives.Actions" do
         if null instanceErrors
           then do
 
-            n1 <- ((ContextInstance "model:User$MijnSysteem") ##= getRole (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"))
+            n1 <- ((ContextInstance "model:User$test") ##= getRole (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"))
             -- logShow n1
             liftAff $ assert "There should be a computed instance of ModelsInUse." (length n1 == 1)
             getUnloadedModel <- getRoleFunction "model:System$PerspectivesSystem$UnloadedModel"
-            n2 <- ((ContextInstance "model:User$MijnSysteem") ##= getUnloadedModel)
+            n2 <- ((ContextInstance "model:User$test") ##= getUnloadedModel)
             logShow n2
             liftAff $ assert "There should be a computed instance of UnloadedModel." (length n2 == 1)
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false

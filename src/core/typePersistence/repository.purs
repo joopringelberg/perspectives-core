@@ -51,7 +51,7 @@ fetchModelFromRepository url = catchError
     (rq :: (Request String)) <- defaultPerspectRequest
     res <- liftAff $ request $ rq {url = url}
     m <- liftAff $ onAccepted res.status [200, 304] "fetchModelFromRepository"
-      (onCorrectCallAndResponse "fetchEntiteit" res.body \(m :: DomeinFile) -> pure unit)
+      (onCorrectCallAndResponse "fetchModelFromRepository" res.body \(m :: DomeinFile) -> pure unit)
     rev <- version res.headers
     pure $ changeRevision rev m
   \e -> throwError $ error ("fetchModelFromRepository: failed to retrieve model from this url: " <> url <> "." <> show e)

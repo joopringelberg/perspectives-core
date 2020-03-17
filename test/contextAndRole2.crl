@@ -3,6 +3,6 @@ GebruikerGegevens
 import model:ContextAndRole als tst:
 
 tst:TestCase usr:MyTestCase
-	$Self -> usr:MijnSysteem$User(1)
+	$Self -> usr:test$User(1)
 	$AContextRole =>
 		$NestedCase usr:MyNestedCase

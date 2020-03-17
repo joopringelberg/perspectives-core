@@ -2,7 +2,6 @@ module Test.Sync.Channel where
 
 import Prelude
 
-import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (lift)
 import Data.Array (head)
@@ -10,20 +9,20 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes ((##>), (##>>))
-import Perspectives.Couchdb.Databases (addDocument, createDatabase, deleteDatabase, deleteDocument, endReplication, getDocument)
-import Perspectives.CouchdbState (CouchdbUser(..))
+import Perspectives.Couchdb.Databases (addDocument, createDatabase, deleteDatabase, endReplication, getDocument)
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (externalRole, isMe)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
+import Perspectives.Names (getUserIdentifier)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.Sync.Channel (addUserToChannel, createChannel, localReplication, postDbName, setChannelReplication, setMyAddress, setYourAddress)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
-import Perspectives.User (getUser)
+import Perspectives.Sync.Transaction (Transaction, createTransactie)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -38,14 +37,15 @@ theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Sync.Channel" do
 
   test "createChannel" (runP do
-    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    _ <- loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory
     setupUser
     void $ runMonadPerspectivesTransaction createChannel
 
-    -- There must be an instance of "model:System$PerspectivesSystem$Channels" in "model:User$MijnSysteem"
+    -- There must be an instance of "model:System$PerspectivesSystem$Channels" in "model:User$test"
     -- If we can retrieve a value for the property model:System$PerspectivesSystem$User$Channel, everything is OK.
     getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
-    mdbname <- RoleInstance "model:User$MijnSysteem$User_0001" ##> getter
+    me <- getUserIdentifier
+    mdbname <- (RoleInstance me) ##> getter
     lift $ logShow mdbname
     liftAff $ assert "We should be able to calculate the value of the Channel property for `me`" (isJust mdbname)
     case mdbname of
@@ -55,13 +55,15 @@ theSuite = suite "Perspectives.Sync.Channel" do
     )
 
   test "create channel, add user" (runP do
-    -- _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-    -- setupUser
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    setupUser
     achannel <- runMonadPerspectivesTransaction createChannel
     case head achannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
       Just channel -> do
         -- load a second user
+        -- channelContext <- getPerspectEntiteit channel
+        -- logShow channelContext
         void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
         void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$JoopsSysteem$User_0001") channel
 
@@ -104,22 +106,23 @@ theSuite = suite "Perspectives.Sync.Channel" do
   test "local replication" (runP do
     createDatabase "channel"
     createDatabase "post"
-    localReplication "channel" "post" Nothing
-    (user :: CouchdbUser) <- gets $ _.userInfo
-    addDocument "channel" user "user"
+    (user :: String) <- getUserIdentifier
+    localReplication "channel" "post" (Just user)
+    t <- liftAff $ createTransactie user
+    addDocument "channel" t "emptyTransaction"
 
     -- Wait a bit
     liftAff $ delay (Milliseconds 5000.0)
     -- Now retrieve the document
-    (muser :: Maybe CouchdbUser) <- getDocument "post" "user"
-    liftAff $ assert "The 'user' document should now be in the post database!" (isJust muser)
+    (muser :: Maybe Transaction) <- getDocument "post" "emptyTransaction"
+    liftAff $ assert "The 'emptyTransaction' document should now be in the post database!" (isJust muser)
 
     void $ endReplication "channel" "post"
     deleteDatabase "channel"
     deleteDatabase "post"
     )
 
-  test "endReplication" (runP do
+  testSkip "endReplication" (runP do
     success <- endReplication "channel" "post"
     liftAff $ assert "It should be gone!" success)
 
@@ -144,14 +147,14 @@ theSuite = suite "Perspectives.Sync.Channel" do
         case mchannel of
           Nothing -> pure unit
           Just (Value channelId) -> do
-            (user :: CouchdbUser) <- gets $ _.userInfo
-            addDocument channelId user "user"
+            t <- liftAff $ createTransactie "model:User$JoopsSysteem$User_0001"
+            addDocument channelId t "emptyTransaction"
             -- Wait a bit
             liftAff $ delay (Milliseconds 5000.0)
             -- Now retrieve the document
             post <- postDbName
-            (muser :: Maybe CouchdbUser) <- getDocument post "user"
-            liftAff $ assert "The 'user' document should now be in the post database!" (isJust muser)
+            (mt :: Maybe Transaction) <- getDocument post "emptyTransaction"
+            liftAff $ assert "The 'emptyTransaction' document should now be in the post database!" (isJust mt)
 
             -- Clean up: end replication, remove the channel, clear the user entities database
             void $ endReplication channelId post

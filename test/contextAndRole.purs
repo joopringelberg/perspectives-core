@@ -12,7 +12,7 @@ import Foreign.Object (Object)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeRol_binding, context_rolInContext, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_gevuldeRol, rol_property, setContext_rolInContext, setRol_property)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
-import Perspectives.LoadCRL (loadCrlFile)
+import Perspectives.LoadCRL (loadAndCacheCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
@@ -27,7 +27,7 @@ theSuite :: Free TestF Unit
 theSuite = suite "ContextAndRole" do
   test "Access a Role" do
     ra <- runP do
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextAndRole.crl" testDirectory
       -- logShow r
       -- now get the role
       getPerspectContext (ContextInstance "model:User$MyTestCase") >>= pure <<< flip context_rolInContext (EnumeratedRoleType "model:ContextAndRole$TestCase$Self")
@@ -35,7 +35,7 @@ theSuite = suite "ContextAndRole" do
 
   test "Add a Role" do
     ra <- runP do
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextAndRole.crl" testDirectory
       -- logShow r
       -- now add a Role
       getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
@@ -45,7 +45,7 @@ theSuite = suite "ContextAndRole" do
 
   test "Add an array of Role instances" do
     ra <- runP do
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextAndRole.crl" testDirectory
       -- logShow r
       -- now add a Role
       getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
@@ -55,7 +55,7 @@ theSuite = suite "ContextAndRole" do
 
   test "Retrieve non-existing role instances" do
     ra <- runP do
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextAndRole.crl" testDirectory
       -- logShow r
       -- now add a Role
       getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
@@ -64,7 +64,7 @@ theSuite = suite "ContextAndRole" do
 
   test "Add an array of Role instances to non-existing role instances" do
     ra <- runP do
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextAndRole.crl" testDirectory
       -- logShow r
       -- now add a Role
       getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
@@ -74,7 +74,7 @@ theSuite = suite "ContextAndRole" do
 
   test "Add a Role instance to non-existing role instances" do
     ra <- runP do
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextAndRole.crl" testDirectory
       -- logShow r
       -- now add a Role
       getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
@@ -83,7 +83,7 @@ theSuite = suite "ContextAndRole" do
     assert "There should be one instance of Self" (length ra == 1)
 
   test "Role assignments" $ runP do
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextAndRole.crl" testDirectory
       -- logShow r
 
       context1 <- getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
@@ -103,7 +103,7 @@ theSuite = suite "ContextAndRole" do
       liftAff $ assert "modifyContext_rolInContext fails" (length (context_rolInContext context5 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole")) == 1)
 
   test "Property assignments" $ runP do
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextAndRole.crl" testDirectory
       -- logShow r
 
       role1 <- getPerspectRol (RoleInstance "model:User$MyTestCase$Self_0001") >>=

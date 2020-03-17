@@ -29,7 +29,7 @@ import Data.List (List)
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty)
-import Foreign.Object (fromFoldable) as OBJ
+import Foreign.Object (fromFoldable, union) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
@@ -38,7 +38,7 @@ import Perspectives.Names (defaultNamespaces, expandDefaultNamespaces_, expandNa
 import Perspectives.Parsing.Arc.AST (ContextPart(..))
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<>), (<<<), (>>=))
+import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -72,7 +72,7 @@ evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesE
 evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord empty
 
 evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> Object String -> m (Either PerspectivesError a)
-evalPhaseTwo_' computation drf indexedNames = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty, indexedNames, variableBindings: ENV.empty}
+evalPhaseTwo_' computation drf indexedNames = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: defaultNamespaces, indexedNames, variableBindings: ENV.empty}
 
 type PhaseTwo a = PhaseTwo' a Identity
 
@@ -120,8 +120,8 @@ withNamespaces :: forall a. Partial => List ContextPart -> PhaseTwo a -> PhaseTw
 withNamespaces pairs pt = do
   x <- pure $ OBJ.fromFoldable $ map (\(PREFIX pre mod) -> Tuple pre mod) pairs
   ns <- lift $ gets _.namespaces
-  -- TODO: gebruik een andere vorm van samenvoegen, zodat namen worden geschaduwd.
-  void $ modify \s -> s {namespaces = x <> ns}
+  -- replace keys in ns with values found in x.
+  void $ modify \s -> s {namespaces = x `OBJ.union` ns}
   ctxt <- pt
   void $ modify \s -> s {namespaces = ns}
   pure ctxt

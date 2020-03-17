@@ -515,7 +515,7 @@ setProperty rids propertyName values = for_ rids \rid -> do
 -- Save the entity in cache and in couchdb.
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
 saveEntiteit rid rol = do
-  -- We can use cacheEntity instead of cachePreservingRevision because a) we know there is
+  -- We can use cacheEntity instead of cacheEntity because a) we know there is
   -- a cached entiteit, in this context of updating, so b) we do not accidentally overwrite
   -- the version number (because we don't create entities in this file).
   lift2 $ void $ cacheEntity rid rol

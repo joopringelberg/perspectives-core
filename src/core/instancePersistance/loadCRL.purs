@@ -37,17 +37,20 @@ import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
+import Perspectives.Persistent (updateRevision)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (saveContextInstance)
 
 -- | Loads a file from a directory relative to the active process.
 -- | All context and role instances are loaded into the cache.
 -- | Takes care of the responsibility CURRENTUSER.
-loadCrlFile :: String ->
+-- | NOTICE that if an entity was in Couchdb before and was not already in cache,
+-- | it will now have revision Nothing in cache. Saving it will lead to conflict.
+loadAndCacheCrlFile :: String ->
   String ->
   MonadPerspectives (Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol)))
-loadCrlFile file directoryName = do
+loadAndCacheCrlFile file directoryName = do
   procesDir <- liftEffect cwd
   text <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, file])
   parseResult <- parseAndCache text
@@ -56,16 +59,16 @@ loadCrlFile file directoryName = do
     Right contextsAndRoles@(Tuple contextInstances roleInstances) -> do
       pure $ Right contextsAndRoles
 
-loadCrlFile_ :: String ->
+loadAndCacheCrlFile_ :: String ->
   String ->
   MonadPerspectives (Array PerspectivesError)
-loadCrlFile_ file directoryName = do
-  r <- loadCrlFile file directoryName
+loadAndCacheCrlFile_ file directoryName = do
+  r <- loadAndCacheCrlFile file directoryName
   case r of
     Left e -> pure e
     Right _ -> pure []
 
--- | Loads a file from the directory "src/model" relative to the directory of the active process.
+-- | Loads a file from the given directory relative to the directory of the active process.
 -- | Runs all bot actions.
 -- | All instances are loaded into the cache, and stored in Couchdb.
 -- | This function takes care of
@@ -75,13 +78,15 @@ loadCrlFile_ file directoryName = do
 -- | CURRENTUSER
 loadAndSaveCrlFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
 loadAndSaveCrlFile file directoryName = do
-  -- r <- loadCrlFile file directoryName
   procesDir <- liftEffect cwd
   text <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, file])
   parseResult <- parseAndCache text
   case parseResult of
     Left e -> pure $ [Custom (show e)]
-    Right contextsAndRoles@(Tuple contextInstances _) -> do
+    Right contextsAndRoles@(Tuple contextInstances roleInstances) -> do
+      -- Update the revision in cache by visiting Couchdb.
+      forWithIndex_ contextInstances \i _ -> updateRevision (ContextInstance i)
+      forWithIndex_ roleInstances \i _ -> updateRevision (RoleInstance i)
       void $ runMonadPerspectivesTransaction $ (forWithIndex_ contextInstances
         \i _ -> do
           saveContextInstance (ContextInstance i))

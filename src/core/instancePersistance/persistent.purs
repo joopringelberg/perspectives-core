@@ -43,6 +43,7 @@ module Perspectives.Persistent
 , class Persistent
 , database
 , entitiesDatabaseName
+, updateRevision
   )
 where
 
@@ -50,18 +51,17 @@ import Prelude
 
 import Affjax (Request, request)
 import Affjax.RequestBody as RequestBody
-import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Except (catchError, throwError)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Effect.Aff.AVar (AVar, kill, put, read, take)
+import Effect.Aff.AVar (AVar, kill, put, read)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericEncodeJSON)
+import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
@@ -70,7 +70,7 @@ import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthenticat
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheEntity, cacheEntity, cachePreservingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, takeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
 
@@ -79,21 +79,21 @@ class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i wh
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
   database _ = do
-    userIdentifier <- getSystemIdentifier
+    sysId <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
-    pure $ cdbUrl <> userIdentifier <> "_entities/"
+    pure $ cdbUrl <> sysId <> "_entities/"
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
   database _ = do
-    userIdentifier <- getSystemIdentifier
+    sysId <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
-    pure $ cdbUrl <> userIdentifier <> "_entities/"
+    pure $ cdbUrl <> sysId <> "_entities/"
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
   database _ = do
-    userIdentifier <- getSystemIdentifier
+    sysId <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
-    pure $ cdbUrl <> userIdentifier <> "_models/"
+    pure $ cdbUrl <> sysId <> "_models/"
 
 instance persistentCouchdbUser :: Persistent CouchdbUser UserName where
   database _ = do
@@ -167,66 +167,33 @@ fetchEntiteit id = ensureAuthentication $ catchError
       Just av -> liftAff $ kill (error ("Cound not find " <> unwrap id)) av
     throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
 
--- | Save an entity, whether it has been saved before or not. It must be present in the cache.
--- | On success it will have the same version in cache as in Couchdb.
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
-saveEntiteit id = do
-  (pe :: Maybe a) <- tryGetPerspectEntiteit id
-  case pe of
-    Nothing -> saveUnversionedEntiteit id
-    Just pe' -> case rev pe' of
-      Nothing -> saveUnversionedEntiteit id
-      otherwise -> saveVersionedEntiteit id pe'
+saveEntiteit id = saveEntiteit' id Nothing
 
 saveEntiteit_ :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
-saveEntiteit_ id pe = do
-  case rev pe of
-    Nothing -> do
-      (av :: Maybe (AVar a)) <- retrieveInternally id
-      case av of
-        (Just avar) -> do
-          -- kijken of er een revisie is?
-          void $ cachePreservingRevision id pe
-          saveUnversionedEntiteit id
-        Nothing -> do
-          void $ cacheEntity id pe
-          saveUnversionedEntiteit id
-    otherwise -> saveVersionedEntiteit id pe
-
--- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
--- | couchdb with this function. Set its version (_rev) in the cache.
-saveUnversionedEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
-saveUnversionedEntiteit id = ensureAuthentication $ do
-  (mAvar :: Maybe (AVar a)) <- retrieveInternally id
-  case mAvar of
-    Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> unwrap id)
-    (Just avar) -> do
-      pe <- liftAff $ take avar
-      ebase <- database id
-      (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap id), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions pe)}
-      if res.status == (StatusCode 409)
-        -- Unexpectedly we do have a version in Couchdb.
-        then retrieveDocumentVersion (ebase <> unwrap id) >>= pure <<< (flip changeRevision pe) >>= saveVersionedEntiteit id
-        else do
-          void $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
-            (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> do
-              v <- version res.headers
-              void $ liftAff $ put (changeRevision v pe) avar))
-          pure pe
+saveEntiteit_ entId entiteit = saveEntiteit' entId (Just entiteit)
 
 -- | Save an Entiteit and set its new _rev parameter in the cache.
-saveVersionedEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
-saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
-  case (rev entiteit) of
-    Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> unwrap entId)
-    (Just rev) -> do
-      ebase <- database entId
-      (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> "?rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions entiteit)}
-      void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
-        (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> do
-          v <- version res.headers
-          -- We **must** use cacheEntity because we want to overwrite the version number.
-          void $ cacheEntity entId (changeRevision v entiteit)))
-      pure entiteit
+saveEntiteit' :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
+saveEntiteit' entId mentiteit = ensureAuthentication $ do
+  entityFromCache <- takeEntiteitFromCache entId
+  entiteit <- pure case mentiteit of
+    Nothing -> entityFromCache
+    Just e -> e
+  revParam <- pure case (rev entityFromCache) of
+    Nothing -> ""
+    Just rev -> "?rev=" <> rev
+  ebase <- database entId
+  (rq :: (Request String)) <- defaultPerspectRequest
+  res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> revParam), content = Just $ RequestBody.string  (encodeJSON entiteit)}
+  void $ onAccepted res.status [200, 201] ("saveEntiteit_ for " <> (unwrap entId))
+    (onCorrectCallAndResponse ("saveEntiteit_ for " <> (unwrap entId)) res.body (\(a :: PutCouchdbDocument) -> do
+      v <- version res.headers
+      void $ cacheEntity entId (changeRevision v entiteit)))
+  pure entiteit
+
+updateRevision :: forall a i. Persistent a i => i -> MonadPerspectives Unit
+updateRevision entId = do
+  ebase <- database entId
+  revision <- retrieveDocumentVersion (ebase <> (unwrap entId))
+  setRevision entId revision

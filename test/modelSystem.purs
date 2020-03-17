@@ -73,12 +73,12 @@ theSuite = suiteSkip  "Model:System" do
         void $ removeInternally (RoleInstance "model:User$MyTests_External")
         -- Get the model descriptions from the repository into cache.
         getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
-        models <- ((ContextInstance "model:User$MijnSysteem") ##= getModels)
+        models <- ((ContextInstance "model:User$test") ##= getModels)
 
         -- Bind the description of Model:TestBotActie to an instance of ModelsInUse
         descriptionId <- pure "model:User$TestBotActieModel_External"
         binder <- pure $ EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"
-        roleIds <- runMonadPerspectivesTransaction $ createAndAddRoleInstance binder "model:User$MijnSysteem"
+        roleIds <- runMonadPerspectivesTransaction $ createAndAddRoleInstance binder "model:User$test"
           (RolSerialization{ properties: PropertySerialization empty, binding: Just descriptionId})
         role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head roleIds)
         b <- getPerspectRol (RoleInstance descriptionId)
@@ -91,7 +91,7 @@ theSuite = suiteSkip  "Model:System" do
 
         -- Check if ModelsInUse has two instances.
         getIndexedContexts <- getRoleFunction "model:System$PerspectivesSystem$IndexedContexts"
-        n2 <- ((ContextInstance "model:User$MijnSysteem") ##= getIndexedContexts)
+        n2 <- ((ContextInstance "model:User$test") ##= getIndexedContexts)
         -- logShow n2
         liftAff $ assert "There should be two instances of IndexedContexts." (length n2 == 2)
 

@@ -36,16 +36,15 @@ import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), onAccepted, onCorrectCallAndResponse)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
-import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove)
-import Perspectives.Representation.Class.Cacheable (cacheEntity, cachePreservingRevision, retrieveInternally)
-import Perspectives.User (getCouchdbBaseURL)
+import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
+import Perspectives.User (getCouchdbBaseURL, getCouchdbPassword, getUser)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
-storeDomeinFileInCache ns df= cachePreservingRevision (DomeinFileId ns) df
+storeDomeinFileInCache ns df= cacheEntity (DomeinFileId ns) df
 
 removeDomeinFileFromCache :: Namespace -> MonadPerspectives Unit
 removeDomeinFileFromCache = void <<< domeinCacheRemove
@@ -78,7 +77,8 @@ type DatabaseName = String
 documentsInDatabase :: DatabaseName -> MonadPerspectives GetCouchdbAllDocs
 documentsInDatabase database = do
   baseUrl <- getCouchdbBaseURL
-  res <- lift $ AX.request $ domeinRequest {url = baseUrl <> escapeCouchdbDocumentName database <> "/_all_docs"}
+  req <- domeinRequest
+  res <- lift $ AX.request $ req {url = baseUrl <> escapeCouchdbDocumentName database <> "/_all_docs"}
   onAccepted res.status [200] "documentsInDatabase"
     (onCorrectCallAndResponse "documentsInDatabase" res.body \(a :: GetCouchdbAllDocs) -> pure unit)
 
@@ -87,8 +87,10 @@ documentNamesInDatabase database = do
   (GetCouchdbAllDocs cad) <- documentsInDatabase database
   pure $ (\(DocReference{id}) -> id) <$> cad.rows
 
-saveCachedDomeinFile :: ID -> MonadPerspectives Unit
-saveCachedDomeinFile ns = saveEntiteit (DomeinFileId ns) *> pure unit
+saveCachedDomeinFile :: DomeinFileId -> MonadPerspectives Unit
+saveCachedDomeinFile ns = do
+  updateRevision ns
+  saveEntiteit ns *> pure unit
 
 -- | Either create or modify the DomeinFile in couchdb. Caches.
 -- | Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
@@ -96,20 +98,22 @@ saveCachedDomeinFile ns = saveEntiteit (DomeinFileId ns) *> pure unit
 storeDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
 storeDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) = do
   void $ storeDomeinFileInCache _id df
-  saveCachedDomeinFile _id
+  saveCachedDomeinFile (DomeinFileId _id)
 
 -- | Remove the file from couchb. Removes the model from cache.
 removeDomeinFileFromCouchdb :: Namespace -> MonadPerspectives Unit
 removeDomeinFileFromCouchdb ns = removeEntiteit (DomeinFileId ns) *> pure unit
 
-domeinRequest :: AX.Request String
-domeinRequest =
-  { method: Left GET
+domeinRequest :: MonadPerspectives (AX.Request String)
+domeinRequest = do
+  username <- getUser
+  password <- getCouchdbPassword
+  pure { method: Left GET
   , url: "http://localhost:5984/models2model_SysteemDomein_"
   , headers: []
   , content: Nothing
-  , username: Just "cor"
-  , password: Just "geheim"
+  , username: Just username
+  , password: Just password
   , withCredentials: true
   , responseFormat: ResponseFormat.string
   }

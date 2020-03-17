@@ -12,7 +12,7 @@ import Foreign.Object (Object)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile)
+import Perspectives.LoadCRL (loadAndSaveCrlFile, loadAndCacheCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
@@ -31,7 +31,7 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
-    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "combinators.crl" testDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadAndCacheCrlFile "combinators.crl" testDirectory
     -- logShow r
     pure unit
 
@@ -67,4 +67,5 @@ theSuite = suite "Perspectives.loadCRL" do
       else do
         logShow r
         liftAff $ assert "A CRL file should load without problems" false
+    clearUserDatabase
 )

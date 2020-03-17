@@ -25,7 +25,7 @@ module Perspectives.Extern.Couchdb where
 
 import Affjax (Request, URL, printResponseFormatError, request)
 import Affjax.RequestBody (string) as RequestBody
-import Control.Monad.Error.Class (catchError, throwError, try)
+import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except (runExcept)
 import Control.Monad.State (StateT, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
@@ -43,9 +43,8 @@ import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (log, logShow)
 import Effect.Exception (error)
-import Foreign.Generic (decodeJSON, defaultOptions, encodeJSON, genericEncodeJSON)
+import Foreign.Generic (decodeJSON, encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, insert, lookup)
 import Perspectives.CollectAffectedContexts (lift2)
@@ -61,8 +60,8 @@ import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hid
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem)
-import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, getPerspectRol, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, cachePreservingRevision)
+import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.User (getSystemIdentifier)
@@ -138,7 +137,7 @@ addModelToLocalStore urls = do
       -- Take the role- and contextinstances from it and add them to the user (instances) database.
       -- We have to cache all roleInstances (except the external role of the modeldescription) first,
       -- otherwise we cannot see what its `isMe` must be.
-      forWithIndex_ roleInstances' \i a -> void $ lift $ lift $ try (cacheEntity (RoleInstance i) a)
+      forWithIndex_ roleInstances' \i a -> void $ lift $ lift (cacheRoleInstance (RoleInstance i) a)
       cis <- lift2 $ execStateT (saveRoleInstances roleInstances') contextInstances
       forWithIndex_ cis \i a -> save (ContextInstance i) a
       -- For each role instance with a binding that is not one of the other imported role instances,
@@ -160,9 +159,16 @@ addModelToLocalStore urls = do
     replaceSystemIdentifier :: String -> DomeinFile -> MonadPerspectivesTransaction DomeinFile
     replaceSystemIdentifier sysId c = case runExcept $ decodeJSON $ replaceAll (Pattern "model:User$MijnSysteem") (Replacement sysId) (encodeJSON c) of
       Left e -> do
-        logShow e
         pure c
       Right s' -> pure s'
+
+    -- Prefer an earlier version of the Context instance.
+    cacheRoleInstance :: RoleInstance -> PerspectRol -> MP Unit
+    cacheRoleInstance roleId role = do
+      mexistingRole <- tryGetPerspectEntiteit roleId
+      case mexistingRole of
+        Nothing -> void $ cacheEntity roleId role
+        Just _ -> pure unit
 
     saveRoleInstances :: Object PerspectRol -> StateT (Object PerspectContext) MonadPerspectives Unit
     saveRoleInstances ris = forWithIndex_ ris \i a@(PerspectRol{context, pspType}) -> do
@@ -175,10 +181,16 @@ addModelToLocalStore urls = do
             Just c -> insert (unwrap context) (changeContext_me c (Just (RoleInstance i))) cis
         else void $ lift $ saveEntiteit_ (RoleInstance i) a
 
+    -- Prefer an earlier version of the Context instance.
     save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
-    save i a = do
-      void $ lift $ lift $ cacheEntity i a
-      void $ lift $ lift $ saveEntiteit i
+    save i a = lift $ lift do
+      mexistingContext <- tryGetPerspectEntiteit i
+      case mexistingContext of
+        Nothing -> do
+          void $ cacheEntity i a
+          updateRevision i
+          void $ saveEntiteit i
+        otherwise -> pure unit
 
     -- url is the path to the document in the repository.
     addA :: String -> String -> MP Unit
@@ -211,13 +223,13 @@ uploadToRepository_ dfId url df = lift $ lift $ do
   case mVersion of
     Nothing -> do
     -- If not available, store without revision
-      res <- liftAff $ request $ rq {method = Left PUT, url = docUrl, content = Just $ RequestBody.string (genericEncodeJSON defaultOptions df)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = docUrl, content = Just $ RequestBody.string (encodeJSON df)}
       void $ onAccepted res.status [200, 201] "uploadToRepository_"
         (onCorrectCallAndResponse "uploadToRepository_" res.body (\(a :: PutCouchdbDocument) -> pure unit))
       -- Now add the attachment.
     -- If available, store with revision
     Just rev -> do
-      res <- liftAff $ request $ rq {method = Left PUT, url = (docUrl <> "?rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions df)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = (docUrl <> "?rev=" <> rev), content = Just $ RequestBody.string  (encodeJSON df)}
       void $ onAccepted res.status [200, 201] "uploadToRepository_"
         (onCorrectCallAndResponse "uploadToRepository_" res.body (\(a :: PutCouchdbDocument) -> pure unit))
 

@@ -28,6 +28,7 @@ import Data.Array (union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -35,6 +36,7 @@ import Effect.Now (now)
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.ApiTypes (CorrelationIdentifier)
+import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.AffectedContext (AffectedContext)
 import Perspectives.Sync.Class.DeltaClass (addBase)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
@@ -79,7 +81,6 @@ instance decodeTransactie :: Decode Transaction where
     ((Transaction' {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles}) :: Transaction') <- decode f
     pure $ Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: [], nextDeltaIndex: 0}
 
-
 instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
 
@@ -98,6 +99,11 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , correlationIdentifiers: []
       , nextDeltaIndex: base + extra
     }
+
+-- | The Revision instance is a stub; we don't really need it (except in tests).
+instance revisionTransaction :: Revision Transaction where
+  rev t = Nothing
+  changeRevision _ t = t
 
 createTransactie :: String -> Aff Transaction
 createTransactie author =

@@ -29,8 +29,8 @@ theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
         then
           do
           EnumeratedRole{onRoleDelta_binding, onRoleDelta_binder, onContextDelta_context, onContextDelta_role} <- getEnumeratedRole (EnumeratedRoleType "model:Test$TestCase1$ARole")
-          -- logShow onContextDelta_context
-          liftAff $ assert "There is just one AffectedContextQuery on ARole" (length (onRoleDelta_binding <> onRoleDelta_binder <> onContextDelta_role <> onContextDelta_context) == 1)
+          -- logShow (length (onRoleDelta_binding <> onRoleDelta_binder <> onContextDelta_role <> onContextDelta_context))
+          liftAff $ assert "There should be two AffectedContextQueries on ARole" (length (onRoleDelta_binding <> onRoleDelta_binder <> onContextDelta_role <> onContextDelta_context) == 2)
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
@@ -41,7 +41,8 @@ theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
         then
           do
           EnumeratedProperty{onPropertyDelta} <- getEnumeratedProperty (EnumeratedPropertyType "model:Test$TestCase2$ARole$Prop1")
-          liftAff $ assert "There should be a single AffectedContextQuery on ARole$Prop1" (length onPropertyDelta == 1)
+          -- logShow $ length onPropertyDelta
+          liftAff $ assert "There should be two AffectedContextQueries on ARole$Prop1" (length onPropertyDelta == 2)
           EnumeratedRole{onContextDelta_context} <- getEnumeratedRole (EnumeratedRoleType "model:Test$TestCase2$ARole")
           -- logShow onContextDelta_context
           liftAff $ assert "There should two AffectedContextQueries in onContextDelta_context on ARole" (length onContextDelta_context == 2)
@@ -86,8 +87,8 @@ theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
         then
           do
           EnumeratedProperty{onPropertyDelta} <- getEnumeratedProperty (EnumeratedPropertyType "model:Test$TestCase5$SubCase3$External$Prop2")
-          -- logShow onPropertyDelta
-          liftAff $ assert "There should be a single AffectedContextQuery on SubCase3$External$Prop2" (length onPropertyDelta == 1)
+          -- logShow $ length onPropertyDelta
+          liftAff $ assert "There should be two AffectedContextQueries on SubCase3$External$Prop2" (length onPropertyDelta == 2)
           EnumeratedRole{onContextDelta_context} <- getEnumeratedRole (EnumeratedRoleType "model:Test$TestCase5$SubCase3$External")
           liftAff $ assert "There should be a single AffectedContextQuery in onContextDelta_context on ARole" (length onContextDelta_context == 1)
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false

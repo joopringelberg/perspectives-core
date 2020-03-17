@@ -3,7 +3,7 @@ GebruikerGegevens
 import model:Test als tst:
 
 tst:TestCaseUnbindQualified usr:MyTestCase
-	$Self -> usr:MijnSysteem$User(1)
+	$Self -> usr:test$User(1)
 	$AnotherRole6 => ()
 	$ARole6 -> $AnotherRole6(1)
 	$Nested6 =>

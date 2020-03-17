@@ -80,7 +80,7 @@ theSuite = suite "RunMonadPerspectivesTransaction" do
               liftAff $ assert "Flag should be true." (n1 == [Value "true"])
             else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-      -- clearUserDatabase
+      clearUserDatabase
         )
 
   test "roleDelta_binder" (runP do

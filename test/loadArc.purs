@@ -7,11 +7,11 @@ import Control.Monad.Free (Free)
 import Data.Array (null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Effect.Class.Console (logShow)
-import Perspectives.DomeinCache (retrieveDomeinFile)
+import Effect.Class.Console (log, logShow)
 import Perspectives.Couchdb.Revision (changeRevision)
+import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, retrieveDomeinFile)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndSaveArcFile, loadCompileAndSaveArcFile', loadAndCompileArcFile)
-import Test.Perspectives.Utils (runP, setupUser)
+import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -22,7 +22,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Perspectives.loadArc" do
+theSuite = suite "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
     messages <- runP $ loadCompileAndSaveArcFile' "contextAndRole" testDirectory
@@ -43,6 +43,7 @@ theSuite = suite  "Perspectives.loadArc" do
         -- logShow (changeRevision Nothing reParsedModel)
         assert "The model reloaded from couchdb should equal the model loaded from file."
           (eq (changeRevision Nothing retrievedModel) (changeRevision Nothing reParsedModel))
+    runP $ removeDomeinFileFromCouchdb "model:ContextAndRole"
 
   test "Load a model file and cache it" do
     -- 1. Load and save a model.
@@ -57,10 +58,26 @@ theSuite = suite  "Perspectives.loadArc" do
     -- 1. Load and save a model.
     messages <- runP do
       setupUser
-      catchError (loadCompileAndSaveArcFile "TestBotActie" modelDirectory)
+      catchError (loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory)
         \e -> logShow e *> pure []
     if null messages
       then pure unit
       else do
         logShow messages
         assert "The file could not be parsed, compiled or saved" false
+    runP $ removeDomeinFileFromCouchdb "model:System"
+
+  test "Load a model file and instances and store it in Couchdb" do
+    -- 1. Load and save a model.
+    messages <- runP do
+      setupUser
+      catchError (loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory)
+        \e -> logShow e *> pure []
+    if null messages
+      then pure unit
+      else do
+        logShow messages
+        assert "The file could not be parsed, compiled or saved" false
+    runP do
+      removeDomeinFileFromCouchdb "model:System"
+      clearUserDatabase

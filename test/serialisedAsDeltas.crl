@@ -3,7 +3,7 @@ GebruikerGegevens
 import model:Test als tst:
 
 tst:TestCase usr:MyTestCase
-  $Self -> usr:cor$User(1)
+  $Self -> usr:test$User(1)
   $ARole => ()
     $Prop1 = true
   $Other => ()

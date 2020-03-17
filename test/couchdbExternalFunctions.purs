@@ -43,7 +43,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
     if null modelErrors
       then do
         getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
-        models <- ((ContextInstance "model:User$MijnSysteem") ##= getModels)
+        models <- ((ContextInstance "model:User$test") ##= getModels)
         logShow models
         liftAff $ assert "There should be some models" (length models > 0)
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false

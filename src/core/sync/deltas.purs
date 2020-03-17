@@ -26,7 +26,7 @@ import Affjax.RequestBody as RequestBody
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (cons, union)
+import Data.Array (union)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Map (Map, lookup, insert, empty)
@@ -36,12 +36,13 @@ import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Generic (defaultOptions, genericEncodeJSON)
+import Foreign.Generic (encodeJSON)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##>>))
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
+import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
@@ -51,11 +52,11 @@ import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, t
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<>))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<>), (>>>))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
-  for_ changedDomeinFiles saveCachedDomeinFile
+  for_ changedDomeinFiles (DomeinFileId >>> saveCachedDomeinFile)
   -- Send the Transaction to all involved.
   distributeTransactie' t
   pure unit
@@ -77,7 +78,7 @@ sendTransactieToUser userId t = do
     Just (Value channel) -> do
       cdbUrl <- getCouchdbBaseURL
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (cdbUrl <> channel <> "/" <> transactieID t), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions t)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = (cdbUrl <> channel <> "/" <> transactieID t), content = Just $ RequestBody.string (encodeJSON t)}
       void $ onAccepted res.status [200, 201] "sendTransactieToUser"
         (onCorrectCallAndResponse "sendTransactieToUser" res.body (\(a :: PutCouchdbDocument) -> pure unit))
 

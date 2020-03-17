@@ -3,5 +3,5 @@ GebruikerGegevens
 import model:Test als tst:
 
 tst:TestCase1 usr:MyTestCase
-	$Self -> usr:MijnSysteem$User(1)
+	$Self -> usr:test$User(1)
 	$ARole => ()

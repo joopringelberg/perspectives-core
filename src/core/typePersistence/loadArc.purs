@@ -36,7 +36,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.LoadCRL (loadCrlFile)
+import Perspectives.LoadCRL (loadAndCacheCrlFile)
 import Perspectives.Names (defaultIndexedNames)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
@@ -102,7 +102,7 @@ loadArcAndCrl fileName directoryName = do
   where
     addModelInstances :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
     addModelInstances df = do
-      r <- loadCrlFile (fileName <> ".crl") directoryName
+      r <- loadAndCacheCrlFile (fileName <> ".crl") directoryName
       case r of
         Left e -> pure $ Left e
         Right (Tuple contexts roles) -> do

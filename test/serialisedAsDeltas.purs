@@ -35,9 +35,9 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "SerialisedAsDeltas" do
+theSuite = suite "SerialisedAsDeltas" do
 
-  testOnly "Bind a user to a role in a context" (runP do
+  test "Bind a user to a role in a context" (runP do
     _ <- setupUser
     -- Do not load userdata
     _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
