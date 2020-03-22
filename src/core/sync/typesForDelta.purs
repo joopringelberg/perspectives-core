@@ -46,7 +46,6 @@ newtype UniverseContextDelta = UniverseContextDelta (DeltaRecord
   ( id :: ContextInstance
   , contextType :: ContextType
   , deltaType :: UniverseContextDeltaType
-  -- Add, Remove
   ))
 
 derive instance genericUniverseContextDelta :: Generic UniverseContextDelta _
@@ -167,7 +166,7 @@ newtype RoleBindingDelta = RoleBindingDelta (DeltaRecord
   -- Remove, Change
   ))
 
-data RoleBindingDeltaType = SetBinding | RemoveBinding | RemoveBinding_
+data RoleBindingDeltaType = SetBinding | RemoveBinding
 
 derive instance genericRoleDelta :: Generic RoleBindingDelta _
 
@@ -203,9 +202,8 @@ instance decodeRoleBindingDeltaType :: Decode RoleBindingDeltaType where
 newtype RolePropertyDelta = RolePropertyDelta (DeltaRecord
   ( id :: RoleInstance
   , property :: EnumeratedPropertyType
-  , value :: Maybe Value
-  , deltaType :: DeltaType
-  -- Add, Remove, Delete, Change
+  , values :: Array Value
+  , deltaType :: RolePropertyDeltaType
   ))
 
 derive instance genericPropertyDelta :: Generic RolePropertyDelta _
@@ -222,17 +220,17 @@ instance decodePropertyDelta :: Decode RolePropertyDelta where
   decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
--- DELTATYPE
+-- ROLEPROPERTYDELTATYPE
 -----------------------------------------------------------
-data DeltaType = Add | Remove | Change | Delete | ContextRemoved | Move
+data RolePropertyDeltaType = AddProperty | RemoveProperty | DeleteProperty | SetProperty
 
-derive instance genericDeltaType :: Generic DeltaType _
-derive instance eqDeltaType :: Eq DeltaType
+derive instance genericRolePropertyDeltaType :: Generic RolePropertyDeltaType _
+derive instance eqRolePropertyDeltaType :: Eq RolePropertyDeltaType
 
-instance showDeltaType :: Show DeltaType where
+instance showRolePropertyDeltaType :: Show RolePropertyDeltaType where
   show = genericShow
 
-instance encodeDeltaType :: Encode DeltaType where
+instance encodeRolePropertyDeltaType :: Encode RolePropertyDeltaType where
   encode = genericEncode defaultOptions
-instance decodeDeltaType :: Decode DeltaType where
+instance decodeRolePropertyDeltaType :: Decode RolePropertyDeltaType where
   decode = genericDecode defaultOptions

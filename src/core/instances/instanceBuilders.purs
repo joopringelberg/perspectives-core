@@ -31,6 +31,8 @@
 module Perspectives.Instances.Builders
   ( constructContext
   , createAndAddRoleInstance
+  , constructEmptyContext
+  , constructEmptyRole
   )
 
 where

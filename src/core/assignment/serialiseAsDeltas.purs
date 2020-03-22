@@ -35,7 +35,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, ($), discard, pure, unit)
 
 serialisedAsDeltasFor:: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -83,15 +83,14 @@ serialisedAsDeltasFor cid userId = do
               forWithIndex_ properties \propertyTypeId values -> do
                 propAllowed <- lift2 (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))
                 if propAllowed
-                  then for_ values \value -> do
-                    addPropertyDelta $ RolePropertyDelta
-                      { id : roleInstance
-                      , property: (EnumeratedPropertyType propertyTypeId)
-                      , deltaType: Add
-                      , value: Just value
-                      , users: [userId]
-                      , sequenceNumber: 0
-                      }
+                  then addPropertyDelta $ RolePropertyDelta
+                    { id : roleInstance
+                    , property: (EnumeratedPropertyType propertyTypeId)
+                    , deltaType: AddProperty
+                    , values: values
+                    , users: [userId]
+                    , sequenceNumber: 0
+                    }
                   else pure unit
             addContextDelta $ ContextDelta
               { id : cid

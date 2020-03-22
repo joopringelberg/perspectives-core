@@ -22,19 +22,26 @@
 module Perspectives.Sync.HandleTransaction where
 
 import Control.Monad.Writer (WriterT, execWriterT, tell)
-import Data.Array (sort)
+import Data.Array (sort, length)
 import Data.Foldable (for_)
 import Data.Identity (Identity)
 import Data.Maybe (fromJust)
 import Data.Newtype (unwrap)
+import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Assignment.Update (addRoleInstancesToContext, moveRoleInstancesToAnotherContext)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, OrderedDelta(..), MonadPerspectives)
+import Perspectives.ApiTypes (PropertySerialization(..))
+import Perspectives.Assignment.Update (addRoleInstancesToContext, deleteProperty, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding, setProperty)
+import Perspectives.CollectAffectedContexts (lift2)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, OrderedDelta(..), MonadPerspectives, (##=))
+import Perspectives.Instances.Builders (constructEmptyContext, constructEmptyRole)
+import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
+import Perspectives.SaveUserData (removeContextInstance, removeRoleInstance)
+import Perspectives.SerializableNonEmptyArray (toNonEmptyArray)
 import Perspectives.Sync.Class.DeltaClass (getSequenceNumber)
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
-import Prelude (Unit, discard, pure, unit, void, ($))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Prelude (Unit, discard, pure, unit, void, ($), bind)
 
 executeContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
 executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext} ) = case deltaType of
@@ -43,16 +50,29 @@ executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstan
   NoOp -> pure unit
 
 executeRoleBindingDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
-executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType}) = pure unit
+executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved}) = case deltaType of
+  SetBinding -> void $ setBinding roleId (unsafePartial $ fromJust binding)
+  RemoveBinding -> void $ removeBinding roleWillBeRemoved roleId
 
 executeRolePropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
-executeRolePropertyDelta d = pure unit
+executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property}) = case deltaType of
+  AddProperty -> setProperty [id] property values
+  RemoveProperty -> removeProperty [id] property values
+  DeleteProperty -> deleteProperty [id] property
+  SetProperty -> setProperty [id] property values
 
 executeUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
-executeUniverseContextDelta d = pure unit
+executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) = case deltaType of
+  ConstructEmptyContext -> void $ constructEmptyContext id (unwrap contextType) "" (PropertySerialization empty)
+  RemoveContextInstance -> removeContextInstance id
 
 executeUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
-executeUniverseRoleDelta d = pure unit
+executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaType}) = case deltaType of
+  ConstructEmptyRole -> do
+    -- find the number of roleinstances in the context.
+    roles <- lift2 (id ##= getRole roleType)
+    void $ constructEmptyRole roleType id (length roles) ""
+  RemoveRoleInstance -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
 
 collectDeltas :: Transaction -> Array OrderedDelta
 collectDeltas t = sort $ unwrap $ execWriterT (collectDeltas_ t)

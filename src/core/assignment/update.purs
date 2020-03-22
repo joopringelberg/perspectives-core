@@ -59,7 +59,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 
 -----------------------------------------------------------
 -- UPDATE A ROLE (ADD OR REMOVE A BINDING)
@@ -325,15 +325,14 @@ addProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array V
 addProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
   saveEntiteit rid (addRol_property pe propertyName values)
-  for_ values \val ->
-    aisInPropertyDelta (RolePropertyDelta
-                { id : rid
-                , property: propertyName
-                , deltaType: Add
-                , value: Just val
-                , users: []
-                , sequenceNumber: 0
-                }) >>= addPropertyDelta
+  aisInPropertyDelta (RolePropertyDelta
+    { id : rid
+    , property: propertyName
+    , deltaType: AddProperty
+    , values: values
+    , users: []
+    , sequenceNumber: 0
+    }) >>= addPropertyDelta
   (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
 
 -- | Modify the role instance with the new property values.
@@ -346,14 +345,14 @@ removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Arra
 removeProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
   saveEntiteit rid (removeRol_property pe propertyName values)
-  for_ values \val -> aisInPropertyDelta (RolePropertyDelta
-              { id : rid
-              , property: propertyName
-              , deltaType: Remove
-              , value: Just val
-              , users: []
-              , sequenceNumber: 0
-              }) >>= addPropertyDelta
+  aisInPropertyDelta (RolePropertyDelta
+    { id : rid
+    , property: propertyName
+    , deltaType: RemoveProperty
+    , values: values
+    , users: []
+    , sequenceNumber: 0
+    }) >>= addPropertyDelta
   (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
 
 -- | Delete all property values from the role for the EnumeratedPropertyType.
@@ -369,8 +368,8 @@ deleteProperty rids propertyName = for_ rids \rid -> do
   aisInPropertyDelta (RolePropertyDelta
               { id : rid
               , property: propertyName
-              , deltaType: Delete
-              , value: Nothing
+              , deltaType: DeleteProperty
+              , values: []
               , users: []
               , sequenceNumber: 0
               }) >>= addPropertyDelta
@@ -387,16 +386,14 @@ setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array V
 setProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
   saveEntiteit rid (setRol_property pe propertyName values)
-  for_ values \value -> do
-    delta <- pure $ RolePropertyDelta
-                { id : rid
-                , property: propertyName
-                , deltaType: Change
-                , value: Just value
-                , users: []
-                , sequenceNumber: 0
-                }
-    aisInPropertyDelta delta >>= addPropertyDelta
+  aisInPropertyDelta (RolePropertyDelta
+    { id : rid
+    , property: propertyName
+    , deltaType: SetProperty
+    , values: values
+    , users: []
+    , sequenceNumber: 0
+    }) >>= addPropertyDelta
   (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
 
 -----------------------------------------------------------
