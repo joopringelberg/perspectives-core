@@ -23,6 +23,7 @@ module Perspectives.TypesForDeltas where
 
 import Data.Eq (class Eq)
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
@@ -30,12 +31,13 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
+import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray)
 import Prelude (class Show, eq)
 
 -----------------------------------------------------------
 -- GENERIC
 -----------------------------------------------------------
-type DeltaRecord f = {users :: Array RoleInstance, deltaType :: DeltaType, sequenceNumber :: Int | f}
+type DeltaRecord f = {users :: Array RoleInstance, sequenceNumber :: Int | f}
 
 -----------------------------------------------------------
 -- UNIVERSECONTEXTDELTA
@@ -43,6 +45,7 @@ type DeltaRecord f = {users :: Array RoleInstance, deltaType :: DeltaType, seque
 newtype UniverseContextDelta = UniverseContextDelta (DeltaRecord
   ( id :: ContextInstance
   , contextType :: ContextType
+  , deltaType :: UniverseContextDeltaType
   -- Add, Remove
   ))
 
@@ -59,12 +62,27 @@ instance encodeUniverseContextDelta :: Encode UniverseContextDelta where
 instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
   decode = genericDecode defaultOptions
 
+data UniverseContextDeltaType = ConstructEmptyContext | RemoveContextInstance
+derive instance genericUniverseContextDeltaType :: Generic UniverseContextDeltaType _
+instance showUniverseContextDeltaType :: Show UniverseContextDeltaType where
+  show = genericShow
+
+instance eqUniverseContextDeltaType :: Eq UniverseContextDeltaType where
+  eq = genericEq
+
+instance encodeUniverseContextDeltaType :: Encode UniverseContextDeltaType where
+  encode = genericEncode defaultOptions
+instance decodeUniverseContextDeltaType :: Decode UniverseContextDeltaType where
+  decode = genericDecode defaultOptions
+
 -----------------------------------------------------------
 -- UNIVERSEROLEDELTA
 -----------------------------------------------------------
 newtype UniverseRoleDelta = UniverseRoleDelta (DeltaRecord
-  ( id :: RoleInstance
+  ( id :: ContextInstance
   , roleType :: EnumeratedRoleType
+  , roleInstances :: SerializableNonEmptyArray RoleInstance
+  , deltaType :: UniverseRoleDeltaType
   -- Add, Remove
   ))
 
@@ -83,15 +101,34 @@ instance encodeUniverseRoleDelta :: Encode UniverseRoleDelta where
 instance decodeUniverseRoleDelta :: Decode UniverseRoleDelta where
   decode = genericDecode defaultOptions
 
+data UniverseRoleDeltaType = ConstructEmptyRole | RemoveRoleInstance
+derive instance genericUniverseRoleDeltaType :: Generic UniverseRoleDeltaType _
+instance showUniverseRoleDeltaType :: Show UniverseRoleDeltaType where
+  show = genericShow
+
+instance eqUniverseRoleDeltaType :: Eq UniverseRoleDeltaType where
+  eq = genericEq
+
+instance encodeUniverseRoleDeltaType :: Encode UniverseRoleDeltaType where
+  encode = genericEncode defaultOptions
+instance decodeUniverseRoleDeltaType :: Decode UniverseRoleDeltaType where
+  decode = genericDecode defaultOptions
+
 -----------------------------------------------------------
 -- CONTEXTDELTA
 -----------------------------------------------------------
 newtype ContextDelta = ContextDelta (DeltaRecord
   ( id :: ContextInstance
   , roleType :: EnumeratedRoleType
-  , roleInstance :: RoleInstance
-  -- Add, Remove, Delete,
+  , roleInstances :: SerializableNonEmptyArray RoleInstance
+  , destinationContext :: Maybe ContextInstance
+  , deltaType :: ContextDeltaType
   ))
+
+data ContextDeltaType =
+  AddRoleInstancesToContext |
+  MoveRoleInstancesToAnotherContext |
+  NoOp
 
 derive instance genericContextDelta :: Generic ContextDelta _
 
@@ -106,6 +143,18 @@ instance encodeContextDelta :: Encode ContextDelta where
 instance decodeContextDelta :: Decode ContextDelta where
   decode = genericDecode defaultOptions
 
+derive instance genericContextDeltaType :: Generic ContextDeltaType _
+instance showContextDeltaType :: Show ContextDeltaType where
+  show = genericShow
+
+instance eqContextDeltaType :: Eq ContextDeltaType where
+  eq = genericEq
+
+instance encodeContextDeltaType :: Encode ContextDeltaType where
+  encode = genericEncode defaultOptions
+instance decodeContextDeltaType :: Decode ContextDeltaType where
+  decode = genericDecode defaultOptions
+
 -----------------------------------------------------------
 -- ROLEBINDINGDELTA
 -----------------------------------------------------------
@@ -113,8 +162,12 @@ newtype RoleBindingDelta = RoleBindingDelta (DeltaRecord
   ( id :: RoleInstance
   , binding :: Maybe RoleInstance
   , oldBinding :: Maybe RoleInstance
+  , deltaType :: RoleBindingDeltaType
+  , roleWillBeRemoved :: Boolean
   -- Remove, Change
   ))
+
+data RoleBindingDeltaType = SetBinding | RemoveBinding | RemoveBinding_
 
 derive instance genericRoleDelta :: Generic RoleBindingDelta _
 
@@ -130,6 +183,20 @@ instance encodeRoleDelta :: Encode RoleBindingDelta where
 instance decodeRoleDelta :: Decode RoleBindingDelta where
   decode = genericDecode defaultOptions
 
+derive instance genericRoleBindingDeltaType :: Generic RoleBindingDeltaType _
+
+instance showRoleBindingDeltaType :: Show RoleBindingDeltaType where
+  show = genericShow
+
+instance eqRoleBindingDeltaType :: Eq RoleBindingDeltaType where
+  eq = genericEq
+
+
+instance encodeRoleBindingDeltaType :: Encode RoleBindingDeltaType where
+  encode = genericEncode defaultOptions
+instance decodeRoleBindingDeltaType :: Decode RoleBindingDeltaType where
+  decode = genericDecode defaultOptions
+
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTA
 -----------------------------------------------------------
@@ -137,6 +204,7 @@ newtype RolePropertyDelta = RolePropertyDelta (DeltaRecord
   ( id :: RoleInstance
   , property :: EnumeratedPropertyType
   , value :: Maybe Value
+  , deltaType :: DeltaType
   -- Add, Remove, Delete, Change
   ))
 
@@ -156,7 +224,7 @@ instance decodePropertyDelta :: Decode RolePropertyDelta where
 -----------------------------------------------------------
 -- DELTATYPE
 -----------------------------------------------------------
-data DeltaType = Add | Remove | Change | Delete
+data DeltaType = Add | Remove | Change | Delete | ContextRemoved | Move
 
 derive instance genericDeltaType :: Generic DeltaType _
 derive instance eqDeltaType :: Eq DeltaType

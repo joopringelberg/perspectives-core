@@ -29,8 +29,9 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, null, uncons, unsafeIndex)
+import Data.Array.NonEmpty (fromArray, head)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
@@ -40,7 +41,7 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, deleteRoleFromContextInstance, moveRoles, removeBinding, removeProperty, setBinding, setProperty)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
@@ -115,7 +116,6 @@ compileAssignment (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDelet
     ctxts <- lift $ lift (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
       removeAllRoleInstances qualifiedRoleIdentifier ctxt
-      deleteRoleFromContextInstance ctxt qualifiedRoleIdentifier
 
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
@@ -132,22 +132,22 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
     then pure \contextId -> do
       c <- lift $ lift (contextId ##>> contextGetter)
       (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
-      case uncons roles of
+      case fromArray roles of
         Nothing -> pure unit
-        Just {head, tail} -> do
-          ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
-          moveRoles context c pspType roles
+        Just roles' -> do
+          ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (head roles')
+          moveRoleInstancesToAnotherContext context c pspType roles'
     else pure \contextId -> do
       ctxt <- lift $ lift (contextId ##> contextGetter)
       case ctxt of
         Nothing -> pure unit
         Just c -> do
           (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
-          case uncons roles of
+          case fromArray roles of
             Nothing -> pure unit
-            Just {head, tail} -> do
-              ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
-              moveRoles context c pspType roles
+            Just roles' -> do
+              ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (head roles')
+              moveRoleInstancesToAnotherContext context c pspType roles'
 
 compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn
@@ -180,11 +180,11 @@ compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
     Nothing -> pure
       \contextId -> do
         binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.allRoleBinders)
-        for_ binders removeBinding
+        for_ binders (removeBinding false)
     Just roleType -> pure
       \contextId -> do
         binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getRoleBinders roleType)
-        for_ binders removeBinding
+        for_ binders (removeBinding false)
 
 compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
@@ -196,7 +196,7 @@ compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
     -- is taken into account, too.
     void $ case binder of
       Nothing -> pure []
-      Just binder' -> removeBinding binder'
+      Just binder' -> removeBinding false binder'
 
 compileAssignment (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd

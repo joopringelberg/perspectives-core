@@ -239,3 +239,14 @@ type MPT = MonadPerspectivesTransaction
 -- UPDATER
 -----------------------------------------------------------
 type Updater s = s -> MonadPerspectivesTransaction Unit
+
+-----------------------------------------------------------
+-- ORDEREDDELTA
+-----------------------------------------------------------
+data OrderedDelta = OrderedDelta (Unit -> MonadPerspectivesTransaction Unit) Int
+
+instance eqOrderedDelta :: Eq OrderedDelta where
+  eq (OrderedDelta _ i) (OrderedDelta _ j) = eq i j
+
+instance ordOrderedDelta :: Ord OrderedDelta where
+  compare (OrderedDelta _ i) (OrderedDelta _ j) = compare i j

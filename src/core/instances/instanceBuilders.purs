@@ -37,6 +37,7 @@ where
 
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Writer (WriterT, lift, runWriterT, tell)
+import Data.Array.NonEmpty (NonEmptyArray, singleton)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust)
@@ -53,14 +54,14 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
 import Perspectives.Deltas (addUniverseContextDelta, increaseDeltaIndex)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.TypesForDeltas (DeltaType(..), UniverseContextDelta(..))
+import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..))
 import Prelude (bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
@@ -78,13 +79,14 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
       case mc of
         Just _ -> pure $ Right contextInstanceId
         Nothing -> do
-          -- Bump the index in the transaction
-          i <- increaseDeltaIndex
           contextInstance <- Right <$> constructEmptyContext contextInstanceId ctype localName externeProperties
-          -- We now have an empty context. Add each role to it.
+          -- Bump the index in the transaction, reserve the current index for the
+          -- UniverseContextDelta.
+          i <- increaseDeltaIndex
+          -- Add each role to the new empty context.
           r <- try $ runWriterT $ forWithIndex_ rollen \rolTypeId rolDescriptions -> do
-            -- Construct the role instances first, then add to the context.
-            rolInstances <- forWithIndex rolDescriptions (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId))
+            -- Construct all instances of this type first, then add them to the context.
+            (rolInstances :: NonEmptyArray RoleInstance) <- forWithIndex (unwrap rolDescriptions) (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId))
             -- Add the completed Role instance to the context.
             lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) rolInstances
           case r of
@@ -95,7 +97,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
               addUniverseContextDelta $ UniverseContextDelta
                   { id: contextInstanceId
                   , contextType
-                  , deltaType: Add
+                  , deltaType: ConstructEmptyContext
                   , users
                   , sequenceNumber: i
                 }
@@ -124,8 +126,9 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
           pure roleInstance
 
 -- | Constructs an empty context, caches it.
--- | We don't add Deltas for the external role. On receiving a UniverseContextDelta,
--- | we know we'll have to construct an external rol and how to connect it to the context.
+-- | Whenever constructEmptyContext is applied, a UniverseContextDelta should be added
+-- | to the Transaction. However, in order to be able to add all users with a perspective,
+-- | it is better to construct that Delta in the calling function.
 constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> MonadPerspectivesTransaction ContextInstance
 constructEmptyContext contextInstanceId ctype localName externeProperties = do
   externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
@@ -182,5 +185,5 @@ createAndAddRoleInstance roleType id (RolSerialization{properties, binding}) = d
     (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
       setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
   -- Finally, add the completed Role instance to the context.
-  addRoleInstancesToContext contextInstanceId roleType [roleInstance]
+  addRoleInstancesToContext contextInstanceId roleType (singleton roleInstance)
   pure roleInstance

@@ -25,14 +25,15 @@ import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader (lift)
 import Data.Array (filterA, head, union)
-import Data.Array.NonEmpty (fromArray, toArray)
+import Data.Array.NonEmpty (fromArray, toArray, head) as NER
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (for, traverse)
+import Data.Traversable (for, for_, traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_isMe)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MonadPerspectivesTransaction, (##=), (##>>))
@@ -49,19 +50,13 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), RoleBindingDelta(..), RolePropertyDelta(..))
-import Prelude (Unit, bind, const, discard, join, not, pure, ($), (<<<), (==), (>=>), (>>=))
+import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..))
+import Prelude (Unit, bind, const, discard, join, not, pure, unit, ($), (<<<), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
--- | From the ContextDelta, collect affected contexts. Compile all queries that are used to collect
--- | affected context instances, first. Add the contexts to the Transaction.
--- | Adds users for SYNCHRONISATION.
--- | Guarantees RULE TRIGGERING for `context` and `role <Type>` steps.
-aisInContextDelta :: ContextDelta -> MonadPerspectivesTransaction ContextDelta
-aisInContextDelta (ContextDelta dr@{id, roleType, roleInstance}) = do
-  otherUsers <- usersWithPerspectiveOnRoleInstance id roleType roleInstance
-  pure $ ContextDelta dr {users = otherUsers}
-
+-- Notice that even though we compute the users for a single given RoleInstance, we can use that result
+-- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
+-- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
 usersWithPerspectiveOnRoleInstance ::  ContextInstance -> EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
 usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
   users1 <- do
@@ -80,15 +75,37 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
 
 -- Adds an AffectedContext to the transaction and returns user instances.
 handleAffectedContexts :: Array ContextInstance -> Array EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
-handleAffectedContexts affectedContexts userTypes = case fromArray affectedContexts of
+handleAffectedContexts affectedContexts userTypes = case NER.fromArray affectedContexts of
   Nothing -> pure []
   Just contextInstances -> do
-    addAffectedContexts $ AffectedContext {contextInstances, userTypes}
-    (for userTypes \er -> for (toArray contextInstances) \ci -> lift $ lift $ (ci ##= getRole er)) >>= pure <<< join <<< join
+    addAffectedContext $ AffectedContext {contextInstances, userTypes}
+    (for userTypes \er -> for affectedContexts \ci -> lift $ lift $ (ci ##= getRole er)) >>= pure <<< join <<< join
 
-addAffectedContexts :: AffectedContext -> MonadPerspectivesTransaction Unit
-addAffectedContexts as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [as] affectedContexts})
+addAffectedContext :: AffectedContext -> MonadPerspectivesTransaction Unit
+addAffectedContext as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [as] affectedContexts})
 
+-----------------------------------------------------------
+-- OBSERVINGCONTEXTS
+-----------------------------------------------------------
+-- | Just collect and add to the Transaction all contexts that have a role with
+-- | a perspective on the RoleType in the context instance.
+-- | Guarantees RULE TRIGGERING.
+addRoleObservingContexts :: ContextInstance -> EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction Unit
+addRoleObservingContexts id roleType roleInstance = do
+  contextCalculations <- lift2 $ compileDescriptions _onContextDelta_context roleType
+  for_ contextCalculations \(InvertedQuery{compilation, userTypes}) ->
+      (lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)) >>= addContexts userTypes
+  roleCalculations <- lift2 $ compileDescriptions _onContextDelta_role roleType
+  for_ roleCalculations \(InvertedQuery{compilation, userTypes}) -> lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance) >>= addContexts userTypes
+
+addContexts :: Array EnumeratedRoleType -> Array ContextInstance -> MonadPerspectivesTransaction Unit
+addContexts userTypes as = case NER.fromArray as of
+  Nothing -> pure unit
+  Just contextInstances -> lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [AffectedContext {contextInstances, userTypes}] affectedContexts})
+
+-----------------------------------------------------------
+-- FOR ROLE DELTAS
+-----------------------------------------------------------
 -- | Computes the AffectedContexts and adds them to the Transaction.
 -- | Adds the users that should receive it, to the Delta.
 -- | Adds users for SYNCHRONISATION, guarantees RULE TRIGGERING.
@@ -116,7 +133,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
     Nothing -> pure []
 
   users3 <- case oldBinding of
-    Just bnd | deltaType == Change -> do
+    Just bnd | deltaType == SetBinding -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
       binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binder bindingType
       for binderCalculations (\(InvertedQuery{compilation, userTypes}) -> do

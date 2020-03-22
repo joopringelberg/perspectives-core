@@ -46,6 +46,7 @@ import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.SerializableNonEmptyArray (singleton) as SNA
 import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
 import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>))
 
@@ -63,15 +64,15 @@ createChannel = do
     { id: "model:User$" <> channelName
     , prototype: Nothing
     , ctype: "sys:Channel"
-    , rollen: fromFoldable [(Tuple "model:System$Channel$ConnectedPartner"
-      [ RolSerialization
+    , rollen: fromFoldable [(Tuple "model:System$Channel$ConnectedPartner" $
+      SNA.singleton (RolSerialization
         { properties: PropertySerialization $ fromFoldable
         [
           Tuple "model:System$Channel$ConnectedPartner$Host" [host]
         , Tuple "model:System$Channel$ConnectedPartner$Port" [(show port)]
         ],
-        binding: Just "usr:Me" }
-       ])]
+        binding: Just "usr:Me" })
+       )]
     , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
     }
   -- TODO: dit is eigenlijk niet nodig.

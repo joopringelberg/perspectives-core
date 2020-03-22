@@ -13,7 +13,6 @@ import Effect.Class.Console (log, logShow)
 import Perspectives.Assignment.Update (setBinding)
 import Perspectives.CoreTypes ((##>>))
 import Perspectives.Couchdb.Databases (deleteDatabase)
-import Perspectives.Sync.Channel (addUserToChannel, createChannel)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
@@ -21,6 +20,7 @@ import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.Sync.Channel (addUserToChannel, createChannel)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndCacheArcFile)
 import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
@@ -63,24 +63,27 @@ theSuite = suite "SerialisedAsDeltas" do
     joop <- (ContextInstance "model:User$JoopsSysteem") ##>> userGetter
     void $ runMonadPerspectivesTransaction do
       void $ setBinding unboundOtherRole joop
-      Transaction{universeContextDeltas, universeRoleDeltas, contextDeltas, roleDeltas, propertyDeltas} <- lift get
+      t@(Transaction{universeContextDeltas, universeRoleDeltas, contextDeltas, roleDeltas, propertyDeltas}) <- lift get
       -- logShow t
       -- There should be five deltas.
       case head universeContextDeltas of
         Nothing -> liftAff $ assert "There should be one UniverseContextDelta" false
-        Just (UniverseContextDelta{contextType, sequenceNumber}) -> liftAff $ assert "The contextType should be model:Test$TestCase and the sequenceNumber should be 1" (contextType == (ContextType "model:Test$TestCase") && sequenceNumber == 1 && length universeContextDeltas == 1)
+        Just (UniverseContextDelta{contextType, sequenceNumber}) -> liftAff $ assert "The contextType should be model:Test$TestCase and the sequenceNumber should be 0" (contextType == (ContextType "model:Test$TestCase") && sequenceNumber == 0 && length universeContextDeltas == 1)
       case head universeRoleDeltas of
         Nothing -> liftAff $ assert "There should be one UniverseRoleDelta" false
-        Just (UniverseRoleDelta{roleType, sequenceNumber}) -> liftAff $ assert "The roleType should be model:Test$TestCase$ARole and the sequenceNumber should be 2" (roleType == (EnumeratedRoleType "model:Test$TestCase$ARole") && sequenceNumber == 2 && length universeRoleDeltas == 1)
+        Just x@(UniverseRoleDelta{roleType, sequenceNumber}) -> do
+          -- logShow x
+          liftAff $ assert "The roleType should be model:Test$TestCase$ARole and the sequenceNumber should be 1" (roleType == (EnumeratedRoleType "model:Test$TestCase$ARole") && sequenceNumber == 1 && length universeRoleDeltas == 1)
+      case head propertyDeltas of
+        Nothing -> liftAff $ assert "There should be one RolePropertyDelta" false
+        Just (RolePropertyDelta{property, sequenceNumber}) -> liftAff $ assert "The propertyType should be model:Test$TestCase$ARole$Prop1 and the sequenceNumber should be 2" (property == (EnumeratedPropertyType "model:Test$TestCase$ARole$Prop1") && sequenceNumber == 2 && length propertyDeltas == 1)
       case head contextDeltas of
         Nothing -> liftAff $ assert "There should be one ContextDelta" false
         Just (ContextDelta{roleType, sequenceNumber}) -> liftAff $ assert "The roleType should be model:Test$TestCase$ARole and the sequenceNumber should be 3" (roleType == (EnumeratedRoleType "model:Test$TestCase$ARole") && sequenceNumber == 3 && length contextDeltas == 1)
       case head roleDeltas of
         Nothing -> liftAff $ assert "There should be one RoleBindingDelta" false
-        Just (RoleBindingDelta{id, sequenceNumber}) -> liftAff $ assert "The roleInstance should be model:User$MyTestCase$ARole_0001 and the sequenceNumber should be 4" (id == (RoleInstance "model:User$MyTestCase$ARole_0001") && sequenceNumber == 4 && length roleDeltas == 2)
-      case head propertyDeltas of
-        Nothing -> liftAff $ assert "There should be one RolePropertyDelta" false
-        Just (RolePropertyDelta{property, sequenceNumber}) -> liftAff $ assert "The propertyType should be model:Test$TestCase$ARole$Prop1 and the sequenceNumber should be 5" (property == (EnumeratedPropertyType "model:Test$TestCase$ARole$Prop1") && sequenceNumber == 5 && length propertyDeltas == 1)
+        Just (RoleBindingDelta{id, sequenceNumber}) -> liftAff $ assert "There should finally be a RoleBindingDelta on role model:User$MyTestCase$Other_0001 and its sequenceNumber should be 4" (id ==
+        (RoleInstance "model:User$MyTestCase$Other_0001") && sequenceNumber == 4)
     userType <- roleType_ joop
     getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" userType
     channel <- joop ##>> getChannel

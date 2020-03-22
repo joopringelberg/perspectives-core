@@ -21,6 +21,7 @@
 
 module Perspectives.Assignment.SerialiseAsDeltas where
 
+import Data.Array.NonEmpty (fromArray, singleton)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
@@ -32,8 +33,9 @@ import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, ($), discard, pure, unit)
 
 serialisedAsDeltasFor:: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -42,55 +44,63 @@ serialisedAsDeltasFor cid userId = do
   addUniverseContextDelta $ UniverseContextDelta
     { id: cid
     , contextType: pspType
-    , deltaType: Add
+    , deltaType: ConstructEmptyContext
     , users: [userId]
     , sequenceNumber: 0
     }
   -- Now for each role, decide if the user may see it.
   -- If so, add a UniverseRoleDelta and a ContextDelta.
   userType <- lift2 $ roleType_ userId
-  forWithIndex_ rolInContext \roleTypeId roleInstances -> do
+  forWithIndex_ rolInContext \roleTypeId roleInstances' -> do
     allowed <- lift2 (userType ###>> roleIsInPerspectiveOf (ENR $ EnumeratedRoleType roleTypeId))
     if allowed
       then do
-        for_ roleInstances \roleInstance -> do
-          addUniverseRoleDelta $ UniverseRoleDelta
-            { id: roleInstance
-            , roleType: (EnumeratedRoleType roleTypeId)
-            , deltaType: Add
-            , users: [userId]
-            , sequenceNumber: 0
-          }
-          addContextDelta $ ContextDelta
-            { id : cid
-            , roleType: (EnumeratedRoleType roleTypeId)
-            , deltaType: Add
-            , roleInstance
-            , users: [userId]
-            , sequenceNumber: 0
-            }
-          (PerspectRol{binding, properties}) <- lift2 $ getPerspectRol roleInstance
-          rd <- pure $ RoleBindingDelta
-            { id : roleInstance
-            , binding: binding
-            , oldBinding: Nothing
-            , deltaType: Change
-            , users: [userId]
-            , sequenceNumber: 0
-            }
-          addRoleDelta rd
-          -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
-          forWithIndex_ properties \propertyTypeId values -> do
-            propAllowed <- lift2 (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))
-            if propAllowed
-              then for_ values \value -> do
-                addPropertyDelta $ RolePropertyDelta
+        case fromArray roleInstances' of
+          Nothing -> pure unit
+          Just roleInstances -> do
+            for_ roleInstances \roleInstance -> do
+              addUniverseRoleDelta $ UniverseRoleDelta
+                { id: cid
+                , roleInstances: (SerializableNonEmptyArray $ singleton roleInstance)
+                , roleType: (EnumeratedRoleType roleTypeId)
+                , deltaType: ConstructEmptyRole
+                , users: [userId]
+                , sequenceNumber: 0
+                }
+              (PerspectRol{binding, properties}) <- lift2 $ getPerspectRol roleInstance
+              case binding of
+                Nothing -> pure unit
+                Just b -> addRoleDelta (RoleBindingDelta
                   { id : roleInstance
-                  , property: (EnumeratedPropertyType propertyTypeId)
-                  , deltaType: Add
-                  , value: Just value
+                  , binding: binding
+                  , oldBinding: Nothing
+                  , deltaType: SetBinding
+                  , roleWillBeRemoved: false
                   , users: [userId]
                   , sequenceNumber: 0
-                  }
-              else pure unit
+                  })
+              -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
+              forWithIndex_ properties \propertyTypeId values -> do
+                propAllowed <- lift2 (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))
+                if propAllowed
+                  then for_ values \value -> do
+                    addPropertyDelta $ RolePropertyDelta
+                      { id : roleInstance
+                      , property: (EnumeratedPropertyType propertyTypeId)
+                      , deltaType: Add
+                      , value: Just value
+                      , users: [userId]
+                      , sequenceNumber: 0
+                      }
+                  else pure unit
+            addContextDelta $ ContextDelta
+              { id : cid
+              , roleType: (EnumeratedRoleType roleTypeId)
+              , deltaType: AddRoleInstancesToContext
+              , roleInstances: SerializableNonEmptyArray roleInstances
+              , users: [userId]
+              , sequenceNumber: 0
+              , destinationContext: Nothing
+              }
+
       else pure unit

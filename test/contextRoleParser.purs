@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Array (head, length)
+import Data.Array.NonEmpty (singleton)
 import Data.Either (Either(..), isRight)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Traversable (traverse)
@@ -28,6 +29,7 @@ import Perspectives.Persistent (getPerspectRol, getPerspectContext)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -110,7 +112,7 @@ theSuite = suite "ContextRoleParser" do
       _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
       _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-      void $ runMonadPerspectivesTransaction $ removeBinding
+      void $ runMonadPerspectivesTransaction $ removeBinding false
         (RoleInstance "model:User$MyTestCase$MyNestedCase2$NestedSelf_0001")
       getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
     assert "MyNestedCase2 should have 'me' equal to Nothing" (context_me c == Nothing)
@@ -126,9 +128,9 @@ theSuite = suite "ContextRoleParser" do
         , prototype: Nothing
         , ctype: "model:Test$TestCase$NestedCase"
         , rollen: fromFoldable [Tuple "model:Test$TestCase$NestedCase$NestedSelf"
-          [(RolSerialization
+          (SerializableNonEmptyArray $ singleton (RolSerialization
             { properties: PropertySerialization empty
-            , binding: Just "model:User$test$User_0001"})]]
+            , binding: Just "model:User$test$User_0001"}))]
         , externeProperties: PropertySerialization empty
 
       }

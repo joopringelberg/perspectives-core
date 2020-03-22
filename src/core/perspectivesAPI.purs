@@ -252,7 +252,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- {request: "RemoveBinding", subject: rolID}
     Api.RemoveBinding -> catchError
       do
-        void $ runMonadPerspectivesTransaction $ removeBinding (RoleInstance subject)
+        void $ runMonadPerspectivesTransaction $ removeBinding false (RoleInstance subject)
         sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- Create a new instance of the roletype RolDef in Context and fill the role with RolID.

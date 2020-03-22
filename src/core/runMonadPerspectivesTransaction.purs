@@ -50,7 +50,7 @@ import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleTy
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
-import Perspectives.TypesForDeltas (DeltaType(..), UniverseContextDelta(..), UniverseRoleDelta(..))
+import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>), (==), (&&))
 
 -----------------------------------------------------------
@@ -109,15 +109,13 @@ assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas,
     filterRemovedRoles :: Array UniverseRoleDelta -> Array Assumption -> Array Assumption
     filterRemovedRoles udeltas ass = let
       (removedRoleInstances :: Array String) = foldr (\(UniverseRoleDelta{id, deltaType}) cumulator -> case deltaType of
-        Remove -> cons (unwrap id) cumulator
-        Delete -> cons (unwrap id) cumulator
+        RemoveRoleInstance -> cons (unwrap id) cumulator
         _ -> cumulator) [] (udeltas :: Array UniverseRoleDelta)
       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedRoleInstances) ass
     filterRemovedContexts :: Array UniverseContextDelta -> Array Assumption -> Array Assumption
     filterRemovedContexts cdeltas ass = let
       (removedContextInstances :: Array String) = foldr (\(UniverseContextDelta{id, deltaType}) cumulator -> case deltaType of
-        Remove -> cons (unwrap id) cumulator
-        Delete -> cons (unwrap id) cumulator
+        RemoveContextInstance -> cons (unwrap id) cumulator
         _ -> cumulator) [] (cdeltas :: Array UniverseContextDelta)
       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedContextInstances) ass
 
@@ -158,7 +156,7 @@ contextsAffectedByTransaction = do
     skipRemovedContexts :: Array UniverseContextDelta -> AffectedContext -> Writer (Array AffectedContext) Unit
     skipRemovedContexts universeContextDeltas (AffectedContext acr@{contextInstances}) = let
       remainingInstances = ARR.filter
-        (\ci -> not $ isJust $ find (\(UniverseContextDelta{id, deltaType}) -> id == ci && deltaType == Remove) universeContextDeltas)
+        (\ci -> not $ isJust $ find (\(UniverseContextDelta{id, deltaType}) -> id == ci && deltaType == RemoveContextInstance) universeContextDeltas)
         (toArray contextInstances)
       in
         case fromArray remainingInstances of

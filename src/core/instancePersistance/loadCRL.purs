@@ -39,7 +39,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (updateRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (saveContextInstance)
 
 -- | Loads a file from a directory relative to the active process.
@@ -87,7 +87,7 @@ loadAndSaveCrlFile file directoryName = do
       -- Update the revision in cache by visiting Couchdb.
       forWithIndex_ contextInstances \i _ -> updateRevision (ContextInstance i)
       forWithIndex_ roleInstances \i _ -> updateRevision (RoleInstance i)
-      void $ runMonadPerspectivesTransaction $ (forWithIndex_ contextInstances
+      void $ runMonadPerspectivesTransaction' false (forWithIndex_ contextInstances
         \i _ -> do
           saveContextInstance (ContextInstance i))
       pure []

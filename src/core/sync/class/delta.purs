@@ -27,23 +27,29 @@ import Prelude ((+))
 class DeltaClass d where
   addBase :: Int -> d -> d
   setIndex :: Int -> d -> d
+  getSequenceNumber :: d -> Int
 
 instance contextDeltaDeltaUsers :: DeltaClass ContextDelta where
   addBase i (ContextDelta r@{sequenceNumber}) = ContextDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (ContextDelta r) = ContextDelta r {sequenceNumber = i}
+  getSequenceNumber (ContextDelta{sequenceNumber}) = sequenceNumber
 
 instance roleBindingDeltaDeltaUsers :: DeltaClass RoleBindingDelta where
   addBase i (RoleBindingDelta r@{sequenceNumber}) = RoleBindingDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (RoleBindingDelta r) = RoleBindingDelta r {sequenceNumber = i}
+  getSequenceNumber (RoleBindingDelta{sequenceNumber}) = sequenceNumber
 
 instance rolePropertyDeltaDeltaUsers :: DeltaClass RolePropertyDelta where
   addBase i (RolePropertyDelta r@{sequenceNumber}) = RolePropertyDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (RolePropertyDelta r) = RolePropertyDelta r {sequenceNumber = i}
+  getSequenceNumber (RolePropertyDelta{sequenceNumber}) = sequenceNumber
 
 instance deltaUsersUniverseContextDelta :: DeltaClass UniverseContextDelta where
   addBase i (UniverseContextDelta r@{sequenceNumber}) = UniverseContextDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (UniverseContextDelta r) = UniverseContextDelta r {sequenceNumber = i}
+  getSequenceNumber (UniverseContextDelta{sequenceNumber}) = sequenceNumber
 
 instance deltaUsersUniverseRoleDelta :: DeltaClass UniverseRoleDelta where
   addBase i (UniverseRoleDelta r@{sequenceNumber}) = UniverseRoleDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (UniverseRoleDelta r) = UniverseRoleDelta r {sequenceNumber = i}
+  getSequenceNumber (UniverseRoleDelta{sequenceNumber}) = sequenceNumber
