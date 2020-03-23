@@ -21,7 +21,7 @@ theSuite = suiteSkip "Perspectives.SetupCouchdb" do
     assert "Just ran 'setupCouchdbForFirstUser'" true
 
   test "setupCouchdbForAnotherUser" (runP do
-    setupCouchdbForAnotherUser "cor" "geheim"
+    setupCouchdbForAnotherUser "joop" "geheim"
     liftAff $ assert "Just ran 'setupCouchdbForAnotherUser'" true)
 
   testSkip "set security document on localusers" (runP do

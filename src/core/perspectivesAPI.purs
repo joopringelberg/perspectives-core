@@ -41,7 +41,7 @@ import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (removeBinding, setBinding, setProperty)
+import Perspectives.Assignment.Update (handleNewPeer, removeBinding, setBinding, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), MP)
@@ -246,7 +246,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- {request: "SetBinding", subject: rolID, object: bindingID},
     Api.SetBinding -> catchError
       do
-        void $ runMonadPerspectivesTransaction $ setBinding (RoleInstance subject) (RoleInstance object)
+        void $ runMonadPerspectivesTransaction do
+          void $ setBinding (RoleInstance subject) (RoleInstance object)
+          handleNewPeer (RoleInstance subject)
         sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- {request: "RemoveBinding", subject: rolID}

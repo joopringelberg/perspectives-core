@@ -24,9 +24,9 @@ module Perspectives.DomeinCache
 
 where
 
-import Affjax (Request, request) as AX
+import Affjax (Request) as AX
 import Affjax.ResponseFormat as ResponseFormat
-import Control.Monad.Except (catchError, lift, throwError)
+import Control.Monad.Except (catchError, throwError)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
@@ -34,14 +34,13 @@ import Effect.Aff.AVar (AVar, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), onAccepted, onCorrectCallAndResponse)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
-import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
+import Perspectives.Identifiers (Namespace)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
-import Perspectives.User (getCouchdbBaseURL, getCouchdbPassword, getUser)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>))
+import Perspectives.User (getCouchdbPassword, getUser)
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<<<), (<>))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
 storeDomeinFileInCache ns df= cacheEntity (DomeinFileId ns) df
@@ -73,19 +72,6 @@ retrieveDomeinFile ns = catchError (getPerspectEntiteit (DomeinFileId ns))
 
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String
-
-documentsInDatabase :: DatabaseName -> MonadPerspectives GetCouchdbAllDocs
-documentsInDatabase database = do
-  baseUrl <- getCouchdbBaseURL
-  req <- domeinRequest
-  res <- lift $ AX.request $ req {url = baseUrl <> escapeCouchdbDocumentName database <> "/_all_docs"}
-  onAccepted res.status [200] "documentsInDatabase"
-    (onCorrectCallAndResponse "documentsInDatabase" res.body \(a :: GetCouchdbAllDocs) -> pure unit)
-
-documentNamesInDatabase :: DatabaseName -> MonadPerspectives (Array String)
-documentNamesInDatabase database = do
-  (GetCouchdbAllDocs cad) <- documentsInDatabase database
-  pure $ (\(DocReference{id}) -> id) <$> cad.rows
 
 saveCachedDomeinFile :: DomeinFileId -> MonadPerspectives Unit
 saveCachedDomeinFile ns = do

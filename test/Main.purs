@@ -31,6 +31,7 @@ import Test.SerialisedAsDeltas as SAD
 import Test.Sync.Channel as CHA
 import Test.PrepareTestUser as PTU
 import Test.ArrayT as ARRT
+import Test.Sync.HandleTransaction as HTA
 import Test.Unit.Main (runTest)
 
 
@@ -62,3 +63,4 @@ main = runTest do
   CHA.theSuite
   PTU.theSuite
   ARRT.theSuite
+  HTA.theSuite

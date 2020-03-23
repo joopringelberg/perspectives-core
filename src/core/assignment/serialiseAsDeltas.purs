@@ -86,7 +86,7 @@ serialisedAsDeltasFor cid userId = do
                   then addPropertyDelta $ RolePropertyDelta
                     { id : roleInstance
                     , property: (EnumeratedPropertyType propertyTypeId)
-                    , deltaType: AddProperty
+                    , deltaType: SetProperty
                     , values: values
                     , users: [userId]
                     , sequenceNumber: 0

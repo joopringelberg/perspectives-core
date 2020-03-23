@@ -51,6 +51,7 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addContextDelta, addCorrelationIdentifiersToTransactie, addPropertyDelta, addRoleDelta, addUniverseRoleDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findPropertyRequests, findRoleRequests)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Instances.ObjectGetters (isMe, roleType_)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
@@ -111,14 +112,6 @@ setBinding roleId (newBindingId :: RoleInstance) = do
   -- Add this roleinstance as a binding role for the new binding.
   saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
-  -- If the type of the role has kind UserRole, we add a new user to the context. This user should have access to
-  -- this context. We will generate Deltas so his PDR can build it from scratch, according to his perspective.
-  -- We do this before generating the RoleBindingDelta!
-  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole (rol_pspType originalRole)
-  if kindOfRole == UserRole && not isMe
-    then (rol_context originalRole) `serialisedAsDeltasFor` roleId
-    else pure unit
-
   delta@(RoleBindingDelta{users}) <- aisInRoleDelta $ RoleBindingDelta
                 { id : roleId
                 , binding: Just newBindingId
@@ -129,8 +122,30 @@ setBinding roleId (newBindingId :: RoleInstance) = do
                 , sequenceNumber: 0
                 }
   addRoleDelta delta
-
   pure users
+
+-- | If the type of the role has kind UserRole and is not the `me` role for its context,
+-- | we add a new user to the context. This user should have access to
+-- | this context. We will generate Deltas so his PDR can build it from scratch,
+-- | according to his perspective.
+-- | Notice that in order to establish whether this role represents `usr:Me`,
+-- | it needs a binding!
+handleNewPeer :: RoleInstance -> MonadPerspectivesTransaction Unit
+handleNewPeer roleInstance = do
+  PerspectRol{context, pspType} <- lift2 $ getPerspectRol roleInstance
+  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole pspType
+  me <- lift2 $ isMe roleInstance
+  if kindOfRole == UserRole && not me
+    then context `serialisedAsDeltasFor` roleInstance
+    else pure unit
+
+handleNewPeer_ :: Boolean -> RoleInstance -> MonadPerspectivesTransaction Unit
+handleNewPeer_ me roleInstance = do
+  PerspectRol{context, pspType} <- lift2 $ getPerspectRol roleInstance
+  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole pspType
+  if kindOfRole == UserRole && not me
+    then context `serialisedAsDeltasFor` roleInstance
+    else pure unit
 
 -- | Removes the binding R of the rol, if any.
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.

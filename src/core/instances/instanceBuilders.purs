@@ -33,6 +33,7 @@ module Perspectives.Instances.Builders
   , createAndAddRoleInstance
   , constructEmptyContext
   , constructEmptyRole
+  , constructEmptyRole_
   )
 
 where
@@ -49,14 +50,14 @@ import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.Update (addRoleInstancesToContext, setBinding, setProperty)
+import Perspectives.Assignment.Update (addRoleInstancesToContext, handleNewPeer_, setBinding, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
 import Perspectives.Deltas (addUniverseContextDelta, increaseDeltaIndex)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.ObjectGetters (getRole, isMe)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -158,6 +159,10 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
 constructEmptyRole :: EnumeratedRoleType -> ContextInstance -> Int -> String -> MonadPerspectivesTransaction RoleInstance
 constructEmptyRole roleType contextInstance i localRoleName = do
   rolInstanceId <- pure $ RoleInstance (unwrap contextInstance <> "$" <> localRoleName <> "_" <> (rol_padOccurrence i))
+  constructEmptyRole_ roleType contextInstance i rolInstanceId
+
+constructEmptyRole_ :: EnumeratedRoleType -> ContextInstance -> Int -> RoleInstance -> MonadPerspectivesTransaction RoleInstance
+constructEmptyRole_ roleType contextInstance i rolInstanceId = do
   role <- pure (PerspectRol defaultRolRecord
         { _id = rolInstanceId
         , pspType = roleType
@@ -166,6 +171,7 @@ constructEmptyRole roleType contextInstance i localRoleName = do
         })
   void $ lift2 $ cacheEntity rolInstanceId role
   pure rolInstanceId
+
 
 -- | Construct a Role instance for an existing Context instance.
 -- | This function is complete w.r.t. the five responsibilities.
@@ -176,16 +182,22 @@ createAndAddRoleInstance roleType id (RolSerialization{properties, binding}) = d
   rolInstances <- lift2 (contextInstanceId ##= getRole roleType)
   -- create an empty role
   roleInstance <- constructEmptyRole roleType contextInstanceId (getNextRolIndex rolInstances) (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType))
+  -- Serialise as Deltas if we bind to a user that is not me.
+  case binding of
+    Nothing -> pure unit
+    Just b -> do
+      me <- lift2 $ isMe (RoleInstance b)
+      handleNewPeer_ me roleInstance
+  -- Then add the new Role instance to the context.
+  addRoleInstancesToContext contextInstanceId roleType (singleton roleInstance)
   -- then add the binding
   case binding of
     Nothing -> pure unit
     Just bnd -> do
       expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
       void $ setBinding roleInstance expandedBinding
-  -- then add the properties
+  -- Finally add the properties
   case properties of
     (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
       setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
-  -- Finally, add the completed Role instance to the context.
-  addRoleInstancesToContext contextInstanceId roleType (singleton roleInstance)
   pure roleInstance

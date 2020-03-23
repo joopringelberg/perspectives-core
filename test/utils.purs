@@ -10,6 +10,7 @@ import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadAndCacheCrlFile)
+import Perspectives.Names (getMySystem)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
@@ -66,12 +67,15 @@ setupCouchdbForTestUser :: MonadPerspectives Unit
 setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "secret"
 
 setupUser :: MonadPerspectives Unit
-setupUser = do
-  void $ loadAndCacheCrlFile "perspectivesSysteem.crl" "./test"
-  -- now set isMe of "model:User$test$User_0001" to true.
-  (user :: RoleInstance) <- ContextInstance "model:User$test" ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
+setupUser = setupUser_ "perspectivesSysteem.crl"
+
+setupUser_ :: String -> MonadPerspectives Unit
+setupUser_ userFile = do
+  void $ loadAndCacheCrlFile userFile "./test"
+  mySysteem <- getMySystem
+  (user :: RoleInstance) <- ContextInstance mySysteem ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
   (userRol :: PerspectRol) <- getPerspectRol user
   void $ cacheEntity user (changeRol_isMe userRol true)
-  -- And set 'me' of "model:User$test"
-  (mijnSysteem :: PerspectContext) <- getPerspectContext (ContextInstance "model:User$test")
-  void $ cacheEntity (ContextInstance "model:User$test") (changeContext_me mijnSysteem (Just user))
+  -- And set 'me' of mySystem
+  (mijnSysteem :: PerspectContext) <- getPerspectContext (ContextInstance mySysteem)
+  void $ cacheEntity (ContextInstance mySysteem) (changeContext_me mijnSysteem (Just user))

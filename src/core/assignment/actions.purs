@@ -41,7 +41,7 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding, setProperty)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, handleNewPeer, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
@@ -172,7 +172,8 @@ compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
       Nothing -> pure []
       Just binding'' -> case binder' of
         Nothing -> pure []
-        Just binder'' -> setBinding binder'' binding''
+        Just binder'' -> do
+          setBinding binder'' binding'' <* handleNewPeer binder''
 
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
