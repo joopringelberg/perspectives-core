@@ -52,7 +52,9 @@ type ContextInstances = GLStrMap (AVar PerspectContext)
 type RolInstances = GLStrMap (AVar PerspectRol)
 type DomeinCache = GLStrMap (AVar DomeinFile)
 
-type PerspectivesState = CouchdbState
+type PerspectivesState = CouchdbState PerspectivesExtraState
+
+type PerspectivesExtraState = 
   -- Caching instances
   ( rolInstances :: RolInstances
   , contextInstances :: ContextInstances

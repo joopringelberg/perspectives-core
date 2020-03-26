@@ -21,9 +21,9 @@
 
 module Perspectives.Api where
 
-import Control.Aff.Sockets (ConnectionProcess, EmitFunction, Emitter, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
+import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
-import Control.Coroutine.Aff (Step(..), produce')
+import Control.Coroutine.Aff (Step(..), produce', Emitter)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
@@ -66,9 +66,14 @@ import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, n
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
 -----------------------------------------------------------
-foreign import createRequestEmitterImpl :: EffectFn3 (Foreign -> Step Foreign Unit) (Unit -> Step Foreign Unit) (EmitFunction Foreign Unit) Unit
+foreign import createRequestEmitterImpl :: EffectFn3
+  (Foreign -> Step Foreign Unit)
+  (Unit -> Step Foreign Unit)
+  (Emitter Effect Foreign Unit)
+  Unit
 
-createRequestEmitter :: Emitter Foreign Unit
+-- createRequestEmitter :: Emitter Foreign Unit
+createRequestEmitter :: Emitter Effect Foreign Unit -> Effect Unit
 createRequestEmitter = runEffectFn3 createRequestEmitterImpl Emit Finish
 
 -- A Producer for Requests.

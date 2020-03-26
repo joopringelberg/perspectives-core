@@ -19,13 +19,20 @@
 -- END LICENSE
 
 module Main where
+import Control.Coroutine (Consumer, await, runProcess, ($$))
+import Control.Monad.Rec.Class (forever)
+import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Error, forkAff, runAff)
 import Effect.Aff.AVar (AVar, new)
+import Effect.Class (liftEffect)
 import Effect.Console (log)
+import Foreign (MultipleErrors)
 import Perspectives.Api (setupApi, setupTcpApi)
+import Perspectives.CoreTypes (MonadPerspectives, PerspectivesExtraState)
+import Perspectives.Couchdb.ChangesFeed (DocProducer, createEventSource, docProducer)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.LocalAuthentication (AuthenticationResult(..))
@@ -34,6 +41,10 @@ import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (partyMode, setupCouchdbForFirstUser)
 import Perspectives.SetupUser (setupUser)
+import Perspectives.Sync.Channel (postDbName)
+import Perspectives.Sync.HandleTransaction (executeTransaction)
+import Perspectives.Sync.Transaction (Transaction)
+import Perspectives.User (getCouchdbBaseURL)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>))
 
 -- | Runs the PDR with default credentials. Used for testing clients without authentication.
@@ -58,13 +69,36 @@ runPDR usr pwd ident = void $ runAff handleError do
     , couchdbPort: 5984
     , systemIdentifier: ident
     , _rev: Nothing}) av
-  void $ forkAff $ runPerspectivesWithState f state
+  void $ forkAff $ runPerspectivesWithState api state
+  void $ forkAff $ runPerspectivesWithState incomingPost state
   -- void $ forkAff $ runPerspectivesWithState setupTcpApi state
   where
-    f = do
+    api :: MonadPerspectives Unit
+    api = do
       void $ setupUser
       ExternalCouchdb.addExternalFunctions
       setupApi
+
+    incomingPost :: MonadPerspectives Unit
+    incomingPost = do
+      -- get host and port
+      base <- getCouchdbBaseURL
+      -- get the post database
+      post <- postDbName
+      -- Create an EventSource
+      es <- liftEffect $ createEventSource (base <> post) Nothing true
+      -- Produce new Transaction documents
+      (transactionProducer :: DocProducer PerspectivesExtraState Transaction) <- pure $ docProducer es
+      -- Handle them.
+      void $ runProcess $ transactionProducer $$ transactionConsumer
+
+    transactionConsumer :: Consumer (Either MultipleErrors (Maybe Transaction)) MonadPerspectives Unit
+    transactionConsumer = forever do
+      change <- await
+      case change of
+        Left me -> pure unit
+        Right Nothing -> pure unit
+        Right (Just t) -> lift $ executeTransaction t
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = log $ "An error condition: " <> (show e)
