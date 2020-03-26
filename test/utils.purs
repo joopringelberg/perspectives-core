@@ -11,7 +11,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadAndCacheCrlFile)
 import Perspectives.Names (getMySystem)
-import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
+import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, postDatabaseName)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives)
@@ -19,15 +19,17 @@ import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser)
 import Test.Unit.Assert as Assert
 
 
-runP :: forall a.
-  MonadPerspectives a ->
-  Aff a
-runP t = runPerspectives "test" "secret" "test" t
+runP_ :: forall a. String -> MonadPerspectives a -> Aff a
+runP_ username = runPerspectives username "geheim" username
 
-runPJoop :: forall a.
-  MonadPerspectives a ->
-  Aff a
-runPJoop t = runPerspectives "joop" "geheim" "joop" t
+runP :: forall a. MonadPerspectives a -> Aff a
+runP = runP_ "test"
+
+runPJoop :: forall a. MonadPerspectives a -> Aff a
+runPJoop = runP_ "joop"
+
+runPCor :: forall a. MonadPerspectives a -> Aff a
+runPCor = runP_ "cor"
 
 p :: String -> String
 p s = "model:Perspectives$" <> s
@@ -63,8 +65,14 @@ clearUserDatabase = do
   deleteDatabase userDatabaseName
   createDatabase userDatabaseName
 
+clearPostDatabase :: MonadPerspectives Unit
+clearPostDatabase = do
+  db <- postDatabaseName
+  deleteDatabase db
+  createDatabase db
+
 setupCouchdbForTestUser :: MonadPerspectives Unit
-setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "secret"
+setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "geheim"
 
 setupUser :: MonadPerspectives Unit
 setupUser = setupUser_ "perspectivesSysteem.crl"

@@ -43,6 +43,7 @@ module Perspectives.Persistent
 , class Persistent
 , database
 , entitiesDatabaseName
+, postDatabaseName
 , updateRevision
   )
 where
@@ -112,6 +113,9 @@ getPerspectEntiteit id =
 
 entitiesDatabaseName :: MonadPerspectives String
 entitiesDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_entities/")
+
+postDatabaseName :: MonadPerspectives String
+postDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_post/")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit
