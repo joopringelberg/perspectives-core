@@ -24,7 +24,7 @@ module Perspectives.Representation.InstanceIdentifiers where
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
-import Prelude (class Eq, class Ord, class Show, compare, show, (<<<), (==))
+import Prelude (class Eq, class Ord, class Show, compare, show, (<<<), (==), (<>))
 
 newtype ContextInstance = ContextInstance String
 derive instance newtypeContextInstance :: Newtype ContextInstance _
@@ -61,3 +61,6 @@ instance eqValue :: Eq Value where
   eq (Value id1) (Value id2) = id1 == id2
 instance ordValue :: Ord Value where
   compare (Value v1) (Value v2) = compare v1 v2
+
+externalRole :: ContextInstance -> RoleInstance
+externalRole ct = RoleInstance (unwrap ct <> "_External")

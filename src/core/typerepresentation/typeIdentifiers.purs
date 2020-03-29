@@ -185,3 +185,6 @@ instance eqActionType :: Eq ActionType where
   eq (ActionType id1) (ActionType id2) = id1 == id2
 instance ordActionType :: Ord ActionType where
   compare (ActionType a1) (ActionType a2) = compare a1 a2
+
+externalRoleType :: ContextType -> EnumeratedRoleType
+externalRoleType (ContextType ct) = EnumeratedRoleType (ct <> "$External")

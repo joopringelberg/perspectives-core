@@ -100,7 +100,7 @@ instance encodeUniverseRoleDelta :: Encode UniverseRoleDelta where
 instance decodeUniverseRoleDelta :: Decode UniverseRoleDelta where
   decode = genericDecode defaultOptions
 
-data UniverseRoleDeltaType = ConstructEmptyRole | RemoveRoleInstance
+data UniverseRoleDeltaType = ConstructEmptyRole | ConstructExternalRole | RemoveRoleInstance
 derive instance genericUniverseRoleDeltaType :: Generic UniverseRoleDeltaType _
 instance showUniverseRoleDeltaType :: Show UniverseRoleDeltaType where
   show = genericShow

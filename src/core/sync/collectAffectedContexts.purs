@@ -24,14 +24,15 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader (lift)
+import Control.Monad.State (StateT, execStateT, get, put)
 import Data.Array (filterA, head, union)
-import Data.Array.NonEmpty (fromArray, toArray, head) as NER
+import Data.Array.NonEmpty (fromArray)
+import Data.Foldable (traverse_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromJust, isJust)
-import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse)
 import Partial.Unsafe (unsafePartial)
@@ -40,7 +41,7 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MonadPerspecti
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
-import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.ObjectGetters (bottom, getRole)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Persistent (getPerspectRol)
@@ -51,9 +52,12 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..))
-import Prelude (Unit, bind, const, discard, join, not, pure, unit, ($), (<<<), (==), (>=>), (>>=))
+import Prelude (Unit, bind, const, discard, join, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
+-----------------------------------------------------------
+-- USERSWITHPERSPECTIVEONROLEINSTANCE
+-----------------------------------------------------------
 -- Notice that even though we compute the users for a single given RoleInstance, we can use that result
 -- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
 -- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
@@ -75,7 +79,7 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
 
 -- Adds an AffectedContext to the transaction and returns user instances.
 handleAffectedContexts :: Array ContextInstance -> Array EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
-handleAffectedContexts affectedContexts userTypes = case NER.fromArray affectedContexts of
+handleAffectedContexts affectedContexts userTypes = case fromArray affectedContexts of
   Nothing -> pure []
   Just contextInstances -> do
     addAffectedContext $ AffectedContext {contextInstances, userTypes}
@@ -83,6 +87,38 @@ handleAffectedContexts affectedContexts userTypes = case NER.fromArray affectedC
 
 addAffectedContext :: AffectedContext -> MonadPerspectivesTransaction Unit
 addAffectedContext as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [as] affectedContexts})
+
+-----------------------------------------------------------
+-- USERSHASPERSPECTIVEONROLEINSTANCE
+-----------------------------------------------------------
+userHasPerspectiveOnRoleInstance ::  EnumeratedRoleType -> RoleInstance -> RoleInstance -> MonadPerspectives Boolean
+userHasPerspectiveOnRoleInstance roleType roleInstance peer = execStateT (userHasPerspectiveOnRoleInstance_ roleType roleInstance peer) false
+
+userHasPerspectiveOnRoleInstance_ ::  EnumeratedRoleType -> RoleInstance -> RoleInstance -> StateT Boolean MonadPerspectives Unit
+userHasPerspectiveOnRoleInstance_ roleType roleInstance peer = do
+  (lift $ compileDescriptions _onContextDelta_context roleType) >>= traverse_ g
+  notFound <- get
+  when notFound $ (lift $ compileDescriptions _onContextDelta_role roleType) >>= traverse_ g
+
+  where
+    g :: InvertedQuery -> StateT Boolean MonadPerspectives Unit
+    g (InvertedQuery{compilation, userTypes}) = do
+      notFound <- get
+      when notFound $
+        lift (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance) >>= traverse_
+        -- Check if the peer has one of the userType roles in at least one of the context instances.
+          \ctxt -> do
+            notFound1 <- get
+            when notFound1 do
+              for_ userTypes \ut -> do
+                notFound2 <- get
+                when notFound2 do
+                  roles <- lift (ctxt ##= getRole ut)
+                  for_ roles \role -> do
+                    notFound3 <- get
+                    when notFound3 do
+                      otherPeer <- lift (role ##>> bottom)
+                      when (otherPeer == peer) (put true)
 
 -----------------------------------------------------------
 -- OBSERVINGCONTEXTS
@@ -99,7 +135,7 @@ addRoleObservingContexts id roleType roleInstance = do
   for_ roleCalculations \(InvertedQuery{compilation, userTypes}) -> lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance) >>= addContexts userTypes
 
 addContexts :: Array EnumeratedRoleType -> Array ContextInstance -> MonadPerspectivesTransaction Unit
-addContexts userTypes as = case NER.fromArray as of
+addContexts userTypes as = case fromArray as of
   Nothing -> pure unit
   Just contextInstances -> lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [AffectedContext {contextInstances, userTypes}] affectedContexts})
 

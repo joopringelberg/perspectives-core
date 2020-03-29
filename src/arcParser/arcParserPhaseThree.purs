@@ -74,7 +74,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>=>))
@@ -134,7 +134,7 @@ qualifyActionRoles = do
               (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
                 ar' <- do
                   qname <- case object of
-                    (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ EnumeratedRoleType ((unwrap ctxtId) <> "$" <> "External")  -- TODO: check naamgeving externe rol!
+                    (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
                     other -> qualifiedRoleType ctxtId pos (roletype2string other)
                   -- qname <- qualifiedRoleType ctxtId pos (roletype2string object)
                   pure $ ar {object = qname}

@@ -23,6 +23,7 @@ module Perspectives.Sync.HandleTransaction where
 
 import Control.Monad.Writer (WriterT, execWriterT, tell)
 import Data.Array (sort, length)
+import Data.Array.NonEmpty (head)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Identity (Identity)
@@ -37,6 +38,7 @@ import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, OrderedDelta(..), MonadPerspectives, (##=))
 import Perspectives.Instances.Builders (constructEmptyContext, constructEmptyRole_)
 import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Persistent (saveEntiteit)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (removeContextInstance, removeRoleInstance)
 import Perspectives.SerializableNonEmptyArray (toNonEmptyArray)
@@ -82,8 +84,13 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
     -- find the number of roleinstances in the context.
     offset <- lift2 ((id ##= getRole roleType) >>= pure <<< length)
     forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do
-      log ("constructEmptyRole_ in " <> show id <> " with id " <> show roleInstance)
+      log ("constructEmptyRole in " <> show id <> " with id " <> show roleInstance)
       void $ constructEmptyRole_ roleType id (offset + i) roleInstance
+  ConstructExternalRole -> do
+    externalRole <- pure (head $ toNonEmptyArray roleInstances)
+    log ("ConstructExternalRole in " <> show id)
+    void $ constructEmptyRole_ roleType id 0 externalRole
+    lift2 $ void $ saveEntiteit externalRole
   RemoveRoleInstance -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
 
 collectDeltas :: Transaction -> Array OrderedDelta

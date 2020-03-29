@@ -119,13 +119,13 @@ theSuite = suiteOnly "Perspectives.Sync.HandleTransaction" do
       _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       setupUser_ "userJoop.crl"
       -- Without this, the test user is unknown at Joop's side.
-      void $ loadAndCacheCrlFile_ "userCor.crl" testDirectory
+      -- void $ loadAndCacheCrlFile_ "userCor.crl" testDirectory
       (pstate :: AVar PerspectivesState) <- ask
       -- Handle post in parallel
       -- TODO. Dit proces stopt niet, ondanks killFiber
       postFiber <- lift $ forkAff (runPerspectivesWithState incomingPost pstate)
       -- Wait a little
-      liftAff $ delay (Milliseconds 4000.0)
+      liftAff $ delay (Milliseconds 8000.0)
       -- Check if there is a channel document, starting with the user.
       mySysteem <- getMySystem
       (user :: RoleInstance) <- ContextInstance mySysteem ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
@@ -139,7 +139,7 @@ theSuite = suiteOnly "Perspectives.Sync.HandleTransaction" do
 
       -- Clean up
       lift $ killFiber (error "Stop") postFiber
-      clearUserDatabase
+      -- clearUserDatabase
       -- clear the post database
       clearPostDatabase
 
