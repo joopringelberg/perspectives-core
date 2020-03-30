@@ -25,14 +25,27 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
 import Data.Array.NonEmpty (NonEmptyArray, toArray, fromArray, singleton) as NER
 import Data.Either (Either(..))
+import Data.FunctorWithIndex (class FunctorWithIndex)
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Foreign (ForeignError(..))
 import Foreign.Class (class Decode, class Encode, decode, encode)
-import Prelude (class Eq, class Show, eq, pure, show, (<>), ($), (<<<))
+import Prelude (class Eq, class Functor, class Ord, class Semigroup, class Show, pure, show, ($), (<<<), (<>))
 
 newtype SerializableNonEmptyArray a = SerializableNonEmptyArray (NER.NonEmptyArray a)
+
+instance showSerializableNonEmptyArray :: Show a => Show (SerializableNonEmptyArray a) where
+  show (SerializableNonEmptyArray arr) = "SerializableNonEmptyArray" <> show arr
+
+derive newtype instance eqSerializableNonEmptyArray :: Eq a => Eq (SerializableNonEmptyArray a)
+
+derive newtype instance ordSerializableNonEmptyArray :: Ord a => Ord (SerializableNonEmptyArray a)
+
+derive newtype instance semigroupSerializableNonEmptyArray :: Semigroup (SerializableNonEmptyArray a)
+
+derive newtype instance functorSerializableNonEmptyArray :: Functor SerializableNonEmptyArray
+derive newtype instance functorWithIndexSerializableNonEmptyArray :: FunctorWithIndex Int SerializableNonEmptyArray
 
 derive instance newtypeSerializableNonEmptyArray :: Newtype (SerializableNonEmptyArray a) _
 
@@ -45,12 +58,6 @@ instance decodeSerializableNonEmptyArray :: Decode a => Decode (SerializableNonE
     Right (arr :: Array a) -> case NER.fromArray arr of
       Nothing -> throwError (NEL.singleton (ForeignError "SerializableNonEmptyArray cannot be empty"))
       Just narr -> pure (SerializableNonEmptyArray narr)
-
-instance showSerializableNonEmptyArray :: Show a => Show (SerializableNonEmptyArray a) where
-  show (SerializableNonEmptyArray arr) = "SerializableNonEmptyArray" <> show arr
-
-instance eqSerializableNonEmptyArray :: Eq a => Eq (SerializableNonEmptyArray a) where
-  eq (SerializableNonEmptyArray arr1) (SerializableNonEmptyArray arr2) = eq arr1 arr2
 
 fromArray :: forall a. Array a -> Maybe (SerializableNonEmptyArray a)
 fromArray arr = case NER.fromArray arr of
