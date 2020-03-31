@@ -29,9 +29,10 @@ import Data.FunctorWithIndex (class FunctorWithIndex)
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
-import Foreign (ForeignError(..))
+import Foreign (ForeignError(..), readString)
 import Foreign.Class (class Decode, class Encode, decode, encode)
-import Prelude (class Eq, class Functor, class Ord, class Semigroup, class Show, pure, show, ($), (<<<), (<>))
+import Prelude (class Eq, class Functor, class Ord, class Semigroup, class Show, pure, show, ($), (<<<), (<>), bind)
+import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', write)
 
 newtype SerializableNonEmptyArray a = SerializableNonEmptyArray (NER.NonEmptyArray a)
 
@@ -58,6 +59,17 @@ instance decodeSerializableNonEmptyArray :: Decode a => Decode (SerializableNonE
     Right (arr :: Array a) -> case NER.fromArray arr of
       Nothing -> throwError (NEL.singleton (ForeignError "SerializableNonEmptyArray cannot be empty"))
       Just narr -> pure (SerializableNonEmptyArray narr)
+
+instance readForeignSerializableNonEmptyArray :: ReadForeign a => ReadForeign (SerializableNonEmptyArray a) where
+  readImpl f = do
+    s <- readString f
+    arr <- readJSON' s
+    case fromArray arr of
+      Nothing -> throwError (NEL.singleton $ ForeignError "SerializableNonEmptyArray expects an array with elements.")
+      Just a -> pure a
+
+instance writeForeignSerializableNonEmptyArray :: WriteForeign a => WriteForeign (SerializableNonEmptyArray a) where
+  writeImpl (SerializableNonEmptyArray a) = write $ NER.toArray a
 
 fromArray :: forall a. Array a -> Maybe (SerializableNonEmptyArray a)
 fromArray arr = case NER.fromArray arr of
