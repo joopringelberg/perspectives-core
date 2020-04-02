@@ -57,7 +57,12 @@ import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<
 createChannel :: MonadPerspectivesTransaction ContextInstance
 createChannel = do
   channelName <- pure ("channel_" <> (show $ guid unit))
+  channel <- createChannelContext channelName
   lift2 $ ensureAuthentication (createDatabase channelName)
+  pure channel
+
+createChannelContext :: String -> MonadPerspectivesTransaction ContextInstance
+createChannelContext channelName = do
   host <- lift2 getHost
   port <- lift2 getPort
   eChannel <- constructContext $ ContextSerialization
@@ -66,12 +71,13 @@ createChannel = do
     , ctype: "sys:Channel"
     , rollen: fromFoldable [(Tuple "model:System$Channel$ConnectedPartner" $
       SNA.singleton (RolSerialization
-        { properties: PropertySerialization $ fromFoldable
-        [
-          Tuple "model:System$Channel$ConnectedPartner$Host" [host]
-        , Tuple "model:System$Channel$ConnectedPartner$Port" [(show port)]
-        ],
-        binding: Just "usr:Me" })
+        { id: Nothing
+        , properties: PropertySerialization $ fromFoldable
+          [
+            Tuple "model:System$Channel$ConnectedPartner$Host" [host]
+          , Tuple "model:System$Channel$ConnectedPartner$Port" [(show port)]
+          ]
+        , binding: Just "usr:Me" })
        )]
     , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
     }
@@ -83,7 +89,8 @@ createChannel = do
       void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$PerspectivesSystem$Channels")
         sysId
         (RolSerialization
-          { properties: PropertySerialization empty,
+          { id: Nothing
+          , properties: PropertySerialization empty,
           binding: Just (buitenRol $ unwrap channel)})
       pure channel
 
@@ -91,7 +98,8 @@ addUserToChannel :: RoleInstance -> ContextInstance -> MonadPerspectivesTransact
 addUserToChannel (RoleInstance usr) (ContextInstance channel) = void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
   channel
   (RolSerialization
-    { properties: PropertySerialization empty,
+    { id: Nothing
+    , properties: PropertySerialization empty,
     binding: Just usr})
 
 type Host = String

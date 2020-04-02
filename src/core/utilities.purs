@@ -22,10 +22,15 @@
 module Perspectives.Utilities where
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
-import Data.Foldable (fold)
+import Data.Array (cons)
+import Data.Foldable (intercalate)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Foreign.Object (Object, foldMap)
-import Prelude (class Monad, class Show, type (~>), bind, pure, show, (<$>), (<<<), (<>), (>>=))
+import Prelude (class Monad, class Show, type (~>), bind, map, pure, show, (<>), (>>=))
+import Prim.RowList as RL
+import Record.Unsafe (unsafeGet)
+import Type.Data.RowList (RLProxy(..))
 
 onNothing :: forall m a e. MonadThrow e m => e -> m (Maybe a) -> m a
 onNothing s ma = ma >>= (maybe (throwError s) pure)
@@ -49,20 +54,24 @@ prettyPrint a = prettyPrint' "  " a
 class PrettyPrint d where
   prettyPrint' :: String -> d -> String
 
+-- | No indentation for an Int.
 instance intPrettyPrint :: PrettyPrint Int where
-  prettyPrint' indent = (<>) indent <<< show
+  prettyPrint' indent i = show i
 
+-- | No indentation for a String.
 instance stringPrettyPrint :: PrettyPrint String where
-  prettyPrint' indent = (<>) indent
+  prettyPrint' indent s = s
 
+-- | No indentation for a Boolean.
 instance boolPrettyPrint :: PrettyPrint Boolean where
-  prettyPrint' indent = (<>) indent <<< show
+  prettyPrint' indent b = show b
 
 instance objectPrettyPrint :: PrettyPrint v => PrettyPrint (Object v) where
   prettyPrint' tab o = "{ " <> (foldMap (\(s :: String) (v :: v) -> newline <> tab <> s <> ": " <> (prettyPrint' (tab <> "  ") v)) o) <> " }"
 
 instance arrayPrettyPrint :: (Show v, PrettyPrint v) => PrettyPrint (Array v) where
-  prettyPrint' tab a = "[" <> fold (((<>) newline <<< (prettyPrint' (tab <> "  "))) <$> a) <> newline <> tab <> "]"
+  -- prettyPrint' tab a = "[" <> fold (((<>) newline <<< (prettyPrint' (tab <> "  "))) <$> a) <> newline <> tab <> "]"
+  prettyPrint' tab a = "[" <> intercalate ", " (map (prettyPrint' tab) a) <> "]"
 
 instance maybePrettyPrint :: (PrettyPrint v) => PrettyPrint (Maybe v) where
   prettyPrint' tab Nothing = "Nothing"
@@ -70,3 +79,31 @@ instance maybePrettyPrint :: (PrettyPrint v) => PrettyPrint (Maybe v) where
 
 newline :: String
 newline = "\n"
+
+-- | PrettyPrint a record by
+-- |  * starting on a new line, with the given indent and an opening bracket and the first key;
+-- |  * printing every other key on a new line between , and :
+-- |  * providing every value with an extra indent.
+-- |  * ending with a closing bracket on a new line.
+instance prettyPrintRecord :: (RL.RowToList rs rl, PrettyPrintRecordFields rl rs) => PrettyPrint (Record rs) where
+  prettyPrint' tab record = case prettyPrintRecordFields tab (RLProxy :: RLProxy rl) record  of
+    [] -> "{}"
+    fields -> "\n" <> tab <> "{ " <> intercalate ("\n" <> tab <> ", " ) fields <> "\n" <> tab <> "}"
+
+class PrettyPrintRecordFields rowlist row where
+  prettyPrintRecordFields ::  String -> RLProxy rowlist -> Record row -> Array String
+
+instance prettyPrintRecordFieldsNil :: PrettyPrintRecordFields RL.Nil row where
+  prettyPrintRecordFields _ _ _ = []
+
+instance prettyPrintRecordFieldsCons
+    ::  ( IsSymbol key
+        , PrettyPrintRecordFields rowlistTail row
+        , PrettyPrint focus
+        )
+    => PrettyPrintRecordFields (RL.Cons key focus rowlistTail) row where
+  prettyPrintRecordFields tab _ record = cons (key <> ": " <> (prettyPrint' (tab <> "  ") focus)) tail
+    where
+      key = reflectSymbol (SProxy :: SProxy key)
+      focus = (unsafeGet key record :: focus)
+      tail = prettyPrintRecordFields tab (RLProxy :: RLProxy rowlistTail) record

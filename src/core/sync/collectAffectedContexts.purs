@@ -91,8 +91,9 @@ addAffectedContext as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> 
 -----------------------------------------------------------
 -- USERSHASPERSPECTIVEONROLEINSTANCE
 -----------------------------------------------------------
-userHasPerspectiveOnRoleInstance ::  EnumeratedRoleType -> RoleInstance -> RoleInstance -> MonadPerspectives Boolean
-userHasPerspectiveOnRoleInstance roleType roleInstance peer = execStateT (userHasPerspectiveOnRoleInstance_ roleType roleInstance peer) false
+-- | Parameter `peer` should be bound to an instance of model:System$User (the bottom of a user role chain).
+userHasNoPerspectiveOnRoleInstance ::  EnumeratedRoleType -> RoleInstance -> RoleInstance -> MonadPerspectives Boolean
+userHasNoPerspectiveOnRoleInstance roleType roleInstance peer = execStateT (userHasPerspectiveOnRoleInstance_ roleType roleInstance peer) true
 
 userHasPerspectiveOnRoleInstance_ ::  EnumeratedRoleType -> RoleInstance -> RoleInstance -> StateT Boolean MonadPerspectives Unit
 userHasPerspectiveOnRoleInstance_ roleType roleInstance peer = do
@@ -118,7 +119,7 @@ userHasPerspectiveOnRoleInstance_ roleType roleInstance peer = do
                     notFound3 <- get
                     when notFound3 do
                       otherPeer <- lift (role ##>> bottom)
-                      when (otherPeer == peer) (put true)
+                      when (otherPeer == peer) (put false)
 
 -----------------------------------------------------------
 -- OBSERVINGCONTEXTS

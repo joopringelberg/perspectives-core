@@ -79,7 +79,7 @@ theSuite = suiteSkip  "Model:System" do
         descriptionId <- pure "model:User$TestBotActieModel_External"
         binder <- pure $ EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"
         roleIds <- runMonadPerspectivesTransaction $ createAndAddRoleInstance binder "model:User$test"
-          (RolSerialization{ properties: PropertySerialization empty, binding: Just descriptionId})
+          (RolSerialization{ id: Nothing, properties: PropertySerialization empty, binding: Just descriptionId})
         role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head roleIds)
         b <- getPerspectRol (RoleInstance descriptionId)
         void $ cacheEntity (RoleInstance descriptionId) (addRol_gevuldeRollen b binder _id)

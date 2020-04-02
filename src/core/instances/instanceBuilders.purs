@@ -177,11 +177,13 @@ constructEmptyRole_ roleType contextInstance i rolInstanceId = do
 -- | This function is complete w.r.t. the five responsibilities.
 -- | Notice that roleType must be a well-formed identifier!
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction RoleInstance
-createAndAddRoleInstance roleType id (RolSerialization{properties, binding}) = do
+createAndAddRoleInstance roleType id (RolSerialization{id: mRoleId, properties, binding}) = do
   contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces id)
   rolInstances <- lift2 (contextInstanceId ##= getRole roleType)
   -- create an empty role
-  roleInstance <- constructEmptyRole roleType contextInstanceId (getNextRolIndex rolInstances) (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType))
+  roleInstance <- case mRoleId of
+    Nothing -> constructEmptyRole roleType contextInstanceId (getNextRolIndex rolInstances) (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType))
+    Just roleId -> constructEmptyRole_ roleType contextInstanceId (getNextRolIndex rolInstances) (RoleInstance roleId)
   -- Serialise as Deltas if we bind to a user that is not me.
   case binding of
     Nothing -> pure unit

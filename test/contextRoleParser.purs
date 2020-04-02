@@ -129,7 +129,8 @@ theSuite = suite "ContextRoleParser" do
         , ctype: "model:Test$TestCase$NestedCase"
         , rollen: fromFoldable [Tuple "model:Test$TestCase$NestedCase$NestedSelf"
           (SerializableNonEmptyArray $ singleton (RolSerialization
-            { properties: PropertySerialization empty
+            { id: Nothing
+            , properties: PropertySerialization empty
             , binding: Just "model:User$test$User_0001"}))]
         , externeProperties: PropertySerialization empty
 
@@ -150,7 +151,8 @@ theSuite = suite "ContextRoleParser" do
       roleIdArray <- runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")
         "model:User$MyTestCase$MyNestedCase4"
         (RolSerialization
-            { properties: PropertySerialization empty
+            { id: Nothing
+            , properties: PropertySerialization empty
             , binding: Just "model:User$test$User_0001"})
       r' <- traverse getPerspectRol roleIdArray
       clearUserDatabase

@@ -29,15 +29,16 @@ import Data.FunctorWithIndex (class FunctorWithIndex)
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
-import Foreign (ForeignError(..), readString)
+import Foreign (ForeignError(..))
 import Foreign.Class (class Decode, class Encode, decode, encode)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Eq, class Functor, class Ord, class Semigroup, class Show, pure, show, ($), (<<<), (<>), bind)
-import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', write)
+import Simple.JSON (class ReadForeign, class WriteForeign, write, read')
 
 newtype SerializableNonEmptyArray a = SerializableNonEmptyArray (NER.NonEmptyArray a)
 
 instance showSerializableNonEmptyArray :: Show a => Show (SerializableNonEmptyArray a) where
-  show (SerializableNonEmptyArray arr) = "SerializableNonEmptyArray" <> show arr
+  show (SerializableNonEmptyArray arr) = "SerializableNonEmptyArray" <> show (NER.toArray arr)
 
 derive newtype instance eqSerializableNonEmptyArray :: Eq a => Eq (SerializableNonEmptyArray a)
 
@@ -62,14 +63,16 @@ instance decodeSerializableNonEmptyArray :: Decode a => Decode (SerializableNonE
 
 instance readForeignSerializableNonEmptyArray :: ReadForeign a => ReadForeign (SerializableNonEmptyArray a) where
   readImpl f = do
-    s <- readString f
-    arr <- readJSON' s
+    arr <- read' f
     case fromArray arr of
       Nothing -> throwError (NEL.singleton $ ForeignError "SerializableNonEmptyArray expects an array with elements.")
       Just a -> pure a
 
 instance writeForeignSerializableNonEmptyArray :: WriteForeign a => WriteForeign (SerializableNonEmptyArray a) where
   writeImpl (SerializableNonEmptyArray a) = write $ NER.toArray a
+
+instance prettyPrintSerializableNonEmptyArray :: (Show a, PrettyPrint a) => PrettyPrint (SerializableNonEmptyArray a) where
+  prettyPrint' tab arr = prettyPrint' tab (toArray arr)
 
 fromArray :: forall a. Array a -> Maybe (SerializableNonEmptyArray a)
 fromArray arr = case NER.fromArray arr of

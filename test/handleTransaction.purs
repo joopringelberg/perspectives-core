@@ -37,7 +37,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Sync.HandleTransaction" do
+theSuite = suite "Perspectives.Sync.HandleTransaction" do
 
   test "create channel, add user, check for channel on the other side" do
     mdbName <- (runP do
@@ -92,7 +92,7 @@ theSuite = suiteOnly "Perspectives.Sync.HandleTransaction" do
           deleteDatabase dbName
     )
 
-  testOnly "create channel between two users, add user on one side, check for channel context on the other side" do
+  test "create channel between two users, add user on one side, check for channel context on the other side" do
     channelId <- runPCor do
       _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       setupUser_ "userCor.crl"

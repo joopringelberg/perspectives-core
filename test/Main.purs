@@ -32,6 +32,8 @@ import Test.Sync.Channel as CHA
 import Test.PrepareTestUser as PTU
 import Test.ArrayT as ARRT
 import Test.Sync.HandleTransaction as HTA
+import Test.Assignment.SerialiseAsJson as SAJ
+import Test.Utilities as UT
 import Test.Unit.Main (runTest)
 
 
@@ -64,3 +66,5 @@ main = runTest do
   PTU.theSuite
   ARRT.theSuite
   HTA.theSuite
+  SAJ.theSuite
+  UT.theSuite

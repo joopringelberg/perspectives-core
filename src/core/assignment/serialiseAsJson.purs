@@ -29,58 +29,82 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (Object, singleton, empty) as OBJ
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.CoreTypes (MonadPerspectives, (###>>))
+import Perspectives.CollectAffectedContexts (userHasNoPerspectiveOnRoleInstance)
+import Perspectives.CoreTypes (MonadPerspectives, (###>>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (roleType_)
+import Perspectives.Instances.ObjectGetters (bottom, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value, externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
+import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Prelude (Unit, bind, map, pure, unit, when, ($), (<$>))
+import Prelude (Unit, bind, discard, map, pure, unit, when, ($), (<$>))
 
-serialisedAsJsonFor :: ContextInstance -> RoleInstance -> MonadPerspectives ContextSerialization
-serialisedAsJsonFor cid userId = do
+serialiseAsJsonFor :: ContextInstance -> RoleInstance -> MonadPerspectives (Array ContextSerialization)
+serialiseAsJsonFor cid userId = do
   userType <- roleType_ userId
-  serialisedAsJsonFor_ cid userId userType
+  systemUser <- userId ##>> bottom
+  execWriterT $ serialiseAsJsonFor_ cid systemUser userType
 
-serialisedAsJsonFor_:: ContextInstance -> RoleInstance -> EnumeratedRoleType -> MonadPerspectives ContextSerialization
-serialisedAsJsonFor_ cid userId userType = do
-  (PerspectContext{pspType, rolInContext}) <- getPerspectContext cid
+type WriteContexts m = WriterT (Array ContextSerialization) m
+
+serialiseAsJsonFor_:: ContextInstance -> RoleInstance -> EnumeratedRoleType -> WriteContexts MonadPerspectives Unit
+serialiseAsJsonFor_ cid userId userType = do
+  (PerspectContext{pspType, rolInContext}) <- lift $ getPerspectContext cid
   (rollen :: OBJ.Object (SerializableNonEmptyArray RolSerialization)) <- execWriterT $ forWithIndex_ rolInContext serialiseRoleInstances
-  PerspectRol{properties} <- getPerspectRol (externalRole cid)
-  (externeProperties :: OBJ.Object (Array String)) <- execWriterT $ forWithIndex_ properties serialisePropertiesFor
-  pure $ ContextSerialization
+  PerspectRol{properties} <- lift $ getPerspectRol (externalRole cid)
+  (externeProperties :: OBJ.Object (Array String)) <- lift $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
+  tell $ [ContextSerialization
     { id: (unwrap cid)
     , prototype: Nothing
     , ctype: (unwrap pspType)
     , rollen
-    -- , properties: PropertySerialization externeProperties
     , externeProperties: PropertySerialization OBJ.empty
-    }
+    }]
 
   where
-    serialiseRoleInstances :: String -> Array RoleInstance -> WriterT (OBJ.Object (SerializableNonEmptyArray RolSerialization)) MonadPerspectives Unit
+    serialiseRoleInstances :: String -> Array RoleInstance -> WriterT (OBJ.Object (SerializableNonEmptyArray RolSerialization)) (WriteContexts MonadPerspectives) Unit
     serialiseRoleInstances roleTypeId roleInstances = do
       -- Now for each role, decide if the user may see it.
-      -- If so, add a UniverseRoleDelta and a ContextDelta.
-      allowed <- lift (userType ###>> roleIsInPerspectiveOf (ENR $ EnumeratedRoleType roleTypeId))
+      allowed <- lift $ lift (userType ###>> roleIsInPerspectiveOf (ENR $ EnumeratedRoleType roleTypeId))
       when allowed
         case fromArray roleInstances of
           Nothing -> pure unit
           Just roleInstances' -> do
-            x <- lift $ traverse (serialiseRoleInstance cid (EnumeratedRoleType roleTypeId)) roleInstances'
-            tell $ OBJ.singleton roleTypeId (SerializableNonEmptyArray x)
+            rolesAsJson <- lift $ traverse (serialiseRoleInstance cid (EnumeratedRoleType roleTypeId)) roleInstances'
+            tell $ OBJ.singleton roleTypeId (SerializableNonEmptyArray rolesAsJson)
 
-    serialiseRoleInstance :: ContextInstance -> EnumeratedRoleType -> RoleInstance -> MonadPerspectives RolSerialization
+    serialiseRoleInstance :: ContextInstance -> EnumeratedRoleType -> RoleInstance -> WriteContexts MonadPerspectives RolSerialization
     serialiseRoleInstance cid' roleTypeId roleInstance = do
-      PerspectRol{binding, properties} <- getPerspectRol roleInstance
-      (properties' :: (OBJ.Object (Array String))) <- execWriterT $ forWithIndex_ properties serialisePropertiesFor
-      -- pure $ RolSerialization { properties: PropertySerialization OBJ.empty, binding: map unwrap binding }
-      pure $ RolSerialization { properties: (PropertySerialization properties'), binding: map unwrap binding }
+      PerspectRol{binding, properties} <- lift $ getPerspectRol roleInstance
+      (properties' :: (OBJ.Object (Array String))) <- lift $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
+      case binding of
+        Nothing -> pure unit
+        Just b -> do
+          typeOfBinding <- lift (b ##>> roleType)
+          shouldBeSent <- lift $ userHasNoPerspectiveOnRoleInstance typeOfBinding b userId
+          when shouldBeSent do
+            (ctxts :: Array ContextSerialization) <- lift $ execWriterT $ serialiseBinding b
+            tell ctxts
+      pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: map unwrap binding }
 
     serialisePropertiesFor :: String -> Array Value -> WriterT (OBJ.Object (Array String)) MonadPerspectives Unit
     serialisePropertiesFor propertyTypeId values = do
       -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
       propAllowed <- lift (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))
       when propAllowed $ tell (OBJ.singleton propertyTypeId (unwrap <$> values))
+
+    serialiseBinding :: RoleInstance -> WriteContexts MonadPerspectives Unit
+    serialiseBinding roleInstance = do
+      PerspectRol{context, pspType: roleType} <- lift $ getPerspectRol roleInstance
+      -- Serialise the roleInstance
+      (r :: RolSerialization) <- serialiseRoleInstance context roleType roleInstance
+      -- Serialise the contextInstance with just the roleInstance
+      (PerspectContext{pspType}) <- lift $ getPerspectContext context
+      tell $ [ContextSerialization
+        { id: (unwrap context)
+        , prototype: Nothing
+        , ctype: (unwrap pspType)
+        , rollen: OBJ.singleton (unwrap roleType) (singleton r)
+        , externeProperties: PropertySerialization OBJ.empty
+        }]

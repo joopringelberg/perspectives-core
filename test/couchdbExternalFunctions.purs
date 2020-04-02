@@ -69,10 +69,10 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
     -- setupUser
     cdburl <- getCouchdbBaseURL
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    errors <- loadCompileAndSaveArcFile "simpleChat" modelDirectory
+    -- errors <- loadCompileAndSaveArcFile "simpleChat" modelDirectory
     -- errors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
-    liftAff $ assert ("There should be no errors" <> show errors) (null errors)
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
+    -- liftAff $ assert ("There should be no errors" <> show errors) (null errors)
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.
     -- The result must include "model:System$Model$External"
       )

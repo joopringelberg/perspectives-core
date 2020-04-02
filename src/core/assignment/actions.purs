@@ -122,7 +122,7 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
   pure \contextId -> do
     ctxts <- lift2 (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
-      roleIdentifier <- createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing})
+      roleIdentifier <- createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
       lift2 $ getPerspectRol roleIdentifier
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
@@ -159,7 +159,7 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
       for_ bindings' \bndg -> createAndAddRoleInstance
         qualifiedRoleIdentifier
         (unwrap ctxt)
-        (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)})
+        (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just (unwrap bndg)})
 
 compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
   (bindingGetter :: (ContextInstance ~~> RoleInstance)) <- context2role binding

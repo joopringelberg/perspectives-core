@@ -25,23 +25,24 @@ import Data.Array.NonEmpty (fromArray, singleton)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
-import Perspectives.CollectAffectedContexts (lift2, userHasPerspectiveOnRoleInstance)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###>>))
+import Perspectives.CollectAffectedContexts (lift2, userHasNoPerspectiveOnRoleInstance)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###>>), (##>>))
 import Perspectives.Deltas (addContextDelta, addPropertyDelta, addRoleDelta, addUniverseContextDelta, addUniverseRoleDelta)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (roleType_)
+import Perspectives.Instances.ObjectGetters (bottom, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), externalRoleType)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, not, pure, unit, when, ($))
+import Prelude (Unit, bind, discard, pure, unit, when, ($))
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor cid userId = do
   userType <- lift2 $ roleType_ userId
-  serialisedAsDeltasFor_ cid userId userType
+  systemUser <- lift2 (userId ##>> bottom)
+  serialisedAsDeltasFor_ cid systemUser userType
 
 serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor_ cid userId userType = do
@@ -91,8 +92,9 @@ serialisedAsDeltasFor_ cid userId userType = do
     case binding of
       Nothing -> pure unit
       Just b -> do
-        hasBinding <- lift2 $ userHasPerspectiveOnRoleInstance roleTypeId b userId
-        when (not hasBinding) $ serialiseBinding b
+        typeOfBinding <- lift2 (b ##>> roleType)
+        shouldBeSent <- lift2 $ userHasNoPerspectiveOnRoleInstance typeOfBinding b userId
+        when shouldBeSent $ serialiseBinding b
         addRoleDelta (RoleBindingDelta
           { id : roleInstance
           , binding: binding
