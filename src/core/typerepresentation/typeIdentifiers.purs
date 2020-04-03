@@ -98,6 +98,24 @@ instance eqRoleType :: Eq RoleType where
 instance ordRoleType :: Ord RoleType where
   compare = genericCompare
 
+-- | We have rare occasions where we want to lose the difference between
+-- | CalculatedRoletype and EnumeratedRoleType.
+newtype RoleType_ = RoleType_ String
+derive instance newtypeRoleType_ :: Newtype RoleType_ _
+derive instance genericRepRoleType_ :: Generic RoleType_ _
+derive newtype instance encodeRoleType_ :: Encode RoleType_
+derive newtype instance decodeRoleType_ :: Decode RoleType_
+instance showRoleType_ :: Show RoleType_ where
+  show i = "RoleType_ " <> (unwrap i)
+instance eqRoleType_ :: Eq RoleType_ where
+  eq (RoleType_ id1) (RoleType_ id2) = id1 == id2
+instance ordRoleType_ :: Ord RoleType_ where
+  compare (RoleType_ p1) (RoleType_ p2) = compare p1 p2
+
+toRoleType_ :: RoleType -> RoleType_
+toRoleType_ (ENR (EnumeratedRoleType r)) = RoleType_ r
+toRoleType_ (CR (CalculatedRoleType r)) = RoleType_ r
+
 -- | Get the string representation of a RoleType.
 roletype2string :: RoleType -> String
 roletype2string (ENR s) = unwrap s

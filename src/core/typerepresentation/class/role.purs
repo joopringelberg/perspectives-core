@@ -114,7 +114,7 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
 -----------------------------------------------------------
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
-  roleAspects r = roleAspectsBindingADT r >>= roleAspectsOfADT
+  roleAspects r = roleADT r >>= roleAspectsOfADT
   context r = pure $ ST $ contextOfRepresentation r
   contextOfRepresentation r = (unwrap r).context
   binding r = pure (unwrap r).binding

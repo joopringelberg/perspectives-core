@@ -24,7 +24,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (cons, elemIndex, find, foldM, foldr, singleton, sort, union)
+import Data.Array (cons, elemIndex, find, foldM, foldr, sort, union)
 import Data.Array (filter) as ARR
 import Data.Array.NonEmpty (fromArray, head, toArray)
 import Data.Foldable (for_)
@@ -33,25 +33,24 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
-import Foreign.Object (values)
 import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
-import Perspectives.CoreTypes (type (~~>), ActionInstance(..), Assumption, MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>))
+import Perspectives.CoreTypes (ActionInstance(..), Assumption, MonadPerspectives, MonadPerspectivesTransaction, (##>), (###=))
 import Perspectives.Deltas (distributeTransaction)
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMe)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.Names (getUserIdentifier)
-import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
+import Perspectives.Types.ObjectGetters (actionsClosure, isAutomatic)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>), (==), (&&))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (==), (&&))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -163,12 +162,6 @@ contextsAffectedByTransaction = do
           Nothing -> pure unit
           Just ri -> tell [(AffectedContext acr {contextInstances = ri})]
 
-allActions :: EnumeratedRoleType ~~> ActionType
-allActions rt = ArrayT (lift $ getEnumeratedRole rt >>= unwrap >>> _.perspectives >>> values >>> join >>> pure)
-
-isAutomatic :: ActionType ~~> Boolean
-isAutomatic at = ArrayT (lift $ getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
-
 getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
 getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
   mmyType <- lift2 (head contextInstances ##> getMe >=> OG.roleType)
@@ -176,11 +169,7 @@ getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
     Nothing -> pure []
     Just myType -> if isJust $ elemIndex myType userTypes
       then do
-        -- TODO. Notice that this test does not exclude contexts that are affected
-        -- because a Calculated Role or Property changes. As a consequence, we may
-        -- trigger rules (actions) for which the condition value does not change.
-        -- For example, a rule with the constant condition 'true' will then fire.
-        (automaticActions :: Array ActionType) <- lift2 (myType ##= filter allActions isAutomatic)
+        (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure isAutomatic)
         pure $ join $ ((\affectedContext -> (ActionInstance affectedContext) <$> automaticActions) <$> toArray contextInstances)
       else pure []
 

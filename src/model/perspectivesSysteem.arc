@@ -20,6 +20,7 @@ domain: System
     user: User (mandatory, functional)
       property: Achternaam (mandatory, not functional, String)
       property: Voornaam (mandatory, not functional, String)
+      -- LET OP: dit zijn er dus heel veel!
       property: Channel = binder ConnectedPartner >> context >> extern >> ChannelDatabaseName
       view: VolledigeNaam (Voornaam, Achternaam)
       perspective on: User

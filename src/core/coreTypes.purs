@@ -22,7 +22,7 @@
 
 module Perspectives.CoreTypes where
 
-import Control.Monad.Reader (ReaderT)
+import Control.Monad.Reader (ReaderT, lift)
 import Control.Monad.Writer (WriterT, runWriterT)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
@@ -35,7 +35,7 @@ import Effect.Exception (error)
 import Foreign.Object as F
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CouchdbState (CouchdbState)
-import Perspectives.DependencyTracking.Array.Trans (ArrayT, runArrayT)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
@@ -54,7 +54,7 @@ type DomeinCache = GLStrMap (AVar DomeinFile)
 
 type PerspectivesState = CouchdbState PerspectivesExtraState
 
-type PerspectivesExtraState = 
+type PerspectivesExtraState =
   -- Caching instances
   ( rolInstances :: RolInstances
   , contextInstances :: ContextInstances
@@ -227,6 +227,13 @@ runMonadPerspectivesQueryToObject id tog = evalMonadPerspectivesQuery id tog >>=
   (Just obj) -> pure obj
 
 infix 0 runMonadPerspectivesQueryToObject as ##>>
+
+
+-----------------------------------------------------------
+-- COMPOSE INSTANCE LEVEL AND TYPE LEVEL GETTERS
+-----------------------------------------------------------
+liftToInstanceLevel :: forall s o. (s ~~~> o) -> (s ~~> o)
+liftToInstanceLevel f = ArrayT <<< lift <<< runArrayT <<< f
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVESTRANSACTION

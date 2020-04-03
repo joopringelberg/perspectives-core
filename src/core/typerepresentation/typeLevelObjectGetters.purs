@@ -24,22 +24,23 @@ module Perspectives.Types.ObjectGetters where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (filter, find, foldM)
-import Data.Maybe (Maybe(..))
+import Data.Array (filter, find, findIndex, foldM, singleton)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Foreign.Object (keys, values)
-import Perspectives.CoreTypes (MonadPerspectives, type (~~~>))
+import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments)
+import Perspectives.Instances.Combinators (closure_)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, providesPerspectiveOnRole)
 import Perspectives.Representation.Class.PersistentType (getAction, getContext, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (class RoleClass, adtOfRole, getRole, propertiesOfADT, roleAspectsBindingADT, roleSet, viewsOfADT)
+import Perspectives.Representation.Class.Role (class RoleClass, adtOfRole, getRole, propertiesOfADT, roleAspects, roleAspectsBindingADT, roleSet, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextADT)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -114,6 +115,31 @@ propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRo
   where
     propertiesOfRole_ :: forall r i. RoleClass r i => i ~~~> PropertyType
     propertiesOfRole_ = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> roleAspectsBindingADT >=> propertiesOfADT)
+
+----------------------------------------------------------------------------------------
+------- FUNCTIONS FOR ASPECTS
+----------------------------------------------------------------------------------------
+aspectsOfRole :: EnumeratedRoleType ~~~> EnumeratedRoleType
+aspectsOfRole = ArrayT <<< (getPerspectType >=> roleAspects)
+
+aspectsClosure :: EnumeratedRoleType ~~~> EnumeratedRoleType
+aspectsClosure = closure_ aspectsOfRole
+
+hasAspect :: EnumeratedRoleType -> (EnumeratedRoleType ~~~> Boolean)
+hasAspect aspect roleType = ArrayT do
+  aspects <- roleType ###= aspectsClosure
+  pure [isJust $ findIndex ((==) aspect) aspects]
+----------------------------------------------------------------------------------------
+------- FUNCTIONS FOR ACTIONS
+----------------------------------------------------------------------------------------
+actionsOfRole :: EnumeratedRoleType ~~~> ActionType
+actionsOfRole rt = ArrayT (getEnumeratedRole rt >>= unwrap >>> _.perspectives >>> values >>> join >>> pure)
+
+actionsClosure :: EnumeratedRoleType ~~~> ActionType
+actionsClosure = aspectsClosure >=> actionsOfRole
+
+isAutomatic :: ActionType ~~~> Boolean
+isAutomatic at = ArrayT (getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS

@@ -21,7 +21,8 @@
 
 module Perspectives.Instances.ObjectGetters where
 
-import Control.Monad.Writer (lift, tell)
+import Control.Alt ((<|>))
+import Control.Monad.Writer (WriterT(..), lift, tell)
 import Data.Array (findIndex, head, index, singleton)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -33,14 +34,16 @@ import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (##>), type (~~>), MP, MonadPerspectives, assumption)
+import Perspectives.CoreTypes (type (##>), type (~~>), type (~~~>), Assumption, MP, MonadPerspectives, assumption, liftToInstanceLevel, (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
+import Perspectives.Instances.Combinators (filter)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>))
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Types.ObjectGetters (hasAspect, lookForUnqualifiedRoleType, roleInContext)
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>), (>=>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -78,6 +81,12 @@ getMe ctxt = ArrayT do
   c <- lift $ getPerspectContext ctxt
   tell [assumption (unwrap ctxt) "model:System$Context$Me"]
   pure $ maybe [] singleton (context_me c)
+
+-- | If the user has no role, return the role with the Aspect "model:System$Invitation$Guest".
+getMyType :: ContextInstance ~~> RoleType
+getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
+  <|>
+  (contextType >=> liftToInstanceLevel (lookForUnqualifiedRoleType "Guest")) ctxt
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE

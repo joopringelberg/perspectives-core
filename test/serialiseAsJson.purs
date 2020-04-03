@@ -36,7 +36,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Assignment.SerialiseAsJson" do
+theSuite = suite "Perspectives.Assignment.SerialiseAsJson" do
 
   test "serialiseAsJsonFor" (runP do
     _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
