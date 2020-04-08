@@ -33,7 +33,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -57,8 +57,8 @@ type DomeinFileRecord =
   , calculatedProperties :: Object CalculatedProperty
   , views :: Object View
   , actions :: Object Action
-  , roleInstances :: Object PerspectRol
-  , contextInstances :: Object PerspectContext
+  , crl :: String
+  , indexedNames :: Array String
   , modelDescription :: Maybe PerspectRol
   , referredModels :: Array DomeinFileId
   }
@@ -112,8 +112,8 @@ defaultDomeinFileRecord =
   , calculatedProperties: empty
   , views: empty
   , actions: empty
-  , roleInstances: empty
-  , contextInstances: empty
+  , crl: ""
+  , indexedNames: []
   , modelDescription: Nothing
   , referredModels: []}
 

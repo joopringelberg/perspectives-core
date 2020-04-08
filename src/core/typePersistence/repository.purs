@@ -58,8 +58,8 @@ fetchModelFromRepository url = catchError
 
 -- | Put the DomeinFile in the user's personal Models database.
 -- | Adds the Model instances to the user's entities.
-startUsingNewModel :: DomeinFile -> MonadPerspectives Unit
-startUsingNewModel df@(DomeinFile{contextInstances, roleInstances}) = do
-  storeDomeinFileInCouchdb df
-  forWithIndex_ contextInstances \s e -> saveEntiteit_ (ContextInstance s) e
-  forWithIndex_ roleInstances \s e -> saveEntiteit_ (RoleInstance s) e
+-- startUsingNewModel :: DomeinFile -> MonadPerspectives Unit
+-- startUsingNewModel df@(DomeinFile{contextInstances, roleInstances}) = do
+--   storeDomeinFileInCouchdb df
+--   forWithIndex_ contextInstances \s e -> saveEntiteit_ (ContextInstance s) e
+--   forWithIndex_ roleInstances \s e -> saveEntiteit_ (RoleInstance s) e
