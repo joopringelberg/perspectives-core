@@ -44,8 +44,8 @@ import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
 import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Representation.Class.Cacheable (cacheEntity, cacheEntity)
+import Perspectives.Persistent (tryGetPerspectEntiteit)
+import Perspectives.Representation.Class.Cacheable (cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
@@ -343,6 +343,9 @@ isRoleDeclaration = withPos (roleName *> (sameLine *> optionMaybe roleOccurrence
 roleOccurrence ::  IP Int
 roleOccurrence = token.parens token.integer
 
+roleInstanceName :: IP QualifiedName
+roleInstanceName = token.parens prefixedContextName
+
 data Arrow = ContextBinding | RoleBinding
 instance showArrow :: Show Arrow where
   show ContextBinding = "=>"
@@ -359,7 +362,8 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
     cmtBefore <- manyOneLineComments
     withPos do
       rname@(QualifiedName _ localRoleName) <- roleName
-      occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
+      occurrence <- sameLine *> optionMaybe (try roleOccurrence) -- The sequence number in text
+      instanceName <- sameLine *> optionMaybe (try roleInstanceName)
       _ <- (sameLine *> reservedOp (show arrow))
       (Tuple cmt bindng) <- p
       props <- withExtendedTypeNamespace localRoleName $
@@ -368,7 +372,10 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
 
       -- Naming
       nrOfRoleOccurrences <- getRoleOccurrences (show rname) -- The position in the sequence.
-      rolId <- pure $ RoleInstance ((show cname) <> "$" <> localRoleName <> "_" <> (rol_padOccurrence (roleIndex occurrence nrOfRoleOccurrences)))
+      rolId <- case instanceName of
+        Just id -> pure $ RoleInstance $ show id
+        Nothing -> pure $ RoleInstance ((show cname) <> "$" <> localRoleName <> "_" <> (rol_padOccurrence (roleIndex occurrence nrOfRoleOccurrences)))
+      -- rolId <- pure $ RoleInstance ((show cname) <> "$" <> localRoleName <> "_" <> (rol_padOccurrence (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
       cacheRol rolId
@@ -443,6 +450,13 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
       qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID)
       pure (show qn)
 
+indexedIndividualBinding ::  QualifiedName
+  -> IP (Tuple RolName RoleInstance)
+indexedIndividualBinding cName = roleBinding' cName RoleBinding do
+  ident <- (sameLine *> prefixedContextName)
+  cmt <- inLineComment
+  pure $ Tuple cmt (Just $ RoleInstance (show ident))
+
 relativeInstanceID ::  IP QualifiedName
 relativeInstanceID = lexeme do
   namespace <- getNamespace -- not $-terminated!
@@ -470,6 +484,7 @@ roleBinding cname =
   <|> contextBindingByReference cname
   <|> emptyBinding cname
   <|> roleBindingByReference cname
+  <|> indexedIndividualBinding cname
 
 withRoleCounting :: forall a. IP a -> IP a
 withRoleCounting p = do
@@ -658,7 +673,11 @@ userData = do
       else case rol_binding r of
         Nothing -> pure false
         Just b -> case FO.lookup (unwrap b) roles of
-          Nothing -> (lift $ lift $ lift $ getPerspectRol b) >>= pure <<< rol_isMe
+          Nothing -> do
+            mrole <- lift $ lift $ lift $ tryGetPerspectEntiteit b
+            case mrole of
+              Nothing -> pure false
+              Just role -> pure $ rol_isMe role
           Just br -> representsCurrentUser roles br
 
 

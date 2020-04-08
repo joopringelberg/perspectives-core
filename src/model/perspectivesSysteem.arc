@@ -1,6 +1,7 @@
 -- Copyright Joop Ringelberg and Cor Baars 2019
 domain: System
   use: sys for model:System
+  use: cdb for model:Couchdb
 
   case: TrustedCluster
     external:
