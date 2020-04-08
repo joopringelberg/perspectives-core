@@ -22,7 +22,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.loadArc" do
+theSuite = suite "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
     messages <- runP $ loadCompileAndSaveArcFile' "contextAndRole" testDirectory
@@ -45,7 +45,7 @@ theSuite = suiteOnly "Perspectives.loadArc" do
           (eq (changeRevision Nothing retrievedModel) (changeRevision Nothing reParsedModel))
     runP $ removeDomeinFileFromCouchdb "model:ContextAndRole"
 
-  testOnly "Load a model file and cache it" do
+  test "Load a model file and cache it" do
     -- 1. Load and save a model.
     messages <- runP (loadAndCompileArcFile "perspectivesSysteem" modelDirectory)
     case messages of
@@ -58,14 +58,14 @@ theSuite = suiteOnly "Perspectives.loadArc" do
     -- 1. Load and save a model.
     messages <- runP do
       setupUser
-      catchError (loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory)
+      catchError (loadCompileAndSaveArcFile' "couchdb" modelDirectory)
         \e -> logShow e *> pure []
     if null messages
       then pure unit
       else do
         logShow messages
         assert "The file could not be parsed, compiled or saved" false
-    runP $ removeDomeinFileFromCouchdb "model:System"
+    runP $ removeDomeinFileFromCouchdb "model:Couchdb"
 
   test "Load a model file and instances and store it in Couchdb" do
     -- 1. Load and save a model.
@@ -78,6 +78,6 @@ theSuite = suiteOnly "Perspectives.loadArc" do
       else do
         logShow messages
         assert "The file could not be parsed, compiled or saved" false
-    runP do
-      removeDomeinFileFromCouchdb "model:System"
-      clearUserDatabase
+    -- runP do
+    --   removeDomeinFileFromCouchdb "model:System"
+    --   clearUserDatabase

@@ -25,12 +25,12 @@ module Perspectives.Extern.Couchdb where
 
 import Affjax (Request, URL, printResponseFormatError, request)
 import Affjax.RequestBody (string) as RequestBody
+import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Error.Class (catchError, throwError)
-import Control.Monad.Except (runExcept)
 import Control.Monad.State (StateT, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
-import Data.Array (foldl, head)
+import Data.Array (elemIndex, foldl, head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -44,7 +44,7 @@ import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Generic (decodeJSON, encodeJSON)
+import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, insert, lookup)
 import Perspectives.CollectAffectedContexts (lift2)
@@ -133,6 +133,7 @@ addModelToLocalStore urls = do
       lift $ lift $ addA url _id
 
       -- sys:MijnSysteem is a special case, as we have an identifier for that already.
+      -- It is created on creating a new local user.
       crl' <- lift2 $ replaceSystemIdentifier crl
       -- For all indexed names, generate a guid and replace the occurrences of
       -- that indexed name in the CRL source file. Notice that even for model:System
@@ -211,13 +212,15 @@ addModelToLocalStore urls = do
     addA url modelName = do
       (rq :: (Request String)) <-  defaultPerspectRequest
       res <- liftAff $ request $ rq {url = url <> "/screens.js"}
-      -- res <- liftAff $ request $ rq {url = docUrl <> (maybe "" ((<>) "?rev=") rev) <> "/screens.js"}
-      result <- onAccepted res.status [200, 304] "uploadToRepository_" (pure res.body)
-      void $ case result of
-        Left e -> throwError $ error ("uploadToRepository: Errors on retrieving attachment: " <> (printResponseFormatError e))
-        Right attachment -> do
-          perspect_models <- modelsDatabaseName
-          void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
+      case elemIndex res.status [StatusCode 200, StatusCode 304] of
+        Nothing -> pure unit
+        Just _ -> do
+          void $ case res.body of
+            Left e -> throwError $ error ("addModelToLocalStore: Errors on retrieving attachment: " <> (printResponseFormatError e))
+            -- Left e -> pure unit
+            Right attachment -> do
+              perspect_models <- modelsDatabaseName
+              void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
 
 -- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do

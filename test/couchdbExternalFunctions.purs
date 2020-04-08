@@ -17,14 +17,15 @@ import Perspectives.Couchdb.Databases (getDesignDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
-import Perspectives.Extern.Couchdb (models, uploadToRepository)
-import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.Extern.Couchdb (addModelToLocalStore, models, uploadToRepository)
+import Perspectives.Persistent (entitiesDatabaseName, removeEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndSaveArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
-import Test.Perspectives.Utils (assertEqual, runP)
+import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -35,7 +36,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Extern.Couchdb" do
+theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
@@ -64,6 +65,27 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
         liftAff $ assert "There must be the model:System description" (isJust $ elemIndex (RoleInstance "model:User$PerspectivesSystemModel_External") descriptions)
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
+
+  testOnly "addModelToLocalStore" do
+    (runP do
+      setupUser
+      -- model:Couchdb is a prerequisite.
+      void $ loadCompileAndCacheArcFile' "couchdb" modelDirectory
+      -- put model:System in cache.
+      modelErrors <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+      if null modelErrors
+        then do
+          cdburl <- getCouchdbBaseURL
+          void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+      )
+    runP do
+      void $ runSterileTransaction $ addModelToLocalStore ["http://127.0.0.1:5984/repository/model%3ASystem"]
+      r <- tryGetPerspectEntiteit (ContextInstance "model:User$test")
+      liftAff $ assert "There should be an instance of model:User$test" (isJust r)
+      clearUserDatabase
+      void $ removeEntiteit (DomeinFileId "model:System")
+
 
   test "upload model to repository from files" (runP do
     -- setupUser

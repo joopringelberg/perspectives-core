@@ -344,7 +344,7 @@ roleOccurrence ::  IP Int
 roleOccurrence = token.parens token.integer
 
 roleInstanceName :: IP QualifiedName
-roleInstanceName = token.parens prefixedContextName
+roleInstanceName = token.parens expandedName
 
 data Arrow = ContextBinding | RoleBinding
 instance showArrow :: Show Arrow where
@@ -453,7 +453,7 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
 indexedIndividualBinding ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
 indexedIndividualBinding cName = roleBinding' cName RoleBinding do
-  ident <- (sameLine *> prefixedContextName)
+  ident <- (sameLine *> expandedName)
   cmt <- inLineComment
   pure $ Tuple cmt (Just $ RoleInstance (show ident))
 
