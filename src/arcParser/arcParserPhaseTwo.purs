@@ -530,9 +530,9 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     handleParts _ (Action ar) (Condition s) = expandPrefix s >>= \es -> pure $ Action (ar {condition = S es})
 
     -- ASSIGNMENT
-    handleParts _ (Action ar@{effect}) (AssignmentPart a) = case effect of
-      Nothing -> pure $ Action (ar {effect = Just $ A [a]})
-      Just (A as) -> pure $ Action (ar {effect = Just $ A (cons a as)})
+    handleParts _ (Action ar@{effect}) (AssignmentPart a) = expandPrefix a >>= \ea -> case effect of
+      Nothing -> pure $ Action (ar {effect = Just $ A [ea]})
+      Just (A as) -> pure $ Action (ar {effect = Just $ A (cons ea as)})
 
     -- LETPART
-    handleParts _ (Action ar) (LetPart lstep) = pure $ Action (ar {effect = Just $ L lstep})
+    handleParts _ (Action ar) (LetPart lstep) = expandPrefix lstep >>= \elstep -> pure $ Action (ar {effect = Just $ L elstep})
