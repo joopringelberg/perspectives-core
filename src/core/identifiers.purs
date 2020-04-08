@@ -66,6 +66,9 @@ newtype ModelName = ModelName Namespace
 instance showModelName :: Show ModelName where
   show (ModelName mn) = mn
 
+instance eqModelName :: Eq ModelName where
+  eq (ModelName n1) (ModelName n2) = n1 == n2
+
 -- | A QualifiedName consists of a namespace and a local name.
 data QualifiedName = QualifiedName Namespace LocalName
 

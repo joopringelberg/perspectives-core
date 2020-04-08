@@ -108,6 +108,8 @@ compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
   RDOM _ -> pure $ R2V (pure <<< const (Value value))
   VDOM _ _ -> throwError (error "There is no constant function for value.")
 
+compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ C2R (pure <<< const individual)
+
 compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of

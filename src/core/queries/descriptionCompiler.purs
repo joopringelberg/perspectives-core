@@ -39,13 +39,14 @@ import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range, roleRange)
 import Perspectives.Representation.ADT (ADT(..), product)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, lessThanOrEqualTo, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_, externalRoleOfADT)
+import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, lessThanOrEqualTo, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
@@ -53,7 +54,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
-import Prelude (bind, eq, map, pure, ($), (==), (&&), discard, (<$>), (<*>), (>>=))
+import Prelude (bind, discard, eq, map, pure, ($), (&&), (<$>), (<*>), (==), (>>=))
 
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
@@ -77,32 +78,46 @@ makeRoleGetter currentDomain rt = do
   pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
 
 compileSimpleStep :: Domain -> SimpleStep -> FD
-compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
-  case currentDomain of
-    (CDOM c) -> do
-      (rts :: Array RoleType) <- if isQualifiedWithDomein ident
-        then lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
-        else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
-      case uncons rts of
-        Nothing -> throwError $ ContextHasNoRole c ident
-        Just {head, tail} -> if null tail
-          then lift2 $ makeRoleGetter currentDomain head
-          else do
-            head' <- lift2 $ makeRoleGetter currentDomain head
-            foldM (makeConjunction currentDomain) head' tail
-
-    (RDOM r) -> do
-      (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
-        then  lift2 $ runArrayT $ lookForPropertyType ident r
-        else lift2 $ runArrayT $ lookForUnqualifiedPropertyType ident r
-      case head pts of
-        Nothing -> throwError $ RoleHasNoProperty r ident
-        (Just (pt :: PropertyType)) -> do
-          isF <- lift2 $ propertyTypeIsFunctional pt
-          isM <- lift2 $ propertyTypeIsMandatory pt
-          (rOfpt :: Range) <- lift2 $ rangeOfPropertyType pt
-          pure $ SQD currentDomain (QF.PropertyGetter pt) (VDOM rOfpt (Just pt)) (bool2threeValued isF) (bool2threeValued isM)
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
+  -- case deconstructModelName ident of
+  --   Nothing -> throwError $ NotWellFormedName pos ident
+  --   Just model -> do
+  --     seenBefore <- gets \{referredModels} -> isJust $ elemIndex (ModelName model) referredModels
+  --     when (not seenBefore) do
+  --       addIndexedContextsOf (ModelName model)
+  --       addIndexedRolesOf (ModelName model)
+  -- TODO. Bepaal het model. Als dat model nog niet in de namespaces van state zit, voeg dan toe en voeg de indexed names van dat model toe aan state.
+  mindexedContextType <- isIndexedContext ident
+  case mindexedContextType of
+    Just indexedContextType -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (ST indexedContextType)) True True
+    Nothing -> do
+      mindexedRoleType <- isIndexedRole ident
+      case mindexedRoleType of
+        Just indexedRoleType -> pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (ST indexedRoleType)) True True
+        Nothing -> case currentDomain of
+          (CDOM c) -> do
+            (rts :: Array RoleType) <- if isQualifiedWithDomein ident
+              then lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
+              else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
+            case uncons rts of
+              Nothing -> throwError $ ContextHasNoRole c ident
+              Just {head, tail} -> if null tail
+                then lift2 $ makeRoleGetter currentDomain head
+                else do
+                  head' <- lift2 $ makeRoleGetter currentDomain head
+                  foldM (makeConjunction currentDomain) head' tail
+          (RDOM r) -> do
+            (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
+              then  lift2 $ runArrayT $ lookForPropertyType ident r
+              else lift2 $ runArrayT $ lookForUnqualifiedPropertyType ident r
+            case head pts of
+              Nothing -> throwError $ RoleHasNoProperty r ident
+              (Just (pt :: PropertyType)) -> do
+                isF <- lift2 $ propertyTypeIsFunctional pt
+                isM <- lift2 $ propertyTypeIsMandatory pt
+                (rOfpt :: Range) <- lift2 $ rangeOfPropertyType pt
+                pure $ SQD currentDomain (QF.PropertyGetter pt) (VDOM rOfpt (Just pt)) (bool2threeValued isF) (bool2threeValued isM)
+          otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $
   SQD currentDomain (QF.Constant range stringRepresentation) (VDOM range Nothing) True True

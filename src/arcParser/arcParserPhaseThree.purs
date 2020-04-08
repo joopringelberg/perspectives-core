@@ -27,6 +27,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 -- | a role that is 'later' in the source text).
 -- |
 
+import Control.Monad.Error.Class (try)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets)
 import Control.Monad.Trans.Class (lift)
@@ -41,22 +42,22 @@ import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, insert, keys, lookup, values)
+import Foreign.Object (insert, keys, lookup, unions, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.External.CoreModules (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.InvertedQuery (InvertedQuery(..))
-import Perspectives.Names (defaultIndexedNames, expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeSequence)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..), reduce)
@@ -66,7 +67,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, getCalculation, getRole, lessThanOrEqualTo)
+import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, getCalculation, getRole, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Class.Role (contextOfRepresentation, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
@@ -77,25 +78,34 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>=>))
+import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>=>), (<*))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
-  indexedNames <- defaultIndexedNames
+  -- Store the DomeinFile in cache. If a prefix for the domain is defined in the file,
+  -- phaseThree_ will try to retrieve it.
+  void $ storeDomeinFileInCache _id (DomeinFile df)
+  phaseThree_ df <* removeDomeinFileFromCache _id
+
+phaseThree_ :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
+phaseThree_ df@{_id, referredModels} = do
+  indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
+  indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
   (Tuple ei {dfr}) <- runPhaseTwo_'
     (do
       qualifyActionRoles
       qualifyBindings
       qualifyPropertyReferences
       qualifyViewReferences
-      -- inverseBindings  -- not yet implemented, probably unnecessary.
       qualifyReturnsClause
       invertedQueriesForLocalRolesAndProperties
       compileExpressions
+      requalifyBindingsToCalculatedRoles
       compileRules
       )
     df
-    indexedNames
+    indexedContexts
+    indexedRoles
   case ei of
     (Left e) -> pure $ Left e
     otherwise -> pure $ Right dfr
@@ -169,13 +179,13 @@ qualifyActionRoles = do
 -- | to `ST qualifiedName`, using the `Reducible a (ADT b)` instance.
 -- | We qualify a name only by searching the roles of the domain. Role names that have the segmentedName as a suffix
 -- | are candidates to qualify it. Only one such Role may exist in the domain!
--- | Note that this function requires the DomeinFile to be available in the cache!
+-- | Note that this function requires the DomeinFile to be available in the cache.
 -- | This function just uses the DomeinFileRecord that is passed in as an argument.
 qualifyBindings :: PhaseThree Unit
 qualifyBindings = (lift $ gets _.dfr) >>= qualifyBindings'
   where
     qualifyBindings' :: DomeinFileRecord -> PhaseThree Unit
-    qualifyBindings' {enumeratedRoles:roles} = for_ roles
+    qualifyBindings' {enumeratedRoles:eroles, calculatedRoles:croles} = for_ eroles
       (\(EnumeratedRole rr@{_id, binding, pos}) -> do
         qbinding <- reduce (qualifyBinding pos) binding
         if binding == qbinding
@@ -184,18 +194,42 @@ qualifyBindings = (lift $ gets _.dfr) >>= qualifyBindings'
             modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {binding = qbinding}) enumeratedRoles}))
       where
         qualifyBinding :: ArcPosition -> EnumeratedRoleType -> PhaseThree (ADT EnumeratedRoleType)
-        qualifyBinding pos i@(EnumeratedRoleType ident) = qualifyRoleType pos ident roles >>= pure <<< ST
+        qualifyBinding pos i@(EnumeratedRoleType ident) = do
+          q <- try $ qualifyLocalRoleName pos ident (keys eroles)
+          case q of
+            -- We introduce an intentional semantic error here by attempting to qualify the binding, that we know not
+            -- to be an EnumeratedRole, as an EnumeratedRole. However, with requalifyBindingsToCalculatedRoles we will
+            -- correct that error. We cannot do otherwise because at this state we don't have compiled the expressions
+            -- of the CalculatedRoles yet.
+            Left _ -> qualifyLocalRoleName pos ident (keys croles)
+            Right adt -> pure adt
 
 -- | If the name is unqualified, look for an EnumeratedRol with matching local name in the Domain.
-qualifyRoleType :: ArcPosition -> String -> Object EnumeratedRole -> PhaseThree EnumeratedRoleType
-qualifyRoleType pos ident enumeratedRoles = if isQualifiedWithDomein ident
-  then pure $ EnumeratedRoleType ident
+qualifyLocalRoleName :: ArcPosition -> String -> Array String -> PhaseThree (ADT EnumeratedRoleType)
+qualifyLocalRoleName pos ident roleIdentifiers = if isQualifiedWithDomein ident
+  then pure $ ST $ EnumeratedRoleType ident
   else do
-    (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) (keys enumeratedRoles)
+    (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) roleIdentifiers
     case head candidates of
       Nothing -> throwError $ UnknownRole pos ident
-      (Just qname) | length candidates == 1 -> pure $ EnumeratedRoleType qname
+      (Just qname) | length candidates == 1 -> pure $ ST $ EnumeratedRoleType qname
       otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
+
+-- | For each (Enumerated) role with a binding to the name of a CalculatedRole (falsely declared to be Enumerated!),
+-- | replace that binding with the ADT of the (now compiled) CalculatedRole.
+requalifyBindingsToCalculatedRoles :: PhaseThree Unit
+requalifyBindingsToCalculatedRoles = (lift $ gets _.dfr) >>= qualifyBindings'
+  where
+    qualifyBindings' :: DomeinFileRecord -> PhaseThree Unit
+    qualifyBindings' {enumeratedRoles:eroles, calculatedRoles:croles} = for_ eroles
+      (\(EnumeratedRole rr@{_id, binding, pos}) -> case binding of
+        -- If the binding is to a calculated role, replace it with the roleADT of that calculated role.
+        ST (EnumeratedRoleType cr) -> case lookup cr croles of
+          Nothing -> pure unit
+          Just crole -> do
+            adt <- lift2 $ roleADT crole
+            modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {binding = adt}) enumeratedRoles})
+        otherwise -> pure unit)
 
 -- | Qualify the references to Properties in each View.
 qualifyPropertyReferences :: PhaseThree Unit
@@ -294,12 +328,10 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
           Q (MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
-            computedType' <- lift $ lift $ expandDefaultNamespaces computedType
-            qComputedType <- qualifyRoleType pos computedType' enumeratedRoles
-            if computedType == unwrap qComputedType
-              then pure unit
-              else -- change the role in the domain
-                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST qComputedType)) isF isM}) calculatedRoles})
+            computedTypeADT <- qualifyLocalRoleName pos computedType (keys enumeratedRoles)
+            case computedTypeADT of
+              ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure unit
+              _ -> modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM}) calculatedRoles})
           -- Add cases for ExternalCorePropertyGetter, ForeignRoleGetter, ForeignPropertyGetter.
           otherwise -> pure unit)
 
@@ -590,12 +622,11 @@ compileRules = do
                   otherwise -> throwError $ NotAPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty
                 pure $ BQD currentDomain fname valueQfd roleQfd currentDomain True True
               ExternalEffect f@{start, end, effectName, arguments} -> do
-                effectName' <- lift $ lift (expandDefaultNamespaces effectName)
-                case (deconstructModelName effectName' ) of
+                case (deconstructModelName effectName) of
                   Nothing -> throwError (NotWellFormedName start effectName)
                   Just modelName -> if isExternalCoreModule modelName
                     then do
-                      mappedFunctionName <- lift $ lift (mapName <$> (expandDefaultNamespaces effectName))
+                      mappedFunctionName <- pure (mapName effectName)
                       mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs mappedFunctionName
                       case mexpectedNrOfArgs of
                         Nothing -> throwError (UnknownExternalFunction start end mappedFunctionName)

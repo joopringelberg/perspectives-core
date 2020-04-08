@@ -16,12 +16,14 @@ domain: System
       aspect: sys:NamedContext$External
       property: ModelOphaalTeller (mandatory, functional, Number)
     aspect: sys:NamedContext
+    indexed: sys:MySystem
     context: TheTrustedCluster (not mandatory, functional) filledBy: TrustedCluster
     user: User (mandatory, functional)
       property: Achternaam (mandatory, not functional, String)
       property: Voornaam (mandatory, not functional, String)
       -- LET OP: dit zijn er dus heel veel!
       property: Channel = binder ConnectedPartner >> context >> extern >> ChannelDatabaseName
+      indexed: sys:Me
       view: VolledigeNaam (Voornaam, Achternaam)
       perspective on: User
     -- TODO: dit is eigenlijk overbodig
@@ -70,7 +72,18 @@ domain: System
       property: Url (mandatory, functional, String)
     user: Author (not mandatory, functional) filledBy: User
     context: IndexedContext (mandatory, functional) filledBy: sys:NamedContext
+    thing: IndexedRole (not mandatory, not functional)
 
   case: NamedContext
     external:
       property: Name (mandatory, functional, String)
+
+  case: Invitation
+    external:
+      property: IWantToInviteAnUnconnectedUser (not mandatory, functional, Boolean)
+      property: SerialisedInvitation (not mandatory, functional, String)
+    user: Guest = sys:Me
+    --user: Guest (not mandatory, functional)
+    user: Invitee (mandatory, functional) filledBy: Guest
+    user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
+    thing: Channel (not mandatory, functional) filledBy: Channel

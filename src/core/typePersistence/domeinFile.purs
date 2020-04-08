@@ -21,6 +21,8 @@
 
 module Perspectives.DomeinFile where
 
+import Control.Monad.State (State, execState, modify)
+import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
@@ -29,18 +31,19 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Foreign.Object (Object, empty)
+import Foreign.Object (Object, empty, insert)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Context (Context)
+import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Perspectives.Representation.View (View)
-import Prelude (class Eq, class Ord, class Show, bind, compare, pure, ($), (<<<), (==))
+import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, pure, unit, void, ($), (<<<), (==))
 
 newtype DomeinFile = DomeinFile DomeinFileRecord
 
@@ -57,6 +60,7 @@ type DomeinFileRecord =
   , roleInstances :: Object PerspectRol
   , contextInstances :: Object PerspectContext
   , modelDescription :: Maybe PerspectRol
+  , referredModels :: Array DomeinFileId
   }
 
 derive instance genericDomeinFile :: Generic DomeinFile _
@@ -110,7 +114,8 @@ defaultDomeinFileRecord =
   , actions: empty
   , roleInstances: empty
   , contextInstances: empty
-  , modelDescription: Nothing}
+  , modelDescription: Nothing
+  , referredModels: []}
 
 defaultDomeinFile :: DomeinFile
 defaultDomeinFile = DomeinFile defaultDomeinFileRecord
@@ -119,3 +124,21 @@ type DomeinFileEnumeratedRoles = Object EnumeratedRole
 
 setRevision :: String -> DomeinFile -> DomeinFile
 setRevision vs (DomeinFile dff) = DomeinFile $ dff {_rev = Just vs}
+
+-- | Returns a table with indexed names as key and ContextType as value.
+indexedContexts :: DomeinFile -> Object ContextType
+indexedContexts (DomeinFile{contexts}) = execState indexedContexts_ empty
+  where
+    indexedContexts_ :: State (Object ContextType) Unit
+    indexedContexts_ = for_ contexts \(Context{_id, indexedContext}) -> case indexedContext of
+      Nothing -> pure unit
+      Just i -> void $ modify \table -> insert (unwrap i) _id table
+
+-- | Returns a table with indexed names as key and ContextType as value.
+indexedRoles :: DomeinFile -> Object EnumeratedRoleType
+indexedRoles (DomeinFile{enumeratedRoles}) = execState indexedRoles_ empty
+  where
+    indexedRoles_ :: State (Object EnumeratedRoleType) Unit
+    indexedRoles_ = for_ enumeratedRoles \(EnumeratedRole{_id, indexedRole}) -> case indexedRole of
+      Nothing -> pure unit
+      Just i -> void $ modify \table -> insert (unwrap i) _id table

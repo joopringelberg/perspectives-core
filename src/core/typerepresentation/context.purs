@@ -88,6 +88,8 @@ type ContextRecord =
   , actions :: Array ActionType
   , context :: Maybe ContextType
 
+  , indexedContext :: Maybe ContextInstance
+
   , pos :: ArcPosition
   }
 
@@ -110,6 +112,8 @@ defaultContext id dname kind context pos = Context { _id: (ContextType id)
   , actions: []
   , context: map ContextType context
   , pos: pos
+
+  , indexedContext: Nothing
   }
 
 derive instance genericRepContext :: Generic Context _

@@ -71,6 +71,7 @@ contextE = try $ withEntireBlock
       case keyword of
         "use" -> useE
         "aspect" -> aspectE
+        "indexed" -> indexedE
         ctxt | isContextKind ctxt -> contextE
         role | isRoleKind role -> roleE
         otherwise -> fail "unknown keyword for a context."
@@ -81,6 +82,13 @@ contextE = try $ withEntireBlock
       pos <-getPosition
       aspect <- arcIdentifier
       pure $ ContextAspect aspect pos
+
+    indexedE :: IP ContextPart
+    indexedE = do
+      void $ reserved "indexed" *> colon
+      pos <- getPosition
+      indexedName <- arcIdentifier
+      pure $ IndexedContext indexedName pos
 
 domain :: IP ContextE
 domain = do
@@ -125,11 +133,12 @@ roleE = try $ withEntireBlock
 
     rolePart :: IP RolePart
     rolePart = do
-      typeOfPart <- lookAhead (reserved' "property" <|> reserved' "perspective" <|> reserved' "view" <|> reserved' "aspect")
+      typeOfPart <- lookAhead (reserved' "property" <|> reserved' "perspective" <|> reserved' "view" <|> reserved' "aspect" <|> reserved' "indexed")
       case typeOfPart of
         "property" -> propertyE
         "perspective" -> perspectiveE
         "aspect" -> aspectE
+        "indexed" -> indexedE
         _ -> viewE
 
     aspectE :: IP RolePart
@@ -138,6 +147,13 @@ roleE = try $ withEntireBlock
       pos <- getPosition
       aspect <- arcIdentifier
       pure $ RoleAspect aspect pos
+
+    indexedE :: IP RolePart
+    indexedE = do
+      void $ reserved "indexed" *> colon
+      pos <- getPosition
+      indexedName <- arcIdentifier
+      pure $ IndexedRole indexedName pos
 
     otherRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     otherRole_ pos knd uname = try do
@@ -289,7 +305,7 @@ perspectiveE = try do
   where
     perspective_ :: IP (List PerspectivePart)
     perspective_ = do
-      (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> arcIdentifier <|> reserved' "External" >>= pure <<< Object
+      (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> token.identifier <|> reserved' "External" >>= pure <<< Object
       (mdefaultView :: Maybe PerspectivePart) <- optionMaybe (token.parens $ arcIdentifier >>= pure <<< DefaultView)
       pos <- getPosition
       (actions :: List PerspectivePart) <- option Nil (colon *> token.commaSep minimalAction')
@@ -350,7 +366,7 @@ actionE = try $ withEntireBlock
     indirectObject :: IP (List ActionPart)
     indirectObject = do
       pos <- getPosition
-      indirectObjectName <- reserved "indirectObject" *> colon *> arcIdentifier
+      indirectObjectName <- reserved "indirectObject" *> colon *> token.identifier
       indirectObjectView <- option Nil (token.parens (arcIdentifier >>= pure <<< singleton <<< IndirectObjectView))
       pure $ Cons (IndirectObject indirectObjectName) indirectObjectView
 

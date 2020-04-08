@@ -27,6 +27,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
@@ -122,6 +123,8 @@ data QueryFunction
   -- | NaryCombinator FunctionName (Array QueryFunction)
   | BinaryCombinator FunctionName
   | Constant Range String
+  | RoleIndividual RoleInstance
+  | ContextIndividual ContextInstance
 
   | CreateRole EnumeratedRoleType
 	| CreateContext' ContextType

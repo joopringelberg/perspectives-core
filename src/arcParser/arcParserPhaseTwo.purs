@@ -27,7 +27,7 @@ import Control.Monad.Except (throwError)
 import Data.Array (cons, elemIndex, fromFoldable)
 import Data.Char.Unicode (toLower)
 import Data.Foldable (foldl)
-import Data.Lens (over)
+import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head, null, (:), length)
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -48,6 +48,7 @@ import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), 
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Query.ExpandPrefix (expandPrefix)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
@@ -59,13 +60,14 @@ import Perspectives.Representation.Class.Role (Role(..))
 import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (bind, discard, map, pure, show, ($), (<>), (==), (&&), not, (<$>))
+import Prelude (bind, discard, map, not, pure, show, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
@@ -117,8 +119,12 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
         then pure (Context $ contextUnderConstruction {contextAspects = cons (ContextType expandedAspect) contextAspects})
         else throwError $ NotWellFormedName pos' contextName
 
+    handleParts (Context contextUnderConstruction) (IndexedContext indexedName pos') = do
+      qualifiedIndexedName <- expandNamespace indexedName
+      pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
+
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
-    addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = over
+    addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = LN.over
       (prop (SProxy :: SProxy "contexts"))
       (insert ident c)
       domeinFile
@@ -249,6 +255,10 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
         then pure (EnumeratedRole $ roleUnderConstruction {roleAspects = cons (EnumeratedRoleType expandedAspect) roleAspects})
         else throwError $ NotWellFormedName pos' a
 
+    handleParts roleName (EnumeratedRole roleUnderConstruction) (IndexedRole indexedName pos') = do
+      expandedIndexedName <- expandNamespace indexedName
+      pure (EnumeratedRole $ roleUnderConstruction {indexedRole = Just (RoleInstance expandedIndexedName)})
+
     userServedByBot :: ArcPosition -> String -> List RolePart -> PhaseTwo String
     userServedByBot pos' localBotName parts = let
       f = foldl
@@ -301,11 +311,11 @@ traverseViewE (ViewE {id, viewParts, pos}) ns = do
       pure $ ENP $ EnumeratedPropertyType expandedPname
 
 addRoleToDomeinFile :: Role -> DomeinFileRecord -> DomeinFileRecord
-addRoleToDomeinFile (E r@(EnumeratedRole{_id})) domeinFile = over
+addRoleToDomeinFile (E r@(EnumeratedRole{_id})) domeinFile = LN.over
   (prop (SProxy :: SProxy "enumeratedRoles"))
   (insert (unwrap _id) r)
   domeinFile
-addRoleToDomeinFile (C r@(CalculatedRole{_id})) domeinFile = over
+addRoleToDomeinFile (C r@(CalculatedRole{_id})) domeinFile = LN.over
   (prop (SProxy :: SProxy "calculatedRoles"))
   (insert (unwrap _id) r)
   domeinFile
@@ -324,8 +334,9 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     -- Parse the query expression.
-    handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) =
-      pure $ CalculatedRole (roleUnderConstruction {calculation = S calc})
+    handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) = do
+      expandedCalc <- expandPrefix calc
+      pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc})
 
 -- | Traverse a RoleE that results in an CalculatedRole with a Calculation that depends on a Computed function.
 traverseComputedRoleE :: RoleE -> Namespace -> PhaseTwo Role
@@ -338,14 +349,16 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) = do
-      functionName' <- expandDefaultNamespaces functionName
+      functionName' <- expandNamespace functionName
+      computedType' <- expandNamespace computedType
+      expandedArguments <- traverse expandPrefix arguments
       case (deconstructModelName functionName') of
         Nothing -> throwError (NotWellFormedName pos functionName)
         Just modelName -> if isExternalCoreModule modelName
           then let
             mappedFunctionName = mapName functionName'
             mexpectedNrOfArgs = lookupHiddenFunctionNArgs mappedFunctionName
-            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter mappedFunctionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter mappedFunctionName) (S <$> (fromFoldable expandedArguments)) (RDOM (ST (EnumeratedRoleType computedType'))) Unknown Unknown
             in case mexpectedNrOfArgs of
               Nothing -> throwError (UnknownExternalFunction pos pos functionName')
               Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
@@ -353,7 +366,7 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
                 else throwError (WrongNumberOfArguments pos pos functionName expectedNrOfArgs (length arguments))
           else let
             -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
-            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ForeignRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ForeignRoleGetter functionName) (S <$> (fromFoldable expandedArguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
             in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
 
     mapName :: String -> String
@@ -397,7 +410,7 @@ traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
   (CalculatedProperty property@{calculation}) <- pure $ defaultCalculatedProperty (ns <> "$" <> id) id ns pos
   calculation' <- case head propertyParts of
     -- TODO: fish out the actually parsed calculation and use that!
-    (Just (Calculation' c)) -> pure $ S c
+    (Just (Calculation' c)) -> expandPrefix c >>= pure <<< S
     otherwise -> pure calculation
   property' <- pure $ Property.C $ CalculatedProperty (property {calculation = calculation'})
   modifyDF (\df -> addPropertyToDomeinFile property' df)
@@ -420,7 +433,7 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
   (object :: String) <- case head $ filter (case _ of
     (Object _) -> true
     otherwise -> false) perspectiveParts of
-      -- (Just (Object o)) -> pure (deconstructNamespace_ rolename <> "$" <> o)
+      -- Object **must** be a local role name. We do not expand it.
       -- Even though the object should be a role in the context,
       -- we cannot be sure at this point that it will actually be so.
       -- We pass the unqualified name and have PhaseThree look it up.
@@ -436,11 +449,15 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
   -- underly the calculation of such a role. However, that still allows the View to be defined in another
   -- namespace than the Role itself.
   -- In other words, the namespace of the View is unknown.
+  -- However, it may be fully qualified or be a prefixed name (we expand the latter).
   (defaultObjectView :: Maybe ViewType) <- pure $ map (unsafePartial \(DefaultView v) -> ViewType v)
     (head $ filter (case _ of
       (DefaultView _) -> true
       otherwise -> false) perspectiveParts)
 
+  expandedDefaultObjectView <- case defaultObjectView of
+    Nothing -> pure Nothing
+    Just (ViewType v) -> Just <<< ViewType <$> expandNamespace v
   -- Now construct all Actions. If there are no Actions and this is not a bot, fill in the defaults for Users.
   actions <- do
     (acts :: List PerspectivePart) <- pure $ (filter (case _ of
@@ -501,16 +518,16 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     handleParts contextName (Action ar) (IndirectObject ido) = pure $ Action ar {indirectObject = Just (ENR $ EnumeratedRoleType (contextName <> "$" <> ido))}
 
     -- SUBJECTVIEW
-    handleParts _ (Action ar) (SubjectView sv) = pure $ Action (ar {requiredSubjectProperties = Just $ ViewType sv})
+    handleParts _ (Action ar) (SubjectView sv) = expandNamespace sv >>= \sview -> pure $ Action (ar {requiredSubjectProperties = Just $ ViewType sview})
 
     -- OBJECTVIEW
-    handleParts _ (Action ar) (ObjectView ov) = pure $ Action (ar {requiredObjectProperties = Just $ ViewType ov})
+    handleParts _ (Action ar) (ObjectView ov) = expandNamespace ov >>= \oview -> pure $ Action (ar {requiredObjectProperties = Just $ ViewType oview})
 
     -- INDIRECTOBJECTVIEW
-    handleParts _ (Action ar) (IndirectObjectView iov) = pure $ Action (ar {requiredIndirectObjectProperties = Just $ ViewType iov})
+    handleParts _ (Action ar) (IndirectObjectView iov) = expandNamespace iov >>= \ioview -> pure $ Action (ar {requiredIndirectObjectProperties = Just $ ViewType ioview})
 
     -- CONDITION
-    handleParts _ (Action ar) (Condition s) = pure $ Action (ar {condition = S s})
+    handleParts _ (Action ar) (Condition s) = expandPrefix s >>= \es -> pure $ Action (ar {condition = S es})
 
     -- ASSIGNMENT
     handleParts _ (Action ar@{effect}) (AssignmentPart a) = case effect of

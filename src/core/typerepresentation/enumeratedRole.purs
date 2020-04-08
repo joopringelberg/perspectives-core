@@ -28,11 +28,12 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
+import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Couchdb.Revision (class Revision, Revision_)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 
@@ -69,6 +70,8 @@ type EnumeratedRoleRecord =
   , onContextDelta_context :: Array InvertedQuery
   , onContextDelta_role :: Array InvertedQuery
 
+  , indexedRole :: Maybe RoleInstance
+
   }
 
 defaultEnumeratedRole :: String -> String -> RoleKind -> String -> ArcPosition -> EnumeratedRole
@@ -97,6 +100,8 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
   , onRoleDelta_binder: []
   , onContextDelta_context: []
   , onContextDelta_role: []
+
+  , indexedRole: Nothing
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _

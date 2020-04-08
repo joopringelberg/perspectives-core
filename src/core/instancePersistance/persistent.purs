@@ -39,6 +39,7 @@ module Perspectives.Persistent
 , getPerspectEntiteit
 , getPerspectContext
 , getPerspectRol
+, getDomeinFile
 , tryGetPerspectEntiteit
 , class Persistent
 , database
@@ -122,6 +123,9 @@ getPerspectContext = getPerspectEntiteit
 
 getPerspectRol :: RoleInstance -> MP PerspectRol
 getPerspectRol = getPerspectEntiteit
+
+getDomeinFile :: DomeinFileId -> MP DomeinFile
+getDomeinFile = getPerspectEntiteit
 
 tryGetPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))

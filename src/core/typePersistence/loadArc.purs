@@ -28,6 +28,7 @@ import Data.Foldable (find)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Foreign.Object (empty)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
@@ -37,13 +38,12 @@ import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCac
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.LoadCRL (loadAndCacheCrlFile)
-import Perspectives.Names (defaultIndexedNames)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo_')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Prelude (bind, discard, pure, show, void, ($), (*>), (<>), (==))
@@ -70,12 +70,13 @@ loadAndCompileArcFile fileName directoryName = do
       case r of
         (Left e) -> pure $ Left [parseError2PerspectivesError e]
         (Right ctxt) -> do
-          -- TODO. Voeg hier CNS namen toe.
-          indexedNames <- defaultIndexedNames
-          case unwrap $ evalPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord indexedNames of
+          (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- pure $ unwrap $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty
+          case result of
             (Left e) -> pure $ Left [e]
             (Right (DomeinFile dr')) -> do
-              (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr'
+              -- Add referredModels to DomeinFile
+              dr'' <- pure dr' {referredModels = state.referredModels}
+              (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr''
               case x' of
                 (Left e) -> pure $ Left [e]
                 (Right correctedDFR) -> do

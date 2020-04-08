@@ -23,22 +23,24 @@ module Perspectives.Parsing.Arc.PhaseTwoDefs where
 
 import Control.Monad.Except (ExceptT, lift, runExceptT)
 import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, runStateT)
+import Data.Array (union)
 import Data.Either (Either)
 import Data.Identity (Identity)
 import Data.List (List)
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, empty)
-import Foreign.Object (fromFoldable, union) as OBJ
+import Foreign.Object (Object, empty, values)
+import Foreign.Object (fromFoldable, union, lookup) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinFile (DomeinFileRecord, defaultDomeinFileRecord)
+import Perspectives.DomeinFile (DomeinFileId(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
-import Perspectives.Names (defaultNamespaces, expandDefaultNamespaces_, expandNamespaces)
+import Perspectives.Names (defaultNamespaces, expandNamespaces)
 import Perspectives.Parsing.Arc.AST (ContextPart(..))
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
+import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=), (<$>))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -49,7 +51,9 @@ type PhaseTwoState =
   { bot :: Boolean
   , dfr :: DomeinFileRecord
   , namespaces :: Object String
-  , indexedNames :: Object String
+  , referredModels :: Array DomeinFileId
+  , indexedContexts :: Object ContextType
+  , indexedRoles :: Object EnumeratedRoleType
   -- In PhaseTwoState, variables are bound to QueryFunctionDescriptions.
   -- In PerspectivesState, variables are bound to Strings.
   , variableBindings :: Environment QueryFunctionDescription
@@ -62,17 +66,31 @@ type PhaseTwo' a m = ExceptT PerspectivesError (StateT PhaseTwoState m) a
 
 -- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
 runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord empty
+runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord empty empty
 
-runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> Object String ->  m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_' computation dfr indexedNames = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: defaultNamespaces, indexedNames, variableBindings: ENV.empty}
+runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> Object ContextType -> Object EnumeratedRoleType ->  m (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo_' computation dfr indexedContexts indexedRoles = runStateT (runExceptT computation)
+  { bot: false
+  , dfr: dfr
+  , namespaces: defaultNamespaces
+  , referredModels: []
+  , indexedContexts
+  , indexedRoles
+  , variableBindings: ENV.empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
-evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord empty
+evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord empty empty
 
-evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> Object String -> m (Either PerspectivesError a)
-evalPhaseTwo_' computation drf indexedNames = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: defaultNamespaces, indexedNames, variableBindings: ENV.empty}
+evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> Object ContextType -> Object EnumeratedRoleType -> m (Either PerspectivesError a)
+evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExceptT computation)
+  { bot: false
+  , dfr: drf
+  , namespaces: defaultNamespaces
+  , referredModels: []
+  , indexedContexts
+  , indexedRoles
+  , variableBindings: ENV.empty}
 
 type PhaseTwo a = PhaseTwo' a Identity
 
@@ -116,23 +134,36 @@ withFrame computation = do
   pure r
 
 -- | withNamespaces only handles the `PREFIX` element of the `ContextPart` Sum.
+-- | Computes a value in PhaseTwo with the extra namespaces.
+-- | Cumulates referredModels in PhaseTwoState, too.
 withNamespaces :: forall a. Partial => List ContextPart -> PhaseTwo a -> PhaseTwo a
 withNamespaces pairs pt = do
   x <- pure $ OBJ.fromFoldable $ map (\(PREFIX pre mod) -> Tuple pre mod) pairs
   ns <- lift $ gets _.namespaces
   -- replace keys in ns with values found in x.
-  void $ modify \s -> s {namespaces = x `OBJ.union` ns}
+  void $ modify \(s@{namespaces, referredModels}) -> s
+    { namespaces = x `OBJ.union` namespaces
+    , referredModels = referredModels `union` (DomeinFileId <$> values x)}
   ctxt <- pt
   void $ modify \s -> s {namespaces = ns}
   pure ctxt
 
-expandNamespace :: String -> PhaseTwo String
+-- | Expand prefixes to full model names.
+expandNamespace :: forall m. Monad m => String -> (PhaseTwo' String) m
 expandNamespace s = do
   namespaces <- lift $ gets _.namespaces
   pure $ expandNamespaces namespaces s
 
-expandDefaultNamespaces :: String -> PhaseTwo String
-expandDefaultNamespaces s = do
-  namespaces <- lift $ gets _.namespaces
-  indexedNames <- lift $ gets _.indexedNames
-  pure $ expandDefaultNamespaces_ indexedNames namespaces s
+-- | From an expanded name like "model:System$MySystem" returns a Maybe Context.
+isIndexedContext :: forall m. Monad m => String -> (PhaseTwo' (Maybe ContextType)) m
+isIndexedContext n = do
+  indexedContexts <- lift $ gets _.indexedContexts
+  pure $ OBJ.lookup n indexedContexts
+
+isIndexedRole :: forall m. Monad m => String -> (PhaseTwo' (Maybe EnumeratedRoleType)) m
+isIndexedRole n = do
+  indexedRoles <- lift $ gets _.indexedRoles
+  pure $ OBJ.lookup n indexedRoles
+
+-- addIndexedContextsOf :: forall m. Monad m => DomeinFileId -> PhaseTwo' Unit m
+-- addIndexedContextsOf domeinFileId =

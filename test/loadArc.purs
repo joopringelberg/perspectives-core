@@ -22,7 +22,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.loadArc" do
+theSuite = suiteOnly "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
     messages <- runP $ loadCompileAndSaveArcFile' "contextAndRole" testDirectory
@@ -45,7 +45,7 @@ theSuite = suite "Perspectives.loadArc" do
           (eq (changeRevision Nothing retrievedModel) (changeRevision Nothing reParsedModel))
     runP $ removeDomeinFileFromCouchdb "model:ContextAndRole"
 
-  test "Load a model file and cache it" do
+  testOnly "Load a model file and cache it" do
     -- 1. Load and save a model.
     messages <- runP (loadAndCompileArcFile "perspectivesSysteem" modelDirectory)
     case messages of
