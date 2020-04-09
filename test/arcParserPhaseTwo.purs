@@ -44,7 +44,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
 
@@ -123,9 +123,9 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseTwo" do
             case lookup "model:MyTestDomain$MyRole" calculatedRoles of
               Nothing -> assert "There should be a role 'MyRole'" false
               Just (CalculatedRole{calculation}) -> do
-                assert "The calculation should have '(RDOM (ST EnumeratedRoleType sys:Modellen))' as its Range"
+                assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$Modellen))' as its Range"
                   case calculation of
-                    (Q (MQD _ _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen"))) _ _)) -> true
+                    (Q (MQD _ _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$Modellen"))) _ _)) -> true
                     otherwise -> false
                 -- logShow calculation
                 assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"cbd:Models\")'"
