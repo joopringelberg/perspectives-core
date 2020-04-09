@@ -159,7 +159,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
                     )
 
   test "Testing qualifyActionRoles: UnknownRole." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  user: Gast (mandatory, functional)\n    perspective on: model:System$System$SomeRole: Consult\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  user: Gast (mandatory, functional)\n    perspective on: SomeRole: Consult\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -170,8 +170,9 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
             -- logShow dr'
             x' <- runP $ phaseThree dr'
             case x' of
-              (Left (UnknownRole _ _)) -> assert "" true
-              otherwise -> assert "Expected the 'UnkownRole' error" false
+              (Left (RoleMissingInContext _ _ _)) -> assert "" true
+              otherwise -> do
+                assert "Expected the 'RoleMissingInContext' error" false
 
   test "Testing qualifyActionRoles: RoleMissingInContext." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  user: Gast (mandatory, functional)\n    perspective on: SomeRole: Consult\n" ARC.domain
@@ -278,6 +279,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
             x' <- runP $ phaseThree dr'
+            logShow x'
             case x' of
               (Left e@(NotUniquelyIdentifying _ _ _)) -> do
                 -- logShow e

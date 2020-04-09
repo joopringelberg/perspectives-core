@@ -78,7 +78,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>=>), (<*))
+import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -201,7 +201,9 @@ qualifyBindings = (lift $ gets _.dfr) >>= qualifyBindings'
             -- to be an EnumeratedRole, as an EnumeratedRole. However, with requalifyBindingsToCalculatedRoles we will
             -- correct that error. We cannot do otherwise because at this state we don't have compiled the expressions
             -- of the CalculatedRoles yet.
-            Left _ -> qualifyLocalRoleName pos ident (keys croles)
+            -- If not found in the EnumeratedRoles, try the CalculatedRoles
+            Left (UnknownRole _ _) -> qualifyLocalRoleName pos ident (keys croles)
+            Left e -> throwError e
             Right adt -> pure adt
 
 -- | If the name is unqualified, look for an EnumeratedRol with matching local name in the Domain.
