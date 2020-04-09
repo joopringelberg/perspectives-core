@@ -3,7 +3,7 @@ GebruikerGegevens
 import model:Perspectives als psp:
 
 -- NB: Deze file wordt nooit van deze lokatie geladen. Wel b.v. in het project perspectives-react-integrated-client
-psp:PerspectivesSysteem usr:MijnSysteem
+psp:PerspectivesSysteem usr:MySystem
 	extern $modelOphaalTeller = 0
 	$gebruiker(1) => ()
 		$voornaam = "Joop"
@@ -13,4 +13,4 @@ psp:PerspectivesSysteem usr:MijnSysteem
 			extern $naam = "Het cluster van Joop"
 			$clusterGenoot -> $$gebruiker(1)
 				$url = "http://localhost"
-	$indexedContexts => usr:MijnSysteem
+	$indexedContexts => usr:MySystem

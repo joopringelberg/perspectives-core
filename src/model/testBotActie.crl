@@ -10,4 +10,4 @@ sys:Model usr:TestBotActieModel
   $IndexedContext =>
     tba:Tests usr:MyTests
       extern sys:NamedContext$External$Name = "Test bot action"
-      $Tester -> model:User$MijnSysteem$User(1)
+      $Tester -> sys:Me

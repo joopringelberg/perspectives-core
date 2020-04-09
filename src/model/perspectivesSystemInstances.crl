@@ -10,6 +10,6 @@ sys:Model usr:PerspectivesSystem
   extern $Name = "Perspectives System"
   extern $Description = "The base of all Perspectives models. Defines 'PerspectivesSystem' (with 'User'), 'Model' and 'TrustedCluster'."
   extern $Url = "http://127.0.0.1:5984/perspect_models/model%3ASystem"
-  -- This is conform the definitions, but we never use it, because usr:MijnSysteem comes complete with usr:MijnSysteem
+  -- This is conform the definitions, but we never use it, because usr:MySystem comes complete with usr:MySystem
   -- bound in $IndexedContexts. model:System is not added to an installation in the same way as other models.
-  $IndexedContext => usr:MijnSysteem
+  $IndexedContext => usr:MySystem

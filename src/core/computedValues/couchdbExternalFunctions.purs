@@ -132,12 +132,12 @@ addModelToLocalStore urls = do
       -- Copy the attachment
       lift $ lift $ addA url _id
 
-      -- sys:MijnSysteem is a special case, as we have an identifier for that already.
+      -- sys:MySystem is a special case, as we have an identifier for that already.
       -- It is created on creating a new local user.
       crl' <- lift2 $ replaceSystemIdentifier crl
       -- For all indexed names, generate a guid and replace the occurrences of
       -- that indexed name in the CRL source file. Notice that even for model:System
-      -- we can replace all indexed names now, because sys:MijnSysteem does not occur
+      -- we can replace all indexed names now, because sys:MySystem does not occur
       -- any more.
       crl'' <- pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ "model:User$" <> show (guid unit)) crl_) crl' indexedNames
       -- The modeller may have used indexed names of each of the referred models.
@@ -171,11 +171,11 @@ addModelToLocalStore urls = do
                 -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
                 -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
 
-    -- Replace all occurrences of "model:User$MijnSysteem" in the text with an identifier of the form "model:User$<guid>"
+    -- Replace all occurrences of "model:User$MySystem" in the text with an identifier of the form "model:User$<guid>"
     replaceSystemIdentifier :: String -> MonadPerspectives String
     replaceSystemIdentifier c = do
       sysId <- getMySystem
-      pure $ replaceAll (Pattern "model:System$MijnSysteem") (Replacement sysId) c
+      pure $ replaceAll (Pattern "model:System$MySystem") (Replacement sysId) c
 
     -- Prefer an earlier version of the Context instance.
     cacheRoleInstance :: RoleInstance -> PerspectRol -> MP Unit

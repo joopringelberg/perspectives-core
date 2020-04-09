@@ -2,7 +2,7 @@ UserData
 
 import model:System as sys
 
-sys:PerspectivesSystem sys:MijnSysteem
+sys:PerspectivesSystem sys:MySystem
 	extern $ModelOphaalTeller = 0
 	extern sys:NamedContext$External$Name = "Mijn Systeem"
 	$User(sys:Me) => ()
@@ -13,11 +13,11 @@ sys:PerspectivesSystem sys:MijnSysteem
 			extern $Naam = "Het cluster van Cor"
 			$ClusterGenoot -> sys:Me
 				$Url = "http://localhost"
-	$IndexedContexts => sys:MijnSysteem
+	$IndexedContexts => sys:MySystem
 	$ModelsInUse =>
 		sys:Model usr:PerspectivesSystemModel
 			extern $Name = "Perspectives System"
 			extern $Description = "The base model of Perspectives."
 			extern $Url = "http://127.0.0.1:5984/repository/model%3ASystem"
-			$IndexedContext => sys:MijnSysteem
+			$IndexedContext => sys:MySystem
 			$IndexedRole -> sys:Me
