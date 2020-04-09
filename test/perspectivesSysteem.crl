@@ -1,22 +1,23 @@
-GebruikerGegevens
+UserData
 
-import model:System als sys:
+import model:System as sys
 
-sys:PerspectivesSystem usr:test
+sys:PerspectivesSystem sys:MijnSysteem
 	extern $ModelOphaalTeller = 0
 	extern sys:NamedContext$External$Name = "Mijn Systeem"
-	$User(1) => ()
-		$Voornaam = "Test"
-		$Achternaam = "User"
+	$User(sys:Me) => ()
+		$Voornaam = "Cor"
+		$Achternaam = "Baars"
 	$TheTrustedCluster =>
 		sys:TrustedCluster $MijnCluster
-			extern $Naam = "The Test User Cluster"
-			$ClusterGenoot -> $$User(1)
+			extern $Naam = "Het cluster van Cor"
+			$ClusterGenoot -> sys:Me
 				$Url = "http://localhost"
-	$IndexedContexts => usr:test
+	$IndexedContexts => sys:MijnSysteem
 	$ModelsInUse =>
 		sys:Model usr:PerspectivesSystemModel
 			extern $Name = "Perspectives System"
 			extern $Description = "The base model of Perspectives."
 			extern $Url = "http://127.0.0.1:5984/repository/model%3ASystem"
-			$IndexedContext => usr:test
+			$IndexedContext => sys:MijnSysteem
+			$IndexedRole -> sys:Me

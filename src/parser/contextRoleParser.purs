@@ -163,6 +163,10 @@ prefix ::  IP String
 prefix = (f <$> lower <*> AR.many lower <*> char ':') where
   f fst ca c = fromCharArray $ AR.cons fst (AR.snoc ca c)
 
+prefixNoColon ::  IP String
+prefixNoColon = (f <$> lower <*> AR.many lower) where
+  f fst ca = fromCharArray $ AR.cons fst ca
+
 prefixedName ::  IP String -> IP QualifiedName
 prefixedName localName = lexeme do
   pre <- prefix
@@ -194,7 +198,7 @@ expandedPropertyName =
   try $ lexeme $ do
     dn <- domeinName
     _ <- STRING.string "$"
-    ln <- localPropertyName
+    ln <- segmentedName
     pure $ QualifiedName dn ln
 
 contextInstanceIDInCurrentNamespace ::  IP QualifiedName
@@ -293,7 +297,7 @@ enclosingContextDeclaration = (do
   cname <- (reserved "Context" *> perspectEntiteitIdentifier)
   _ <- setNamespace $ cname
   _ <- setTypeNamespace $ "model:System$Context"
-  prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
+  prfx <- (optionMaybe (reserved "as" *> prefix <* whiteSpace))
   cmt <- inLineComment
   case prfx of
     Nothing -> pure unit
@@ -344,7 +348,7 @@ roleOccurrence ::  IP Int
 roleOccurrence = token.parens token.integer
 
 roleInstanceName :: IP QualifiedName
-roleInstanceName = token.parens expandedName
+roleInstanceName = token.parens (expandedName <|> prefixedContextName)
 
 data Arrow = ContextBinding | RoleBinding
 instance showArrow :: Show Arrow where
@@ -453,7 +457,7 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
 indexedIndividualBinding ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
 indexedIndividualBinding cName = roleBinding' cName RoleBinding do
-  ident <- (sameLine *> expandedName)
+  ident <- (sameLine *> (expandedName <|> prefixedContextName))
   cmt <- inLineComment
   pure $ Tuple cmt (Just $ RoleInstance (show ident))
 
@@ -614,7 +618,7 @@ definition = do
 importExpression ::  IP Unit
 importExpression = do
   ns@(ModelName mn) <- reserved "import" *> modelName
-  mpre <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
+  mpre <- (optionMaybe (reserved "as" *> prefixNoColon <* whiteSpace))
   case mpre of
     Nothing -> pure unit
     (Just pre) -> setPrefix pre mn
@@ -652,7 +656,7 @@ userData = do
   where
 
     userDataDeclaration :: IP Unit
-    userDataDeclaration = reserved "GebruikerGegevens"
+    userDataDeclaration = reserved "UserData"
 
     -- Find all roles that bind r. Add them as the value of gevuldeRollen to r, each under its type as key.
     addGevuldeRollen :: FO.Object PerspectRol -> PerspectRol -> PerspectRol

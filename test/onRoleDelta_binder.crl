@@ -1,6 +1,6 @@
-GebruikerGegevens
+UserData
 
-import model:Test als tst:
+import model:Test as tst
 
 tst:TestCaseRoleDelta_binder usr:MyTestCase
 	$UberSelf -> usr:test$User(1)

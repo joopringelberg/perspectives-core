@@ -8,7 +8,7 @@ import Control.Monad.Writer (runWriterT)
 import Data.Array (elemIndex, length, null)
 import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Effect.Exception (error)
 import Foreign.Object (lookup)
 import Perspectives.CoreTypes (evalMonadPerspectivesQuery, (##=))
@@ -68,7 +68,6 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   testOnly "addModelToLocalStore" do
     (runP do
-      setupUser
       -- model:Couchdb is a prerequisite.
       void $ loadCompileAndCacheArcFile' "couchdb" modelDirectory
       -- put model:System in cache.
@@ -85,7 +84,6 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       liftAff $ assert "There should be an instance of model:User$test" (isJust r)
       clearUserDatabase
       void $ removeEntiteit (DomeinFileId "model:System")
-
 
   test "upload model to repository from files" (runP do
     -- setupUser

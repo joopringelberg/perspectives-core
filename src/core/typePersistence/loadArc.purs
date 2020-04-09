@@ -24,20 +24,22 @@ module Perspectives.TypePersistence.LoadArc where
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
-import Data.Foldable (find)
+import Data.Foldable (find, foldl)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
-import Foreign.Object (empty)
+import Foreign.Object (Object, empty, keys, lookup)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Node.Process (cwd)
-import Perspectives.ContextRoleParser (parseAndCache)
+import Perspectives.ContextRoleParser (userData)
 import Perspectives.CoreTypes (MonadPerspectives, (##=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
+import Perspectives.IndentParser (runIndentParser')
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding, context, getRole)
 import Perspectives.Parsing.Arc (domain)
@@ -103,21 +105,31 @@ loadArcAndCrl fileName directoryName = do
       removeDomeinFileFromCache _id
       case x of
         (Left e) -> pure $ Left e
-        (Right withInstances) -> pure $ Right (DomeinFile withInstances)
+        (Right withInstances) -> do
+          pure $ Right (DomeinFile withInstances)
   where
     addModelDescriptionAndCrl :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
     addModelDescriptionAndCrl df = do
       procesDir <- liftEffect cwd
       source <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, fileName <> ".crl"])
-      parseResult <- parseAndCache source
+      (Tuple parseResult {roleInstances, prefixes}) <- runIndentParser' source userData
       case parseResult of
         Left e -> pure $ Left $ [Custom (show e)]
-        Right (Tuple contexts roles) -> do
-          modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roles
+        Right _ -> do
+          modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roleInstances
           indexedNames <- case modelDescription of
             Nothing -> pure []
             Just m -> collectIndexedNames (identifier m)
-          pure $ Right (df {modelDescription = modelDescription, crl = source, indexedNames = indexedNames})
+          pure $ Right (df
+            { modelDescription = modelDescription
+            , crl = foldl (replacePrefix prefixes) source (keys prefixes)
+            , indexedNames = indexedNames})
+
+    -- Prefixes are stored in ParserState with a colon appended.
+    replacePrefix :: Object String -> String -> String -> String
+    replacePrefix prefixes crl prefix = case lookup prefix prefixes of
+      Nothing -> crl
+      Just r -> replaceAll (Pattern prefix) (Replacement (r <> "$")) crl
 
     collectIndexedNames :: RoleInstance -> MonadPerspectives (Array String)
     collectIndexedNames modelDescription = do

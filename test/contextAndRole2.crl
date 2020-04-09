@@ -1,6 +1,6 @@
-GebruikerGegevens
+UserData
 
-import model:ContextAndRole als tst:
+import model:ContextAndRole as tst
 
 tst:TestCase usr:MyTestCase
 	$Self -> usr:test$User(1)

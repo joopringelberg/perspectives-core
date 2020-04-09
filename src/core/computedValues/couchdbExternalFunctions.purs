@@ -175,7 +175,7 @@ addModelToLocalStore urls = do
     replaceSystemIdentifier :: String -> MonadPerspectives String
     replaceSystemIdentifier c = do
       sysId <- getMySystem
-      pure $ replaceAll (Pattern "model:User$MijnSysteem") (Replacement sysId) c
+      pure $ replaceAll (Pattern "model:System$MijnSysteem") (Replacement sysId) c
 
     -- Prefer an earlier version of the Context instance.
     cacheRoleInstance :: RoleInstance -> PerspectRol -> MP Unit

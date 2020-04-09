@@ -1,7 +1,7 @@
-GebruikerGegevens
+UserData
 
-import model:System als sys:
-import model:TestBotActie als tba:
+import model:System as sys
+import model:TestBotActie as tba
 
 sys:Model usr:TestBotActieModel
   extern $Name = "Test bot action"

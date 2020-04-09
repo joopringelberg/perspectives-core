@@ -1,7 +1,7 @@
-GebruikerGegevens
+UserData
 
-import model:Perspectives als psp:
-import model:TestBotActie als tba:
+import model:Perspectives as psp
+import model:TestBotActie as tba
 
 tba:Test usr:test1
 	intern tba:Test$binnenRolBeschrijving$v1 = "aap"

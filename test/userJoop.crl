@@ -1,6 +1,6 @@
-GebruikerGegevens
+UserData
 
-import model:System als sys:
+import model:System as sys
 
 -- Note: this description is meant for use in the PDR of others!
 sys:PerspectivesSystem usr:joop

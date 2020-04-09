@@ -207,7 +207,7 @@ getSection = lift (lift get) >>= pure <<< (_.section)
 setPrefix :: Prefix -> String -> IP Unit
 setPrefix pre exp = do
   (s@{prefixes}) <- lift (lift get)
-  lift (lift (put s {prefixes = F.insert pre exp prefixes}))
+  lift (lift (put s {prefixes = F.insert (pre <> ":") exp prefixes}))
 
 getPrefix :: Prefix -> IP (Maybe String)
 getPrefix pre = lift (lift (gets (\{prefixes} -> F.lookup pre prefixes)))

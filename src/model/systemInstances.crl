@@ -1,6 +1,6 @@
-GebruikerGegevens
+UserData
 
-import model:System als sys:
+import model:System as sys
 
 -- NB: Deze file wordt nooit van deze lokatie geladen. Wel b.v. in het project perspectives-react-integrated-client
 sys:PerspectivesSystem usr:MijnSysteem

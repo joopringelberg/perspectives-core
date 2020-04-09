@@ -1,6 +1,6 @@
-GebruikerGegevens
+UserData
 
-import model:Combinators als tst:
+import model:Combinators as tst
 
 tst:TestCase usr:MyTestCase
   $SomeRole => ()

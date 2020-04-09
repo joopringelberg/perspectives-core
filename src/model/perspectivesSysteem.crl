@@ -1,6 +1,6 @@
-GebruikerGegevens
+UserData
 
-import model:System als sys:
+import model:System as sys
 
 sys:PerspectivesSystem sys:MijnSysteem
 	extern $ModelOphaalTeller = 0

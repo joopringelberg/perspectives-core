@@ -1,6 +1,6 @@
-GebruikerGegevens
+UserData
 
-import model:Test als tst:
+import model:Test as tst
 
 tst:Case1 usr:TC1
   $RoleB(1) => ()

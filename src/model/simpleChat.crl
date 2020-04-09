@@ -1,7 +1,7 @@
-GebruikerGegevens
+UserData
 
-import model:System als sys:
-import model:SimpleChat als chat:
+import model:System as sys
+import model:SimpleChat as chat
 
 sys:Model usr:SimpleChatModel
   extern $Name = "Simple Chat"

@@ -1,6 +1,6 @@
-GebruikerGegevens
+UserData
 
-import model:Test als tst:
+import model:Test as tst
 
 tst:TestCase1 usr:MyTestCase
 	$Self -> usr:test$User(1)
