@@ -98,8 +98,9 @@ runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< create
             runner unit
       pure r
 
+-- | Run and discard the transaction.
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
-runSterileTransaction a = getUserIdentifier >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT a)
+runSterileTransaction a = pure "" >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT a)
 
 -- | Derive Assumptions from the Deltas in a Transaction. Each Assumption in the result is unique.
 assumptionsInTransaction :: Transaction -> Array Assumption

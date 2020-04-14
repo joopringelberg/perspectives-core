@@ -30,7 +30,6 @@ import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setRoleView)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
 import Perspectives.User (getCouchdbBaseURL)
 import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>), (>>=))
 
@@ -39,6 +38,7 @@ modelDirectory = "./src/model"
 
 -- | Set up by adding model:System to the users' models database. This will add the model instances, too.
 -- | This function also ensures CURRENTUSER.
+-- | Note that the repository should have model:Couchdb and model:System.
 setupUser :: MonadPerspectives Unit
 setupUser = do
   sysId <- getMySystem
@@ -47,7 +47,6 @@ setupUser = do
     Nothing -> do
       -- First, upload model:System to perspect_models.
       cdbUrl <- getCouchdbBaseURL
-      void $ loadCompileAndCacheArcFile' "couchdb" modelDirectory
       void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "/repository/model:System"])
       entitiesDatabaseName >>= setRoleView
 

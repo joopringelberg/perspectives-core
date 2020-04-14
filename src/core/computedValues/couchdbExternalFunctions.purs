@@ -26,7 +26,7 @@ module Perspectives.Extern.Couchdb where
 import Affjax (Request, URL, printResponseFormatError, request)
 import Affjax.RequestBody (string) as RequestBody
 import Affjax.StatusCode (StatusCode(..))
-import Control.Monad.AvarMonadAsk (modify) as AMA
+import Control.Monad.AvarMonadAsk (modify, get) as AMA
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.State (StateT, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
@@ -47,7 +47,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
-import Foreign.Object (Object, fromFoldable, insert, lookup, union)
+import Foreign.Object (Object, fromFoldable, insert, keys, lookup, union)
 import Foreign.Object.Unsafe (unsafeIndex)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
@@ -61,7 +61,6 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
 import Perspectives.Guid (guid)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.Indexed (indexedContexts, indexedRoles) as Indexed
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
@@ -136,19 +135,26 @@ addModelToLocalStore urls = do
       -- Copy the attachment
       lift $ lift $ addA url _id
 
-      sysId <- lift2 getMySystem
-      userId <- lift2 getUserIdentifier
-      indexedNames <- pure $ ((unwrap <$> indexedRoles) <> (unwrap <$> indexedContexts))
-      (replacements :: Object String) <- pure $ (fromFoldable
-        [Tuple "model:System$MySystem" sysId, Tuple "model:System$Me" userId]) `union` (fromFoldable ((\iname -> Tuple iname ("model:User$" <> show (guid unit))) <$> indexedNames))
-      crl' <- pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unsafeIndex replacements iname) crl_) crl indexedNames
+      -- Add replacements to PerspectivesState for the new indexed names introduced in this model.
+      (iroles :: Object RoleInstance) <- pure $ fromFoldable $ (\iRole -> Tuple (unwrap iRole) (RoleInstance ("model:User$" <> show (guid unit)))) <$> indexedRoles
+      (icontexts :: Object ContextInstance) <- pure $ fromFoldable $ (\iContext -> Tuple (unwrap iContext) (ContextInstance ("model:User$" <> show (guid unit)))) <$> indexedContexts
+      -- Make sure that `sys:Me` and `sys:MySystem` replacements come from perspectivesState.
+      mySystem <- lift2 (ContextInstance <$> getMySystem)
+      me <- lift2 (RoleInstance <$> getUserIdentifier)
+      void $ lift2 $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
+
+      -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
+      {indexedRoles:roleReplacements, indexedContexts:contextReplacements} <- lift2 AMA.get
+      crl' <- pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unwrap $ unsafeIndex roleReplacements iname) crl_) crl (keys roleReplacements)
+      crl'' <- pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unwrap $ unsafeIndex contextReplacements iname) crl_) crl' (keys contextReplacements)
+
       -- Remove the modelDescription first from cache: it will have been retrieved before the user decided to start using this model.
       case modelDescription of
         Nothing -> throwError (error ("A model has no description: " <> url))
         Just m -> void $ lift2 $ removeInternally (identifier (m :: PerspectRol))
 
       -- Parse the CRL. This will cache all roleInstances.
-      parseResult <- lift2 $ parseAndCache crl'
+      parseResult <- lift2 $ parseAndCache crl''
       case parseResult of
         Left e -> throwError (error (show e))
         Right (Tuple contextInstances roleInstances') -> do
@@ -168,14 +174,8 @@ addModelToLocalStore urls = do
                 lift2 $ void $ saveEntiteit newBindingId
                 -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
                 -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
-      -- Finally, add all indexed names defined in this model to state.
-      case modelDescription of
-        Nothing -> pure unit
-        Just m -> do
-          (iroles :: Object RoleInstance) <- lift2 $ Indexed.indexedRoles $ identifier m
-          (icontexts :: Object ContextInstance) <- lift2 $ Indexed.indexedContexts $ identifier m
-          void $ lift2 $ AMA.modify \ps -> ps {indexedRoles = ps.indexedRoles `union` iroles, indexedContexts = ps.indexedContexts `union` icontexts}
 
+    -- Sets the `me` property on the role instances. Detects the ultimate bottom case: the user instance of sys:PerspectivesSystem. Note that model user instances should never comprise particular other users!
     saveRoleInstances :: Object PerspectRol -> StateT (Object PerspectContext) MonadPerspectives Unit
     saveRoleInstances ris = forWithIndex_ ris \i a@(PerspectRol{context, pspType}) -> do
       me <- lift $ isMe (RoleInstance i)

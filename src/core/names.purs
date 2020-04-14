@@ -23,16 +23,16 @@ module Perspectives.Names
 
 where
 import Control.Monad.AvarMonadAsk (gets)
-import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (unwrap)
+import Control.Monad.Error.Class (throwError)
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Effect.Exception (error)
 import Foreign.Object (Object, fromFoldable, lookup) as OBJ
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isQualifiedWithDomein)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.User (getSystemIdentifier)
-import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=), (<$>))
+import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- EXPAND DEFAULT NAMESPACES
@@ -102,10 +102,17 @@ q ln = "model:QueryAst$" <> ln
 psp :: String -> String
 psp ln = "model:Perspectives$" <> ln
 
--- | Returns a Perspectives Identifier of the form "model:User$<guid>$User_0001".
--- TODO: vervang dit door het opzoeken van de geïndexeerde naam "model:User$Me"
+-----------------------------------------------------------
+-- SYSTEM AND USER
+-----------------------------------------------------------
+-- | Returns a Perspectives Identifier of the form "model:User$<systemIdentifier>$User".
 getUserIdentifier :: MonadPerspectives String
 getUserIdentifier = getMySystem >>= pure <<< flip append "$User"
+-- getUserIdentifier = do
+--   me <- lookupIndexedRole "model:System$Me"
+--   case me of
+--     Nothing -> throwError (error "Indexed name 'model:System$Me' should be available!")
+--     Just (RoleInstance m) -> pure m
 
 -- | Returns a Perspectives Identifier of the form "model:User$<guid>"
 getMySystem :: MonadPerspectives String
