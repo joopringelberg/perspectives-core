@@ -32,7 +32,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (||), class Eq, (&&), eq)
+import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||))
 
 -----------------------------------------------------------
 -- NAMESPACE, MODELNAME
@@ -101,6 +101,12 @@ guardWellFormedNess :: forall m. MonadThrow Error m => (String -> Maybe String) 
 guardWellFormedNess f a = onNothing' (error $ "This identifier is not well formed: " <> a ) (f a)
 
 -----------------------------------------------------------
+-- QUALIFY A NAME
+-----------------------------------------------------------
+qualifyWith :: Namespace -> String -> String
+qualifyWith ns = append ns
+
+-----------------------------------------------------------
 -- DECONSTRUCTING NAMESPACES
 -----------------------------------------------------------
 -- | A qualified name has the form `model:ModelName$First$Second`.
@@ -149,6 +155,9 @@ namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
 -- | deconstructModelName "model:Model" == Just "model:Model"
 deconstructModelName :: String -> Maybe Namespace
 deconstructModelName = getFirstMatch namespaceRegex
+
+unsafeDeconstructModelName :: String -> Namespace
+unsafeDeconstructModelName = unsafePartial fromJust <<< deconstructModelName
 
 -- | Matches all segments of the name (the string after the first "$")
 localPartsRegEx :: Regex

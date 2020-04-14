@@ -3,6 +3,6 @@ UserData
 import model:ContextAndRole as tst
 
 tst:TestCase usr:MyTestCase
-	$Self -> usr:test$User(1)
+	$Self -> model:System$Me
 	$AContextRole =>
 		$NestedCase usr:MyNestedCase

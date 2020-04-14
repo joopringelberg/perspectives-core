@@ -3,6 +3,6 @@ UserData
 import model:Test as tst
 
 tst:TestCaseAddProp usr:MyTestCase
-	$Self -> usr:test$User(1)
+	$Self -> model:System$Me
 	$ARole10 => ()
 		$Prop3 = "aap","noot"

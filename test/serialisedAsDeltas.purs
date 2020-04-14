@@ -55,7 +55,7 @@ theSuite = suite "SerialisedAsDeltas" do
       Just channel -> do
         -- load a second user
         void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User_0001") channel
+        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User") channel
 
     getter <- getRoleFunction "model:Test$TestCase$Other"
     unboundOtherRole <- (ContextInstance "model:User$MyTestCase") ##>> getter

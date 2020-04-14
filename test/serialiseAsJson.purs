@@ -47,7 +47,7 @@ theSuite = suite "Perspectives.Assignment.SerialiseAsJson" do
       Just channel -> do
         -- load a second user
         void $ loadAndCacheCrlFile "userJoop.crl" testDirectory
-        void $ runSterileTransaction $ addUserToChannel (RoleInstance "model:User$joop$User_0001") channel
+        void $ runSterileTransaction $ addUserToChannel (RoleInstance "model:User$joop$User") channel
         -- Serialise as JSON
         -- Get one of the roles
         partners <- channel ##= getRole (EnumeratedRoleType "model:System$Channel$ConnectedPartner")

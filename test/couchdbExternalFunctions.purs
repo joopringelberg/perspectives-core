@@ -36,7 +36,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
+theSuite = suite "Perspectives.Extern.Couchdb" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
@@ -66,7 +66,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  testOnly "addModelToLocalStore" do
+  test "addModelToLocalStore" do
     (runP do
       -- model:Couchdb is a prerequisite.
       void $ loadCompileAndCacheArcFile' "couchdb" modelDirectory

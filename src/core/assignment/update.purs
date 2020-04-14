@@ -396,7 +396,6 @@ deleteProperty rids propertyName = for_ rids \rid -> do
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
 -- | CURRENTUSER: there can be no change to the current user.
--- TODO. Dit kan efficienter, als je alle waarden ineens zet.
 setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 setProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid

@@ -3,10 +3,10 @@ UserData
 import model:Test as tst
 
 	tst:TestCaseContextDelta_rol usr:MyTestCase2
-		$UberSelf -> usr:test$User(1)
+		$UberSelf -> model:System$Me
 		$AnotherRole => ()
 			$Prop3 = true
 		$SourceRole =>
 			$SubCase usr:MySubcase
-				$Self -> usr:test$User(1)
+				$Self -> model:System$Me
 				$RoleToInspect => ()

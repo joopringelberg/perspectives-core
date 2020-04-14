@@ -3,7 +3,7 @@ UserData
 import model:Test as tst
 
 tst:TestCaseUnbindQualified usr:MyTestCase
-	$Self -> usr:test$User(1)
+	$Self -> model:System$Me
 	$AnotherRole6 => ()
 	$ARole6 -> $AnotherRole6(1)
 	$Nested6 =>

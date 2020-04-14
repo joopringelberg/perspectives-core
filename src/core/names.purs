@@ -22,13 +22,17 @@
 module Perspectives.Names
 
 where
-import Data.Maybe (Maybe(..))
+import Control.Monad.AvarMonadAsk (gets)
+import Data.Maybe (Maybe(..), fromJust)
+import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, fromFoldable, lookup) as OBJ
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isQualifiedWithDomein)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (getSystemIdentifier)
-import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
+import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=), (<$>))
 
 -----------------------------------------------------------
 -- EXPAND DEFAULT NAMESPACES
@@ -77,6 +81,18 @@ defaultIndexedNames = do
   pure $ OBJ.fromFoldable
     [ Tuple "model:User$Me" user
     ]
+
+-----------------------------------------------------------
+-- LOOKUP INDEXED NAMES
+-----------------------------------------------------------
+-- | Look up a fully qualified indexed name, e.g. model:User$Me
+lookupIndexedRole :: String -> MonadPerspectives (Maybe RoleInstance)
+lookupIndexedRole iname = gets _.indexedRoles >>= pure <<< OBJ.lookup iname
+
+-- | Look up a fully qualified indexed name, e.g. model:User$MySystem
+lookupIndexedContext :: String -> MonadPerspectives (Maybe ContextInstance)
+lookupIndexedContext iname = gets _.indexedContexts >>= pure <<< OBJ.lookup iname
+
 -----------------------------------------------------------
 -- CONVENIENCE NAMESPACE PREFIX FUNCIONS
 -----------------------------------------------------------
@@ -87,8 +103,9 @@ psp :: String -> String
 psp ln = "model:Perspectives$" <> ln
 
 -- | Returns a Perspectives Identifier of the form "model:User$<guid>$User_0001".
+-- TODO: vervang dit door het opzoeken van de geïndexeerde naam "model:User$Me"
 getUserIdentifier :: MonadPerspectives String
-getUserIdentifier = getMySystem >>= pure <<< flip append "$User_0001"
+getUserIdentifier = getMySystem >>= pure <<< flip append "$User"
 
 -- | Returns a Perspectives Identifier of the form "model:User$<guid>"
 getMySystem :: MonadPerspectives String

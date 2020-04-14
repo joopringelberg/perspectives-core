@@ -41,6 +41,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Perspectives.Representation.View (View)
 import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, pure, unit, void, ($), (<<<), (==))
@@ -58,7 +59,8 @@ type DomeinFileRecord =
   , views :: Object View
   , actions :: Object Action
   , crl :: String
-  , indexedNames :: Array String
+  , indexedRoles :: Array RoleInstance
+  , indexedContexts :: Array ContextInstance
   , modelDescription :: Maybe PerspectRol
   , referredModels :: Array DomeinFileId
   }
@@ -113,7 +115,8 @@ defaultDomeinFileRecord =
   , views: empty
   , actions: empty
   , crl: ""
-  , indexedNames: []
+  , indexedRoles: []
+  , indexedContexts: []
   , modelDescription: Nothing
   , referredModels: []}
 

@@ -4,7 +4,7 @@ import model:Test as tst
 import model:System as sys
 
 tst:TestCase usr:MyTestCase
-	$Self(1) -> usr:test$User(1)
+	$Self(1) -> model:System$Me
 	$AContextRole(1) =>
 		$NestedCase $MyNestedCase
 			$NestedSelf(1) -> $$Self(1)

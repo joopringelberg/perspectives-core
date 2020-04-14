@@ -29,7 +29,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.loadCRL" do
+theSuite = suiteOnly "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadAndCacheCrlFile "combinators.crl" testDirectory
     -- logShow r
@@ -48,10 +48,12 @@ theSuite = suite "Perspectives.loadCRL" do
         logShow r
         assert "Expected to load a file into couchdb" false
 
-  test "Load a file with a context instance, setup bot action" do
+  testOnly "Load a file with a context instance, setup bot action" do
     r <- runP do
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      setupUser
+      -- void $ loadCompileAndCacheArcFile' "couchdb" modelDirectory
+      errs <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+      logShow errs
+      -- setupUser
       _ <- loadCompileAndCacheArcFile' "contextAndRole" testDirectory
       _ <- loadAndSaveCrlFile "contextAndRole2.crl" testDirectory
       r' <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))

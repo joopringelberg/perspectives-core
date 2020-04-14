@@ -73,7 +73,9 @@ domain: System
       property: Url (mandatory, functional, String)
     user: Author (not mandatory, functional) filledBy: User
     context: IndexedContext (mandatory, functional) filledBy: sys:NamedContext
+      property: Name (mandatory, functional, String)
     thing: IndexedRole (not mandatory, not functional)
+      property: Name (mandatory, functional, String)
 
   case: NamedContext
     external:

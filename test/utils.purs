@@ -7,6 +7,8 @@ import Effect.Aff (Aff)
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
 import Perspectives.CoreTypes (MonadPerspectives, (##>>))
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
+import Perspectives.DomeinFile (DomeinFileId(..))
+import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadAndCacheCrlFile)
@@ -14,6 +16,7 @@ import Perspectives.Names (getMySystem)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, postDatabaseName)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
+import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser)
 import Test.Unit.Assert as Assert
@@ -87,3 +90,14 @@ setupUser_ userFile = do
   -- And set 'me' of mySystem
   (mijnSysteem :: PerspectContext) <- getPerspectContext (ContextInstance mySysteem)
   void $ cacheEntity (ContextInstance mySysteem) (changeContext_me mijnSysteem (Just user))
+
+withModel :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives Unit
+withModel m@(DomeinFileId id) a = do
+  withModel' m a
+  clearUserDatabase
+
+withModel' :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives Unit
+withModel' m@(DomeinFileId id) a = do
+  void $ runSterileTransaction (addModelToLocalStore [id])
+  void a
+  clearUserDatabase

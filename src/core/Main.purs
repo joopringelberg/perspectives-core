@@ -19,8 +19,11 @@
 -- END LICENSE
 
 module Main where
+import Control.Monad.AvarMonadAsk (modify)
+import Control.Monad.Writer (runWriterT)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.Tuple (fst)
 import Effect (Effect)
 import Effect.Aff (Error, forkAff, runAff)
 import Effect.Aff.AVar (AVar, new)
@@ -28,15 +31,19 @@ import Effect.Console (log)
 import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
+import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
+import Perspectives.Extern.Couchdb (roleInstancesFromCouchdb)
+import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.LocalAuthentication (AuthenticationResult(..))
 import Perspectives.LocalAuthentication (authenticate) as LA
 import Perspectives.PerspectivesState (newPerspectivesState)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (partyMode, setupCouchdbForFirstUser)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.IncomingPost (incomingPost)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (<$>))
 
 -- | Runs the PDR with default credentials. Used for testing clients without authentication.
 main :: Effect Unit
@@ -60,15 +67,14 @@ runPDR usr pwd ident = void $ runAff handleError do
     , couchdbPort: 5984
     , systemIdentifier: ident
     , _rev: Nothing}) av
-  void $ forkAff $ runPerspectivesWithState api state
+  runPerspectivesWithState (do
+    void $ setupUser
+    ExternalCouchdb.addExternalFunctions
+    addIndexedNames)
+    state
+  void $ forkAff $ runPerspectivesWithState setupApi state
   void $ forkAff $ runPerspectivesWithState incomingPost state
   -- void $ forkAff $ runPerspectivesWithState setupTcpApi state
-  where
-    api :: MonadPerspectives Unit
-    api = do
-      void $ setupUser
-      ExternalCouchdb.addExternalFunctions
-      setupApi
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = log $ "An error condition: " <> (show e)
@@ -92,3 +98,13 @@ authenticate usr pwd callback = void $ runAff handler do
       OK (CouchdbUser{systemIdentifier})-> do
         runPDR usr pwd systemIdentifier
         callback 2
+
+-- | Retrieve all instances of sys:Model$IndexedRole and sys:Model$IndexedContext and create a table of
+-- | all known indexed names and their private replacements in PerspectivesState.
+addIndexedNames :: MonadPerspectives Unit
+addIndexedNames = do
+  (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedRole"]))
+  iRoles <- indexedRoles_ roleInstances
+  contextInstances <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedContext"]))
+  iContexts <- indexedContexts_ contextInstances
+  modify \ps -> ps {indexedRoles = iRoles, indexedContexts = iContexts}

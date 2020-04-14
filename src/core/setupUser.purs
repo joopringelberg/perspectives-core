@@ -30,6 +30,7 @@ import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setRoleView)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
 import Perspectives.User (getCouchdbBaseURL)
 import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>), (>>=))
 
@@ -46,6 +47,7 @@ setupUser = do
     Nothing -> do
       -- First, upload model:System to perspect_models.
       cdbUrl <- getCouchdbBaseURL
+      void $ loadCompileAndCacheArcFile' "couchdb" modelDirectory
       void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "/repository/model:System"])
       entitiesDatabaseName >>= setRoleView
 

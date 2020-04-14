@@ -3,7 +3,7 @@ UserData
 import model:Test as tst
 
 tst:TestCaseContextDelta_context usr:MyTestCase
-	$Self -> usr:test$User(1)
+	$Self -> model:System$Me
 	$FillerRole => ()
 	$RoleToInspect => ()
 	$SourceRole -> $FillerRole(1)

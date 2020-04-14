@@ -3,11 +3,11 @@ UserData
 import model:Test as tst
 
 tst:TestCaseRoleDelta_binder usr:MyTestCase
-	$UberSelf -> usr:test$User(1)
+	$UberSelf -> model:System$Me
 	$AnotherRole => ()
 		$Prop4 = true
 	$NestedContext2 => ()
 	$SourceRole2 =>
 		$SubCase2 usr:MySubcase
-			$Self -> usr:test$User(1)
+			$Self -> model:System$Me
 			$RoleToInspect => ()

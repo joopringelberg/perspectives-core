@@ -42,6 +42,8 @@ newPerspectivesState uinfo av =
   -- CouchdbState
   , userInfo: uinfo
   , couchdbSessionStarted: false
+  , indexedRoles: empty
+  , indexedContexts: empty
   }
 
 -----------------------------------------------------------

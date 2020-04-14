@@ -25,10 +25,12 @@ import Control.Monad.Reader (runReaderT)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar, new)
+import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.PerspectivesState (newPerspectivesState)
-import Prelude (bind, ($))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Prelude (bind, ($), (<>))
 
 -- | Run an action in MonadPerspectives, given a username and password.
 runPerspectives :: forall a. String -> String -> String -> MonadPerspectives a
@@ -36,14 +38,14 @@ runPerspectives :: forall a. String -> String -> String -> MonadPerspectives a
 runPerspectives userName password systemId mp = do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- new $
-    newPerspectivesState (CouchdbUser
+    ((newPerspectivesState (CouchdbUser
       { userName: UserName userName
       , couchdbPassword: password
       , couchdbHost: "http://127.0.0.1"
       , couchdbPort: 5984
       , systemIdentifier: systemId
       , _rev: Nothing})
-      av
+      av) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
   runReaderT mp rf
 
 runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a

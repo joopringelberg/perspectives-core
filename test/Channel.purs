@@ -65,13 +65,13 @@ theSuite = suite "Perspectives.Sync.Channel" do
         -- channelContext <- getPerspectEntiteit channel
         -- logShow channelContext
         void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User_0001") channel
+        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User") channel
 
     getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
-    mdbname <- RoleInstance "model:User$joop$User_0001" ##> getter
+    mdbname <- RoleInstance "model:User$joop$User" ##> getter
     lift $ logShow mdbname
 
-    liftAff $ assert "We should be able to calculate the value of the Channel property for `model:User$joop$User_0001`" (isJust mdbname)
+    liftAff $ assert "We should be able to calculate the value of the Channel property for `model:User$joop$User`" (isJust mdbname)
 
     -- Comment out to prepare for a test of Transaction distribution.
     -- case mdbname of
@@ -132,7 +132,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
     achannel <- runMonadPerspectivesTransaction do
       channel <- createChannel
       void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-      addUserToChannel (RoleInstance "model:User$joop$User_0001") channel
+      addUserToChannel (RoleInstance "model:User$joop$User") channel
       setYourAddress "http://127.0.0.1" 5984 channel
       -- We now have a channel with two partners.
       lift2 $ setChannelReplication channel
@@ -147,7 +147,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
         case mchannel of
           Nothing -> pure unit
           Just (Value channelId) -> do
-            t <- liftAff $ createTransactie "model:User$joop$User_0001"
+            t <- liftAff $ createTransactie "model:User$joop$User"
             addDocument channelId t "emptyTransaction"
             -- Wait a bit
             liftAff $ delay (Milliseconds 5000.0)

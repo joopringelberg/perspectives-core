@@ -87,7 +87,7 @@ theSuite = suite "ContextRoleParser" do
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
       void $ runMonadPerspectivesTransaction $ setBinding
         (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
-        (RoleInstance "model:User$test$User_0001")
+        (RoleInstance "model:User$test$User")
       getPerspectRol (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
     assert "Self should have isMe == true" (rol_isMe ra)
     (runP clearUserDatabase)
@@ -100,7 +100,7 @@ theSuite = suite "ContextRoleParser" do
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
       void $ runMonadPerspectivesTransaction $ setBinding
         (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
-        (RoleInstance "model:User$test$User_0001")
+        (RoleInstance "model:User$test$User")
       getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
     -- logShow c
     assert "MyNestedCase3 should have 'me' equal to model:User$MyTestCase$MyNestedCase3$NestedSelf_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001"))
@@ -131,7 +131,7 @@ theSuite = suite "ContextRoleParser" do
           (SerializableNonEmptyArray $ singleton (RolSerialization
             { id: Nothing
             , properties: PropertySerialization empty
-            , binding: Just "model:User$test$User_0001"}))]
+            , binding: Just "model:User$test$User"}))]
         , externeProperties: PropertySerialization empty
 
       }
@@ -153,7 +153,7 @@ theSuite = suite "ContextRoleParser" do
         (RolSerialization
             { id: Nothing
             , properties: PropertySerialization empty
-            , binding: Just "model:User$test$User_0001"})
+            , binding: Just "model:User$test$User"})
       r' <- traverse getPerspectRol roleIdArray
       clearUserDatabase
       pure r'
@@ -163,11 +163,11 @@ theSuite = suite "ContextRoleParser" do
       Just role -> assert "The constructed Role should have 'isMe' == true" (rol_isMe role)
 
   test "expandedName on role instance name" do
-    (r :: Either ParseError QualifiedName) <- runP $ runIndentParser "model:User$test$User_0001" expandedName
+    (r :: Either ParseError QualifiedName) <- runP $ runIndentParser "model:User$test$User" expandedName
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        assert "'model:User$test$User_0001' should be parsed as a valid identifier" (id == QualifiedName "model:User" "test$User_0001")
+        assert "'model:User$test$User' should be parsed as a valid identifier" (id == QualifiedName "model:User" "test$User")
 
   test "roleBindingByReference on role instance name" (runP (do
     (r :: Either ParseError ((Tuple RolName RoleInstance))) <- runIndentParser "$Tester -> model:User$test$User(1)" (roleBindingByReference (QualifiedName "model:User" "MyTests"))
@@ -178,5 +178,5 @@ theSuite = suite "ContextRoleParser" do
         -- logShow rn -- "model:System$Tester"
         -- logShow ri -- "model:User$MyTests$Tester_0001"
         -- logShow binding
-        liftAff $ assert "In '$Tester -> model:User$test$User_0001' the parser should recognise a role instance" (binding == Just (RoleInstance "model:User$test$User_0001"))
+        liftAff $ assert "In '$Tester -> model:User$test$User' the parser should recognise a role instance" (binding == Just (RoleInstance "model:User$test$User"))
 ))

@@ -32,6 +32,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, throwError)
 import Effect.Aff.AVar (AVar)
 import Effect.Exception (error)
+import Foreign.Object (Object)
 import Foreign.Object as F
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CouchdbState (CouchdbState)
@@ -65,6 +66,10 @@ type PerspectivesExtraState =
   , queryAssumptionRegister :: AssumptionRegister
 
   , variableBindings :: Environment (Array String)
+
+  , indexedRoles :: Object RoleInstance
+
+  , indexedContexts :: Object ContextInstance
   )
 
 -----------------------------------------------------------

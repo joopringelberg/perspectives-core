@@ -3,7 +3,7 @@ UserData
 import model:Test as tst
 
 tst:TestCase usr:MyTestCase
-  $Self -> usr:test$User(1)
+  $Self -> model:System$Me
   $ARole => ()
     $Prop1 = true
   $Other => ()

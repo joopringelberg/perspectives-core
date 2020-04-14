@@ -51,9 +51,9 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
           -- logShow channelContext
           -- load a second user
           void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-          void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User_0001") channel
+          void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User") channel
       getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
-      mdbName <- RoleInstance "model:User$joop$User_0001" ##> getter
+      mdbName <- RoleInstance "model:User$joop$User" ##> getter
       clearUserDatabase
       pure mdbName
       )
@@ -77,7 +77,7 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
                   -- Now check:
                   --  * there should be a channel document
                   --  * with two instances of model:System$Channel$ConnectedPartner
-                  --  * bound to respectively "model:User$test$User_0001" and "model:User$joop$User_0001"
+                  --  * bound to respectively "model:User$test$User" and "model:User$joop$User"
                   --  * `me` of that context should be the latter.
                   mySysteem <- getMySystem
                   (user :: RoleInstance) <- ContextInstance mySysteem ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
@@ -87,7 +87,7 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
                     Just channel -> do
                       connectedPartners <- channel ##= (getRole (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> binding)
                       logShow connectedPartners
-                      liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$test$User_0001","model:User$joop$User_0001"])) == 0)
+                      liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$test$User","model:User$joop$User"])) == 0)
           clearUserDatabase
           deleteDatabase dbName
     )
@@ -99,7 +99,7 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
       (channelA :: Array ContextInstance) <- runMonadPerspectivesTransaction do
         channel <- createChannel
         void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        addUserToChannel (RoleInstance "model:User$joop$User_0001") channel
+        addUserToChannel (RoleInstance "model:User$joop$User") channel
         -- setYourAddress "http://127.0.0.1" 5984 channel
         -- We now have a channel with two partners.
         pure channel
@@ -113,7 +113,7 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
             Just (Value channelId) -> do
               -- We have to artificially replicate the channel to the post of Joop,
               -- replicating just transactions coming from Cor.
-              localReplication channelId "joop_post" (Just "model:User$cor$User_0001")
+              localReplication channelId "joop_post" (Just "model:User$cor$User")
               pure $ Just channelId
     runPJoop do
       _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
@@ -135,7 +135,7 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
         Just channel -> do
           connectedPartners <- channel ##= (getRole (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> binding)
           logShow connectedPartners
-          liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$cor$User_0001","model:User$joop$User_0001"])) == 0)
+          liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$cor$User","model:User$joop$User"])) == 0)
 
       -- Clean up
       lift $ killFiber (error "Stop") postFiber

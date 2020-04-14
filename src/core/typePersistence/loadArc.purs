@@ -30,6 +30,7 @@ import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (Object, empty, keys, lookup)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
@@ -50,9 +51,9 @@ import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Prelude (bind, discard, pure, show, void, ($), (*>), (<>), (==), (>=>), (<$>))
+import Prelude (bind, discard, pure, show, void, ($), (*>), (<>), (==), (>=>))
 import Text.Parsing.Parser (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
@@ -82,6 +83,8 @@ loadAndCompileArcFile fileName directoryName = do
             (Right (DomeinFile dr')) -> do
               -- Add referredModels to DomeinFile
               dr'' <- pure dr' {referredModels = state.referredModels}
+              log ("Just before entering phase three with " <> fileName)
+              logShow state.referredModels
               (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr''
               case x' of
                 (Left e) -> pure $ Left [e]
@@ -116,14 +119,17 @@ loadArcAndCrl fileName directoryName = do
       case parseResult of
         Left e -> pure $ Left $ [Custom (show e)]
         Right _ -> do
+          logShow (keys roleInstances)
           modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roleInstances
-          indexedNames <- case modelDescription of
-            Nothing -> pure []
-            Just m -> collectIndexedNames (identifier m)
+          (Tuple indexedRoles indexedContexts) <- case modelDescription of
+            Nothing -> pure $ Tuple [] []
+            Just m -> do
+              collectIndexedNames (identifier m)
           pure $ Right (df
             { modelDescription = modelDescription
             , crl = foldl (replacePrefix prefixes) source (keys prefixes)
-            , indexedNames = indexedNames})
+            , indexedRoles = indexedRoles
+            , indexedContexts = indexedContexts})
 
     -- Prefixes are stored in ParserState with a colon appended.
     replacePrefix :: Object String -> String -> String -> String
@@ -131,11 +137,11 @@ loadArcAndCrl fileName directoryName = do
       Nothing -> crl
       Just r -> replaceAll (Pattern prefix) (Replacement (r <> "$")) crl
 
-    collectIndexedNames :: RoleInstance -> MonadPerspectives (Array String)
+    collectIndexedNames :: RoleInstance -> MonadPerspectives (Tuple (Array RoleInstance) (Array ContextInstance))
     collectIndexedNames modelDescription = do
       iroles <- modelDescription ##= context >=> getRole (EnumeratedRoleType "model:System$Model$IndexedRole") >=> binding
       icontexts <- modelDescription ##= context >=> getRole (EnumeratedRoleType "model:System$Model$IndexedContext") >=> binding >=> context
-      pure $ (unwrap <$> iroles) <> (unwrap <$> icontexts)
+      pure $ Tuple iroles icontexts
 
 -- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl
 -- | file to the DomeinFile. Adds the model description instance. Persists that DomeinFile.

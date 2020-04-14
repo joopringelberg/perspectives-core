@@ -3,4 +3,4 @@ UserData
 import model:Test as tst
 
 tst:TestCase2 usr:MyTestCase
-	$Self -> usr:test$User(1)
+	$Self -> model:System$Me
