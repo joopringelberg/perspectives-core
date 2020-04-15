@@ -13,12 +13,13 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadAndCacheCrlFile)
 import Perspectives.Names (getMySystem)
-import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, postDatabaseName)
+import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, postDatabaseName, removeEntiteit)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser)
+import Perspectives.User (getCouchdbBaseURL)
 import Test.Unit.Assert as Assert
 
 
@@ -77,9 +78,11 @@ clearPostDatabase = do
 setupCouchdbForTestUser :: MonadPerspectives Unit
 setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "geheim"
 
+-- OBSOLETE: replace by runP and withModel.
 setupUser :: MonadPerspectives Unit
 setupUser = setupUser_ "perspectivesSysteem.crl"
 
+-- OBSOLETE: replace by a runP function and withModel.
 setupUser_ :: String -> MonadPerspectives Unit
 setupUser_ userFile = do
   void $ loadAndCacheCrlFile userFile "./test"
@@ -91,13 +94,19 @@ setupUser_ userFile = do
   (mijnSysteem :: PerspectContext) <- getPerspectContext (ContextInstance mySysteem)
   void $ cacheEntity (ContextInstance mySysteem) (changeContext_me mijnSysteem (Just user))
 
-withModel :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives Unit
+-- | Load the model, compute the value in MonadPerspectives, unload the model and remove the instances.
+-- | Notice: dependencies of the model are not automatically removed!
+withModel :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
 withModel m@(DomeinFileId id) a = do
-  withModel' m a
+  result <- withModel' m a
   clearUserDatabase
+  pure result
 
-withModel' :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives Unit
+-- | Load the model, compute the value in MonadPerspectives, unload the model.
+withModel' :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
 withModel' m@(DomeinFileId id) a = do
-  void $ runSterileTransaction (addModelToLocalStore [id])
-  void a
-  clearUserDatabase
+  cdbUrl <- getCouchdbBaseURL
+  void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "repository/" <> id])
+  result <- a
+  void $ removeEntiteit m
+  pure result
