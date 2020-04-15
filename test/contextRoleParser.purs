@@ -10,7 +10,6 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (log, logShow)
 import Foreign.Object (Object, fromFoldable, lookup, empty)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (removeBinding, setBinding)
@@ -31,7 +30,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
-import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
+import Test.Perspectives.Utils (runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
@@ -44,123 +43,91 @@ modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
 theSuite = suite "ContextRoleParser" do
-  test "inverse binding" do
-    ra <- runP do
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-      (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getRole (EnumeratedRoleType "model:Test$TestCase$Self")
-      getPerspectRol rl >>= pure <<< rol_gevuldeRollen
-    assert "There should be two inverse bindings for model:Test$TestCase$NestedCase$NestedSelf" (Just 2 == (length <$> (lookup "model:Test$TestCase$NestedCase$NestedSelf" ra)))
-    assert "There should be an inverse binding for model:Test$TestCase$NestedCase2$NestedSelf" (isJust (lookup "model:Test$TestCase$NestedCase2$NestedSelf" ra))
 
-  test "Load both a model and instances" do
-    r <- runP do
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-    -- logShow r
-    assert "A CRL file should load without problems" (isRight r)
+  test "inverse binding" $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
+    (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getRole (EnumeratedRoleType "model:Test$TestCase$Self")
+    ra <- getPerspectRol rl >>= pure <<< rol_gevuldeRollen
+    liftAff $ assert "There should be two inverse bindings for model:Test$TestCase$NestedCase$NestedSelf" (Just 2 == (length <$> (lookup "model:Test$TestCase$NestedCase$NestedSelf" ra)))
+    liftAff $ assert "There should be an inverse binding for model:Test$TestCase$NestedCase2$NestedSelf" (isJust (lookup "model:Test$TestCase$NestedCase2$NestedSelf" ra))
 
-  test "isMe for a role constructed with binding that represents the user." do
-    ra <- runP do
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-      (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getRole (EnumeratedRoleType "model:Test$TestCase$Self")
-      getPerspectRol rl
-    assert "Self should have isMe == true" (rol_isMe ra)
+  test "Load both a model and instances" $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    r <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
+    liftAff $ assert "A CRL file should load without problems" (isRight r)
 
-  test "me for a context constructed with a role that represents the user." do
-    c <- runP do
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-      getPerspectContext (ContextInstance "model:User$MyTestCase")
-    assert "MyTestCase should have 'me' equal to model:User$MyTestCase$Self_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$Self_0001"))
+  test "isMe for a role constructed with binding that represents the user." $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
+    (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getRole (EnumeratedRoleType "model:Test$TestCase$Self")
+    ra <- getPerspectRol rl
+    liftAff $ assert "Self should have isMe == true" (rol_isMe ra)
 
-  test "isMe for a role we bind with a role that represents the user." do
-    ra <- runP do
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-      void $ runMonadPerspectivesTransaction $ setBinding
-        (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
-        (RoleInstance "model:User$test$User")
-      getPerspectRol (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
-    assert "Self should have isMe == true" (rol_isMe ra)
-    (runP clearUserDatabase)
+  test "me for a context constructed with a role that represents the user." $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
+    c <- getPerspectContext (ContextInstance "model:User$MyTestCase")
+    liftAff $ assert "MyTestCase should have 'me' equal to model:User$MyTestCase$Self_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$Self_0001"))
 
-  test "me for a role we bind with a role that represents the user." do
-    c <- runP do
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-      void $ runMonadPerspectivesTransaction $ setBinding
-        (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
-        (RoleInstance "model:User$test$User")
-      getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
-    -- logShow c
-    assert "MyNestedCase3 should have 'me' equal to model:User$MyTestCase$MyNestedCase3$NestedSelf_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001"))
-    (runP clearUserDatabase)
+  test "isMe for a role we bind with a role that represents the user." $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
+    void $ runMonadPerspectivesTransaction $ setBinding
+      (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
+      (RoleInstance "model:User$test$User")
+    ra <- getPerspectRol (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
+    liftAff $ assert "Self should have isMe == true" (rol_isMe ra)
 
-  test "me for the context of a role from which we remove the binding." do
-    c <- runP do
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-      void $ runMonadPerspectivesTransaction $ removeBinding false
-        (RoleInstance "model:User$MyTestCase$MyNestedCase2$NestedSelf_0001")
-      getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
-    assert "MyNestedCase2 should have 'me' equal to Nothing" (context_me c == Nothing)
-    (runP clearUserDatabase)
+  test "me for a role we bind with a role that represents the user." $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
+    void $ runMonadPerspectivesTransaction $ setBinding
+      (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
+      (RoleInstance "model:User$test$User")
+    c <- getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
+    liftAff $ assert "MyNestedCase3 should have 'me' equal to model:User$MyTestCase$MyNestedCase3$NestedSelf_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001"))
 
-  test "me for a constructed context (isMe by implication)." do
-    c <- runP do
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      _ <- runMonadPerspectivesTransaction $ constructContext $ ContextSerialization
-        { id: "model:User$MyTestCase$MyNestedCase4"
-        , prototype: Nothing
-        , ctype: "model:Test$TestCase$NestedCase"
-        , rollen: fromFoldable [Tuple "model:Test$TestCase$NestedCase$NestedSelf"
-          (SerializableNonEmptyArray $ singleton (RolSerialization
-            { id: Nothing
-            , properties: PropertySerialization empty
-            , binding: Just "model:User$test$User"}))]
-        , externeProperties: PropertySerialization empty
+  test "me for the context of a role from which we remove the binding." $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
+    void $ runMonadPerspectivesTransaction $ removeBinding false
+      (RoleInstance "model:User$MyTestCase$MyNestedCase2$NestedSelf_0001")
+    c <- getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
+    liftAff $ assert "MyNestedCase2 should have 'me' equal to Nothing" (context_me c == Nothing)
 
-      }
-      c' <- getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase4")
-      clearUserDatabase
-      pure c'
-    -- logShow c
-    assert "MyNestedCase4 should have 'me' equal to model:User$MyTestCase$MyNestedCase4$NestedSelf_0000" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase4\
+  test "me for a constructed context (isMe by implication)." $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    _ <- runMonadPerspectivesTransaction $ constructContext $ ContextSerialization
+      { id: "model:User$MyTestCase$MyNestedCase4"
+      , prototype: Nothing
+      , ctype: "model:Test$TestCase$NestedCase"
+      , rollen: fromFoldable [Tuple "model:Test$TestCase$NestedCase$NestedSelf"
+        (SerializableNonEmptyArray $ singleton (RolSerialization
+          { id: Nothing
+          , properties: PropertySerialization empty
+          , binding: Just "model:User$test$User"}))]
+      , externeProperties: PropertySerialization empty
+
+    }
+    c <- getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase4")
+    liftAff $ assert "MyNestedCase4 should have 'me' equal to model:User$MyTestCase$MyNestedCase4$NestedSelf_0000" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase4\
     \$NestedSelf_0000"))
 
-  test "isMe for a constructed role." do
-    ra <- runP do
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      _ <- setupUser
-      _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-      roleIdArray <- runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")
-        "model:User$MyTestCase$MyNestedCase4"
-        (RolSerialization
-            { id: Nothing
-            , properties: PropertySerialization empty
-            , binding: Just "model:User$test$User"})
-      r' <- traverse getPerspectRol roleIdArray
-      clearUserDatabase
-      pure r'
-    -- logShow ra
+  test "isMe for a constructed role." $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
+    roleIdArray <- runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")
+      "model:User$MyTestCase$MyNestedCase4"
+      (RolSerialization
+          { id: Nothing
+          , properties: PropertySerialization empty
+          , binding: Just "model:User$test$User"})
+    ra <- traverse getPerspectRol roleIdArray
     case head ra of
-      Nothing -> assert "No role created" false
-      Just role -> assert "The constructed Role should have 'isMe' == true" (rol_isMe role)
+      Nothing -> liftAff $ assert "No role created" false
+      Just role -> liftAff $ assert "The constructed Role should have 'isMe' == true" (rol_isMe role)
 
   test "expandedName on role instance name" do
     (r :: Either ParseError QualifiedName) <- runP $ runIndentParser "model:User$test$User" expandedName
@@ -178,5 +145,5 @@ theSuite = suite "ContextRoleParser" do
         -- logShow rn -- "model:System$Tester"
         -- logShow ri -- "model:User$MyTests$Tester_0001"
         -- logShow binding
-        liftAff $ assert "In '$Tester -> model:User$test$User' the parser should recognise a role instance" (binding == Just (RoleInstance "model:User$test$User"))
+        liftAff $ assert "In '$Tester -> model:User$test$User' the parser should recognise a role instance" (binding == Just (RoleInstance "model:User$test$User_0001"))
 ))
