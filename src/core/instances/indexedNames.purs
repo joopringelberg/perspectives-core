@@ -23,14 +23,17 @@
 
 module Perspectives.Instances.Indexed where
 
+import Control.Monad.AvarMonadAsk (get) as AMA
 import Control.Monad.Error.Class (throwError)
-import Data.Array (head)
+import Data.Array (foldl, head)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
-import Foreign.Object (Object, fromFoldable)
+import Foreign.Object (Object, fromFoldable, keys)
+import Foreign.Object.Unsafe (unsafeIndex)
 import Perspectives.ContextAndRole (rol_binding, rol_property)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>))
 import Perspectives.Identifiers (qualifyWith, unsafeDeconstructModelName)
@@ -39,6 +42,13 @@ import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (bind, pure, ($), (<>), (>=>), (>>=))
+
+-- | Replace any occurrence of any indexed name in the string.
+replaceIndexedNames :: String -> MonadPerspectives String
+replaceIndexedNames s = do
+  {indexedRoles:roleReplacements, indexedContexts:contextReplacements} <- AMA.get
+  s' <- pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unwrap $ unsafeIndex roleReplacements iname) crl_) s (keys roleReplacements)
+  pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unwrap $ unsafeIndex contextReplacements iname) crl_) s' (keys contextReplacements)
 
 -- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
 indexedRoles :: RoleInstance -> MonadPerspectives (Object RoleInstance)

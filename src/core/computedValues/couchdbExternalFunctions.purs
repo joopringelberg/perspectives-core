@@ -1,4 +1,4 @@
--- BEGIN LICENSE
+  -- BEGIN LICENSE
 -- Perspectives Distributed Runtime
 -- Copyright (C) 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
 --
@@ -26,12 +26,12 @@ module Perspectives.Extern.Couchdb where
 import Affjax (Request, URL, printResponseFormatError, request)
 import Affjax.RequestBody (string) as RequestBody
 import Affjax.StatusCode (StatusCode(..))
-import Control.Monad.AvarMonadAsk (modify, get) as AMA
+import Control.Monad.AvarMonadAsk (modify) as AMA
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.State (StateT, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
-import Data.Array (elemIndex, foldl, head)
+import Data.Array (delete, elemIndex, head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -40,15 +40,15 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
-import Data.String (Pattern(..), Replacement(..), replaceAll)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
-import Foreign.Object (Object, fromFoldable, insert, keys, lookup, union)
-import Foreign.Object.Unsafe (unsafeIndex)
+import Foreign.Object (Object, fromFoldable, insert, lookup, union)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
 import Perspectives.ContextRoleParser (parseAndCache)
@@ -57,10 +57,12 @@ import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndRes
 import Perspectives.Couchdb.Databases (addAttachment, defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version, documentNamesInDatabase)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
 import Perspectives.Guid (guid)
+import Perspectives.Identifiers (getFirstMatch)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
@@ -68,7 +70,7 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cach
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.User (getSystemIdentifier)
-import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<<<), (<>), (==), (>>=), (||), (<$>))
+import Prelude (class Monad, Unit, append, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -126,8 +128,8 @@ addModelToLocalStore urls = do
       res <- liftAff $ request $ rq {url = url}
       df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels}) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
         (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
-
-      addModelToLocalStore (unwrap <$> referredModels)
+      repositoryUrl <- lift2 $ repository url
+      addModelToLocalStore (append repositoryUrl <<< unwrap <$> delete (DomeinFileId _id) referredModels)
       rev <- version res.headers
       -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
       -- not the local perspect_models.
@@ -144,9 +146,7 @@ addModelToLocalStore urls = do
       void $ lift2 $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
 
       -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
-      {indexedRoles:roleReplacements, indexedContexts:contextReplacements} <- lift2 AMA.get
-      crl' <- pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unwrap $ unsafeIndex roleReplacements iname) crl_) crl (keys roleReplacements)
-      crl'' <- pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unwrap $ unsafeIndex contextReplacements iname) crl_) crl' (keys contextReplacements)
+      crl' <- lift2 $ replaceIndexedNames crl
 
       -- Remove the modelDescription first from cache: it will have been retrieved before the user decided to start using this model.
       case modelDescription of
@@ -154,7 +154,7 @@ addModelToLocalStore urls = do
         Just m -> void $ lift2 $ removeInternally (identifier (m :: PerspectRol))
 
       -- Parse the CRL. This will cache all roleInstances.
-      parseResult <- lift2 $ parseAndCache crl''
+      parseResult <- lift2 $ parseAndCache crl'
       case parseResult of
         Left e -> throwError (error (show e))
         Right (Tuple contextInstances roleInstances') -> do
@@ -212,6 +212,11 @@ addModelToLocalStore urls = do
             Right attachment -> do
               perspect_models <- modelsDatabaseName
               void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
+
+    repository :: String -> MP String
+    repository url = case getFirstMatch (unsafeRegex "^(.*/).+$" noFlags) url of
+      Nothing -> throwError (error ("Cannot get repository from " <> url))
+      Just s -> pure s
 
 -- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do

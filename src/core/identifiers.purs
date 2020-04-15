@@ -241,7 +241,7 @@ roleIndexNr s = case match roleIndexNrRegex s of
 
 -----------------------------------------------------------
 -- ESCAPING FOR RETRIEVAL FROM COUCHDB
---  Couchdb accepts documentnames with ":" en "$" prima. But to retrieve them through http, these
+--  Couchdb accepts documentnames with ":" en "$". But to retrieve them through http, these
 --  characters have to be escaped.
 -----------------------------------------------------------
 
