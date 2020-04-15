@@ -2,28 +2,15 @@ module Test.Queries where
 
 import Prelude
 
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Free (Free)
-import Control.Monad.Writer (runWriterT)
-import Data.Array (elemIndex, length, null)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Array (length, null)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
-import Effect.Exception (error)
-import Foreign.Object (lookup)
-import Perspectives.CoreTypes (evalMonadPerspectivesQuery, (##=))
-import Perspectives.Couchdb (designDocumentViews)
-import Perspectives.Couchdb.Databases (getDesignDocument)
-import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.DomeinFile (DomeinFileId(..))
-import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
-import Perspectives.Extern.Couchdb (models, uploadToRepository)
+import Perspectives.CoreTypes ((##=))
 import Perspectives.Query.Compiler (getRoleFunction)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.SetupCouchdb (setModelDescriptionsView)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
-import Perspectives.User (getCouchdbBaseURL)
-import Test.Perspectives.Utils (assertEqual, runP, setupUser)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
+import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 

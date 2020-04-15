@@ -6,9 +6,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Effect.Class.Console (log)
 import Perspectives.Utilities (prettyPrint)
-import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
-import Test.Unit.Assert (assert)
 
 type MyRecordType = {a :: Int, b :: Boolean}
 
