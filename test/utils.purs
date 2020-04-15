@@ -2,20 +2,12 @@ module Test.Perspectives.Utils where
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
-import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
-import Perspectives.CoreTypes (MonadPerspectives, (##>>))
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.LoadCRL (loadAndCacheCrlFile)
-import Perspectives.Names (getMySystem)
-import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, postDatabaseName, removeEntiteit)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
+import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName, removeEntiteit)
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser)
@@ -77,22 +69,6 @@ clearPostDatabase = do
 
 setupCouchdbForTestUser :: MonadPerspectives Unit
 setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "geheim"
-
--- OBSOLETE: replace by runP and withModel.
-setupUser :: MonadPerspectives Unit
-setupUser = setupUser_ "perspectivesSysteem.crl"
-
--- OBSOLETE: replace by a runP function and withModel.
-setupUser_ :: String -> MonadPerspectives Unit
-setupUser_ userFile = do
-  void $ loadAndCacheCrlFile userFile "./test"
-  mySysteem <- getMySystem
-  (user :: RoleInstance) <- ContextInstance mySysteem ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
-  (userRol :: PerspectRol) <- getPerspectRol user
-  void $ cacheEntity user (changeRol_isMe userRol true)
-  -- And set 'me' of mySystem
-  (mijnSysteem :: PerspectContext) <- getPerspectContext (ContextInstance mySysteem)
-  void $ cacheEntity (ContextInstance mySysteem) (changeContext_me mijnSysteem (Just user))
 
 -- | Load the model, compute the value in MonadPerspectives, unload the model and remove the instances.
 -- | Notice: dependencies of the model are not automatically removed!
