@@ -20,4 +20,6 @@ sys:PerspectivesSystem sys:MySystem
 			extern $Description = "The base model of Perspectives."
 			extern $Url = "http://127.0.0.1:5984/repository/model%3ASystem"
 			$IndexedContext => sys:MySystem
+				$Name = "MySystem"
 			$IndexedRole -> sys:Me
+				$Name = "Me"

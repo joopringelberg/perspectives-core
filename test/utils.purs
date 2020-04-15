@@ -110,3 +110,6 @@ withModel' m@(DomeinFileId id) a = do
   result <- a
   void $ removeEntiteit m
   pure result
+
+withSystem :: forall a. MonadPerspectives a -> MonadPerspectives a
+withSystem = withModel (DomeinFileId "model:System")
