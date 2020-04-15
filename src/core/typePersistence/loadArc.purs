@@ -30,7 +30,6 @@ import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
-import Effect.Class.Console (log, logShow)
 import Foreign.Object (Object, empty, keys, lookup)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
@@ -80,11 +79,8 @@ loadAndCompileArcFile fileName directoryName = do
           (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- pure $ unwrap $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty
           case result of
             (Left e) -> pure $ Left [e]
-            (Right (DomeinFile dr')) -> do
-              -- Add referredModels to DomeinFile
+            (Right (DomeinFile dr'@{_id})) -> do
               dr'' <- pure dr' {referredModels = state.referredModels}
-              log ("Just before entering phase three with " <> fileName)
-              logShow state.referredModels
               (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr''
               case x' of
                 (Left e) -> pure $ Left [e]
@@ -119,7 +115,6 @@ loadArcAndCrl fileName directoryName = do
       case parseResult of
         Left e -> pure $ Left $ [Custom (show e)]
         Right _ -> do
-          logShow (keys roleInstances)
           modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roleInstances
           (Tuple indexedRoles indexedContexts) <- case modelDescription of
             Nothing -> pure $ Tuple [] []

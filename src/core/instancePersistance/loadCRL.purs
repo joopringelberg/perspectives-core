@@ -36,6 +36,7 @@ import Node.Process (cwd)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (updateRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -43,6 +44,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransac
 import Perspectives.SaveUserData (saveContextInstance)
 
 -- | Loads a file from a directory relative to the active process.
+-- | Replaces all indexed names.
 -- | All context and role instances are loaded into the cache.
 -- | Takes care of the responsibility CURRENTUSER.
 -- | NOTICE that if an entity was in Couchdb before and was not already in cache,
@@ -53,7 +55,7 @@ loadAndCacheCrlFile :: String ->
 loadAndCacheCrlFile file directoryName = do
   procesDir <- liftEffect cwd
   text <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, file])
-  parseResult <- parseAndCache text
+  parseResult <- replaceIndexedNames text >>= parseAndCache
   case parseResult of
     Left e -> pure $ Left [Custom (show e)]
     Right contextsAndRoles@(Tuple contextInstances roleInstances) -> do
@@ -69,6 +71,7 @@ loadAndCacheCrlFile_ file directoryName = do
     Right _ -> pure []
 
 -- | Loads a file from the given directory relative to the directory of the active process.
+-- | Replaces all indexed names.
 -- | Runs all bot actions.
 -- | All instances are loaded into the cache, and stored in Couchdb.
 -- | This function takes care of
@@ -80,7 +83,7 @@ loadAndSaveCrlFile :: String -> String -> MonadPerspectives (Array PerspectivesE
 loadAndSaveCrlFile file directoryName = do
   procesDir <- liftEffect cwd
   text <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, file])
-  parseResult <- parseAndCache text
+  parseResult <- replaceIndexedNames text >>= parseAndCache
   case parseResult of
     Left e -> pure $ [Custom (show e)]
     Right contextsAndRoles@(Tuple contextInstances roleInstances) -> do
