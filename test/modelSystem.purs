@@ -29,7 +29,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadArcAndCrl, loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
 import Perspectives.User (getCouchdbBaseURL)
-import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
+import Test.Perspectives.Utils (clearUserDatabase, runP)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -52,7 +52,7 @@ theSuite = suiteSkip  "Model:System" do
         logShow ar
         liftAff $ assert "Model errors" false
       else pure unit
-    setupUser
+    -- setupUser
     -- Read and compile the model and its instances, but do not save or cache them.
     r <- loadArcAndCrl "testBotActie" modelDirectory
     case r of

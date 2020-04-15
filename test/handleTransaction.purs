@@ -108,8 +108,6 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
               localReplication channelId "joop_post" (Just "model:User$cor$User")
               pure $ Just channelId
     runPJoop $ withSystem do
-      -- Without this, the test user is unknown at Joop's side.
-      -- void $ loadAndCacheCrlFile_ "userCor.crl" testDirectory
       (pstate :: AVar PerspectivesState) <- ask
       -- Handle post in parallel
       -- TODO. Dit proces stopt niet, ondanks killFiber
