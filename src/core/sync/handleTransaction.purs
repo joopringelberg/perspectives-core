@@ -29,7 +29,6 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Identity (Identity)
 import Data.Maybe (fromJust)
 import Data.Newtype (unwrap)
-import Effect.Class.Console (log)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..))
@@ -45,12 +44,12 @@ import Perspectives.SerializableNonEmptyArray (toNonEmptyArray)
 import Perspectives.Sync.Class.DeltaClass (getSequenceNumber)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, discard, pure, unit, void, ($), bind, (>>=), (<<<), (+), (<>), show)
+import Prelude (Unit, discard, pure, unit, void, ($), bind, (>>=), (<<<), (+))
 
 executeContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
 executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext} ) = case deltaType of
   AddRoleInstancesToContext -> do
-    log ("addRoleInstancesToContext " <> show contextId <> " and " <> show roleInstances)
+    -- log ("addRoleInstancesToContext " <> show contextId <> " and " <> show roleInstances)
     addRoleInstancesToContext contextId roleType (unwrap roleInstances)
   MoveRoleInstancesToAnotherContext -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
   NoOp -> pure unit
@@ -58,7 +57,7 @@ executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstan
 executeRoleBindingDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
 executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved}) = case deltaType of
   SetBinding -> do
-    log ("setBinding of " <> show roleId <> " to " <> show (unsafePartial $ fromJust binding))
+    -- log ("setBinding of " <> show roleId <> " to " <> show (unsafePartial $ fromJust binding))
     void $ setBinding roleId (unsafePartial $ fromJust binding)
   RemoveBinding -> void $ removeBinding roleWillBeRemoved roleId
 
@@ -68,13 +67,13 @@ executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property}) = 
   RemoveProperty -> removeProperty [id] property values
   DeleteProperty -> deleteProperty [id] property
   SetProperty -> do
-    log ("setProperty " <> show property <> " of " <> show id <> " to " <> show values)
+    -- log ("setProperty " <> show property <> " of " <> show id <> " to " <> show values)
     setProperty [id] property values
 
 executeUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
 executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) = case deltaType of
   ConstructEmptyContext -> do
-    log ("constructEmptyContext " <> show id <> " with type " <> show contextType)
+    -- log ("constructEmptyContext " <> show id <> " with type " <> show contextType)
     void $ constructEmptyContext id (unwrap contextType) "" (PropertySerialization empty)
   RemoveContextInstance -> removeContextInstance id
 
@@ -84,11 +83,11 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
     -- find the number of roleinstances in the context.
     offset <- lift2 ((id ##= getRole roleType) >>= pure <<< length)
     forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do
-      log ("constructEmptyRole in " <> show id <> " with id " <> show roleInstance)
+      -- log ("constructEmptyRole in " <> show id <> " with id " <> show roleInstance)
       void $ constructEmptyRole_ roleType id (offset + i) roleInstance
   ConstructExternalRole -> do
     externalRole <- pure (head $ toNonEmptyArray roleInstances)
-    log ("ConstructExternalRole in " <> show id)
+    -- log ("ConstructExternalRole in " <> show id)
     void $ constructEmptyRole_ roleType id 0 externalRole
     lift2 $ void $ saveEntiteit externalRole
   RemoveRoleInstance -> for_ (toNonEmptyArray roleInstances) removeRoleInstance

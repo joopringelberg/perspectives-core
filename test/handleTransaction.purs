@@ -26,7 +26,7 @@ import Perspectives.Sync.Channel (addUserToChannel, createChannel, localReplicat
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.IncomingPost (incomingPost)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
-import Test.Perspectives.Utils (clearPostDatabase, clearUserDatabase, runP, runPCor, runPJoop, setupUser, setupUser_)
+import Test.Perspectives.Utils (clearPostDatabase, clearUserDatabase, runP, runPCor, runPJoop, setupUser, setupUser_, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -40,9 +40,7 @@ theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Sync.HandleTransaction" do
 
   test "create channel, add user, check for channel on the other side" do
-    mdbName <- (runP do
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      setupUser
+    mdbName <- (runP $ withSystem do
       achannel <- runMonadPerspectivesTransaction createChannel
       case head achannel of
         Nothing -> liftAff $ assert "Failed to create a channel" false
@@ -53,12 +51,9 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
           void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
           void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User") channel
       getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
-      mdbName <- RoleInstance "model:User$joop$User" ##> getter
-      clearUserDatabase
-      pure mdbName
+      RoleInstance "model:User$joop$User" ##> getter
       )
-    (runPJoop do
-      setupUser_ "userJoop.crl"
+    (runPJoop $ withSystem do
       case mdbName of
         Nothing -> liftAff $ assert "There should be a channel" false
         Just (Value dbName) -> do
@@ -88,14 +83,11 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
                       connectedPartners <- channel ##= (getRole (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> binding)
                       logShow connectedPartners
                       liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$test$User","model:User$joop$User"])) == 0)
-          clearUserDatabase
           deleteDatabase dbName
     )
 
   test "create channel between two users, add user on one side, check for channel context on the other side" do
-    channelId <- runPCor do
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      setupUser_ "userCor.crl"
+    channelId <- runPCor $ withSystem do
       (channelA :: Array ContextInstance) <- runMonadPerspectivesTransaction do
         channel <- createChannel
         void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
@@ -115,9 +107,7 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
               -- replicating just transactions coming from Cor.
               localReplication channelId "joop_post" (Just "model:User$cor$User")
               pure $ Just channelId
-    runPJoop do
-      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-      setupUser_ "userJoop.crl"
+    runPJoop $ withSystem do
       -- Without this, the test user is unknown at Joop's side.
       -- void $ loadAndCacheCrlFile_ "userCor.crl" testDirectory
       (pstate :: AVar PerspectivesState) <- ask
@@ -139,7 +129,6 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
 
       -- Clean up
       lift $ killFiber (error "Stop") postFiber
-      -- clearUserDatabase
       -- clear the post database
       clearPostDatabase
 
@@ -148,5 +137,3 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
         Just c -> do
           deleteDatabase c
           void $ endReplication c "joop_post"
-
-    runPCor clearUserDatabase
