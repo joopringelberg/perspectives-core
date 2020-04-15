@@ -35,6 +35,7 @@ import Effect.Exception (error)
 import Foreign.Object (Object)
 import Foreign.Object as F
 import Perspectives.ApiTypes (CorrelationIdentifier)
+import Perspectives.Couchdb.ChangesFeed (EventSource)
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
@@ -70,6 +71,8 @@ type PerspectivesExtraState =
   , indexedRoles :: Object RoleInstance
 
   , indexedContexts :: Object ContextInstance
+
+  , post :: Maybe EventSource
   )
 
 -----------------------------------------------------------

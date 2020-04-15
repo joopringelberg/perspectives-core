@@ -21,6 +21,7 @@
 module Perspectives.Sync.IncomingPost where
 
 import Control.Coroutine (Consumer, await, runProcess, ($$))
+import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
@@ -28,12 +29,12 @@ import Data.Maybe (Maybe(..))
 import Effect.Class (liftEffect)
 import Foreign (MultipleErrors)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesExtraState)
-import Perspectives.Couchdb.ChangesFeed (DocProducer, createEventSource, docProducer)
+import Perspectives.Couchdb.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.Transaction (Transaction)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, pure, unit, void, ($), (<>))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>))
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
@@ -42,7 +43,9 @@ incomingPost = do
   -- get the post database
   post <- postDbName
   -- Create an EventSource
-  es <- liftEffect $ createEventSource (base <> post) Nothing true
+  (es :: EventSource) <- liftEffect $ createEventSource (base <> post) Nothing true
+  -- Save in state, so we can close it.
+  void $ modify \s -> s {post = Just es}
   -- Produce new Transaction documents
   (transactionProducer :: DocProducer PerspectivesExtraState Transaction) <- pure $ docProducer es
   -- Handle them.

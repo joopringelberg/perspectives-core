@@ -22,7 +22,7 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (AVar)
 import Foreign.Object (empty)
 import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState)
@@ -44,6 +44,7 @@ newPerspectivesState uinfo av =
   , couchdbSessionStarted: false
   , indexedRoles: empty
   , indexedContexts: empty
+  , post: Nothing
   }
 
 -----------------------------------------------------------
