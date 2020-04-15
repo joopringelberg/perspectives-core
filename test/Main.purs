@@ -3,7 +3,6 @@ module Test.Main where
 import Prelude
 
 import Effect (Effect)
--- import Perspectives.SetupUser (setupUser)
 -- import Test.Perspectives.DataTypeObjectGetters (theSuite) as DTO
 import Test.Parsing.Arc.TransferFile (theSuite) as TF
 import Test.Parsing.Arc as TPA

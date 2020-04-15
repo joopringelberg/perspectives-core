@@ -23,7 +23,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Actions" do
+theSuite = suite "Perspectives.Actions" do
 
   test "compileAssignment: Remove" $ runP $ withSystem do
     modelErrors <- loadCompileAndCacheArcFile' "actions" testDirectory

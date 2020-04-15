@@ -25,7 +25,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
-import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP)
+import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -38,46 +38,27 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Extern.Couchdb" do
 
-  test "models" (runP do
+  test "models" $ runP $ withSystem do
     ExternalCouchdb.addExternalFunctions
-    modelErrors <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    if null modelErrors
-      then do
-        getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
-        models <- ((ContextInstance "model:User$test") ##= getModels)
-        logShow models
-        liftAff $ assert "There should be some models" (length models > 0)
-      else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-      )
+    getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
+    models <- ((ContextInstance "model:User$test") ##= getModels)
+    logShow models
+    liftAff $ assert "There should be some models" (length models > 0)
 
-  test "upload model to repository and to perspect_models from files" (runP do
+  test "upload model to repository and to perspect_models from files" $ runP $ withSystem do
     ExternalCouchdb.addExternalFunctions
-    -- setupUser
-    modelErrors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
-    if null modelErrors
-      then do
-        cdburl <- getCouchdbBaseURL
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
-        -- now run the query that retrieves the modelDescription field of all models in repository.
-        -- The result must include "model:System$Model$External"
-        (descriptions :: Array RoleInstance) <- evalMonadPerspectivesQuery "" \_ -> models
-        logShow descriptions
-        liftAff $ assert "There must be the model:System description" (isJust $ elemIndex (RoleInstance "model:User$PerspectivesSystemModel_External") descriptions)
-      else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-      )
+    cdburl <- getCouchdbBaseURL
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+    -- now run the query that retrieves the modelDescription field of all models in repository.
+    -- The result must include "model:System$Model$External"
+    (descriptions :: Array RoleInstance) <- evalMonadPerspectivesQuery "" \_ -> models
+    logShow descriptions
+    liftAff $ assert "There must be the model:System description" (isJust $ elemIndex (RoleInstance "model:User$PerspectivesSystemModel_External") descriptions)
 
   test "addModelToLocalStore" do
-    (runP do
-      -- model:Couchdb is a prerequisite.
-      void $ loadCompileAndCacheArcFile' "couchdb" modelDirectory
-      -- put model:System in cache.
-      modelErrors <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-      if null modelErrors
-        then do
-          cdburl <- getCouchdbBaseURL
-          void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
-        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-      )
+    runP $ withSystem do
+      cdburl <- getCouchdbBaseURL
+      void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
     runP do
       void $ runSterileTransaction $ addModelToLocalStore ["http://127.0.0.1:5984/repository/model%3ASystem"]
       r <- tryGetPerspectEntiteit (ContextInstance "model:User$test")
@@ -87,10 +68,8 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
 
   test "upload model to repository from files" $ runP do
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
-    -- _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     cdburl <- getCouchdbBaseURL
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") (cdburl <> "repository"))
-
 
   test "setModelDescriptionsView" do
     assertEqual "The retrieved document should equal the sent document"
