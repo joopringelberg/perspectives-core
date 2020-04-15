@@ -2,20 +2,23 @@ module Test.Sync.HandleTransaction where
 
 import Prelude
 
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Free (Free)
 import Control.Monad.Reader (ask)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (difference, head, length)
 import Data.Maybe (Maybe(..))
 import Effect.AVar (AVar)
-import Effect.Aff (Milliseconds(..), delay, error, forkAff, killFiber)
+import Effect.Aff (Milliseconds(..), delay, forkAff)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (log, logShow)
+import Effect.Class (liftEffect)
+import Effect.Class.Console (logShow)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (PerspectivesState, (##=), (##>), (##>>))
+import Perspectives.Couchdb.ChangesFeed (EventSource, closeEventSource)
 import Perspectives.Couchdb.Databases (deleteDatabase, documentNamesInDatabase, endReplication, getDocument)
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getRole, getRoleBinders)
-import Perspectives.LoadCRL (loadAndCacheCrlFile_, loadAndSaveCrlFile)
+import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Names (getMySystem)
 import Perspectives.Query.Compiler (getPropertyFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -25,8 +28,7 @@ import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.Sync.Channel (addUserToChannel, createChannel, localReplication)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.IncomingPost (incomingPost)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
-import Test.Perspectives.Utils (clearPostDatabase, clearUserDatabase, runP, runPCor, runPJoop, setupUser, setupUser_, withSystem)
+import Test.Perspectives.Utils (clearPostDatabase, runP, runPCor, runPJoop, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -57,8 +59,6 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
       case mdbName of
         Nothing -> liftAff $ assert "There should be a channel" false
         Just (Value dbName) -> do
-          _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-          setupUser
           -- get the document name
           transactionDocNames <- documentNamesInDatabase dbName
           case head transactionDocNames of
@@ -116,6 +116,7 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
       postFiber <- lift $ forkAff (runPerspectivesWithState incomingPost pstate)
       -- Wait a little
       liftAff $ delay (Milliseconds 8000.0)
+
       -- Check if there is a channel document, starting with the user.
       mySysteem <- getMySystem
       (user :: RoleInstance) <- ContextInstance mySysteem ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
@@ -128,7 +129,13 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
           liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$cor$User","model:User$joop$User"])) == 0)
 
       -- Clean up
-      lift $ killFiber (error "Stop") postFiber
+      -- lift $ killFiber (error "Stop") postFiber
+      (post :: Maybe EventSource) <- gets _.post
+      case post of
+        Nothing -> do
+          pure unit
+        Just p -> do
+          liftEffect $ closeEventSource p
       -- clear the post database
       clearPostDatabase
 
