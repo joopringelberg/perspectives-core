@@ -25,7 +25,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
-import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP, setupUser)
+import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -85,17 +85,12 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
       clearUserDatabase
       void $ removeEntiteit (DomeinFileId "model:System")
 
-  test "upload model to repository from files" (runP do
-    -- setupUser
+  test "upload model to repository from files" $ runP do
+    _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    -- _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     cdburl <- getCouchdbBaseURL
-    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    -- errors <- loadCompileAndSaveArcFile "simpleChat" modelDirectory
-    -- errors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
-    -- liftAff $ assert ("There should be no errors" <> show errors) (null errors)
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
-    -- now run the query that retrieves the modelDescription field of all models in repository.
-    -- The result must include "model:System$Model$External"
-      )
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") (cdburl <> "repository"))
+
 
   test "setModelDescriptionsView" do
     assertEqual "The retrieved document should equal the sent document"

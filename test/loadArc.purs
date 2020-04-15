@@ -10,7 +10,7 @@ import Data.Maybe (Maybe(..))
 import Effect.Class.Console (log, logShow)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, retrieveDomeinFile)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndSaveArcFile, loadCompileAndSaveArcFile', loadAndCompileArcFile)
+import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -46,8 +46,11 @@ theSuite = suite "Perspectives.loadArc" do
     runP $ removeDomeinFileFromCouchdb "model:ContextAndRole"
 
   test "Load a model file and cache it" do
-    -- 1. Load and save a model.
-    messages <- runP (loadAndCompileArcFile "perspectivesSysteem" modelDirectory)
+    messages <- runP do
+      -- 1. Load the required model:Couchdb.
+      _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
+      -- 2. Try to load PerspectivesSystem.
+      loadAndCompileArcFile "perspectivesSysteem" modelDirectory
     case messages of
       Left m -> do
         logShow messages
