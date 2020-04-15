@@ -22,8 +22,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.Sync.Channel (addUserToChannel, createChannel, localReplication, postDbName, setChannelReplication, setMyAddress, setYourAddress)
 import Perspectives.Sync.Transaction (Transaction, createTransactie)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile')
-import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
+import Test.Perspectives.Utils (runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -36,9 +35,7 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Sync.Channel" do
 
-  test "createChannel" (runP do
-    _ <- loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory
-    setupUser
+  test "createChannel" $ runP $ withSystem do
     void $ runMonadPerspectivesTransaction createChannel
 
     -- There must be an instance of "model:System$PerspectivesSystem$Channels" in "model:User$test"
@@ -51,12 +48,8 @@ theSuite = suite "Perspectives.Sync.Channel" do
     case mdbname of
       Nothing -> pure unit
       Just dbname -> deleteDatabase (unwrap dbname)
-    clearUserDatabase
-    )
 
-  test "create channel, add user" (runP do
-    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-    setupUser
+  test "create channel, add user" $ runP $ withSystem do
     achannel <- runMonadPerspectivesTransaction createChannel
     case head achannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
@@ -65,24 +58,20 @@ theSuite = suite "Perspectives.Sync.Channel" do
         -- channelContext <- getPerspectEntiteit channel
         -- logShow channelContext
         void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User") channel
+        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User_0001") channel
 
     getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
-    mdbname <- RoleInstance "model:User$joop$User" ##> getter
+    mdbname <- RoleInstance "model:User$joop$User_0001" ##> getter
     lift $ logShow mdbname
 
     liftAff $ assert "We should be able to calculate the value of the Channel property for `model:User$joop$User`" (isJust mdbname)
 
     -- Comment out to prepare for a test of Transaction distribution.
-    -- case mdbname of
-    --   Nothing -> pure unit
-    --   Just dbname -> deleteDatabase (unwrap dbname)
-    -- clearUserDatabase
-    )
+    case mdbname of
+      Nothing -> pure unit
+      Just dbname -> deleteDatabase (unwrap dbname)
 
-  test "setMyAddress" (runP do
-    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-    setupUser
+  test "setMyAddress" $ runP $ withSystem do
     achannel <- runMonadPerspectivesTransaction createChannel
     case head achannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
@@ -100,8 +89,6 @@ theSuite = suite "Perspectives.Sync.Channel" do
         getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
         (Value channelId) <- channel ##>> externalRole >=> getChannelId
         deleteDatabase channelId
-        clearUserDatabase
-    )
 
   test "local replication" (runP do
     createDatabase "channel"
@@ -126,13 +113,11 @@ theSuite = suite "Perspectives.Sync.Channel" do
     success <- endReplication "channel" "post"
     liftAff $ assert "It should be gone!" success)
 
-  test "setChannelReplication" (runP do
-    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-    setupUser
+  test "setChannelReplication" $ runP $ withSystem do
     achannel <- runMonadPerspectivesTransaction do
       channel <- createChannel
       void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-      addUserToChannel (RoleInstance "model:User$joop$User") channel
+      addUserToChannel (RoleInstance "model:User$joop$User_0001") channel
       setYourAddress "http://127.0.0.1" 5984 channel
       -- We now have a channel with two partners.
       lift2 $ setChannelReplication channel
@@ -147,7 +132,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
         case mchannel of
           Nothing -> pure unit
           Just (Value channelId) -> do
-            t <- liftAff $ createTransactie "model:User$joop$User"
+            t <- liftAff $ createTransactie "model:User$joop$User_0001"
             addDocument channelId t "emptyTransaction"
             -- Wait a bit
             liftAff $ delay (Milliseconds 5000.0)
@@ -159,5 +144,3 @@ theSuite = suite "Perspectives.Sync.Channel" do
             -- Clean up: end replication, remove the channel, clear the user entities database
             void $ endReplication channelId post
             deleteDatabase channelId
-            clearUserDatabase
-    )
