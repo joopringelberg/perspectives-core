@@ -10,7 +10,6 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (log, logShow)
 import Foreign (unsafeToForeign)
 import Foreign.Class (decode, encode)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization, RolSerialization)
@@ -22,10 +21,8 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.Sync.Channel (addUserToChannel, createChannelContext)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
-import Perspectives.Utilities (prettyPrint)
 import Simple.JSON (readImpl)
-import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
+import Test.Perspectives.Utils (clearUserDatabase, runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -38,9 +35,7 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Assignment.SerialiseAsJson" do
 
-  test "serialiseAsJsonFor" (runP do
-    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-    setupUser
+  test "serialiseAsJsonFor" (runP $ withSystem $ do
     achannel <- runSterileTransaction $ createChannelContext "MyTestChannel"
     case head achannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
