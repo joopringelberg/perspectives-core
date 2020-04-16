@@ -1,14 +1,16 @@
 -- Copyright Joop Ringelberg and Cor Baars 2019
 domain: SimpleChat
   use: sys for model:System
+  use: cdb for model:Couchdb
 
   case: ChatApp
     external:
       aspect: sys:NamedContext$External
     aspect: sys:NamedContext
-    context: Chats filledBy: Chat
+    context: Chats = callExternal cdb:RoleInstances( "model:SimpleChat$Chat$External" ) returns: Chat$External
     thing: PotentialPartners = callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns: sys:PerspectivesSystem$User
-    user: Chatter filledBy: sys:PerspectivesSystem$User
+    user: Chatter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
+      perspective on: Chats
 
   case: Chat
     external:

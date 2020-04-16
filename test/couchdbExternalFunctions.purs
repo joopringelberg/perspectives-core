@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (elemIndex, length, null)
+import Data.Array (elemIndex, length)
 import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
@@ -16,14 +16,13 @@ import Perspectives.Couchdb (designDocumentViews)
 import Perspectives.Couchdb.Databases (getDesignDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinFile (DomeinFileId(..))
-import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.Extern.Couchdb (addModelToLocalStore, models, uploadToRepository)
 import Perspectives.Persistent (entitiesDatabaseName, removeEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -39,14 +38,14 @@ theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Extern.Couchdb" do
 
   test "models" $ runP $ withSystem do
-    ExternalCouchdb.addExternalFunctions
+
     getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
     models <- ((ContextInstance "model:User$test") ##= getModels)
     logShow models
     liftAff $ assert "There should be some models" (length models > 0)
 
   test "upload model to repository and to perspect_models from files" $ runP $ withSystem do
-    ExternalCouchdb.addExternalFunctions
+
     cdburl <- getCouchdbBaseURL
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.

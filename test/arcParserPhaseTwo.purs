@@ -22,7 +22,7 @@ import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Extern.Couchdb (addExternalFunctions)
+import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Step(..))
@@ -115,7 +115,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         case evalPhaseTwo do
-          addExternalFunctions
+          addAllExternalFunctions
           (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr'@{calculatedRoles})) -> do

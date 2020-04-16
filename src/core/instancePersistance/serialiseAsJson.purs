@@ -19,36 +19,50 @@
 
 -- END LICENSE
 
-module Perspectives.Assignment.SerialiseAsJson where
+module Perspectives.Instances.SerialiseAsJson where
 
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Data.Array.NonEmpty (fromArray)
+import Data.Array.Partial (head)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, singleton, empty) as OBJ
+import Global.Unsafe (unsafeStringify)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.CollectAffectedContexts (userHasNoPerspectiveOnRoleInstance)
 import Perspectives.CoreTypes (MonadPerspectives, (###>>), (##>>))
+import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (bottom, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value, externalRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value, externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Prelude (Unit, bind, discard, map, pure, unit, when, ($), (<$>))
+import Prelude (Unit, bind, discard, map, pure, unit, when, ($), (<$>), (>>=), (<<<))
+import Unsafe.Coerce (unsafeCoerce)
+
+-- | A function for the External Core Module `model:Serialise`. The first argument should be a singleton holding
+-- | the string value of a User role type; the second should be a singleton holding the string value of the
+-- | context instance to be serialised.
+-- | Notice that, in the use case we want to serialise an Invitation context for a user we do not yet have contact
+-- | with, we can only have his type.
+serialiseFor :: Array String -> Array String -> MonadPerspectives String
+serialiseFor userTypeIds contextIds = (execWriterT $ serialiseAsJsonFor_ (ContextInstance $ unsafePartial $ head contextIds) Nothing (EnumeratedRoleType $ unsafePartial $ head userTypeIds) )>>= pure <<< unsafeStringify
 
 serialiseAsJsonFor :: ContextInstance -> RoleInstance -> MonadPerspectives (Array ContextSerialization)
 serialiseAsJsonFor cid userId = do
   userType <- roleType_ userId
   systemUser <- userId ##>> bottom
-  execWriterT $ serialiseAsJsonFor_ cid systemUser userType
+  execWriterT $ serialiseAsJsonFor_ cid (Just systemUser) userType
 
 type WriteContexts m = WriterT (Array ContextSerialization) m
 
-serialiseAsJsonFor_:: ContextInstance -> RoleInstance -> EnumeratedRoleType -> WriteContexts MonadPerspectives Unit
+serialiseAsJsonFor_:: ContextInstance -> Maybe RoleInstance -> EnumeratedRoleType -> WriteContexts MonadPerspectives Unit
 serialiseAsJsonFor_ cid userId userType = do
   (PerspectContext{pspType, rolInContext}) <- lift $ getPerspectContext cid
   (rollen :: OBJ.Object (SerializableNonEmptyArray RolSerialization)) <- execWriterT $ forWithIndex_ rolInContext serialiseRoleInstances
@@ -80,12 +94,14 @@ serialiseAsJsonFor_ cid userId userType = do
       (properties' :: (OBJ.Object (Array String))) <- lift $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
       case binding of
         Nothing -> pure unit
-        Just b -> do
-          typeOfBinding <- lift (b ##>> roleType)
-          shouldBeSent <- lift $ userHasNoPerspectiveOnRoleInstance typeOfBinding b userId
-          when shouldBeSent do
-            (ctxts :: Array ContextSerialization) <- lift $ execWriterT $ serialiseBinding b
-            tell ctxts
+        Just b -> case userId of
+          Nothing -> (lift $ execWriterT $ serialiseBinding b) >>= tell
+          Just userId' -> do
+            typeOfBinding <- lift (b ##>> roleType)
+            shouldBeSent <- lift $ userHasNoPerspectiveOnRoleInstance typeOfBinding b userId'
+            when shouldBeSent do
+              (ctxts :: Array ContextSerialization) <- lift $ execWriterT $ serialiseBinding b
+              tell ctxts
       pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: map unwrap binding }
 
     serialisePropertiesFor :: String -> Array Value -> WriterT (OBJ.Object (Array String)) MonadPerspectives Unit
@@ -108,3 +124,10 @@ serialiseAsJsonFor_ cid userId userType = do
         , rollen: OBJ.singleton (unwrap roleType) (singleton r)
         , externeProperties: PropertySerialization OBJ.empty
         }]
+
+-- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
+-- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
+externalFunctions :: Array (Tuple String HiddenFunctionDescription)
+externalFunctions =
+  [ Tuple "model:Serialise$SerialiseFor" {func: unsafeCoerce serialiseAsJsonFor, nArgs: 2}
+  ]

@@ -58,7 +58,7 @@ import Perspectives.Couchdb.Databases (addAttachment, defaultPerspectRequest, ge
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
-import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
+import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (getFirstMatch)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
@@ -70,7 +70,7 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cach
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.User (getSystemIdentifier)
-import Prelude (class Monad, Unit, append, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
+import Prelude (Unit, append, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -106,6 +106,7 @@ modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models/")
 -- | Retrieves all instances of a particular role type from Couchdb.
 -- | For example: `user: Users = callExternal cdb:RoleInstances("model:System$PerspectivesSystem$User") returns: model:System$PerspectivesSystem$User`
 -- | Notice that only the first element of the array argument is actually used.
+-- TODO. We hebben een mechanisme nodig om te actualiseren als er een instantie bijkomt of afgaat.
 roleInstancesFromCouchdb :: Array String -> MPQ RoleInstance
 roleInstancesFromCouchdb roleTypes = ArrayT $ lift $ do
   (roles :: Array PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
@@ -250,11 +251,8 @@ uploadToRepository_ dfId url df = lift $ lift $ do
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "couchdb_Models" {func: unsafeCoerce models, nArgs: 0}
-  , Tuple "couchdb_AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
-  , Tuple "couchdb_UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
-  , Tuple "couchdb_RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
+  [ Tuple "model:Couchdb$Models" {func: unsafeCoerce models, nArgs: 0}
+  , Tuple "model:Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
+  , Tuple "model:Couchdb$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
+  , Tuple "model:Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
 ]
-
-addExternalFunctions :: forall m. Monad m => m Unit
-addExternalFunctions = for_ externalFunctions \(Tuple n f) -> pure $ hiddenFunctionInsert n f.func f.nArgs

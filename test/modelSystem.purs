@@ -17,7 +17,6 @@ import Perspectives.CoreTypes ((##=))
 import Perspectives.Couchdb.Databases (deleteDocument, documentExists)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId(..))
-import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.Extern.Couchdb (uploadToRepository_)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
@@ -27,7 +26,7 @@ import Perspectives.Representation.Class.Cacheable (cacheEntity, removeInternall
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadArcAndCrl, loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
+import Perspectives.TypePersistence.LoadArc (loadArcAndCrl, loadCompileAndSaveArcFile')
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (clearUserDatabase, runP)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -45,7 +44,7 @@ theSuite :: Free TestF Unit
 theSuite = suiteSkip  "Model:System" do
 
   test "models" (runP do
-    ExternalCouchdb.addExternalFunctions
+
     ar <- loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory
     if not null ar
       then do

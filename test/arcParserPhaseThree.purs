@@ -18,7 +18,6 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, runTypeLevelToArray, (###=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
@@ -411,7 +410,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         case unwrap $ evalPhaseTwo' do
-          ExternalCouchdb.addExternalFunctions
+
           (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
@@ -1063,7 +1062,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
             x' <- runP do
-              ExternalCouchdb.addExternalFunctions
+
               phaseThree dr'
             case x' of
               (Left e) -> assert (show e) false

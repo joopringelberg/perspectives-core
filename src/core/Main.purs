@@ -32,7 +32,7 @@ import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
+import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Extern.Couchdb (roleInstancesFromCouchdb)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.LocalAuthentication (AuthenticationResult(..))
@@ -69,7 +69,7 @@ runPDR usr pwd ident = void $ runAff handleError do
     , _rev: Nothing}) av
   runPerspectivesWithState (do
     void $ setupUser
-    ExternalCouchdb.addExternalFunctions
+    addAllExternalFunctions
     addIndexedNames)
     state
   void $ forkAff $ runPerspectivesWithState setupApi state

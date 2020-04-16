@@ -7,6 +7,7 @@ import Control.Monad.Free (Free)
 import Data.Array (null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, retrieveDomeinFile)
@@ -22,7 +23,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.loadArc" do
+theSuite = suiteOnly "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
     messages <- runP $ withSystem $ loadCompileAndSaveArcFile' "contextAndRole" testDirectory
@@ -56,6 +57,15 @@ theSuite = suite "Perspectives.loadArc" do
         logShow messages
         assert "The file could not be parsed or compiled" false
       _ -> pure unit
+
+  testOnly "Load a model depending on model:System and cache it" $ runP $ withSystem do
+    messages <- loadAndCompileArcFile "simpleChat" modelDirectory
+    case messages of
+      Left m -> do
+        logShow messages
+        liftAff $ assert "The file could not be parsed or compiled" false
+      _ -> pure unit
+
 
   test "Load a model file and store it in Couchdb" do
     messages <- runP do

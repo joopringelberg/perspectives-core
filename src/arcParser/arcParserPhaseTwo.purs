@@ -25,22 +25,19 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs
 
 import Control.Monad.Except (throwError)
 import Data.Array (cons, elemIndex, fromFoldable)
-import Data.Char.Unicode (toLower)
 import Data.Foldable (foldl)
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head, null, (:), length)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
-import Data.String (Pattern(..), Replacement(..), replace)
-import Data.String.CodeUnits (fromCharArray, uncons)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.External.CoreModules (isExternalCoreModule)
+import Perspectives.External.CoreModules (addExternalFunctionForModule, isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
@@ -355,24 +352,20 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
       case (deconstructModelName functionName') of
         Nothing -> throwError (NotWellFormedName pos functionName)
         Just modelName -> if isExternalCoreModule modelName
-          then let
-            mappedFunctionName = mapName functionName'
-            mexpectedNrOfArgs = lookupHiddenFunctionNArgs mappedFunctionName
-            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter mappedFunctionName) (S <$> (fromFoldable expandedArguments)) (RDOM (ST (EnumeratedRoleType computedType'))) Unknown Unknown
-            in case mexpectedNrOfArgs of
-              Nothing -> throwError (UnknownExternalFunction pos pos functionName')
-              Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
-                then pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
-                else throwError (WrongNumberOfArguments pos pos functionName expectedNrOfArgs (length arguments))
+          then do
+            addExternalFunctionForModule modelName
+            (let
+              mexpectedNrOfArgs = lookupHiddenFunctionNArgs functionName'
+              calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter functionName') (S <$> (fromFoldable expandedArguments)) (RDOM (ST (EnumeratedRoleType computedType'))) Unknown Unknown
+              in case mexpectedNrOfArgs of
+                Nothing -> throwError (UnknownExternalFunction pos pos functionName')
+                Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
+                  then pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
+                  else throwError (WrongNumberOfArguments pos pos functionName expectedNrOfArgs (length arguments)))
           else let
             -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
             calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ForeignRoleGetter functionName) (S <$> (fromFoldable expandedArguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
             in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
-
-    mapName :: String -> String
-    mapName s = case uncons (replace (Pattern "$") (Replacement "_") (replace (Pattern "model:") (Replacement "") s)) of
-      (Just {head, tail}) -> fromCharArray [toLower head] <> tail
-      Nothing -> s
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
 -- | and insert it into a DomeinFileRecord.

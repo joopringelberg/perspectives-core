@@ -79,14 +79,6 @@ makeRoleGetter currentDomain rt = do
 
 compileSimpleStep :: Domain -> SimpleStep -> FD
 compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
-  -- case deconstructModelName ident of
-  --   Nothing -> throwError $ NotWellFormedName pos ident
-  --   Just model -> do
-  --     seenBefore <- gets \{referredModels} -> isJust $ elemIndex (ModelName model) referredModels
-  --     when (not seenBefore) do
-  --       addIndexedContextsOf (ModelName model)
-  --       addIndexedRolesOf (ModelName model)
-  -- TODO. Bepaal het model. Als dat model nog niet in de namespaces van state zit, voeg dan toe en voeg de indexed names van dat model toe aan state.
   mindexedContextType <- isIndexedContext ident
   case mindexedContextType of
     Just indexedContextType -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (ST indexedContextType)) True True

@@ -10,12 +10,14 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (log)
 import Foreign (unsafeToForeign)
 import Foreign.Class (decode, encode)
+import Global.Unsafe (unsafeStringify)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization, RolSerialization)
-import Perspectives.Assignment.SerialiseAsJson (serialiseAsJsonFor)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.SerialiseAsJson (serialiseAsJsonFor)
 import Perspectives.LoadCRL (loadAndCacheCrlFile)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
@@ -33,7 +35,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Assignment.SerialiseAsJson" do
+theSuite = suite "Perspectives.Instances.SerialiseAsJson" do
 
   test "serialiseAsJsonFor" (runP $ withSystem $ do
     achannel <- runSterileTransaction $ createChannelContext "MyTestChannel"
@@ -50,6 +52,7 @@ theSuite = suite "Perspectives.Assignment.SerialiseAsJson" do
           Nothing -> liftAff $ assert "There should be two ConnectedPartners in the Channel instance" false
           Just p -> do
             (channelSerialiation :: Array ContextSerialization) <- serialiseAsJsonFor channel p
+            log $ unsafeStringify channelSerialiation
             -- log $ "\n" <> (prettyPrint channelSerialiation)
             liftAff $ assert "The context 'model:User$joop' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$joop") channelSerialiation)
             liftAff $ assert "The context 'model:User$MyTestChannel' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$MyTestChannel") channelSerialiation)

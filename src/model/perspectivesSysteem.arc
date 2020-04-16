@@ -2,6 +2,7 @@
 domain: System
   use: sys for model:System
   use: cdb for model:Couchdb
+  use: ser for model:Serialise
 
   case: TrustedCluster
     external:
@@ -86,7 +87,10 @@ domain: System
       property: IWantToInviteAnUnconnectedUser (not mandatory, functional, Boolean)
       property: SerialisedInvitation (not mandatory, functional, String)
     user: Guest = sys:Me
-    --user: Guest (not mandatory, functional)
     user: Invitee (mandatory, functional) filledBy: Guest
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
+    bot: for Inviter
+      perspective on: Invitation$External
+        if IWantToInviteAnUnconnectedUser then
+          SerialisedInvitation = callExternal ser:serialiseFor( "model:System$Invitation$Invitee", context )
     thing: Channel (not mandatory, functional) filledBy: Channel

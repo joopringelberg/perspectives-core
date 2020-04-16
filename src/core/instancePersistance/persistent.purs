@@ -37,6 +37,7 @@ module Perspectives.Persistent
 , saveEntiteit_
 , removeEntiteit
 , getPerspectEntiteit
+, fetchEntiteit
 , getPerspectContext
 , getPerspectRol
 , getDomeinFile
