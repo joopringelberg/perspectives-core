@@ -8,18 +8,18 @@ import Data.Either (Either(..))
 import Data.Maybe (isJust, isNothing)
 import Data.Newtype (unwrap)
 import Effect.Class.Console (log, logShow)
-import Perspectives.Parsing.Arc.Expression (assignment, letStep, operator, simpleStep, step, unaryStep)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression (assignment, computationStep, letStep, operator, simpleStep, step, unaryStep)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), ComputationStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Utilities (prettyPrint)
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
+theSuite = suite "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -493,3 +493,14 @@ theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
         assert "functionName should be 'cbd:LoadModel'" (effectName == "cdb:LoadModel")
         assert "no arguments" (arguments == [])
       otherwise -> assert ("'callEffect cdb:LoadModel()' should be parsed as an ExternalEffect assignment, instead this was returned: " <> show otherwise) false
+
+  test "callExternal" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns: String" computationStep
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Computation (ComputationStep {functionName, arguments, computedType}))) -> do
+        -- logShow a
+        assert "functionName should be 'cbd:LoadModel'" (functionName == "ser:SerialiseFor")
+        assert "two arguments" (length arguments == 2)
+        assert "ComputedType should be 'String'" (computedType == "String")
+      otherwise -> assert ("'callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns: String' should be parsed as an ComputationStep, instead this was returned: " <> show otherwise) false

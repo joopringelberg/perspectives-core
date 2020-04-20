@@ -88,9 +88,11 @@ domain: System
       property: SerialisedInvitation (not mandatory, functional, String)
     user: Guest = sys:Me
     user: Invitee (mandatory, functional) filledBy: Guest
+      perspective on: Inviter
+      perspective on: Channel
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
     bot: for Inviter
-      perspective on: Invitation$External
-        if IWantToInviteAnUnconnectedUser then
-          SerialisedInvitation = callExternal ser:serialiseFor( "model:System$Invitation$Invitee", context )
+      perspective on: External
+        if extern >> IWantToInviteAnUnconnectedUser then
+          SerialisedInvitation = extern >> callExternal ser:SerialiseFor( "model:System$Invitation$Invitee" ) returns: String
     thing: Channel (not mandatory, functional) filledBy: Channel

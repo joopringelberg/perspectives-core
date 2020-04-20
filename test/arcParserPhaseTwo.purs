@@ -128,9 +128,9 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseTwo" do
                     (Q (MQD _ _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$Modellen"))) _ _)) -> true
                     otherwise -> false
                 -- logShow calculation
-                assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"cbd:Models\")'"
+                assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"model:Couchdb$Models\")'"
                   case calculation of
-                    (Q (MQD _ (ExternalCoreRoleGetter "couchdb_Models") _ _ _ _)) -> true
+                    (Q (MQD _ (ExternalCoreRoleGetter "model:Couchdb$Models") _ _ _ _)) -> true
                     otherwise -> false
 
   test "A Context with an external property and role." do

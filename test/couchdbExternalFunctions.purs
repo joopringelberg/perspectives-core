@@ -67,8 +67,10 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
 
   test "upload model to repository from files" $ runP do
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     cdburl <- getCouchdbBaseURL
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") (cdburl <> "repository"))
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
 
   test "setModelDescriptionsView" do
     assertEqual "The retrieved document should equal the sent document"

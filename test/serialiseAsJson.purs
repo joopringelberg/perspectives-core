@@ -51,7 +51,7 @@ theSuite = suite "Perspectives.Instances.SerialiseAsJson" do
         case head partners of
           Nothing -> liftAff $ assert "There should be two ConnectedPartners in the Channel instance" false
           Just p -> do
-            (channelSerialiation :: Array ContextSerialization) <- serialiseAsJsonFor channel p
+            (channelSerialiation :: Array ContextSerialization) <- serialiseAsJsonFor p channel
             log $ unsafeStringify channelSerialiation
             -- log $ "\n" <> (prettyPrint channelSerialiation)
             liftAff $ assert "The context 'model:User$joop' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$joop") channelSerialiation)

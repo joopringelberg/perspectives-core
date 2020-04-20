@@ -2,6 +2,7 @@ module Test.Main where
 
 import Prelude
 
+import Test.Unit.Main (runTest)
 import Effect (Effect)
 -- import Test.Perspectives.DataTypeObjectGetters (theSuite) as DTO
 import Test.Parsing.Arc.TransferFile (theSuite) as TF
@@ -33,7 +34,7 @@ import Test.ArrayT as ARRT
 import Test.Sync.HandleTransaction as HTA
 import Test.Assignment.SerialiseAsJson as SAJ
 import Test.Utilities as UT
-import Test.Unit.Main (runTest)
+import Test.Invitation as IT
 
 
 main :: Effect Unit
@@ -67,3 +68,4 @@ main = runTest do
   HTA.theSuite
   SAJ.theSuite
   UT.theSuite
+  IT.theSuite

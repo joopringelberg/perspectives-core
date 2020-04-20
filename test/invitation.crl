@@ -1,0 +1,6 @@
+UserData
+
+import model:System as sys
+
+sys:Invitation usr:MyInvitation
+  $Inviter -> model:System$Me

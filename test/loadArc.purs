@@ -23,7 +23,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.loadArc" do
+theSuite = suite "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
     messages <- runP $ withSystem $ loadCompileAndSaveArcFile' "contextAndRole" testDirectory
@@ -50,7 +50,9 @@ theSuite = suiteOnly "Perspectives.loadArc" do
     messages <- runP do
       -- 1. Load the required model:Couchdb.
       _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
-      -- 2. Try to load PerspectivesSystem.
+      -- 2. Load the required model:Serialise.
+      _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
+      -- 3. Try to load PerspectivesSystem.
       loadAndCompileArcFile "perspectivesSysteem" modelDirectory
     case messages of
       Left m -> do
@@ -58,7 +60,7 @@ theSuite = suiteOnly "Perspectives.loadArc" do
         assert "The file could not be parsed or compiled" false
       _ -> pure unit
 
-  testOnly "Load a model depending on model:System and cache it" $ runP $ withSystem do
+  test "Load a model depending on model:System and cache it" $ runP $ withSystem do
     messages <- loadAndCompileArcFile "simpleChat" modelDirectory
     case messages of
       Left m -> do

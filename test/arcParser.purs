@@ -4,23 +4,23 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
-import Data.List (List(..), filter, findIndex, head, length)
+import Data.List (filter, findIndex, head, length)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Node.Encoding (Encoding(..)) as ENC
 import Node.FS.Sync (readTextFile)
 import Node.Path as Path
-import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE, viewE)
-import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Step(..))
+import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE, ruleE, viewE)
+import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), RuleE(..), ViewE(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), ComputationStep(..), Operator(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -29,7 +29,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Perspectives.Parsing.Arc" do
+theSuite = suite "Perspectives.Parsing.Arc" do
   test "arcIdentifier on simple name" do
     (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "MyTestDomain" arcIdentifier
     case r of
@@ -119,7 +119,7 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
           otherwise -> assert "Parsed an unexpected type" false
 
   test "Domain with a computed role" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = callExternal cdb:Models() returns : sys:Modellen" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  use: cdb for model:Couchdb\n  thing : MyRole = callExternal cdb:Models() returns : Model$External" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{contextParts})) -> do
@@ -130,7 +130,7 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
           Nothing -> assert "The Domain should have a role." false
           (Just (RE (RoleE{roleParts}))) -> do
             case (head (filter (case _ of
-                (Computation "cdb:Models" Nil "sys:Modellen") -> true
+                (Calculation _) -> true
                 otherwise -> false) roleParts)) of
               Nothing -> assert "There should be a computation RolePart" false
               otherwise -> assert "" true
@@ -255,6 +255,22 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
           Just (ForUser u) -> assert "BotRole should have ForUser part with value 'MySelf'" (u == "MySelf")
           otherwise -> assert "BotRole should have ForUser part" false
       otherwise -> assert "BotRole should have a ForUser part." false
+
+  test "Rule with propertyAssignment to a value computed with callExternal" do
+    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "if IWantToInviteAnUnconnectedUser then\n  SerialisedInvitation = callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns: String" ruleE
+    case r of
+      (Left e) -> assert (show e) false
+      Right (Act (ActionE{actionParts})) -> case (head (filter (case _ of
+          (AssignmentPart _) -> true
+          otherwise -> false) actionParts)) of
+        Nothing -> assert "There should be an AssignmentPart" false
+        Just (AssignmentPart (PropertyAssignment{propertyIdentifier, valueExpression})) -> do
+          assert "propertyIdentifier should be SerialisedInvitation" (propertyIdentifier == "SerialisedInvitation")
+          case valueExpression of
+            (Computation (ComputationStep{functionName})) -> assert "functionName should be ser:SerialiseFor" (functionName == "ser:SerialiseFor")
+            otherwise -> assert "There should be a Computation" false
+        otherwise -> assert "There should be an AssignmentPart" false
+      otherwise -> assert "There should be an ActionE" false
 
   test "Property with functional and mandatory attributes" do
     (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "property: MyProperty (mandatory, not functional, Number)" propertyE
