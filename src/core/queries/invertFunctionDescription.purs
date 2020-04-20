@@ -21,10 +21,12 @@
 
 module Perspectives.Query.Inversion where
 
+import Control.Monad.Error.Class (throwError)
 import Data.Array (catMaybes, cons, foldr, last, reverse, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
+import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.Identifiers (endsWithSegments)
@@ -36,6 +38,7 @@ import Perspectives.Representation.Class.Role (contextOfADT, getCalculation, get
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Utilities (prettyPrint)
 import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), (<$>), (<*>), (<>), (>=>), (>>=), (<<<))
 
 -- | Compute from the description of a query function a series of paths.
@@ -43,7 +46,7 @@ import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), 
 -- | We use this function to compute contexts whose rules should be re-run when processing a Delta.MonadPerspectives
 invertFunctionDescription :: QueryFunctionDescription -> MP (Array QueryFunctionDescription)
 invertFunctionDescription qfd = do
-  paths <- unsafePartial $ invertFunctionDescription_ qfd
+  paths <- invertFunctionDescription_ qfd
   traverse invert (allPaths paths) >>= pure <<< catMaybes
   where
     invert :: Array QueryFunctionDescription -> MonadPerspectives (Maybe QueryFunctionDescription)
@@ -53,25 +56,26 @@ invertFunctionDescription qfd = do
         Nothing -> pure Nothing
         Just augmentedPath -> case uncons augmentedPath of
           Nothing -> pure Nothing
+          -- Now invert the steps.
           Just {head, tail} -> pure $ Just $ foldr compose head (reverse tail)
 
--- | If the array of steps ends with Value2Role, and does not start with context, prepend context before inverting.
-addContextToPropertyQuery :: Path -> MonadPerspectives (Maybe Path)
-addContextToPropertyQuery path = case last path of
-  Nothing -> pure Nothing
-  Just (SQD _ (Value2Role _) _ _ _) -> case uncons path of
-    Nothing -> pure Nothing
-    Just {head: (SQD _ (DataTypeGetter ContextF) _ _ _), tail} -> pure $ Just path
-    Just {head, tail} -> case domain head of
-      (RDOM adt) -> do
-        -- The first step has a domain that is a role. Compute the context of that role.
-        (contextAdt :: ADT ContextType) <- contextOfADT adt
-        pure $ Just $ cons (SQD (domain head) (DataTypeGetter ContextF) (CDOM contextAdt) True True) path
+    -- | If the array of steps ends with Value2Role, and does not start with context, prepend context before inverting.
+    addContextToPropertyQuery :: Path -> MonadPerspectives (Maybe Path)
+    addContextToPropertyQuery path = case last path of
+      Nothing -> pure Nothing
+      Just (SQD _ (Value2Role _) _ _ _) -> case uncons path of
+        Nothing -> pure Nothing
+        Just {head: (SQD _ (DataTypeGetter ContextF) _ _ _), tail} -> pure $ Just path
+        Just {head, tail} -> case domain head of
+          (RDOM adt) -> do
+            -- The first step has a domain that is a role. Compute the context of that role.
+            (contextAdt :: ADT ContextType) <- contextOfADT adt
+            pure $ Just $ cons (SQD (domain head) (DataTypeGetter ContextF) (CDOM contextAdt) True True) path
+          otherwise -> pure $ Just path
       otherwise -> pure $ Just path
-  otherwise -> pure $ Just path
 
 -- | Invert each step, but keep the same order of steps.
-invertFunctionDescription_ :: Partial => QueryFunctionDescription -> MP Paths
+invertFunctionDescription_ :: QueryFunctionDescription -> MP Paths
 
 invertFunctionDescription_ (SQD dom (Constant _ _) ran _ _) = pure mempty
 
@@ -84,6 +88,11 @@ invertFunctionDescription_ (SQD dom (RolGetter rt) ran _ _) = case rt of
 invertFunctionDescription_ (SQD dom (PropertyGetter (CP prop)) ran _ _) = do
   calc <- (getCalculatedProperty >=> calculation) prop
   invertFunctionDescription_ calc
+
+-- For now, ignore externe functions.
+invertFunctionDescription_ (MQD dom (ExternalCorePropertyGetter functionName) args ran _ _) = pure mempty
+
+invertFunctionDescription_ (MQD dom (ExternalCoreRoleGetter functionName) args ran _ _) = pure mempty
 
 invertFunctionDescription_ (SQD dom (DataTypeGetter CountF) ran _ _) = pure mempty
 
@@ -105,6 +114,9 @@ invertFunctionDescription_ (BQD dom (BinaryCombinator FilterF) source criterium 
 
 -- For all other functions, we just sum their paths.
 invertFunctionDescription_ (BQD dom (BinaryCombinator f) qfd1 qfd2 ran _ _) = sumPaths <$> (invertFunctionDescription_ qfd1) <*> (invertFunctionDescription_ qfd2)
+
+-- catchall
+invertFunctionDescription_ qfd = throwError (error $ "Missing case in invertFunctionDescription_ for: " <> prettyPrint qfd)
 
 -- | For each type of function that appears as a single step in a query, we compute the inverse step.
 invertFunction :: Domain -> QueryFunction -> Range -> Maybe QueryFunction
@@ -137,9 +149,6 @@ invertFunction dom qf ran = case qf of
     -- A lot of cases will never be seen in a regular query.
     _ -> Nothing
 
-  -- TODO: Is overbodig, nu?
-  -- RolGetter rt -> Just $ DataTypeGetter ContextF
-  PropertyGetter (CP _) -> Nothing
   PropertyGetter pt -> Just $ Value2Role pt
   -- Variable lookup implies variable binding elsewhere. We've traced the path back in the binding, so we ignore it here.
   VariableLookup _ -> Nothing

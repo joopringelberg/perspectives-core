@@ -41,12 +41,13 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Names (expandDefaultNamespaces)
+import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
+import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain)
@@ -80,7 +81,10 @@ data CompiledFunction =
 -- | But in the instance representation, there is no need for that. All (Enumerated)
 -- | roles have the same runtime representation and their names are unique.
 compileFunction :: QueryFunctionDescription -> MP CompiledFunction
-compileFunction (SQD _ (RolGetter (ENR r)) _ _ _) = pure $ C2R $ getRole r
+-- TODO. ALS het de externe rol is, die ook pakken!
+compileFunction (SQD _ (RolGetter (ENR (EnumeratedRoleType r))) _ _ _) = if isExternalRole r
+  then pure $ C2R externalRole
+  else pure $ C2R $ getRole (EnumeratedRoleType r)
 
 compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
@@ -114,7 +118,7 @@ compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
       Q descr -> context2string descr
-      S s -> throwError (error $ "Argument to ExternalCoreFunction not compiled: " <> show s))
+      S s -> throwError (error $ "Argument to ExternalCoreRoleGetter not compiled: " <> show s))
     args
   pure $ C2R (\c -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
@@ -133,6 +137,35 @@ compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
+      _ -> throwError (error "Too many arguments for external core module: maximum is 4")
+    )
+
+compileFunction (MQD dom (ExternalCorePropertyGetter functionName) args _ _ _) = do
+  (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
+  (argFunctions :: Array (RoleInstance ~~> String)) <- traverse (\calc -> case calc of
+      Q descr -> role2string descr
+      S s -> throwError (error $ "Argument to ExternalCorePropertyGetter not compiled: " <> show s))
+    args
+  pure $ R2V (\c -> do
+    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
+    case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
+      0 -> (unsafeCoerce f :: (Array RoleInstance -> MPQ Value)) [c]
+      1 -> (unsafeCoerce f :: (Array String -> Array RoleInstance -> MPQ Value)) (unsafePartial (unsafeIndex values 0)) [c]
+      2 -> (unsafeCoerce f :: (Array String -> Array String -> Array RoleInstance -> MPQ Value))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        [c]
+      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array RoleInstance -> MPQ Value))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        [c]
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array RoleInstance -> MPQ Value))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        [c]
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )
 
@@ -475,7 +508,7 @@ context2role qd = unsafePartial $ do
     (C2R f) <- compileFunction qd
     pure f
 
--- | Construct a function to compute instances of a ContextType from an instance of a Context.
+-- | Construct a function to compute Strings (not further typed) from an instance of a Context.
 context2string :: QueryFunctionDescription -> MP (ContextInstance ~~> String)
 context2string qd = unsafeCoerce $ unsafePartial $ do
   cf <- compileFunction qd
@@ -489,6 +522,15 @@ role2context :: QueryFunctionDescription -> MP (RoleInstance ~~> ContextInstance
 role2context qd = unsafePartial $ do
     (R2C f) <- compileFunction qd
     pure f
+
+-- | Construct a function to compute Strings (not further typed) from an instance of a Role.
+role2string :: QueryFunctionDescription -> MP (RoleInstance ~~> String)
+role2string qd = unsafeCoerce $ unsafePartial $ do
+  cf <- compileFunction qd
+  case cf of
+    (R2C f) -> pure $ unsafeCoerce f
+    (R2R f) -> pure $ unsafeCoerce f
+    (R2V f) -> pure $ unsafeCoerce f
 
 -- | Construct a function to compute values of a Property for some RoleType from an instance of a Context.
 context2propertyValue :: QueryFunctionDescription -> MP (ContextInstance ~~> Value)

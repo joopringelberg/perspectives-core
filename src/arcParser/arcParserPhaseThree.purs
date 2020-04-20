@@ -150,7 +150,9 @@ qualifyActionRoles = do
                   pure $ ar {object = qname}
                 ar'' <- case mindirectObject of
                   (Just indirectObject) -> do
-                    qname <- qualifiedRoleType ctxtId pos (roletype2string indirectObject)
+                    qname <- case object of
+                      (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
+                      other -> qualifiedRoleType ctxtId pos (roletype2string indirectObject)
                     pure $ ar' {indirectObject = Just qname}
                   otherwise -> pure ar'
                 if ar'' == ar
@@ -322,6 +324,7 @@ inverseBindings = throwError (Custom "Implement inverseBindings")
 -- | A Computed Role has a clause that specifies the type of Role that is computed.
 -- | The modeller can use an unqualified name, that should be resolved against all Roles in the Domain.
 -- TODO: qualificeer Computed properties!
+-- TODO: Ditzelfde moet gebeuren overal waar een QueryFunctionDescription met callExternal kan voorkomen!
 qualifyReturnsClause :: PhaseThree Unit
 qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
   where
@@ -628,14 +631,13 @@ compileRules = do
                   Nothing -> throwError (NotWellFormedName start effectName)
                   Just modelName -> if isExternalCoreModule modelName
                     then do
-                      mappedFunctionName <- pure (mapName effectName)
-                      mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs mappedFunctionName
+                      mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs effectName
                       case mexpectedNrOfArgs of
-                        Nothing -> throwError (UnknownExternalFunction start end mappedFunctionName)
+                        Nothing -> throwError (UnknownExternalFunction start end effectName)
                         Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
                           then do
                             compiledArguments <- traverse (\s -> compileAndDistributeStep [subject] currentDomain s >>= pure <<< Q) arguments
-                            pure $ MQD currentDomain (QF.ExternalEffectFullFunction mappedFunctionName) compiledArguments currentDomain Unknown Unknown
+                            pure $ MQD currentDomain (QF.ExternalEffectFullFunction effectName) compiledArguments currentDomain Unknown Unknown
                           else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
                     -- TODO: behandel hier Foreign functions.
                     else throwError (UnknownExternalFunction start end effectName)

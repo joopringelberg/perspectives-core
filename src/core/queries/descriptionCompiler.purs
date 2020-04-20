@@ -29,19 +29,22 @@ module Perspectives.Query.DescriptionCompiler where
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
-import Data.Array (elemIndex, foldM, head, length, null, reverse, uncons)
+import Data.Array (elemIndex, foldM, fromFoldable, head, length, null, reverse, uncons)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
+import Perspectives.External.CoreModules (addExternalFunctionForModule, isExternalCoreModule)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range, roleRange)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range, roleRange, Calculation(..))
 import Perspectives.Representation.ADT (ADT(..), product)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
@@ -56,12 +59,15 @@ import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedR
 import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, ($), (&&), (<$>), (<*>), (==), (>>=))
 
+type FD = PhaseThree QueryFunctionDescription
+
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
 compileStep currentDomain (Unary st) = compileUnaryStep currentDomain st
 compileStep currentDomain (Binary st) = compileBinaryStep currentDomain st
 compileStep currentDomain (PureLet st) = compileLetStep currentDomain st
 compileStep currentDomain (Let st) = throwError $ NotAPureLet st
+compileStep currentDomain (Computation st) = compileComputationStep currentDomain st
 
 -- Describe a conjunction of rolegetters.
 makeConjunction :: Domain -> QueryFunctionDescription -> RoleType -> FD
@@ -354,4 +360,34 @@ compileVarBinding currentDomain (VarBinding varName step) = do
   addBinding varName step_
   pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) (functional step_) (mandatory step_)
 
-type FD = PhaseThree QueryFunctionDescription
+compileComputationStep :: Domain -> ComputationStep -> FD
+compileComputationStep currentDomain (ComputationStep {functionName, arguments, computedType, start, end}) =
+  case (deconstructModelName functionName) of
+    Nothing -> throwError (NotWellFormedName start functionName)
+    Just modelName -> if isExternalCoreModule modelName
+      then do
+        addExternalFunctionForModule modelName
+        compiledArgs <- traverse (compileStep currentDomain) arguments
+        (let
+          mexpectedNrOfArgs = lookupHiddenFunctionNArgs functionName
+          in case mexpectedNrOfArgs of
+            Nothing -> throwError (UnknownExternalFunction start end functionName)
+            Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
+              then case mapToRange computedType of
+                Nothing -> pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (Q <$> (fromFoldable compiledArgs)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+                Just r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (Q <$> (fromFoldable compiledArgs)) (VDOM r Nothing) Unknown Unknown
+              else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
+      else do
+        compiledArgs <- traverse (compileStep currentDomain) arguments
+        -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
+        pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (Q <$> (fromFoldable compiledArgs)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+
+  where
+
+    mapToRange :: String -> Maybe Range
+    mapToRange s = case s of
+      "String" -> Just PString
+      "Boolean" -> Just PBool
+      "Number" -> Just PNumber
+      "DateTime" -> Just PDate
+      otherwise -> Nothing

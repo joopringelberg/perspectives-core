@@ -28,7 +28,7 @@ import Data.Array (cons, elemIndex, fromFoldable)
 import Data.Foldable (foldl)
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
-import Data.List (List(..), filter, findIndex, foldM, head, null, (:), length)
+import Data.List (List(..), filter, findIndex, foldM, head, null, (:))
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
@@ -37,16 +37,14 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.External.CoreModules (addExternalFunctionForModule, isExternalCoreModule)
-import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (Namespace, deconstructModelName, deconstructNamespace_, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
@@ -58,10 +56,8 @@ import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
 import Prelude (bind, discard, map, not, pure, show, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
@@ -157,20 +153,12 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
 traverseRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseRoleE r ns = if isCalculatedRole r
   then traverseCalculatedRoleE r ns
-  else if isComputedRole r
-    then traverseComputedRoleE r ns
-    else traverseEnumeratedRoleE r ns
+  else traverseEnumeratedRoleE r ns
   where
     isCalculatedRole :: RoleE -> Boolean
     -- isCalculatedRole _ = true
     isCalculatedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
       (Calculation _) -> true
-      otherwise -> false) roleParts))
-
-    isComputedRole :: RoleE -> Boolean
-    -- isCalculatedRole _ = true
-    isComputedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
-      (Computation _ _ _) -> true
       otherwise -> false) roleParts))
 
 -- | Traverse a RoleE that results in an EnumeratedRole.
@@ -334,38 +322,6 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
     handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) = do
       expandedCalc <- expandPrefix calc
       pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc})
-
--- | Traverse a RoleE that results in an CalculatedRole with a Calculation that depends on a Computed function.
-traverseComputedRoleE :: RoleE -> Namespace -> PhaseTwo Role
-traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
-  role <- pure (defaultCalculatedRole (ns <> "$" <> id) id kindOfRole ns pos)
-  role' <- foldM (unsafePartial $ handleParts) role roleParts
-  modifyDF (\domeinFile -> addRoleToDomeinFile (C role') domeinFile)
-  pure (C role')
-
-  where
-    handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
-    handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) = do
-      functionName' <- expandNamespace functionName
-      computedType' <- expandNamespace computedType
-      expandedArguments <- traverse expandPrefix arguments
-      case (deconstructModelName functionName') of
-        Nothing -> throwError (NotWellFormedName pos functionName)
-        Just modelName -> if isExternalCoreModule modelName
-          then do
-            addExternalFunctionForModule modelName
-            (let
-              mexpectedNrOfArgs = lookupHiddenFunctionNArgs functionName'
-              calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter functionName') (S <$> (fromFoldable expandedArguments)) (RDOM (ST (EnumeratedRoleType computedType'))) Unknown Unknown
-              in case mexpectedNrOfArgs of
-                Nothing -> throwError (UnknownExternalFunction pos pos functionName')
-                Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
-                  then pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
-                  else throwError (WrongNumberOfArguments pos pos functionName expectedNrOfArgs (length arguments)))
-          else let
-            -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
-            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ForeignRoleGetter functionName) (S <$> (fromFoldable expandedArguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
-            in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
 -- | and insert it into a DomeinFileRecord.
