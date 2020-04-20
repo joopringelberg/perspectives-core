@@ -32,13 +32,13 @@ import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Extern.Couchdb (roleInstancesFromCouchdb)
+import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.LocalAuthentication (AuthenticationResult(..))
 import Perspectives.LocalAuthentication (authenticate) as LA
 import Perspectives.PerspectivesState (newPerspectivesState)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (partyMode, setupCouchdbForFirstUser)
 import Perspectives.SetupUser (setupUser)
@@ -103,8 +103,8 @@ authenticate usr pwd callback = void $ runAff handler do
 -- | all known indexed names and their private replacements in PerspectivesState.
 addIndexedNames :: MonadPerspectives Unit
 addIndexedNames = do
-  (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedRole"]))
+  (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedRole"] (ContextInstance "")))
   iRoles <- indexedRoles_ roleInstances
-  contextInstances <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedContext"]))
+  contextInstances <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedContext"] (ContextInstance "")))
   iContexts <- indexedContexts_ contextInstances
   modify \ps -> ps {indexedRoles = iRoles, indexedContexts = iContexts}

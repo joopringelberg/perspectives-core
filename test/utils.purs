@@ -8,6 +8,7 @@ import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName, removeEntiteit)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser)
@@ -82,7 +83,7 @@ withModel m@(DomeinFileId id) a = do
 withModel' :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
 withModel' m@(DomeinFileId id) a = do
   cdbUrl <- getCouchdbBaseURL
-  void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "repository/" <> id])
+  void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "repository/" <> id] (RoleInstance ""))
   result <- a
   void $ removeEntiteit m
   pure result

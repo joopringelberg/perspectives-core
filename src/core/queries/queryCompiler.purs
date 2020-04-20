@@ -146,26 +146,27 @@ compileFunction (MQD dom (ExternalCorePropertyGetter functionName) args _ _ _) =
       Q descr -> role2string descr
       S s -> throwError (error $ "Argument to ExternalCorePropertyGetter not compiled: " <> show s))
     args
-  pure $ R2V (\c -> do
-    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
+  pure $ R2V (\r -> do
+    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> r ##= g) argFunctions
+    -- Notice that the number of parameters given ignores the default argument (context or role) that the function is applied to anyway.
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
-      0 -> (unsafeCoerce f :: (Array RoleInstance -> MPQ Value)) [c]
-      1 -> (unsafeCoerce f :: (Array String -> Array RoleInstance -> MPQ Value)) (unsafePartial (unsafeIndex values 0)) [c]
-      2 -> (unsafeCoerce f :: (Array String -> Array String -> Array RoleInstance -> MPQ Value))
+      0 -> (unsafeCoerce f :: (RoleInstance -> MPQ Value)) r
+      1 -> (unsafeCoerce f :: (Array String -> RoleInstance -> MPQ Value)) (unsafePartial (unsafeIndex values 0)) r
+      2 -> (unsafeCoerce f :: (Array String -> Array String -> RoleInstance -> MPQ Value))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
-        [c]
-      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array RoleInstance -> MPQ Value))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        [c]
-      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array RoleInstance -> MPQ Value))
+        r
+      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> RoleInstance -> MPQ Value))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
+        r
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> RoleInstance -> MPQ Value))
         (unsafePartial (unsafeIndex values 0))
-        [c]
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        r
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )
 

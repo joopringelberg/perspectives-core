@@ -76,8 +76,8 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | Retrieve from the repository the external roles of instances of sys:Model.
 -- | These are kept in the field "modelDescription" of DomeinFile.
 -- | TODO: provide a repository parameter, so the URL is taken from the repository rather than hardcoded.
-models :: MPQ RoleInstance
-models = ArrayT do
+models :: ContextInstance -> MPQ RoleInstance
+models _ = ArrayT do
   sysId <- lift getSystemIdentifier
   tell [assumption sysId ophaalTellerName]
   lift $ getExternalRoles
@@ -106,9 +106,11 @@ modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models/")
 -- | Retrieves all instances of a particular role type from Couchdb.
 -- | For example: `user: Users = callExternal cdb:RoleInstances("model:System$PerspectivesSystem$User") returns: model:System$PerspectivesSystem$User`
 -- | Notice that only the first element of the array argument is actually used.
+-- | Notice, too, that the second parameter is ignored. We must provide it, however, as the query compiler
+-- | will give us an argument for it.
 -- TODO. We hebben een mechanisme nodig om te actualiseren als er een instantie bijkomt of afgaat.
-roleInstancesFromCouchdb :: Array String -> MPQ RoleInstance
-roleInstancesFromCouchdb roleTypes = ArrayT $ lift $ do
+roleInstancesFromCouchdb :: Array String -> ContextInstance ->  MPQ RoleInstance
+roleInstancesFromCouchdb roleTypes _ = ArrayT $ lift $ do
   (roles :: Array PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
   for roles \r@(PerspectRol{_id}) -> do
     void $ cacheEntity _id r
@@ -117,9 +119,10 @@ roleInstancesFromCouchdb roleTypes = ArrayT $ lift $ do
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
 -- | Load the acompanying instances, too.
 -- | Notice that the urls should be the full path to the relevant documents.
+-- | This function is applied with `callEffect`. Accordingly, it will get the Object of the Action as second parameter.
 -- TODO. Authentication at the repository urls.
-addModelToLocalStore :: Array String -> MonadPerspectivesTransaction Unit
-addModelToLocalStore urls = do
+addModelToLocalStore :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
+addModelToLocalStore urls r = do
   for_ urls addModelToLocalStore'
   where
     addModelToLocalStore' :: String -> MonadPerspectivesTransaction Unit
@@ -130,7 +133,7 @@ addModelToLocalStore urls = do
       df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels}) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
         (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
       repositoryUrl <- lift2 $ repository url
-      addModelToLocalStore (append repositoryUrl <<< unwrap <$> delete (DomeinFileId _id) referredModels)
+      addModelToLocalStore (append repositoryUrl <<< unwrap <$> delete (DomeinFileId _id) referredModels) r
       rev <- version res.headers
       -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
       -- not the local perspect_models.

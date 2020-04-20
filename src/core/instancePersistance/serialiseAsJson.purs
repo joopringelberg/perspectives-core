@@ -55,8 +55,8 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | context instance to be serialised.
 -- | Notice that, in the use case we want to serialise an Invitation context for a user we do not yet have contact
 -- | with, we can only have his type.
-serialiseFor :: Array String -> Array String -> MPQ Value
-serialiseFor userTypeIds externalRoleIds = ArrayT $ lift $ (execWriterT $ serialiseAsJsonFor_ (ContextInstance $ deconstructBuitenRol $ unsafePartial $ head externalRoleIds) Nothing (EnumeratedRoleType $ unsafePartial $ head userTypeIds) )>>= pure <<< ARR.singleton <<< Value <<< unsafeStringify <<< encode
+serialiseFor :: Array String -> RoleInstance -> MPQ Value
+serialiseFor userTypeIds externalRoleId = ArrayT $ lift $ (execWriterT $ serialiseAsJsonFor_ (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId) Nothing (EnumeratedRoleType $ unsafePartial $ head userTypeIds) )>>= pure <<< ARR.singleton <<< Value <<< unsafeStringify <<< encode
 
 serialiseAsJsonFor :: RoleInstance -> ContextInstance -> MonadPerspectives (Array ContextSerialization)
 serialiseAsJsonFor userId cid = do

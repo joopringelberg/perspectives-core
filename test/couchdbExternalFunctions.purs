@@ -50,7 +50,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.
     -- The result must include "model:System$Model$External"
-    (descriptions :: Array RoleInstance) <- evalMonadPerspectivesQuery "" \_ -> models
+    (descriptions :: Array RoleInstance) <- evalMonadPerspectivesQuery "" \_ -> models (ContextInstance "")
     logShow descriptions
     liftAff $ assert "There must be the model:System description" (isJust $ elemIndex (RoleInstance "model:User$PerspectivesSystemModel_External") descriptions)
 
@@ -59,7 +59,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
       cdburl <- getCouchdbBaseURL
       void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
     runP do
-      void $ runSterileTransaction $ addModelToLocalStore ["http://127.0.0.1:5984/repository/model%3ASystem"]
+      void $ runSterileTransaction $ addModelToLocalStore ["http://127.0.0.1:5984/repository/model%3ASystem"] (RoleInstance "")
       r <- tryGetPerspectEntiteit (ContextInstance "model:User$test")
       liftAff $ assert "There should be an instance of model:User$test" (isJust r)
       clearUserDatabase
