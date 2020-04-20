@@ -122,14 +122,10 @@ roleE = try $ withEntireBlock
         ExternalRole -> externalRole_ pos
         otherwise -> do
           uname <- arcIdentifier
-          isComputed <- lookAhead $ optionMaybe (try (reserved "=" *> reserved "callExternal"))
-          case isComputed of
-            (Just _) -> computedRole_ pos knd uname
-            Nothing -> do
-              isCalculated <- (lookAhead $ optionMaybe (reserved "="))
-              case isCalculated of
-                Nothing -> otherRole_ pos knd uname
-                (Just _) -> calculatedRole_ pos knd uname
+          isCalculated <- (lookAhead $ optionMaybe (reserved "="))
+          case isCalculated of
+            Nothing -> otherRole_ pos knd uname
+            (Just _) -> calculatedRole_ pos knd uname
 
     rolePart :: IP RolePart
     rolePart = do
@@ -175,13 +171,6 @@ roleE = try $ withEntireBlock
       -- calculation <- reserved "=" *> stringUntilNewline >>= pure <<< Calculation
       calculation <- reserved "=" *> step >>= pure <<< Calculation
       pure {uname, knd, pos, parts: Cons calculation Nil }
-
-    computedRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
-    computedRole_ pos knd uname = try do
-      functionName <- reserved "=" *> reserved "callExternal" *> arcIdentifier
-      arguments <- token.parens (token.commaSep step)
-      computedType <- reserved "returns" *> colon *> arcIdentifier
-      pure {uname, knd, pos, parts: Cons (Computation functionName arguments computedType) Nil }
 
     roleAttributes :: IP (List RolePart)
     roleAttributes = option Nil $ token.parens do

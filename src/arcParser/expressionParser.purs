@@ -30,8 +30,8 @@ import Data.Maybe (Maybe(..))
 import Data.String (length)
 import Data.String.CodeUnits as SCU
 import Effect.Unsafe (unsafePerformEffect)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), VarBinding(..), LetStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), ComputationStep(..), LetStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, colon, lowerCaseName, reserved)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition, withEntireBlock)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
@@ -69,7 +69,7 @@ step_ parenthesised = do
         otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}
   where
     leftSide :: IP Step
-    leftSide = defer \_ -> reserved "filter" *> step <|> letStep <|> unaryStep <|> simpleStep
+    leftSide = defer \_ -> reserved "filter" *> step <|> letStep <|> computationStep <|> unaryStep <|> simpleStep
 
 simpleStep :: IP Step
 simpleStep = try
@@ -186,6 +186,7 @@ startOf stp = case stp of
   (Unary us) -> startOfUnary us
   (Let (LetStep {start})) -> start
   (PureLet (PureLetStep {start})) -> start
+  (Computation (ComputationStep {start})) -> start
 
   where
     startOfSimple (ArcIdentifier p _) = p
@@ -211,6 +212,7 @@ endOf stp = case stp of
   (Unary us) -> endOfUnary us
   (Let (LetStep {end})) -> end
   (PureLet (PureLetStep {end})) -> end
+  (Computation (ComputationStep {end})) -> end
 
   where
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
@@ -387,3 +389,12 @@ letStep = do
 
     binding :: IP VarBinding
     binding = VarBinding <$> (lowerCaseName <* token.reservedOp "<-") <*> defer \_ -> step
+
+computationStep :: IP Step
+computationStep = do
+  start <- getPosition
+  functionName <- reserved "callExternal" *> arcIdentifier
+  arguments <- token.parens (token.commaSep step)
+  computedType <- reserved "returns" *> colon *> arcIdentifier
+  end <- getPosition
+  pure $ Computation $ ComputationStep {functionName, arguments: (fromFoldable arguments), computedType, start, end}

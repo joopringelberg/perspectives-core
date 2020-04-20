@@ -93,7 +93,7 @@ import Perspectives.Representation.Range (Range)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -- | Step represents an Expression conforming to the grammar given above.
-data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | Let LetStep | PureLet PureLetStep
+data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | Let LetStep | PureLet PureLetStep | Computation ComputationStep
 
 data SimpleStep =
   ArcIdentifier ArcPosition String
@@ -118,6 +118,8 @@ newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, opera
 newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, assignments :: Array Assignment}
 
 newtype PureLetStep = PureLetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, body :: Step}
+
+newtype ComputationStep = ComputationStep {functionName :: String, arguments :: Array Step, computedType :: String, start :: ArcPosition, end :: ArcPosition}
 
 data VarBinding = VarBinding String Step
 
@@ -174,6 +176,7 @@ instance prettyPrintStep :: PrettyPrint Step where
   prettyPrint' t (Unary s) = prettyPrint' t s
   prettyPrint' t (Let s) = prettyPrint' t s
   prettyPrint' t (PureLet s) = prettyPrint' t s
+  prettyPrint' t (Computation s) = prettyPrint' t s
 
 derive instance genericSimpleStep :: Generic SimpleStep _
 instance showSimpleStep :: Show SimpleStep where show = genericShow
@@ -302,3 +305,15 @@ instance prettyPrintAssignmentOperator :: PrettyPrint AssignmentOperator where
   prettyPrint' _ (Set _) = "Set"
   prettyPrint' _ (AddTo _) = "AddTo"
   prettyPrint' _ (DeleteFrom _) = "DeleteFrom"
+
+-- newtype ComputationStep = ComputationStep {functionName :: String, arguments :: List Step, computedType :: String}
+
+derive instance genericComputationStep :: Generic ComputationStep _
+instance showComputationStep :: Show ComputationStep where show s = genericShow s
+instance eqComputationStep :: Eq ComputationStep where eq c1 c2 = genericEq c1 c2
+instance encodeComputationStep :: Encode ComputationStep where
+  encode q = genericEncode defaultOptions q
+instance decodeComputationStep :: Decode ComputationStep where
+  decode q = genericDecode defaultOptions q
+instance prettyPrintComputationStep :: PrettyPrint ComputationStep where
+  prettyPrint' t (ComputationStep{functionName, arguments, computedType}) = "Computation\n" <> intercalate ("\n" <> t) (prettyPrint' (t <> " ") <$> arguments) <> "\n" <> t <> computedType
