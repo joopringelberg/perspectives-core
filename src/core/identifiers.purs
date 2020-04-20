@@ -53,6 +53,9 @@ buitenRol s = if isModelName s
 deconstructBuitenRol :: String -> String
 deconstructBuitenRol s = replaceAll (Pattern "_External") (Replacement "")(replaceAll (Pattern "$_External") (Replacement "") s)
 
+isExternalRole :: String -> Boolean
+isExternalRole n = n `endsWithSegments` "External"
+
 type Namespace = String
 type LocalName = String
 type Prefix = String

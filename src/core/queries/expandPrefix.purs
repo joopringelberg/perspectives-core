@@ -22,7 +22,7 @@
 module Perspectives.Query.ExpandPrefix where
 
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), LetStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), ComputationStep(..), LetStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Prelude (pure, (<$>), bind, ($))
 
@@ -35,6 +35,7 @@ instance containsPrefixesStep :: ContainsPrefixes Step where
   expandPrefix (Unary s) = Unary <$> expandPrefix s
   expandPrefix (Let s) = Let <$> expandPrefix s
   expandPrefix (PureLet s) = PureLet <$> expandPrefix s
+  expandPrefix (Computation s) = Computation <$> expandPrefix s
 
 instance containsPrefixesSimpleStep :: ContainsPrefixes SimpleStep where
   expandPrefix (ArcIdentifier pos s) = ArcIdentifier pos <$> expandNamespace s
@@ -65,6 +66,13 @@ instance containsPrefixesPureLetStep :: ContainsPrefixes PureLetStep where
     ebindings <- traverse expandPrefix bindings
     ebody <- expandPrefix body
     pure $ PureLetStep r {bindings = ebindings, body = ebody}
+
+instance containsPrefixesComputationStep :: ContainsPrefixes ComputationStep where
+  expandPrefix (ComputationStep r@{functionName, arguments, computedType}) = do
+    efunctionName <- expandNamespace functionName
+    earguments <- traverse expandPrefix arguments
+    ecomputedType <- expandNamespace computedType
+    pure $ ComputationStep r {functionName = efunctionName, arguments = earguments, computedType = ecomputedType}
 
 instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
   expandPrefix (Remove r@{roleExpression}) = do

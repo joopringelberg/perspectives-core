@@ -22,6 +22,7 @@
 module Perspectives.Instances.SerialiseAsJson where
 
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
+import Data.Array (singleton) as ARR
 import Data.Array.NonEmpty (fromArray)
 import Data.Array.Partial (head)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -29,21 +30,24 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Foreign.Class (encode)
 import Foreign.Object (Object, singleton, empty) as OBJ
 import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.CollectAffectedContexts (userHasNoPerspectiveOnRoleInstance)
-import Perspectives.CoreTypes (MonadPerspectives, (###>>), (##>>))
+import Perspectives.CoreTypes (MonadPerspectives, MPQ, (###>>), (##>>))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
+import Perspectives.Identifiers (deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (bottom, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value, externalRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value(..), externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Prelude (Unit, bind, discard, map, pure, unit, when, ($), (<$>), (>>=), (<<<))
+import Prelude (Unit, bind, discard, map, pure, unit, when, ($), (<$>), (<<<), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A function for the External Core Module `model:Serialise`. The first argument should be a singleton holding
@@ -51,11 +55,11 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | context instance to be serialised.
 -- | Notice that, in the use case we want to serialise an Invitation context for a user we do not yet have contact
 -- | with, we can only have his type.
-serialiseFor :: Array String -> Array String -> MonadPerspectives String
-serialiseFor userTypeIds contextIds = (execWriterT $ serialiseAsJsonFor_ (ContextInstance $ unsafePartial $ head contextIds) Nothing (EnumeratedRoleType $ unsafePartial $ head userTypeIds) )>>= pure <<< unsafeStringify
+serialiseFor :: Array String -> Array String -> MPQ Value
+serialiseFor userTypeIds externalRoleIds = ArrayT $ lift $ (execWriterT $ serialiseAsJsonFor_ (ContextInstance $ deconstructBuitenRol $ unsafePartial $ head externalRoleIds) Nothing (EnumeratedRoleType $ unsafePartial $ head userTypeIds) )>>= pure <<< ARR.singleton <<< Value <<< unsafeStringify <<< encode
 
-serialiseAsJsonFor :: ContextInstance -> RoleInstance -> MonadPerspectives (Array ContextSerialization)
-serialiseAsJsonFor cid userId = do
+serialiseAsJsonFor :: RoleInstance -> ContextInstance -> MonadPerspectives (Array ContextSerialization)
+serialiseAsJsonFor userId cid = do
   userType <- roleType_ userId
   systemUser <- userId ##>> bottom
   execWriterT $ serialiseAsJsonFor_ cid (Just systemUser) userType
@@ -129,5 +133,5 @@ serialiseAsJsonFor_ cid userId userType = do
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model:Serialise$SerialiseFor" {func: unsafeCoerce serialiseAsJsonFor, nArgs: 2}
+  [ Tuple "model:Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1}
   ]
