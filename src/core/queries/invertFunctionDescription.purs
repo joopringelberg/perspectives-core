@@ -22,7 +22,7 @@
 module Perspectives.Query.Inversion where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (catMaybes, cons, foldr, last, reverse, uncons)
+import Data.Array (catMaybes, cons, fold, foldr, last, reverse, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
@@ -30,7 +30,7 @@ import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.Identifiers (endsWithSegments)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
@@ -39,7 +39,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), (<$>), (<*>), (<>), (>=>), (>>=), (<<<))
+import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), (<$>), (<*>), (<>), (>=>), (>>=), (<<<), show)
 
 -- | Compute from the description of a query function a series of paths.
 -- | Consider the description to be a tree, then the paths run from the leaves to the root.
@@ -90,9 +90,10 @@ invertFunctionDescription_ (SQD dom (PropertyGetter (CP prop)) ran _ _) = do
   invertFunctionDescription_ calc
 
 -- For now, ignore externe functions.
-invertFunctionDescription_ (MQD dom (ExternalCorePropertyGetter functionName) args ran _ _) = pure mempty
+-- TODO. Draai de argumenten om.
+invertFunctionDescription_ (MQD dom (ExternalCorePropertyGetter functionName) args ran _ _) = traverse invertCalculation args >>= pure <<< fold
 
-invertFunctionDescription_ (MQD dom (ExternalCoreRoleGetter functionName) args ran _ _) = pure mempty
+invertFunctionDescription_ (MQD dom (ExternalCoreRoleGetter functionName) args ran _ _) =  traverse invertCalculation args >>= pure <<< fold
 
 invertFunctionDescription_ (SQD dom (DataTypeGetter CountF) ran _ _) = pure mempty
 
@@ -117,6 +118,10 @@ invertFunctionDescription_ (BQD dom (BinaryCombinator f) qfd1 qfd2 ran _ _) = su
 
 -- catchall
 invertFunctionDescription_ qfd = throwError (error $ "Missing case in invertFunctionDescription_ for: " <> prettyPrint qfd)
+
+invertCalculation :: Calculation -> MP Paths
+invertCalculation (Q qfd) = invertFunctionDescription_ qfd
+invertCalculation (S s) = throwError (error $ "invertCalculation: Step should have been compiled: " <> show s)
 
 -- | For each type of function that appears as a single step in a query, we compute the inverse step.
 invertFunction :: Domain -> QueryFunction -> Range -> Maybe QueryFunction
@@ -197,7 +202,7 @@ composePaths :: Paths -> Paths -> Paths
 composePaths (Paths mp1 subs1) (Paths mp2 subs2) = Paths (mp1 <> mp2) (subs1 <> (((<>) mp1) <$> subs2))
 
 instance pathsSemiGroup :: Semigroup Paths where
-  append = composePaths
+  append = sumPaths
 
 instance pathsMonoid :: Monoid Paths where
   mempty = Paths [] []
