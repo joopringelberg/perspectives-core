@@ -60,7 +60,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (getFirstMatch)
+import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
@@ -127,57 +127,64 @@ addModelToLocalStore urls r = do
   where
     addModelToLocalStore' :: String -> MonadPerspectivesTransaction Unit
     addModelToLocalStore' url = do
-        -- Retrieve the DomeinFile from the URL.
-      (rq :: (Request String)) <- lift $ lift $ defaultPerspectRequest
-      res <- liftAff $ request $ rq {url = url}
-      df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels}) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
-        (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
-      repositoryUrl <- lift2 $ repository url
-      addModelToLocalStore (append repositoryUrl <<< unwrap <$> delete (DomeinFileId _id) referredModels) r
-      rev <- version res.headers
-      -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
-      -- not the local perspect_models.
-      save (identifier df :: DomeinFileId) (changeRevision Nothing df)
-      -- Copy the attachment
-      lift $ lift $ addA url _id
+      case namespaceFromUrl url of
+        Nothing -> throwError (error $ "Repository URL does not end on model name: " <> url)
+        Just ns -> do
+          mdomeinFile <- lift2 $ tryGetPerspectEntiteit (DomeinFileId ns)
+          case mdomeinFile of
+            Just _ -> pure unit
+            Nothing -> do
+                -- Retrieve the DomeinFile from the URL.
+              (rq :: (Request String)) <- lift $ lift $ defaultPerspectRequest
+              res <- liftAff $ request $ rq {url = url}
+              df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels}) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
+                (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
+              repositoryUrl <- lift2 $ repository url
+              addModelToLocalStore (append repositoryUrl <<< unwrap <$> delete (DomeinFileId _id) referredModels) r
+              rev <- version res.headers
+              -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
+              -- not the local perspect_models.
+              save (identifier df :: DomeinFileId) (changeRevision Nothing df)
+              -- Copy the attachment
+              lift $ lift $ addA url _id
 
-      -- Add replacements to PerspectivesState for the new indexed names introduced in this model.
-      (iroles :: Object RoleInstance) <- pure $ fromFoldable $ (\iRole -> Tuple (unwrap iRole) (RoleInstance ("model:User$" <> show (guid unit)))) <$> indexedRoles
-      (icontexts :: Object ContextInstance) <- pure $ fromFoldable $ (\iContext -> Tuple (unwrap iContext) (ContextInstance ("model:User$" <> show (guid unit)))) <$> indexedContexts
-      -- Make sure that `sys:Me` and `sys:MySystem` replacements come from perspectivesState.
-      mySystem <- lift2 (ContextInstance <$> getMySystem)
-      me <- lift2 (RoleInstance <$> getUserIdentifier)
-      void $ lift2 $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
+              -- Add replacements to PerspectivesState for the new indexed names introduced in this model.
+              (iroles :: Object RoleInstance) <- pure $ fromFoldable $ (\iRole -> Tuple (unwrap iRole) (RoleInstance ("model:User$" <> show (guid unit)))) <$> indexedRoles
+              (icontexts :: Object ContextInstance) <- pure $ fromFoldable $ (\iContext -> Tuple (unwrap iContext) (ContextInstance ("model:User$" <> show (guid unit)))) <$> indexedContexts
+              -- Make sure that `sys:Me` and `sys:MySystem` replacements come from perspectivesState.
+              mySystem <- lift2 (ContextInstance <$> getMySystem)
+              me <- lift2 (RoleInstance <$> getUserIdentifier)
+              void $ lift2 $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
 
-      -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
-      crl' <- lift2 $ replaceIndexedNames crl
+              -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
+              crl' <- lift2 $ replaceIndexedNames crl
 
-      -- Remove the modelDescription first from cache: it will have been retrieved before the user decided to start using this model.
-      case modelDescription of
-        Nothing -> throwError (error ("A model has no description: " <> url))
-        Just m -> void $ lift2 $ removeInternally (identifier (m :: PerspectRol))
+              -- Remove the modelDescription first from cache: it will have been retrieved before the user decided to start using this model.
+              case modelDescription of
+                Nothing -> throwError (error ("A model has no description: " <> url))
+                Just m -> void $ lift2 $ removeInternally (identifier (m :: PerspectRol))
 
-      -- Parse the CRL. This will cache all roleInstances.
-      parseResult <- lift2 $ parseAndCache crl'
-      case parseResult of
-        Left e -> throwError (error (show e))
-        Right (Tuple contextInstances roleInstances') -> do
-          -- Save role- and contextinstances.
-          cis <- lift2 $ execStateT (saveRoleInstances roleInstances') contextInstances
-          forWithIndex_ cis \i a -> lift2 $ saveEntiteit (ContextInstance i)
-          -- For each role instance with a binding that is not one of the other imported role instances,
-          -- set the inverse binding administration on that binding.
-          forWithIndex_ roleInstances' \i a -> case rol_binding a of
-            Nothing -> pure unit
-            Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
-              then pure unit
-              else do
-                -- set the inverse binding
-                newBinding <- lift2 $ getPerspectEntiteit newBindingId
-                lift2 $ void $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType a) (RoleInstance i))
-                lift2 $ void $ saveEntiteit newBindingId
-                -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
-                -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
+              -- Parse the CRL. This will cache all roleInstances.
+              parseResult <- lift2 $ parseAndCache crl'
+              case parseResult of
+                Left e -> throwError (error (show e))
+                Right (Tuple contextInstances roleInstances') -> do
+                  -- Save role- and contextinstances.
+                  cis <- lift2 $ execStateT (saveRoleInstances roleInstances') contextInstances
+                  forWithIndex_ cis \i a -> lift2 $ saveEntiteit (ContextInstance i)
+                  -- For each role instance with a binding that is not one of the other imported role instances,
+                  -- set the inverse binding administration on that binding.
+                  forWithIndex_ roleInstances' \i a -> case rol_binding a of
+                    Nothing -> pure unit
+                    Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
+                      then pure unit
+                      else do
+                        -- set the inverse binding
+                        newBinding <- lift2 $ getPerspectEntiteit newBindingId
+                        lift2 $ void $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType a) (RoleInstance i))
+                        lift2 $ void $ saveEntiteit newBindingId
+                        -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
+                        -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
 
     -- Sets the `me` property on the role instances. Detects the ultimate bottom case: the user instance of sys:PerspectivesSystem. Note that model user instances should never comprise particular other users!
     saveRoleInstances :: Object PerspectRol -> StateT (Object PerspectContext) MonadPerspectives Unit

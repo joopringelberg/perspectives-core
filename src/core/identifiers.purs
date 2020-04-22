@@ -56,6 +56,11 @@ deconstructBuitenRol s = replaceAll (Pattern "_External") (Replacement "")(repla
 isExternalRole :: String -> Boolean
 isExternalRole n = n `endsWithSegments` "External"
 
+
+-- | Return the Namespace that is the last segment of the URL.
+namespaceFromUrl :: String -> Maybe String
+namespaceFromUrl = getFirstMatch (unsafeRegex ".*\\/(model:.+)" noFlags)
+
 type Namespace = String
 type LocalName = String
 type Prefix = String
