@@ -31,6 +31,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
@@ -48,6 +49,23 @@ data QueryFunctionDescription =
   UQD Domain QueryFunction QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic|
   BQD Domain QueryFunction QueryFunctionDescription QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic |
   MQD Domain QueryFunction (Array QueryFunctionDescription) Range ThreeValuedLogic ThreeValuedLogic
+
+---------------------------------------------------------------------------------------------------------------------
+---- TRAVERSING
+---------------------------------------------------------------------------------------------------------------------
+-- | Traverse a QueryFunctionDescription with a function that modifies each individual QueryFunctionDescription.
+traverseQfd :: forall f. Monad f => (QueryFunctionDescription -> f QueryFunctionDescription) -> QueryFunctionDescription -> f QueryFunctionDescription
+traverseQfd f q@(SQD _ _ _ _ _) = f q
+traverseQfd f q@(UQD dom qf qfd ran fun man) = traverseQfd f qfd >>= \qfd' -> f (UQD dom qf qfd' ran fun man)
+traverseQfd f q@(BQD dom qf qfd1 qfd2 ran fun man) = do
+  qfd1' <- traverseQfd f qfd1
+  qfd2' <- traverseQfd f qfd2
+  f (BQD dom qf qfd1' qfd2' ran fun man)
+traverseQfd f q@(MQD dom qf qfds ran fun man) = traverse (traverseQfd f) qfds >>= \qfds' -> f (MQD dom qf qfds' ran fun man)
+
+---------------------------------------------------------------------------------------------------------------------
+---- SELECTING PARTS
+---------------------------------------------------------------------------------------------------------------------
 
 range :: QueryFunctionDescription -> Range
 range (SQD _ _ r _ _) = r

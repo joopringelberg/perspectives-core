@@ -25,7 +25,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Step(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), Step(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, evalPhaseTwo', expandNamespace, withNamespaces)
@@ -55,7 +55,7 @@ evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
 evalPhaseTwo = unwrap <<< evalPhaseTwo'
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -123,15 +123,13 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseTwo" do
             case lookup "model:MyTestDomain$MyRole" calculatedRoles of
               Nothing -> assert "There should be a role 'MyRole'" false
               Just (CalculatedRole{calculation}) -> do
-                assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$Modellen))' as its Range"
-                  case calculation of
-                    (Q (MQD _ _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$Modellen"))) _ _)) -> true
-                    otherwise -> false
                 -- logShow calculation
-                assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"model:Couchdb$Models\")'"
-                  case calculation of
-                    (Q (MQD _ (ExternalCoreRoleGetter "model:Couchdb$Models") _ _ _ _)) -> true
-                    otherwise -> false
+                case calculation of
+                  (Q (MQD _ f _ (RDOM (ST (EnumeratedRoleType "Modellen"))) _ _)) -> assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"model:Couchdb$Models\")'" (f == (ExternalCoreRoleGetter "model:Couchdb$Models"))
+                  (Q _) -> assert "The calculation should have '(RDOM (ST EnumeratedRoleType Modellen))' as its Range" false
+                  (S (Computation (ComputationStep {computedType}))) -> assert "The step should have 'model:MyTestDomain$Modellen' as computedType" (computedType == "model:MyTestDomain$Modellen")
+                  otherwise -> assert ("Unexpected result: " <> show otherwise) false
+                -- logShow calculation
 
   test "A Context with an external property and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  case: MyCase\n    external:\n      property: MyProp (mandatory, functional, String) " ARC.domain

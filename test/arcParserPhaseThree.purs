@@ -56,7 +56,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -1072,7 +1072,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
                   Just (Action{effect}) -> do
                     case extractEffect effect of
                       (MQD _ qf args _ _ _) -> do
-                        assert "The queryfunction should be ExternalEffectFullFunction" (eq qf (ExternalEffectFullFunction "couchdb_AddModelToLocalStore") )
+                        assert "The queryfunction should be ExternalEffectFullFunction" (eq qf (ExternalEffectFullFunction "model:Couchdb$AddModelToLocalStore") )
                         assert "There should be one argument" (length args == 1)
                       otherwise -> assert "Side effect expected" false
                   Nothing -> assert "The effect should compile to a binary query function" false

@@ -59,7 +59,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, mod
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeSequence)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range, traverseQfd)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -97,7 +97,6 @@ phaseThree_ df@{_id, referredModels} = do
       qualifyBindings
       qualifyPropertyReferences
       qualifyViewReferences
-      qualifyReturnsClause
       invertedQueriesForLocalRolesAndProperties
       compileExpressions
       requalifyBindingsToCalculatedRoles
@@ -321,25 +320,6 @@ qualifyViewReferences = do
 inverseBindings :: PhaseThree Unit
 inverseBindings = throwError (Custom "Implement inverseBindings")
 
--- | A Computed Role has a clause that specifies the type of Role that is computed.
--- | The modeller can use an unqualified name, that should be resolved against all Roles in the Domain.
--- TODO: qualificeer Computed properties!
--- TODO: Ditzelfde moet gebeuren overal waar een QueryFunctionDescription met callExternal kan voorkomen!
-qualifyReturnsClause :: PhaseThree Unit
-qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
-  where
-    qualifyReturnsClause' :: DomeinFileRecord -> PhaseThree Unit
-    qualifyReturnsClause' {calculatedRoles:roles, enumeratedRoles} = for_ roles
-      (\(CalculatedRole rr@{_id, calculation, pos}) -> do
-        case calculation of
-          Q (MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
-            computedTypeADT <- qualifyLocalRoleName pos computedType (keys enumeratedRoles)
-            case computedTypeADT of
-              ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure unit
-              _ -> modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM}) calculatedRoles})
-          -- Add cases for ExternalCorePropertyGetter, ForeignRoleGetter, ForeignPropertyGetter.
-          otherwise -> pure unit)
-
 -- | For each EnumeratedRole R in the model, add three InvertedQueries to make deltas
 -- | available for User Roles in the context of R that have a Perspective on R.
 -- | The query is tailored to add InvertedQueries for ContextDeltas,
@@ -452,9 +432,18 @@ compileExpressions = do
 compileAndDistributeStep :: Array EnumeratedRoleType -> Domain -> Step -> PhaseThree QueryFunctionDescription
 compileAndDistributeStep userTypes dom s = do
   descr <- compileStep dom s
-  setInvertedQueries userTypes descr
-  -- TODO. Doorloop de structuur en kwalificeer het return type van elke ExternalCoreRoleGetter en ExternalPropertyGetter.
-  pure descr
+  descr' <- traverseQfd (qualifyReturnsClause (startOf s)) descr
+  setInvertedQueries userTypes descr'
+  pure descr'
+  where
+    qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
+    qualifyReturnsClause pos qfd@(MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = do
+      enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
+      computedTypeADT <- qualifyLocalRoleName pos computedType (keys enumeratedRoles)
+      case computedTypeADT of
+        ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure qfd
+        _ -> pure (MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
+    qualifyReturnsClause pos qfd = pure qfd
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process.
