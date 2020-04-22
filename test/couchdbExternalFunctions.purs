@@ -66,12 +66,17 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
       clearUserDatabase
       void $ removeEntiteit (DomeinFileId "model:System")
 
-  test "upload model to repository from files" $ runP do
+  test "upload model:System to repository from files" $ runP do
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     cdburl <- getCouchdbBaseURL
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+
+  test "upload model:SimpleChat to repository from files" $ runP $ withSystem do
+    _ <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
+    cdburl <- getCouchdbBaseURL
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
 
   test "setModelDescriptionsView" do
     assertEqual "The retrieved document should equal the sent document"

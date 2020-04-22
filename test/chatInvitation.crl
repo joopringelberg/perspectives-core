@@ -1,0 +1,6 @@
+UserData
+
+import model:SimpleChat as sim
+
+sim:Chat usr:MyChatInvitation
+  $Initiator -> model:System$Me

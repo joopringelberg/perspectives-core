@@ -13,11 +13,15 @@ domain: SimpleChat
       perspective on: Chats
 
   case: Chat
+    aspect: sys:Invitation
     external:
+      aspect: sys:Invitation$External
       property: WithPartner = context >> Partner >> binding >> Voornaam
     user: Initiator (mandatory, functional) filledBy: Chatter
+      aspect: sys:Invitation$Inviter
       property: MyText (not mandatory, functional, String)
       perspective on: Partner
     user: Partner (not mandatory, functional) filledBy: sys:PerspectivesSystem$User
+      aspect: sys:Invitation$Invitee
       property: MyText (not mandatory, functional, String)
       perspective on: Initiator

@@ -90,3 +90,6 @@ withModel' m@(DomeinFileId id) a = do
 
 withSystem :: forall a. MonadPerspectives a -> MonadPerspectives a
 withSystem = withModel (DomeinFileId "model:System")
+
+withSimpleChat :: forall a. MonadPerspectives a -> MonadPerspectives a
+withSimpleChat = withModel (DomeinFileId "model:SimpleChat")
