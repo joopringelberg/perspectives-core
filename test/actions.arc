@@ -14,6 +14,7 @@ domain: Test
       perspective on: Self
         if true then
           createRole ARole
+          
   case: TestCase3
     user: Self filledBy: sys:PerspectivesSystem$User
       property: Prop1 (not mandatory, functional, Boolean)
@@ -25,6 +26,7 @@ domain: Test
           move Nested1 >> binding >> context >> ARole to Nested2 >> binding >> context
     case: NestedContext
       thing: ARole
+
   case: TestCaseBind
     user: Self filledBy: sys:PerspectivesSystem$User
     thing: ARole filledBy: AnotherRole
@@ -71,7 +73,7 @@ domain: Test
           unbind AnotherRole6 from TestCaseUnbindQualified$ARole6
     case: NestedCase6
       thing: ARole6
-      
+
   case: TestCaseUnbind_
     user: Self filledBy: sys:PerspectivesSystem$User
     thing: ARole7 filledBy: AnotherRole7

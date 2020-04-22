@@ -34,7 +34,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.Inversion (domain2RoleType, invertFunctionDescription)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, domain2contextType)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, domain2contextType, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Role (contextOfADT)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
@@ -43,7 +43,8 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (Unit, discard, pure, unit, ($), bind, (>>=))
+import Perspectives.Utilities (prettyPrint)
+import Prelude (Unit, discard, pure, unit, ($), bind, (>>=), (<>))
 
 -- | Compute the inverse paths for the queryfunction description. Save each path with the type that is the origin
 -- | (Domain) of the inverse path. These paths are used to detect contexts whose rules need to be (re)run
@@ -53,13 +54,19 @@ import Prelude (Unit, discard, pure, unit, ($), bind, (>>=))
 -- | However, we want the inverted queries to end in a context.
 setInvertedQueries :: Array EnumeratedRoleType -> QueryFunctionDescription -> PhaseThree Unit
 setInvertedQueries userTypes qfd = do
-  paths <- ensureContextDomain >>= \q -> lift $ lift $ unsafePartial $ invertFunctionDescription q
-  for_ paths
-    \path -> do
+  qfds <- ensureContextDomain >>= \q -> unsafePartial $ invertFunctionDescription q
+  for_ qfds
+    \qfd' -> do
+      -- TODO. deze expressie mag eruit in productie: het is een controle gedurende ontwikkeling.
+      case range qfd' of
+        CDOM _ -> pure unit
+        otherwise -> throwError (Custom $ "inverted query must have a context range:\n" <> prettyPrint qfd' <> "\n" <> prettyPrint qfd)
       -- log $ prettyPrint path
-      unsafePartial $ setPathForEachSubPath path
+      unsafePartial $ setPathForEachSubPath qfd'
 
   where
+    -- Make sure the Domain is a Context before we invert the query, as an InvertedQuery should always have
+    -- Context as Range.
     ensureContextDomain :: PhaseThree QueryFunctionDescription
     ensureContextDomain = case domain qfd of
       (RDOM dom@(ST et)) -> (lift $ lift $ contextOfADT dom) >>= \c -> pure $

@@ -255,10 +255,7 @@ compileAssignment (UQD _ (BindVariable varName) f1 _ _ _) = do
 
 compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
-  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
-      Q descr -> context2string descr
-      S s -> throwError (error $ "Argument to ExternalEffectFullFunction not compiled: " <> show s))
-    args
+  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse context2string args
   pure (\c -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of

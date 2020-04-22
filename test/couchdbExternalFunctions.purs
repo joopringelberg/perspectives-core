@@ -41,6 +41,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
 
     getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
     models <- ((ContextInstance "model:User$test") ##= getModels)
+    -- hier komt ie niet
     logShow models
     liftAff $ assert "There should be some models" (length models > 0)
 

@@ -68,7 +68,12 @@ type PhaseTwo' a m = ExceptT PerspectivesError (StateT PhaseTwoState m) a
 runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
 runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord empty empty
 
-runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> Object ContextType -> Object EnumeratedRoleType ->  m (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo_' :: forall a m.
+  PhaseTwo' a m ->
+  DomeinFileRecord ->
+  Object ContextType ->
+  Object EnumeratedRoleType ->
+  m (Tuple (Either PerspectivesError a) PhaseTwoState)
 runPhaseTwo_' computation dfr indexedContexts indexedRoles = runStateT (runExceptT computation)
   { bot: false
   , dfr: dfr
@@ -125,6 +130,7 @@ addBinding varName qfd = void $ modify \s@{variableBindings} -> s {variableBindi
 lookupVariableBinding :: forall m. Monad m => String -> PhaseTwo' (Maybe QueryFunctionDescription) m
 lookupVariableBinding varName = getVariableBindings >>= pure <<< (ENV.lookup varName)
 
+-- | Introduce a new scope.
 withFrame :: forall a m. Monad m => PhaseTwo' a m -> PhaseTwo' a m
 withFrame computation = do
   old <- getVariableBindings

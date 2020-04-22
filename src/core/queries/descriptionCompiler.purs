@@ -374,13 +374,13 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
             Nothing -> throwError (UnknownExternalFunction start end functionName)
             Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
               then case mapToRange computedType of
-                Nothing -> pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (Q <$> (fromFoldable compiledArgs)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
-                Just r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (Q <$> (fromFoldable compiledArgs)) (VDOM r Nothing) Unknown Unknown
+                Nothing -> pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+                Just r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) Unknown Unknown
               else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
       else do
         compiledArgs <- traverse (compileStep currentDomain) arguments
         -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
-        pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (Q <$> (fromFoldable compiledArgs)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+        pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
 
   where
 

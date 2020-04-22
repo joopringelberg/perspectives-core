@@ -419,10 +419,6 @@ compileExpressions = do
 
     compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
     compileRolExpr roleName (CalculatedRole cr@{_id, calculation, context}) = case calculation of
-      Q (MQD dom function arguments ran isF isM) -> do
-        userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (CR _id))
-        compiledArguments <- traverse (compileArg userTypes dom) arguments
-        pure $ CalculatedRole (cr {calculation = Q $ MQD dom function compiledArguments ran isF isM})
       Q _ -> pure $ CalculatedRole cr
       S stp -> do
         userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (CR _id))
@@ -438,9 +434,9 @@ compileExpressions = do
         descr <- compileAndDistributeStep userTypes (RDOM $ ST role) stp
         pure $ CalculatedProperty (cr {calculation = Q descr})
 
-compileArg :: Array EnumeratedRoleType -> Domain -> Calculation -> PhaseThree Calculation
-compileArg userTypes dom (S s) = compileAndDistributeStep userTypes dom s >>= pure <<< Q
-compileArg userTypes dom x = pure x
+-- compileArg :: Array EnumeratedRoleType -> Domain -> Calculation -> PhaseThree Calculation
+-- compileArg userTypes dom (S s) = compileAndDistributeStep userTypes dom s >>= pure <<< Q
+-- compileArg userTypes dom x = pure x
 
 -- | Use `compileAndDistributeStep` to compile a parsed expression into a QueryFunctionDescription, and to
 -- | distribute inverted versions of it over all definitions of EnumeratedRoles and EnumeratedProperties that
@@ -457,6 +453,7 @@ compileAndDistributeStep :: Array EnumeratedRoleType -> Domain -> Step -> PhaseT
 compileAndDistributeStep userTypes dom s = do
   descr <- compileStep dom s
   setInvertedQueries userTypes descr
+  -- TODO. Doorloop de structuur en kwalificeer het return type van elke ExternalCoreRoleGetter en ExternalPropertyGetter.
   pure descr
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
@@ -636,7 +633,7 @@ compileRules = do
                         Nothing -> throwError (UnknownExternalFunction start end effectName)
                         Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
                           then do
-                            compiledArguments <- traverse (\s -> compileAndDistributeStep [subject] currentDomain s >>= pure <<< Q) arguments
+                            compiledArguments <- traverse (\s -> compileAndDistributeStep [subject] currentDomain s) arguments
                             pure $ MQD currentDomain (QF.ExternalEffectFullFunction effectName) compiledArguments currentDomain Unknown Unknown
                           else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
                     -- TODO: behandel hier Foreign functions.

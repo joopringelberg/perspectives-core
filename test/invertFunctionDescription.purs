@@ -3,20 +3,23 @@ module Test.Query.Inversion where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (cons, head, intercalate, length, null)
+import Data.Array (cons, head, length, null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Tuple (fst)
+import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
-import Foreign.Object (lookup)
-import Perspectives.DomeinFile (DomeinFile(..))
+import Foreign.Object (lookup, empty)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo', runPhaseTwo_')
+import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Query.Inversion (invertFunctionDescription)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, queryFunction)
 import Perspectives.Representation.Action (Action(..))
@@ -24,10 +27,10 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.Class.PersistentType (getAction)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), PropertyType(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
 import Test.Perspectives.Utils (runP)
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip, suiteOnly)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
 
@@ -35,7 +38,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Test.Query.Inversion" do
+theSuite = suite "Test.Query.Inversion" do
 
   test "Invert a rule condition on a CalculatedProperty" (runP do
       modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
@@ -46,13 +49,18 @@ theSuite = suite  "Test.Query.Inversion" do
             S _ -> liftAff $ assert "Condition should have been compiled." false
             Q qfd -> do
               -- log $ prettyPrint qfd
-              affectedContextQueries <- invertFunctionDescription qfd
-              -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
-              -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
-              liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
-                [ [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop7")),(DataTypeGetter ContextF)]
-                , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop6")),(DataTypeGetter ContextF)]
-                ])
+              -- the condition is variable-free.
+              (DomeinFile (dfr :: DomeinFileRecord)) <- getPerspectEntiteit (DomeinFileId "model:Test")
+              result <- runPhaseTwo_' (invertFunctionDescription qfd) dfr empty empty
+              case fst result of
+                Left e -> liftAff $ assert ("Cannot invert query: " <> show e) false
+                Right (affectedContextQueries :: Array QueryFunctionDescription) -> do
+                  -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
+                  -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
+                  liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
+                    [ [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop7")),(DataTypeGetter ContextF)]
+                    , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop6")),(DataTypeGetter ContextF)]
+                    ])
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
@@ -76,7 +84,7 @@ theSuite = suite  "Test.Query.Inversion" do
                   (Just (CalculatedProperty{calculation})) -> case calculation of
                     S _ -> assert "The calculation should have been compiled!" false
                     Q c -> do
-                      inv <- runP $ invertFunctionDescription c
+                      inv <- invertFD c
                       assert "The inversion of a Constant should be Nothing" (null inv)
 
   test "Property of another role in the same context" do
@@ -99,7 +107,7 @@ theSuite = suite  "Test.Query.Inversion" do
                   (Just (CalculatedProperty{calculation})) -> case calculation of
                     S _ -> assert "The calculation should have been compiled!" false
                     Q c -> do
-                      paths <- runP $ invertFunctionDescription c
+                      paths <- invertFD c
                       -- log $ intercalate "\n" (prettyPrint <$> paths)
                       assert "The inversion of a a property of another role in the same context should run \
                       \from that property to the role to the context" (not $null paths)
@@ -130,7 +138,7 @@ theSuite = suite  "Test.Query.Inversion" do
                   (Just (CalculatedProperty{calculation})) -> case calculation of
                     S _ -> assert "The calculation should have been compiled!" false
                     Q c -> do
-                      paths <- runP $ invertFunctionDescription c
+                      paths <- invertFD c
                       -- log $ intercalate "\n" (prettyPrint <$> paths)
                       assert "The inversion of a a property of another role in the same context should run \
                       \from that property to the role to the context" (not $ null paths)
@@ -165,7 +173,7 @@ theSuite = suite  "Test.Query.Inversion" do
                     S _ -> assert "The calculation should have been compiled!" false
                     Q c -> do
                       -- log (prettyPrint c)
-                      paths <- runP $ invertFunctionDescription c
+                      paths <- invertFD c
                       -- log $ intercalate "\n" (prettyPrint <$> paths)
                       assert "The inversion of an expression with a filter should yield two inverse queries" (length paths == 2)
 
@@ -178,7 +186,7 @@ theSuite = suite  "Test.Query.Inversion" do
           case condition of
             S _ -> liftAff $ assert "Condition should have been compiled." false
             Q qfd -> do
-              affectedContextQueries <- invertFunctionDescription qfd
+              affectedContextQueries <- liftAff $ invertFD qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- logShow $ paths2functions <$> affectedContextQueries
               liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop3", (DataTypeGetter ContextF)],[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2",(DataTypeGetter ContextF)]])
@@ -194,7 +202,7 @@ theSuite = suite  "Test.Query.Inversion" do
           case condition of
             S _ -> liftAff $ assert "Condition should have been compiled." false
             Q qfd -> do
-              affectedContextQueries <- invertFunctionDescription qfd
+              affectedContextQueries <- liftAff $ invertFD qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
               liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [
@@ -217,7 +225,7 @@ theSuite = suite  "Test.Query.Inversion" do
           case condition of
             S _ -> liftAff $ assert "Condition should have been compiled." false
             Q qfd -> do
-              affectedContextQueries <- invertFunctionDescription qfd
+              affectedContextQueries <- liftAff $ invertFD qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
               liftAff $ assert "There should be three AffectedContextQueries." (length affectedContextQueries == 3)
@@ -233,7 +241,7 @@ theSuite = suite  "Test.Query.Inversion" do
           case condition of
             S _ -> liftAff $ assert "Condition should have been compiled." false
             Q qfd -> do
-              affectedContextQueries <- invertFunctionDescription qfd
+              affectedContextQueries <- liftAff $ invertFD qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
               -- logShow (map domain affectedContextQueries)
@@ -252,3 +260,10 @@ composition2path qfd = [qfd]
 
 paths2functions :: QueryFunctionDescription -> Array QueryFunction
 paths2functions = (map queryFunction <<< composition2path)
+
+invertFD :: QueryFunctionDescription -> Aff (Array QueryFunctionDescription)
+invertFD qfd = do
+  result <- runP $ evalPhaseTwo' (invertFunctionDescription qfd)
+  case result of
+    Left e -> assert ("Cannot invert query: " <> show e) false *> pure []
+    Right qfds -> pure qfds

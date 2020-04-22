@@ -34,7 +34,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Invitation" do
+theSuite = suite "Invitation" do
 
   test "Bot serialises invitation" $ runP $ withSystem do
     addAllExternalFunctions

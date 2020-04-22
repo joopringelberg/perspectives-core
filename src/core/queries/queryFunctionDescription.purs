@@ -47,7 +47,7 @@ data QueryFunctionDescription =
   SQD Domain QueryFunction Range ThreeValuedLogic ThreeValuedLogic |
   UQD Domain QueryFunction QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic|
   BQD Domain QueryFunction QueryFunctionDescription QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic |
-  MQD Domain QueryFunction (Array Calculation) Range ThreeValuedLogic ThreeValuedLogic
+  MQD Domain QueryFunction (Array QueryFunctionDescription) Range ThreeValuedLogic ThreeValuedLogic
 
 range :: QueryFunctionDescription -> Range
 range (SQD _ _ r _ _) = r

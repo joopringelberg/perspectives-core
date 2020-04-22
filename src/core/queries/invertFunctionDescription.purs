@@ -22,14 +22,14 @@
 module Perspectives.Query.Inversion where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (catMaybes, cons, fold, foldr, last, reverse, uncons)
+import Data.Array (catMaybes, cons, foldl, foldr, last, reverse, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
-import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.Identifiers (endsWithSegments)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
@@ -44,12 +44,12 @@ import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), 
 -- | Compute from the description of a query function a series of paths.
 -- | Consider the description to be a tree, then the paths run from the leaves to the root.
 -- | We use this function to compute contexts whose rules should be re-run when processing a Delta.MonadPerspectives
-invertFunctionDescription :: QueryFunctionDescription -> MP (Array QueryFunctionDescription)
+invertFunctionDescription :: QueryFunctionDescription -> PhaseThree (Array QueryFunctionDescription)
 invertFunctionDescription qfd = do
   paths <- invertFunctionDescription_ qfd
   traverse invert (allPaths paths) >>= pure <<< catMaybes
   where
-    invert :: Array QueryFunctionDescription -> MonadPerspectives (Maybe QueryFunctionDescription)
+    invert :: Array QueryFunctionDescription -> PhaseThree (Maybe QueryFunctionDescription)
     invert path = do
       mPath <- addContextToPropertyQuery path
       case mPath of
@@ -60,7 +60,7 @@ invertFunctionDescription qfd = do
           Just {head, tail} -> pure $ Just $ foldr compose head (reverse tail)
 
     -- | If the array of steps ends with Value2Role, and does not start with context, prepend context before inverting.
-    addContextToPropertyQuery :: Path -> MonadPerspectives (Maybe Path)
+    addContextToPropertyQuery :: Path -> PhaseThree (Maybe Path)
     addContextToPropertyQuery path = case last path of
       Nothing -> pure Nothing
       Just (SQD _ (Value2Role _) _ _ _) -> case uncons path of
@@ -69,33 +69,35 @@ invertFunctionDescription qfd = do
         Just {head, tail} -> case domain head of
           (RDOM adt) -> do
             -- The first step has a domain that is a role. Compute the context of that role.
-            (contextAdt :: ADT ContextType) <- contextOfADT adt
+            (contextAdt :: ADT ContextType) <- lift2 $ contextOfADT adt
             pure $ Just $ cons (SQD (domain head) (DataTypeGetter ContextF) (CDOM contextAdt) True True) path
           otherwise -> pure $ Just path
       otherwise -> pure $ Just path
 
 -- | Invert each step, but keep the same order of steps.
-invertFunctionDescription_ :: QueryFunctionDescription -> MP Paths
+invertFunctionDescription_ :: QueryFunctionDescription -> PhaseThree Paths
 
 invertFunctionDescription_ (SQD dom (Constant _ _) ran _ _) = pure mempty
 
 invertFunctionDescription_ (SQD dom (RolGetter rt) ran _ _) = case rt of
   ENR _ -> pure $ mkPaths (SQD ran (DataTypeGetter ContextF) dom (inversionIsFunctional (RolGetter rt)) (inversionIsMandatory (RolGetter rt)))
   CR r -> do
-    calc <- (getRole >=> getCalculation) rt
+    calc <- lift2 $ (getRole >=> getCalculation) rt
     invertFunctionDescription_ calc
 
 invertFunctionDescription_ (SQD dom (PropertyGetter (CP prop)) ran _ _) = do
-  calc <- (getCalculatedProperty >=> calculation) prop
+  calc <- lift2 $ (getCalculatedProperty >=> calculation) prop
   invertFunctionDescription_ calc
 
--- For now, ignore externe functions.
--- TODO. Draai de argumenten om.
-invertFunctionDescription_ (MQD dom (ExternalCorePropertyGetter functionName) args ran _ _) = traverse invertCalculation args >>= pure <<< fold
-
-invertFunctionDescription_ (MQD dom (ExternalCoreRoleGetter functionName) args ran _ _) =  traverse invertCalculation args >>= pure <<< fold
-
+-- TODO. Dit kan niet kloppen.
 invertFunctionDescription_ (SQD dom (DataTypeGetter CountF) ran _ _) = pure mempty
+
+  -- Treat a variable by looking up its definition (a QueryFunctionDescription), inverting it and inserting it.
+invertFunctionDescription_ (SQD dom (VariableLookup varName) _ _ _) = do
+  varExpr <- lookupVariableBinding varName
+  case varExpr of
+    Nothing -> pure mempty
+    Just qfd -> invertFunctionDescription_ qfd
 
 invertFunctionDescription_ (SQD dom f ran _ _) = do
   minvertedF <- pure $ invertFunction dom f ran
@@ -116,12 +118,16 @@ invertFunctionDescription_ (BQD dom (BinaryCombinator FilterF) source criterium 
 -- For all other functions, we just sum their paths.
 invertFunctionDescription_ (BQD dom (BinaryCombinator f) qfd1 qfd2 ran _ _) = sumPaths <$> (invertFunctionDescription_ qfd1) <*> (invertFunctionDescription_ qfd2)
 
--- catchall
-invertFunctionDescription_ qfd = throwError (error $ "Missing case in invertFunctionDescription_ for: " <> prettyPrint qfd)
+invertFunctionDescription_ (MQD dom (ExternalCorePropertyGetter functionName) args ran _ _) = traverse invertFunctionDescription_ args >>= pure <<< foldl sumPaths mempty
 
-invertCalculation :: Calculation -> MP Paths
+invertFunctionDescription_ (MQD dom (ExternalCoreRoleGetter functionName) args ran _ _) =  traverse invertFunctionDescription_ args >>= pure <<< foldl sumPaths mempty
+
+-- catchall
+invertFunctionDescription_ qfd = throwError (Custom $ "Missing case in invertFunctionDescription_ for: " <> prettyPrint qfd)
+
+invertCalculation :: Calculation -> PhaseThree Paths
 invertCalculation (Q qfd) = invertFunctionDescription_ qfd
-invertCalculation (S s) = throwError (error $ "invertCalculation: Step should have been compiled: " <> show s)
+invertCalculation (S s) = throwError (Custom $ "invertCalculation: Step should have been compiled: " <> show s)
 
 -- | For each type of function that appears as a single step in a query, we compute the inverse step.
 invertFunction :: Domain -> QueryFunction -> Range -> Maybe QueryFunction
@@ -155,8 +161,6 @@ invertFunction dom qf ran = case qf of
     _ -> Nothing
 
   PropertyGetter pt -> Just $ Value2Role pt
-  -- Variable lookup implies variable binding elsewhere. We've traced the path back in the binding, so we ignore it here.
-  VariableLookup _ -> Nothing
 
   -- Catchall clause
   _ -> Nothing
@@ -202,7 +206,7 @@ composePaths :: Paths -> Paths -> Paths
 composePaths (Paths mp1 subs1) (Paths mp2 subs2) = Paths (mp1 <> mp2) (subs1 <> (((<>) mp1) <$> subs2))
 
 instance pathsSemiGroup :: Semigroup Paths where
-  append = sumPaths
+  append = composePaths
 
 instance pathsMonoid :: Monoid Paths where
   mempty = Paths [] []

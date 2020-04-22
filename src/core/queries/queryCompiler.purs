@@ -50,7 +50,7 @@ import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -114,38 +114,38 @@ compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
 
 compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ C2R (pure <<< const individual)
 
+compileFunction (SQD dom (Value2Role _) _ _ _) = pure $ R2R (pure <<< identity)
+
 compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
-  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
-      Q descr -> context2string descr
-      S s -> throwError (error $ "Argument to ExternalCoreRoleGetter not compiled: " <> show s))
-    args
+  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse context2string args
   pure $ C2R (\c -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
+    -- Notice that the number of parameters given ignores the default argument (context or role) that the function is applied to anyway.
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
-      0 -> (unsafeCoerce f :: MPQ RoleInstance)
-      1 -> (unsafeCoerce f :: (Array String -> MPQ RoleInstance)) (unsafePartial (unsafeIndex values 0))
-      2 -> (unsafeCoerce f :: (Array String -> Array String -> MPQ RoleInstance))
+      0 -> (unsafeCoerce f :: (ContextInstance -> MPQ RoleInstance)) c
+      1 -> (unsafeCoerce f :: (Array String -> ContextInstance -> MPQ RoleInstance)) (unsafePartial (unsafeIndex values 0)) c
+      2 -> (unsafeCoerce f :: (Array String -> Array String -> ContextInstance -> MPQ RoleInstance))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
-      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> MPQ RoleInstance))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> MPQ RoleInstance))
+        c
+      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> ContextInstance -> MPQ RoleInstance))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
+        c
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> ContextInstance -> MPQ RoleInstance))
         (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        c
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )
 
 compileFunction (MQD dom (ExternalCorePropertyGetter functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
-  (argFunctions :: Array (RoleInstance ~~> String)) <- traverse (\calc -> case calc of
-      Q descr -> role2string descr
-      S s -> throwError (error $ "Argument to ExternalCorePropertyGetter not compiled: " <> show s))
-    args
+  (argFunctions :: Array (RoleInstance ~~> String)) <- traverse role2string args
   pure $ R2V (\r -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> r ##= g) argFunctions
     -- Notice that the number of parameters given ignores the default argument (context or role) that the function is applied to anyway.

@@ -9,7 +9,7 @@ import Data.Array (head, length, null)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Perspectives.Assignment.Update (handleNewPeer, setBinding)
 import Perspectives.CoreTypes ((##>>))
 import Perspectives.Couchdb.Databases (deleteDatabase)
@@ -36,7 +36,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "SerialisedAsDeltas" do
+theSuite = suiteOnly "SerialisedAsDeltas" do
 
   test "Bind a user to a role in a context" (runP $ withModel' (DomeinFileId "model:System") $ do
     -- load userdata.
@@ -46,8 +46,8 @@ theSuite = suite "SerialisedAsDeltas" do
         logShow modelErrors
         liftAff $ assert "There are modelErrors" false
       else pure unit
-
     achannel <- runMonadPerspectivesTransaction createChannel
+    -- Hierboven gaat het fout
     case head achannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
       Just channel -> do
