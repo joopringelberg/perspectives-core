@@ -24,7 +24,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (cons, elemIndex, find, foldM, foldr, sort, union)
+import Data.Array (cons, elemIndex, filterA, find, foldM, foldr, null, sort, union)
 import Data.Array (filter) as ARR
 import Data.Array.NonEmpty (fromArray, head, toArray)
 import Data.Foldable (for_)
@@ -44,6 +44,8 @@ import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMe)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.Names (getUserIdentifier)
+import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Class.Role (greaterThanOrEqualTo)
 import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
@@ -168,11 +170,15 @@ getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
   mmyType <- lift2 (head contextInstances ##> getMe >=> OG.roleType)
   case mmyType of
     Nothing -> pure []
-    Just myType -> if isJust $ elemIndex myType userTypes
-      then do
-        (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure isAutomatic)
-        pure $ join $ ((\affectedContext -> (ActionInstance affectedContext) <$> automaticActions) <$> toArray contextInstances)
-      else pure []
+    Just myType -> do
+      -- myType should be equal to or a specialisation of one of the userTypes.
+      -- TODO. Optimalisatie: stop bij het eerste type. Gebruik een state?
+      r <- lift2 $ filterA (\userType -> (ST myType) `greaterThanOrEqualTo` (ST userType)) userTypes
+      if not $ null r
+        then do
+          (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure isAutomatic)
+          pure $ join $ ((\affectedContext -> (ActionInstance affectedContext) <$> automaticActions) <$> toArray contextInstances)
+        else pure []
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift
