@@ -24,10 +24,12 @@ module Perspectives.Instances.Combinators where
 import Control.Monad.Error.Class (class MonadError)
 import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (guard)
-import Data.Array (cons, elemIndex, foldM, null, union)
+import Data.Array (cons, elemIndex, foldM, foldMap, null, union)
 import Data.HeytingAlgebra (not, (&&)) as HA
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Monoid.Conj (Conj(..))
+import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (class Newtype, ala, unwrap)
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
@@ -133,6 +135,20 @@ exists :: forall m s o. Eq o => Monad m =>
 exists source id = ArrayT do
   r <- runArrayT $ source id
   pure $ [Value $ show $ HA.not $ null r]
+
+every :: forall m s. Monad m =>
+  (s -> ArrayT m Boolean) ->
+  (s -> ArrayT m Boolean)
+every source id = ArrayT do
+  (r :: Array Boolean) <- runArrayT $ source id
+  pure [ala Conj foldMap r]
+
+some :: forall m s. Monad m =>
+  (s -> ArrayT m Boolean) ->
+  (s -> ArrayT m Boolean)
+some source id = ArrayT do
+  (r :: Array Boolean) <- runArrayT $ source id
+  pure [ala Disj foldMap r]
 
 available :: forall s o. Eq o => Newtype o String => Show o =>
   (s -> MonadPerspectivesQuery o) ->
