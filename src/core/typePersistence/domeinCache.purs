@@ -28,6 +28,7 @@ import Affjax (Request) as AX
 import Affjax.ResponseFormat as ResponseFormat
 import Control.Monad.Except (catchError, throwError)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (AVar, take)
@@ -36,7 +37,7 @@ import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Identifiers (Namespace)
-import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, updateRevision)
+import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
 import Perspectives.User (getCouchdbPassword, getUser)
@@ -63,7 +64,7 @@ modifyDomeinFileInCache modifier ns =
         pure unit
 
 -----------------------------------------------------------
---
+-- RETRIEVE A DOMAINFILE
 -----------------------------------------------------------
 -- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the database and caches it.
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
@@ -103,3 +104,18 @@ domeinRequest = do
   , withCredentials: true
   , responseFormat: ResponseFormat.string
   }
+
+-----------------------------------------------------------
+-- CASCADING DELETION OF A DOMAINFILE
+-----------------------------------------------------------
+-- | Delete the DomeinFile from cache and from the local models store.
+-- | (First) delete all dependencies.
+-- | Notice that this may remove files that are dependencies of other locally stored DomeinFiles!
+cascadeDeleteDomeinFile :: DomeinFileId -> MonadPerspectives Unit
+cascadeDeleteDomeinFile dfid = do
+  df <- tryGetPerspectEntiteit dfid
+  case df of
+    Just (DomeinFile{referredModels}) -> do
+      for_ referredModels cascadeDeleteDomeinFile
+      void $ removeEntiteit dfid
+    otherwise -> pure unit

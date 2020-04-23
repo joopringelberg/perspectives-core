@@ -46,7 +46,7 @@ theSuite = suite "Perspectives.loadArc" do
           (eq (changeRevision Nothing retrievedModel) (changeRevision Nothing reParsedModel))
     runP $ removeDomeinFileFromCouchdb "model:ContextAndRole"
 
-  test "Load a model file and cache it" do
+  test "Load model:System and cache it" do
     messages <- runP do
       -- 1. Load the required model:Couchdb.
       _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory

@@ -140,7 +140,7 @@ addModelToLocalStore urls r = do
               df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels}) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
                 (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
               repositoryUrl <- lift2 $ repository url
-              addModelToLocalStore (append repositoryUrl <<< unwrap <$> delete (DomeinFileId _id) referredModels) r
+              addModelToLocalStore (append repositoryUrl <<< unwrap <$> referredModels) r
               rev <- version res.headers
               -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
               -- not the local perspect_models.

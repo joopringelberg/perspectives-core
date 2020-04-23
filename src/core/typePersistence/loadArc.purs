@@ -23,6 +23,7 @@ module Perspectives.TypePersistence.LoadArc where
 
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
+import Data.Array (delete)
 import Data.Either (Either(..))
 import Data.Foldable (find, foldl)
 import Data.Maybe (Maybe(..))
@@ -38,7 +39,7 @@ import Node.Process (cwd)
 import Perspectives.ContextRoleParser (userData)
 import Perspectives.CoreTypes (MonadPerspectives, (##=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache, storeDomeinFileInCouchdb)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.IndentParser (runIndentParser')
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding, context, getRole)
@@ -84,8 +85,9 @@ loadAndCompileArcFile fileName directoryName = do
               (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr''
               case x' of
                 (Left e) -> pure $ Left [e]
-                (Right correctedDFR) -> do
-                  pure $ Right $ DomeinFile correctedDFR
+                (Right correctedDFR@{referredModels}) -> do
+                  -- Remove the self-referral
+                  pure $ Right $ DomeinFile correctedDFR {referredModels = delete (DomeinFileId _id) referredModels}
     \e -> pure $ Left [Custom (show e)]
 
 type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)

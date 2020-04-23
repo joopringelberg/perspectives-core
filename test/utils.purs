@@ -5,9 +5,10 @@ import Prelude
 import Effect.Aff (Aff)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
+import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName, removeEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.RunPerspectives (runPerspectives)
@@ -85,7 +86,7 @@ withModel' m@(DomeinFileId id) a = do
   cdbUrl <- getCouchdbBaseURL
   void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "repository/" <> id] (RoleInstance ""))
   result <- a
-  void $ removeEntiteit m
+  void $ cascadeDeleteDomeinFile m
   pure result
 
 withSystem :: forall a. MonadPerspectives a -> MonadPerspectives a
