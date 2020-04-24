@@ -27,6 +27,7 @@ import Control.Plus (empty, map, (<|>))
 import Data.Array (filter, find, findIndex, foldM, singleton)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (keys, values)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), (###=))
@@ -34,7 +35,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments)
-import Perspectives.Instances.Combinators (closure_)
+import Perspectives.Instances.Combinators (closure_, some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT)
@@ -47,7 +48,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>), discard)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -190,8 +191,21 @@ qualifyContextInDomain localName namespace = ArrayT do
 ------- ROLES WITH A PERSPECTIVE ON ANOTHER TYPE
 ----------------------------------------------------------------------------------------
 -- | <userRole> `hasPerspectiveOnRole` <RoleType>
+-- | True iff the userRole or one of its aspects has an Action with RoleType as object.
 hasPerspectiveOnRole :: EnumeratedRoleType -> RoleType ~~~> Boolean
-hasPerspectiveOnRole userRole' rt = lift $ getEnumeratedRole userRole' >>= \(EnumeratedRole{perspectives}) -> foldM (\(found :: Boolean) (next :: ActionType) -> if found
+hasPerspectiveOnRole userRole' rt = some (f userRole') rt
+  where
+    f :: EnumeratedRoleType -> RoleType ~~~> Boolean
+    f userRole'' rt' = do
+      u <- aspectsClosure userRole''
+      r <- hasPerspectiveOnRole_ u rt'
+      -- log (unwrap u <> " hasPerspectiveOnRole_ " <> show rt' <> " = " <> show r)
+      pure r
+
+-- | <userRole> `hasPerspectiveOnRole_` <RoleType>
+-- | True iff the userRole has an Action with RoleType as object.
+hasPerspectiveOnRole_ :: EnumeratedRoleType -> RoleType ~~~> Boolean
+hasPerspectiveOnRole_ userRole' rt = lift $ getEnumeratedRole userRole' >>= \(EnumeratedRole{perspectives}) -> foldM (\(found :: Boolean) (next :: ActionType) -> if found
     then pure found
     else getAction next >>= pure <<< providesPerspectiveOnRole rt)
   false
