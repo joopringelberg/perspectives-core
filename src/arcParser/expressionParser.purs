@@ -81,6 +81,8 @@ simpleStep = try
   <|>
   Simple <$> (Context <$> (getPosition <* reserved "context"))
   <|>
+  Simple <$> (TypeOfContext <$> (getPosition <* reserved "contextType"))
+  <|>
   Simple <$> (Extern <$> (getPosition <* reserved "extern"))
   <|>
   Simple <$> (Value <$> getPosition <*> pure PDate <*> (parseDate >>= pure <<< show))
@@ -194,6 +196,7 @@ startOf stp = case stp of
     startOfSimple (Binding p) = p
     startOfSimple (Binder p _) = p
     startOfSimple (Context p) = p
+    startOfSimple (TypeOfContext p) = p
     startOfSimple (Extern p) = p
     startOfSimple (CreateContext p _) = p
     startOfSimple (CreateEnumeratedRole p _) = p
@@ -220,6 +223,7 @@ endOf stp = case stp of
     endOfSimple (Binding (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Binder (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
+    endOfSimple (TypeOfContext (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (CreateContext (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}

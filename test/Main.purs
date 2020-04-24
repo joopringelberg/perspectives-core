@@ -35,6 +35,7 @@ import Test.Sync.HandleTransaction as HTA
 import Test.Assignment.SerialiseAsJson as SAJ
 import Test.Utilities as UT
 import Test.Invitation as IT
+import Test.TypeLevelQueries as TLQ
 
 
 main :: Effect Unit
@@ -69,3 +70,4 @@ main = runTest do
   SAJ.theSuite
   UT.theSuite
   IT.theSuite
+  TLQ.theSuite

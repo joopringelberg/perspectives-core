@@ -103,6 +103,7 @@ data SimpleStep =
   | Binding ArcPosition
   | Binder ArcPosition String
   | Context ArcPosition
+  | TypeOfContext ArcPosition
   | Extern ArcPosition
   | SequenceFunction ArcPosition QF.FunctionName
   | Identity ArcPosition
@@ -192,6 +193,7 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (Binding _) = "Binding"
   prettyPrint' t (Binder _ s) = "Binder " <> s
   prettyPrint' t (Context _) = "Context"
+  prettyPrint' t (TypeOfContext _) = "TypeOfContext"
   prettyPrint' t (Extern _) = "Extern"
   prettyPrint' t (SequenceFunction _ s) = "SequenceFunction " <> show s
   prettyPrint' t (Identity _ ) = "Identity"

@@ -160,6 +160,12 @@ compileSimpleStep currentDomain s@(Context pos) = do
       pure $ SQD currentDomain (QF.DataTypeGetter ContextF) (CDOM typeOfContext) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
+compileSimpleStep currentDomain s@(TypeOfContext pos) = do
+  case currentDomain of
+    (CDOM (r :: ADT ContextType)) -> do
+      pure $ SQD currentDomain (QF.TypeGetter TypeOfContextF) ContextKind True True
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
 compileSimpleStep currentDomain s@(Extern pos) = do
   case currentDomain of
     (CDOM c) -> do

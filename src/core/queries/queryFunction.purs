@@ -27,7 +27,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
@@ -67,7 +67,7 @@ data FunctionName =
   | MaximumF            -- TODO
   | AvailableF           -- TODO
 
-  | ContextTypeF
+  | TypeOfContextF
 
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
@@ -101,7 +101,7 @@ isFunctionalFunction fn = case fn of
   MinimumF -> True
   MaximumF -> True
   AvailableF -> True
-  ContextTypeF -> True
+  TypeOfContextF -> True
 
 
 data QueryFunction
@@ -199,6 +199,6 @@ instance showFunctionName :: Show FunctionName where
     show MinimumF = "minimum"
     show MaximumF = "maximum"
     show AvailableF = "available"
-    show ContextTypeF = "contextType"
+    show TypeOfContextF = "TypeOfContextF"
 
 instance eqFunctionName :: Eq FunctionName where eq = genericEq

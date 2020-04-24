@@ -61,9 +61,9 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, Unit, bind, const, discard, eq, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||))
+import Prelude (class Eq, class Ord, bind, discard, eq, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 compileFunction :: QueryFunctionDescription -> MP (String ~~> String)
@@ -86,19 +86,17 @@ compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ unsafeCoer
 
 compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ unsafeCoerce context
 
-compileFunction (SQD _ (TypeGetter ContextTypeF) _ _ _) = pure $ unsafeCoerce contextType
+compileFunction (SQD _ (TypeGetter TypeOfContextF) _ _ _) = pure $ unsafeCoerce contextType
 
 compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ unsafeCoerce binding
 
 compileFunction (SQD dom Identity _ _ _) = case dom of
-  CDOM _ -> pure $ (pure <<< identity)
-  RDOM _ -> pure $ (pure <<< identity)
   VDOM _ _ -> throwError (error "There is no identity function for value.")
+  otherwise -> pure $ (pure <<< identity)
 
 compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
-  CDOM _ -> pure $ unsafeCoerce \x -> (pure (Value value) :: MPQ Value)
-  RDOM _ -> pure $ unsafeCoerce \x -> (pure (Value value) :: MPQ Value)
   VDOM _ _ -> throwError (error "There is no constant function for value.")
+  otherwise -> pure $ unsafeCoerce \x -> (pure (Value value) :: MPQ Value)
 
 compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ unsafeCoerce (\x -> pure individual :: MPQ RoleInstance)
 
