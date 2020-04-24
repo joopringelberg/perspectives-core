@@ -153,14 +153,19 @@ some source id = ArrayT do
 available :: forall s o. Eq o => Newtype o String => Show o =>
   (s -> MonadPerspectivesQuery o) ->
   (s -> MonadPerspectivesQuery Value)
-available source id = ArrayT do
+available source id = available_ (source >=> pure <<< unwrap) id
+
+available_ :: forall s.
+  (s -> MonadPerspectivesQuery String) ->
+  (s -> MonadPerspectivesQuery Value)
+available_ source id = ArrayT do
   r <- runArrayT $ source id
   result <- foldM
     (\allAvailable resId -> lift do
-      mr <- tryGetPerspectEntiteit (RoleInstance $ unwrap resId)
+      mr <- tryGetPerspectEntiteit (RoleInstance resId)
       case mr of
         Nothing -> do
-          mc <- tryGetPerspectEntiteit (ContextInstance $ unwrap resId)
+          mc <- tryGetPerspectEntiteit (ContextInstance resId)
           case mc of
             Nothing -> pure false
             otherwise -> pure allAvailable

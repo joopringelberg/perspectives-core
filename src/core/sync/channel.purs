@@ -43,7 +43,7 @@ import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstan
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier)
-import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
+import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNA

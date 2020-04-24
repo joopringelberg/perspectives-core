@@ -34,7 +34,7 @@ import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, type (~~>))
 import Perspectives.Instances.ObjectGetters (roleType_, binding) as OG
-import Perspectives.Query.Compiler (getPropertyFunction)
+import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (binding, propertiesOfADT, roleAspectsADT)

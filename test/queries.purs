@@ -7,11 +7,11 @@ import Data.Array (length, null)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes ((##=))
-import Perspectives.Query.Compiler (getRoleFunction)
+import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
 import Test.Perspectives.Utils (runP)
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
 testDirectory :: String
@@ -21,7 +21,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Queries" do
+theSuite = suite "Queries" do
 
   test "Two results over: RoleA >> binding" (runP do
     -- Load the test Arc file from the testDirectory. Parse the file completely. Cache it.

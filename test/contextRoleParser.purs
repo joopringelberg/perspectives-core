@@ -72,7 +72,6 @@ theSuite = suite "ContextRoleParser" do
 
   test "isMe for a role we bind with a role that represents the user." $ runP $ withSystem do
     _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
     void $ runMonadPerspectivesTransaction $ setBinding
       (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")

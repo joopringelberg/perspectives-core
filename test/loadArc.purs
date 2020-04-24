@@ -8,7 +8,7 @@ import Data.Array (null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, retrieveDomeinFile)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
@@ -84,6 +84,7 @@ theSuite = suite "Perspectives.loadArc" do
     messages <- runP do
       catchError (do
         void $ loadCompileAndCacheArcFile' "couchdb" modelDirectory
+        void $ loadCompileAndCacheArcFile' "serialise" modelDirectory
         loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
         )
         \e -> logShow e *> pure []

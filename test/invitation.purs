@@ -18,7 +18,7 @@ import Perspectives.CoreTypes ((##=))
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
-import Perspectives.Query.Compiler (getPropertyFunction)
+import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
@@ -34,7 +34,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Invitation" do
+theSuite = suite "Invitation" do
 
   test "Bot serialises invitation" $ runP $ withSystem do
     addAllExternalFunctions
@@ -61,7 +61,7 @@ theSuite = suiteOnly "Invitation" do
                   Nothing -> liftAff $ assert "There should have been an instance named model:User$MyInvitation" false
                   otherwise -> pure unit
 
-  testOnly "Bot serialises Chat" $ runP $ withSimpleChat do
+  test "Bot serialises Chat" $ runP $ withSimpleChat do
     addAllExternalFunctions
     -- Create a Chat instance with an Initiator
     errs <- loadAndSaveCrlFile "chatInvitation.crl" testDirectory

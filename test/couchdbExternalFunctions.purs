@@ -15,10 +15,11 @@ import Perspectives.CoreTypes (evalMonadPerspectivesQuery, (##=))
 import Perspectives.Couchdb (designDocumentViews)
 import Perspectives.Couchdb.Databases (getDesignDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
+import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore, models, uploadToRepository)
 import Perspectives.Persistent (entitiesDatabaseName, removeEntiteit, tryGetPerspectEntiteit)
-import Perspectives.Query.Compiler (getRoleFunction)
+import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
@@ -60,11 +61,11 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
       cdburl <- getCouchdbBaseURL
       void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
     runP do
-      void $ runSterileTransaction $ addModelToLocalStore ["http://127.0.0.1:5984/repository/model%3ASystem"] (RoleInstance "")
+      void $ runSterileTransaction $ addModelToLocalStore ["http://127.0.0.1:5984/repository/model:System"] (RoleInstance "")
       r <- tryGetPerspectEntiteit (ContextInstance "model:User$test")
       liftAff $ assert "There should be an instance of model:User$test" (isJust r)
       clearUserDatabase
-      void $ removeEntiteit (DomeinFileId "model:System")
+      void $ cascadeDeleteDomeinFile (DomeinFileId "model:System")
 
   test "upload model:System to repository from files" $ runP do
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory

@@ -53,8 +53,8 @@ import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as 
 import Perspectives.Instances.ObjectGetters (getConditionState, setConditionState)
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
-import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role, context2string)
-import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
+import Perspectives.Query.UnsafeCompiler (context2context, context2propertyValue, context2role, context2string)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
@@ -88,6 +88,7 @@ compileBotAction actionType = do
     ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
       conditionWasTrue <- lift2 $ getConditionState actionType contextId
       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+      -- hierboven gaat het fout
       if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
         then if conditionWasTrue
           then pure unit
@@ -106,7 +107,7 @@ compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
     case uncons roles of
       Nothing -> pure unit
       Just {head, tail} -> do
-        ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
+        -- ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
         for_ roles removeRoleInstance
 
 -- Delete all instances of the role. Model

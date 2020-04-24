@@ -1,4 +1,5 @@
 domain: Test
+
   use: sys for model:System
   case: TestCase1
     user: Self filledBy: sys:PerspectivesSystem$User
@@ -7,6 +8,7 @@ domain: Test
       perspective on: Self
         if true then
           remove ARole
+          
   case: TestCase2
     user: Self filledBy: sys:PerspectivesSystem$User
     thing: ARole
@@ -14,7 +16,7 @@ domain: Test
       perspective on: Self
         if true then
           createRole ARole
-          
+
   case: TestCase3
     user: Self filledBy: sys:PerspectivesSystem$User
       property: Prop1 (not mandatory, functional, Boolean)

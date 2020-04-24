@@ -45,6 +45,7 @@ main = runTest do
   TPA3.theSuite
   TPAE.theSuite
   QDC.theSuite
+  QR.theSuite
   ADT.theSuite
   LCRL.theSuite
   LARC.theSuite
@@ -58,7 +59,6 @@ main = runTest do
   CDB.theSuite
   TMS.theSuite
   TTO.theSuite
-  QR.theSuite
   SCDB.theSuite
   LA.theSuite
   SAD.theSuite

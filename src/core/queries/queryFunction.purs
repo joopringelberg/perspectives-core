@@ -67,6 +67,8 @@ data FunctionName =
   | MaximumF            -- TODO
   | AvailableF           -- TODO
 
+  | ContextTypeF
+
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
   ContextF -> True
@@ -99,6 +101,7 @@ isFunctionalFunction fn = case fn of
   MinimumF -> True
   MaximumF -> True
   AvailableF -> True
+  ContextTypeF -> True
 
 
 data QueryFunction
@@ -118,6 +121,8 @@ data QueryFunction
   | AssignmentOperator FunctionName
   | Identity
   | WithFrame
+
+  | TypeGetter FunctionName
 
   | UnaryCombinator FunctionName
   -- | NaryCombinator FunctionName (Array QueryFunction)
@@ -194,5 +199,6 @@ instance showFunctionName :: Show FunctionName where
     show MinimumF = "minimum"
     show MaximumF = "maximum"
     show AvailableF = "available"
+    show ContextTypeF = "contextType"
 
 instance eqFunctionName :: Eq FunctionName where eq = genericEq

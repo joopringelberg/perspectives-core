@@ -20,7 +20,7 @@ import Perspectives.Couchdb.Databases (deleteDatabase, documentNamesInDatabase, 
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getRole, getRoleBinders)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Names (getMySystem)
-import Perspectives.Query.Compiler (getPropertyFunction)
+import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)

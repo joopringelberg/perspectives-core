@@ -45,7 +45,7 @@ import Perspectives.Instances.ObjectGetters (bottom, getRole)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Query.Compiler (getHiddenFunction)
+import Perspectives.Query.UnsafeCompiler (getHiddenFunction)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
