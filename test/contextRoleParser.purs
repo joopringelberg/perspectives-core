@@ -21,7 +21,7 @@ import Perspectives.Identifiers (QualifiedName(..))
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.LoadCRL (loadAndCacheCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectRol, getPerspectContext)
@@ -47,7 +47,7 @@ theSuite = suite "ContextRoleParser" do
   test "inverse binding" $ runP $ withSystem do
     _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-    (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getRole (EnumeratedRoleType "model:Test$TestCase$Self")
+    (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCase$Self")
     ra <- getPerspectRol rl >>= pure <<< rol_gevuldeRollen
     liftAff $ assert "There should be two inverse bindings for model:Test$TestCase$NestedCase$NestedSelf" (Just 2 == (length <$> (lookup "model:Test$TestCase$NestedCase$NestedSelf" ra)))
     liftAff $ assert "There should be an inverse binding for model:Test$TestCase$NestedCase2$NestedSelf" (isJust (lookup "model:Test$TestCase$NestedCase2$NestedSelf" ra))
@@ -60,7 +60,7 @@ theSuite = suite "ContextRoleParser" do
   test "isMe for a role constructed with binding that represents the user." $ runP $ withSystem do
     _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-    (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getRole (EnumeratedRoleType "model:Test$TestCase$Self")
+    (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCase$Self")
     ra <- getPerspectRol rl
     liftAff $ assert "Self should have isMe == true" (rol_isMe ra)
 

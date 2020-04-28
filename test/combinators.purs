@@ -8,7 +8,7 @@ import Data.Foldable (for_)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Perspectives.CoreTypes ((##=))
-import Perspectives.Instances.ObjectGetters (binding, getRole)
+import Perspectives.Instances.ObjectGetters (binding, getEnumeratedRoleInstances)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.Class.Cacheable (removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value(..))
@@ -29,18 +29,18 @@ theSuite = suite "Combinators" do
       if null modelErrors
         then do
           bindingAvailable <- getPropertyFunction "model:Combinators$TestCase$SomeRole$BindingAvailable"
-          b <- (ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Combinators$TestCase$SomeRole") >=> bindingAvailable
+          b <- (ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Combinators$TestCase$SomeRole") >=> bindingAvailable
           liftAff $ assert "The property value SomeRole$BindingAvailable should be false because there is no binding at all." (b == [Value "false"])
           -- log "Just after looking for the binding of SomeRole."
           bindingAvailable' <- getPropertyFunction "model:Combinators$TestCase$AnotherRole$BindingAvailable"
-          b' <- (ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Combinators$TestCase$AnotherRole") >=> bindingAvailable'
+          b' <- (ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Combinators$TestCase$AnotherRole") >=> bindingAvailable'
           liftAff $ assert "The property value AnotherRole$BindingExists should be true, because there is a binding available and it is represented" (b' == [Value "true"])
           -- log "Just after looking for the binding of AnotherRole."
           -- remove the binding from cache without modifying the instance.
-          (bnd :: Array RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Combinators$TestCase$AnotherRole") >=> binding
+          (bnd :: Array RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Combinators$TestCase$AnotherRole") >=> binding
           for_ bnd removeInternally
           -- log "Removed the binding of AnotherRole."
-          b'' <- (ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Combinators$TestCase$AnotherRole") >=> bindingAvailable'
+          b'' <- (ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Combinators$TestCase$AnotherRole") >=> bindingAvailable'
           liftAff $ assert "The property value AnotherRole$BindingExists should be false after we remove the binding from cache" (b'' == [Value "false"])
           -- log "Just after looking for the binding of AnotherRole after removing it."
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false

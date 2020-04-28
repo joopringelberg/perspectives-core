@@ -8,7 +8,7 @@ import Effect.Aff.Class (liftAff)
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.DomeinFile (DomeinFileId(..))
-import Perspectives.Instances.ObjectGetters (getProperty, getRole)
+import Perspectives.Instances.ObjectGetters (getProperty, getEnumeratedRoleInstances)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
@@ -36,9 +36,9 @@ theSuite = suite "RunMonadPerspectivesTransaction" do
         instanceErrors <- loadAndSaveCrlFile "onContextDelta_context.crl" testDirectory
         if null instanceErrors
           then do
-            sr <- (ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseContextDelta_context$SomeRole")
+            sr <- (ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCaseContextDelta_context$SomeRole")
             liftAff $ assert "There should be an instance of SomeRole" (length sr == 1)
-            n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseContextDelta_context$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseContextDelta_context$RoleToInspect$Flag"))
+            n1 <- ((ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCaseContextDelta_context$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseContextDelta_context$RoleToInspect$Flag"))
             liftAff $ assert "Flag should be true." (n1 == [Value "true"])
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
@@ -53,7 +53,7 @@ theSuite = suite "RunMonadPerspectivesTransaction" do
         instanceErrors <- loadAndSaveCrlFile "onContextDelta_role.crl" testDirectory
         if null instanceErrors
           then do
-            n1 <- ((ContextInstance "model:User$MySubcase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseContextDelta_rol$SubCase$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseContextDelta_rol$SubCase$RoleToInspect$Flag"))
+            n1 <- ((ContextInstance "model:User$MySubcase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCaseContextDelta_rol$SubCase$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseContextDelta_rol$SubCase$RoleToInspect$Flag"))
             liftAff $ assert "Flag should be true." (n1 == [Value "true"])
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
@@ -68,7 +68,7 @@ theSuite = suite "RunMonadPerspectivesTransaction" do
         instanceErrors <- loadAndSaveCrlFile "onRoleDelta_binding.crl" testDirectory
         if null instanceErrors
           then do
-            n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseRoleDelta_binding$BinderRole") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseRoleDelta_binding$BinderRole$Flag"))
+            n1 <- ((ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCaseRoleDelta_binding$BinderRole") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseRoleDelta_binding$BinderRole$Flag"))
             liftAff $ assert "Flag should be true." (n1 == [Value "true"])
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
@@ -81,7 +81,7 @@ theSuite = suite "RunMonadPerspectivesTransaction" do
         instanceErrors <- loadAndSaveCrlFile "onRoleDelta_binder.crl" testDirectory
         if null instanceErrors
           then do
-            n1 <- ((ContextInstance "model:User$MySubcase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseRoleDelta_binder$SubCase2$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseRoleDelta_binder$SubCase2$RoleToInspect$Flag"))
+            n1 <- ((ContextInstance "model:User$MySubcase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCaseRoleDelta_binder$SubCase2$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseRoleDelta_binder$SubCase2$RoleToInspect$Flag"))
             liftAff $ assert "Flag should be true." (n1 == [Value "true"])
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
@@ -94,7 +94,7 @@ theSuite = suite "RunMonadPerspectivesTransaction" do
         instanceErrors <- loadAndSaveCrlFile "onPropertyDelta.crl" testDirectory
         if null instanceErrors
           then do
-            n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCasePropertyDelta$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCasePropertyDelta$RoleToInspect$Flag"))
+            n1 <- ((ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCasePropertyDelta$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCasePropertyDelta$RoleToInspect$Flag"))
             liftAff $ assert "Flag should be true." (n1 == [Value "true"])
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
@@ -117,10 +117,10 @@ theSuite = suite "RunMonadPerspectivesTransaction" do
       if null modelErrors
         then do
           -- Now set Prop on ARole to be true
-          aRoleInstance <- (ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseInCouchdb$ARole")
+          aRoleInstance <- (ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCaseInCouchdb$ARole")
           _ <- runMonadPerspectivesTransaction (setProperty aRoleInstance (EnumeratedPropertyType "model:Test$TestCaseInCouchdb$ARole$Prop") [(Value "true")])
           -- NOTE: on inspecting Couchdb we see the Flag hoisted even if we comment out the lines below.
-          n1 <- ((ContextInstance "model:User$MySubcase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseInCouchdb$SubCase3$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseInCouchdb$SubCase3$RoleToInspect$Flag"))
+          n1 <- ((ContextInstance "model:User$MySubcase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCaseInCouchdb$SubCase3$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseInCouchdb$SubCase3$RoleToInspect$Flag"))
           liftAff $ assert "Flag should be true." (n1 == [Value "true"])
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       clearUserDatabase)

@@ -16,7 +16,7 @@ import Foreign.Class (decode, encode)
 import Global.Unsafe (unsafeStringify)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization, RolSerialization)
 import Perspectives.CoreTypes ((##=))
-import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Instances.SerialiseAsJson (serialiseAsJsonFor)
 import Perspectives.LoadCRL (loadAndCacheCrlFile)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
@@ -47,7 +47,7 @@ theSuite = suite "Perspectives.Instances.SerialiseAsJson" do
         void $ runSterileTransaction $ addUserToChannel (RoleInstance "model:User$joop$User") channel
         -- Serialise as JSON
         -- Get one of the roles
-        partners <- channel ##= getRole (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
+        partners <- channel ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
         case head partners of
           Nothing -> liftAff $ assert "There should be two ConnectedPartners in the Channel instance" false
           Just p -> do

@@ -17,7 +17,7 @@ import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (PerspectivesState, (##=), (##>), (##>>))
 import Perspectives.Couchdb.ChangesFeed (EventSource, closeEventSource)
 import Perspectives.Couchdb.Databases (deleteDatabase, documentNamesInDatabase, endReplication, getDocument)
-import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getRole, getRoleBinders)
+import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getEnumeratedRoleInstances, getRoleBinders)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Names (getMySystem)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
@@ -75,12 +75,12 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
                   --  * bound to respectively "model:User$test$User" and "model:User$joop$User"
                   --  * `me` of that context should be the latter.
                   mySysteem <- getMySystem
-                  (user :: RoleInstance) <- ContextInstance mySysteem ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
+                  (user :: RoleInstance) <- ContextInstance mySysteem ##>> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$PerspectivesSystem$User")
                   mchannel <- user ##> (getRoleBinders (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> context)
                   case mchannel of
                     Nothing -> liftAff $ assert "There should be a channel on this side" false
                     Just channel -> do
-                      connectedPartners <- channel ##= (getRole (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> binding)
+                      connectedPartners <- channel ##= (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> binding)
                       logShow connectedPartners
                       liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$test$User","model:User$joop$User"])) == 0)
           deleteDatabase dbName
@@ -117,12 +117,12 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
 
       -- Check if there is a channel document, starting with the user.
       mySysteem <- getMySystem
-      (user :: RoleInstance) <- ContextInstance mySysteem ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
+      (user :: RoleInstance) <- ContextInstance mySysteem ##>> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$PerspectivesSystem$User")
       mchannel <- user ##> (getRoleBinders (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> context)
       case mchannel of
         Nothing -> liftAff $ assert "There should be a channel on this side" false
         Just channel -> do
-          connectedPartners <- channel ##= (getRole (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> binding)
+          connectedPartners <- channel ##= (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> binding)
           logShow connectedPartners
           liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$cor$User","model:User$joop$User"])) == 0)
 

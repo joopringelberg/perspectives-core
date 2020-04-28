@@ -12,7 +12,7 @@ import Foreign.Object (Object)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.LoadCRL (loadAndSaveCrlFile, loadAndCacheCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
@@ -41,7 +41,7 @@ theSuite = suite "Perspectives.loadCRL" do
       loadAndSaveCrlFile "contextAndRole.crl" testDirectory
     if null r
       then do
-        srole <- runP ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
+        srole <- runP ((ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
         assert "There should not be an instance of SomeRole." (length srole == 0)
         runP clearUserDatabase
       else do
@@ -53,7 +53,7 @@ theSuite = suite "Perspectives.loadCRL" do
       do
         _ <- loadCompileAndCacheArcFile' "contextAndRole" testDirectory
         _ <- loadAndSaveCrlFile "contextAndRole2.crl" testDirectory
-        r <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
+        r <- ((ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
         liftAff $ assert "There should be an instance of SomeRole." (length r == 1)
 
   test "Load a file with a context instance in couchdb" (runP do
