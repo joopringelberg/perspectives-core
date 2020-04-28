@@ -6,7 +6,7 @@ import model:TestBotActie as tba
 sys:Model usr:TestBotActieModel
   extern $Name = "Test bot action"
   extern $Description = "A simple bot test"
-  extern $Url = "http://127.0.0.1:5984/repository/model%3ATestBotActie"
+  extern $Url = "http://127.0.0.1:5984/repository/model:TestBotActie"
   $IndexedContext =>
     tba:Tests usr:MyTests
       extern sys:NamedContext$External$Name = "Test bot action"

@@ -18,7 +18,7 @@ sys:PerspectivesSystem sys:MySystem
 		sys:Model usr:PerspectivesSystemModel
 			extern $Name = "Perspectives System"
 			extern $Description = "The base model of Perspectives."
-			extern $Url = "http://127.0.0.1:5984/repository/model%3ASystem"
+			extern $Url = "http://127.0.0.1:5984/repository/model:System"
 			$IndexedContext => sys:MySystem
 				$Name = "MySystem"
 			$IndexedRole -> sys:Me

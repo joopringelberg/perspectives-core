@@ -5,4 +5,4 @@ import model:System as sys
 sys:Model usr:SerialiseModel
   extern $Name = "Serialise External Functions"
   extern $Description = "Functions to serialise contexts and roles as JSON"
-  extern $Url = "http://127.0.0.1:5984/repository/model%3ASerialise"
+  extern $Url = "http://127.0.0.1:5984/repository/model:Serialise"

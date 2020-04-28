@@ -5,4 +5,4 @@ import model:System as sys
 sys:Model usr:CouchdbModel
   extern $Name = "Couchdb External Functions"
   extern $Description = "A collection of purescript functions made available as external core functions."
-  extern $Url = "http://127.0.0.1:5984/repository/model%3ACouchdb"
+  extern $Url = "http://127.0.0.1:5984/repository/model:Couchdb"

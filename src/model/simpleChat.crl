@@ -6,7 +6,7 @@ import model:SimpleChat as chat
 sys:Model usr:SimpleChatModel
   extern $Name = "Simple Chat"
   extern $Description = "A (very) simple chat application."
-  extern $Url = "http://127.0.0.1:5984/repository/model%3ASimpleChat"
+  extern $Url = "http://127.0.0.1:5984/repository/model:SimpleChat"
   $IndexedContext =>
     chat:ChatApp usr:MyChatApp
       extern sys:NamedContext$External$Name = "Simple Chat"
