@@ -80,7 +80,7 @@ handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = log $ "An error condition: " <> (show e)
 handleError (Right a) = log $ "Perspectives-core has started!"
 
--- | The main entrance to the PDR for client programs. Runs the PDR on succesfull login.
+-- | The main entrance to the PDR for client programs. Runs the PDR on succesful login.
 -- | When Couchdb is in Party Mode, initialises the first admin.
 authenticate :: String -> String -> (Int -> Effect Unit) -> Effect Unit
 authenticate usr pwd callback = void $ runAff handler do

@@ -117,6 +117,7 @@ roleInstancesFromCouchdb roleTypes _ = ArrayT $ lift $ do
     pure _id
 
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
+-- | Load the dependencies first.
 -- | Load the acompanying instances, too.
 -- | Notice that the urls should be the full path to the relevant documents.
 -- | This function is applied with `callEffect`. Accordingly, it will get the Object of the Action as second parameter.
@@ -171,7 +172,7 @@ addModelToLocalStore urls r = do
                 Right (Tuple contextInstances roleInstances') -> do
                   -- Save role- and contextinstances.
                   cis <- lift2 $ execStateT (saveRoleInstances roleInstances') contextInstances
-                  forWithIndex_ cis \i a -> lift2 $ saveEntiteit (ContextInstance i)
+                  forWithIndex_ cis \i a -> lift2 $ saveEntiteit_ (ContextInstance i) a
                   -- For each role instance with a binding that is not one of the other imported role instances,
                   -- set the inverse binding administration on that binding.
                   forWithIndex_ roleInstances' \i a -> case rol_binding a of

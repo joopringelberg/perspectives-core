@@ -36,9 +36,9 @@ import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>), (>>=))
 modelDirectory :: String
 modelDirectory = "./src/model"
 
--- | Set up by adding model:System to the users' models database. This will add the model instances, too.
+-- | Set up by adding model:System and dependencies to the users' models database. This will add the model instances, too.
 -- | This function also ensures CURRENTUSER.
--- | Note that the repository should have model:Couchdb and model:System.
+-- | Note that the repository should have model:Couchdb, model:Serialise and model:System.
 setupUser :: MonadPerspectives Unit
 setupUser = do
   sysId <- getMySystem
