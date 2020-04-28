@@ -103,11 +103,14 @@ data SimpleStep =
   | Binding ArcPosition
   | Binder ArcPosition String
   | Context ArcPosition
-  | TypeOfContext ArcPosition
   | Extern ArcPosition
   | SequenceFunction ArcPosition QF.FunctionName
   | Identity ArcPosition
   | Variable ArcPosition String
+
+  | TypeOfContext ArcPosition
+  | RoleTypes ArcPosition
+  | SpecialisesRoleType ArcPosition String
 
 data UnaryStep =
   LogicalNot ArcPosition Step
@@ -193,12 +196,14 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (Binding _) = "Binding"
   prettyPrint' t (Binder _ s) = "Binder " <> s
   prettyPrint' t (Context _) = "Context"
-  prettyPrint' t (TypeOfContext _) = "TypeOfContext"
   prettyPrint' t (Extern _) = "Extern"
   prettyPrint' t (SequenceFunction _ s) = "SequenceFunction " <> show s
   prettyPrint' t (Identity _ ) = "Identity"
   prettyPrint' t (Variable _ s) = "Variable " <> s
   prettyPrint' t (Value _ range s) = "Value " <> show range <> " " <> s
+  prettyPrint' t (RoleTypes _) = "RoleTypes"
+  prettyPrint' t (TypeOfContext _) = "TypeOfContext"
+  prettyPrint' t (SpecialisesRoleType _ s) = "SpecialisesRoleType " <> s
 
 derive instance genericBinaryStep :: Generic BinaryStep _
 instance showBinaryStep :: Show BinaryStep where show = genericShow

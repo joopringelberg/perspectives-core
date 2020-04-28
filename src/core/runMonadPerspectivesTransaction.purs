@@ -33,6 +33,7 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
+import Effect.Class.Console (log, logShow)
 import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
@@ -44,13 +45,11 @@ import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMe)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.Names (getUserIdentifier)
-import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Role (greaterThanOrEqualTo)
-import Perspectives.Representation.TypeIdentifiers (ActionType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, RoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
-import Perspectives.Types.ObjectGetters (actionsClosure, isAutomatic)
+import Perspectives.Types.ObjectGetters (actionsClosure, isAutomatic, specialisesRoleType_)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (==), (&&))
 
@@ -173,7 +172,7 @@ getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
     Just myType -> do
       -- myType should be equal to or a specialisation of one of the userTypes.
       -- TODO. Optimalisatie: stop bij het eerste type. Gebruik een state?
-      r <- lift2 $ filterA (\userType -> (ST myType) `greaterThanOrEqualTo` (ST userType)) userTypes
+      r <- lift2 $ filterA (\userType -> (ENR myType) `specialisesRoleType_` userType) userTypes
       if not $ null r
         then do
           (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure isAutomatic)

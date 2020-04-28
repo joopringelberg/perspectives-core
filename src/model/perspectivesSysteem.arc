@@ -94,5 +94,5 @@ domain: System
     bot: for Inviter
       perspective on: External
         if extern >> IWantToInviteAnUnconnectedUser then
-          SerialisedInvitation = extern >> callExternal ser:SerialiseFor( "model:System$Invitation$Invitee" ) returns: String
+          SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
     thing: Channel (not mandatory, functional) filledBy: Channel

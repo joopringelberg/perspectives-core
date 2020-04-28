@@ -106,6 +106,6 @@ checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding roletype instanceToBind = do
   instanceType' <- (roleType_ >=> getEnumeratedRole >=> roleAspectsBindingADT) instanceToBind
   -- TODO. Voor de rol moet ik alleen de binding ophalen.
-  -- roleType' <- (getRole roletype) >>= adtOfRole
+  -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRole
   roleType' <- bindingOfRole roletype
   roleType' `lessThanOrEqualTo` instanceType'

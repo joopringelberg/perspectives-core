@@ -39,10 +39,10 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
-newtype InvertedQuery = InvertedQuery {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction), userTypes :: Array EnumeratedRoleType}
+newtype InvertedQuery = InvertedQuery {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction), userTypes :: Array RoleType}
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _
 

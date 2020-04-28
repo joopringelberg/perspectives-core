@@ -37,7 +37,7 @@ import Data.String (Pattern(..), stripSuffix)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
+import Perspectives.CoreTypes (type (~~>), MP, MPQ, MonadPerspectives, liftToInstanceLevel, (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -45,7 +45,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, externalRole, getProperty, getRole, getRoleBinders, makeBoolean)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, externalRole, getProperty, getEnumeratedRoleInstances, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
@@ -62,15 +62,18 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, specialisesRoleType)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, discard, eq, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||))
+import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
+-- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
+-- beter zijn.
 compileFunction :: QueryFunctionDescription -> MP (String ~~> String)
 
 compileFunction (SQD _ (RolGetter (ENR (EnumeratedRoleType r))) _ _ _) = if isExternalRole r
   then pure $ unsafeCoerce $ externalRole
-  else pure $ unsafeCoerce $ getRole (EnumeratedRoleType r)
+  else pure $ unsafeCoerce $ getEnumeratedRoleInstances (EnumeratedRoleType r)
 
 compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
@@ -87,6 +90,8 @@ compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ unsafeCoer
 compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ unsafeCoerce context
 
 compileFunction (SQD _ (TypeGetter TypeOfContextF) _ _ _) = pure $ unsafeCoerce contextType
+
+compileFunction (SQD _ (TypeGetter RoleTypesF) _ _ _) = pure $ unsafeCoerce (liftToInstanceLevel allRoleTypesInContext)
 
 compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ unsafeCoerce binding
 
@@ -245,6 +250,7 @@ compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
 compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ _ ) = do
   case functionName of
     GetRoleBindersF -> pure $ unsafeCoerce (getRoleBinders (EnumeratedRoleType parameter))
+    SpecialisesRoleTypeF -> pure $ unsafeCoerce (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)))
 
     -- CreateContextF ->
     -- CreateRoleF ->
@@ -350,6 +356,21 @@ getRoleFunction id = do
     do
       (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType ident)
       unsafeCoerce $ RC.calculation p >>= compileFunction)
+
+getRoleInstances :: RoleType -> (ContextInstance ~~> RoleInstance)
+getRoleInstances (ENR rt) c = do
+  (p :: EnumeratedRole) <- lift $ lift $ getPerspectType rt
+  f <- (lift $ lift $ RC.calculation p) >>= lift <<< lift <<< compileFunction
+  (unsafeCoerce f) c
+getRoleInstances (CR rt) c = getCalculatedRoleInstances rt c
+
+getCalculatedRoleInstances :: CalculatedRoleType -> (ContextInstance ~~> RoleInstance)
+getCalculatedRoleInstances rt@(CalculatedRoleType ident) c = case lookupRoleGetterByName ident of
+  (Just g) -> g c
+  Nothing -> do
+    (p :: CalculatedRole) <- lift $ lift $ getPerspectType rt
+    f <- (lift $ lift $ RC.calculation p) >>= lift <<< lift <<< compileFunction
+    (unsafeCoerce f) c
 
 -- | Construct a function to compute instances of a ContextType from an instance of a Context.
 context2context :: QueryFunctionDescription -> MP (ContextInstance ~~> ContextInstance)

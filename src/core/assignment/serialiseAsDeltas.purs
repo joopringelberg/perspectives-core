@@ -42,9 +42,9 @@ serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTra
 serialisedAsDeltasFor cid userId = do
   userType <- lift2 $ roleType_ userId
   systemUser <- lift2 (userId ##>> bottom)
-  serialisedAsDeltasFor_ cid systemUser userType
+  serialisedAsDeltasFor_ cid systemUser (ENR userType)
 
-serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction Unit
+serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> RoleType -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor_ cid userId userType = do
   (PerspectContext{pspType, rolInContext}) <- lift2 $ getPerspectContext cid
   addUniverseContextDelta $ UniverseContextDelta

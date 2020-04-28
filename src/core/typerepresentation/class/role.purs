@@ -28,6 +28,7 @@ import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable, Set)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
+import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
@@ -40,12 +41,12 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable, ident
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Context (roles, externalRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.ExplicitSet (ExplicitSet(..), elements, intersectionOfArrays, intersectionPset, unionOfArrays, unionPset)
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..), elements, intersectionOfArrays, intersectionPset, subsetPSet, unionOfArrays, unionPset)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (class Eq, class Show, bind, flip, map, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (class Eq, class Show, bind, flip, join, map, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -185,13 +186,24 @@ type RoleSet = ExplicitSet RoleType
 
 -- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
 roleSet :: ADT ContextType -> MP RoleSet
--- roleSet (ST (ENR r)) = getEnumeratedRole r >>= pure <<< PSet <<< _.properties <<< unwrap
--- roleSet (ST (CR r)) = getCalculatedRole r >>= (rangeOfCalculatedRole >=> propertySet)
 roleSet (ST r) = getContext r >>= pure <<< PSet <<< roles
 roleSet (SUM terms) = traverse roleSet terms >>= pure <<< intersectionPset
 roleSet (PROD terms) = traverse roleSet terms >>= pure <<< unionPset
 roleSet UNIVERSAL = pure Universal
 roleSet EMPTY = pure Empty
+
+--------------------------------------------------------------------------------------------------
+---- ACTIONSET
+--------------------------------------------------------------------------------------------------
+type ActionSet = ExplicitSet ActionType
+
+-- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
+actionSet :: ADT EnumeratedRoleType -> MP ActionSet
+actionSet (ST r) = getEnumeratedRole r >>= pure <<< PSet <<< join <<< values <<< _.perspectives <<< unwrap
+actionSet (SUM terms) = traverse actionSet terms >>= pure <<< intersectionPset
+actionSet (PROD terms) = traverse actionSet terms >>= pure <<< unionPset
+actionSet UNIVERSAL = pure Universal
+actionSet EMPTY = pure Empty
 
 -----------------------------------------------------------
 -- LESSTHANOREQUALTO
@@ -199,16 +211,7 @@ roleSet EMPTY = pure Empty
 -- | `p lessThanOrEqualTo q` means: p is less specific than q, or equal to q.
 -- | `p lessThanOrEqualTo q` equals: `q greaterThanOrEqualTo p`
 lessThanOrEqualTo :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-lessThanOrEqualTo p q = do
-  p' <- propertySet p
-  q' <- propertySet q
-  case p', q' of
-    a, b | a == b -> pure true
-    Empty, _ -> pure true
-    _, Empty -> pure false
-    Universal, _ -> pure false
-    _, Universal -> pure true
-    (PSet x), (PSet y) -> pure $ subset (fromFoldable x) (fromFoldable y)
+lessThanOrEqualTo p q = (&&) <$> (subsetPSet <$> propertySet p <*> propertySet q) <*> (subsetPSet <$> actionSet p <*> actionSet q)
 
 -- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
 -- | If you use `less specific` instead of `more specific`, flip the arguments.
@@ -331,6 +334,11 @@ typeExcludingBinding_ :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
 typeExcludingBinding_ = getRole >=> (case _ of
   E r -> roleADT r
   C r -> roleADT r)
+
+typeIncludingAspects :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
+typeIncludingAspects = getRole >=> (case _ of
+  E r -> roleAspectsADT r
+  C r -> roleAspectsADT r)
 
 roleTypeIsFunctional :: RoleType -> MonadPerspectives Boolean
 roleTypeIsFunctional = getRole >=> (case _ of

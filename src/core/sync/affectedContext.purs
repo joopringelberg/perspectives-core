@@ -30,17 +30,17 @@ import Data.Generic.Rep.Show (genericShow)
 import Foreign.Class (class Encode, encode)
 import Foreign.Generic (defaultOptions, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleType)
 
 -- | By construction the contextInstances will be of the same type and the userTypes are roles in that type of Context.
-newtype AffectedContext = AffectedContext {contextInstances :: NonEmptyArray ContextInstance, userTypes :: Array EnumeratedRoleType}
+newtype AffectedContext = AffectedContext {contextInstances :: NonEmptyArray ContextInstance, userTypes :: Array RoleType}
 
 derive instance genericAffectedContext :: Generic AffectedContext _
 
 instance showAffectedContext :: Show AffectedContext where
   show = genericShow
 
-newtype AffectedContext' = AffectedContext' {contextInstances :: Array ContextInstance, userTypes :: Array EnumeratedRoleType}
+newtype AffectedContext' = AffectedContext' {contextInstances :: Array ContextInstance, userTypes :: Array RoleType}
 
 derive instance genericAffectedContext' :: Generic AffectedContext' _
 

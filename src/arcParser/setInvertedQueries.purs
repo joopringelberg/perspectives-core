@@ -52,7 +52,7 @@ import Prelude (Unit, discard, pure, unit, ($), bind, (>>=), (<>))
 -- | of a change.
 -- | If the first step of descr is ContextF, omit that step. This can only happen for a Property query.
 -- | However, we want the inverted queries to end in a context.
-setInvertedQueries :: Array EnumeratedRoleType -> QueryFunctionDescription -> PhaseThree Unit
+setInvertedQueries :: Array RoleType -> QueryFunctionDescription -> PhaseThree Unit
 setInvertedQueries userTypes qfd = do
   qfds <- ensureContextDomain >>= \q -> unsafePartial $ invertFunctionDescription q
   for_ qfds

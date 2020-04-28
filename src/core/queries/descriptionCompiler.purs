@@ -166,6 +166,29 @@ compileSimpleStep currentDomain s@(TypeOfContext pos) = do
       pure $ SQD currentDomain (QF.TypeGetter TypeOfContextF) ContextKind True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
+compileSimpleStep currentDomain s@(RoleTypes pos) = do
+  case currentDomain of
+    ContextKind -> do
+      pure $ SQD currentDomain (QF.TypeGetter RoleTypesF) RoleKind True True
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
+compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
+  case currentDomain of
+    RoleKind -> do
+      -- TODO: controleer of roleName inderdaad een EnumeratedRole is!
+      (qRoleName :: EnumeratedRoleType) <- if isQualifiedWithDomein roleName
+        then pure $ EnumeratedRoleType roleName
+        -- Try to qualify the name within the Domain.
+        else do
+          {_id:namespace} <- lift $ gets _.dfr
+          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain roleName (unsafePartial $ fromJust $ (deconstructModelName namespace))
+          case head qnames of
+            Nothing -> throwError $ UnknownRole pos roleName
+            (Just qn) | length qnames == 1 -> pure qn
+            otherwise -> throwError $ NotUniquelyIdentifying pos roleName (map unwrap qnames)
+      pure $ SQD currentDomain (QF.DataTypeGetterWithParameter SpecialisesRoleTypeF (unwrap qRoleName)) (VDOM PBool Nothing) False False
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
 compileSimpleStep currentDomain s@(Extern pos) = do
   case currentDomain of
     (CDOM c) -> do

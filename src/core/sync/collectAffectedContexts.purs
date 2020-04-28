@@ -41,14 +41,14 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MonadPerspecti
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
-import Perspectives.Instances.ObjectGetters (bottom, getRole)
+import Perspectives.Instances.ObjectGetters (bottom)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Query.UnsafeCompiler (getHiddenFunction)
+import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType)
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..))
@@ -78,12 +78,12 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
   lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (union users1 users2)
 
 -- Adds an AffectedContext to the transaction and returns user instances.
-handleAffectedContexts :: Array ContextInstance -> Array EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
+handleAffectedContexts :: Array ContextInstance -> Array RoleType -> MonadPerspectivesTransaction (Array RoleInstance)
 handleAffectedContexts affectedContexts userTypes = case fromArray affectedContexts of
   Nothing -> pure []
   Just contextInstances -> do
     addAffectedContext $ AffectedContext {contextInstances, userTypes}
-    (for userTypes \er -> for affectedContexts \ci -> lift $ lift $ (ci ##= getRole er)) >>= pure <<< join <<< join
+    (for userTypes \er -> for affectedContexts \ci -> lift $ lift $ (ci ##= getRoleInstances er)) >>= pure <<< join <<< join
 
 addAffectedContext :: AffectedContext -> MonadPerspectivesTransaction Unit
 addAffectedContext as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [as] affectedContexts})
@@ -114,7 +114,7 @@ userHasPerspectiveOnRoleInstance_ roleType roleInstance peer = do
               for_ userTypes \ut -> do
                 notFound2 <- get
                 when notFound2 do
-                  roles <- lift (ctxt ##= getRole ut)
+                  roles <- lift (ctxt ##= getRoleInstances ut)
                   for_ roles \role -> do
                     notFound3 <- get
                     when notFound3 do
@@ -135,7 +135,7 @@ addRoleObservingContexts id roleType roleInstance = do
   roleCalculations <- lift2 $ compileDescriptions _onContextDelta_role roleType
   for_ roleCalculations \(InvertedQuery{compilation, userTypes}) -> lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance) >>= addContexts userTypes
 
-addContexts :: Array EnumeratedRoleType -> Array ContextInstance -> MonadPerspectivesTransaction Unit
+addContexts :: Array RoleType -> Array ContextInstance -> MonadPerspectivesTransaction Unit
 addContexts userTypes as = case fromArray as of
   Nothing -> pure unit
   Just contextInstances -> lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [AffectedContext {contextInstances, userTypes}] affectedContexts})

@@ -51,7 +51,7 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addContextDelta, addCorrelationIdentifiersToTransactie, addPropertyDelta, addRoleDelta, addUniverseRoleDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findPropertyRequests, findRoleRequests)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (isMe, roleType_)
+import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)

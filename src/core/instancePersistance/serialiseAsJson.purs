@@ -22,6 +22,8 @@
 module Perspectives.Instances.SerialiseAsJson where
 
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
+import Control.Plus (empty)
+import Data.Array (null)
 import Data.Array (singleton) as ARR
 import Data.Array.NonEmpty (fromArray)
 import Data.Array.Partial (head)
@@ -55,18 +57,30 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | context instance to be serialised.
 -- | Notice that, in the use case we want to serialise an Invitation context for a user we do not yet have contact
 -- | with, we can only have his type.
-serialiseFor :: Array String -> RoleInstance -> MPQ Value
-serialiseFor userTypeIds externalRoleId = ArrayT $ lift $ (execWriterT $ serialiseAsJsonFor_ (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId) Nothing (EnumeratedRoleType $ unsafePartial $ head userTypeIds) )>>= pure <<< ARR.singleton <<< Value <<< unsafeStringify <<< encode
+-- serialiseFor :: Array String -> RoleInstance -> MPQ Value
+-- serialiseFor userTypeIds externalRoleId = if null userTypeIds
+--   then empty
+--   else ArrayT $ lift $ (execWriterT $ serialiseAsJsonFor_ (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId) Nothing (EnumeratedRoleType $ unsafePartial $ head userTypeIds) ) >>= pure <<< ARR.singleton <<< Value <<< unsafeStringify <<< encode
+
+-- | A function for the External Core Module `model:Serialise`. The first argument should be a singleton holding
+-- | the RoleType (representing a User); the second should be a singleton holding the string value of the
+-- | context instance to be serialised.
+-- | Notice that, in the use case we want to serialise an Invitation context for a user we do not yet have contact
+-- | with, we can only have his type.
+serialiseFor :: Array RoleType -> RoleInstance -> MPQ Value
+serialiseFor userTypes externalRoleId = if null userTypes
+  then empty
+  else ArrayT $ lift $ (execWriterT $ serialiseAsJsonFor_ (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId) Nothing (unsafePartial $ head userTypes) ) >>= pure <<< ARR.singleton <<< Value <<< unsafeStringify <<< encode
 
 serialiseAsJsonFor :: RoleInstance -> ContextInstance -> MonadPerspectives (Array ContextSerialization)
 serialiseAsJsonFor userId cid = do
   userType <- roleType_ userId
   systemUser <- userId ##>> bottom
-  execWriterT $ serialiseAsJsonFor_ cid (Just systemUser) userType
+  execWriterT $ serialiseAsJsonFor_ cid (Just systemUser) (ENR userType)
 
 type WriteContexts m = WriterT (Array ContextSerialization) m
 
-serialiseAsJsonFor_:: ContextInstance -> Maybe RoleInstance -> EnumeratedRoleType -> WriteContexts MonadPerspectives Unit
+serialiseAsJsonFor_:: ContextInstance -> Maybe RoleInstance -> RoleType -> WriteContexts MonadPerspectives Unit
 serialiseAsJsonFor_ cid userId userType = do
   (PerspectContext{pspType, rolInContext}) <- lift $ getPerspectContext cid
   (rollen :: OBJ.Object (SerializableNonEmptyArray RolSerialization)) <- execWriterT $ forWithIndex_ rolInContext serialiseRoleInstances

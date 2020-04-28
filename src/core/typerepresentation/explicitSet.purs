@@ -23,8 +23,9 @@ module Perspectives.Representation.ExplicitSet where
 
 import Prelude
 
-import Data.Array (delete, elemIndex, foldl, intersect, nub, uncons)
+import Data.Array (delete, elemIndex, find, foldM, foldl, intersect, nub, uncons)
 import Data.Maybe (Maybe(..), isJust)
+import Data.Set (subset, fromFoldable)
 import Partial.Unsafe (unsafePartial)
 
 -- | An ExplicitSet represents a set of elements, where we have an explicit representation of the
@@ -49,6 +50,35 @@ intersectionPset :: forall a. Eq a => Array (ExplicitSet a) -> ExplicitSet a
 intersectionPset terms = if isJust (elemIndex Empty terms)
   then Empty
   else PSet (intersectionOfArrays (unsafePartial elements <$> (delete Universal terms)))
+
+isElementOf :: forall a. Eq a => a -> ExplicitSet a -> Boolean
+isElementOf a Empty = false
+isElementOf a Universal = true
+isElementOf a (PSet arr) = isJust (elemIndex a arr)
+
+hasElement :: forall a. (a -> Boolean) -> ExplicitSet a -> Boolean
+hasElement f Empty = false
+hasElement f Universal = true
+hasElement f (PSet arr) = isJust $ find f arr
+
+hasElementM :: forall a m. Monad m => (a -> m Boolean) -> ExplicitSet a -> m Boolean
+hasElementM f Empty = pure false
+hasElementM f Universal = pure true
+hasElementM f (PSet arr) = foldM g false arr
+  where
+    g found next =
+      if found
+        then pure found
+        else f next
+
+subsetPSet :: forall a. Eq a => Ord a => ExplicitSet a -> ExplicitSet a -> Boolean
+subsetPSet p q = case p, q of
+    a, b | a == b -> true
+    Empty, _ -> true
+    _, Empty -> false
+    Universal, _ -> false
+    _, Universal -> true
+    (PSet x), (PSet y) -> subset (fromFoldable x) (fromFoldable y)
 
 elements :: forall a. Partial => ExplicitSet a -> Array a
 elements (PSet s) = s

@@ -37,7 +37,7 @@ import Foreign.Object.Unsafe (unsafeIndex)
 import Perspectives.ContextAndRole (rol_binding, rol_property)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>))
 import Perspectives.Identifiers (qualifyWith, unsafeDeconstructModelName)
-import Perspectives.Instances.ObjectGetters (binding, context, getRole)
+import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
@@ -52,7 +52,7 @@ replaceIndexedNames s = do
 
 -- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
 indexedRoles :: RoleInstance -> MonadPerspectives (Object RoleInstance)
-indexedRoles modelDescription = (modelDescription ##= context >=> getRole (EnumeratedRoleType "model:System$Model$IndexedRole")) >>= indexedRoles_
+indexedRoles modelDescription = (modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedRole")) >>= indexedRoles_
 
 indexedRoles_ :: Array RoleInstance -> MonadPerspectives (Object RoleInstance)
 indexedRoles_ roleIds = do
@@ -70,7 +70,7 @@ indexedRoles_ roleIds = do
 
 -- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
 indexedContexts :: RoleInstance -> MonadPerspectives (Object ContextInstance)
-indexedContexts modelDescription = (modelDescription ##= context >=> getRole (EnumeratedRoleType "model:System$Model$IndexedContext")) >>= indexedContexts_
+indexedContexts modelDescription = (modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedContext")) >>= indexedContexts_
 
 indexedContexts_ :: Array RoleInstance -> MonadPerspectives (Object ContextInstance)
 indexedContexts_ externalRoleIds = do

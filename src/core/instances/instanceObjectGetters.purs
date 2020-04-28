@@ -55,12 +55,10 @@ trackContextDependency roleName f c = (lift $ tell [(assumption (unwrap c) (unwr
 externalRole :: ContextInstance ~~> RoleInstance
 externalRole = lift <<< lift <<< getContextMember IP.externalRole
 
-getRole :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
-getRole rn c = ArrayT do
+getEnumeratedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
+getEnumeratedRoleInstances rn c = ArrayT do
   tell [assumption (unwrap c)(unwrap rn)]
   lift $ getContextMember (flip context_rolInContext rn) c
-
--- getRole rn = trackContextDependency rn (getContextMember \(ctxt :: PerspectContext) -> (context_rolInContext ctxt rn))
 
 -- | Because we never change the type of a Context, we have no real need
 -- | to track it as a dependency.

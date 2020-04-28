@@ -42,7 +42,7 @@ import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCac
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.IndentParser (runIndentParser')
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, context, getRole)
+import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
@@ -136,8 +136,8 @@ loadArcAndCrl fileName directoryName = do
 
     collectIndexedNames :: RoleInstance -> MonadPerspectives (Tuple (Array RoleInstance) (Array ContextInstance))
     collectIndexedNames modelDescription = do
-      iroles <- modelDescription ##= context >=> getRole (EnumeratedRoleType "model:System$Model$IndexedRole") >=> binding
-      icontexts <- modelDescription ##= context >=> getRole (EnumeratedRoleType "model:System$Model$IndexedContext") >=> binding >=> context
+      iroles <- modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedRole") >=> binding
+      icontexts <- modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedContext") >=> binding >=> context
       pure $ Tuple iroles icontexts
 
 -- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl

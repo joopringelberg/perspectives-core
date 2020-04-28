@@ -68,6 +68,8 @@ data FunctionName =
   | AvailableF           -- TODO
 
   | TypeOfContextF
+  | RoleTypesF
+  | SpecialisesRoleTypeF
 
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
@@ -102,6 +104,8 @@ isFunctionalFunction fn = case fn of
   MaximumF -> True
   AvailableF -> True
   TypeOfContextF -> True
+  RoleTypesF -> False
+  SpecialisesRoleTypeF -> True
 
 
 data QueryFunction
@@ -200,5 +204,7 @@ instance showFunctionName :: Show FunctionName where
     show MaximumF = "maximum"
     show AvailableF = "available"
     show TypeOfContextF = "TypeOfContextF"
+    show RoleTypesF = "RoleTypesF"
+    show SpecialisesRoleTypeF = "SpecialisesRoleTypeF"
 
 instance eqFunctionName :: Eq FunctionName where eq = genericEq

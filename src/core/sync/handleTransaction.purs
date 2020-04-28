@@ -36,7 +36,7 @@ import Perspectives.Assignment.Update (addProperty, addRoleInstancesToContext, d
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, OrderedDelta(..), MonadPerspectives, (##=))
 import Perspectives.Instances.Builders (constructEmptyContext, constructEmptyRole_)
-import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Persistent (saveEntiteit)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (removeContextInstance, removeRoleInstance)
@@ -81,7 +81,7 @@ executeUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Un
 executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaType}) = case deltaType of
   ConstructEmptyRole -> do
     -- find the number of roleinstances in the context.
-    offset <- lift2 ((id ##= getRole roleType) >>= pure <<< length)
+    offset <- lift2 ((id ##= getEnumeratedRoleInstances roleType) >>= pure <<< length)
     forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do
       -- log ("constructEmptyRole in " <> show id <> " with id " <> show roleInstance)
       void $ constructEmptyRole_ roleType id (offset + i) roleInstance

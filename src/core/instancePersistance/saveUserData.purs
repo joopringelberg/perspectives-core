@@ -53,7 +53,7 @@ import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, 
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addUniverseContextDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
@@ -175,7 +175,7 @@ removeRoleInstance roleId = do
 -- | ContextDelta's are not necessary (see removeRoleInstance).
 removeAllRoleInstances :: EnumeratedRoleType -> Updater ContextInstance
 removeAllRoleInstances et cid = do
-  instances <- lift2 (cid ##= getRole et)
+  instances <- lift2 (cid ##= getEnumeratedRoleInstances et)
   case fromArray instances of
     Nothing -> pure unit
     Just instances' -> do

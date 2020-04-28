@@ -48,6 +48,9 @@ maybeM default fromJust monadicValue = do
 ifNothing :: forall a b m. Monad m => m (Maybe b) -> m a -> (b -> m a) -> m a
 ifNothing monadicValue default fromJust = maybeM default fromJust monadicValue
 
+----------------------------------------------------------------------------------------
+---- PRETTYPRINT
+----------------------------------------------------------------------------------------
 prettyPrint :: forall a. PrettyPrint a => a -> String
 prettyPrint a = prettyPrint' "  " a
 

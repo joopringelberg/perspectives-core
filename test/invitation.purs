@@ -34,7 +34,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Invitation" do
+theSuite = suiteOnly "Invitation" do
 
   test "Bot serialises invitation" $ runP $ withSystem do
     addAllExternalFunctions
@@ -61,7 +61,7 @@ theSuite = suite "Invitation" do
                   Nothing -> liftAff $ assert "There should have been an instance named model:User$MyInvitation" false
                   otherwise -> pure unit
 
-  test "Bot serialises Chat" $ runP $ withSimpleChat do
+  testOnly "Bot serialises Chat" $ runP $ withSimpleChat do
     addAllExternalFunctions
     -- Create a Chat instance with an Initiator
     errs <- loadAndSaveCrlFile "chatInvitation.crl" testDirectory
@@ -84,4 +84,5 @@ theSuite = suite "Invitation" do
               Right (deserialised :: Array ContextSerialization) ->
                 case find (\(ContextSerialization{id}) -> id == "model:User$MyChatInvitation") deserialised of
                   Nothing -> liftAff $ assert "There should have been an instance named model:User$MyChatInvitation" false
+                  -- Nothing -> log "There should have been an instance named model:User$MyChatInvitation"
                   otherwise -> pure unit

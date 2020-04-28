@@ -81,8 +81,6 @@ simpleStep = try
   <|>
   Simple <$> (Context <$> (getPosition <* reserved "context"))
   <|>
-  Simple <$> (TypeOfContext <$> (getPosition <* reserved "contextType"))
-  <|>
   Simple <$> (Extern <$> (getPosition <* reserved "extern"))
   <|>
   Simple <$> (Value <$> getPosition <*> pure PDate <*> (parseDate >>= pure <<< show))
@@ -100,6 +98,14 @@ simpleStep = try
   Simple <$> (SequenceFunction <$> getPosition <*> sequenceFunction)
   <|>
   Simple <$> (Identity <$> getPosition <* reserved "this")
+  <|>
+  Simple <$> (TypeOfContext <$> (getPosition <* reserved "contextType"))
+  <|>
+  Simple <$> (RoleTypes <$> (getPosition <* reserved "roleTypes"))
+  <|>
+  Simple <$> (SpecialisesRoleType <$> (getPosition <* reserved "specialisesRoleType") <*> arcIdentifier)
+
+  -- VARIABLE MUST BE LAST!
   <|>
   Simple <$> (Variable <$> getPosition <*> lowerCaseName)
   ) <?> "binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count"
@@ -129,7 +135,8 @@ unaryStep = try
   <|>
   Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
   <|>
-  Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step)))) <?> "not <expr>, exists <step> or available <step>."
+  Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step))))
+  <?> "not <expr>, exists <step> or available <step>."
 
 operator :: IP Operator
 operator =
@@ -196,13 +203,16 @@ startOf stp = case stp of
     startOfSimple (Binding p) = p
     startOfSimple (Binder p _) = p
     startOfSimple (Context p) = p
-    startOfSimple (TypeOfContext p) = p
     startOfSimple (Extern p) = p
     startOfSimple (CreateContext p _) = p
     startOfSimple (CreateEnumeratedRole p _) = p
     startOfSimple (SequenceFunction p _) = p
     startOfSimple (Identity p) = p
     startOfSimple (Variable p _) = p
+
+    startOfSimple (TypeOfContext p) = p
+    startOfSimple (RoleTypes p) = p
+    startOfSimple (SpecialisesRoleType p _) = p
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
@@ -223,13 +233,16 @@ endOf stp = case stp of
     endOfSimple (Binding (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Binder (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
-    endOfSimple (TypeOfContext (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (CreateContext (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length (show fname)}
     endOfSimple (Identity (ArcPosition{line, column})) = ArcPosition{line, column: column + 4}
     endOfSimple (Variable (ArcPosition{line, column}) v) = ArcPosition{line, column: column + length v}
+
+    endOfSimple (TypeOfContext (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}
+    endOfSimple (RoleTypes (ArcPosition{line, column})) = ArcPosition{line, column: column + 9}
+    endOfSimple (SpecialisesRoleType (ArcPosition{line, column}) ident) = ArcPosition{line, column: column + 19 + length ident}
 
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}

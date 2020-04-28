@@ -57,7 +57,7 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
 import Perspectives.Deltas (addUniverseContextDelta, increaseDeltaIndex)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getRole, isMe)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, isMe)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -179,7 +179,7 @@ constructEmptyRole_ roleType contextInstance i rolInstanceId = do
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction RoleInstance
 createAndAddRoleInstance roleType id (RolSerialization{id: mRoleId, properties, binding}) = do
   contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces id)
-  rolInstances <- lift2 (contextInstanceId ##= getRole roleType)
+  rolInstances <- lift2 (contextInstanceId ##= getEnumeratedRoleInstances roleType)
   -- create an empty role
   roleInstance <- case mRoleId of
     Nothing -> constructEmptyRole roleType contextInstanceId (getNextRolIndex rolInstances) (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType))

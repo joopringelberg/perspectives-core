@@ -163,10 +163,10 @@ infix 1 runTypeLevelToMaybeObject as ###>
 -----------------------------------------------------------
 -- OBTAIN A SINGLE RESULT OR AN ERROR (###>>) FROM A TYPELEVELGETTER
 -----------------------------------------------------------
-runTypeLevelToObject :: forall s o. Newtype s String => s -> (s ~~~> o) -> (MonadPerspectives) o
+runTypeLevelToObject :: forall s o. Show s => s -> (s ~~~> o) -> (MonadPerspectives) o
 runTypeLevelToObject id tog = runTypeLevelToArray id tog >>= \objects ->
   case head objects of
-  Nothing -> throwError $ error $ "TypeLevelGetter returns no values for '" <> (unwrap id) <> "'."
+  Nothing -> throwError $ error $ "TypeLevelGetter returns no values for '" <> (show id) <> "'."
   (Just obj) -> pure obj
 
 infix 1 runTypeLevelToObject as ###>>
