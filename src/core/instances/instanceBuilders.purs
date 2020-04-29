@@ -48,6 +48,7 @@ import Data.Newtype (unwrap)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
+import Foreign.Object (isEmpty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addRoleInstancesToContext, handleNewPeer_, setBinding, setProperty)
@@ -65,7 +66,7 @@ import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..))
-import Prelude (bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>))
+import Prelude (bind, discard, pure, show, unit, void, when, ($), (*>), (<$>), (<>))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setBinding on each role.
@@ -151,8 +152,10 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
       , binding = Nothing
       })
   case externeProperties of
-    (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
-      setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
+    (PropertySerialization props) -> do
+      forWithIndex_ props \propertyTypeId values ->
+        setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
+      when (isEmpty props) (lift2 $ void $ saveEntiteit externalRole)
   pure contextInstanceId
 
 -- | Constructs an empty role and caches it. `localName` should be the local name of the roleType.
