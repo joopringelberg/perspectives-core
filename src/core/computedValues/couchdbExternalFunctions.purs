@@ -43,18 +43,19 @@ import Data.Newtype (unwrap)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for)
+import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
-import Foreign.Object (Object, fromFoldable, insert, lookup, union)
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, MonadPerspectives, assumption)
-import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
-import Perspectives.Couchdb.Databases (addAttachment, defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version, documentNamesInDatabase)
+import Perspectives.Couchdb (DocWithAttachmentInfo(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
+import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, defaultPerspectRequest, documentNamesInDatabase, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
@@ -66,7 +67,7 @@ import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, removeInternally)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.User (getSystemIdentifier)
@@ -160,16 +161,20 @@ addModelToLocalStore urls r = do
               -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
               crl' <- lift2 $ replaceIndexedNames crl
 
-              -- Remove the modelDescription first from cache: it will have been retrieved before the user decided to start using this model.
-              case modelDescription of
+              -- Retrieve the modelDescription from cache: it may have been changed if the user decided to use it in InPlace.
+              modelDescription' <- case modelDescription of
                 Nothing -> throwError (error ("A model has no description: " <> url))
-                Just m -> void $ lift2 $ removeInternally (identifier (m :: PerspectRol))
+                Just m -> lift2 $ tryGetPerspectEntiteit (identifier (m :: PerspectRol))
 
-              -- Parse the CRL. This will cache all roleInstances.
+              -- Parse the CRL. This will cache all roleInstances, overwriting the modelDescription.
               parseResult <- lift2 $ parseAndCache crl'
               case parseResult of
                 Left e -> throwError (error (show e))
                 Right (Tuple contextInstances roleInstances') -> do
+                  -- Restore the modelDescription, overwrite the version that came out of the user instances.
+                  case modelDescription' of
+                    Nothing -> pure unit
+                    Just (m :: PerspectRol) -> void $ lift2 $ cacheEntity (identifier m) m
                   -- Save role- and contextinstances.
                   cis <- lift2 $ execStateT (saveRoleInstances roleInstances') contextInstances
                   forWithIndex_ cis \i a -> lift2 $ saveEntiteit_ (ContextInstance i) a
@@ -233,6 +238,8 @@ addModelToLocalStore urls r = do
 -- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do
 -- | not assume anything about that name here.
+-- | Attachments are preserved: if they were in the repository before uploading,
+-- | they will be in the repository after uploading.
 uploadToRepository :: DomeinFileId -> URL -> MPQ Unit
 uploadToRepository dfId url = do
   df <- lift $ lift $ getPerspectEntiteit dfId
@@ -242,21 +249,30 @@ uploadToRepository dfId url = do
 uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit
 uploadToRepository_ dfId url df = lift $ lift $ do
   docUrl <- pure (url <> "/" <> (show dfId))
-  (rq :: (Request String)) <- defaultPerspectRequest
+  -- Get the attachment info
+  (atts :: Maybe DocWithAttachmentInfo) <- getAttachmentsFromUrl docUrl
+  attachments <- case atts of
+    Nothing -> pure empty
+    Just (DocWithAttachmentInfo {_attachments}) -> traverseWithIndex (\attName {content_type} -> Tuple (MediaType content_type) <$> getDocumentAsStringFromUrl (docUrl <> "/" <> attName)) _attachments
   -- Try to get the revision, so we can overwrite.
   mVersion <- retrieveDocumentVersion docUrl
+  (rq :: (Request String)) <- defaultPerspectRequest
   case mVersion of
     Nothing -> do
     -- If not available, store without revision
       res <- liftAff $ request $ rq {method = Left PUT, url = docUrl, content = Just $ RequestBody.string (encodeJSON df)}
       void $ onAccepted res.status [200, 201] "uploadToRepository_"
         (onCorrectCallAndResponse "uploadToRepository_" res.body (\(a :: PutCouchdbDocument) -> pure unit))
-      -- Now add the attachment.
     -- If available, store with revision
     Just rev -> do
       res <- liftAff $ request $ rq {method = Left PUT, url = (docUrl <> "?rev=" <> rev), content = Just $ RequestBody.string  (encodeJSON df)}
       void $ onAccepted res.status [200, 201] "uploadToRepository_"
         (onCorrectCallAndResponse "uploadToRepository_" res.body (\(a :: PutCouchdbDocument) -> pure unit))
+  -- Now add the attachments.
+  forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
+    Nothing -> pure unit
+    Just attachment -> void $ addAttachmentToUrl docUrl attName attachment mimetype
+
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
