@@ -43,7 +43,7 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, handleNewPeer, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MPT, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
@@ -54,7 +54,7 @@ import Perspectives.Instances.ObjectGetters (getConditionState, setConditionStat
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
-import Perspectives.Query.UnsafeCompiler (context2context, context2propertyValue, context2role, context2string)
+import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
@@ -88,7 +88,6 @@ compileBotAction actionType = do
     ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
       conditionWasTrue <- lift2 $ getConditionState actionType contextId
       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
-      -- hierboven gaat het fout
       if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
         then if conditionWasTrue
           then pure unit
@@ -256,24 +255,29 @@ compileAssignment (UQD _ (BindVariable varName) f1 _ _ _) = do
 
 compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
-  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse context2string args
+  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (unsafeCoerce compileFunction) args
   pure (\c -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
-      0 -> (unsafeCoerce f :: MonadPerspectivesTransaction Unit)
-      1 -> (unsafeCoerce f :: (Array String -> MonadPerspectivesTransaction Unit)) (unsafePartial (unsafeIndex values 0))
-      2 -> (unsafeCoerce f :: (Array String -> Array String -> MonadPerspectivesTransaction Unit))
+      0 -> (unsafeCoerce f :: ContextInstance -> MPT Unit) c
+      1 -> (unsafeCoerce f :: (Array String -> ContextInstance -> MPT Unit))
+        (unsafePartial (unsafeIndex values 0))
+        c
+      2 -> (unsafeCoerce f :: (Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
-      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> MonadPerspectivesTransaction Unit))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> MonadPerspectivesTransaction Unit))
-        (unsafePartial (unsafeIndex values 0))
+        c
+      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
+        c
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        c
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )
 

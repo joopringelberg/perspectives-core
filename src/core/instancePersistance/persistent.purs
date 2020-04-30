@@ -36,6 +36,7 @@ module Perspectives.Persistent
 ( saveEntiteit
 , saveEntiteit_
 , removeEntiteit
+, tryRemoveEntiteit
 , getPerspectEntiteit
 , fetchEntiteit
 , getPerspectContext
@@ -148,14 +149,26 @@ getAVarRepresentingPerspectEntiteit id =
 removeEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 removeEntiteit entId = do
   entiteit <- getPerspectEntiteit entId
+  removeEntiteit_ entId entiteit
+
+removeEntiteit_ :: forall a i. Persistent a i => i -> a -> MonadPerspectives a
+removeEntiteit_ entId entiteit =
   ensureAuthentication $ do
     case (rev entiteit) of
       Nothing -> pure entiteit
       (Just rev) -> do
+        void $ removeInternally entId
         ebase <- database entId
         (rq :: (Request String)) <- defaultPerspectRequest
         res <- liftAff $ request $ rq {method = Left DELETE, url = (ebase <> unwrap entId <> "?rev=" <> rev)}
-        onAccepted res.status [200, 202] "removeEntiteit" $ (removeInternally entId :: MP (Maybe (AVar a))) *> pure entiteit
+        onAccepted res.status [200, 202] ("removeEntiteit(" <> unwrap entId <> ")") $ pure entiteit
+
+tryRemoveEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives Unit
+tryRemoveEntiteit entId = do
+  mentiteit <- tryGetPerspectEntiteit entId
+  case mentiteit of
+    Nothing -> pure unit
+    Just entiteit -> void $ removeEntiteit_ entId entiteit
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
 fetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a

@@ -65,7 +65,7 @@ indexedRoles_ roleIds = do
       case rol_binding r of
         Nothing -> throwError (error ("An instance of sys:Model$IndexedRole has no binding: " <> unwrap roleId))
         Just b -> case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedRole$Name") of
-          Nothing -> throwError (error ("An instance of sys:Model$IndexeRole$Name has no value: " <> unwrap roleId))
+          Nothing -> throwError (error ("An instance of sys:Model$IndexedRole$Name has no value: " <> unwrap roleId))
           Just (Value iname) -> pure (Tuple (qualifyWith (unsafeDeconstructModelName $ unwrap b) iname) b)
 
 -- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
@@ -81,9 +81,9 @@ indexedContexts_ externalRoleIds = do
     f roleId = do
       r <- getPerspectRol roleId
       case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedContext$Name") of
-        Nothing -> throwError (error ("An instance of sys:Model$IndexeContext$Name has no value: " <> unwrap roleId))
+        Nothing -> throwError (error ("An instance of sys:Model$IndexedContext$Name has no value: " <> unwrap roleId))
         Just (Value iname) -> do
           mcontextId <- roleId ##> binding >=> context
           case mcontextId of
-            Nothing -> throwError (error ("An instance of sys:Model$IndexeContext has no context bound to it: " <> unwrap roleId))
+            Nothing -> throwError (error ("An instance of sys:Model$IndexedContext has no context bound to it: " <> unwrap roleId))
             Just c -> pure (Tuple (qualifyWith (unsafeDeconstructModelName $ unwrap c) iname) c)

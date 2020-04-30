@@ -37,7 +37,7 @@ import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Identifiers (Namespace)
-import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, updateRevision)
+import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
 import Perspectives.User (getCouchdbPassword, getUser)
@@ -117,5 +117,6 @@ cascadeDeleteDomeinFile dfid = do
   case df of
     Just (DomeinFile{referredModels}) -> do
       for_ referredModels cascadeDeleteDomeinFile
-      void $ removeEntiteit dfid
+      -- One of the dependencies may have removed dfid.
+      void $ tryRemoveEntiteit dfid
     otherwise -> pure unit

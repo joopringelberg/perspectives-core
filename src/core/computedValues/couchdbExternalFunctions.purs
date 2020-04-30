@@ -211,7 +211,7 @@ addModelToLocalStore urls r = do
       case mexistingContext of
         Nothing -> do
           void $ cacheEntity i a
-          updateRevision i
+          -- updateRevision i
           void $ saveEntiteit i
         otherwise -> pure unit
 
@@ -229,6 +229,7 @@ addModelToLocalStore urls r = do
             Right attachment -> do
               perspect_models <- modelsDatabaseName
               void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
+              updateRevision (DomeinFileId modelName)
 
     repository :: String -> MP String
     repository url = case getFirstMatch (unsafeRegex "^(.*/).+$" noFlags) url of
