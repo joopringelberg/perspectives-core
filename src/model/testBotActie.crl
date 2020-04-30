@@ -11,3 +11,4 @@ sys:Model usr:TestBotActieModel
     tba:Tests usr:MyTests
       extern sys:NamedContext$External$Name = "Test bot action"
       $Tester -> sys:Me
+    $Name = "MyTests"

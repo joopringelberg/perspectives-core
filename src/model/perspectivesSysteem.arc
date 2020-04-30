@@ -49,7 +49,7 @@ domain: System
     context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
     -- On moving a model to ModelsInUse for the second time, the bot with the perspective on UnloadedModel will not work. We need a third rule for that.
-    context: UnconnectedIndexedContext = filter (ModelsInUse >> binding >> context >> IndexedContext >> binding) with not exists binder IndexedContexts
+    context: UnconnectedIndexedContext = (filter ModelsInUse >> binding with available context) >> filter (context >> IndexedContext >> binding) with not exists binder IndexedContexts
 
   -- A Channel is shared by just two users.
   case: Channel
