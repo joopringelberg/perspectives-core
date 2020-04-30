@@ -55,7 +55,8 @@ import Perspectives.Assignment.Update (addRoleInstancesToContext, handleNewPeer_
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
-import Perspectives.Deltas (addUniverseContextDelta, increaseDeltaIndex)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addUniverseContextDelta, increaseDeltaIndex)
+import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, isMe)
@@ -66,7 +67,7 @@ import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..))
-import Prelude (bind, discard, pure, show, unit, void, when, ($), (*>), (<$>), (<>))
+import Prelude (bind, discard, pure, show, unit, void, when, ($), (*>), (<$>), (<>), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setBinding on each role.
@@ -151,6 +152,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
       , context = contextInstanceId
       , binding = Nothing
       })
+  (lift2 $ findRoleRequests (ContextInstance "AnyContext") (EnumeratedRoleType $ unwrap pspType <> "$External")) >>= addCorrelationIdentifiersToTransactie
   case externeProperties of
     (PropertySerialization props) -> do
       forWithIndex_ props \propertyTypeId values ->

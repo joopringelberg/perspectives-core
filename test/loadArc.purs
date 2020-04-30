@@ -7,6 +7,7 @@ import Control.Monad.Free (Free)
 import Data.Array (null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Perspectives.Couchdb.Revision (changeRevision)
@@ -67,7 +68,7 @@ theSuite = suite "Perspectives.loadArc" do
         logShow messages
         liftAff $ assert "The file could not be parsed or compiled" false
       _ -> pure unit
-
+    log "Done it"
 
   test "Load a model file and store it in Couchdb" do
     messages <- runP do

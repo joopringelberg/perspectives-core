@@ -113,7 +113,10 @@ findDependencies :: Assumption -> MP (Maybe (Array CorrelationIdentifier))
 findDependencies a@(Tuple resource tpe) = do
   r <- queryAssumptionRegister
   case lookup resource r of
-    Nothing -> pure Nothing
+    -- The resource "AnyContext" serves as a wildcard.
+    Nothing -> case lookup "AnyContext" r of
+      Nothing -> pure Nothing
+      Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
     Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
 
 findResourceDependencies :: String -> MP (Array CorrelationIdentifier)

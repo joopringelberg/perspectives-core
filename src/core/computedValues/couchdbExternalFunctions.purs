@@ -53,7 +53,7 @@ import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
 import Perspectives.ContextRoleParser (parseAndCache)
-import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, MonadPerspectives, assumption)
+import Perspectives.CoreTypes (MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, assumption, type (~~>))
 import Perspectives.Couchdb (DocWithAttachmentInfo(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, defaultPerspectRequest, documentNamesInDatabase, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.Couchdb.Revision (changeRevision)
@@ -110,12 +110,16 @@ modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models/")
 -- | Notice, too, that the second parameter is ignored. We must provide it, however, as the query compiler
 -- | will give us an argument for it.
 -- TODO. We hebben een mechanisme nodig om te actualiseren als er een instantie bijkomt of afgaat.
-roleInstancesFromCouchdb :: Array String -> ContextInstance ->  MPQ RoleInstance
-roleInstancesFromCouchdb roleTypes _ = ArrayT $ lift $ do
-  (roles :: Array PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
-  for roles \r@(PerspectRol{_id}) -> do
-    void $ cacheEntity _id r
-    pure _id
+roleInstancesFromCouchdb :: Array String -> (ContextInstance ~~> RoleInstance)
+roleInstancesFromCouchdb roleTypes _ = ArrayT do
+  case head roleTypes of
+    Nothing -> pure []
+    Just rt -> do
+      tell [assumption "AnyContext" rt]
+      (roles :: Array PerspectRol) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
+      for roles \r@(PerspectRol{_id}) -> do
+        void $ lift $ cacheEntity _id r
+        pure _id
 
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
 -- | Load the dependencies first.

@@ -20,7 +20,7 @@
 -- END LICENSE
 
 
-module Perspectives.CoreTypes where
+module Perspectives.CoreTypes where 
 
 import Control.Monad.Reader (ReaderT, lift)
 import Control.Monad.Writer (WriterT, runWriterT)

@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (elemIndex, length)
+import Data.Array (elemIndex, length, null)
 import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
@@ -36,7 +36,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Extern.Couchdb" do
+theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   test "models" $ runP $ withSystem do
 
@@ -70,14 +70,28 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
   test "upload model:System to repository from files" $ runP do
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
-    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    cdburl <- getCouchdbBaseURL
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+    errs <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    if null errs
+      then do
+        cdburl <- getCouchdbBaseURL
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+      else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
 
-  test "upload model:SimpleChat to repository from files" $ runP $ withSystem do
-    _ <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
-    cdburl <- getCouchdbBaseURL
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
+  testOnly "upload model:SimpleChat to repository from files" $ runP $ withSystem do
+    errs <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
+    if null errs
+      then do
+        cdburl <- getCouchdbBaseURL
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
+      else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
+
+  test "upload model:TestBotActie to repository from files" $ runP $ withSystem do
+    errs <- loadCompileAndCacheArcFile "testBotActie" modelDirectory
+    if null errs
+      then do
+        cdburl <- getCouchdbBaseURL
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
+      else liftAff $ assert ("There are instance- or model errors for model:TestBotActie: " <> show errs) false
 
   test "setModelDescriptionsView" do
     assertEqual "The retrieved document should equal the sent document"

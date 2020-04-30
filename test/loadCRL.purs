@@ -30,9 +30,9 @@ modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.loadCRL" do
-  test "Load a file with a context instance in cache" do
-    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadAndCacheCrlFile "combinators.crl" testDirectory
-    -- logShow r
+  test "Load a file with instances in cache" do
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadAndCacheCrlFile "simpleChat.crl" modelDirectory
+    logShow r
     pure unit
 
   test "Load a file with a context instance in couchdb with a light check" do
