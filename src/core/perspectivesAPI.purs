@@ -32,6 +32,7 @@ import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
 import Effect (Effect)
 import Effect.Aff (Aff, catchError, launchAff_)
 import Effect.Class (liftEffect)
@@ -40,7 +41,7 @@ import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
-import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), mkApiEffect, showRequestRecord)
+import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), mkApiEffect, showRequestRecord, ContextsSerialisation(..))
 import Perspectives.Assignment.Update (handleNewPeer, removeBinding, setBinding, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
@@ -57,7 +58,7 @@ import Perspectives.Representation.Class.Role (rangeOfRoleCalculation')
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', runSterileTransaction)
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Perspectives.User (getSystemIdentifier)
@@ -214,10 +215,18 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> void $ runMonadPerspectivesTransaction $ do
-        ctxt <- constructContext (ContextSerialization cd {id = "model:User$c" <> (show $ guid unit)})
+        ctxt <- runExceptT $ constructContext (ContextSerialization cd {id = "model:User$c" <> (show $ guid unit)})
         case ctxt of
           (Left messages) -> lift2 $ sendResponse (Error corrId (show messages)) setter
           (Right id) -> lift2 $ sendResponse (Result corrId [buitenRol $ unwrap id]) setter
+    Api.ImportContexts -> case unwrap $ runExceptT $ decode contextDescription of
+      (Left e :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> sendResponse (Error corrId (show e)) setter
+      (Right (ContextsSerialisation ctxts) :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> void $
+        runMonadPerspectivesTransaction' false do
+          result <- runExceptT $ traverse constructContext ctxts
+          case result of
+            Left e -> lift2 $ sendResponse (Error corrId (show e)) setter
+            Right ids -> lift2 $ sendResponse (Result corrId (unwrap <$> ids)) setter
     Api.DeleteContext -> do
       void $ runMonadPerspectivesTransaction $ removeContextInstance (ContextInstance subject)
       sendResponse (Result corrId []) setter

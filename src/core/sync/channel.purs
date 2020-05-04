@@ -24,6 +24,7 @@
 module Perspectives.Sync.Channel where
 
 import Control.Monad.Error.Class (throwError)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
@@ -65,7 +66,7 @@ createChannelContext :: String -> MonadPerspectivesTransaction ContextInstance
 createChannelContext channelName = do
   host <- lift2 getHost
   port <- lift2 getPort
-  eChannel <- constructContext $ ContextSerialization
+  eChannel <- runExceptT $ constructContext $ ContextSerialization
     { id: "model:User$" <> channelName
     , prototype: Nothing
     , ctype: "sys:Channel"

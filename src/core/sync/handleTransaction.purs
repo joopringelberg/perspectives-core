@@ -21,6 +21,7 @@
 
 module Perspectives.Sync.HandleTransaction where
 
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Writer (WriterT, execWriterT, tell)
 import Data.Array (sort, length)
 import Data.Array.NonEmpty (head)
@@ -74,7 +75,7 @@ executeUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransact
 executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) = case deltaType of
   ConstructEmptyContext -> do
     -- log ("constructEmptyContext " <> show id <> " with type " <> show contextType)
-    void $ constructEmptyContext id (unwrap contextType) "" (PropertySerialization empty)
+    void $ runExceptT $ constructEmptyContext id (unwrap contextType) "" (PropertySerialization empty)
   RemoveContextInstance -> removeContextInstance id
 
 executeUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
