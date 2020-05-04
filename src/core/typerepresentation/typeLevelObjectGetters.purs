@@ -29,7 +29,6 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Foreign.Object (keys, values)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -43,7 +42,7 @@ import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, 
 import Perspectives.Representation.Class.PersistentType (getAction, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, getRole, greaterThanOrEqualTo, propertiesOfADT, roleAspects, roleAspectsBindingADT, roleSet, typeIncludingAspects, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
-import Perspectives.Representation.Context (contextADT)
+import Perspectives.Representation.Context (contextAspectsADT)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), hasElementM)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
@@ -55,11 +54,11 @@ import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>
 ----------------------------------------------------------------------------------------
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
-lookForRoleType s c = (lift $ getContext c) >>= pure <<< contextADT >>= lookForRoleTypeOfADT s
+lookForRoleType s c = (lift $ getContext c) >>= pure <<< contextAspectsADT >>= lookForRoleTypeOfADT s
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleType :: String -> ContextType ~~~> RoleType
-lookForUnqualifiedRoleType s c = (lift $ getContext c) >>= pure <<< contextADT >>= lookForUnqualifiedRoleTypeOfADT s
+lookForUnqualifiedRoleType s c = (lift $ getContext c) >>= pure <<< contextAspectsADT >>= lookForUnqualifiedRoleTypeOfADT s
 
 lookForRoleTypeOfADT :: String -> (ADT ContextType ~~~> RoleType)
 lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s)) s
