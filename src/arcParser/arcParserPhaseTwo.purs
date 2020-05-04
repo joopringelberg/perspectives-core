@@ -134,13 +134,14 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR _id) contextRol}
       ExternalRole, ctxt -> ctxt
       -- We may have added the user before, on handling his BotRole.
-      UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex _id gebruikerRol of
-        Nothing -> cons _id gebruikerRol
+      UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR _id) gebruikerRol of
+        Nothing -> cons (ENR _id) gebruikerRol
         (Just _) -> gebruikerRol}
 
     insertRoleInto (C (CalculatedRole {_id, kindOfRole})) c = case kindOfRole, c of
       RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR _id) rolInContext}
       ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR _id) contextRol}
+      UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR _id) gebruikerRol}
       -- A catchall case that just returns the context. Calculated roles for ExternalRole,
       -- UserRole and BotRole should be ignored.
       _, _ -> c
