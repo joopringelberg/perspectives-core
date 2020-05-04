@@ -32,8 +32,8 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType(..))
-import Prelude (class Eq, class Show, map, (<<<), (<>), (==), (<$>))
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType)
+import Prelude (class Eq, class Show, map, (<<<), (<>), (==))
 
 -----------------------------------------------------------
 -- CONTEXT TYPE CLASS
@@ -44,7 +44,7 @@ class ContextClass c where
   roleInContext :: c -> Array RoleType
   contextRole :: c -> Array RoleType
   externalRole :: c -> EnumeratedRoleType
-  userRole :: c -> Array EnumeratedRoleType
+  userRole :: c -> Array RoleType
   actions :: c -> Array ActionType
   aspects :: c -> Array ContextType
   nestedContexts :: c -> Array ContextType
@@ -63,7 +63,7 @@ instance contextContextClass :: ContextClass Context where
   aspects = _.contextAspects <<< unwrap
   nestedContexts = _.nestedContexts <<< unwrap
   position = _.pos <<< unwrap
-  roles r = roleInContext r <> contextRole r <> (ENR <$> userRole r)
+  roles r = roleInContext r <> contextRole r <> userRole r
   contextADT = ST <<< _._id <<< unwrap
 
 -----------------------------------------------------------
@@ -82,7 +82,7 @@ type ContextRecord =
 
   , rolInContext :: Array RoleType
   , contextRol :: Array RoleType
-  , gebruikerRol :: Array EnumeratedRoleType
+  , gebruikerRol :: Array RoleType
 
   , nestedContexts :: Array ContextType
   , actions :: Array ActionType

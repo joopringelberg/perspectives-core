@@ -70,7 +70,7 @@ checkContext c = do
   -- E.g.: all EnumeratedRoles and CalculatedRoles in rolInContext must have RoleKind RolInContext.
   for_ (roleInContext c) (checkRoleKind RoleInContext)
   for_ (contextRole c) (checkRoleKind ContextRole)
-  for_ (userRole c) (checkEnumeratedRole UserRole)
+  for_ (userRole c) (checkRoleKind UserRole)
   checkEnumeratedRole ExternalRole (externalRole c)
 
   where

@@ -42,6 +42,7 @@ import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (insert, keys, lookup, unions, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
@@ -75,10 +76,10 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=), (>))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -97,8 +98,8 @@ phaseThree_ df@{_id, referredModels} = do
       qualifyBindings
       qualifyPropertyReferences
       qualifyViewReferences
-      invertedQueriesForLocalRolesAndProperties
       compileExpressions
+      invertedQueriesForLocalRolesAndProperties
       requalifyBindingsToCalculatedRoles
       compileRules
       )
@@ -134,30 +135,33 @@ qualifyActionRoles = do
   qualifyActionRoles' :: DomeinFileRecord -> PhaseThree Unit
   qualifyActionRoles' {contexts, enumeratedRoles, actions, calculatedRoles} = for_ contexts
     \(Context{_id:ctxtId, gebruikerRol, rolInContext, contextRol}) -> for_ gebruikerRol
-      \(EnumeratedRoleType ur) -> case lookup ur enumeratedRoles of
-        Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> ur <> "' in model.")
-        (Just (EnumeratedRole {perspectives})) -> for_ (values perspectives)
-          \acts -> for_ acts
-            \(ActionType a) -> case lookup a actions of
-              Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
-              (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
-                ar' <- do
-                  qname <- case object of
-                    (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
-                    other -> qualifiedRoleType ctxtId pos (roletype2string other)
-                  -- qname <- qualifiedRoleType ctxtId pos (roletype2string object)
-                  pure $ ar {object = qname}
-                ar'' <- case mindirectObject of
-                  (Just indirectObject) -> do
+      \rt -> case rt of
+        (ENR (EnumeratedRoleType ur)) -> case lookup ur enumeratedRoles of
+          Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> ur <> "' in model.")
+          (Just (EnumeratedRole {perspectives})) -> for_ (values perspectives)
+            \acts -> for_ acts
+              \(ActionType a) -> case lookup a actions of
+                Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
+                (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
+                  ar' <- do
                     qname <- case object of
                       (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
-                      other -> qualifiedRoleType ctxtId pos (roletype2string indirectObject)
-                    pure $ ar' {indirectObject = Just qname}
-                  otherwise -> pure ar'
-                if ar'' == ar
-                  then pure unit
-                  -- A change, so modify the DomeinFileRecord
-                  else modifyDF (\df@{actions: actions'} -> df {actions = insert (unwrap actId) (Action ar'') actions'})
+                      other -> qualifiedRoleType ctxtId pos (roletype2string other)
+                    -- qname <- qualifiedRoleType ctxtId pos (roletype2string object)
+                    pure $ ar {object = qname}
+                  ar'' <- case mindirectObject of
+                    (Just indirectObject) -> do
+                      qname <- case object of
+                        (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
+                        other -> qualifiedRoleType ctxtId pos (roletype2string indirectObject)
+                      pure $ ar' {indirectObject = Just qname}
+                    otherwise -> pure ar'
+                  if ar'' == ar
+                    then pure unit
+                    -- A change, so modify the DomeinFileRecord
+                    else modifyDF (\df@{actions: actions'} -> df {actions = insert (unwrap actId) (Action ar'') actions'})
+        -- No perspectives for Calculated Users yet!
+        (CR (CalculatedRoleType ur)) -> pure unit
     where
       qualifiedRoleType :: ContextType -> ArcPosition -> String -> PhaseThree RoleType
       qualifiedRoleType ctxtId pos ident = if isQualifiedWithDomein ident
@@ -435,15 +439,15 @@ compileAndDistributeStep userTypes dom s = do
   descr' <- traverseQfd (qualifyReturnsClause (startOf s)) descr
   setInvertedQueries userTypes descr'
   pure descr'
-  where
-    qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-    qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = do
-      enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
-      computedTypeADT <- qualifyLocalRoleName pos computedType (keys enumeratedRoles)
-      case computedTypeADT of
-        ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure qfd
-        _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
-    qualifyReturnsClause pos qfd = pure qfd
+
+qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = do
+  enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
+  computedTypeADT <- qualifyLocalRoleName pos computedType (keys enumeratedRoles)
+  case computedTypeADT of
+    ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure qfd
+    _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
+qualifyReturnsClause pos qfd = pure qfd
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process.

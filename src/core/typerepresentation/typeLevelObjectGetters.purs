@@ -27,9 +27,9 @@ import Control.Plus (empty, map, (<|>))
 import Data.Array (filter, find, findIndex, singleton)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
-import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (keys, values)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -48,7 +48,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..), hasElementM)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>), discard)
+import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -85,14 +85,21 @@ roleInContext = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives
 contextRole :: ContextType ~~~> RoleType
 contextRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.contextRole)
 
-userRole :: ContextType ~~~> EnumeratedRoleType
+userRole :: ContextType ~~~> RoleType
 userRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.userRole)
+
+-- | Returns RoleTypes that are guaranteed to be Enumerated.
+enumeratedUserRole :: ContextType ~~~> RoleType
+enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< filter isEnumerated <<< Context.userRole)
+  where
+    isEnumerated (ENR _) = true
+    isEnumerated (CR _) = false
 
 allRoleTypesInContext :: ContextType ~~~> RoleType
 allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole userRole'
   where
     userRole' :: ContextType ~~~> RoleType
-    userRole' = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< map ENR <<< Context.userRole)
+    userRole' = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.userRole)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S
@@ -232,7 +239,7 @@ roleIsInPerspectiveOf = flip hasPerspectiveOnRole
 
 -- | In a Context type, find all user roles that have a perspective on a given RoleType.
 rolesWithPerspectiveOnRole :: RoleType -> ContextType ~~~> RoleType
-rolesWithPerspectiveOnRole rt = COMB.filter (map ENR <<< userRole) (roleIsInPerspectiveOf rt)
+rolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (roleIsInPerspectiveOf rt)
 
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A PROPERTYTYPE
@@ -247,4 +254,4 @@ propertyIsInPerspectiveOf :: PropertyType -> RoleType ~~~> Boolean
 propertyIsInPerspectiveOf = flip hasPerspectiveOnProperty
 
 rolesWithPerspectiveOnProperty :: PropertyType -> ContextType ~~~> RoleType
-rolesWithPerspectiveOnProperty pt = COMB.filter (map ENR <<< userRole) (propertyIsInPerspectiveOf pt)
+rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiveOf pt)
