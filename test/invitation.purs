@@ -15,6 +15,7 @@ import Foreign.Class (decode)
 import Perspectives.ApiTypes (ContextSerialization(..))
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes ((##=))
+import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
@@ -23,7 +24,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Simple.JSON (parseJSON)
-import Test.Perspectives.Utils (runP, withSimpleChat, withSystem)
+import Test.Perspectives.Utils (runP, withModel_, withSimpleChat, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -36,7 +37,8 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suite "Invitation" do
 
-  test "Bot serialises invitation" $ runP $ withSystem do
+  test "Bot serialises invitation" $ runP $ withModel_ (DomeinFileId "model:System") false do
+  -- testOnly "Bot serialises invitation" $ runP $ withSystem do
     addAllExternalFunctions
     -- Create an Invitation instance with an Inviter
     errs <- loadAndSaveCrlFile "invitation.crl" testDirectory
@@ -46,6 +48,7 @@ theSuite = suite "Invitation" do
       Just e -> liftAff $ assert (show errs) false
       Nothing -> do
         -- Set its IWantToInviteAnUnconnectedUser to true
+        -- Hieronder gaat het fout
         void $ runMonadPerspectivesTransaction $ setProperty [RoleInstance $ buitenRol "model:User$MyInvitation"] (EnumeratedPropertyType inviteProp) [Value "true"]
         getter <- getPropertyFunction serialisedProp
         -- Get its SerialisedInvitation

@@ -2,6 +2,7 @@ module Test.ContextRoleParser where
 
 import Prelude
 
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Free (Free)
 import Data.Array (head, length)
 import Data.Array.NonEmpty (singleton)
@@ -98,7 +99,7 @@ theSuite = suite "ContextRoleParser" do
 
   test "me for a constructed context (isMe by implication)." $ runP $ withSystem do
     _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-    _ <- runMonadPerspectivesTransaction $ constructContext $ ContextSerialization
+    _ <- runMonadPerspectivesTransaction $ runExceptT $ constructContext $ ContextSerialization
       { id: "model:User$MyTestCase$MyNestedCase4"
       , prototype: Nothing
       , ctype: "model:Test$TestCase$NestedCase"

@@ -36,6 +36,7 @@ import Test.Assignment.SerialiseAsJson as SAJ
 import Test.Utilities as UT
 import Test.Invitation as IT
 import Test.TypeLevelQueries as TLQ
+import Test.Instances.ObjectGetters as IOG
 
 
 main :: Effect Unit
@@ -71,3 +72,4 @@ main = runTest do
   UT.theSuite
   IT.theSuite
   TLQ.theSuite
+  IOG.theSuite

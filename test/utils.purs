@@ -2,7 +2,8 @@ module Test.Perspectives.Utils where
 
 import Prelude
 
-import Effect.Aff (Aff)
+import Data.Either (Either(..))
+import Effect.Aff (Aff, throwError, try)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
@@ -75,19 +76,26 @@ setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "geheim"
 -- | Load the model, compute the value in MonadPerspectives, unload the model and remove the instances.
 -- | Notice: dependencies of the model are not automatically removed!
 withModel :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
-withModel m@(DomeinFileId id) a = do
-  result <- withModel' m a
-  clearUserDatabase
-  pure result
+withModel m@(DomeinFileId id) a = withModel_ m true a 
+
+withModel_ :: forall a. DomeinFileId -> Boolean -> MonadPerspectives a -> MonadPerspectives a
+withModel_ m@(DomeinFileId id) clear a = do
+  result <- try $ withModel' m a
+  if clear then clearUserDatabase else pure unit
+  case result of
+    Left e -> throwError e
+    Right r -> pure r
 
 -- | Load the model, compute the value in MonadPerspectives, unload the model.
 withModel' :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
 withModel' m@(DomeinFileId id) a = do
   cdbUrl <- getCouchdbBaseURL
   void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "repository/" <> id] (RoleInstance ""))
-  result <- a
+  result <- try a
   void $ cascadeDeleteDomeinFile m
-  pure result
+  case result of
+    Left e -> throwError e
+    Right r -> pure r
 
 withSystem :: forall a. MonadPerspectives a -> MonadPerspectives a
 withSystem = withModel (DomeinFileId "model:System")

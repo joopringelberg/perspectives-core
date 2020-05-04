@@ -697,10 +697,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
             -- logShow dr'
             x' <- runP $ phaseThree dr'
             case x' of
-              (Left (ContextHasNoRole _ _)) -> assert "ok" true
-              -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
+              (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
               otherwise -> do
-                -- logShow otherwise
                 assert "Expected the error CannotCreateCalculatedRole" false
 
   test "Bind: bind non-functional to functional role" do
