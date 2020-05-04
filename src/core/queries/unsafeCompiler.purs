@@ -30,14 +30,16 @@ import Control.Alt (void, (<|>))
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Writer (WriterT(..))
 import Control.Plus (empty)
-import Data.Array (elemIndex, null, unsafeIndex)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Array (elemIndex, null, singleton, unsafeIndex)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MP, MPQ, MonadPerspectives, liftToInstanceLevel, (##=))
+import Perspectives.CoreTypes (type (~~>), MP, MPQ, MonadPerspectives, Assumption, liftToInstanceLevel, (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -47,7 +49,7 @@ import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as 
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, externalRole, getProperty, getEnumeratedRoleInstances, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
-import Perspectives.Names (expandDefaultNamespaces)
+import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
@@ -103,7 +105,13 @@ compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
   VDOM _ _ -> throwError (error "There is no constant function for value.")
   otherwise -> pure $ unsafeCoerce \x -> (pure (Value value) :: MPQ Value)
 
-compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ unsafeCoerce (\x -> pure individual :: MPQ RoleInstance)
+-- compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ unsafeCoerce (\x -> lift $ lift $ maybe [] identity (lookupIndexedRole (unwrap individual)) :: MPQ RoleInstance)
+
+compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ unsafeCoerce \x -> ArrayT do
+  mi <- ((lift $ lookupIndexedRole (unwrap individual)) :: (WriterT (Array Assumption) MonadPerspectives) (Maybe RoleInstance))
+  case mi of
+    Nothing -> pure []
+    Just i -> pure [unwrap i]
 
 compileFunction (SQD dom (Value2Role _) _ _ _) = pure $ unsafeCoerce (\x -> pure x :: MPQ String)
 
