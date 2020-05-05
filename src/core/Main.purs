@@ -30,16 +30,18 @@ import Effect.Aff.AVar (AVar, new)
 import Effect.Console (log)
 import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.Extern.Couchdb (roleInstancesFromCouchdb)
+import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.LocalAuthentication (AuthenticationResult(..))
 import Perspectives.LocalAuthentication (authenticate) as LA
+import Perspectives.Persistent (entitiesDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
-import Perspectives.RunPerspectives (runPerspectivesWithState)
+import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithState)
 import Perspectives.SetupCouchdb (partyMode, setupCouchdbForFirstUser)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.IncomingPost (incomingPost)
@@ -98,6 +100,27 @@ authenticate usr pwd callback = void $ runAff handler do
       OK (CouchdbUser{systemIdentifier})-> do
         runPDR usr pwd systemIdentifier
         callback 2
+
+-- | This is for development only! Assumes the user identifier equals the user name.
+resetAccount :: String -> String -> Effect Unit
+resetAccount usr pwd = void $ runAff handler (runPerspectives usr pwd usr do
+  clearUserDatabase
+  clearModelDatabase)
+  where
+    clearUserDatabase :: MonadPerspectives Unit
+    clearUserDatabase = do
+      userDatabaseName <- entitiesDatabaseName
+      deleteDatabase userDatabaseName
+      createDatabase userDatabaseName
+    clearModelDatabase :: MonadPerspectives Unit
+    clearModelDatabase = do
+      dbname <- modelsDatabaseName
+      deleteDatabase dbname
+      createDatabase dbname
+    handler :: Either Error Unit -> Effect Unit
+    handler (Left e) = log $ "An error condition in resetAccount: " <> (show e)
+    handler (Right e) = log $ "Cleared the account " <> usr
+
 
 -- | Retrieve all instances of sys:Model$IndexedRole and sys:Model$IndexedContext and create a table of
 -- | all known indexed names and their private replacements in PerspectivesState.
