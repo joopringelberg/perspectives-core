@@ -11,4 +11,4 @@ sys:Model usr:SimpleChatModel
     chat:ChatApp usr:MyChatApp
       extern sys:NamedContext$External$Name = "Simple Chat"
       $Chatter -> sys:Me
-    $Name = "MyChats"
+    $Name = "SimpleChat$MyChats"

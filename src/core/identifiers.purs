@@ -112,7 +112,7 @@ guardWellFormedNess f a = onNothing' (error $ "This identifier is not well forme
 -- QUALIFY A NAME
 -----------------------------------------------------------
 qualifyWith :: Namespace -> String -> String
-qualifyWith ns = append ns
+qualifyWith ns = append (ns <> "$")
 
 -----------------------------------------------------------
 -- DECONSTRUCTING NAMESPACES

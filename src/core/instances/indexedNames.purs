@@ -66,7 +66,7 @@ indexedRoles_ roleIds = do
         Nothing -> throwError (error ("An instance of sys:Model$IndexedRole has no binding: " <> unwrap roleId))
         Just b -> case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedRole$Name") of
           Nothing -> throwError (error ("An instance of sys:Model$IndexedRole$Name has no value: " <> unwrap roleId))
-          Just (Value iname) -> pure (Tuple (qualifyWith (unsafeDeconstructModelName $ unwrap b) iname) b)
+          Just (Value iname) -> pure (Tuple ("model:" <> iname) b)
 
 -- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
 indexedContexts :: RoleInstance -> MonadPerspectives (Object ContextInstance)
