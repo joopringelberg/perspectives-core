@@ -21,7 +21,7 @@ import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.Sync.Channel (addUserToChannel, createChannel)
+import Perspectives.Sync.Channel (addPartnerToChannel, createChannel)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
 import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
@@ -53,7 +53,7 @@ theSuite = suite "SerialisedAsDeltas" do
       Just channel -> do
         -- load a second user
         void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$joop$User") channel
+        void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
 
     getter <- getRoleFunction "model:Test$TestCase$Other"
     unboundOtherRole <- (ContextInstance "model:User$MyTestCase") ##>> getter

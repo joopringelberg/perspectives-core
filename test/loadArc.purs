@@ -12,6 +12,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, retrieveDomeinFile)
+import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -49,6 +50,7 @@ theSuite = suite "Perspectives.loadArc" do
 
   test "Load model:System and cache it" do
     messages <- runP do
+      addAllExternalFunctions
       -- 1. Load the required model:Couchdb.
       _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
       -- 2. Load the required model:Serialise.

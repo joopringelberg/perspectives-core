@@ -18,6 +18,7 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore, models, uploadToRepository)
+import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Persistent (entitiesDatabaseName, removeEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -68,6 +69,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
       void $ cascadeDeleteDomeinFile (DomeinFileId "model:System")
 
   test "upload model:System to repository from files" $ runP do
+    addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
     errs <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
