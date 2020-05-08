@@ -23,7 +23,7 @@ module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, (<|>))
-import Data.Array (cons, filterA, null, union, (:))
+import Data.Array (cons, filterA, foldl, null, union, (:))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable, Set)
 import Data.Traversable (traverse)
@@ -44,7 +44,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), elements, intersectionOfArrays, intersectionPset, subsetPSet, unionOfArrays, unionPset)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
 import Perspectives.Representation.View (propertyReferences)
 import Prelude (class Eq, class Show, bind, flip, join, map, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
 
@@ -64,10 +64,10 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   -- | The type of the Role. For an EnumeratedRole this is just `ST EnumeratedRoleType`.
   -- | For a CalculatedRole it is the range of its calculation.
   roleADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
-  -- | The type of the Role, including its aspects.
+  -- | The type of the Role, including its direct aspects: not their transitive closure!
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
-  -- | The type of the Role, including its aspects and its binding.
+  -- | The type of the Role, including its direct binding (not the transitive closure!) and its direct aspects: not their transitive closure!
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsBindingADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   views :: r -> MonadPerspectives (Array ViewType)
@@ -297,6 +297,29 @@ roleAspectsOfADT (SUM terms) = traverse roleAspectsOfADT terms >>= pure <<< unio
 roleAspectsOfADT (PROD terms) = traverse roleAspectsOfADT terms >>= pure <<< intersectionOfArrays
 roleAspectsOfADT EMPTY = pure []
 roleAspectsOfADT UNIVERSAL = throwError (error $ show UniversalRoleHasNoParts)
+
+-----------------------------------------------------------
+-- TRANSITIVEROLEASPECTSOFADT
+-----------------------------------------------------------
+-- | The result will never be a SUM.
+-- transitiveClosureOfRoleADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+-- transitiveClosureOfRoleADT (ST r) = getEnumeratedRole r >>= roleAspectsBindingADT >>= \adt -> case adt of
+--   s@(ST _) -> pure s
+--   otherwise -> transitiveClosureOfRoleADT otherwise
+-- transitiveClosureOfRoleADT EMPTY = pure EMPTY
+-- transitiveClosureOfRoleADT UNIVERSAL = pure UNIVERSAL
+-- -- hoe weet je dat dit geen sum is?
+-- transitiveClosureOfRoleADT (PROD terms) = traverse transitiveClosureOfRoleADT terms >>= pure <<< foldl unionOfADT EMPTY
+-- transitiveClosureOfRoleADT (SUM terms) = traverse transitiveClosureOfRoleADT terms >>= pure <<< foldl intersectionOfADT UNIVERSAL
+
+-----------------------------------------------------------
+-- GREATESTCOMMONANCESTOROFROLES
+-----------------------------------------------------------
+-- greatestCommonAncestorOfRoles :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+-- greatestCommonAncestorOfRoles a b = do
+--   a' <- transitiveClosureOfRoleADT a
+--   b' <- transitiveClosureOfRoleADT b
+--   pure $ intersectionOfADT a' b'
 
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLE

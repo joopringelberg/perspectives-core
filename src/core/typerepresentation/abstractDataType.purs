@@ -32,7 +32,8 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (delete, elemIndex, filter, head, intersect, uncons, union)
+import Data.Array (elemIndex, filter, head, intersect, null, uncons, union, length)
+import Data.Array.Partial (head) as AP
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -43,8 +44,9 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, notEq, pure, show, ($), (<>))
+import Prelude (class Eq, class Monad, class Show, bind, notEq, pure, show, ($), (<>), (==), (>>>))
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
 
@@ -66,15 +68,91 @@ instance encodeADT :: (Encode a) => Encode (ADT a) where
 instance decodeADT :: (Decode a) => Decode (ADT a) where
   decode q = genericDecode defaultOptions q
 
+-- | SUM with simplifications:
+-- | SUM [EMPTY, ..] = EMPTY
+-- | SUM [UNIVERSAL, ..] = [..]
+-- | SUM [SUM [..], x] = SUM [x, ..]
+-- | SUM [SUM [..], SUM[..]] = SUM [.. ..]
+-- | SUM [x, .. x] = SUM[.., x]
+-- | SUM [x] = x
 sum :: forall a. Eq a => Array (ADT a) -> ADT a
-sum terms = if isJust (elemIndex EMPTY terms)
-  then EMPTY
-  else SUM $ delete UNIVERSAL terms
+sum = foldl sum' UNIVERSAL >>> \(s :: ADT a) -> case s of
+    SUM x | length x == 1 -> unsafePartial $ AP.head x
+    otherwise -> otherwise
+  where
+  sum' :: ADT a -> ADT a -> ADT a
+  sum' EMPTY _ = EMPTY
+  sum' UNIVERSAL x = x
+  sum' (SUM terms1) (SUM terms2) = SUM (union terms1 terms2)
+  sum' (SUM terms) x = SUM (union terms [x])
+  sum' t1@(ST x) t2@(ST y) = if x == y then t1 else SUM [t1, t2]
+  sum' a b = SUM [a, b]
 
+-- | PRODUCT with simplifications:
+-- | PRODUCT [UNIVERSAL, ..] = UNIVERSAL
+-- | PRODUCT [EMPTY, ..] = [..]
+-- | PRODUCT [PRODUCT[..], ST x] = PRODUCT[.., x]
+-- | PRODUCT [PRODUCT[..], PRODUCT[..]] = PRODUCT[.. ..]
+-- | PRODUCT [x, .. x] = PRODUCT[.., x]
+-- | PRODUCT [x] = x
 product :: forall a. Eq a => Array (ADT a) -> ADT a
-product terms = if isJust (elemIndex UNIVERSAL terms)
-  then UNIVERSAL
-  else PROD $ delete EMPTY terms
+product = foldl prod' EMPTY >>> \(p :: ADT a) -> case p of
+    PROD x | length x == 1 -> unsafePartial $ AP.head x
+    otherwise -> otherwise
+  where
+  prod' :: ADT a -> ADT a -> ADT a
+  prod' UNIVERSAL _ = UNIVERSAL
+  prod' EMPTY x = x
+  prod' (PROD terms1) (PROD terms2) = PROD (union terms1 terms2)
+  prod' (PROD terms) x = PROD (union terms [x])
+  prod' t1@(ST x) t2@(ST y) = if x == y then t1 else PROD [t1, t2]
+  prod' a b = PROD [a, b]
+
+-- | From two ADTs, compute an ADT that represents their commonality.
+-- | The result is simplified according to these rules:
+-- | SUM [EMPTY, ..] = EMPTY
+-- | SUM [UNIVERSAL, ..] = [..]
+-- | SUM [ST x, SUM [..] ] = SUM [x, ..]
+-- | SUM [SUM [..], SUM[..]] = SUM [.. ..]
+-- | SUM [x, .. x] = SUM[.., x]
+-- | SUM [x] = x
+-- | PRODUCT [UNIVERSAL, ..] = UNIVERSAL
+-- | PRODUCT [EMPTY, ..] = [..]
+-- | PRODUCT [PRODUCT[..], ST x] = PRODUCT[.., x]
+-- | PRODUCT [PRODUCT[..], PRODUCT[..]] = PRODUCT[.. ..]
+-- | PRODUCT [x, .. x] = PRODUCT[.., x]
+-- | PRODUCT [x] = x
+-- intersectionOfADT :: forall a. Eq a => ADT a -> ADT a -> ADT a
+-- -- 5 cases
+-- intersectionOfADT EMPTY _ = EMPTY
+-- -- 5 cases, total is 10
+-- intersectionOfADT UNIVERSAL x = x
+-- -- 1 case, total is 11
+-- intersectionOfADT t@(ST x) (ST y) = if x == y then t else EMPTY
+-- -- 1 case, total is 12
+-- intersectionOfADT (ST x) (SUM terms) = EMPTY
+-- -- 1 case, total is 13
+-- intersectionOfADT t@(ST _) (PROD terms) = if isJust $ elemIndex t terms then t else EMPTY
+-- -- 1 case, total is 14. 2 ST cases missing: ST UNIVERSAL and ST EMPTY. Covered by flip in last case.
+-- intersectionOfADT (PROD terms1) (PROD terms2) = let i = intersect terms1 terms2 in
+--   if null i then EMPTY else (product i)
+-- -- 1 case, total is 15
+-- intersectionOfADT (PROD terms) t2@(SUM _) = if isJust $ elemIndex t2 terms then t2 else EMPTY
+-- -- 1 case, total is 16, 3 PROD cases missing: PROD ST, PROD UNIVERSAL, PROD EMPTY. Covered by flip in last case.
+-- intersectionOfADT (SUM terms1) (SUM terms2) = sum (union terms1 terms2)
+-- -- 4 SUM cases missing, 9 missing in total: SUM ST, SUM PROD, SUM UNIVERSAL, SUM EMPTY. Covered by flip in last case.
+-- intersectionOfADT a b = intersectionOfADT b a
+--
+-- -- | From two ADT's compute an ADT that represents their union
+-- unionOfADT :: forall a. Eq a => ADT a -> ADT a -> ADT a
+-- unionOfADT EMPTY x = x
+-- unionOfADT UNIVERSAL _ = UNIVERSAL
+-- unionOfADT t1@(ST _) t2@(ST _) = product [t1, t2]
+-- unionOfADT t1@(ST _) t2@(SUM _) = product [t1, t2]
+-- unionOfADT t1@(ST _) t2@(PROD _) = product [t2, t1]
+-- unionOfADT t1@(PROD _) t2@(PROD _) = product [t1, t2]
+-- unionOfADT t1@(PROD _) t2@(SUM _) = product [t1, t2]
+
 
 -- | The `Reducible` class implements a pattern to recursively process an ADT.
 class Reducible a b where
