@@ -36,7 +36,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.QueryFunction (QueryFunction)
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
@@ -63,9 +63,9 @@ traverseQfd f q@(BQD dom qf qfd1 qfd2 ran fun man) = do
   f (BQD dom qf qfd1' qfd2' ran fun man)
 traverseQfd f q@(MQD dom qf qfds ran fun man) = traverse (traverseQfd f) qfds >>= \qfds' -> f (MQD dom qf qfds' ran fun man)
 
----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 ---- SELECTING PARTS
----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
 range :: QueryFunctionDescription -> Range
 range (SQD _ _ r _ _) = r
@@ -101,6 +101,21 @@ queryFunction (UQD _ f _ _ _ _) = f
 queryFunction (BQD _ f _ _ _ _ _) = f
 queryFunction (MQD _ f _ _ _ _) = f
 
+-----------------------------------------------------------------------------------------
+---- REPLACE DOMAIN
+-----------------------------------------------------------------------------------------
+replaceDomain :: QueryFunctionDescription -> Domain -> QueryFunctionDescription
+replaceDomain (SQD dom f ran fun man) d = (SQD d f ran fun man)
+replaceDomain (UQD dom f qfd ran fun man) d = (UQD d f (replaceDomain qfd d) ran fun man)
+replaceDomain (BQD dom f qfd1 qfd2 ran fun man) d = case f of
+  (BinaryCombinator FilterF) -> (BQD d f (replaceDomain qfd1 d) qfd2 ran fun man)
+  (BinaryCombinator ComposeF) -> (BQD d f (replaceDomain qfd1 d) qfd2 ran fun man)
+  otherwise -> (BQD d f (replaceDomain qfd1 d) (replaceDomain qfd2 d) ran fun man)
+replaceDomain (MQD dom f qfds ran fun man) d = (MQD d f (flip replaceDomain d <$> qfds) ran fun man)
+-----------------------------------------------------------------------------------------
+---- INSTANCES
+-----------------------------------------------------------------------------------------
+
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
 
 instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where
@@ -120,7 +135,7 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
-data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM RAN.Range (Maybe PropertyType) | ContextKind | RoleKind 
+data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM RAN.Range (Maybe PropertyType) | ContextKind | RoleKind
 
 type Range = Domain
 

@@ -30,7 +30,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range, replaceDomain)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
@@ -107,7 +107,16 @@ invertFunctionDescription_ (SQD dom f ran _ _) = do
 
 invertFunctionDescription_ (UQD dom f qfd1 ran _ _) = invertFunctionDescription_ qfd1
 
-invertFunctionDescription_ (BQD dom (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _)= append <$> invertFunctionDescription_ qfd1 <*> invertFunctionDescription_ qfd2
+invertFunctionDescription_ (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _) =
+  case qfd1 of
+    (BQD _ (BinaryCombinator ConjunctionF) conj1 conj2 _ _ _) -> do
+      conj1' <- invertFunctionDescription_ conj1
+      conj2' <- invertFunctionDescription_ conj2
+      -- replace the domain of qfd2 with the range of conj1' and conj2' respectively.
+      qfd2_1 <- invertFunctionDescription_ (replaceDomain qfd2 (range conj1))
+      qfd2_2 <- invertFunctionDescription_ (replaceDomain qfd2 (range conj2))
+      pure $ sumPaths (append conj1' qfd2_1) (append conj2' qfd2_2)
+    otherwise -> append <$> invertFunctionDescription_ qfd1 <*> invertFunctionDescription_ qfd2
 
 -- At a filter expression, the path splits in two.
 -- One path leads through the source.

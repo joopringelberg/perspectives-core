@@ -39,12 +39,12 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModules (addExternalFunctionForModule, isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.Expression (startOf)
+import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range, roleRange)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range, roleRange, sumOfDomains)
 import Perspectives.Representation.ADT (ADT(..), product)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
@@ -270,6 +270,12 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       f2 <- compileStep (range f1) right
       -- TODO. An optimalisation: if the left or right term is Identity, replace the entire composition by the other term.
       pure $ BQD currentDomain (QF.BinaryCombinator ComposeF) f1 f2 (range f2) (THREE.and (functional f1)(functional f2)) (THREE.and (mandatory f1)(mandatory f2))
+    Join pos -> do
+      f1 <- compileStep currentDomain left
+      f2 <- compileStep currentDomain right
+      case (range f1), (range f2) of
+        (RDOM _), (RDOM _) -> pure $ BQD currentDomain (QF.BinaryCombinator ConjunctionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
+        _, _ -> throwError $ NotARoleDomain currentDomain (startOf left) (endOf right)
 
     otherwise -> do
       f1 <- compileStep currentDomain left
@@ -291,8 +297,9 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         Divide pos -> binOp pos f1 f2 [PNumber] DivideF
         Multiply pos -> binOp pos f1 f2 [PNumber] MultiplyF
 
-        Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
-        Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
+        Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Compose"
+        Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Filter"
+        Join _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Join"
 
         -- >>= is parsed as the operator Sequence.
         -- "sum", "product", "minimum", "maximum" and "count" are parsed as SequenceFunction

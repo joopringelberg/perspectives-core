@@ -143,6 +143,7 @@ data Operator =
   | Multiply ArcPosition
   | Filter ArcPosition
   | Sequence ArcPosition
+  | Join ArcPosition
 
 -- newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Maybe Step}
 
@@ -280,6 +281,7 @@ instance prettyPrintOperator :: PrettyPrint Operator where
   prettyPrint' t (Multiply _) = "Multiply"
   prettyPrint' t (Filter _) = "Filter"
   prettyPrint' t (Sequence _) = "Sequence"
+  prettyPrint' t (Join _) = "Join"
 
 derive instance genericAssignment :: Generic Assignment _
 instance showAssignment :: Show Assignment where show = genericShow
