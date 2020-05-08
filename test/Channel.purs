@@ -13,8 +13,7 @@ import Effect.Class.Console (log, logShow)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes ((##>), (##>>))
 import Perspectives.Couchdb.Databases (addDocument, createDatabase, deleteDatabase, endReplication, getDocument)
-import Perspectives.Instances.Combinators (filter)
-import Perspectives.Instances.ObjectGetters (externalRole, isMe)
+import Perspectives.Instances.ObjectGetters (externalRole)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
@@ -33,7 +32,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Sync.Channel" do
+theSuite = suite "Perspectives.Sync.Channel" do
 
   test "createChannel" $ runP $ withSystem do
     void $ runMonadPerspectivesTransaction createChannel
@@ -70,18 +69,18 @@ theSuite = suiteOnly "Perspectives.Sync.Channel" do
       Nothing -> pure unit
       Just dbname -> deleteDatabase (unwrap dbname)
 
-  testOnly "setMyAddress" $ runP $ withSystem do
+  test "setMyAddress" $ runP $ withSystem do
     achannel <- runMonadPerspectivesTransaction createChannel
     case head achannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
       Just channel -> do
         void $ runMonadPerspectivesTransaction (setMyAddress "localhost" 5984 channel)
-        connectedPartner <- (getRoleFunction "sys:Channel$ConnectedPartner")
-        me <- (channel ##>> filter connectedPartner (lift <<< lift <<< isMe))
-        host <- getPropertyFunction "sys:Channel$ConnectedPartner$Host"
+        getInitiator <- (getRoleFunction "sys:Channel$Initiator")
+        me <- (channel ##>> getInitiator)
+        host <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Host"
         hostValue <- me ##> host
         liftAff $ assert "Host should be 'localhost'" (maybe false ((==) (Value "localhost")) hostValue)
-        port <- getPropertyFunction "sys:Channel$ConnectedPartner$Port"
+        port <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Port"
         portValue <- me ##> port
         liftAff $ assert "Port should be '5984'" (maybe false ((==) (Value "5984")) portValue)
 

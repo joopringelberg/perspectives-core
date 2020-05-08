@@ -128,12 +128,12 @@ getYouFromChannel = do
 setAddress :: Host -> Port -> Array RoleInstance -> MPT Unit
 setAddress host port rl = do
   setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Host") [Value host]
-  setProperty rl (EnumeratedPropertyType "model:System$Channel$UserWithAddress$Port") [Value (show port)]
+  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Port") [Value (show port)]
 
 setRelayAddress :: Host -> Port -> Array RoleInstance -> MPT Unit
 setRelayAddress host port rl = do
-  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Host") [Value host]
-  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Port") [Value (show port)]
+  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$RelayHost") [Value host]
+  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$RelayPort") [Value (show port)]
 
 -- | Regardless whether I am the Initiator or the ConnectedPartner, set my host and port value.
 setMyAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
@@ -175,11 +175,11 @@ setChannelReplication channel = do
         Just you -> do
           -- yourIdentifier
           (RoleInstance userBehindYou) <- you ##>> bottom
-          host <- getPropertyFunction "sys:Channel$ConnectedPartner$Host"
+          host <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Host"
           hostValue <- you ##> host
           case hostValue of
             Nothing -> do
-              relayHost <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayHost"
+              relayHost <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayHost"
               relayHostValue <- you ##> relayHost
               case relayHostValue of
                 Nothing -> pure unit
@@ -189,7 +189,7 @@ setChannelReplication channel = do
                   if myHost == h
                     then pure unit
                     else do
-                      relayPort <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayPort"
+                      relayPort <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayPort"
                       portValue <- you ##> relayPort
                       case portValue of
                         Nothing -> pure unit
@@ -201,7 +201,7 @@ setChannelReplication channel = do
               if myHost == h
                 then pure unit
                 else do
-                  port <- getPropertyFunction "sys:Channel$ConnectedPartner$Port"
+                  port <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Port"
                   portValue <- you ##> port
                   case portValue of
                     Nothing -> pure unit
