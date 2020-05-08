@@ -125,7 +125,7 @@ roleInstancesFromCouchdb roleTypes _ = ArrayT do
 -- | Load the dependencies first.
 -- | Load the acompanying instances, too.
 -- | Notice that the urls should be the full path to the relevant documents.
--- | This function is applied with `callEffect`. Accordingly, it will get the Object of the Action as second parameter.
+-- | This function is applied with `callEffect`. Accordingly, it will get the ContextInstance of the Action as second parameter.
 -- TODO. Authentication at the repository urls.
 addModelToLocalStore :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
 addModelToLocalStore urls r = do

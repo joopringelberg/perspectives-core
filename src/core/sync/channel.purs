@@ -35,13 +35,13 @@ import Foreign.Object (empty, fromFoldable)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, MPT, (##=), (##>), (##>>), type (~~>))
 import Perspectives.Couchdb (selectOnField)
 import Perspectives.Couchdb.Databases (createDatabase, ensureAuthentication, replicateContinuously)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
-import Perspectives.Instances.Combinators (filter)
+import Perspectives.Instances.Combinators (filter, disjunction)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
@@ -49,10 +49,10 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNA
 import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
-import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>))
+import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>), (>>=))
 
 -- | Create a new database for the communication between `me` and another user.
--- | Create an instance of sys:Channel. Bind `me` in the role ConnectedPartner. Set the value of ChannelDatabaseName to
+-- | Create an instance of sys:Channel. Bind `me` in the role Initiator. Set the value of ChannelDatabaseName to
 -- | that of the new database.
 -- | Bind the new Channel to MySystem in the role Channels.
 createChannel :: MonadPerspectivesTransaction ContextInstance
@@ -70,13 +70,13 @@ createChannelContext channelName = do
     { id: "model:User$" <> channelName
     , prototype: Nothing
     , ctype: "sys:Channel"
-    , rollen: fromFoldable [(Tuple "model:System$Channel$ConnectedPartner" $
+    , rollen: fromFoldable [(Tuple "model:System$Channel$Initiator" $
       SNA.singleton (RolSerialization
         { id: Nothing
         , properties: PropertySerialization $ fromFoldable
           [
-            Tuple "model:System$Channel$ConnectedPartner$Host" [host]
-          , Tuple "model:System$Channel$ConnectedPartner$Port" [(show port)]
+            Tuple "model:System$PhysicalContext$UserWithAddress$Host" [host]
+          , Tuple "model:System$PhysicalContext$UserWithAddress$Port" [(show port)]
           ]
         , binding: Just "usr:Me" })
        )]
@@ -95,8 +95,9 @@ createChannelContext channelName = do
           binding: Just (buitenRol $ unwrap channel)})
       pure channel
 
-addUserToChannel :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
-addUserToChannel (RoleInstance usr) (ContextInstance channel) = void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
+-- | Add the second user to the channel: not the Initiator, but the ConnectedPartner.
+addPartnerToChannel :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
+addPartnerToChannel (RoleInstance usr) (ContextInstance channel) = void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
   channel
   (RolSerialization
     { id: Nothing
@@ -106,33 +107,55 @@ addUserToChannel (RoleInstance usr) (ContextInstance channel) = void $ createAnd
 type Host = String
 type Port = Int
 
+-- | Get either the Initiator or the ConnectedPartner - whomever is filled by me.
+getMeFromChannel :: MonadPerspectives (ContextInstance ~~> RoleInstance)
+getMeFromChannel = do
+  getConnectedPartner <- (getRoleFunction "sys:Channel$ConnectedPartner")
+  getInitiator <- (getRoleFunction "sys:Channel$Initiator")
+  pure $ disjunction
+    (filter getConnectedPartner (lift <<< lift <<< isMe))
+    (filter getInitiator (lift <<< lift <<< isMe))
+
+-- | Get either the Initiator or the ConnectedPartner - whomever is NOT filled by me.
+getYouFromChannel :: MonadPerspectives (ContextInstance ~~> RoleInstance)
+getYouFromChannel = do
+  getConnectedPartner <- (getRoleFunction "sys:Channel$ConnectedPartner")
+  getInitiator <- (getRoleFunction "sys:Channel$Initiator")
+  pure $ disjunction
+    (filter getConnectedPartner (lift <<< lift <<< isMe >=> pure <<< not))
+    (filter getInitiator (lift <<< lift <<< isMe >=> pure <<< not))
+
+setAddress :: Host -> Port -> Array RoleInstance -> MPT Unit
+setAddress host port rl = do
+  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Host") [Value host]
+  setProperty rl (EnumeratedPropertyType "model:System$Channel$UserWithAddress$Port") [Value (show port)]
+
+setRelayAddress :: Host -> Port -> Array RoleInstance -> MPT Unit
+setRelayAddress host port rl = do
+  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Host") [Value host]
+  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Port") [Value (show port)]
+
+-- | Regardless whether I am the Initiator or the ConnectedPartner, set my host and port value.
 setMyAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setMyAddress host port channel = do
-  connectedPartner <- lift2 (getRoleFunction "sys:Channel$ConnectedPartner")
-  me <- lift2 (channel ##= filter connectedPartner (lift <<< lift <<< isMe))
-  setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$Host") [Value host]
-  setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$Port") [Value (show port)]
+  g <- lift $ lift getMeFromChannel
+  (lift $ lift (channel ##= g)) >>= setAddress host port
 
+-- | Regardless whether you are the Initiator or the ConnectedPartner, set your host and port value.
 setYourAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
-setYourAddress host port channel =  do
-  connectedPartner <- lift2 (getRoleFunction "sys:Channel$ConnectedPartner")
-  you <- lift2 (channel ##= filter connectedPartner (lift <<< lift <<< isMe >=> pure <<< not))
-  setProperty you (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$Host") [Value host]
-  setProperty you (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$Port") [Value (show port)]
+setYourAddress host port channel = do
+  g <- lift $ lift getYouFromChannel
+  (lift $ lift (channel ##= g)) >>= setAddress host port
 
 setMyRelayAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setMyRelayAddress host port channel = do
-  connectedPartner <- lift2 (getRoleFunction "sys:Channel$ConnectedPartner")
-  me <- lift2 (channel ##= filter connectedPartner (lift <<< lift <<< isMe))
-  setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$RelayHost") [Value host]
-  setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$RelayPort") [Value (show port)]
+  g <- lift $ lift getMeFromChannel
+  (lift $ lift (channel ##= g)) >>= setRelayAddress host port
 
 setYourRelayAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setYourRelayAddress host port channel = do
-  connectedPartner <- lift2 (getRoleFunction "sys:Channel$ConnectedPartner")
-  me <- lift2 (channel ##= filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not)))
-  setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$RelayHost") [Value host]
-  setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$RelayPort") [Value (show port)]
+  g <- lift $ lift getYouFromChannel
+  (lift $ lift (channel ##= g)) >>= setRelayAddress host port
 
 -- | For a channel, set the replication of the local copy to the database found at either Host or RelayHost.
 -- | If host and port are equal for both partners, do not set replication.

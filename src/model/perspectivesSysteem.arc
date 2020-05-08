@@ -23,8 +23,8 @@ domain: System
     user: User (mandatory, functional)
       property: Achternaam (mandatory, not functional, String)
       property: Voornaam (mandatory, not functional, String)
-      -- LET OP: dit zijn er dus heel veel!
-      property: Channel = binder ConnectedPartner >> context >> extern >> ChannelDatabaseName
+      -- LET OP: dit zijn er dus heel veel! En tegelijk zijn het alleen de kanalen waar je zelf de initiatiefnemer bent.
+      property: Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       indexed: sys:Me
       view: VolledigeNaam (Voornaam, Achternaam)
       perspective on: User
@@ -51,21 +51,29 @@ domain: System
     -- On moving a model to ModelsInUse for the second time, the bot with the perspective on UnloadedModel will not work. We need a third rule for that.
     context: UnconnectedIndexedContext = (filter ModelsInUse >> binding with available context) >> filter (context >> IndexedContext >> binding) with not exists binder IndexedContexts
 
-  -- A Channel is shared by just two users.
-  case: Channel
-    external:
-      property: ChannelDatabaseName (mandatory, functional, String)
-    user: ConnectedPartner filledBy: sys:PerspectivesSystem$User
-      -- The public URL of the PDR of the partner.
+  case: PhysicalContext
+    user: UserWithAddress
+      -- The public URL of the PDR of the UserWithAddress.
       property: Host (not mandatory, functional, String)
       -- The port where Couchdb listens.
       property: Port (not mandatory, functional, Number)
-      -- The public URL of the RelayServer of the partner
+      -- The public URL of the RelayServer of the UserWithAddress
       property: RelayHost (not mandatory, functional, String)
       -- The port where Couchdb listens on the RelayServer.
       property: RelayPort (not mandatory, functional, String)
 
+  -- A Channel is shared by just two users.
+  case: Channel
+    external:
+      property: ChannelDatabaseName (mandatory, functional, String)
+    aspect: sys:PhysicalContext
+    user: Initiator filledBy: sys:PerspectivesSystem$User
+      aspect: sys:PhysicalContext$UserWithAddress
       perspective on: ConnectedPartner
+    user: ConnectedPartner filledBy: sys:PerspectivesSystem$User
+      -- The public URL of the PDR of the partner.
+      aspect: sys:PhysicalContext$UserWithAddress
+      perspective on: Initiator
 
   case: Model
     external:
@@ -89,10 +97,15 @@ domain: System
     user: Guest = sys:Me
     user: Invitee (mandatory, functional) filledBy: Guest
       perspective on: Inviter
-      perspective on: Channel
+      perspective on: PrivateChannel
+      -- Invitee needs to see the Channel's Initiator in order to access Host and Port.
+      perspective on: ChannelInitiator
+    user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
     bot: for Inviter
       perspective on: External
         if extern >> IWantToInviteAnUnconnectedUser then
+          -- Creates a Channel, binds it to PrivateChannel.
+          callEffect ser:AddChannel()
           SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
-    thing: Channel (not mandatory, functional) filledBy: Channel
+    context: PrivateChannel (not mandatory, functional) filledBy: Channel

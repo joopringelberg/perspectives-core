@@ -22,7 +22,7 @@
 module Perspectives.Instances.SerialiseAsJson where
 
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
-import Control.Plus (empty)
+import Control.Plus (empty, void)
 import Data.Array (null)
 import Data.Array (singleton) as ARR
 import Data.Array.NonEmpty (fromArray)
@@ -38,16 +38,18 @@ import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.CollectAffectedContexts (userHasNoPerspectiveOnRoleInstance)
-import Perspectives.CoreTypes (MonadPerspectives, MPQ, (###>>), (##>>))
+import Perspectives.CoreTypes (MPQ, MonadPerspectives, MPT, (###>>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (deconstructBuitenRol)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
+import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (bottom, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value(..), externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
+import Perspectives.Sync.Channel (createChannel)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
 import Prelude (Unit, bind, discard, map, pure, unit, when, ($), (<$>), (<<<), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
@@ -143,9 +145,18 @@ serialiseAsJsonFor_ cid userId userType = do
         , externeProperties: PropertySerialization OBJ.empty
         }]
 
+-- | This function expects an instance of type sys:Invitation, creates a channel and binds it to the Invitation
+-- | in the role PrivateChannel.
+addChannel :: ContextInstance -> MPT Unit
+addChannel invitation = createChannel >>= \channel -> void $ createAndAddRoleInstance
+  (EnumeratedRoleType "model:System$Invitation$PrivateChannel")
+  (unwrap invitation)
+  (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model:Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1}
+  , Tuple "model:Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0}
   ]
