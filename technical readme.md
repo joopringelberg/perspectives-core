@@ -11,9 +11,24 @@ Clients communicate with the core on both channels using exactly the same protoc
 Follow these steps to start developing.
 
 1. Clone this repository.
-2. Install [Purescript](http://www.purescript.org).
-3. Install [psc-package](https://github.com/purescript/psc-package)
-4. Install [pulp](https://github.com/purescript-contrib/pulp)
+2. Install [Purescript](http://www.purescript.org) version 0.12.5.
+
+```
+npm install -g purescript@0.12.5
+```
+
+3. Install [psc-package](https://github.com/purescript/psc-package) version 0.5.1
+
+```
+npm install -g psc-package@0.5.1
+```
+
+4. Install [pulp](https://github.com/purescript-contrib/pulp) version 12.2.0.
+
+```
+npm install -g pulp@12.2.0
+```
+
 5. Install [Webpack](https://webpack.js.org/)
 5. To install the purescript dependencies, run:
 
