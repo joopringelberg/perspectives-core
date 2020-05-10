@@ -227,21 +227,12 @@ qualifyContextInDomain localName namespace = ArrayT do
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A ROLETYPE
 ----------------------------------------------------------------------------------------
--- | <userRole> `hasPerspectiveOnRole` <RoleType>
--- | True iff the userRole or one of its aspects has an Action with RoleType as object.
--- hasPerspectiveOnRole :: RoleType -> RoleType ~~~> Boolean
--- hasPerspectiveOnRole userRole' rt = (lift $ typeIncludingAspects userRole') >>= lift <<< actionSet >>= hasElementM g
---   where
---     g = lift <<< getAction >=> pure <<< providesPerspectiveOnRole rt
-
 hasPerspectiveOnRole :: RoleType -> RoleType ~~~> Boolean
 hasPerspectiveOnRole ur (ENR rt@(EnumeratedRoleType _)) = do
   EnumeratedRole{onContextDelta_context, onContextDelta_role, onRoleDelta_binder, onRoleDelta_binding} <- lift $ getEnumeratedRole rt
   b <- pure $ isJust $ elemIndex ur (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role <> onRoleDelta_binder <> onRoleDelta_binding)))
   log $ show ur <> " hasPerspectiveOnRole " <> show rt <> " = " <> show b
   pure b
-
-  -- (lift $ getEnumeratedRole rt) >>= \(EnumeratedRole{onContextDelta_context, onContextDelta_role}) -> pure $ isJust $ elemIndex ur (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role)))
 
 hasPerspectiveOnRole _ _ = pure false
 
@@ -251,7 +242,14 @@ roleIsInPerspectiveOf = flip hasPerspectiveOnRole
 
 -- | In a Context type, find all user roles that have a perspective on a given RoleType.
 rolesWithPerspectiveOnRole :: RoleType -> ContextType ~~~> RoleType
-rolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (roleIsInPerspectiveOf rt)
+rolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (roleIsInPerspectiveOfLocalUser rt)
+  where
+  -- | <RoleType> `roleIsInPerspectiveOfLocalUser` <userRole>
+  -- | True iff the userRole or one of its aspects has an Action with RoleType as object.
+  roleIsInPerspectiveOfLocalUser :: RoleType -> RoleType ~~~> Boolean
+  roleIsInPerspectiveOfLocalUser rt' userRole' = (lift $ typeIncludingAspects userRole') >>= lift <<< actionSet >>= hasElementM g
+    where
+      g = lift <<< getAction >=> pure <<< providesPerspectiveOnRole rt'
 
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A PROPERTYTYPE
