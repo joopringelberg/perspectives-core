@@ -40,14 +40,15 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, providesPerspectiveOnRole)
-import Perspectives.Representation.Class.PersistentType (getAction, getContext, getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (getAction, getContext, getEnumeratedProperty, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, getRole, greaterThanOrEqualTo, propertiesOfADT, roleAspects, roleAspectsBindingADT, roleSet, typeIncludingAspects, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextAspectsADT)
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), hasElementM)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (propertyReferences)
 import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>), (<$>), discard)
 
@@ -230,9 +231,7 @@ qualifyContextInDomain localName namespace = ArrayT do
 hasPerspectiveOnRole :: RoleType -> RoleType ~~~> Boolean
 hasPerspectiveOnRole ur (ENR rt@(EnumeratedRoleType _)) = do
   EnumeratedRole{onContextDelta_context, onContextDelta_role, onRoleDelta_binder, onRoleDelta_binding} <- lift $ getEnumeratedRole rt
-  b <- pure $ isJust $ elemIndex ur (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role <> onRoleDelta_binder <> onRoleDelta_binding)))
-  log $ show ur <> " hasPerspectiveOnRole " <> show rt <> " = " <> show b
-  pure b
+  pure $ isJust $ elemIndex ur (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role <> onRoleDelta_binder <> onRoleDelta_binding)))
 
 hasPerspectiveOnRole _ _ = pure false
 
@@ -254,15 +253,20 @@ rolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (roleIsInPerspect
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A PROPERTYTYPE
 ----------------------------------------------------------------------------------------
--- TODO. Schrijf net zoals hasPerspectiveOnRole.
 hasPerspectiveOnProperty :: RoleType -> PropertyType ~~~> Boolean
-hasPerspectiveOnProperty userRole' rt = (lift $ typeIncludingAspects userRole') >>= lift <<< actionSet >>= hasElementM g
-  where
-    g = lift <<< getAction >=> lift <<< providesPerspectiveOnProperty rt
+hasPerspectiveOnProperty userRole' (ENP pt@(EnumeratedPropertyType _)) = do
+  EnumeratedProperty{onPropertyDelta} <- lift $ getEnumeratedProperty pt
+  pure $ isJust $ elemIndex userRole' (join (_.userTypes <<< unwrap <$> onPropertyDelta))
+hasPerspectiveOnProperty _ _ = pure false
 
 -- | <RoleType> `propertyIsInPerspectiveOf` <userRole>
 propertyIsInPerspectiveOf :: PropertyType -> RoleType ~~~> Boolean
 propertyIsInPerspectiveOf = flip hasPerspectiveOnProperty
 
 rolesWithPerspectiveOnProperty :: PropertyType -> ContextType ~~~> RoleType
-rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiveOf pt)
+rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiveOfLocalUser pt)
+  where
+    propertyIsInPerspectiveOfLocalUser :: PropertyType -> RoleType ~~~> Boolean
+    propertyIsInPerspectiveOfLocalUser rt userRole' = (lift $ typeIncludingAspects userRole') >>= lift <<< actionSet >>= hasElementM g
+      where
+        g = lift <<< getAction >=> lift <<< providesPerspectiveOnProperty rt
