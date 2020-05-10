@@ -35,6 +35,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -45,6 +46,7 @@ import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 newtype InvertedQuery = InvertedQuery {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction), userTypes :: Array RoleType}
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _
+derive instance newtypeInvertedQuery :: Newtype InvertedQuery _
 
 instance showInvertedQuery :: Show InvertedQuery where
   show = genericShow

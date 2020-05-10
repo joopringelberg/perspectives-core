@@ -24,9 +24,10 @@ module Perspectives.Types.ObjectGetters where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (filter, find, findIndex, singleton)
+import Data.Array (elemIndex, filter, find, findIndex, singleton)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (keys, values)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=))
@@ -43,11 +44,12 @@ import Perspectives.Representation.Class.PersistentType (getAction, getContext, 
 import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, getRole, greaterThanOrEqualTo, propertiesOfADT, roleAspects, roleAspectsBindingADT, roleSet, typeIncludingAspects, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextAspectsADT)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), hasElementM)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>), (<$>), discard)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -227,10 +229,21 @@ qualifyContextInDomain localName namespace = ArrayT do
 ----------------------------------------------------------------------------------------
 -- | <userRole> `hasPerspectiveOnRole` <RoleType>
 -- | True iff the userRole or one of its aspects has an Action with RoleType as object.
+-- hasPerspectiveOnRole :: RoleType -> RoleType ~~~> Boolean
+-- hasPerspectiveOnRole userRole' rt = (lift $ typeIncludingAspects userRole') >>= lift <<< actionSet >>= hasElementM g
+--   where
+--     g = lift <<< getAction >=> pure <<< providesPerspectiveOnRole rt
+
 hasPerspectiveOnRole :: RoleType -> RoleType ~~~> Boolean
-hasPerspectiveOnRole userRole' rt = (lift $ typeIncludingAspects userRole') >>= lift <<< actionSet >>= hasElementM g
-  where
-    g = lift <<< getAction >=> pure <<< providesPerspectiveOnRole rt
+hasPerspectiveOnRole ur (ENR rt@(EnumeratedRoleType _)) = do
+  EnumeratedRole{onContextDelta_context, onContextDelta_role, onRoleDelta_binder, onRoleDelta_binding} <- lift $ getEnumeratedRole rt
+  b <- pure $ isJust $ elemIndex ur (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role <> onRoleDelta_binder <> onRoleDelta_binding)))
+  log $ show ur <> " hasPerspectiveOnRole " <> show rt <> " = " <> show b
+  pure b
+
+  -- (lift $ getEnumeratedRole rt) >>= \(EnumeratedRole{onContextDelta_context, onContextDelta_role}) -> pure $ isJust $ elemIndex ur (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role)))
+
+hasPerspectiveOnRole _ _ = pure false
 
 -- | <RoleType> `roleIsInPerspectiveOf` <userRole>
 roleIsInPerspectiveOf :: RoleType -> RoleType ~~~> Boolean
@@ -243,6 +256,7 @@ rolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (roleIsInPerspect
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A PROPERTYTYPE
 ----------------------------------------------------------------------------------------
+-- TODO. Schrijf net zoals hasPerspectiveOnRole.
 hasPerspectiveOnProperty :: RoleType -> PropertyType ~~~> Boolean
 hasPerspectiveOnProperty userRole' rt = (lift $ typeIncludingAspects userRole') >>= lift <<< actionSet >>= hasElementM g
   where
