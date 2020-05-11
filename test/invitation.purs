@@ -35,10 +35,10 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Invitation" do
+theSuite = suiteOnly "Invitation" do
 
-  test "Bot serialises invitation" $ runP $ withModel_ (DomeinFileId "model:System") false do
-  -- testOnly "Bot serialises invitation" $ runP $ withSystem do
+  -- testOnly "Bot serialises invitation" $ runP $ withModel_ (DomeinFileId "model:System") false do
+  testOnly "Bot serialises invitation" $ runP $ withSystem do
     addAllExternalFunctions
     -- Create an Invitation instance with an Inviter
     errs <- loadAndSaveCrlFile "invitation.crl" testDirectory
@@ -48,7 +48,6 @@ theSuite = suite "Invitation" do
       Just e -> liftAff $ assert (show errs) false
       Nothing -> do
         -- Set its IWantToInviteAnUnconnectedUser to true
-        -- Hieronder gaat het fout
         void $ runMonadPerspectivesTransaction $ setProperty [RoleInstance $ buitenRol "model:User$MyInvitation"] (EnumeratedPropertyType inviteProp) [Value "true"]
         getter <- getPropertyFunction serialisedProp
         -- Get its SerialisedInvitation

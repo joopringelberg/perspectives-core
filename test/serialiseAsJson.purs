@@ -46,15 +46,14 @@ theSuite = suite "Perspectives.Instances.SerialiseAsJson" do
         void $ loadAndCacheCrlFile "userJoop.crl" testDirectory
         void $ runSterileTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
         -- Serialise as JSON
-        -- Get one of the roles
         partners <- channel ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
         case head partners of
-          Nothing -> liftAff $ assert "There should be two ConnectedPartners in the Channel instance" false
+          Nothing -> liftAff $ assert "There should be a ConnectedPartner in the Channel instance" false
           Just p -> do
             (channelSerialiation :: Array ContextSerialization) <- serialiseAsJsonFor p channel
             log $ unsafeStringify channelSerialiation
             -- log $ "\n" <> (prettyPrint channelSerialiation)
-            liftAff $ assert "The context 'model:User$joop' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$joop") channelSerialiation)
+            liftAff $ assert "The context 'model:User$test' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$test") channelSerialiation)
             liftAff $ assert "The context 'model:User$MyTestChannel' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$MyTestChannel") channelSerialiation)
             encodedChannelSerialization <- pure $ encode channelSerialiation
             case unwrap $ runExceptT (decode encodedChannelSerialization) of

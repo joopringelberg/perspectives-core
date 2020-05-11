@@ -324,10 +324,9 @@ qualifyViewReferences = do
 inverseBindings :: PhaseThree Unit
 inverseBindings = throwError (Custom "Implement inverseBindings")
 
--- | For each EnumeratedRole R in the model, add three InvertedQueries to make deltas
--- | available for User Roles in the context of R that have a Perspective on R.
--- | The query is tailored to add InvertedQueries for ContextDeltas,
--- | RoleBindingDeltas and PropertyDeltas.
+-- | For each EnumeratedRole R in the model, add InvertedQueries to make deltas
+-- | available to User Roles in the context of R that have a Perspective on R.
+-- | For an explanation, see https://joopringelberg.github.io/perspectives-documentation/Perspectives%20on%20bindings.pdf
 invertedQueriesForLocalRolesAndProperties :: PhaseThree Unit
 invertedQueriesForLocalRolesAndProperties = do
   df@{_id} <- lift $ gets _.dfr

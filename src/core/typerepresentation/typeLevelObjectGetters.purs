@@ -239,7 +239,7 @@ hasPerspectiveOnRole _ _ = pure false
 roleIsInPerspectiveOf :: RoleType -> RoleType ~~~> Boolean
 roleIsInPerspectiveOf = flip hasPerspectiveOnRole
 
--- | In a Context type, find all user roles that have a perspective on a given RoleType.
+-- | In a Context type, find all enumerated local user roles that have a perspective on a given RoleType.
 rolesWithPerspectiveOnRole :: RoleType -> ContextType ~~~> RoleType
 rolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (roleIsInPerspectiveOfLocalUser rt)
   where
