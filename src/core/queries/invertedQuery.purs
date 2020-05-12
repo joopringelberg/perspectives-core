@@ -31,13 +31,15 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
+import Data.Array (cons, findIndex, modifyAt, union)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.TypeIdentifiers (RoleType)
@@ -62,3 +64,14 @@ instance decodeInvertedQuery :: Decode InvertedQuery where
 
 instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
   prettyPrint' t (InvertedQuery{description, userTypes}) = "InvertedQuery " <> prettyPrint' (t <> "  ") description <> show userTypes
+
+equalDescriptions :: InvertedQuery -> InvertedQuery -> Boolean
+equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}) = d1 == d2
+
+addUserTypes :: Array RoleType -> InvertedQuery -> InvertedQuery
+addUserTypes t (InvertedQuery r@{userTypes}) = InvertedQuery r {userTypes = union userTypes t}
+
+addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
+addInvertedQuery q@(InvertedQuery{userTypes}) qs = case findIndex (equalDescriptions q) qs of
+  Nothing -> cons q qs
+  Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes userTypes) qs
