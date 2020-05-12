@@ -31,7 +31,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, filter, filterA, foldM, head, length, null, reverse, uncons)
+import Data.Array (filter, filterA, foldM, head, length, null, reverse, uncons)
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -42,7 +42,6 @@ import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log, logShow)
 import Foreign.Object (insert, keys, lookup, unions, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
@@ -51,10 +50,10 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContext
 import Perspectives.External.CoreModules (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
-import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Parsing.Arc.InvertQueriesForBindings (hasAccessToPropertiesOf, setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -71,15 +70,14 @@ import Perspectives.Representation.Class.Property (range) as PT
 import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, getCalculation, getRole, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Class.Role (contextOfRepresentation, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
-import Prelude (Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=), (>))
+import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -338,47 +336,12 @@ invertedQueriesForLocalRolesAndProperties = do
     invertedQueriesForLocalRolesAndProperties' :: DomeinFileRecord -> PhaseThree Unit
     invertedQueriesForLocalRolesAndProperties' {enumeratedRoles, enumeratedProperties} = do
       for_ enumeratedRoles
-        (\(EnumeratedRole rr@{_id, context, binding, onContextDelta_context, onRoleDelta_binding}) -> do
-          userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
-          if null userTypes
-            then pure unit
-            else do
-              -- In order to handle a mutation of the instances of a role, we add an InvertedQuery that
-              -- will be applied to the role-instance in the ContextDelta that describes that change.
-              -- It should result in the context-instance. We give it the user types with a perspective on the
-              -- role type.
-              contextQuery <- pure $
-                InvertedQuery
-                  { description: (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) Unknown Unknown)
-                  , compilation: Nothing
-                  , userTypes
-                  }
-              -- The same InvertedQuery can be used to apply to the RoleBindingDelta that describes a change
-              -- to the binding of a role instance!
-              modifyDF (\df@{enumeratedRoles:roles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr
-                { onContextDelta_context = cons contextQuery onContextDelta_context
-                , onRoleDelta_binding = cons contextQuery onRoleDelta_binding}) roles})
-        )
-      for_ enumeratedProperties
-        (\(EnumeratedProperty pr@{_id, role, onPropertyDelta, range}) -> do
-          roleContext <- (lift $ lift $ getEnumeratedRole role) >>= pure <<< _.context <<< unwrap
-          (userTypes :: Array RoleType) <- lift $ lift (roleContext ###= rolesWithPerspectiveOnProperty (ENP _id))
-          if null userTypes
-            then pure unit
-            else do
-              -- In order to handle a mutation of the values of a Property on a role instance, we add an InvertedQuery
-              -- that will be applied to the role-instance in the PropertyDelta that describes the change.
-              -- It should result in the context instance of the role instance.
-              -- Again, we can make do with the same query that takes the context of the role instance.
-              -- This time however, we should just add user role types that have a perspective on the Property.
-              contextQuery <- pure $
-                InvertedQuery
-                  { description: (SQD (RDOM (ST role)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST roleContext)) Unknown Unknown)
-                  , compilation: Nothing
-                  , userTypes
-                  }
-              modifyDF (\df@{enumeratedProperties:properties} -> df {enumeratedProperties = insert (unwrap _id) (EnumeratedProperty pr {onPropertyDelta = cons contextQuery onPropertyDelta}) properties})
-        )
+        \(EnumeratedRole {_id, context, mandatory}) -> do
+          (userTypes :: Array RoleType) <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
+          qfd <- pure $ (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory))
+          for_ userTypes \user -> do
+            props <- lift $ lift (user `hasAccessToPropertiesOf` (ENR _id))
+            setInvertedQueriesForUserAndRole user (ST _id) props qfd
 
 -- | The calculation of a CalculatedRole or a CalculatedProperty are both expressions. This function compiles the
 -- | parser AST output that represents these expressions to QueryFunctionDescriptions.

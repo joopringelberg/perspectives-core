@@ -19,15 +19,27 @@
 
 -- END LICENSE
 
+-- | The properties of a Role’s binding are as accessible as if they were the Role’s own
+-- | properties. The modeller may add a View to an Action that includes any of these binding
+-- | properties. And this applies to the binding of the binding, recursively.
+-- |
+-- | This module addresses the issue: how do we make sure that changes to such properties are
+-- | distributed properly?
+-- |
+-- | For an explanatory text, see: https://joopringelberg.github.io/perspectives-documentation/Perspectives%20on%20bindings.pdf
+
 module Perspectives.Parsing.Arc.InvertQueriesForBindings where
 
 import Prelude
 
 import Control.Plus (empty)
-import Data.Array (catMaybes, elemIndex, null, cons, filterA)
+import Data.Array (catMaybes, cons, elemIndex, filterA, foldMap, null)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust, maybe)
-import Data.Newtype (unwrap)
+import Data.Monoid.Conj (Conj(..))
+import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (ala, unwrap)
+import Data.Traversable (traverse)
 import Foreign.Object (lookup, insert)
 import Perspectives.CoreTypes (type (~~~>), MP, (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -48,6 +60,9 @@ import Perspectives.Representation.ThreeValuedLogic (bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 
+-- | For a User RoleType, and an ADT EnumeratedRoleType that represents the Object of a Perspective,
+-- | construct and distribute InvertedQueries that ensure that this User is notified of changes to the role,
+-- | its binding and its properties, recursively.
 setInvertedQueriesForUserAndRole :: RoleType -> ADT EnumeratedRoleType -> RelevantProperties -> QueryFunctionDescription -> PhaseThree Boolean
 setInvertedQueriesForUserAndRole user (ST role) props invertedQ = case props of
   All -> do
@@ -120,6 +135,19 @@ setInvertedQueriesForUserAndRole user (ST role) props invertedQ = case props of
     isPropertyOfRole :: EnumeratedPropertyType -> MP Boolean
     isPropertyOfRole p = propertySet (ST role) >>= \ps -> pure $ isElementOf (ENP p) ps
 
+setInvertedQueriesForUserAndRole user (PROD terms) props invertedQ = do
+  x <- traverse
+    (\t -> setInvertedQueriesForUserAndRole user t props invertedQ)
+    terms
+  pure $ ala Conj foldMap x
+
+setInvertedQueriesForUserAndRole user (SUM terms) props invertedQ = do
+  x <- traverse
+    (\t -> setInvertedQueriesForUserAndRole user t props invertedQ)
+    terms
+  pure $ ala Disj foldMap x
+
+-- This handles the EMPTY and UNIVERSAL case.
 setInvertedQueriesForUserAndRole user _ props invertedQ = pure false
 
 data RelevantProperties = All | Properties (Array EnumeratedPropertyType)
