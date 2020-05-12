@@ -14,7 +14,8 @@ import Foreign (MultipleErrors)
 import Foreign.Class (decode)
 import Perspectives.ApiTypes (ContextSerialization(..))
 import Perspectives.Assignment.Update (setProperty)
-import Perspectives.CoreTypes ((##=))
+import Perspectives.CoreTypes ((##=), (##>))
+import Perspectives.Couchdb.Databases (deleteDatabase)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (buitenRol)
@@ -35,10 +36,10 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Invitation" do
+theSuite = suite "Invitation" do
 
   -- testOnly "Bot serialises invitation" $ runP $ withModel_ (DomeinFileId "model:System") false do
-  testOnly "Bot serialises invitation" $ runP $ withSystem do
+  test "Bot serialises invitation" $ runP $ withSystem do
     addAllExternalFunctions
     -- Create an Invitation instance with an Inviter
     errs <- loadAndSaveCrlFile "invitation.crl" testDirectory
@@ -62,6 +63,12 @@ theSuite = suiteOnly "Invitation" do
                 case find (\(ContextSerialization{id}) -> id == "model:User$MyInvitation") deserialised of
                   Nothing -> liftAff $ assert "There should have been an instance named model:User$MyInvitation" false
                   otherwise -> pure unit
+        getChannelId <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
+        mchannel <- (RoleInstance "model:User$test$User") ##> getChannelId
+        case mchannel of
+          Nothing -> pure unit
+          Just (Value channelId) -> deleteDatabase channelId
+
 
   test "Bot serialises Chat" $ runP $ withSimpleChat do
     addAllExternalFunctions
@@ -86,5 +93,9 @@ theSuite = suiteOnly "Invitation" do
               Right (deserialised :: Array ContextSerialization) ->
                 case find (\(ContextSerialization{id}) -> id == "model:User$MyChatInvitation") deserialised of
                   Nothing -> liftAff $ assert "There should have been an instance named model:User$MyChatInvitation" false
-                  -- Nothing -> log "There should have been an instance named model:User$MyChatInvitation"
                   otherwise -> pure unit
+        getChannelId <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
+        mchannel <- (RoleInstance "model:User$test$User") ##> getChannelId
+        case mchannel of
+          Nothing -> pure unit
+          Just (Value channelId) -> deleteDatabase channelId
