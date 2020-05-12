@@ -28,10 +28,10 @@ import Affjax.RequestBody (string) as RequestBody
 import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.AvarMonadAsk (modify) as AMA
 import Control.Monad.Error.Class (catchError, throwError)
-import Control.Monad.State (StateT, execStateT, modify)
+import Control.Monad.State (State, StateT, execState, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
-import Data.Array (elemIndex, head)
+import Data.Array (cons, elemIndex, head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -58,7 +58,7 @@ import Perspectives.Couchdb (DocWithAttachmentInfo(..), PutCouchdbDocument, onAc
 import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, defaultPerspectRequest, documentNamesInDatabase, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, SeparateInvertedQuery(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
@@ -66,9 +66,11 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier)
-import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
+import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier)
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.User (getSystemIdentifier)
 import Prelude (Unit, append, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
@@ -143,7 +145,7 @@ addModelToLocalStore urls r = do
                 -- Retrieve the DomeinFile from the URL.
               (rq :: (Request String)) <- lift $ lift $ defaultPerspectRequest
               res <- liftAff $ request $ rq {url = url}
-              df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels}) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
+              df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels, invertedQueriesInOtherDomains}) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
                 (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
               repositoryUrl <- lift2 $ repository url
               addModelToLocalStore (append repositoryUrl <<< unwrap <$> referredModels) r
@@ -151,8 +153,6 @@ addModelToLocalStore urls r = do
               -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
               -- not the local perspect_models.
               save (identifier df :: DomeinFileId) (changeRevision Nothing df)
-              -- Copy the attachment
-              lift $ lift $ addA url _id
 
               -- Add replacements to PerspectivesState for the new indexed names introduced in this model.
               (iroles :: Object RoleInstance) <- pure $ fromFoldable $ (\iRole -> Tuple (unwrap iRole) (RoleInstance ("model:User$" <> show (guid unit)))) <$> indexedRoles
@@ -195,6 +195,52 @@ addModelToLocalStore urls r = do
                         lift2 $ void $ saveEntiteit newBindingId
                         -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
                         -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
+
+              -- Distribute the SeparateInvertedQueries over the other domains.
+              forWithIndex_ invertedQueriesInOtherDomains
+                \domainName queries -> do
+                  DomeinFile dfr <- lift2 $ getDomeinFile (DomeinFileId domainName)
+                  lift2 (saveEntiteit_ (DomeinFileId domainName) (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+                  
+              -- Copy the attachment
+              lift $ lift $ addA url _id
+      where
+
+        addInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
+        addInvertedQuery (OnContextDelta_context typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+          case lookup typeName enumeratedRoles of
+            -- It should be there! But it seems possible that the author of this model removed typeName
+            -- after the author of the imported model referenced it.
+            Nothing -> dfr
+            Just (EnumeratedRole rr@{onContextDelta_context}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_context = cons invertedQuery onContextDelta_context}) enumeratedRoles}
+
+        addInvertedQuery (OnContextDelta_role typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+          case lookup typeName enumeratedRoles of
+            -- It should be there! But it seems possible that the author of this model removed typeName
+            -- after the author of the imported model referenced it.
+            Nothing -> dfr
+            Just (EnumeratedRole rr@{onContextDelta_role}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_role = cons invertedQuery onContextDelta_role}) enumeratedRoles}
+
+        addInvertedQuery (OnRoleDelta_binder typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+          case lookup typeName enumeratedRoles of
+            -- It should be there! But it seems possible that the author of this model removed typeName
+            -- after the author of the imported model referenced it.
+            Nothing -> dfr
+            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binder = cons invertedQuery onRoleDelta_binder}) enumeratedRoles}
+
+        addInvertedQuery (OnRoleDelta_binding typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+          case lookup typeName enumeratedRoles of
+            -- It should be there! But it seems possible that the author of this model removed typeName
+            -- after the author of the imported model referenced it.
+            Nothing -> dfr
+            Just (EnumeratedRole rr@{onRoleDelta_binding}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binding = cons invertedQuery onRoleDelta_binding}) enumeratedRoles}
+
+        addInvertedQuery (OnPropertyDelta typeName invertedQuery) = void $ modify \dfr@{enumeratedProperties} ->
+          case lookup typeName enumeratedProperties of
+            -- It should be there! But it seems possible that the author of this model removed typeName
+            -- after the author of the imported model referenced it.
+            Nothing -> dfr
+            Just (EnumeratedProperty rr@{onPropertyDelta}) -> dfr {enumeratedProperties = insert typeName (EnumeratedProperty rr {onPropertyDelta = cons invertedQuery onPropertyDelta}) enumeratedProperties}
 
     -- Sets the `me` property on the role instances. Detects the ultimate bottom case: the user instance of sys:PerspectivesSystem. Note that model user instances should never comprise particular other users!
     saveRoleInstances :: Object PerspectRol -> StateT (Object PerspectContext) MonadPerspectives Unit

@@ -28,6 +28,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
@@ -90,7 +91,10 @@ setInvertedQueries userTypes qfd = do
     setPathForStep (SQD dom qf ran _ _) path = case qf of
       QF.Value2Role pt -> case pt of
         ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
-          Nothing -> dfr
+          Nothing -> addInvertedQueryForDomain (unwrap p)
+            (InvertedQuery {description: path, compilation: Nothing, userTypes})
+            OnPropertyDelta
+            dfr
           Just ep -> dfr {enumeratedProperties = insert (unwrap p) (addPathToProperty ep path) enumeratedProperties}
         -- CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in invertFunctionDescription."
         CP _ -> pure unit
@@ -98,7 +102,10 @@ setInvertedQueries userTypes qfd = do
       QF.DataTypeGetterWithParameter QF.GetRoleBindersF enr -> modifyDF \dfr@{enumeratedRoles} -> let
         roleName = unwrap $ unsafePartial $ domain2RoleType dom
         in case lookup roleName  enumeratedRoles of
-          Nothing -> dfr
+          Nothing -> addInvertedQueryForDomain roleName
+            (InvertedQuery {description: path, compilation: Nothing, userTypes})
+            OnRoleDelta_binder
+            dfr
           Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en path) enumeratedRoles}
 
       QF.DataTypeGetter QF.BindingF -> modifyDF \dfr@{enumeratedRoles} -> case dom of
@@ -106,25 +113,37 @@ setInvertedQueries userTypes qfd = do
         otherwise -> let
           roleName = unwrap $ unsafePartial $ domain2RoleType dom
           in case lookup roleName  enumeratedRoles of
-            Nothing -> dfr
+            Nothing -> addInvertedQueryForDomain roleName
+              (InvertedQuery {description: path, compilation: Nothing, userTypes})
+              OnRoleDelta_binding
+              dfr
             Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en path) enumeratedRoles}
 
       QF.RolGetter roleType -> case roleType of
         ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> case lookup roleName enumeratedRoles of
-          Nothing -> dfr
+          Nothing -> addInvertedQueryForDomain roleName
+            (InvertedQuery {description: path, compilation: Nothing, userTypes})
+            OnContextDelta_role
+            dfr
           Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_role en path) enumeratedRoles}
         CR _ -> throwError $ Custom "Implement the handling of Calculated Roles in invertFunctionDescription."
 
       QF.DataTypeGetter QF.ContextF->  modifyDF \dfr@{enumeratedRoles} -> let
         roleName = unwrap $ unsafePartial $ domain2RoleType dom
         in case lookup roleName  enumeratedRoles of
-          Nothing -> dfr
+          Nothing -> addInvertedQueryForDomain roleName
+            (InvertedQuery {description: path, compilation: Nothing, userTypes})
+            OnContextDelta_context
+            dfr
           Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_context en path) enumeratedRoles}
 
       -- Apply addPathToOnContextDelta_role to the external role of the context.
       QF.DataTypeGetter QF.ExternalRoleF -> case unsafePartial (domain2contextType dom) of
         ST (ContextType id) -> modifyDF \dfr@{enumeratedRoles} -> case lookup (buitenRol id) enumeratedRoles of
-          Nothing -> dfr
+          Nothing -> addInvertedQueryForDomain (buitenRol id)
+            (InvertedQuery {description: path, compilation: Nothing, userTypes})
+            OnContextDelta_role
+            dfr
           Just er -> dfr {enumeratedRoles = insert (buitenRol id) (addPathToOnContextDelta_role er path) enumeratedRoles}
 
       -- Ignore ExternalRoleF and IdentityF in an inverse path. We do not

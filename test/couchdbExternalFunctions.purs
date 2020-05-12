@@ -95,6 +95,22 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
       else liftAff $ assert ("There are instance- or model errors for model:TestBotActie: " <> show errs) false
 
+  test "upload model:Serialise to repository from files" $ runP do
+    errs <- loadCompileAndCacheArcFile "serialise" modelDirectory
+    if null errs
+      then do
+        cdburl <- getCouchdbBaseURL
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Serialise") (cdburl <> "repository"))
+      else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
+
+  test "upload model:Couchdb to repository from files" $ runP do
+    errs <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    if null errs
+      then do
+        cdburl <- getCouchdbBaseURL
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") (cdburl <> "repository"))
+      else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
+
   test "setModelDescriptionsView" do
     assertEqual "The retrieved document should equal the sent document"
       (do

@@ -22,6 +22,7 @@
 module Perspectives.DomeinFile where
 
 import Control.Monad.State (State, execState, modify)
+import Data.Array (cons)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -31,9 +32,11 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Foreign.Object (Object, empty, insert)
+import Foreign.Object (Object, empty, insert, lookup)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
+import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol)
+import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -64,6 +67,7 @@ type DomeinFileRecord =
   , indexedContexts :: Array ContextInstance
   , modelDescription :: Maybe PerspectRol
   , referredModels :: Array DomeinFileId
+  , invertedQueriesInOtherDomains :: Object (Array SeparateInvertedQuery)
   }
 
 derive instance genericDomeinFile :: Generic DomeinFile _
@@ -92,6 +96,42 @@ instance revisionDomeinFile :: Revision DomeinFile where
   rev = _._rev <<< unwrap
   changeRevision s = over DomeinFile (\vr -> vr {_rev = s})
 
+-------------------------------------------------------------------------------
+---- INVERTEDQUERYCOLLECTION
+-------------------------------------------------------------------------------
+data SeparateInvertedQuery = OnContextDelta_context TypeName InvertedQuery |
+	OnContextDelta_role TypeName InvertedQuery |
+	OnRoleDelta_binding TypeName InvertedQuery |
+	OnRoleDelta_binder TypeName InvertedQuery |
+	OnPropertyDelta TypeName InvertedQuery
+
+type TypeName = String
+
+derive instance genericSeparateInvertedQuery :: Generic SeparateInvertedQuery _
+
+instance showSeparateInvertedQuery :: Show SeparateInvertedQuery where
+  show = genericShow
+
+derive instance eqSeparateInvertedQuery :: Eq SeparateInvertedQuery
+
+instance encodeSeparateInvertedQuery :: Encode SeparateInvertedQuery where
+  encode = genericEncode defaultOptions
+
+instance decodeSeparateInvertedQuery :: Decode SeparateInvertedQuery where
+  decode = genericDecode defaultOptions
+
+addInvertedQueryForDomain :: TypeName -> InvertedQuery -> (TypeName -> InvertedQuery -> SeparateInvertedQuery) -> DomeinFileRecord -> DomeinFileRecord
+addInvertedQueryForDomain typeName iq collectionConstructor dfr@{invertedQueriesInOtherDomains} = case deconstructModelName typeName of
+  Nothing -> dfr
+  Just modelName -> let
+    invertedQueriesInOtherDomains' = case lookup modelName invertedQueriesInOtherDomains of
+      Nothing -> insert modelName [collectionConstructor typeName iq] invertedQueriesInOtherDomains
+      Just separateQueries -> insert modelName (cons (collectionConstructor typeName iq) separateQueries) invertedQueriesInOtherDomains
+    in
+    dfr {invertedQueriesInOtherDomains = invertedQueriesInOtherDomains'}
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
 newtype DomeinFileId = DomeinFileId String
 derive instance newtypeDomeinFileId :: Newtype DomeinFileId _
 derive instance genericRepDomeinFileId :: Generic DomeinFileId _
@@ -119,7 +159,9 @@ defaultDomeinFileRecord =
   , indexedRoles: []
   , indexedContexts: []
   , modelDescription: Nothing
-  , referredModels: []}
+  , referredModels: []
+  , invertedQueriesInOtherDomains: empty
+}
 
 defaultDomeinFile :: DomeinFile
 defaultDomeinFile = DomeinFile defaultDomeinFileRecord

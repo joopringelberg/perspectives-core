@@ -23,7 +23,7 @@ module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, (<|>))
-import Data.Array (cons, filterA, foldl, null, union, (:))
+import Data.Array (cons, filterA, null, union, (:))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable, Set)
 import Data.Traversable (traverse)
@@ -44,7 +44,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), elements, intersectionOfArrays, intersectionPset, subsetPSet, unionOfArrays, unionPset)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
 import Perspectives.Representation.View (propertyReferences)
 import Prelude (class Eq, class Show, bind, flip, join, map, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
 
@@ -293,8 +293,8 @@ roleAspectsOfADT :: ADT EnumeratedRoleType -> MP (Array EnumeratedRoleType)
 -- roleAspectsOfADT (ST (ENR r)) = getEnumeratedRole r >>= pure <<< _.roleAspects <<< unwrap
 -- roleAspectsOfADT (ST (CR r)) = getCalculatedRole r >>= (rangeOfCalculatedRole >=> roleAspectsOfADT)
 roleAspectsOfADT (ST r) = getEnumeratedRole r >>= pure <<< _.roleAspects <<< unwrap
-roleAspectsOfADT (SUM terms) = traverse roleAspectsOfADT terms >>= pure <<< unionOfArrays
-roleAspectsOfADT (PROD terms) = traverse roleAspectsOfADT terms >>= pure <<< intersectionOfArrays
+roleAspectsOfADT (SUM terms) = traverse roleAspectsOfADT terms >>= pure <<< intersectionOfArrays
+roleAspectsOfADT (PROD terms) = traverse roleAspectsOfADT terms >>= pure <<< unionOfArrays
 roleAspectsOfADT EMPTY = pure []
 roleAspectsOfADT UNIVERSAL = throwError (error $ show UniversalRoleHasNoParts)
 

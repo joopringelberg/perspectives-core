@@ -24,10 +24,9 @@ module Perspectives.Types.ObjectGetters where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (elemIndex, filter, find, findIndex, singleton)
+import Data.Array (elemIndex, filter, find, findIndex, intersect, null, singleton)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
-import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (keys, values)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=))
@@ -50,7 +49,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..), hasElementM)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>), (<$>), discard)
+import Prelude (bind, flip, join, not, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -228,10 +227,14 @@ qualifyContextInDomain localName namespace = ArrayT do
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A ROLETYPE
 ----------------------------------------------------------------------------------------
+-- TODO: handle Calculated user roles
 hasPerspectiveOnRole :: RoleType -> RoleType ~~~> Boolean
-hasPerspectiveOnRole ur (ENR rt@(EnumeratedRoleType _)) = do
+hasPerspectiveOnRole (ENR ur) (ENR rt@(EnumeratedRoleType _)) = do
   EnumeratedRole{onContextDelta_context, onContextDelta_role, onRoleDelta_binder, onRoleDelta_binding} <- lift $ getEnumeratedRole rt
-  pure $ isJust $ elemIndex ur (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role <> onRoleDelta_binder <> onRoleDelta_binding)))
+  -- The role, or one of its aspects, must be compared to the usertypes in the various
+  -- InvertedQueries.
+  (includingAspects :: Array RoleType) <- lift (map ENR <$> (ur ###= aspectsClosure))
+  pure $ not $ null $ intersect includingAspects (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role <> onRoleDelta_binder <> onRoleDelta_binding)))
 
 hasPerspectiveOnRole _ _ = pure false
 

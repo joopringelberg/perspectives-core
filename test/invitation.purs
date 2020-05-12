@@ -36,7 +36,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Invitation" do
+theSuite = suiteOnly "Invitation" do
 
   -- testOnly "Bot serialises invitation" $ runP $ withModel_ (DomeinFileId "model:System") false do
   test "Bot serialises invitation" $ runP $ withSystem do
@@ -71,6 +71,7 @@ theSuite = suite "Invitation" do
 
 
   test "Bot serialises Chat" $ runP $ withSimpleChat do
+  -- testOnly "Bot serialises invitation" $ runP $ withModel_ (DomeinFileId "model:SimpleChat") false do
     addAllExternalFunctions
     -- Create a Chat instance with an Initiator
     errs <- loadAndSaveCrlFile "chatInvitation.crl" testDirectory
