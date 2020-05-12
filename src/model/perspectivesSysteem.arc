@@ -70,10 +70,12 @@ domain: System
     user: Initiator filledBy: sys:PerspectivesSystem$User
       aspect: sys:PhysicalContext$UserWithAddress
       perspective on: ConnectedPartner
+      perspective on: Initiator
     user: ConnectedPartner filledBy: sys:PerspectivesSystem$User
       -- The public URL of the PDR of the partner.
       aspect: sys:PhysicalContext$UserWithAddress
       perspective on: Initiator
+      perspective on: ConnectedPartner
 
   case: Model
     external:
