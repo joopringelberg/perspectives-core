@@ -192,6 +192,8 @@ createAndAddRoleInstance roleType id (RolSerialization{id: mRoleId, properties, 
     Nothing -> pure unit
     Just b -> do
       me <- lift2 $ isMe (RoleInstance b)
+      -- If we have a user role and we bind to a user that is not me, serialise the context.
+      -- We assume here that a user has just one role in the context (otherwise the serialisation is superfluous).
       handleNewPeer_ me roleInstance
   -- Then add the new Role instance to the context.
   addRoleInstancesToContext contextInstanceId roleType (singleton roleInstance)

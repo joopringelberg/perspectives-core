@@ -25,11 +25,11 @@ import Data.Array.NonEmpty (fromArray, singleton)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
-import Perspectives.CollectAffectedContexts (lift2, userHasNoPerspectiveOnRoleInstance)
+import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###>>), (##>>))
 import Perspectives.Deltas (addContextDelta, addPropertyDelta, addRoleDelta, addUniverseContextDelta, addUniverseRoleDelta)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (bottom, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (bottom, context, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), externalRoleType)
@@ -92,18 +92,21 @@ serialisedAsDeltasFor_ cid userId userType = do
     case binding of
       Nothing -> pure unit
       Just b -> do
+        c <- lift2 (b ##>> context)
         typeOfBinding <- lift2 (b ##>> roleType)
-        shouldBeSent <- lift2 $ userHasNoPerspectiveOnRoleInstance typeOfBinding b userId
-        when shouldBeSent $ serialiseBinding b
-        addRoleDelta (RoleBindingDelta
-          { id : roleInstance
-          , binding: binding
-          , oldBinding: Nothing
-          , deltaType: SetBinding
-          , roleWillBeRemoved: false
-          , users: [userId]
-          , sequenceNumber: 0
-          })
+        shouldBeSent <- lift2 (userType ###>> roleIsInPerspectiveOf (ENR typeOfBinding))
+        -- On adding the delta, we check whether it has been serialised before in this transaction.
+        when shouldBeSent do
+          serialisedAsDeltasFor_ c userId userType
+          addRoleDelta (RoleBindingDelta
+            { id : roleInstance
+            , binding: binding
+            , oldBinding: Nothing
+            , deltaType: SetBinding
+            , roleWillBeRemoved: false
+            , users: [userId]
+            , sequenceNumber: 0
+            })
     -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
     forWithIndex_ properties \propertyTypeId values -> do
       propAllowed <- lift2 (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))
@@ -117,38 +120,3 @@ serialisedAsDeltasFor_ cid userId userType = do
           , sequenceNumber: 0
           }
         else pure unit
-
-  -- | Serialise the Role and its context. Recursively serialise its binding if necessary.
-  serialiseBinding :: RoleInstance -> MonadPerspectivesTransaction Unit
-  serialiseBinding roleInstance = do
-    PerspectRol{context, pspType: roleType} <- lift2 $ getPerspectRol roleInstance
-    -- serialise the context, minimally, first.
-    (PerspectContext{pspType, rolInContext}) <- lift2 $ getPerspectContext context
-    addUniverseContextDelta $ UniverseContextDelta
-      { id: context
-      , contextType: pspType
-      , deltaType: ConstructEmptyContext
-      , users: [userId]
-      , sequenceNumber: 0
-      }
-    -- Serialise the external role, without properties.
-    addUniverseRoleDelta $ UniverseRoleDelta
-      { id: context
-      , roleInstances: (SerializableNonEmptyArray $ singleton (externalRole context))
-      , roleType: (externalRoleType pspType)
-      , deltaType: ConstructExternalRole
-      , users: [userId]
-      , sequenceNumber: 0
-      }
-    -- Serialise the role, with any applicable properties and possibly with its binding.
-    serialiseRoleInstance context roleType roleInstance
-    -- Add it to the context.
-    addContextDelta $ ContextDelta
-      { id : context
-      , roleType: roleType
-      , deltaType: AddRoleInstancesToContext
-      , roleInstances: SerializableNonEmptyArray $ singleton roleInstance
-      , users: [userId]
-      , sequenceNumber: 0
-      , destinationContext: Nothing
-      }

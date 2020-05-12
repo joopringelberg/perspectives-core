@@ -41,7 +41,7 @@ import Perspectives.Sync.AffectedContext (AffectedContext)
 import Perspectives.Sync.Class.DeltaClass (addBase)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
-import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<$>), (==), (+))
+import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<$>), (==), (+), (-))
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -97,7 +97,7 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , changedDomeinFiles: union changedDomeinFiles cd
       , affectedContexts: []
       , correlationIdentifiers: []
-      , nextDeltaIndex: base + extra
+      , nextDeltaIndex: base + extra - 1
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
