@@ -125,6 +125,10 @@ addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas, next
 addUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
 addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas, nextDeltaIndex} -> t {universeContextDeltas = union [(setIndex nextDeltaIndex d)] universeContextDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
+-- | Add a context delta with a fixed index.
+addUniverseContextDelta_ :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
+addUniverseContextDelta_ d = lift $ AA.modify (over Transaction \t@{universeContextDeltas} -> t {universeContextDeltas = union [d] universeContextDeltas})
+
 addUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
 addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas, nextDeltaIndex} -> t {universeRoleDeltas = union [(setIndex nextDeltaIndex d)] universeRoleDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 

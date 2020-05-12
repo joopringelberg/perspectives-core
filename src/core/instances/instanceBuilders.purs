@@ -54,7 +54,7 @@ import Perspectives.Assignment.Update (addRoleInstancesToContext, handleNewPeer_
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
-import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addUniverseContextDelta, increaseDeltaIndex)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addUniverseContextDelta, addUniverseContextDelta_, increaseDeltaIndex)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
@@ -95,7 +95,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
             lift $ lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) rolInstances
           -- Add a UniverseContextDelta with the union of the users of the RoleBindingDeltas.
           contextType <- ContextType <$> (lift $ lift2 $ expandDefaultNamespaces ctype)
-          lift $ addUniverseContextDelta $ UniverseContextDelta
+          lift $ addUniverseContextDelta_ $ UniverseContextDelta
               { id: contextInstanceId
               , contextType
               , deltaType: ConstructEmptyContext
