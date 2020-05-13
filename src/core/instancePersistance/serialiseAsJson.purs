@@ -24,16 +24,16 @@ module Perspectives.Instances.SerialiseAsJson where
 import Control.Monad.State (StateT, execStateT, gets, modify)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Control.Plus (empty, void)
-import Data.Array (cons, find, tail, union)
+import Data.Array (catMaybes, find, snoc)
 import Data.Array (singleton, head) as ARR
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Foreign.Class (encode)
-import Foreign.Object (Object, singleton, empty) as OBJ
+import Foreign.Object (Object, singleton, empty, toUnfoldable, fromFoldable) as OBJ
 import Global.Unsafe (unsafeStringify)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.CoreTypes (MPQ, MonadPerspectives, MPT, (###>>), (##>>))
@@ -49,7 +49,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Channel (createChannel)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Prelude (class Monad, Unit, bind, discard, eq, identity, map, pure, unit, when, ($), (<$>), (<<<), (>>=), (<*), (&&), not)
+import Prelude (class Monad, Unit, bind, discard, eq, map, pure, when, ($), (<$>), (>>=), (&&), not, (>>>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A function for the External Core Module `model:Serialise`. The first argument should be a singleton holding
@@ -59,75 +59,47 @@ serialiseFor :: Array RoleType -> RoleInstance -> MPQ Value
 serialiseFor userTypes externalRoleId = ArrayT $ case ARR.head userTypes of
   Nothing -> empty
   Just u -> do
-    (sers :: Array ContextSerialization) <- lift $ getContextSerialisations (serialiseAsJsonFor_ u) (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId)
+    (sers :: Array ContextSerialization) <- lift $ execStateT (serialiseAsJsonFor_ u (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId)) []
     pure $ ARR.singleton $ Value $ unsafeStringify $ encode sers
 
 serialiseAsJsonFor :: RoleInstance -> ContextInstance -> MonadPerspectives (Array ContextSerialization)
 serialiseAsJsonFor userId cid = do
   userType <- roleType_ userId
-  getContextSerialisations (serialiseAsJsonFor_ (ENR userType)) cid
+  execStateT (serialiseAsJsonFor_ (ENR userType) cid) []
 
 type ContextDone m = WriterT (Array ContextSerialization) m
 
 -----------------------------------------------------------------------------------------
----- A NESTED STATE PATTERN TO COLLECT SERIALIZATIONS
+---- A STATE PATTERN TO COLLECT SERIALIZATIONS
 -----------------------------------------------------------------------------------------
 -- | Collect ContextSerializations in state. This is work done.
 type ContextsDone m = StateT (Array ContextSerialization) m
 
--- | Collect ContextInstances in state. These will represent a list of contexts we have
--- | yet to serialize.
-type ContextsToDo m = StateT (Array ContextInstance) m
-
--- | A function that takes a ContextInstance and produces a stateful computation that
--- | holds both work done and a todo list.
-type Serializer m = ContextInstance -> (ContextsToDo (ContextsDone m)) Unit
-
--- | From a Serializer and a starting point, produce an array of serialized contexts.
-getContextSerialisations :: forall m. Monad m => Serializer m -> ContextInstance -> m (Array ContextSerialization)
-getContextSerialisations serializer cid = execStateT (execStateT (f cid) []) []
-  where
-    f :: ContextInstance -> ContextsToDo (ContextsDone m) Unit
-    f cid' = do
-      serializer cid'
-      next <- getNextContextToDo
-      case next of
-        Just c -> f c
-        otherwise -> pure unit
-
--- | Pop an entry from the todo list.
-getNextContextToDo :: forall m. Monad m => ContextsToDo m (Maybe ContextInstance)
-getNextContextToDo = gets ARR.head <* modify \s -> maybe [] identity (tail s)
-
--- | Add to the todo list.
-doThisContext :: forall m. Monad m => ContextInstance -> ContextsToDo m (Array ContextInstance)
-doThisContext c = modify \ctxts -> union ctxts [c]
-
 -- | Have we serialised this context instance already?
-hasContextBeenDone :: forall m. Monad m => ContextInstance -> ContextsToDo (ContextsDone m) Boolean
-hasContextBeenDone c = lift $ gets \ctxts -> isJust $ find hasId ctxts
+hasContextBeenDone :: forall m. Monad m => ContextInstance -> (ContextsDone m) Boolean
+hasContextBeenDone c = gets \ctxts -> isJust $ find hasId ctxts
   where
     hasId :: ContextSerialization -> Boolean
     hasId (ContextSerialization{id}) = eq id (unwrap c)
 
 -- | Save work done.
-contextHasBeenDone :: forall m. Monad m => ContextSerialization -> ContextsToDo (ContextsDone m) (Array ContextSerialization)
-contextHasBeenDone ser = lift $ modify \sers -> cons ser sers
+contextHasBeenDone :: forall m. Monad m => ContextSerialization -> (ContextsDone m) (Array ContextSerialization)
+contextHasBeenDone ser = modify \sers -> snoc sers ser
 
 -----------------------------------------------------------------------------------------
 ---- SERIALIZING
 -----------------------------------------------------------------------------------------
-type Collecting =  ContextsToDo (ContextsDone MonadPerspectives)
+type Collecting =  (ContextsDone MonadPerspectives)
 
 lift2Coll :: forall a. MonadPerspectives a -> Collecting a
-lift2Coll = lift <<< lift
+lift2Coll = lift
 
 serialiseAsJsonFor_:: RoleType -> ContextInstance -> Collecting Unit
 serialiseAsJsonFor_ userType cid = do
   (PerspectContext{pspType, rolInContext}) <- lift2Coll $ getPerspectContext cid
-  (rollen :: OBJ.Object (SerializableNonEmptyArray RolSerialization)) <- execWriterT $ forWithIndex_ rolInContext serialiseRoleInstances
-  PerspectRol{properties} <- lift2Coll $ getPerspectRol (externalRole cid)
-  (externeProperties :: OBJ.Object (Array String)) <- lift2Coll $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
+  (rollen :: OBJ.Object (SerializableNonEmptyArray RolSerialization)) <- traverse serialiseRoleInstances (OBJ.toUnfoldable rolInContext) >>= catMaybes >>> OBJ.fromFoldable >>> pure
+  PerspectRol{properties} <- lift $ getPerspectRol (externalRole cid)
+  (externeProperties :: OBJ.Object (Array String)) <- lift $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
   void $ contextHasBeenDone $ ContextSerialization
     { id: (unwrap cid)
     , prototype: Nothing
@@ -137,31 +109,32 @@ serialiseAsJsonFor_ userType cid = do
     }
 
   where
-    serialiseRoleInstances :: String -> Array RoleInstance -> WriterT (OBJ.Object (SerializableNonEmptyArray RolSerialization)) Collecting Unit
-    serialiseRoleInstances roleTypeId roleInstances = do
+    serialiseRoleInstances :: Tuple String (Array RoleInstance) -> Collecting (Maybe (Tuple String (SerializableNonEmptyArray RolSerialization)))
+    serialiseRoleInstances (Tuple roleTypeId roleInstances) = do
       -- Now for each role, decide if the user may see it.
-      allowed <- lift $ lift2Coll (userType ###>> roleIsInPerspectiveOf (ENR $ EnumeratedRoleType roleTypeId))
-      when allowed
-        case fromArray roleInstances of
-          Nothing -> pure unit
+      allowed <- lift $ (userType ###>> roleIsInPerspectiveOf (ENR $ EnumeratedRoleType roleTypeId))
+      if allowed
+        then case fromArray roleInstances of
+          Nothing -> pure Nothing
           Just roleInstances' -> do
-            rolesAsJson <- lift $ traverse (serialiseRoleInstance cid (EnumeratedRoleType roleTypeId)) roleInstances'
-            tell $ OBJ.singleton roleTypeId (SerializableNonEmptyArray rolesAsJson)
+            rolesAsJson <- traverse (serialiseRoleInstance cid (EnumeratedRoleType roleTypeId)) roleInstances'
+            pure $ Just $ Tuple roleTypeId (SerializableNonEmptyArray rolesAsJson)
+        else pure Nothing
 
     serialiseRoleInstance :: ContextInstance -> EnumeratedRoleType -> RoleInstance -> Collecting RolSerialization
     serialiseRoleInstance cid' roleTypeId roleInstance = do
-      PerspectRol{binding, properties} <- lift2Coll $ getPerspectRol roleInstance
-      (properties' :: (OBJ.Object (Array String))) <- lift2Coll $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
+      PerspectRol{binding, properties} <- lift $ getPerspectRol roleInstance
+      (properties' :: (OBJ.Object (Array String))) <- lift $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
       -- If the userType has a perspective on the role instance, add the context to
       -- the todo list.
       case binding of
         Nothing -> pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: Nothing}
         Just b -> do
-          c <- lift2Coll (b ##>> context)
+          c <- lift (b ##>> context)
           doneBefore <- hasContextBeenDone c
-          typeOfBinding <- lift2Coll (b ##>> roleType)
-          allowed <- lift2Coll (userType ###>> roleIsInPerspectiveOf (ENR typeOfBinding))
-          when (allowed && not doneBefore) (void $ doThisContext c)
+          typeOfBinding <- lift (b ##>> roleType)
+          allowed <- lift (userType ###>> roleIsInPerspectiveOf (ENR typeOfBinding))
+          when (allowed && not doneBefore) (serialiseAsJsonFor_ userType c)
           pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: if allowed then map unwrap binding else Nothing}
 
     serialisePropertiesFor :: String -> Array Value -> WriterT (OBJ.Object (Array String)) MonadPerspectives Unit

@@ -36,7 +36,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Invitation" do
+theSuite = suite "Invitation" do
 
   -- testOnly "Bot serialises invitation" $ runP $ withModel_ (DomeinFileId "model:System") false do
   test "Bot serialises invitation" $ runP $ withSystem do
