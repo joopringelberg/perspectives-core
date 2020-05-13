@@ -99,16 +99,14 @@ setInvertedQueriesForUserAndRole user (ST role) props invertedQ = case props of
 
   where
     addToRole :: QueryFunctionDescription -> EnumeratedRoleType -> PhaseThree Unit
-    addToRole invertedQ' r@(EnumeratedRoleType roleId) = modifyDF \df@{enumeratedRoles:roles} -> do
-      case lookup roleId roles of
-        -- TODO. We cannot modify this role as it is outside the current model. Somehow save the query with the type
-        -- and make sure it is applied if the target model is loaded?
-        Nothing -> addInvertedQueryForDomain roleId
-          (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]})
-          OnContextDelta_context
-          df
-        -- TODO. Als er al een InvertedQuery is met dezelfde description, voeg dan het user type daar aan toe.
-        Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]}) onContextDelta_context }) roles}
+    addToRole invertedQ' r@(EnumeratedRoleType roleId) =
+      modifyDF \df@{enumeratedRoles:roles} ->
+        case lookup roleId roles of
+          Nothing -> addInvertedQueryForDomain roleId
+            (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]})
+            OnContextDelta_context
+            df
+          Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]}) onContextDelta_context }) roles}
 
     addToProperties :: QueryFunctionDescription -> Array PropertyType -> PhaseThree Unit
     addToProperties invertedQ' roleProps = for_ roleProps \prop -> case prop of

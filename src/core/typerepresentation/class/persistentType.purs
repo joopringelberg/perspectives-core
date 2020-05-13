@@ -110,7 +110,7 @@ retrieveFromDomein_ :: forall v i. PersistentType v i =>
 retrieveFromDomein_ id lookupFunction ns = do
   df <- retrieveDomeinFile ns
   case lookupFunction df of
-    Nothing -> throwError $ error ("retrieveFromDomein': cannot find definition of " <> (show id) <> " for " <> ns)
+    Nothing -> throwError $ error ("retrieveFromDomein_: cannot find definition of " <> (show id) <> " for " <> ns)
     (Just v) -> pure v
 
 -----------------------------------------------------------

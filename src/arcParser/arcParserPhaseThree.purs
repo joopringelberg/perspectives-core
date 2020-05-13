@@ -97,8 +97,8 @@ phaseThree_ df@{_id, referredModels} = do
       qualifyPropertyReferences
       qualifyViewReferences
       compileExpressions
-      invertedQueriesForLocalRolesAndProperties
       requalifyBindingsToCalculatedRoles
+      invertedQueriesForLocalRolesAndProperties
       compileRules
       )
     df
@@ -334,7 +334,7 @@ invertedQueriesForLocalRolesAndProperties = do
     (invertedQueriesForLocalRolesAndProperties' df)
   where
     invertedQueriesForLocalRolesAndProperties' :: DomeinFileRecord -> PhaseThree Unit
-    invertedQueriesForLocalRolesAndProperties' {enumeratedRoles, enumeratedProperties} = do
+    invertedQueriesForLocalRolesAndProperties' {enumeratedRoles} = do
       for_ enumeratedRoles
         \(EnumeratedRole {_id, context, mandatory}) -> do
           (userTypes :: Array RoleType) <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
