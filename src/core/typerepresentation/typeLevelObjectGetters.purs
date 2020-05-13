@@ -24,7 +24,7 @@ module Perspectives.Types.ObjectGetters where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (elemIndex, filter, find, findIndex, intersect, null, singleton)
+import Data.Array (filter, find, findIndex, intersect, null, singleton)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
@@ -257,9 +257,10 @@ rolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (roleIsInPerspect
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A PROPERTYTYPE
 ----------------------------------------------------------------------------------------
 hasPerspectiveOnProperty :: RoleType -> PropertyType ~~~> Boolean
-hasPerspectiveOnProperty userRole' (ENP pt@(EnumeratedPropertyType _)) = do
+hasPerspectiveOnProperty (ENR ur) (ENP pt@(EnumeratedPropertyType _)) = do
   EnumeratedProperty{onPropertyDelta} <- lift $ getEnumeratedProperty pt
-  pure $ isJust $ elemIndex userRole' (join (_.userTypes <<< unwrap <$> onPropertyDelta))
+  (includingAspects :: Array RoleType) <- lift (map ENR <$> (ur ###= aspectsClosure))
+  pure $ not $ null $ intersect includingAspects (join (_.userTypes <<< unwrap <$> onPropertyDelta))
 hasPerspectiveOnProperty _ _ = pure false
 
 -- | <RoleType> `propertyIsInPerspectiveOf` <userRole>
