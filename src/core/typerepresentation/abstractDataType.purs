@@ -32,12 +32,11 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (elemIndex, filter, head, intersect, null, uncons, union, length)
+import Data.Array (intersect, union, length)
 import Data.Array.Partial (head) as AP
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
-import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
@@ -46,7 +45,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, notEq, pure, show, ($), (<>), (==), (>>>))
+import Prelude (class Eq, class Monad, class Show, bind, map, pure, show, ($), (<>), (==), (>>>))
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
 
@@ -171,8 +170,8 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
   reduce f EMPTY = pure false
   reduce f UNIVERSAL = pure true
 
--- | Reduce an `ADT a` with `f :: a -> MP (Array b)`
--- | `reduce f` then has type `ADT a -> MP (Array b)`
+-- | Reduce an `ADT a` with `forall a b m. Monad m => f :: a -> m (Array b)`
+-- | `reduce f` then has type `forall a b m. Monad m => ADT a -> m (Array b)`
 instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do
@@ -187,24 +186,10 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
 
 -- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`.
 -- | `reduce f` then has type `ADT a -> MP (ADT b)`.
+-- | Notice that reducing an ADT EnumeratedRoleType is not a transitive operation over binding or aspects!
 instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f (ST et) = f et
-  reduce f (SUM adts) = do
-    (x :: Array (ADT b)) <- traverse (reduce f) adts
-    -- Simplify: all members of the SUM must have a binding, otherwise the binding of the SUM is EMPTY.
-    case elemIndex EMPTY x of
-      Nothing -> pure EMPTY
-      otherwise -> pure $ SUM x
-  reduce f (PROD adts) = do
-    (x :: Array (ADT b)) <- traverse (reduce f) adts
-    -- Simplify: remove all EMPTY's.
-    r <- pure $ filter (notEq EMPTY) x
-    case uncons r of
-      -- SUM [] == EMPTY
-      Nothing -> pure EMPTY
-      (Just {head : hd, tail}) -> case head tail of
-        -- SUM [a] = a
-        Nothing -> pure hd
-        otherwise -> pure $ PROD r
+  reduce f (SUM adts) = map sum (traverse (reduce f) adts)
+  reduce f (PROD adts) = map product (traverse (reduce f) adts)
   reduce f EMPTY = pure EMPTY
   reduce f UNIVERSAL = pure UNIVERSAL

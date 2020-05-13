@@ -67,7 +67,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, getCalculation, getRole, lessThanOrEqualTo, roleADT)
+import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, getCalculation, getRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Class.Role (contextOfRepresentation, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -502,7 +502,7 @@ compileRules = do
               Bind f@{bindingExpression, roleIdentifier, contextExpression} -> do
                 -- Bind <binding-expression> to <binderType> [in <context-expression>]. Check:
                 -- bindingExpression should result in roles
-                (bindings :: QueryFunctionDescription) <- ensureRole [ENR subject]  currentDomain bindingExpression
+                (bindings :: QueryFunctionDescription) <- ensureRole [ENR subject] currentDomain bindingExpression
                 (cte :: QueryFunctionDescription) <- case contextExpression of
                   Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
                   (Just (stp :: Step)) -> ensureContext [ENR subject] currentDomain stp
@@ -519,7 +519,7 @@ compileRules = do
                 qualifies <- do
                   possibleBinding <- lift $ lift (bindingOfRole (ENR qualifiedRoleIdentifier))
                   bindings' <- pure (unsafePartial $ domain2roleType (range bindings))
-                  lift2 $ lessThanOrEqualTo possibleBinding bindings'
+                  lift2 $ possibleBinding `hasNotMorePropertiesThan` bindings'
                 if qualifies
                   -- Create a function description that describes the actual role creating and binding.
                   then pure $ BQD currentDomain (QF.Bind qualifiedRoleIdentifier) bindings cte currentDomain True True

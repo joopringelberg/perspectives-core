@@ -31,11 +31,10 @@ import Effect.Exception (error)
 import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
-import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..))
 import Perspectives.Query.QueryTypes (functional, mandatory, range) as QT
-import Perspectives.Representation.ADT (ADT(..), product, sum)
+import Perspectives.Representation.ADT (ADT(..), product, reduce)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
@@ -46,7 +45,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (class Eq, class Show, bind, flip, join, map, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
+import Prelude (class Eq, class Show, bind, flip, join, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -67,7 +66,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   -- | The type of the Role, including its direct aspects: not their transitive closure!
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
-  -- | The type of the Role, including its direct binding (not the transitive closure!) and its direct aspects: not their transitive closure!
+  -- | Includes: the type of the Role, its own binding (not the bindings transitive closure!) and its own aspects (not their transitive closure!).
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsBindingADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   views :: r -> MonadPerspectives (Array ViewType)
@@ -115,7 +114,7 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
 -----------------------------------------------------------
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
-  roleAspects r = roleADT r >>= roleAspectsOfADT
+  roleAspects r = pure $ _.roleAspects $ unwrap r
   context r = pure $ ST $ contextOfRepresentation r
   contextOfRepresentation r = (unwrap r).context
   binding r = pure (unwrap r).binding
@@ -170,6 +169,7 @@ includeBinding own adtF r = do
 type PropertySet = ExplicitSet PropertyType
 
 -- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
+-- | This function is not transitive over binding or aspects.
 propertySet :: ADT EnumeratedRoleType -> MP PropertySet
 -- propertySet (ST (ENR r)) = getEnumeratedRole r >>= pure <<< PSet <<< _.properties <<< unwrap
 -- propertySet (ST (CR r)) = getCalculatedRole r >>= (rangeOfCalculatedRole >=> propertySet)
@@ -213,6 +213,20 @@ actionSet EMPTY = pure Empty
 lessThanOrEqualTo :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 lessThanOrEqualTo p q = (&&) <$> (subsetPSet <$> propertySet p <*> propertySet q) <*> (subsetPSet <$> actionSet p <*> actionSet q)
 
+hasNotMorePropertiesThan :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
+hasNotMorePropertiesThan p q = subset <$> (allProperties >=> pure <<< fromFoldable) p <*> (allProperties >=> pure <<< fromFoldable) q
+
+-- | All properties, computed recursively over binding and Aspects, of the Role ADT.
+allProperties :: ADT EnumeratedRoleType -> MP (Array PropertyType)
+allProperties = reduce magic
+  where
+    magic :: EnumeratedRoleType -> MP (Array PropertyType)
+    magic rt = do
+      x <- getEnumeratedRole rt >>= \(EnumeratedRole{roleAspects, binding}) -> pure $ product (cons binding (ST <$> roleAspects))
+      case x of
+        ST _ -> (getEnumeratedRole >=> pure <<< _.properties <<< unwrap) rt
+        otherwise -> reduce magic otherwise
+
 -- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
 -- | If you use `less specific` instead of `more specific`, flip the arguments.
 -- | If you use `more general` instead of `more specific`, flip them, too.
@@ -227,11 +241,7 @@ greaterThanOrEqualTo = flip lessThanOrEqualTo
 -- | The context of an ADT
 contextOfADT :: ADT EnumeratedRoleType -> MP (ADT ContextType)
 -- TODO: handle CalculatedRole.
-contextOfADT (ST et) = (getEnumeratedRole >=> context) et
-contextOfADT (SUM adts) = map sum (traverse contextOfADT adts)
-contextOfADT (PROD adts) = map product (traverse contextOfADT adts)
-contextOfADT EMPTY = pure EMPTY
-contextOfADT UNIVERSAL = pure UNIVERSAL
+contextOfADT = reduce (getEnumeratedRole >=> context)
 
 -----------------------------------------------------------
 -- EXTERNALROLEOFADT
@@ -239,11 +249,7 @@ contextOfADT UNIVERSAL = pure UNIVERSAL
 -- | The external role of an ADT ContextType
 externalRoleOfADT :: ADT ContextType -> MP (ADT EnumeratedRoleType)
 -- TODO: handle CalculatedRole.
-externalRoleOfADT (ST ct) = getContext ct >>= pure <<< ST <<< externalRole
-externalRoleOfADT (SUM adts) = map sum (traverse externalRoleOfADT adts)
-externalRoleOfADT (PROD adts) = map product (traverse externalRoleOfADT adts)
-externalRoleOfADT EMPTY = pure EMPTY
-externalRoleOfADT UNIVERSAL = pure UNIVERSAL
+externalRoleOfADT = reduce (getContext >=> pure <<< ST <<< externalRole)
 
 -----------------------------------------------------------
 -- BINDINGOFADT
@@ -251,11 +257,7 @@ externalRoleOfADT UNIVERSAL = pure UNIVERSAL
 -- | The binding of an ADT.
 bindingOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
 -- TODO: handle CalculatedRole.
-bindingOfADT (ST a) = getEnumeratedRole a >>= binding
-bindingOfADT (SUM adts) = map sum (traverse bindingOfADT adts)
-bindingOfADT (PROD adts) = map product (traverse bindingOfADT adts)
-bindingOfADT EMPTY = pure EMPTY
-bindingOfADT a@UNIVERSAL = throwError (error $ show (RoleCannotHaveBinding upperLeft upperLeft (show a)))
+bindingOfADT = reduce (getEnumeratedRole >=> binding)
 -----------------------------------------------------------
 -- PROPERTIESOFADT
 -----------------------------------------------------------
@@ -289,6 +291,7 @@ viewsOfADT UNIVERSAL = throwError (error $ show UniversalRoleHasNoParts)
 -- ROLEASPECTSOFADT
 -----------------------------------------------------------
 -- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
+-- | The aspects, not including the type itself.
 roleAspectsOfADT :: ADT EnumeratedRoleType -> MP (Array EnumeratedRoleType)
 -- roleAspectsOfADT (ST (ENR r)) = getEnumeratedRole r >>= pure <<< _.roleAspects <<< unwrap
 -- roleAspectsOfADT (ST (CR r)) = getCalculatedRole r >>= (rangeOfCalculatedRole >=> roleAspectsOfADT)
