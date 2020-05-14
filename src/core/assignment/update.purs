@@ -206,7 +206,7 @@ type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array Role
 addRoleInstancesToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (NonEmptyArray RoleInstance))
 addRoleInstancesToContext contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
-  changedContext <- pure (modifyContext_rolInContext pe rolName (flip union (toArray rolInstances)))
+  changedContext <- lift2 (modifyContext_rolInContext pe rolName (flip union (toArray rolInstances)))
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   -- PERSISTENCE
   case find rol_isMe roles of
@@ -276,7 +276,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
-  changedContext <- pure (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
+  changedContext <- lift2 (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
   -- PERSISTENCE.
   case find rol_isMe roles of
     Nothing -> saveEntiteit contextId changedContext
@@ -301,12 +301,14 @@ moveRoleInstancesToAnotherContext originContextId destinationContextId rolName r
   destination <- lift $ lift $ getPerspectContext destinationContextId
   case me of
     Nothing -> do
-      saveEntiteit destinationContextId (modifyContext_rolInContext destination rolName (append (toArray rolInstances)))
-      saveEntiteit originContextId (modifyContext_rolInContext origin rolName (flip difference (toArray rolInstances)))
+      (lift2 $ modifyContext_rolInContext destination rolName (append (toArray rolInstances))) >>= saveEntiteit destinationContextId
+      (lift2 $ modifyContext_rolInContext origin rolName (flip difference (toArray rolInstances))) >>= saveEntiteit originContextId 
     Just m -> do
-      saveEntiteit destinationContextId (changeContext_me (modifyContext_rolInContext destination rolName (append (toArray rolInstances))) me)
+      destination' <- lift2 (modifyContext_rolInContext destination rolName (append (toArray rolInstances)))
+      saveEntiteit destinationContextId (changeContext_me destination' me)
       (lift2 $ findRoleRequests destinationContextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
-      saveEntiteit originContextId (changeContext_me (modifyContext_rolInContext origin rolName (flip difference (toArray rolInstances))) Nothing)
+      origin' <- lift2 (modifyContext_rolInContext origin rolName (flip difference (toArray rolInstances)))
+      saveEntiteit originContextId (changeContext_me origin' Nothing)
       (lift2 $ findRoleRequests originContextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
   -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
   -- the transaction, too.

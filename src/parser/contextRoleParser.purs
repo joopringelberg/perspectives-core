@@ -22,10 +22,10 @@
 module Perspectives.ContextRoleParser where
 
 import Control.Alt (void, (<|>))
-import Control.Monad.State (State, execState, get, gets, modify)
+import Control.Monad.State (State, StateT, execState, execStateT, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable, insert) as AR
-import Data.Array (dropEnd, intercalate)
+import Data.Array (dropEnd, foldl, intercalate)
 import Data.Char.Unicode (isLower)
 import Data.Either (Either(..))
 import Data.Foldable (elem, fold, for_, traverse_)
@@ -34,15 +34,16 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), split)
 import Data.String.CodeUnits (fromCharArray)
+import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
 import Foreign.Object (alter)
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType, setRol_gevuldeRollen)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, (###=))
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
-import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
+import Perspectives.IndentParser (IP, ContextRoleParserMonad, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (cacheEntity)
@@ -51,9 +52,10 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
+import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Prelude (class Show, Unit, bind, discard, flip, identity, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
-import Text.Parsing.Parser (ParseState(..), fail, ParseError)
+import Text.Parsing.Parser (ParseError, ParseState(..), ParserT(..), fail)
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
@@ -526,6 +528,7 @@ context = withRoleCounting context' where
             (prototype :: Maybe ContextID) <- option Nothing (indented *> prototypeDeclaration)
             (publicProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "External" (block publicContextPropertyAssignment))
             (rolebindings :: List (Tuple RolName RoleInstance)) <- option Nil (indented *> (block $ roleBinding instanceName))
+            (aliases :: FO.Object String) <- execStateT (traverse (collectAlias <<< fst) rolebindings) FO.empty
 
             -- Storing
             cacheContext (ContextInstance (show instanceName))
@@ -535,6 +538,7 @@ context = withRoleCounting context' where
                 , pspType = ContextType $ show typeName
                 , buitenRol = RoleInstance $ buitenRol (show instanceName)
                 , rolInContext = collect rolebindings
+                , aliases = aliases
               })
             cacheRol (RoleInstance $ buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
@@ -551,6 +555,10 @@ context = withRoleCounting context' where
     case FO.lookup rname map of
       Nothing -> FO.insert rname [id] map
       (Just ids) -> FO.insert rname (AR.insert id ids) map
+
+  collectAlias :: RolName -> StateT (FO.Object String) (ParserT String ContextRoleParserMonad) Unit
+  collectAlias rolname = (lift $ lift $ lift $ lift ((EnumeratedRoleType rolname) ###= aspectsClosure)) >>=
+    \aspects -> void $ modify \aliases -> foldl (\als aspect -> FO.insert (unwrap aspect) rolname als) aliases aspects
 
   prototypeDeclaration :: IP (Maybe ID)
   prototypeDeclaration = do

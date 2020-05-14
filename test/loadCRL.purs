@@ -4,21 +4,17 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Array (length, null)
-import Data.Either (Either)
-import Data.Tuple (Tuple)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
-import Foreign.Object (Object)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.DomeinFile (DomeinFileId(..))
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
-import Perspectives.LoadCRL (loadAndSaveCrlFile, loadAndCacheCrlFile)
+import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile')
-import Test.Perspectives.Utils (clearUserDatabase, runP, withModel)
+import Test.Perspectives.Utils (clearUserDatabase, runP, withModel, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -30,8 +26,8 @@ modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.loadCRL" do
-  test "Load a file with instances in cache" do
-    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadAndCacheCrlFile "simpleChat.crl" modelDirectory
+  test "Load a file with instances in cache" $ runP $ withSystem do
+    (r :: (Array PerspectivesError)) <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
     logShow r
     pure unit
 

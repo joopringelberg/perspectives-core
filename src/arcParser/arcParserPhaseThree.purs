@@ -132,7 +132,7 @@ qualifyActionRoles = do
   where
   qualifyActionRoles' :: DomeinFileRecord -> PhaseThree Unit
   qualifyActionRoles' {contexts, enumeratedRoles, actions, calculatedRoles} = for_ contexts
-    \(Context{_id:ctxtId, gebruikerRol, rolInContext, contextRol}) -> for_ gebruikerRol
+    \(Context{_id:ctxtId, gebruikerRol, contextRol}) -> for_ gebruikerRol
       \rt -> case rt of
         (ENR (EnumeratedRoleType ur)) -> case lookup ur enumeratedRoles of
           Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> ur <> "' in model.")
