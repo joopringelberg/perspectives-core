@@ -102,6 +102,10 @@ domain: System
       perspective on: PrivateChannel
       -- Invitee needs to see the Channel's Initiator in order to access Host and Port.
       perspective on: ChannelInitiator
+    bot: for Invitee
+      perspective on: Invitee
+        if exists Invitee then
+          bind object to ConnectedPartner in PrivateChannel >> binding >> context
     user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
     bot: for Inviter

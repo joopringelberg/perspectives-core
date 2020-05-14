@@ -56,6 +56,7 @@ theSuite = suite "Perspectives.loadArc" do
       -- 2. Load the required model:Serialise.
       _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
       -- 3. Try to load PerspectivesSystem.
+      log "Starting on model:PerspectivesSystem"
       loadAndCompileArcFile "perspectivesSysteem" modelDirectory
     case messages of
       Left m -> do
@@ -63,16 +64,15 @@ theSuite = suite "Perspectives.loadArc" do
         assert "The file could not be parsed or compiled" false
       _ -> pure unit
 
-  test "Load a model depending on model:System and cache it" $ runP $ withSystem do
+  test "Load simpleChat and cache it" $ runP $ withSystem do
     messages <- loadAndCompileArcFile "simpleChat" modelDirectory
     case messages of
       Left m -> do
         logShow messages
         liftAff $ assert "The file could not be parsed or compiled" false
       _ -> pure unit
-    log "Done it"
 
-  test "Load a model file and store it in Couchdb" do
+  test "Load model:Couchdb from file and store it in Couchdb" do
     messages <- runP do
       catchError (loadCompileAndSaveArcFile' "couchdb" modelDirectory)
         \e -> logShow e *> pure []
