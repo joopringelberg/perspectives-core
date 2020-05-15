@@ -36,6 +36,7 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
@@ -88,15 +89,17 @@ compileBotAction actionType = do
     ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
       conditionWasTrue <- lift2 $ getConditionState actionType contextId
       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+      log $ "Running " <> show actionType
       if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
         then if conditionWasTrue
-          then pure unit
+          then log "Condition satisfied, but rule fired before." *> pure unit
           else do
+            log "Condition satifisfied, will run right hand side."
             lift2 $ setConditionState actionType contextId true
             effectFullFunction contextId
         else if conditionWasTrue
-          then lift2 $ setConditionState actionType contextId false
-          else pure unit
+          then (log "Condition not satisfied, rule fired before") *> (lift2 $ setConditionState actionType contextId false)
+          else log "Condition not satisfied, rule did not fire before" *> pure unit
 
 compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
 compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
@@ -265,18 +268,18 @@ compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _)
         c
       2 -> (unsafeCoerce f :: (Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
         c
       3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
         c
       4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
         c
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )

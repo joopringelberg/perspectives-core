@@ -128,18 +128,18 @@ compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
         c
       2 -> (unsafeCoerce f :: (Array String -> Array String -> String -> MPQ String))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
         c
       3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> String -> MPQ String))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
         c
       4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> String -> MPQ String))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
         c
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )
@@ -155,18 +155,18 @@ compileFunction (MQD dom (ExternalCorePropertyGetter functionName) args _ _ _) =
       1 -> (unsafeCoerce f :: (Array String -> String -> MPQ String)) (unsafePartial (unsafeIndex values 0)) r
       2 -> (unsafeCoerce f :: (Array String -> Array String -> String -> MPQ String))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
         r
       3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> String -> MPQ String))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
         r
       4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> String -> MPQ String))
         (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
-        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
         r
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )
