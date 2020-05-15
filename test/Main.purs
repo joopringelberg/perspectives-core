@@ -37,6 +37,7 @@ import Test.Utilities as UT
 import Test.Invitation as IT
 import Test.TypeLevelQueries as TLQ
 import Test.Instances.ObjectGetters as IOG
+import Test.Guid as GUID
 
 
 main :: Effect Unit
@@ -73,3 +74,4 @@ main = runTest do
   IT.theSuite
   TLQ.theSuite
   IOG.theSuite
+  GUID.theSuite

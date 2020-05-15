@@ -19,15 +19,25 @@
 
 -- END LICENSE
 
-module Perspectives.Guid where
+module Perspectives.Guid
+(guid, Guid)
 
-import Prelude (class Show, Unit)
+where
+
+import Effect (Effect)
+import Prelude (class Show, Unit, unit, class Eq, eq, show)
 
 foreign import data Guid :: Type
 
-foreign import guid :: forall a. Unit -> Guid
+foreign import guid_ :: Unit -> Effect Guid
 
 foreign import show_ :: Guid -> String
 
 instance showGuid :: Show Guid where
   show = show_
+
+instance eqGuid :: Eq Guid where
+  eq g1 g2 = eq (show g1) (show g2)
+
+guid :: Effect Guid
+guid = guid_ unit
