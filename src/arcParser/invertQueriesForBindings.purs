@@ -99,7 +99,7 @@ setInvertedQueriesForUserAndRole user (ST role) props invertedQ = case props of
 
   where
     addToRole :: QueryFunctionDescription -> EnumeratedRoleType -> PhaseThree Unit
-    addToRole invertedQ' r@(EnumeratedRoleType roleId) =
+    addToRole invertedQ'@(SQD _ (DataTypeGetter ContextF)_ _ _) r@(EnumeratedRoleType roleId) =
       modifyDF \df@{enumeratedRoles:roles} ->
         case lookup roleId roles of
           Nothing -> addInvertedQueryForDomain roleId
@@ -107,6 +107,15 @@ setInvertedQueriesForUserAndRole user (ST role) props invertedQ = case props of
             OnContextDelta_context
             df
           Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]}) onContextDelta_context }) roles}
+    -- We by construction can safely assume the other case is the composition created by addBinding.
+    addToRole invertedQ' r@(EnumeratedRoleType roleId) =
+      modifyDF \df@{enumeratedRoles:roles} ->
+        case lookup roleId roles of
+          Nothing -> addInvertedQueryForDomain roleId
+            (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]})
+            OnRoleDelta_binder
+            df
+          Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]}) onRoleDelta_binder }) roles}
 
     addToProperties :: QueryFunctionDescription -> Array PropertyType -> PhaseThree Unit
     addToProperties invertedQ' roleProps = for_ roleProps \prop -> case prop of
