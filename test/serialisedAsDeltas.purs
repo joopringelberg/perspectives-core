@@ -25,6 +25,7 @@ import Perspectives.Sync.Channel (addPartnerToChannel, createChannel)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
 import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
+import Perspectives.User (getHost, getPort)
 import Test.Perspectives.Utils (clearUserDatabase, runP, withModel')
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -53,7 +54,9 @@ theSuite = suite "SerialisedAsDeltas" do
       Just channel -> do
         -- load a second user
         void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
+        host <- getHost
+        port <- getPort
+        void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
 
     getter <- getRoleFunction "model:Test$TestCase$Other"
     unboundOtherRole <- (ContextInstance "model:User$MyTestCase") ##>> getter

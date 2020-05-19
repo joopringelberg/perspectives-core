@@ -36,19 +36,27 @@ domain: System
     context: IndexedContexts (not mandatory, not functional) filledBy: sys:NamedContext
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
     bot: for User
+      -- This rule creates an entry in IndexedContexts if its model has been taken in use for the first time.
       perspective on: UnloadedModel
         if exists UnloadedModel then
           callEffect cdb:AddModelToLocalStore( object >> binding >> Url )
           bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
+
+      -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
       perspective on: DanglingIndexedContext
         if exists DanglingIndexedContext then
           remove object
+
+      -- This rule creates an entry in IndexedContexts if the model is taken in use again.
       perspective on: UnconnectedIndexedContext
         if exists UnconnectedIndexedContext then
           bind object to IndexedContexts
+
     context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
+    -- An entry in IndexedContexts is dangling if its model is no in use.
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
     -- On moving a model to ModelsInUse for the second time, the bot with the perspective on UnloadedModel will not work. We need a third rule for that.
+    -- An UnconnectedIndexedContext is model in use that has no entry in IndexedContexts.
     context: UnconnectedIndexedContext = (filter ModelsInUse >> binding with available context) >> filter (context >> IndexedContext >> binding) with not exists binder IndexedContexts
 
   case: PhysicalContext
@@ -105,7 +113,8 @@ domain: System
     bot: for Invitee
       perspective on: Invitee
         if exists Invitee then
-          bind object to ConnectedPartner in PrivateChannel >> binding >> context
+          -- bind object to ConnectedPartner in PrivateChannel >> binding >> context
+          callEffect ser:AddConnectedPartnerToChannel( object, PrivateChannel >> binding >> context )
     user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
     bot: for Inviter

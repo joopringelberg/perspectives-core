@@ -23,6 +23,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannelContext)
+import Perspectives.User (getHost, getPort)
 import Simple.JSON (readImpl)
 import Test.Perspectives.Utils (clearUserDatabase, runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -44,7 +45,9 @@ theSuite = suite "Perspectives.Instances.SerialiseAsJson" do
       Just channel -> do
         -- load a second user
         void $ loadAndCacheCrlFile "userJoop.crl" testDirectory
-        void $ runSterileTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
+        host <- getHost
+        port <- getPort
+        void $ runSterileTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
         -- Serialise as JSON
         partners <- channel ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
         case head partners of

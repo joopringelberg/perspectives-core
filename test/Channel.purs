@@ -21,6 +21,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, localReplication, postDbName, setChannelReplication, setMyAddress, setYourAddress)
 import Perspectives.Sync.Transaction (Transaction, createTransactie)
+import Perspectives.User (getHost, getPort)
 import Test.Perspectives.Utils (runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -56,7 +57,9 @@ theSuite = suite "Perspectives.Sync.Channel" do
         -- channelContext <- getPerspectEntiteit channel
         -- logShow channelContext
         void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
+        host <- getHost
+        port <- getPort
+        void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
 
     getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
     mdbname <- RoleInstance "model:User$joop$User" ##> getter
@@ -115,7 +118,9 @@ theSuite = suite "Perspectives.Sync.Channel" do
     achannel <- runMonadPerspectivesTransaction do
       channel <- createChannel
       void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-      addPartnerToChannel (RoleInstance "model:User$joop$User") channel
+      host <- lift2 getHost
+      port <- lift2 getPort
+      addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
       setYourAddress "http://127.0.0.1" 5984 channel
       -- We now have a channel with two partners.
       lift2 $ setChannelReplication channel
