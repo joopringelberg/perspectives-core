@@ -34,7 +34,7 @@ import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (##>), type (~~>), MP, MonadPerspectives, assumption, liftToInstanceLevel)
+import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, assumption, liftToInstanceLevel)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
@@ -42,14 +42,11 @@ import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPers
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>), (>=>))
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (<<<), (<>), (==), (>>=), (>>>), (>=>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
 -----------------------------------------------------------
-trackContextDependency :: EnumeratedRoleType -> (ContextInstance ##> RoleInstance) -> (ContextInstance ~~> RoleInstance)
-trackContextDependency roleName f c = (lift $ tell [(assumption (unwrap c) (unwrap roleName))]) *> (ArrayT $ lift $ f c)
-
 -- | Because we never change the ExternalRole of a Context, we have no need
 -- | to track it as a dependency.
 externalRole :: ContextInstance ~~> RoleInstance
@@ -136,11 +133,10 @@ getUnqualifiedRoleBinders ln r = ArrayT do
       Nothing -> pure []
       (Just i) -> do
         rn <- pure (unsafePartial $ fromJust (index (keys gevuldeRollen) i))
+        tell [assumption (unwrap r) rn]
         case lookup rn gevuldeRollen of
           Nothing -> pure []
-          (Just bs) -> do
-            for_ bs \b -> tell [assumption (unwrap b) "model:System$Role$binding"]
-            pure bs
+          (Just bs) -> pure bs
 
 getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn r = ArrayT do
