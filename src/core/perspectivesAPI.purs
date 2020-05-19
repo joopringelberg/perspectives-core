@@ -215,7 +215,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> void $ runMonadPerspectivesTransaction $ do
-        ctxt <- runExceptT $ constructContext (ContextSerialization cd {id = "model:User$c" <> (show $ guid unit)})
+        g <- liftEffect guid
+        ctxt <- runExceptT $ constructContext (ContextSerialization cd {id = "model:User$c" <> (show g)})
         case ctxt of
           (Left messages) -> lift2 $ sendResponse (Error corrId (show messages)) setter
           (Right id) -> lift2 $ sendResponse (Result corrId [buitenRol $ unwrap id]) setter

@@ -46,6 +46,7 @@ import Data.Traversable (for)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
@@ -155,9 +156,12 @@ addModelToLocalStore urls r = do
               save (identifier df :: DomeinFileId) (changeRevision Nothing df)
 
               -- Add replacements to PerspectivesState for the new indexed names introduced in this model.
-              (iroles :: Object RoleInstance) <- pure $ fromFoldable $ (\iRole -> Tuple (unwrap iRole) (RoleInstance ("model:User$" <> show (guid unit)))) <$> indexedRoles
-              (icontexts :: Object ContextInstance) <- pure $ fromFoldable $ (\iContext -> Tuple (unwrap iContext) (ContextInstance ("model:User$" <> show (guid unit)))) <$> indexedContexts
-              -- Make sure that `sys:Me` and `sys:MySystem` replacements come from perspectivesState.
+              (iroles :: Object RoleInstance) <- for indexedRoles (\iRole -> do
+                g <- liftEffect guid
+                pure $ Tuple (unwrap iRole) (RoleInstance ("model:User$" <> show g))) >>= pure <<< fromFoldable
+              (icontexts :: Object ContextInstance) <- for indexedContexts (\iContext -> do
+                g <- liftEffect guid
+                pure $ Tuple (unwrap iContext) (ContextInstance ("model:User$" <> show g))) >>= pure <<< fromFoldable
               mySystem <- lift2 (ContextInstance <$> getMySystem)
               me <- lift2 (RoleInstance <$> getUserIdentifier)
               void $ lift2 $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
@@ -201,7 +205,7 @@ addModelToLocalStore urls r = do
                 \domainName queries -> do
                   DomeinFile dfr <- lift2 $ getDomeinFile (DomeinFileId domainName)
                   lift2 (saveEntiteit_ (DomeinFileId domainName) (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
-                  
+
               -- Copy the attachment
               lift $ lift $ addA url _id
       where
