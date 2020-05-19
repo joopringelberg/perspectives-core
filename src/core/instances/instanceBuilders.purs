@@ -43,30 +43,34 @@ import Control.Monad.Except (ExceptT)
 import Control.Monad.Writer (WriterT, lift, runWriterT, tell)
 import Data.Array.NonEmpty (NonEmptyArray, singleton)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (isEmpty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
+import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (addRoleInstancesToContext, handleNewPeer_, setBinding, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addUniverseContextDelta_, increaseDeltaIndex)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
-import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, isMe)
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), Binding)
+import Perspectives.Instances.ObjectGetters (context, getEnumeratedRoleInstances, isMe)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..))
-import Prelude (bind, discard, pure, unit, void, when, ($), (*>), (<$>), (<>), (>>=), (<<<))
+import Prelude (bind, discard, flip, not, pure, unit, void, when, ($), (*>), (<$>), (<<<), (<>), (>>=), (==), (&&))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setBinding on each role.
@@ -183,28 +187,58 @@ createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> 
 createAndAddRoleInstance roleType id (RolSerialization{id: mRoleId, properties, binding}) = do
   contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces id)
   rolInstances <- lift2 (contextInstanceId ##= getEnumeratedRoleInstances roleType)
-  -- create an empty role
-  roleInstance <- case mRoleId of
-    Nothing -> constructEmptyRole roleType contextInstanceId (getNextRolIndex rolInstances) (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType))
-    Just roleId -> constructEmptyRole_ roleType contextInstanceId (getNextRolIndex rolInstances) (RoleInstance roleId)
+  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole roleType
+  -- create a role isMe set. We that for the case when roleType is a User role.
+  -- Without the binding, we cannot judge for whom the UniverseRoleDelta and ContextDelta would be.
+  (PerspectRol{_id:roleInstance, isMe}) <- case mRoleId of
+    Nothing -> do
+      rolInstanceId <- pure $ RoleInstance (unwrap contextInstanceId <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType)) <> "_" <> (rol_padOccurrence (getNextRolIndex rolInstances)))
+      constructRoleWithIsMe contextInstanceId (getNextRolIndex rolInstances) rolInstanceId (RoleInstance <$> binding)
+    Just roleId -> constructRoleWithIsMe contextInstanceId (getNextRolIndex rolInstances) (RoleInstance roleId) (RoleInstance <$> binding)
   -- Serialise as Deltas if we bind to a user that is not me.
-  case binding of
-    Nothing -> pure unit
-    Just b -> do
-      me <- lift2 $ isMe (RoleInstance b)
-      -- If we have a user role and we bind to a user that is not me, serialise the context.
-      -- We assume here that a user has just one role in the context (otherwise the serialisation is superfluous).
-      handleNewPeer_ me roleInstance
+  when (isJust binding && kindOfRole == UserRole && not isMe)
+      -- If the binding is a User that is not me,
+      -- serialise the context for that User.
+      -- We must do that before we generate Deltas that add a role to the context,
+      -- otherwise, on reconstructing from the Deltas, the peer'll try to add a rol to a
+      -- non-existing context!
+      -- We assume here that a User has just one role in the context (otherwise the serialisation is superfluous).
+      (contextInstanceId `serialisedAsDeltasFor` roleInstance)
   -- Then add the new Role instance to the context.
   addRoleInstancesToContext contextInstanceId roleType (singleton roleInstance)
-  -- then add the binding
+  -- Then add the binding
   case binding of
     Nothing -> pure unit
     Just bnd -> do
       expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
       void $ setBinding roleInstance expandedBinding
-  -- Finally add the properties
+  -- Then add the properties
   case properties of
     (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
       setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
   pure roleInstance
+
+  where
+    -- | Constructs a role with a correct value for isMe and caches it. `localName` should be the local name of the roleType.
+    constructRoleWithIsMe :: ContextInstance -> Int -> RoleInstance -> Binding -> MonadPerspectivesTransaction PerspectRol
+    constructRoleWithIsMe contextInstance i rolInstanceId binding' = do
+      isMe <- getIsMe
+      role <- pure (PerspectRol defaultRolRecord
+            { _id = rolInstanceId
+            , pspType = roleType
+            , context = contextInstance
+            , occurrence = i
+            , isMe = isMe
+            , binding = binding'
+            })
+      void $ lift2 $ cacheEntity rolInstanceId role
+      pure role
+
+      where
+        getIsMe :: MonadPerspectivesTransaction Boolean
+        getIsMe = do
+          case binding' of
+            Nothing -> pure false
+            Just b -> do
+              PerspectRol{isMe} <- lift2 $ getPerspectEntiteit b
+              pure isMe

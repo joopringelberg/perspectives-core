@@ -26,33 +26,34 @@ import Affjax.RequestBody as RequestBody
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (length, union)
+import Data.Array (length, nub, union)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Map (Map, lookup, insert, empty)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (over, unwrap)
+import Data.Newtype (over)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
+import Foreign.Object (Object, empty, insert, lookup)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##>>))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##=))
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Sync.Class.DeltaClass (setIndex)
 import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, transactionCloneWithDelta, users)
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<>), (>>>), (==))
+import Prelude (class Show, Unit, bind, discard, pure, unit, void, ($), (+), (<>), (==), (>=>), (>>>))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -67,14 +68,14 @@ distributeTransactie' t = do
   _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
-sendTransactieToUser :: RoleInstance -> Transaction -> MonadPerspectives Unit
+sendTransactieToUser :: String -> Transaction -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
   -- TODO controleer of hier authentication nodig is!
-  userType <- roleType_ userId
+  userType <- roleType_ (RoleInstance userId)
   getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" userType
-  mchannel <- userId ##> getChannel
+  mchannel <- (RoleInstance userId) ##> getChannel
   case mchannel of
-    Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> (unwrap userId)))
+    Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> userId))
     Just (Value channel) -> do
       cdbUrl <- getCouchdbBaseURL
       (rq :: (Request String)) <- defaultPerspectRequest
@@ -82,7 +83,7 @@ sendTransactieToUser userId t = do
       void $ onAccepted res.status [200, 201] "sendTransactieToUser"
         (onCorrectCallAndResponse "sendTransactieToUser" res.body (\(a :: PutCouchdbDocument) -> pure unit))
 
-type TransactionPerUser = Map RoleInstance Transaction
+type TransactionPerUser = Object Transaction
 
 -- | The Transaction holds Deltas and each Delta names user instances who should receive that Delta.
 -- | This function builds a custom version of the Transaction for each such user.
@@ -97,13 +98,13 @@ transactieForEachUser t@(Transaction{contextDeltas, roleDeltas, propertyDeltas, 
     )
     empty
   where
-    addDeltaToCustomisedTransactie :: forall d. DeltaUsers d => d -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
+    addDeltaToCustomisedTransactie :: forall d. Show d => DeltaUsers d => d -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
     addDeltaToCustomisedTransactie d users = do
-      trs <- get
+      sysUsers <- lift (unit ##= (\_ -> ArrayT (pure users)) >=> bottom)
       for_
-        users
-        (\(user :: RoleInstance) -> do
-          sysUser <- lift (user ##>> bottom)
+        (nub sysUsers)
+        (\(RoleInstance sysUser) -> do
+          trs <- get
           case lookup sysUser trs of
             Nothing -> put $ insert sysUser (transactionCloneWithDelta d t) trs
             Just tr -> put $ insert sysUser (addToTransaction d tr) trs

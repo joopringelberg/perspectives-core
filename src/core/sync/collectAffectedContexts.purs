@@ -25,7 +25,7 @@ import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader (lift)
 import Control.Monad.State (StateT, execStateT, get, put)
-import Data.Array (filterA, head, union)
+import Data.Array (filterA, head, nub, union)
 import Data.Array.NonEmpty (fromArray)
 import Data.Foldable (traverse_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
@@ -37,7 +37,8 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_isMe)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MonadPerspectivesTransaction, (##=), (##>>))
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MonadPerspectivesTransaction, (##=), (##>>), (###=))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
@@ -51,6 +52,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType)
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
+import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..))
 import Prelude (Unit, bind, const, discard, join, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
@@ -64,18 +66,18 @@ import Unsafe.Coerce (unsafeCoerce)
 usersWithPerspectiveOnRoleInstance ::  ContextInstance -> EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
 usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
   users1 <- do
-    contextCalculations <- lift2 $ compileDescriptions _onContextDelta_context roleType
+    contextCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_context))
     (for contextCalculations \(InvertedQuery{compilation, userTypes}) -> do
       -- Find all affected contexts, starting from the role instance of the Delta.
       (affectedContexts :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
       handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
-  roleCalculations <- lift2 $ compileDescriptions _onContextDelta_role roleType
+  roleCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_role))
   users2 <- for roleCalculations (\(InvertedQuery{compilation, userTypes}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance)
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
   -- Remove 'me'
-  lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (union users1 users2)
+  lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (nub $ union users1 users2)
 
 -- Adds an AffectedContext to the transaction and returns user instances.
 handleAffectedContexts :: Array ContextInstance -> Array RoleType -> MonadPerspectivesTransaction (Array RoleInstance)
@@ -180,7 +182,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
     otherwise -> pure []
 
   -- remove 'me'.
-  otherUsers <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (union users1 (union users2 users3))
+  otherUsers <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (nub $ union users1 (union users2 users3))
   pure $ RoleBindingDelta dr {users = otherUsers}
 
 -- | Adds users for SYNCHRONISATION, guarantees RULE TRIGGERING.
@@ -191,7 +193,7 @@ aisInPropertyDelta (RolePropertyDelta dr@{id, property})= do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
-  otherUsers <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) users
+  otherUsers <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (nub users)
   pure $ RolePropertyDelta dr {users = otherUsers}
   where
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Array InvertedQuery)
