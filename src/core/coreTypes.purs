@@ -20,7 +20,7 @@
 -- END LICENSE
 
 
-module Perspectives.CoreTypes where 
+module Perspectives.CoreTypes where
 
 import Control.Monad.Reader (ReaderT, lift)
 import Control.Monad.Writer (WriterT, runWriterT)
@@ -43,7 +43,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ActionType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType)
 import Perspectives.Sync.Transaction (Transaction)
 import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
 
@@ -92,6 +92,18 @@ assumption = Tuple
 -- | The CorrelationIdentifiers identify an effect and a query that depends (partly) on the assumption that it is
 -- | registered with.
 type AssumptionRegister = F.Object (F.Object (Array CorrelationIdentifier))
+
+-----------------------------------------------------------
+-- INFORMED ASSUMPTIONS
+-----------------------------------------------------------
+data InformedAssumption =
+	RoleAssumption ContextInstance EnumeratedRoleType
+	| Me ContextInstance
+	| Binding RoleInstance
+	| Binder RoleInstance EnumeratedRoleType
+	| Property RoleInstance EnumeratedPropertyType
+	| Context RoleInstance
+	| External ContextInstance
 
 -----------------------------------------------------------
 -- ASSIGNMENT (RULE) DEPENDENCYTRACKING
@@ -176,7 +188,7 @@ infix 1 runTypeLevelToObject as ###>>
 -----------------------------------------------------------
 -- | The QueryEnvironment accumulates Assumptions.
 
-type MonadPerspectivesQuery =  ArrayT (WriterT (Array Assumption) MonadPerspectives)
+type MonadPerspectivesQuery =  ArrayT (WriterT (Array InformedAssumption) MonadPerspectives)
 
 type MPQ = MonadPerspectivesQuery
 
@@ -202,7 +214,7 @@ runMonadPerspectivesQuery :: forall s o.
   -> (MonadPerspectives (WithAssumptions o))
 runMonadPerspectivesQuery a f = runWriterT (runArrayT (f a))
 
-type WithAssumptions o = Tuple (Array o) (Array Assumption)
+type WithAssumptions o = Tuple (Array o) (Array InformedAssumption)
 -----------------------------------------------------------
 -- EVAL TRACKINGOBJECTSGETTER TO GET AN ARRAY OF RESULTS
 -----------------------------------------------------------

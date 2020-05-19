@@ -26,7 +26,7 @@ module Perspectives.DependencyTracking.Dependency where
 -- | However, in the dependency administration we omit these newtypes.
 import Prelude
 
-import Data.Array (delete, elemIndex, partition, (:))
+import Data.Array (delete, elemIndex, filter, partition, (:))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
@@ -35,7 +35,7 @@ import Effect.Class (liftEffect)
 import Foreign.Object (Object, insert, lookup, singleton, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
-import Perspectives.CoreTypes (Assumption, MP, type (~~>), runMonadPerspectivesQuery)
+import Perspectives.CoreTypes (type (~~>), Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
@@ -84,7 +84,8 @@ registerSupportedEffect corrId ef q arg = do
   where
     apiEffectRunner :: Unit -> MP Unit
     apiEffectRunner _ = do
-      (Tuple result (assumptions :: Array Assumption)) <- runMonadPerspectivesQuery arg q
+      (Tuple result (informedAssumptions :: Array InformedAssumption)) <- runMonadPerspectivesQuery arg q
+      assumptions <- pure (map toAssumption (filter canBeUntypedAssumption informedAssumptions))
       -- destructively set the assumptions in the ActiveSupportedEffects
       (moldSupports :: Maybe SupportedEffect) <- pure $ GLS.peek activeSupportedEffects (show corrId)
       -- We have ensured a registration above, hence we can use unsafePartial.
@@ -113,8 +114,8 @@ findDependencies :: Assumption -> MP (Maybe (Array CorrelationIdentifier))
 findDependencies a@(Tuple resource tpe) = do
   r <- queryAssumptionRegister
   case lookup resource r of
-    -- The resource "AnyContext" serves as a wildcard.
-    Nothing -> case lookup "AnyContext" r of
+    -- The resource "model:System$AnyContext" serves as a wildcard.
+    Nothing -> case lookup "model:System$AnyContext" r of
       Nothing -> pure Nothing
       Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
     Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
@@ -171,3 +172,21 @@ deregisterDependency corrId (Tuple resource tpe) = queryAssumptionRegisterModify
     Just (typesForResource :: Object (Array CorrelationIdentifier)) -> case lookup tpe typesForResource of
       Nothing -> r
       Just correlationIdentifiers -> insert resource (insert tpe (delete corrId correlationIdentifiers) typesForResource) r
+
+toAssumption :: InformedAssumption -> Assumption
+toAssumption (RoleAssumption ci rt) = assumption (unwrap ci) (unwrap rt)
+toAssumption (Me ci) = assumption (unwrap ci) "model:System$Context$Me"
+toAssumption (Binding ri) = assumption (unwrap ri) "model:System$Role$binding"
+toAssumption (Binder ri rt) = assumption (unwrap ri) (unwrap rt)
+toAssumption (Property ri pt) = assumption (unwrap ri) (unwrap pt)
+toAssumption (Context ri) = assumption (unwrap ri) "model:System$Role$context"
+toAssumption (External ci) = assumption (unwrap ci) "model:System$Context$external"
+
+canBeUntypedAssumption :: InformedAssumption -> Boolean
+canBeUntypedAssumption (RoleAssumption _ _) = true
+canBeUntypedAssumption (Me c_) = true
+canBeUntypedAssumption (Binding _) = true
+canBeUntypedAssumption (Binder _ _) = true
+canBeUntypedAssumption (Property _ _) = true
+canBeUntypedAssumption (Context _) = false
+canBeUntypedAssumption (External _) = false

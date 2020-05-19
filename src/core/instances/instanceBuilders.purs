@@ -154,7 +154,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
       , context = contextInstanceId
       , binding = Nothing
       })
-  (lift $ lift2 $ findRoleRequests (ContextInstance "AnyContext") (EnumeratedRoleType $ unwrap pspType <> "$External")) >>= lift <<< addCorrelationIdentifiersToTransactie
+  (lift $ lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (EnumeratedRoleType $ unwrap pspType <> "$External")) >>= lift <<< addCorrelationIdentifiersToTransactie
   case externeProperties of
     (PropertySerialization props) -> lift do
       forWithIndex_ props \propertyTypeId values ->
