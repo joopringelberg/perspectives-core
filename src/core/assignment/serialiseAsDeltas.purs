@@ -97,6 +97,7 @@ serialisedAsDeltasFor_ cid userId userType = do
         shouldBeSent <- lift2 (userType ###>> roleIsInPerspectiveOf (ENR typeOfBinding))
         -- On adding the delta, we check whether it has been serialised before in this transaction.
         when shouldBeSent do
+          -- TODO. Serialiseer de context niet als de ander er al een rol bij speelt!
           serialisedAsDeltasFor_ c userId userType
           addRoleDelta (RoleBindingDelta
             { id : roleInstance

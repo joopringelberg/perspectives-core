@@ -30,6 +30,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
+import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (empty, fromFoldable)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
@@ -57,7 +58,8 @@ import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<
 -- | Bind the new Channel to MySystem in the role Channels.
 createChannel :: MonadPerspectivesTransaction ContextInstance
 createChannel = do
-  channelName <- pure ("channel_" <> (show $ guid unit))
+  g <- liftEffect guid
+  channelName <- pure ("channel_" <> (show g))
   channel <- createChannelContext channelName
   lift2 $ ensureAuthentication (createDatabase channelName)
   pure channel
@@ -96,12 +98,15 @@ createChannelContext channelName = do
       pure channel
 
 -- | Add the second user to the channel: not the Initiator, but the ConnectedPartner.
-addPartnerToChannel :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
-addPartnerToChannel (RoleInstance usr) (ContextInstance channel) = void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
+addPartnerToChannel :: RoleInstance -> ContextInstance -> Host -> Port -> MonadPerspectivesTransaction Unit
+addPartnerToChannel (RoleInstance usr) (ContextInstance channel) host port = void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
   channel
   (RolSerialization
     { id: Nothing
-    , properties: PropertySerialization empty,
+    , properties: PropertySerialization $ fromFoldable
+      [ Tuple "model:System$PhysicalContext$UserWithAddress$Host" [host]
+      , Tuple "model:System$PhysicalContext$UserWithAddress$Port" [show port]
+      ],
     binding: Just usr})
 
 type Host = String

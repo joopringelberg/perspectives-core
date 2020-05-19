@@ -21,6 +21,7 @@
 
 module Perspectives.Instances.SerialiseAsJson where
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, execStateT, gets, modify)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Control.Plus (empty, void)
@@ -32,24 +33,28 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
+import Effect.Exception (error)
 import Foreign.Class (encode)
 import Foreign.Object (Object, singleton, empty, toUnfoldable, fromFoldable) as OBJ
 import Global.Unsafe (unsafeStringify)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.CoreTypes (MPQ, MonadPerspectives, MPT, (###>>), (##>>))
+import Perspectives.CollectAffectedContexts (lift2)
+import Perspectives.CoreTypes (MPQ, MPT, MonadPerspectives, (###>>), (##>>), (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.ObjectGetters (context, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (bottom, context, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value(..), externalRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..), externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
-import Perspectives.Sync.Channel (createChannel)
+import Perspectives.Sync.Channel (addPartnerToChannel, createChannel)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Prelude (class Monad, Unit, bind, discard, eq, map, pure, when, ($), (<$>), (>>=), (&&), not, (>>>))
+import Perspectives.User (getHost, getPort)
+import Prelude (class Monad, Unit, bind, discard, eq, map, pure, when, ($), (<$>), (>>=), (&&), not, (>>>), (<>), show)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A function for the External Core Module `model:Serialise`. The first argument should be a singleton holding
@@ -134,6 +139,7 @@ serialiseAsJsonFor_ userType cid = do
           doneBefore <- hasContextBeenDone c
           typeOfBinding <- lift (b ##>> roleType)
           allowed <- lift (userType ###>> roleIsInPerspectiveOf (ENR typeOfBinding))
+          -- TODO. Serialiseer de context niet als de ander er al een rol bij speelt!
           when (allowed && not doneBefore) (serialiseAsJsonFor_ userType c)
           pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: if allowed then map unwrap binding else Nothing}
 
@@ -151,10 +157,28 @@ addChannel invitation = createChannel >>= \channel -> void $ createAndAddRoleIns
   (unwrap invitation)
   (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
 
+addConnectedPartnerToChannel :: Array String -> Array String -> (ContextInstance -> MPT Unit)
+addConnectedPartnerToChannel userArr channelArr cid = do
+  log $ "addConnectedPartnerToChannel " <> show userArr <> " en " <> show channelArr
+  case ARR.head userArr of
+    Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the first argument.")
+    Just r -> do
+      sysUser <- lift2 ((RoleInstance r) ##> bottom)
+      case sysUser of
+        Nothing -> throwError (error "addConnectedPartnerToChannel: first argument is not a User Role (this error may not occur).")
+        Just usr -> case ARR.head channelArr of
+          Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the second argument.")
+          Just channelId -> do
+            log $ "addConnectedPartnerToChannel " <> show usr <> " en " <> show channelId
+            host <- lift2 getHost
+            port <- lift2 getPort
+            addPartnerToChannel usr (ContextInstance channelId) host port
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model:Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1}
   , Tuple "model:Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0}
+  , Tuple "model:Serialise$AddConnectedPartnerToChannel" {func: unsafeCoerce addConnectedPartnerToChannel, nArgs: 2}
   ]
