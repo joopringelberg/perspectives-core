@@ -50,15 +50,16 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContext
 import Perspectives.External.CoreModules (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.InvertedQuery (QueryWithAKink(..))
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (hasAccessToPropertiesOf, setInvertedQueriesForUserAndRole)
-import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeSequence)
+import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range, traverseQfd)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
@@ -336,12 +337,15 @@ invertedQueriesForLocalRolesAndProperties = do
     invertedQueriesForLocalRolesAndProperties' :: DomeinFileRecord -> PhaseThree Unit
     invertedQueriesForLocalRolesAndProperties' {enumeratedRoles} = do
       for_ enumeratedRoles
-        \(EnumeratedRole {_id, context, mandatory}) -> do
+        \(EnumeratedRole {_id, context, mandatory, functional}) -> do
           (userTypes :: Array RoleType) <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
-          qfd <- pure $ (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory))
+          qwk <- pure $ ZQ
+            (Just (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory)))
+            (Just (SQD (CDOM (ST context)) (QF.RolGetter (ENR _id)) (RDOM (ST _id)) True (bool2threeValued mandatory)))
+          -- qfd <- pure $ (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) (bool2threeValued functional) (bool2threeValued mandatory))
           for_ userTypes \user -> do
             props <- lift $ lift (user `hasAccessToPropertiesOf` (ENR _id))
-            setInvertedQueriesForUserAndRole user (ST _id) props qfd
+            setInvertedQueriesForUserAndRole user (ST _id) props qwk
 
 -- | The calculation of a CalculatedRole or a CalculatedProperty are both expressions. This function compiles the
 -- | parser AST output that represents these expressions to QueryFunctionDescriptions.

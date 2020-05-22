@@ -44,7 +44,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.Instances.ObjectGetters (bottom)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
-import Perspectives.InvertedQuery (InvertedQuery(..))
+import Perspectives.InvertedQuery (InvertedQuery(..), backwards)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
@@ -54,7 +54,7 @@ import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..))
-import Prelude (Unit, bind, const, discard, join, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=))
+import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -244,8 +244,8 @@ compile :: InvertedQuery -> MP InvertedQuery
 compile ac@(InvertedQuery{description, compilation, userTypes}) = case compilation of
   Just c -> pure ac
   Nothing -> do
-    c <- getHiddenFunction description
-    pure $ InvertedQuery{description, compilation: Just (unsafeCoerce c), userTypes}
+    c <- traverse getHiddenFunction (backwards description)
+    pure $ InvertedQuery{description, compilation: (map unsafeCoerce c), userTypes}
 
 _onContextDelta_context :: CalculationsLens
 _onContextDelta_context = prop (SProxy :: SProxy "onContextDelta_context")

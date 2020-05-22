@@ -44,7 +44,7 @@ import Foreign.Object (lookup, insert)
 import Perspectives.CoreTypes (type (~~~>), MP, (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), addInvertedQuery)
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInvertedQuery)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
 import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
@@ -57,24 +57,24 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (isElementOf)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.ThreeValuedLogic (bool2threeValued)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 
 -- | For a User RoleType, and an ADT EnumeratedRoleType that represents the Object of a Perspective,
 -- | construct and distribute InvertedQueries that ensure that this User is notified of changes to the role,
 -- | its binding and its properties, recursively.
-setInvertedQueriesForUserAndRole :: RoleType -> ADT EnumeratedRoleType -> RelevantProperties -> QueryFunctionDescription -> PhaseThree Boolean
-setInvertedQueriesForUserAndRole user (ST role) props invertedQ = case props of
+setInvertedQueriesForUserAndRole :: RoleType -> ADT EnumeratedRoleType -> RelevantProperties -> QueryWithAKink -> PhaseThree Boolean
+setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
   All -> do
-    -- store invertedQ in onContextDelta_context of role
-    addToRole invertedQ role
+    -- store qWithAkink in onContextDelta_context of role
+    addToRole qWithAkink role
   -- for each property of role, store (Value2Role >> invertedQ) in onPropertyDelta of that property
-    (lift2 $ getEnumeratedRole role) >>= \(EnumeratedRole{properties}) -> addToProperties invertedQ properties
+    (lift2 $ getEnumeratedRole role) >>= \(EnumeratedRole{properties}) -> addToProperties qWithAkink properties
     -- get the binding of role
     (b :: ADT EnumeratedRoleType) <- (lift2 $ getEnumeratedRole role) >>= pure <<< _.binding <<< unwrap
     -- recursive call
-    void $ (lift2 $ addBindingStep b invertedQ) >>= setInvertedQueriesForUserAndRole user b props
+    void $ (lift2 $ addBindingStep b qWithAkink) >>= setInvertedQueriesForUserAndRole user b props
     pure true
   Properties relevant -> do
     (propsOfRole :: Array EnumeratedPropertyType) <- lift2 $ filterA isPropertyOfRole relevant
@@ -82,52 +82,54 @@ setInvertedQueriesForUserAndRole user (ST role) props invertedQ = case props of
       then do
         -- get the binding of role
         (b :: ADT EnumeratedRoleType) <- (lift2 $ getEnumeratedRole role) >>= pure <<< _.binding <<< unwrap
-        bindingCarriesProperty <- (lift2 $ addBindingStep b invertedQ) >>= setInvertedQueriesForUserAndRole user b props
+        bindingCarriesProperty <- (lift2 $ addBindingStep b qWithAkink) >>= setInvertedQueriesForUserAndRole user b props
         if bindingCarriesProperty
           then do
-            -- store invertedQ in onContextDelta_context of role
-            addToRole invertedQ role
+            -- store qWithAkink in onContextDelta_context of role
+            addToRole qWithAkink role
             pure true
           else pure false
       else do
-      -- for each property in propsOfRole, store (Value2Role >> invertedQ) in onPropertyDelta of that property
-      addToProperties invertedQ (ENP <$> propsOfRole)
+      -- for each property in propsOfRole, store (Value2Role >> qWithAkink) in onPropertyDelta of that property
+      addToProperties qWithAkink (ENP <$> propsOfRole)
       -- get the binding of role
       (b :: ADT EnumeratedRoleType) <- (lift2 $ getEnumeratedRole role) >>= pure <<< _.binding <<< unwrap
-      void $ (lift2 $ addBindingStep b invertedQ) >>= setInvertedQueriesForUserAndRole user b props
+      void $ (lift2 $ addBindingStep b qWithAkink) >>= setInvertedQueriesForUserAndRole user b props
       pure true
 
   where
-    addToRole :: QueryFunctionDescription -> EnumeratedRoleType -> PhaseThree Unit
-    addToRole invertedQ'@(SQD _ (DataTypeGetter ContextF)_ _ _) r@(EnumeratedRoleType roleId) =
-      modifyDF \df@{enumeratedRoles:roles} ->
-        case lookup roleId roles of
-          Nothing -> addInvertedQueryForDomain roleId
-            (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]})
-            OnContextDelta_context
-            df
-          Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]}) onContextDelta_context }) roles}
-    -- We by construction can safely assume the other case is the composition created by addBinding.
-    addToRole invertedQ' r@(EnumeratedRoleType roleId) =
-      modifyDF \df@{enumeratedRoles:roles} ->
-        case lookup roleId roles of
-          Nothing -> addInvertedQueryForDomain roleId
-            (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]})
-            OnRoleDelta_binder
-            df
-          Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: invertedQ', compilation: Nothing, userTypes: [user]}) onRoleDelta_binder }) roles}
+    addToRole :: QueryWithAKink -> EnumeratedRoleType -> PhaseThree Unit
+    addToRole qwk@(ZQ backwards _) r@(EnumeratedRoleType roleId) =
+      case backwards of
+        Just (SQD _ (DataTypeGetter ContextF)_ _ _) -> modifyDF \df@{enumeratedRoles:roles} ->
+          case lookup roleId roles of
+            Nothing -> addInvertedQueryForDomain roleId
+              (InvertedQuery {description: qwk, compilation: Nothing, userTypes: [user]})
+              OnContextDelta_context
+              df
+            Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery (InvertedQuery {description: qwk, compilation: Nothing, userTypes: [user]}) onContextDelta_context }) roles}
+        -- We by construction can safely assume the other case is the composition created by addBinding.
+        Just _ -> modifyDF \df@{enumeratedRoles:roles} ->
+          case lookup roleId roles of
+            Nothing -> addInvertedQueryForDomain roleId
+              (InvertedQuery {description: qwk, compilation: Nothing, userTypes: [user]})
+              OnRoleDelta_binder
+              df
+            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: qwk, compilation: Nothing, userTypes: [user]}) onRoleDelta_binder }) roles}
+        otherwise -> pure unit
 
-    addToProperties :: QueryFunctionDescription -> Array PropertyType -> PhaseThree Unit
-    addToProperties invertedQ' roleProps = for_ roleProps \prop -> case prop of
+    addToProperties :: QueryWithAKink -> Array PropertyType -> PhaseThree Unit
+    addToProperties qwk@(ZQ backwards forwards) roleProps = for_ roleProps \prop -> case prop of
       ENP pr@(EnumeratedPropertyType p) -> do
-        invertedQ'' <- lift2 $ prependValue2Role (ENP pr) invertedQ'
+        backwards' <- lift2 $ traverse (prependValue2Role (ENP pr)) backwards
+        forwards' <- lift2 $ traverse (postPendProp (ENP pr)) forwards
         modifyDF \df@{enumeratedProperties} -> do
           case lookup p enumeratedProperties of
             Nothing -> addInvertedQueryForDomain p
-              (InvertedQuery {description: invertedQ'', compilation: Nothing, userTypes: [user]})
+              (InvertedQuery {description: ZQ forwards' backwards', compilation: Nothing, userTypes: [user]})
               OnPropertyDelta
               df
-            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: invertedQ'', compilation: Nothing, userTypes: [user]}) onPropertyDelta}) enumeratedProperties}
+            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ forwards' backwards', compilation: Nothing, userTypes: [user]}) onPropertyDelta}) enumeratedProperties}
         pure unit
       _ -> pure unit
 
@@ -136,13 +138,22 @@ setInvertedQueriesForUserAndRole user (ST role) props invertedQ = case props of
       fun <- propertyTypeIsFunctional p
       man <- propertyTypeIsMandatory p
       range <- rangeOfPropertyType p
-      pure $ makeComposition (SQD (RDOM (ST role)) (Value2Role p) (VDOM range (Just p)) (bool2threeValued fun) (bool2threeValued man)) qfd
+      pure $ makeComposition (SQD (VDOM range (Just p)) (Value2Role p) (RDOM (ST role)) True True) qfd
 
-    addBindingStep :: ADT EnumeratedRoleType -> QueryFunctionDescription -> MP QueryFunctionDescription
-    addBindingStep b qfd = do
+    postPendProp :: PropertyType -> QueryFunctionDescription -> MP QueryFunctionDescription
+    postPendProp p qfd = do
+      fun <- propertyTypeIsFunctional p
+      man <- propertyTypeIsMandatory p
+      range <- rangeOfPropertyType p
+      pure $ makeComposition (SQD (VDOM range (Just p)) (PropertyGetter p) (VDOM range (Just p)) (bool2threeValued fun) (bool2threeValued man)) qfd
+
+    addBindingStep :: ADT EnumeratedRoleType -> QueryWithAKink -> MP QueryWithAKink
+    addBindingStep b (ZQ backwards forwards) = do
       fun <- getEnumeratedRole role >>= functional
       man <- getEnumeratedRole role >>= mandatory
-      pure $ makeComposition (SQD (RDOM b) (DataTypeGetterWithParameter GetRoleBindersF (unwrap role)) (RDOM (ST role)) (bool2threeValued fun) (bool2threeValued man)) qfd
+      backwards' <- pure $ makeComposition (SQD (RDOM b) (DataTypeGetterWithParameter GetRoleBindersF (unwrap role)) (RDOM (ST role)) (bool2threeValued fun) (bool2threeValued man)) <$> backwards
+      forwards' <- pure $ makeComposition (SQD (RDOM (ST role)) (DataTypeGetter BindingF) (RDOM b) (bool2threeValued fun) (bool2threeValued man)) <$> forwards
+      pure $ ZQ backwards' forwards'
 
     -- | Collect the Properties defined on the EnumeratedRoleType and its Aspect Roles.
     -- | Returns true iff the property is one of them.

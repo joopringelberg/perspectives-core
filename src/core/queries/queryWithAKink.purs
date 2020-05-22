@@ -29,6 +29,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.InvertedQuery (QueryWithAKink(..))
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setPathForStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -48,17 +49,6 @@ import Prelude (class Show, Unit, append, bind, join, map, pure, unit, ($), (<$>
 --------------------------------------------------------------------------------------------------------------
 ---- ZIPPEDQUERY
 --------------------------------------------------------------------------------------------------------------
--- | A QueryWithAKink represents a query as seen from a specific station (context or role) that is visited by some
--- | original query. The forwards part describes a query that will run from the station to its original query's end;
--- | the backwards part is a query that will run from the station to the original queries beginning.
-data QueryWithAKink = ZQ (Maybe QueryFunctionDescription) (Maybe QueryFunctionDescription)
-
-forwards :: QueryWithAKink -> Maybe QueryFunctionDescription
-forwards (ZQ _ forward) = forward
-
-backwards :: QueryWithAKink -> Maybe QueryFunctionDescription
-backwards (ZQ backward _) = backward
-
 -- This we use in the invert_ function.
 data QueryWithAKink_ = ZQ_ (Array QueryFunctionDescription) (Maybe QueryFunctionDescription)
 
@@ -150,12 +140,12 @@ invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q
 setInvertedQueries :: Array RoleType -> QueryFunctionDescription -> PhaseThree Unit
 setInvertedQueries userTypes qfd = do
   (zqs :: (Array QueryWithAKink)) <- ensureContextDomain qfd >>= invert
-  for_ zqs \(ZQ backward forward) -> case backward of
-    (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 b userTypes
+  for_ zqs \qwk@(ZQ backward forward) -> case backward of
+    (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk userTypes
     (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
     -- Assuming an SQD otherwise
     -- (Just b) -> unsafePartial $ setPathForStep b b userTypes
-    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b b userTypes
+    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk userTypes
     (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
     Nothing -> pure unit
 

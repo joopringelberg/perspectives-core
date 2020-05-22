@@ -28,7 +28,7 @@ import Data.Newtype (unwrap)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..))
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (domain2RoleType)
@@ -40,7 +40,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (Unit, pure, unit, ($))
 
-setPathForStep :: Partial => QueryFunctionDescription -> QueryFunctionDescription -> Array RoleType -> PhaseThree Unit
+setPathForStep :: Partial => QueryFunctionDescription -> QueryWithAKink -> Array RoleType -> PhaseThree Unit
 setPathForStep (SQD dom qf ran _ _) path userTypes = case qf of
   QF.Value2Role pt -> case pt of
     ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
@@ -105,17 +105,17 @@ setPathForStep (SQD dom qf ran _ _) path userTypes = case qf of
   _ -> throwError $ Custom "setInvertedQueries: there should be no other cases. This is a system programming error."
 
   where
-    addPathToProperty :: EnumeratedProperty -> QueryFunctionDescription -> EnumeratedProperty
+    addPathToProperty :: EnumeratedProperty -> QueryWithAKink -> EnumeratedProperty
     addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = union onPropertyDelta [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
 
-    addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
+    addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
     addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = union onRoleDelta_binder [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})] }
 
-    addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
+    addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
     addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = union onRoleDelta_binding [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
 
-    addPathToOnContextDelta_context :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
+    addPathToOnContextDelta_context :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
     addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = union onContextDelta_context [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
 
-    addPathToOnContextDelta_role :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
+    addPathToOnContextDelta_role :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
     addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = union onContextDelta_role [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}

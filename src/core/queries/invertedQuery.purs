@@ -45,7 +45,7 @@ import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.TypeIdentifiers (RoleType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
-newtype InvertedQuery = InvertedQuery {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction), userTypes :: Array RoleType}
+newtype InvertedQuery = InvertedQuery {description :: QueryWithAKink, compilation :: (Maybe HiddenFunction), userTypes :: Array RoleType}
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _
 derive instance newtypeInvertedQuery :: Newtype InvertedQuery _
@@ -75,3 +75,34 @@ addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
 addInvertedQuery q@(InvertedQuery{userTypes}) qs = case findIndex (equalDescriptions q) qs of
   Nothing -> cons q qs
   Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes userTypes) qs
+
+--------------------------------------------------------------------------------------------------------------
+---- QUERYWITHAKINK
+--------------------------------------------------------------------------------------------------------------
+-- | A QueryWithAKink represents a query as seen from a specific station (context or role) that is visited by some
+-- | original query. The forwards part describes a query that will run from the station to its original query's end;
+-- | the backwards part is a query that will run from the station to the original queries beginning.
+data QueryWithAKink = ZQ (Maybe QueryFunctionDescription) (Maybe QueryFunctionDescription)
+
+forwards :: QueryWithAKink -> Maybe QueryFunctionDescription
+forwards (ZQ _ forward) = forward
+
+backwards :: QueryWithAKink -> Maybe QueryFunctionDescription
+backwards (ZQ backward _) = backward
+
+derive instance genericQueryWithAKink :: Generic QueryWithAKink _
+
+instance showQueryWithAKink :: Show QueryWithAKink where
+  show = genericShow
+
+instance prettyPrintQueryWithAKink :: PrettyPrint QueryWithAKink where
+  prettyPrint' tab (ZQ bw fw) = "QueryWithAKink\n" <> (prettyPrint' (tab <> "  ") bw) <> (prettyPrint' (tab <> "  ") fw)
+
+instance eqQueryWithAKink :: Eq QueryWithAKink where
+  eq = genericEq
+
+instance encodeQueryWithAKink :: Encode QueryWithAKink where
+  encode = genericEncode defaultOptions
+
+instance decodeQueryWithAKink :: Decode QueryWithAKink where
+  decode = genericDecode defaultOptions
