@@ -12,7 +12,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
-import Effect.Class.Console (logShow, log)
+import Effect.Class.Console (logShow)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, runTypeLevelToArray, (###=))
@@ -42,7 +42,6 @@ import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
-import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -587,7 +586,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (RoleDoesNotBind _ _ _)) -> assert "ok" true
               otherwise -> do
-                -- logShow otherwise
+                logShow otherwise
                 assert "Expected the error RoleDoesNotBind" false
 
   test "Bind: binding not a role" do

@@ -22,20 +22,28 @@
 module Perspectives.Query.Kinked where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (null, uncons)
+import Control.Monad.Trans.Class (lift)
+import Data.Array (catMaybes, cons, foldr, null, uncons, unsnoc)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Data.Traversable (traverse)
+import Data.Traversable (for_, traverse)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setPathForStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.Inversion (compose, inversionIsFunctional, inversionIsMandatory, invertFunction)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, replaceDomain)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
-import Perspectives.Representation.Class.Role (getCalculation, getRole)
+import Perspectives.Representation.Class.Role (contextOfADT, getCalculation, getRole)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
 import Perspectives.Utilities (prettyPrint)
-import Prelude (append, bind, join, map, pure, ($), (<$>), (<*>), (<>), (>=>), (>>=))
+import Prelude (class Show, Unit, append, bind, join, map, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
 
 --------------------------------------------------------------------------------------------------------------
 ---- ZIPPEDQUERY
@@ -43,68 +51,120 @@ import Prelude (append, bind, join, map, pure, ($), (<$>), (<*>), (<>), (>=>), (
 -- | A QueryWithAKink represents a query as seen from a specific station (context or role) that is visited by some
 -- | original query. The forwards part describes a query that will run from the station to its original query's end;
 -- | the backwards part is a query that will run from the station to the original queries beginning.
-data QueryWithAKink = ZQ QueryFunctionDescription QueryFunctionDescription
+data QueryWithAKink = ZQ (Maybe QueryFunctionDescription) (Maybe QueryFunctionDescription)
 
-forwards :: QueryWithAKink -> QueryFunctionDescription
+forwards :: QueryWithAKink -> Maybe QueryFunctionDescription
 forwards (ZQ _ forward) = forward
 
-backwards :: QueryWithAKink -> QueryFunctionDescription
+backwards :: QueryWithAKink -> Maybe QueryFunctionDescription
 backwards (ZQ backward _) = backward
 
+-- This we use in the invert_ function.
+data QueryWithAKink_ = ZQ_ (Array QueryFunctionDescription) (Maybe QueryFunctionDescription)
+
+derive instance genericQueryWithAKink_ :: Generic QueryWithAKink_ _
+
+instance showQueryWithAKink_ :: Show QueryWithAKink_ where
+  show = genericShow
 --------------------------------------------------------------------------------------------------------------
 ---- INVERT
 --------------------------------------------------------------------------------------------------------------
--- | Invert
+-- | From a query, return a collection of paths that run from some station in the original direction to the query end
+-- | result and in reverse direction to the query start.
+-- | The original query is 'kinked' at the station.
+-- | The result is a collection of all possible inverse paths, kinked at all possible stations.
+-- | As the domain of the original query can be either a ContextType, or an EnumeratedRoleType, the range of the
+-- | inverted parts can be a ContextType or an EnumeratedRoleType, too.
 invert :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink)
-invert (MQD _ _ args _ _ _) = join <$> traverse invert args
+invert = invert_ >=> traverse h >=> pure <<< catMaybes
+  where
+    h :: QueryWithAKink_ -> PhaseThree (Maybe QueryWithAKink)
+    h (ZQ_ steps q) = case unsnoc steps of
+      Nothing -> pure Nothing
+      -- Creates a right-associative composition that preserves the order in steps.
+      Just {init, last} -> pure $ Just $ ZQ (Just $ foldr compose last init) q
 
-invert q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
-  (BQD _ (BinaryCombinator ConjunctionF) conj1 conj2 _ _ _) -> append <$> invert (compose conj1 r) <*> invert (compose conj2 r)
+invert_ :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink_)
+invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
 
-  (BQD _ (BinaryCombinator FilterF) source criterium ran _ _) -> append <$> invert (compose source criterium) <*> invert (compose source r)
+invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
+  (BQD _ (BinaryCombinator ConjunctionF) conj1 conj2 _ _ _) -> append <$> invert_ (compose conj1 (replaceDomain r (range conj1))) <*> invert_ (compose conj2 (replaceDomain r (range conj2)))
 
-  (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _) -> invert (BQD dom (BinaryCombinator ComposeF) qfd1 (BQD (range qfd1) (BinaryCombinator ComposeF) qfd2 r ran f m) ran f m)
+  (BQD _ (BinaryCombinator FilterF) source criterium ran _ _) -> append <$> invert_ (compose source criterium) <*> invert_ (compose source r)
+
+  (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _) -> invert_ (BQD dom (BinaryCombinator ComposeF) qfd1 (BQD (range qfd1) (BinaryCombinator ComposeF) qfd2 r ran f m) ran f m)
+
+  (SQD _ (VariableLookup varName) _ _ _) -> do
+    varExpr <- lookupVariableBinding varName
+    case varExpr of
+      Nothing -> pure []
+      Just qfd -> invert_ (compose qfd r)
 
   otherwise -> do
-    left <- invert l
+    left <- invert_ l
     case uncons left of
-      Just {head, tail} -> if null tail
+      Just {head:(ZQ_ l_ _), tail} -> if null tail
         then do
-          zippedQueries <- invert r
-          -- Now we invert the order of l and r.
-          pure $ zippedQueries <> map (\zippedQuery -> ZQ (compose (backwards zippedQuery) (backwards head)) q)
-            zippedQueries
-        else throwError (Custom $ "Perspectives.Query.Zipped invert: expected single term on the left in composition: " <> prettyPrint l)
-      Nothing -> throwError (Custom $ "Perspectives.Query.Zipped invert: query gives no inversion: " <> prettyPrint l)
+          zippedQueries <- invert_ r
+          -- Now we invert_ the order of l and r.
+          pure $ cons (ZQ_ l_ (Just q))
+            (map (\(ZQ_ r_ q') -> ZQ_ (r_ <> l_) q') zippedQueries)
+        else throwError (Custom $ "Perspectives.Query.Zipped invert_: expected single term on the left in composition: " <> prettyPrint l)
+      Nothing -> pure [ZQ_ [] Nothing]
 
-invert (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert (compose source criterium)
+invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ (compose source criterium)
 
-invert (BQD _ (BinaryCombinator f) qfd1 qfd2 _ _ _) = append <$> invert qfd1 <*> invert qfd2
+invert_ (BQD _ (BinaryCombinator f) qfd1 qfd2 _ _ _) = append <$> invert_ qfd1 <*> invert_ qfd2
 
-invert (UQD _ _ qfd _ _ _) = invert qfd
+invert_ (UQD _ _ qfd _ _ _) = invert_ qfd
 
-invert (SQD dom (Constant _ _) ran _ _) = pure []
+invert_ (SQD dom (Constant _ _) ran _ _) = pure []
 
-invert q@(SQD dom (RolGetter rt) ran _ _) = case rt of
-  ENR _ -> pure [ZQ (SQD ran (DataTypeGetter ContextF) dom (inversionIsFunctional (RolGetter rt)) (inversionIsMandatory (RolGetter rt))) q]
-  CR r -> (lift2 $ (getRole >=> getCalculation) rt) >>= invert
+invert_ (SQD dom (RolGetter rt) ran _ _) = case rt of
+  ENR _ -> pure [ZQ_ [(SQD ran (DataTypeGetter ContextF) dom (inversionIsFunctional (RolGetter rt)) (inversionIsMandatory (RolGetter rt)))] Nothing]
+  CR r -> (lift2 $ (getRole >=> getCalculation) rt) >>= invert_
 
-invert (SQD dom (PropertyGetter (CP prop)) ran _ _) = (lift2 $ (getCalculatedProperty >=> calculation) prop) >>= invert
+invert_ (SQD dom (PropertyGetter (CP prop)) ran _ _) = (lift2 $ (getCalculatedProperty >=> calculation) prop) >>= invert_
 
-invert (SQD dom (DataTypeGetter CountF) ran _ _) = pure []
+invert_ (SQD dom (DataTypeGetter CountF) ran _ _) = pure []
 
   -- Treat a variable by looking up its definition (a QueryFunctionDescription), inverting it and inserting it.
-invert (SQD dom (VariableLookup varName) _ _ _) = do
+invert_ (SQD dom (VariableLookup varName) _ _ _) = do
   varExpr <- lookupVariableBinding varName
   case varExpr of
     Nothing -> pure []
-    Just qfd -> invert qfd
+    Just qfd -> invert_ qfd
 
-invert q@(SQD dom f ran _ _) = do
+invert_ (SQD dom f ran _ _) = do
   minvertedF <- pure $ invertFunction dom f ran
   case minvertedF of
     Nothing -> pure []
-    Just invertedF -> pure [ZQ (SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f)) q]
+    Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f))] Nothing]
 
 -- Catchall.
-invert q = throwError (Custom $ "Missing case in invertFunctionDescription_ for: " <> prettyPrint q)
+invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q)
+
+--------------------------------------------------------------------------------------------------------------
+---- SET INVERTED QUERIES
+--------------------------------------------------------------------------------------------------------------
+setInvertedQueries :: Array RoleType -> QueryFunctionDescription -> PhaseThree Unit
+setInvertedQueries userTypes qfd = do
+  (zqs :: (Array QueryWithAKink)) <- ensureContextDomain qfd >>= invert
+  for_ zqs \(ZQ backward forward) -> case backward of
+    (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 b userTypes
+    (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
+    -- Assuming an SQD otherwise
+    -- (Just b) -> unsafePartial $ setPathForStep b b userTypes
+    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b b userTypes
+    (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
+    Nothing -> pure unit
+
+  where
+    -- For a query that has a Role domain, we add a step from context to role.
+    -- This guarantees that the inverse query has a context domain.
+    -- Note that this is equivalent to addContextToPropertyQuery in Perspectives.Query.Inversion.
+    ensureContextDomain :: QueryFunctionDescription -> PhaseThree QueryFunctionDescription
+    ensureContextDomain q = case domain q of
+      (RDOM dom@(ST et)) -> (lift $ lift $ contextOfADT dom) >>= \c -> pure $
+        makeComposition (SQD (CDOM c) (RolGetter (ENR et)) (RDOM dom) Unknown Unknown) q
+      otherwise -> pure q

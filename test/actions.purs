@@ -7,13 +7,14 @@ import Data.Array (length, null)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Perspectives.CoreTypes ((##=))
+import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, binding, getProperty, getEnumeratedRoleInstances)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
-import Test.Perspectives.Utils (runP, withSystem)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
+import Test.Perspectives.Utils (runP, withModel_, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -50,8 +51,9 @@ theSuite = suite "Perspectives.Actions" do
           else liftAff $ assert ("There are instance errors:\n" <> show instanceErrors) false
       else liftAff $ assert ("There are model errors:\n" <> show modelErrors) false
 
+  -- testOnly "compileAssignment: Move" $ runP $ withModel_ (DomeinFileId "model:System") false do
   test "compileAssignment: Move" $ runP $ withSystem do
-    modelErrors <- loadCompileAndCacheArcFile' "actions" testDirectory
+    modelErrors <- loadCompileAndSaveArcFile' "actionsTestcase3" testDirectory
     if null modelErrors
       then do
         instanceErrors <- loadAndSaveCrlFile "actionsTestcase3.crl" testDirectory
@@ -64,6 +66,7 @@ theSuite = suite "Perspectives.Actions" do
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
 
+  -- test "compileAssignment: Bind" $ runP $ withModel_ (DomeinFileId "model:System") false do
   test "compileAssignment: Bind" $ runP $ withSystem do
     modelErrors <- loadCompileAndCacheArcFile' "actions" testDirectory
     if null modelErrors

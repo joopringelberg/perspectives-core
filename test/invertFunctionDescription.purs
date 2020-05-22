@@ -28,8 +28,8 @@ import Perspectives.Representation.Class.PersistentType (getAction)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), PropertyType(..))
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
-import Test.Perspectives.Utils (runP)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile')
+import Test.Perspectives.Utils (runP, withModel_, withSystem)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip, suiteOnly)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
@@ -37,8 +37,21 @@ import Text.Parsing.Parser (ParseError)
 testDirectory :: String
 testDirectory = "test"
 
+modelDirectory :: String
+modelDirectory = "src/model"
+
 theSuite :: Free TestF Unit
 theSuite = suite "Test.Query.Inversion" do
+
+  -- testOnly "InverseQueries" $ runP $ withSystem do
+  test "InverseQueries" $ runP $ do
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    modelErrors <- loadCompileAndSaveArcFile' "invertedQueryTest" "test"
+    -- logShow modelErrors
+    -- logShow (length modelErrors)
+    liftAff $ assert "There should be no model errors" (null modelErrors)
+    when (length modelErrors > 0) (logShow modelErrors)
+
 
   test "Invert a rule condition on a CalculatedProperty" (runP do
       modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory

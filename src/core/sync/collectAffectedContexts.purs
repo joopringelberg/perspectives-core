@@ -73,7 +73,7 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
       handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
   roleCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_role))
   users2 <- for roleCalculations (\(InvertedQuery{compilation, userTypes}) -> do
-    -- Find all affected contexts, starting from the role instance of the Delta.
+    -- Find all affected contexts, starting from the context instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance)
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
   -- Remove 'me'

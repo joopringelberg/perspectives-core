@@ -206,3 +206,6 @@ instance ordActionType :: Ord ActionType where
 
 externalRoleType :: ContextType -> EnumeratedRoleType
 externalRoleType (ContextType ct) = EnumeratedRoleType (ct <> "$External")
+
+externalRoleType_ :: String -> String
+externalRoleType_ ct = ct <> "$External"

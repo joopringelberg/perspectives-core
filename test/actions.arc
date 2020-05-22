@@ -8,7 +8,7 @@ domain: Test
       perspective on: Self
         if true then
           remove ARole
-          
+
   case: TestCase2
     user: Self filledBy: sys:PerspectivesSystem$User
     thing: ARole
@@ -41,6 +41,7 @@ domain: Test
           bind AnotherRole to ARole in Nested >> binding >> context
     case: NestedCase
       thing: ARole
+
   case: TestCaseBind_
     user: Self filledBy: sys:PerspectivesSystem$User
     thing: ARole4 filledBy: AnotherRole4
