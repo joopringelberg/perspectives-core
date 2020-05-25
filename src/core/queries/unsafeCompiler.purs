@@ -30,10 +30,10 @@ import Control.Alt (void, (<|>))
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Writer (WriterT(..))
+import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
-import Data.Array (elemIndex, null, singleton, unsafeIndex)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Array (elemIndex, null, unsafeIndex)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
 import Data.Traversable (traverse)
@@ -50,15 +50,15 @@ import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, externalRole, getProperty, getEnumeratedRoleInstances, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
-import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
+import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Class.Property (calculation) as PC
+import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
 import Perspectives.Representation.Class.Role (calculation) as RC
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
@@ -419,6 +419,24 @@ getPropertyFunction id = do
       (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType ident)
       unsafeCoerce $ PC.calculation p >>= compileFunction
       )
+
+getterFromPropertyType :: PropertyType -> MP (RoleInstance ~~> Value)
+getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) = case lookupPropertyValueGetterByName id of
+  Nothing -> do
+    p@(EnumeratedProperty {functional, mandatory}) <- getPerspectType ep
+    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction
+    void $ pure $ propertyGetterCacheInsert id getter functional mandatory
+    pure getter
+  Just g -> pure g
+getterFromPropertyType (CP cp@(CalculatedPropertyType id)) = case lookupPropertyValueGetterByName id of
+  Nothing -> do
+    p <- getPerspectType cp
+    functional <- PC.functional p
+    mandatory <- PC.mandatory p
+    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction
+    void $ pure $ propertyGetterCacheInsert id getter functional mandatory
+    pure getter
+  Just g -> pure g
 
 getHiddenFunction :: QueryFunctionDescription -> MP HiddenFunction
 getHiddenFunction = unsafeCoerce $ compileFunction
