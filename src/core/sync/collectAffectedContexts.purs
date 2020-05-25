@@ -25,22 +25,23 @@ import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader (lift)
 import Control.Monad.State (StateT, execStateT, get, put)
-import Control.Monad.Writer (execWriterT)
-import Data.Array (filterA, head, nub, union)
+import Control.Monad.Writer (runWriterT)
+import Data.Array (filterA, fold, head, nub, union)
 import Data.Array.NonEmpty (fromArray)
 import Data.Foldable (traverse_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Map.Internal (keys, Map)
-import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.List (toUnfoldable)
+import Data.Map.Internal (Map, keys, values)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse)
+import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_isMe)
-import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=), (##>>))
+import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, WithAssumptions, runMonadPerspectivesQuery, (###=), (##=), (##>>))
 import Perspectives.Deltas (addUniverseRoleDelta)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
@@ -48,9 +49,11 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.Instances.ObjectGetters (bottom, getEnumeratedRoleInstances)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
-import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties, backwards, forwards)
+import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), backwards, forwards)
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances)
+import Perspectives.Query.QueryTypes (roleRange)
+import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
+import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType)
@@ -163,18 +166,27 @@ aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction RoleBindingDe
 aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
   binderType <- lift2 (id ##>> OG.roleType)
   bindingCalculations <- lift2 $ compileDescriptions_ _onRoleDelta_binding binderType true
-  users1 <- for bindingCalculations (\(InvertedQuery{backwardsCompiled, forwardsCompiled, userTypes}) -> do
+  users1 <- for bindingCalculations (\(InvertedQuery{description, backwardsCompiled, forwardsCompiled, userTypes}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 $ catchError (id ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
     users <- handleAffectedContexts affectedContexts userTypes
-    -- TODO. Pas nu forwards toe om te bepalen wat verstuurd moet worden.
-    -- Je vindt in eerste instantie Assumpties en daar maak je Deltas van.
     case forwardsCompiled of
       Nothing -> pure unit
       Just f -> do
-        (assumptions ::Array InformedAssumption) <- lift2 (execWriterT (runArrayT ((unsafeCoerce f) id)))
-        -- Now create and push Deltas for each of the assumptions.
+        (Tuple instances assumptions :: WithAssumptions RoleInstance) <- lift2 (runMonadPerspectivesQuery id (unsafeCoerce f))
+        -- Now create and push Deltas for each of the assumptions. These Delta's are valid for all users.
         for_ assumptions (createDeltasFromAssumption users)
+        -- Then, for each separate user type, run all property getters in a single query for each value returned from the main query. The Assumptions thus gathered apply to that single user type.
+        -- TODO. We verzamelen hier alles in één grote Transactie en splitsen hem dan later weer uit. Dat kan veel beter.
+        arrayOfProperties <- case fold $ values userTypes of
+          All -> case forwards description of
+            Nothing -> pure []
+            Just qfd -> lift2 $ allProperties (unsafePartial $ roleRange qfd)
+          Properties props -> pure props
+        Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
+          getter <- lift $ lift $ getterFromPropertyType prop
+          for_ instances getter
+        for_ assumptions' (createDeltasFromAssumption users)
     pure users ) >>= pure <<< join
 
   users2 <- case binding of
