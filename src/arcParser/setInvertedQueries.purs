@@ -23,12 +23,13 @@ module Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries where
 
 import Control.Monad.Except (throwError)
 import Data.Array (union)
+import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink)
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink, RelevantProperties)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (domain2RoleType)
@@ -40,34 +41,36 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (Unit, pure, unit, ($))
 
-setPathForStep :: Partial => QueryFunctionDescription -> QueryWithAKink -> Array RoleType -> PhaseThree Unit
+setPathForStep :: Partial => QueryFunctionDescription -> QueryWithAKink -> Map RoleType RelevantProperties -> PhaseThree Unit
 setPathForStep (SQD dom qf ran _ _) path userTypes = case qf of
   QF.Value2Role pt -> case pt of
     ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
       Nothing -> addInvertedQueryForDomain (unwrap p)
-        (InvertedQuery {description: path, compilation: Nothing, userTypes})
+        (InvertedQuery {description: path, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})
         OnPropertyDelta
         dfr
       Just ep -> dfr {enumeratedProperties = insert (unwrap p) (addPathToProperty ep path) enumeratedProperties}
     -- CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in setPathForStep."
     CP _ -> pure unit
 
+  -- add to onRoleDelta_binder of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
   QF.DataTypeGetterWithParameter QF.GetRoleBindersF enr -> modifyDF \dfr@{enumeratedRoles} -> let
     roleName = unwrap $ unsafePartial $ domain2RoleType dom
     in case lookup roleName  enumeratedRoles of
       Nothing -> addInvertedQueryForDomain roleName
-        (InvertedQuery {description: path, compilation: Nothing, userTypes})
+        (InvertedQuery {description: path, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})
         OnRoleDelta_binder
         dfr
       Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en path) enumeratedRoles}
 
+  -- add to onRoleDelta_binding of the role that we apply `binding` to (the domain of the step; the role that binds).
   QF.DataTypeGetter QF.BindingF -> modifyDF \dfr@{enumeratedRoles} -> case dom of
     (RDOM EMPTY) -> dfr
     otherwise -> let
       roleName = unwrap $ unsafePartial $ domain2RoleType dom
       in case lookup roleName  enumeratedRoles of
         Nothing -> addInvertedQueryForDomain roleName
-          (InvertedQuery {description: path, compilation: Nothing, userTypes})
+          (InvertedQuery {description: path, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})
           OnRoleDelta_binding
           dfr
         Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en path) enumeratedRoles}
@@ -75,7 +78,7 @@ setPathForStep (SQD dom qf ran _ _) path userTypes = case qf of
   QF.RolGetter roleType -> case roleType of
     ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> case lookup roleName enumeratedRoles of
       Nothing -> addInvertedQueryForDomain roleName
-        (InvertedQuery {description: path, compilation: Nothing, userTypes})
+        (InvertedQuery {description: path, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})
         OnContextDelta_role
         dfr
       Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_role en path) enumeratedRoles}
@@ -85,7 +88,7 @@ setPathForStep (SQD dom qf ran _ _) path userTypes = case qf of
     roleName = unwrap $ unsafePartial $ domain2RoleType dom
     in case lookup roleName  enumeratedRoles of
       Nothing -> addInvertedQueryForDomain roleName
-        (InvertedQuery {description: path, compilation: Nothing, userTypes})
+        (InvertedQuery {description: path, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})
         OnContextDelta_context
         dfr
       Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_context en path) enumeratedRoles}
@@ -102,20 +105,20 @@ setPathForStep (SQD dom qf ran _ _) path userTypes = case qf of
   -- for the External role.
   QF.DataTypeGetter QF.IdentityF -> pure unit
 
-  _ -> throwError $ Custom "setInvertedQueries: there should be no other cases. This is a system programming error."
+  _ -> throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
 
   where
     addPathToProperty :: EnumeratedProperty -> QueryWithAKink -> EnumeratedProperty
-    addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = union onPropertyDelta [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
+    addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = union onPropertyDelta [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})]}
 
     addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = union onRoleDelta_binder [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})] }
+    addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = union onRoleDelta_binder [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})] }
 
     addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = union onRoleDelta_binding [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
+    addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = union onRoleDelta_binding [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})]}
 
     addPathToOnContextDelta_context :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = union onContextDelta_context [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
+    addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = union onContextDelta_context [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})]}
 
     addPathToOnContextDelta_role :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = union onContextDelta_role [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
+    addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = union onContextDelta_role [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})]}

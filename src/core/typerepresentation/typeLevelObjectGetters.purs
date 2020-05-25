@@ -25,8 +25,10 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
 import Data.Array (filter, find, findIndex, intersect, null, singleton)
+import Data.Map.Internal (keys) as MAP
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
+import Data.List (toUnfoldable)
 import Effect.Exception (error)
 import Foreign.Object (keys, values)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=))
@@ -233,8 +235,8 @@ hasPerspectiveOnRole (ENR ur) (ENR rt@(EnumeratedRoleType _)) = do
   EnumeratedRole{onContextDelta_context, onContextDelta_role, onRoleDelta_binder, onRoleDelta_binding} <- lift $ getEnumeratedRole rt
   -- The role, or one of its aspects, must be compared to the usertypes in the various
   -- InvertedQueries.
-  (includingAspects :: Array RoleType) <- lift (map ENR <$> (ur ###= aspectsClosure))
-  pure $ not $ null $ intersect includingAspects (join (_.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role <> onRoleDelta_binder <> onRoleDelta_binding)))
+  (userRoleAndAspects :: Array RoleType) <- lift (map ENR <$> (ur ###= aspectsClosure))
+  pure $ not $ null $ intersect userRoleAndAspects (join (toUnfoldable <<< MAP.keys <<< _.userTypes <<< unwrap <$> (onContextDelta_context <> onContextDelta_role <> onRoleDelta_binder <> onRoleDelta_binding)))
 
 hasPerspectiveOnRole _ _ = pure false
 
@@ -259,8 +261,8 @@ rolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (roleIsInPerspect
 hasPerspectiveOnProperty :: RoleType -> PropertyType ~~~> Boolean
 hasPerspectiveOnProperty (ENR ur) (ENP pt@(EnumeratedPropertyType _)) = do
   EnumeratedProperty{onPropertyDelta} <- lift $ getEnumeratedProperty pt
-  (includingAspects :: Array RoleType) <- lift (map ENR <$> (ur ###= aspectsClosure))
-  pure $ not $ null $ intersect includingAspects (join (_.userTypes <<< unwrap <$> onPropertyDelta))
+  (userRoleAndAspects :: Array RoleType) <- lift (map ENR <$> (ur ###= aspectsClosure))
+  pure $ not $ null $ intersect userRoleAndAspects (join (toUnfoldable <<< MAP.keys <<< _.userTypes <<< unwrap <$> onPropertyDelta))
 hasPerspectiveOnProperty _ _ = pure false
 
 -- | <RoleType> `propertyIsInPerspectiveOf` <userRole>

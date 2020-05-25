@@ -35,6 +35,7 @@ import Prelude
 import Control.Plus (empty)
 import Data.Array (catMaybes, elemIndex, filterA, foldMap, null)
 import Data.Foldable (for_)
+import Data.Map (singleton)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
@@ -44,7 +45,7 @@ import Foreign.Object (lookup, insert)
 import Perspectives.CoreTypes (type (~~~>), MP, (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInvertedQuery)
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
 import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
@@ -86,6 +87,7 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
         if bindingCarriesProperty
           then do
             -- store qWithAkink in onContextDelta_context of role
+            -- TODO: voeg de propsOfRole toe aan de QueryWithAKink. Dat gebruiken we als we Deltas maken.
             addToRole qWithAkink role
             pure true
           else pure false
@@ -104,18 +106,18 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
         Just (SQD _ (DataTypeGetter ContextF)_ _ _) -> modifyDF \df@{enumeratedRoles:roles} ->
           case lookup roleId roles of
             Nothing -> addInvertedQueryForDomain roleId
-              (InvertedQuery {description: qwk, compilation: Nothing, userTypes: [user]})
+              (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])})
               OnContextDelta_context
               df
-            Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery (InvertedQuery {description: qwk, compilation: Nothing, userTypes: [user]}) onContextDelta_context }) roles}
+            Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])}) onContextDelta_context }) roles}
         -- We by construction can safely assume the other case is the composition created by addBinding.
         Just _ -> modifyDF \df@{enumeratedRoles:roles} ->
           case lookup roleId roles of
             Nothing -> addInvertedQueryForDomain roleId
-              (InvertedQuery {description: qwk, compilation: Nothing, userTypes: [user]})
+              (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])})
               OnRoleDelta_binder
               df
-            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: qwk, compilation: Nothing, userTypes: [user]}) onRoleDelta_binder }) roles}
+            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])}) onRoleDelta_binder }) roles}
         otherwise -> pure unit
 
     addToProperties :: QueryWithAKink -> Array PropertyType -> PhaseThree Unit
@@ -126,10 +128,10 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
         modifyDF \df@{enumeratedProperties} -> do
           case lookup p enumeratedProperties of
             Nothing -> addInvertedQueryForDomain p
-              (InvertedQuery {description: ZQ forwards' backwards', compilation: Nothing, userTypes: [user]})
+              (InvertedQuery {description: ZQ forwards' backwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])})
               OnPropertyDelta
               df
-            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ forwards' backwards', compilation: Nothing, userTypes: [user]}) onPropertyDelta}) enumeratedProperties}
+            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ forwards' backwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])}) onPropertyDelta}) enumeratedProperties}
         pure unit
       _ -> pure unit
 
@@ -174,8 +176,6 @@ setInvertedQueriesForUserAndRole user (SUM terms) props invertedQ = do
 
 -- This handles the EMPTY and UNIVERSAL case.
 setInvertedQueriesForUserAndRole user _ props invertedQ = pure false
-
-data RelevantProperties = All | Properties (Array EnumeratedPropertyType)
 
 isRelevant :: EnumeratedPropertyType -> RelevantProperties -> Boolean
 isRelevant t All = true

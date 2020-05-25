@@ -26,10 +26,11 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, cons, foldr, null, uncons, unsnoc)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.InvertedQuery (QueryWithAKink(..))
+import Perspectives.InvertedQuery (QueryWithAKink(..), RelevantProperties)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setPathForStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -137,7 +138,7 @@ invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q
 --------------------------------------------------------------------------------------------------------------
 ---- SET INVERTED QUERIES
 --------------------------------------------------------------------------------------------------------------
-setInvertedQueries :: Array RoleType -> QueryFunctionDescription -> PhaseThree Unit
+setInvertedQueries :: Map RoleType RelevantProperties -> QueryFunctionDescription -> PhaseThree Unit
 setInvertedQueries userTypes qfd = do
   (zqs :: (Array QueryWithAKink)) <- ensureContextDomain qfd >>= invert
   for_ zqs \qwk@(ZQ backward forward) -> case backward of

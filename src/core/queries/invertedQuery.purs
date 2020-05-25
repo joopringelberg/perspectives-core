@@ -19,7 +19,7 @@
 
 -- END LICENSE
 
--- | An InvertedQuery is the combination of a QueryFunctionDescription, Maybe the compilation
+-- | An InvertedQuery is the combination of a QueryFunctionDescription, Maybe the backwardsCompiled
 -- | of that description and the UserRole types that have a perspective on the query end result.
 -- | However, the Purescript type compiler cannot handle the full type of such functions
 -- | in the places where we want to use it (CalculatedProperty, CalculatedRole).
@@ -31,21 +31,26 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, findIndex, modifyAt, union)
+import Data.Array (cons, findIndex, modifyAt)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Map (Map, fromFoldable, toUnfoldable, union)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype)
+import Data.Tuple (Tuple(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.TypeIdentifiers (RoleType)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, RoleType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
-newtype InvertedQuery = InvertedQuery {description :: QueryWithAKink, compilation :: (Maybe HiddenFunction), userTypes :: Array RoleType}
+-----------------------------------------------------------
+-- INVERTEDQUERY
+-----------------------------------------------------------
+newtype InvertedQuery = InvertedQuery {description :: QueryWithAKink, backwardsCompiled :: (Maybe HiddenFunction), forwardsCompiled :: (Maybe HiddenFunction), userTypes :: Map RoleType RelevantProperties}
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _
 derive instance newtypeInvertedQuery :: Newtype InvertedQuery _
@@ -57,10 +62,18 @@ instance eqInvertedQuery :: Eq InvertedQuery where
   eq = genericEq
 
 instance encodeInvertedQuery :: Encode InvertedQuery where
-  encode (InvertedQuery {description, userTypes}) = genericEncode defaultOptions (InvertedQuery {description, compilation: Nothing, userTypes})
+  encode (InvertedQuery {description, userTypes}) = genericEncode defaultOptions (InvertedQuery' {description, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: g userTypes})
+    where
+      g :: Map RoleType RelevantProperties -> Array UserProps
+      g m = (\(Tuple u props) -> UserProps {user: u, properties: props}) <$> toUnfoldable m
 
 instance decodeInvertedQuery :: Decode InvertedQuery where
-  decode = genericDecode defaultOptions
+  decode x = do
+    InvertedQuery' r <- genericDecode defaultOptions x
+    pure $ InvertedQuery (r {userTypes = f r.userTypes})
+    where
+      f :: Array UserProps -> Map RoleType RelevantProperties
+      f a = fromFoldable ((\(UserProps{user, properties}) -> Tuple user properties) <$> a)
 
 instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
   prettyPrint' t (InvertedQuery{description, userTypes}) = "InvertedQuery " <> prettyPrint' (t <> "  ") description <> show userTypes
@@ -68,7 +81,7 @@ instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
 equalDescriptions :: InvertedQuery -> InvertedQuery -> Boolean
 equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}) = d1 == d2
 
-addUserTypes :: Array RoleType -> InvertedQuery -> InvertedQuery
+addUserTypes :: Map RoleType RelevantProperties -> InvertedQuery -> InvertedQuery
 addUserTypes t (InvertedQuery r@{userTypes}) = InvertedQuery r {userTypes = union userTypes t}
 
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
@@ -76,6 +89,44 @@ addInvertedQuery q@(InvertedQuery{userTypes}) qs = case findIndex (equalDescript
   Nothing -> cons q qs
   Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes userTypes) qs
 
+-----------------------------------------------------------
+-- INVERTEDQUERY'
+-----------------------------------------------------------
+newtype InvertedQuery' = InvertedQuery' {description :: QueryWithAKink, backwardsCompiled :: (Maybe HiddenFunction), forwardsCompiled :: (Maybe HiddenFunction), userTypes :: Array UserProps}
+
+derive instance genericInvertedQuery' :: Generic InvertedQuery' _
+
+-----------------------------------------------------------
+-- USERPROPS
+-----------------------------------------------------------
+newtype UserProps = UserProps {user :: RoleType, properties :: RelevantProperties}
+
+derive instance genericUserProps :: Generic UserProps _
+
+instance encodeUserProps :: Encode UserProps where
+  encode = genericEncode defaultOptions
+
+instance decodeUserProps :: Decode UserProps where
+  decode = genericDecode defaultOptions
+
+-----------------------------------------------------------
+-- RELEVANTPROPERTIES
+-----------------------------------------------------------
+data RelevantProperties = All | Properties (Array EnumeratedPropertyType)
+
+derive instance genericRelevantProperties :: Generic RelevantProperties _
+
+instance encodeRelevantProperties :: Encode RelevantProperties where
+  encode = genericEncode defaultOptions
+
+instance decodeRelevantProperties :: Decode RelevantProperties where
+  decode = genericDecode defaultOptions
+
+instance showRelevantProperties :: Show RelevantProperties where
+  show = genericShow
+
+instance eqRelevantProperties :: Eq RelevantProperties where
+  eq = genericEq
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
 --------------------------------------------------------------------------------------------------------------
