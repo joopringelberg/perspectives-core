@@ -32,6 +32,7 @@ module Perspectives.InvertedQuery where
 import Prelude
 
 import Data.Array (cons, findIndex, modifyAt)
+import Data.Array (union) as ARR
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
@@ -44,7 +45,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -----------------------------------------------------------
@@ -112,7 +113,7 @@ instance decodeUserProps :: Decode UserProps where
 -----------------------------------------------------------
 -- RELEVANTPROPERTIES
 -----------------------------------------------------------
-data RelevantProperties = All | Properties (Array EnumeratedPropertyType)
+data RelevantProperties = All | Properties (Array PropertyType)
 
 derive instance genericRelevantProperties :: Generic RelevantProperties _
 
@@ -127,6 +128,14 @@ instance showRelevantProperties :: Show RelevantProperties where
 
 instance eqRelevantProperties :: Eq RelevantProperties where
   eq = genericEq
+
+instance semigroupRelevantProperties :: Semigroup RelevantProperties where
+  append All _ = All
+  append _ All = All
+  append (Properties p1) (Properties p2) = Properties (ARR.union p1 p2)
+
+instance monoidRelevantProperties :: Monoid RelevantProperties where
+  mempty = Properties []
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
 --------------------------------------------------------------------------------------------------------------
