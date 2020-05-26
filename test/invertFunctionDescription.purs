@@ -3,9 +3,9 @@ module Test.Query.Inversion where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (catMaybes, cons, head, length, null)
+import Data.Array (catMaybes, cons, find, head, intercalate, intersect, last, length, null, union)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Tuple (fst)
 import Effect.Aff (Aff)
@@ -30,6 +30,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), PropertyType(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile')
+import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP, withModel_, withSystem)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip, suiteOnly)
 import Test.Unit.Assert (assert)
@@ -70,10 +71,11 @@ theSuite = suite "Test.Query.Inversion" do
                 Left e -> liftAff $ assert ("Cannot invert query: " <> show e) false
                 Right (affectedContextQueries :: Array QueryWithAKink) -> do
                   -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
-                  -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
+                  -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> (catMaybes $ backwards <$> affectedContextQueries))
                   liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> (catMaybes $ backwards <$> affectedContextQueries)) ==
-                    [ [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop7")),(DataTypeGetter ContextF)]
+                    [ [(DataTypeGetter ContextF)]
                     , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop6")),(DataTypeGetter ContextF)]
+                    , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop7")),(DataTypeGetter ContextF)]
                     ])
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
@@ -125,12 +127,14 @@ theSuite = suite "Test.Query.Inversion" do
                       -- log $ intercalate "\n" (prettyPrint <$> paths)
                       assert "The inversion of a a property of another role in the same context should run \
                       \from that property to the role to the context" (not $null paths)
-                      assert "The domain of the inversion should be Prop2." (case head paths of
-                        Just (BQD (VDOM PBool (Just (ENP (EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2")))) _ _ _ _ _ _) -> true
-                        otherwise -> false)
-                      assert "The first term of the composition should be Value2Role" (case head paths of
-                        Just (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
-                        otherwise -> false)
+                      assert "The domain of the inversion should be Prop2."
+                        (isJust $ find (\path -> case path of
+                          (BQD (VDOM PBool (Just (ENP (EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2")))) _ _ _ _ _ _) -> true
+                          otherwise -> false) paths)
+                      assert "The first term of the composition should be Value2Role"
+                        (isJust $ find (\path -> case path of
+                          (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
+                          otherwise -> false) paths)
 
   test "Property of another role in the same context" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = context >> NestedContext >> binding >> context >> AnotherRole >> Prop2\n    context: NestedContext filledBy: SubCase\n    case: SubCase\n      thing: AnotherRole\n        property: Prop2 (mandatory, functional, Boolean)" ARC.domain
@@ -156,17 +160,20 @@ theSuite = suite "Test.Query.Inversion" do
                       -- log $ intercalate "\n" (prettyPrint <$> paths)
                       assert "The inversion of a a property of another role in the same context should run \
                       \from that property to the role to the context" (not $ null paths)
-                      assert "The domain of the inversion should be Prop2." (case head paths of
-                        Just (BQD (VDOM PBool (Just (ENP (EnumeratedPropertyType "model:Test$TestCase1$SubCase$AnotherRole$Prop2")))) _ _ _ _ _ _) -> true
-                        otherwise -> false)
-                      assert "The first term of the composition should be Value2Role" (case head paths of
-                        Just (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
-                        otherwise -> false)
-                      assert "The third term of the composition should be external" (case head paths of
-                        Just (BQD _ _ _ (BQD _ _ _ (BQD _ _ (SQD _ (DataTypeGetter ExternalRoleF) _ _ _ ) _ _ _ _ ) _ _ _) _ _ _) -> true
-                        otherwise -> false)
+                      assert "The domain of the inversion should be Prop2."
+                        (isJust $ find (\path -> case path of
+                          (BQD (VDOM PBool (Just (ENP (EnumeratedPropertyType "model:Test$TestCase1$SubCase$AnotherRole$Prop2")))) _ _ _ _ _ _) -> true
+                          otherwise -> false) paths)
+                      assert "The first term of the composition should be Value2Role"
+                        (isJust $ find (\path -> case path of
+                          (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
+                          otherwise -> false) paths)
+                      assert "The third term of the composition should be external"
+                        (isJust $ find (\path -> case path of
+                          (BQD _ _ _ (BQD _ _ _ (BQD _ _ (SQD _ (DataTypeGetter ExternalRoleF) _ _ _ ) _ _ _ _ ) _ _ _) _ _ _) -> true
+                          otherwise -> false) paths)
 
-  test "A filter exprssion should yield two inverse queries." do
+  test "A filter expression should yield five inverse queries." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = filter context >> AnotherRole with Prop2 >> Prop3\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)\n      property: Prop3 (mandatory, functional, Boolean)\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -189,7 +196,7 @@ theSuite = suite "Test.Query.Inversion" do
                       -- log (prettyPrint c)
                       paths <- invertFD c
                       -- log $ intercalate "\n" (prettyPrint <$> paths)
-                      assert "The inversion of an expression with a filter should yield two inverse queries" (length paths == 2)
+                      assert "The inversion of an expression with a filter should yield two inverse queries" (length paths == 5)
 
   test "Invert a rule condition" (runP do
       modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
@@ -203,7 +210,12 @@ theSuite = suite "Test.Query.Inversion" do
               affectedContextQueries <- liftAff $ invertFD qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- logShow $ paths2functions <$> affectedContextQueries
-              liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop3", (DataTypeGetter ContextF)],[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2",(DataTypeGetter ContextF)]])
+              liftAff $ assert "There should be four AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
+                [ [(DataTypeGetter ContextF)]
+                , [Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2", (DataTypeGetter ContextF)]
+                , [(DataTypeGetter ContextF)]
+                , [Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop3",(DataTypeGetter ContextF)]
+                ])
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
@@ -219,14 +231,15 @@ theSuite = suite "Test.Query.Inversion" do
               affectedContextQueries <- liftAff $ invertFD qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
-              liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [
-                [ Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$NestedCase1$AnotherRole$Prop3"
-                , (DataTypeGetter ContextF)
-                , (DataTypeGetter ExternalRoleF)
-                , (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole")
-                , (DataTypeGetter ContextF)],
-                [ Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$ARole$Prop1"
-                , (DataTypeGetter ContextF)]])
+              liftAff $ assert "There should be seven AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
+                [ [ (DataTypeGetter ContextF)]
+                , [ Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$ARole$Prop1" , (DataTypeGetter ContextF)]
+                , [(DataTypeGetter ContextF)]
+                , [(DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
+                , [(DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
+                , [(DataTypeGetter ContextF), (DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
+                , [(Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$NestedCase1$AnotherRole$Prop3"), (DataTypeGetter ContextF), (DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
+                ])
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
@@ -242,7 +255,8 @@ theSuite = suite "Test.Query.Inversion" do
               affectedContextQueries <- liftAff $ invertFD qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
-              liftAff $ assert "There should be three AffectedContextQueries." (length affectedContextQueries == 3)
+              -- logShow $ length affectedContextQueries
+              liftAff $ assert "There should be nine AffectedContextQueries." (length affectedContextQueries == 9)
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
@@ -258,13 +272,14 @@ theSuite = suite "Test.Query.Inversion" do
               affectedContextQueries <- liftAff $ invertFD qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
-              -- logShow (map domain affectedContextQueries)
-              liftAff $ assert "There should be three AffectedContextQueries." (length affectedContextQueries == 3)
+              -- log $ intercalate "\n" (map (show <<< domain) affectedContextQueries)
+              liftAff $ assert "There should be twelve AffectedContextQueries." (length affectedContextQueries == 12)
               liftAff $ assert "The three AffectedContextQueries should start in the properties Prop3, Prop5 and Prop2"
-                ((map domain affectedContextQueries) ==
+                (eq 3
+                  (length $ (map domain affectedContextQueries) `intersect`
                   [ (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$AnotherRole$Prop3"))
                   , (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$YetAnotherRole$Prop5"))
-                  , (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$AnotherRole$Prop2"))])
+                  , (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$AnotherRole$Prop2"))]))
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
