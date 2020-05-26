@@ -128,10 +128,10 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
         modifyDF \df@{enumeratedProperties} -> do
           case lookup p enumeratedProperties of
             Nothing -> addInvertedQueryForDomain p
-              (InvertedQuery {description: ZQ forwards' backwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])})
+              (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])})
               OnPropertyDelta
               df
-            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ forwards' backwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])}) onPropertyDelta}) enumeratedProperties}
+            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])}) onPropertyDelta}) enumeratedProperties}
         pure unit
       _ -> pure unit
 
@@ -147,7 +147,7 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
       fun <- propertyTypeIsFunctional p
       man <- propertyTypeIsMandatory p
       range <- rangeOfPropertyType p
-      pure $ makeComposition (SQD (VDOM range (Just p)) (PropertyGetter p) (VDOM range (Just p)) (bool2threeValued fun) (bool2threeValued man)) qfd
+      pure $ makeComposition qfd (SQD (VDOM range (Just p)) (PropertyGetter p) (VDOM range (Just p)) (bool2threeValued fun) (bool2threeValued man))
 
     addBindingStep :: ADT EnumeratedRoleType -> QueryWithAKink -> MP QueryWithAKink
     addBindingStep b (ZQ backwards forwards) = do
