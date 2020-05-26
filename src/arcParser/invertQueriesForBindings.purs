@@ -33,7 +33,7 @@ module Perspectives.Parsing.Arc.InvertQueriesForBindings where
 import Prelude
 
 import Control.Plus (empty)
-import Data.Array (catMaybes, elemIndex, filterA, foldMap, null)
+import Data.Array (elemIndex, filterA, foldMap, null)
 import Data.Foldable (for_)
 import Data.Map (singleton)
 import Data.Maybe (Maybe(..), isJust, maybe)
@@ -78,7 +78,7 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
     void $ (lift2 $ addBindingStep b qWithAkink) >>= setInvertedQueriesForUserAndRole user b props
     pure true
   Properties relevant -> do
-    (propsOfRole :: Array EnumeratedPropertyType) <- lift2 $ filterA isPropertyOfRole relevant
+    (propsOfRole :: Array PropertyType) <- lift2 $ filterA isPropertyOfRole relevant
     if null propsOfRole
       then do
         -- get the binding of role
@@ -93,7 +93,7 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
           else pure false
       else do
       -- for each property in propsOfRole, store (Value2Role >> qWithAkink) in onPropertyDelta of that property
-      addToProperties qWithAkink (ENP <$> propsOfRole)
+      addToProperties qWithAkink propsOfRole
       -- get the binding of role
       (b :: ADT EnumeratedRoleType) <- (lift2 $ getEnumeratedRole role) >>= pure <<< _.binding <<< unwrap
       void $ (lift2 $ addBindingStep b qWithAkink) >>= setInvertedQueriesForUserAndRole user b props
@@ -159,8 +159,8 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
 
     -- | Collect the Properties defined on the EnumeratedRoleType and its Aspect Roles.
     -- | Returns true iff the property is one of them.
-    isPropertyOfRole :: EnumeratedPropertyType -> MP Boolean
-    isPropertyOfRole p = propertySet (ST role) >>= \ps -> pure $ isElementOf (ENP p) ps
+    isPropertyOfRole :: PropertyType -> MP Boolean
+    isPropertyOfRole p = propertySet (ST role) >>= \ps -> pure $ isElementOf p ps
 
 setInvertedQueriesForUserAndRole user (PROD terms) props invertedQ = do
   x <- traverse
@@ -177,7 +177,7 @@ setInvertedQueriesForUserAndRole user (SUM terms) props invertedQ = do
 -- This handles the EMPTY and UNIVERSAL case.
 setInvertedQueriesForUserAndRole user _ props invertedQ = pure false
 
-isRelevant :: EnumeratedPropertyType -> RelevantProperties -> Boolean
+isRelevant :: PropertyType -> RelevantProperties -> Boolean
 isRelevant t All = true
 isRelevant t (Properties set) = isJust $ elemIndex t set
 
@@ -200,15 +200,11 @@ hasAccessToPropertiesOf (ENR user) role = do
       EnumeratedRole{perspectives} <- getEnumeratedRole r
       pure $ maybe [] identity (lookup (roletype2string t) perspectives)
 
-    enumeratedPropertiesForActionObject :: ActionType ~~~> EnumeratedPropertyType
+    enumeratedPropertiesForActionObject :: ActionType ~~~> PropertyType
     enumeratedPropertiesForActionObject a = ArrayT do
       Action{requiredObjectProperties} <- getAction a
       case requiredObjectProperties of
         Nothing -> pure []
-        Just v -> getView v >>= pure <<< catMaybes <<< map enumerated <<< _.propertyReferences <<< unwrap
-
-    enumerated :: PropertyType -> Maybe EnumeratedPropertyType
-    enumerated (ENP t) = Just t
-    enumerated _ = Nothing
+        Just v -> getView v >>= pure <<< _.propertyReferences <<< unwrap
 
 hasAccessToPropertiesOf _ _ = empty

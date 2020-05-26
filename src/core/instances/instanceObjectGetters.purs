@@ -75,7 +75,7 @@ setConditionState a c b = do
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT do
   c <- lift $ getPerspectContext ctxt
-  tell [Me ctxt]
+  tell [Me ctxt (context_me c)]
   pure $ maybe [] singleton (context_me c)
 
 -- | If the user has no role, return the role with the Aspect "model:System$Invitation$Guest".

@@ -27,7 +27,7 @@ import Control.Monad.Reader (lift)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Writer (runWriterT)
 import Data.Array (filterA, fold, head, nub, union)
-import Data.Array.NonEmpty (fromArray)
+import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
 import Data.Foldable (traverse_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
@@ -42,13 +42,13 @@ import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_isMe)
 import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, WithAssumptions, runMonadPerspectivesQuery, (###=), (##=), (##>>))
-import Perspectives.Deltas (addUniverseRoleDelta)
+import Perspectives.Deltas (addContextDelta, addPropertyDelta, addRoleDelta, addUniverseContextDelta, addUniverseRoleDelta)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
-import Perspectives.Instances.ObjectGetters (bottom, getEnumeratedRoleInstances)
-import Perspectives.Instances.ObjectGetters (roleType) as OG
+import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, getEnumeratedRoleInstances, getProperty, getRoleBinders)
+import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), backwards, forwards)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (roleRange)
@@ -61,8 +61,8 @@ import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=), (<$>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -89,7 +89,7 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
 
 -- Adds an AffectedContext to the transaction and returns user instances.
 handleAffectedContexts :: Array ContextInstance -> Map RoleType RelevantProperties -> MonadPerspectivesTransaction (Array RoleInstance)
-handleAffectedContexts affectedContexts userProps = case fromArray affectedContexts of
+handleAffectedContexts affectedContexts userProps = case ANE.fromArray affectedContexts of
   Nothing -> pure []
   Just contextInstances -> do
     userTypes <- pure $ toUnfoldable (keys userProps)
@@ -147,7 +147,7 @@ addRoleObservingContexts id roleType roleInstance = do
   for_ roleCalculations \(InvertedQuery{backwardsCompiled, userTypes}) -> lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: ContextInstance ~~> ContextInstance) >>= addContexts userTypes
 
 addContexts :: Map RoleType RelevantProperties -> Array ContextInstance -> MonadPerspectivesTransaction Unit
-addContexts userTypes as = case fromArray as of
+addContexts userTypes as = case ANE.fromArray as of
   Nothing -> pure unit
   Just contextInstances -> lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [AffectedContext {contextInstances, userTypes: toUnfoldable $ keys userTypes}] affectedContexts})
 
@@ -166,37 +166,12 @@ aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction RoleBindingDe
 aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
   binderType <- lift2 (id ##>> OG.roleType)
   bindingCalculations <- lift2 $ compileDescriptions_ _onRoleDelta_binding binderType true
-  users1 <- for bindingCalculations (\(InvertedQuery{description, backwardsCompiled, forwardsCompiled, userTypes}) -> do
-    -- Find all affected contexts, starting from the role instance of the Delta.
-    affectedContexts <- lift2 $ catchError (id ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
-    users <- handleAffectedContexts affectedContexts userTypes
-    case forwardsCompiled of
-      Nothing -> pure unit
-      Just f -> do
-        (Tuple instances assumptions :: WithAssumptions RoleInstance) <- lift2 (runMonadPerspectivesQuery id (unsafeCoerce f))
-        -- Now create and push Deltas for each of the assumptions. These Delta's are valid for all users.
-        for_ assumptions (createDeltasFromAssumption users)
-        -- Then, for each separate user type, run all property getters in a single query for each value returned from the main query. The Assumptions thus gathered apply to that single user type.
-        -- TODO. We verzamelen hier alles in één grote Transactie en splitsen hem dan later weer uit. Dat kan veel beter.
-        arrayOfProperties <- case fold $ values userTypes of
-          All -> case forwards description of
-            Nothing -> pure []
-            Just qfd -> lift2 $ allProperties (unsafePartial $ roleRange qfd)
-          Properties props -> pure props
-        Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
-          getter <- lift $ lift $ getterFromPropertyType prop
-          for_ instances getter
-        for_ assumptions' (createDeltasFromAssumption users)
-    pure users ) >>= pure <<< join
-
+  users1 <- for bindingCalculations (runInvertedQuery id) >>= pure <<< join
   users2 <- case binding of
     Just bnd -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
       binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binder bindingType
-      for binderCalculations (\(InvertedQuery{backwardsCompiled, userTypes, description}) -> do
-        -- Find all affected contexts, starting from the role instance of the Delta.
-        affectedContexts <- lift2 $ catchError (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
-        handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
+      for binderCalculations (runInvertedQuery bnd) >>= pure <<< join
     Nothing -> pure []
 
   users3 <- case oldBinding of
@@ -210,28 +185,140 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
     otherwise -> pure []
 
   -- remove 'me'.
+  -- TODO: bepaal of hier ook het forwards deel uitgevoerd moet worden en deltas gemaakt?!
   otherUsers <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (nub $ union users1 (union users2 users3))
   pure $ RoleBindingDelta dr {users = otherUsers}
 
--- TODO. Kan ik hier niet serialisedAsDeltasFor inzetten?
+  where
+
+    runInvertedQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array RoleInstance)
+    runInvertedQuery roleInstance (InvertedQuery{description, backwardsCompiled, forwardsCompiled, userTypes}) = do
+      -- Find all affected contexts, starting from the role instance of the Delta.
+      affectedContexts <- lift2 $ catchError (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
+      users <- handleAffectedContexts affectedContexts userTypes
+      case forwardsCompiled of
+        Nothing -> pure unit
+        Just f -> do
+          -- Apply the forwards query to the same role instance as the backwards query.
+          (Tuple instances assumptions :: WithAssumptions RoleInstance) <- lift2 (runMonadPerspectivesQuery roleInstance (unsafeCoerce f))
+          -- Now create and push Deltas for each of the assumptions. These Delta's are valid for all users.
+          for_ assumptions (createDeltasFromAssumption users)
+          -- Then, for each separate user type, run all property getters in a single query for each value returned from the main query. The Assumptions thus gathered apply to that single user type.
+          -- TODO. We verzamelen hier alles in één grote Transactie en splitsen hem dan later weer uit. Dat kan veel beter.
+          arrayOfProperties <- case fold $ values userTypes of
+            All -> case forwards description of
+              Nothing -> pure []
+              Just qfd -> lift2 $ allProperties (unsafePartial $ roleRange qfd)
+            Properties props -> pure props
+          Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
+            getter <- lift $ lift $ getterFromPropertyType prop
+            for_ instances getter
+          for_ assumptions' (createDeltasFromAssumption users)
+      pure users
+
 createDeltasFromAssumption :: Array RoleInstance -> InformedAssumption -> MonadPerspectivesTransaction Unit
 createDeltasFromAssumption users (RoleAssumption ctxt roleTypeId) = do
-  -- Add a UniverseRoleDelta
   instances <- lift2 (ctxt ##= getEnumeratedRoleInstances roleTypeId)
-  case fromArray instances of
+  case SerializableNonEmptyArray <$> ANE.fromArray instances of
     Nothing -> pure unit
-    Just instances' -> addUniverseRoleDelta $ UniverseRoleDelta
-      { id: ctxt
-      , roleInstances: (SerializableNonEmptyArray instances')
-      , roleType: roleTypeId
-      , deltaType: ConstructEmptyRole
+    Just instances' -> magic ctxt instances' roleTypeId users
+
+createDeltasFromAssumption users (Me ctxt mRoleInstance) = case mRoleInstance of
+  Nothing -> pure unit
+  Just me -> do
+    rtype <- lift2 (me ##>> OG.roleType)
+    magic ctxt (SerializableNonEmptyArray $ ANE.singleton me) rtype users
+
+createDeltasFromAssumption users (Binding roleInstance) = do
+  bnd <- lift2 (roleInstance ##>> binding)
+  ctxt <- lift2 (bnd ##>> OG.context)
+  rtype <- lift2 (bnd ##>> OG.roleType)
+  magic ctxt (SerializableNonEmptyArray $ ANE.singleton bnd) rtype users
+  addRoleDelta $ RoleBindingDelta
+    { id: roleInstance
+    , binding: Just bnd
+    , oldBinding: Nothing
+    , roleWillBeRemoved: false
+    , deltaType: SetBinding
+    , users: users
+    , sequenceNumber: 0
+    }
+
+createDeltasFromAssumption users (Binder roleInstance roleType) = do
+  bndrs <- lift2 (roleInstance ##= getRoleBinders roleType)
+  -- There may not be a bndr!
+  case ANE.fromArray bndrs of
+    Nothing -> pure unit
+    Just someBndrs -> do
+      ctxt <- lift2 (ANE.head someBndrs ##>> OG.context)
+      magic ctxt (SerializableNonEmptyArray someBndrs) roleType users
+  for_ bndrs \bndr ->
+    addRoleDelta $ RoleBindingDelta
+      { id: bndr
+      , binding: Just roleInstance
+      , oldBinding: Nothing
+      , roleWillBeRemoved: false
+      , deltaType: SetBinding
       , users: users
       , sequenceNumber: 0
       }
 
-  -- Add a UniverseContextDelta
-  -- Add a ContextDelta
-createDeltasFromAssumption _ _ = pure unit
+createDeltasFromAssumption users (Property roleInstance propertyType) = do
+  ctxt <- lift2 (roleInstance ##>> OG.context)
+  rtype <- lift2 (roleInstance ##>> OG.roleType)
+  magic ctxt (SerializableNonEmptyArray $ ANE.singleton roleInstance) rtype users
+  values <- lift2 (roleInstance ##= getProperty propertyType)
+  addPropertyDelta $ RolePropertyDelta
+    { id: roleInstance
+    , property: propertyType
+    , values
+    , deltaType: AddProperty
+    , users: users
+    , sequenceNumber: 0
+    }
+
+createDeltasFromAssumption users (Context roleInstance) = do
+  ctxt <- lift2 (roleInstance ##>> OG.context)
+  rtype <- lift2 (roleInstance ##>> OG.roleType)
+  magic ctxt (SerializableNonEmptyArray $ ANE.singleton roleInstance) rtype users
+
+-- The forwards part of a QueryWithAKink in an onRoleDelta_binder or onRoleDelta_binding
+-- never starts with 'external', because these queries are applied to respectively the
+-- new binding or the role that binds.
+-- Whenever 'external' is applied, a 'context' step has been applied before - leading
+-- to a UniverseContextDelta that causes the receiver to create both a context and
+-- its external role.
+createDeltasFromAssumption users (External contextInstance) = pure unit
+
+-- | Add a UniverseContextDelta, UniverseRoleDelta and a ContextDelta.
+magic :: ContextInstance -> SerializableNonEmptyArray RoleInstance -> EnumeratedRoleType ->  Array RoleInstance -> MonadPerspectivesTransaction Unit
+magic ctxt roleInstances rtype users =  do
+  ctype <- lift2 (ctxt ##>> contextType)
+  addUniverseContextDelta $ UniverseContextDelta
+    { id: ctxt
+    , contextType: ctype
+    , deltaType: ConstructEmptyContext
+    , users: users
+    , sequenceNumber: 0
+    }
+  addUniverseRoleDelta $ UniverseRoleDelta
+    { id: ctxt
+    , roleInstances: roleInstances
+    , roleType: rtype
+    , deltaType: ConstructEmptyRole
+    , users: users
+    , sequenceNumber: 0
+    }
+  addContextDelta $ ContextDelta
+    { id: ctxt
+    , roleType: rtype
+    , roleInstances: roleInstances
+    , destinationContext: Nothing
+    , deltaType: AddRoleInstancesToContext
+    , users: users
+    , sequenceNumber: 0
+    }
+
 
 -- | Adds users for SYNCHRONISATION, guarantees RULE TRIGGERING.
 aisInPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction RolePropertyDelta
