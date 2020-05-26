@@ -54,7 +54,7 @@ import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
 import Perspectives.ContextRoleParser (parseAndCache)
-import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (DocWithAttachmentInfo(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, defaultPerspectRequest, documentNamesInDatabase, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.Couchdb.Revision (changeRevision)
@@ -118,7 +118,7 @@ roleInstancesFromCouchdb roleTypes _ = ArrayT do
   case head roleTypes of
     Nothing -> pure []
     Just rt -> do
-      tell [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)]
+      tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)]
       (roles :: Array PerspectRol) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
       for roles \r@(PerspectRol{_id}) -> do
         void $ lift $ cacheEntity _id r

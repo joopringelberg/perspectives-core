@@ -3,7 +3,7 @@ module Test.Query.Inversion where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (cons, head, length, null)
+import Data.Array (catMaybes, cons, head, length, null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
@@ -13,6 +13,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup, empty)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord)
+import Perspectives.InvertedQuery (QueryWithAKink, backwards)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
@@ -20,7 +21,7 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo', runPhaseTwo_')
 import Perspectives.Persistent (getPerspectEntiteit)
-import Perspectives.Query.Inversion (invertFunctionDescription)
+import Perspectives.Query.Kinked (invert)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, queryFunction)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -64,13 +65,13 @@ theSuite = suite "Test.Query.Inversion" do
               -- log $ prettyPrint qfd
               -- the condition is variable-free.
               (DomeinFile (dfr :: DomeinFileRecord)) <- getPerspectEntiteit (DomeinFileId "model:Test")
-              result <- runPhaseTwo_' (invertFunctionDescription qfd) dfr empty empty
+              result <- runPhaseTwo_' (invert qfd) dfr empty empty
               case fst result of
                 Left e -> liftAff $ assert ("Cannot invert query: " <> show e) false
-                Right (affectedContextQueries :: Array QueryFunctionDescription) -> do
+                Right (affectedContextQueries :: Array QueryWithAKink) -> do
                   -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
                   -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
-                  liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
+                  liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> (catMaybes $ backwards <$> affectedContextQueries)) ==
                     [ [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop7")),(DataTypeGetter ContextF)]
                     , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop6")),(DataTypeGetter ContextF)]
                     ])
@@ -276,7 +277,7 @@ paths2functions = (map queryFunction <<< composition2path)
 
 invertFD :: QueryFunctionDescription -> Aff (Array QueryFunctionDescription)
 invertFD qfd = do
-  result <- runP $ evalPhaseTwo' (invertFunctionDescription qfd)
+  result <- runP $ evalPhaseTwo' (invert qfd)
   case result of
     Left e -> assert ("Cannot invert query: " <> show e) false *> pure []
-    Right qfds -> pure qfds
+    Right qfds -> pure $ catMaybes (backwards <$> qfds)

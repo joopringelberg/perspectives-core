@@ -24,7 +24,10 @@ module Perspectives.CoreTypes where
 
 import Control.Monad.Reader (ReaderT, lift)
 import Control.Monad.Writer (WriterT, runWriterT)
-import Data.Array (head)
+import Data.Array (foldMap, foldl, foldr, head, union)
+import Data.Foldable (class Foldable)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Ordering (Ordering(..))
@@ -45,7 +48,7 @@ import Perspectives.Instances.Environment (Environment)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType)
 import Perspectives.Sync.Transaction (Transaction)
-import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
+import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -104,6 +107,11 @@ data InformedAssumption =
 	| Property RoleInstance EnumeratedPropertyType
 	| Context RoleInstance
 	| External ContextInstance
+
+derive instance genericInformedAssumption :: Generic InformedAssumption _
+
+instance eqInformedAssumption :: Eq InformedAssumption where
+  eq = genericEq
 
 -----------------------------------------------------------
 -- ASSIGNMENT (RULE) DEPENDENCYTRACKING
@@ -188,9 +196,24 @@ infix 1 runTypeLevelToObject as ###>>
 -----------------------------------------------------------
 -- | The QueryEnvironment accumulates Assumptions.
 
-type MonadPerspectivesQuery =  ArrayT (WriterT (Array InformedAssumption) MonadPerspectives)
+type MonadPerspectivesQuery =  ArrayT (WriterT (ArrayWithoutDoubles InformedAssumption) MonadPerspectives)
 
 type MPQ = MonadPerspectivesQuery
+
+newtype ArrayWithoutDoubles a = ArrayWithoutDoubles (Array a)
+
+derive instance newtypeArrayWithoutDoubles :: Newtype (ArrayWithoutDoubles a) _
+
+instance semigroupArrayWithoutDoubles :: Eq a => Semigroup (ArrayWithoutDoubles a) where
+  append (ArrayWithoutDoubles a1) (ArrayWithoutDoubles a2) = ArrayWithoutDoubles (a1 `union` a2)
+
+instance monoidArrayWithoutDoubles :: Eq a => Monoid (ArrayWithoutDoubles a) where
+  mempty = ArrayWithoutDoubles []
+
+instance foldableArrayWithoutDoubles :: Eq a => Foldable ArrayWithoutDoubles where
+  foldl f b (ArrayWithoutDoubles fa) = foldl f b fa
+  foldr f b (ArrayWithoutDoubles fa) = foldr f b fa
+  foldMap f (ArrayWithoutDoubles fa) = foldMap f fa
 
 -----------------------------------------------------------
 -- TRACKINGOBJECTSGETTER
@@ -214,7 +237,7 @@ runMonadPerspectivesQuery :: forall s o.
   -> (MonadPerspectives (WithAssumptions o))
 runMonadPerspectivesQuery a f = runWriterT (runArrayT (f a))
 
-type WithAssumptions o = Tuple (Array o) (Array InformedAssumption)
+type WithAssumptions o = Tuple (Array o) (ArrayWithoutDoubles InformedAssumption)
 -----------------------------------------------------------
 -- EVAL TRACKINGOBJECTSGETTER TO GET AN ARRAY OF RESULTS
 -----------------------------------------------------------

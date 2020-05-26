@@ -34,7 +34,7 @@ import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, liftToInstanceLevel)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, liftToInstanceLevel)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
@@ -51,12 +51,12 @@ import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($),
 -- | to track it as a dependency.
 externalRole :: ContextInstance ~~> RoleInstance
 externalRole ci = ArrayT do
-  tell [External ci]
+  tell $ ArrayWithoutDoubles [External ci]
   lift (singleton <$> getContextMember IP.externalRole ci)
 
 getEnumeratedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getEnumeratedRoleInstances rn c = ArrayT do
-  tell [RoleAssumption c rn]
+  tell $ ArrayWithoutDoubles [RoleAssumption c rn]
   lift $ getContextMember (flip context_rolInContext rn) c
 
 -- | Because we never change the type of a Context, we have no real need
@@ -75,7 +75,7 @@ setConditionState a c b = do
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT do
   c <- lift $ getPerspectContext ctxt
-  tell [Me ctxt (context_me c)]
+  tell $ ArrayWithoutDoubles [Me ctxt (context_me c)]
   pure $ maybe [] singleton (context_me c)
 
 -- | If the user has no role, return the role with the Aspect "model:System$Invitation$Guest".
@@ -97,13 +97,13 @@ context rid = ArrayT do
   -- that yields rid in the first place. This request is dependent on that other
   -- request, client side. This means that, if rid is removed, the client is notified
   -- of that change and consequently is no longer interested in its context.
-  tell [Context rid]
+  tell $ ArrayWithoutDoubles [Context rid]
   pure $ [rol_context r]
 
 binding :: RoleInstance ~~> RoleInstance
 binding r = ArrayT do
   (role :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
-  tell [Binding r]
+  tell $ ArrayWithoutDoubles [Binding r]
   case rol_binding role of
     Nothing -> pure []
     (Just b) -> pure [b]
@@ -121,7 +121,7 @@ bottom r = ArrayT do
 getRoleBinders :: EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
 getRoleBinders rname r = ArrayT do
   ((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
-  tell [Binder r rname]
+  tell $ ArrayWithoutDoubles [Binder r rname]
   case (lookup (unwrap rname) gevuldeRollen) of
     Nothing -> pure []
     (Just bs) -> pure bs
@@ -136,7 +136,7 @@ getUnqualifiedRoleBinders ln r = ArrayT do
       Nothing -> pure []
       (Just i) -> do
         rn <- pure (unsafePartial $ fromJust (index (keys gevuldeRollen) i))
-        tell [Binder r (EnumeratedRoleType rn)]
+        tell $ ArrayWithoutDoubles [Binder r (EnumeratedRoleType rn)]
         -- tell [assumption (unwrap r) rn]
         case lookup rn gevuldeRollen of
           Nothing -> pure []
@@ -145,7 +145,7 @@ getUnqualifiedRoleBinders ln r = ArrayT do
 getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn r = ArrayT do
   ((IP.PerspectRol{properties}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
-  tell [Property r pn]
+  tell $ ArrayWithoutDoubles [Property r pn]
   -- tell [assumption (unwrap r)(unwrap pn)]
   case (lookup (unwrap pn) properties) of
     Nothing -> pure []
@@ -164,7 +164,7 @@ getUnqualifiedProperty ln r = ArrayT do
     Nothing -> pure []
     (Just i) -> do
       pn <- pure (unsafePartial $ fromJust (index (keys $ rol_properties role) i))
-      tell [Property r (EnumeratedPropertyType pn)]
+      tell $ ArrayWithoutDoubles [Property r (EnumeratedPropertyType pn)]
       -- tell [assumption (unwrap r) pn]
       case (lookup pn properties) of
         Nothing -> pure []
@@ -182,7 +182,7 @@ roleType_ = (getRolMember \r -> rol_pspType r)
 allRoleBinders :: RoleInstance ~~> RoleInstance
 allRoleBinders r = ArrayT do
   ((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
-  for_ (keys gevuldeRollen) (\key -> tell [Binder r (EnumeratedRoleType key)]) -- tell [assumption (unwrap r) key])
+  for_ (keys gevuldeRollen) (\key -> tell $ ArrayWithoutDoubles [Binder r (EnumeratedRoleType key)]) -- tell [assumption (unwrap r) key])
   pure $ join $ values gevuldeRollen
 
 isMe :: RoleInstance -> MP Boolean

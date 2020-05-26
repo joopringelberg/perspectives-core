@@ -36,6 +36,7 @@ import Data.Lens.Record (prop)
 import Data.List (toUnfoldable)
 import Data.Map.Internal (Map, keys, values)
 import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse)
 import Data.Tuple (Tuple(..))
@@ -202,7 +203,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
           -- Apply the forwards query to the same role instance as the backwards query.
           (Tuple instances assumptions :: WithAssumptions RoleInstance) <- lift2 (runMonadPerspectivesQuery roleInstance (unsafeCoerce f))
           -- Now create and push Deltas for each of the assumptions. These Delta's are valid for all users.
-          for_ assumptions (createDeltasFromAssumption users)
+          for_ (unwrap assumptions) (createDeltasFromAssumption users)
           -- Then, for each separate user type, run all property getters in a single query for each value returned from the main query. The Assumptions thus gathered apply to that single user type.
           -- TODO. We verzamelen hier alles in één grote Transactie en splitsen hem dan later weer uit. Dat kan veel beter.
           arrayOfProperties <- case fold $ values userTypes of
@@ -213,7 +214,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
           Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
             getter <- lift $ lift $ getterFromPropertyType prop
             for_ instances getter
-          for_ assumptions' (createDeltasFromAssumption users)
+          for_ (unwrap assumptions') (createDeltasFromAssumption users)
       pure users
 
 createDeltasFromAssumption :: Array RoleInstance -> InformedAssumption -> MonadPerspectivesTransaction Unit

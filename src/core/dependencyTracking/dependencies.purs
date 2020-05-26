@@ -35,7 +35,7 @@ import Effect.Class (liftEffect)
 import Foreign.Object (Object, insert, lookup, singleton, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
-import Perspectives.CoreTypes (type (~~>), Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
@@ -84,8 +84,8 @@ registerSupportedEffect corrId ef q arg = do
   where
     apiEffectRunner :: Unit -> MP Unit
     apiEffectRunner _ = do
-      (Tuple result (informedAssumptions :: Array InformedAssumption)) <- runMonadPerspectivesQuery arg q
-      assumptions <- pure (map toAssumption (filter canBeUntypedAssumption informedAssumptions))
+      (Tuple result (informedAssumptions :: ArrayWithoutDoubles InformedAssumption)) <- runMonadPerspectivesQuery arg q
+      assumptions <- pure (map toAssumption (filter canBeUntypedAssumption (unwrap informedAssumptions)))
       -- destructively set the assumptions in the ActiveSupportedEffects
       (moldSupports :: Maybe SupportedEffect) <- pure $ GLS.peek activeSupportedEffects (show corrId)
       -- We have ensured a registration above, hence we can use unsafePartial.
