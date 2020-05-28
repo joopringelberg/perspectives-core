@@ -222,9 +222,10 @@ allProperties = reduce magic
   where
     magic :: EnumeratedRoleType -> MP (Array PropertyType)
     magic rt = do
-      x <- getEnumeratedRole rt >>= \(EnumeratedRole{roleAspects, binding}) -> pure $ product (cons binding (ST <$> roleAspects))
+      EnumeratedRole{roleAspects, binding, properties} <- getEnumeratedRole rt
+      x <- pure $ product (cons binding (ST <$> roleAspects))
       case x of
-        ST _ -> (getEnumeratedRole >=> pure <<< _.properties <<< unwrap) rt
+        EMPTY -> pure properties
         otherwise -> reduce magic otherwise
 
 -- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p

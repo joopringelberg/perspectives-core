@@ -114,10 +114,10 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
         Just _ -> modifyDF \df@{enumeratedRoles:roles} ->
           case lookup roleId roles of
             Nothing -> addInvertedQueryForDomain roleId
-              (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])})
+              (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user props})
               OnRoleDelta_binder
               df
-            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])}) onRoleDelta_binder }) roles}
+            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user props}) onRoleDelta_binder }) roles}
         otherwise -> pure unit
 
     addToProperties :: QueryWithAKink -> Array PropertyType -> PhaseThree Unit
@@ -150,12 +150,11 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
       pure $ makeComposition qfd (SQD (VDOM range (Just p)) (PropertyGetter p) (VDOM range (Just p)) (bool2threeValued fun) (bool2threeValued man))
 
     addBindingStep :: ADT EnumeratedRoleType -> QueryWithAKink -> MP QueryWithAKink
-    addBindingStep b (ZQ backwards forwards) = do
+    addBindingStep b (ZQ backwards _) = do
       fun <- getEnumeratedRole role >>= functional
       man <- getEnumeratedRole role >>= mandatory
       backwards' <- pure $ makeComposition (SQD (RDOM b) (DataTypeGetterWithParameter GetRoleBindersF (unwrap role)) (RDOM (ST role)) (bool2threeValued fun) (bool2threeValued man)) <$> backwards
-      forwards' <- pure $ makeComposition (SQD (RDOM (ST role)) (DataTypeGetter BindingF) (RDOM b) (bool2threeValued fun) (bool2threeValued man)) <$> forwards
-      pure $ ZQ backwards' forwards'
+      pure $ ZQ backwards' Nothing
 
     -- | Collect the Properties defined on the EnumeratedRoleType and its Aspect Roles.
     -- | Returns true iff the property is one of them.

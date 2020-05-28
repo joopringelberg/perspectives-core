@@ -53,7 +53,7 @@ import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, t
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (class Show, Unit, bind, discard, pure, unit, void, ($), (+), (<>), (==), (>=>), (>>>))
+import Prelude (class Show, Unit, bind, discard, pure, show, unit, void, ($), (+), (<>), (==), (>=>), (>>>))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -75,7 +75,7 @@ sendTransactieToUser userId t = do
   getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" userType
   mchannel <- (RoleInstance userId) ##> getChannel
   case mchannel of
-    Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> userId))
+    Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> userId <> "\n" <> show t))
     Just (Value channel) -> do
       cdbUrl <- getCouchdbBaseURL
       (rq :: (Request String)) <- defaultPerspectRequest

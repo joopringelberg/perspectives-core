@@ -95,7 +95,7 @@ sum = foldl sum' UNIVERSAL >>> \(s :: ADT a) -> case s of
 -- | PRODUCT [x, .. x] = PRODUCT[.., x]
 -- | PRODUCT [x] = x
 product :: forall a. Eq a => Array (ADT a) -> ADT a
-product = foldl prod' EMPTY >>> \(p :: ADT a) -> case p of
+product = (foldl prod' EMPTY) >>> \(p :: ADT a) -> case p of
     PROD x | length x == 1 -> unsafePartial $ AP.head x
     otherwise -> otherwise
   where

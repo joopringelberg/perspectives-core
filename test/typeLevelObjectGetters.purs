@@ -11,8 +11,9 @@ import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes ((###=), (###>>))
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Parsing.Messages (PerspectivesError)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Role (roleADT)
+import Perspectives.Representation.Class.Role (allProperties, roleADT)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile)
@@ -28,7 +29,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Perspectives.Types.ObjectGetters" do
+theSuite = suite "Perspectives.Types.ObjectGetters" do
 
   testSkip "propertiesOfRole 1" (runP do
     -- messages <- loadAndCompileArcFile "perspectivesSysteem" modelDirectory
@@ -62,3 +63,11 @@ theSuite = suite  "Perspectives.Types.ObjectGetters" do
     r <- (ENR $ EnumeratedRoleType "model:System$Invitation$Inviter") ###>> specialisesRoleType (ENR $ EnumeratedRoleType "model:SimpleChat$Chat$Initiator")
     -- logShow r
     liftAff $ assert "chat:Chat$Initiator `specialisesRoleType` sys:Invitation$Inviter should be true" (r == Value "true")
+
+  test "allProperties" $ runP $ withSystem do
+    ps <- allProperties (ST $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+    liftAff $ assert "User has 3 properties" (length ps == 3)
+    -- logShow $ length ps -- 3
+    ps' <- allProperties (ST $ EnumeratedRoleType "model:System$Channel$Initiator")
+    -- logShow $ length ps' -- 7
+    liftAff $ assert "Initiator has 7 properties" (length ps' == 7)

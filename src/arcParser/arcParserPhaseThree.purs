@@ -342,7 +342,7 @@ invertedQueriesForLocalRolesAndProperties = do
           (userTypes :: Array RoleType) <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
           qwk <- pure $ ZQ
             (Just (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory)))
-            (Just (SQD (CDOM (ST context)) (QF.RolGetter (ENR _id)) (RDOM (ST _id)) True (bool2threeValued mandatory)))
+            Nothing
           -- qfd <- pure $ (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) (bool2threeValued functional) (bool2threeValued mandatory))
           for_ userTypes \user -> do
             props <- lift $ lift (user `hasAccessToPropertiesOf` (ENR _id))

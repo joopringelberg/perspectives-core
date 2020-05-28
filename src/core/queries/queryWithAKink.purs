@@ -48,7 +48,7 @@ import Perspectives.Utilities (prettyPrint)
 import Prelude (class Show, Unit, append, bind, join, map, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
 
 --------------------------------------------------------------------------------------------------------------
----- ZIPPEDQUERY
+---- QUERYWITHAKINK
 --------------------------------------------------------------------------------------------------------------
 -- This we use in the invert_ function.
 data QueryWithAKink_ = ZQ_ (Array QueryFunctionDescription) (Maybe QueryFunctionDescription)
@@ -57,6 +57,7 @@ derive instance genericQueryWithAKink_ :: Generic QueryWithAKink_ _
 
 instance showQueryWithAKink_ :: Show QueryWithAKink_ where
   show = genericShow
+  
 --------------------------------------------------------------------------------------------------------------
 ---- INVERT
 --------------------------------------------------------------------------------------------------------------
