@@ -115,6 +115,7 @@ data SimpleStep =
 data UnaryStep =
   LogicalNot ArcPosition Step
   | Exists ArcPosition Step
+  | Binds ArcPosition Step
   | Available ArcPosition Step
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step, parenthesised :: Boolean}
@@ -226,6 +227,7 @@ instance decodeUnaryStep :: Decode UnaryStep where
 instance prettyPrintUnaryStep :: PrettyPrint UnaryStep where
   prettyPrint' t (LogicalNot _ s) = "LogicalNot " <> prettyPrint' t s
   prettyPrint' t (Exists _ s) = "Exists " <> prettyPrint' t s
+  prettyPrint' t (Binds _ s) = "Binds " <> prettyPrint' t s
   prettyPrint' t (Available _ s) = "Available " <> prettyPrint' t s
 
 derive instance genericLetStep :: Generic LetStep _

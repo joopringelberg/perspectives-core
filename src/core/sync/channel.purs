@@ -164,7 +164,8 @@ setYourRelayAddress host port channel = do
 
 -- | For a channel, set the replication of the local copy to the database found at either Host or RelayHost.
 -- | If host and port are equal for both partners, do not set replication.
--- | Also set replication for the channel to the post database.
+-- | Also set replication for the channel to the post database. This replication filters out just transactions
+-- | whose author is the ConnectedPartner (so I do not have to deal with transactions I've created myself).
 -- TODO. Zodra MonadPerspectives gestapeld is op ExceptT, gebruik dan throwError in plaats van pure unit.
 setChannelReplication :: ContextInstance -> MonadPerspectives Unit
 setChannelReplication channel = do
@@ -174,6 +175,7 @@ setChannelReplication channel = do
     Nothing -> pure unit
     Just (Value channelId) -> do
       connectedPartner <- getRoleFunction "sys:Channel$ConnectedPartner"
+      -- 'you' is the ConnectedPartner, if it is not 'me'.
       myou <- channel ##> filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not))
       case myou of
         Nothing -> pure unit

@@ -43,6 +43,7 @@ data FunctionName =
   | SequenceF
   | NotF
   | ExistsF
+  | BindsF
   | FilterF
   | ComposeF
   | DisjunctionF
@@ -80,6 +81,7 @@ isFunctionalFunction fn = case fn of
   SequenceF -> Unknown
   NotF -> True
   ExistsF -> True
+  BindsF -> True
   FilterF -> Unknown
   ComposeF -> Unknown
   DisjunctionF -> Unknown
@@ -180,6 +182,7 @@ instance showFunctionName :: Show FunctionName where
     show SequenceF = "sequence"
     show NotF = "not"
     show ExistsF = "exists"
+    show BindsF = "binds"
     show FilterF = "filter"
     show ComposeF = "compose"
     show DisjunctionF = "disjunction"

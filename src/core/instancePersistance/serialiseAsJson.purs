@@ -33,7 +33,6 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Class (encode)
 import Foreign.Object (Object, singleton, empty, toUnfoldable, fromFoldable) as OBJ
@@ -41,20 +40,21 @@ import Global.Unsafe (unsafeStringify)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MPQ, MPT, MonadPerspectives, (###>>), (##>>), (##>))
+import Perspectives.Couchdb.Databases (createDatabase, databaseExists, ensureAuthentication)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.ObjectGetters (bottom, context, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (bottom, context, getEnumeratedRoleInstances, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..), externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
-import Perspectives.Sync.Channel (addPartnerToChannel, createChannel)
+import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, setChannelReplication)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Perspectives.User (getHost, getPort)
-import Prelude (class Monad, Unit, bind, discard, eq, map, pure, when, ($), (<$>), (>>=), (&&), not, (>>>), (<>), show)
+import Perspectives.User (getCouchdbBaseURL, getHost, getPort)
+import Prelude (class Monad, Unit, bind, discard, eq, map, not, pure, unit, when, ($), (&&), (<$>), (<>), (>>=), (>>>), (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A function for the External Core Module `model:Serialise`. The first argument should be a singleton holding
@@ -152,14 +152,31 @@ serialiseAsJsonFor_ userType cid = do
 -- | This function expects an instance of type sys:Invitation, creates a channel and binds it to the Invitation
 -- | in the role PrivateChannel.
 addChannel :: ContextInstance -> MPT Unit
-addChannel invitation = createChannel >>= \channel -> void $ createAndAddRoleInstance
-  (EnumeratedRoleType "model:System$Invitation$PrivateChannel")
-  (unwrap invitation)
-  (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
+addChannel invitation = createChannel >>= \channel -> do
+  void $ createAndAddRoleInstance
+    (EnumeratedRoleType "model:System$Invitation$PrivateChannel")
+    (unwrap invitation)
+    (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
+  lift2 $ setChannelReplication channel
+
+-- | Create a database with the given name, if it does not yet exist (it may exist if the Initiator uses the same
+-- | Couchdb installation as the ConnectedPartner).
+-- | Also set up sync with the post database.
+createCopyOfChannelDatabase :: ContextInstance -> Array String -> MPT Unit
+createCopyOfChannelDatabase invitation arrWithChannelName = case ARR.head arrWithChannelName of
+  Just channelName -> lift2 $ do
+    base <- getCouchdbBaseURL
+    exsts <- databaseExists (base <> channelName)
+    when (not exsts) (ensureAuthentication (createDatabase channelName))
+    mchannelContext <- invitation ##> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Invitation$PrivateChannel") >=> context
+    case mchannelContext of
+      Just channelContext -> setChannelReplication channelContext
+      Nothing -> pure unit
+  Nothing -> pure unit
 
 addConnectedPartnerToChannel :: Array String -> Array String -> (ContextInstance -> MPT Unit)
 addConnectedPartnerToChannel userArr channelArr cid = do
-  log $ "addConnectedPartnerToChannel " <> show userArr <> " en " <> show channelArr
+  -- log $ "addConnectedPartnerToChannel " <> show userArr <> " en " <> show channelArr
   case ARR.head userArr of
     Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the first argument.")
     Just r -> do
@@ -169,7 +186,7 @@ addConnectedPartnerToChannel userArr channelArr cid = do
         Just usr -> case ARR.head channelArr of
           Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the second argument.")
           Just channelId -> do
-            log $ "addConnectedPartnerToChannel " <> show usr <> " en " <> show channelId
+            -- log $ "addConnectedPartnerToChannel " <> show usr <> " en " <> show channelId
             host <- lift2 getHost
             port <- lift2 getPort
             addPartnerToChannel usr (ContextInstance channelId) host port
@@ -181,4 +198,5 @@ externalFunctions =
   [ Tuple "model:Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1}
   , Tuple "model:Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0}
   , Tuple "model:Serialise$AddConnectedPartnerToChannel" {func: unsafeCoerce addConnectedPartnerToChannel, nArgs: 2}
+  , Tuple "model:Serialise$CreateCopyOfChannelDatabase" {func: unsafeCoerce createCopyOfChannelDatabase, nArgs: 1}
   ]

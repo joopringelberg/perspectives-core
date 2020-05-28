@@ -23,10 +23,11 @@ module Perspectives.Instances.ObjectGetters where
 
 import Control.Alt ((<|>))
 import Control.Monad.Writer (lift, tell)
-import Data.Array (findIndex, head, index, singleton)
+import Data.Array (findIndex, head, index, singleton, foldMap)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (unwrap)
+import Data.Monoid.Conj (Conj(..))
+import Data.Newtype (unwrap, ala)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -34,15 +35,15 @@ import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, liftToInstanceLevel)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, liftToInstanceLevel, (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (<<<), (<>), (==), (>>=), (>>>), (>=>), (<$>))
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (<<<), (<>), (==), (>>=), (>>>), (>=>), (<$>), show)
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -107,6 +108,13 @@ binding r = ArrayT do
   case rol_binding role of
     Nothing -> pure []
     (Just b) -> pure [b]
+
+binding_ :: RoleInstance -> MonadPerspectives (Maybe RoleInstance)
+binding_ r = do
+  (role :: IP.PerspectRol) <- getPerspectEntiteit r
+  case rol_binding role of
+    Nothing -> pure Nothing
+    (Just b) -> pure $ Just b
 
 bottom :: RoleInstance ~~> RoleInstance
 bottom r = ArrayT do
@@ -193,3 +201,24 @@ isMe ri = do
     else case bnd of
       Nothing -> pure false
       Just b -> isMe b
+
+-- | Binder `binds` Binding is true,
+-- | iff either Binding is the direct binding of Binder, or (binding Binder) `binds` Binding is true.
+-- | Query syntax: {step-that-produces-binder} >> binds {step-that-produces-binding}
+binds :: (RoleInstance ~~> RoleInstance) ->
+  (RoleInstance ~~> Value)
+binds sourceOfBindingRoles bnd = ArrayT do
+  (bools :: Array Boolean) <- lift (bnd ##= sourceOfBindingRoles >=> bindsRole bnd)
+  pure [Value $ show $ ala Conj foldMap bools]
+
+  where
+
+  bindsRole :: RoleInstance -> RoleInstance ~~> Boolean
+  bindsRole bnd' role = ArrayT $
+    if role == bnd'
+      then pure [true]
+      else do
+        (bs :: Array RoleInstance) <- runArrayT $ binding role
+        case head bs of
+          Nothing -> pure [false]
+          Just b -> runArrayT $ bindsRole bnd' b

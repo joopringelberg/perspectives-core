@@ -84,6 +84,8 @@ domain: System
       aspect: sys:PhysicalContext$UserWithAddress
       perspective on: Initiator
       perspective on: ConnectedPartner
+    user: Me = filter (Initiator union ConnectedPartner) with binds sys:Me
+    user: You = filter (Initiator union ConnectedPartner) with not binds sys:Me
 
   case: Model
     external:
@@ -115,6 +117,10 @@ domain: System
         if exists Invitee then
           -- bind object to ConnectedPartner in PrivateChannel >> binding >> context
           callEffect ser:AddConnectedPartnerToChannel( object, PrivateChannel >> binding >> context )
+    bot: for Invitee
+      perspective on: PrivateChannel
+        if exists PrivateChannel then
+          callEffect ser:CreateCopyOfChannelDatabase( PrivateChannel >> ChannelDatabaseName )
     user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
     bot: for Inviter
