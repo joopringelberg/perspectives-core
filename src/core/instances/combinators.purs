@@ -34,7 +34,7 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Prelude (class Eq, class Monad, class Show, bind, const, discard, pure, show, ($), (<$>), (<<<), (==), (>=>), (<*>), (&&), (||))
+import Prelude (class Eq, class Monad, class Show, bind, const, discard, pure, show, ($), (&&), (<$>), (<*>), (<<<), (==), (>=>), (||))
 
 -- | The closure of f, not including the root argument.
 -- | The closure of f contains no double entries iff the result of

@@ -40,7 +40,6 @@ import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log, logShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_isMe)
 import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, WithAssumptions, runMonadPerspectivesQuery, (###=), (##=), (##>>))
@@ -65,7 +64,7 @@ import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=), (<$>), (*>), (<>), show)
+import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=), (<$>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -199,14 +198,11 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
       case forwardsCompiled of
         Nothing -> if isNothing (forwards description)
           then do
-            log $ "Will compute all properties"
             arrayOfProperties <- case fold $ values userTypes of
               All -> do
                 rtype <- lift2 (roleInstance ##>> OG.roleType)
-                log $ "Case All for " <> show rtype
                 lift2 $ allProperties (ST rtype)
-              Properties props -> log ("Case props " <> show props) *> pure props
-            logShow arrayOfProperties
+              Properties props -> pure props
             Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
               getter <- lift $ lift $ getterFromPropertyType prop
               getter roleInstance

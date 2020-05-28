@@ -52,6 +52,7 @@ class ContextClass c where
   position :: c -> ArcPosition
   roles :: c -> Array RoleType
   contextADT :: c -> ADT ContextType
+  -- The product of the Context and its direct Aspects.
   contextAspectsADT :: c -> ADT ContextType
 
 instance contextContextClass :: ContextClass Context where

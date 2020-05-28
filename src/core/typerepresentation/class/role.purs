@@ -38,7 +38,7 @@ import Perspectives.Representation.ADT (ADT(..), product, reduce)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Context (roles, externalRole)
+import Perspectives.Representation.Context (contextAspects, externalRole, roles)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), elements, intersectionOfArrays, intersectionPset, subsetPSet, unionOfArrays, unionPset)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
@@ -179,18 +179,45 @@ propertySet (PROD terms) = traverse propertySet terms >>= pure <<< unionPset
 propertySet UNIVERSAL = pure Universal
 propertySet EMPTY = pure Empty
 
+-- | All properties, computed recursively over binding and Aspects, of the Role ADT.
+allProperties :: ADT EnumeratedRoleType -> MP (Array PropertyType)
+allProperties = reduce magic
+  where
+    magic :: EnumeratedRoleType -> MP (Array PropertyType)
+    magic rt = do
+      EnumeratedRole{roleAspects, binding, properties} <- getEnumeratedRole rt
+      x <- pure $ product (cons binding (ST <$> roleAspects))
+      case x of
+        EMPTY -> pure properties
+        otherwise -> do
+          props <- reduce magic otherwise
+          pure $ props <> properties
+
 --------------------------------------------------------------------------------------------------
 ---- ROLESET
 --------------------------------------------------------------------------------------------------
 type RoleSet = ExplicitSet RoleType
 
 -- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
+-- | Computes all roles, but does not descend into Aspects in the ST case.
 roleSet :: ADT ContextType -> MP RoleSet
 roleSet (ST r) = getContext r >>= pure <<< PSet <<< roles
 roleSet (SUM terms) = traverse roleSet terms >>= pure <<< intersectionPset
 roleSet (PROD terms) = traverse roleSet terms >>= pure <<< unionPset
 roleSet UNIVERSAL = pure Universal
 roleSet EMPTY = pure Empty
+
+allRoles :: ADT ContextType -> MP (Array RoleType)
+allRoles = reduce magic
+  where
+    magic :: ContextType -> MP (Array RoleType)
+    magic ct = do
+      c <-  getContext ct
+      if null (contextAspects c)
+        then pure $ roles c
+        else do
+          rs <- reduce magic (PROD (ST <$> contextAspects c))
+          pure (roles c <> rs)
 
 --------------------------------------------------------------------------------------------------
 ---- ACTIONSET
@@ -215,18 +242,6 @@ lessThanOrEqualTo p q = (&&) <$> (subsetPSet <$> propertySet p <*> propertySet q
 
 hasNotMorePropertiesThan :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 hasNotMorePropertiesThan p q = subset <$> (allProperties >=> pure <<< fromFoldable) p <*> (allProperties >=> pure <<< fromFoldable) q
-
--- | All properties, computed recursively over binding and Aspects, of the Role ADT.
-allProperties :: ADT EnumeratedRoleType -> MP (Array PropertyType)
-allProperties = reduce magic
-  where
-    magic :: EnumeratedRoleType -> MP (Array PropertyType)
-    magic rt = do
-      EnumeratedRole{roleAspects, binding, properties} <- getEnumeratedRole rt
-      x <- pure $ product (cons binding (ST <$> roleAspects))
-      case x of
-        EMPTY -> pure properties
-        otherwise -> reduce magic otherwise
 
 -- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
 -- | If you use `less specific` instead of `more specific`, flip the arguments.
@@ -268,6 +283,7 @@ propertiesOfADT adt = propertySet adt >>= case _ of
     PSet ps -> pure ps
     Empty -> pure []
     Universal -> throwError (error $ show UniversalRoleHasNoParts)
+-- propertiesOfADT = allProperties
 
 -----------------------------------------------------------
 -- VIEWSOFADT
