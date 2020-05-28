@@ -206,7 +206,12 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
     -- PERSPECTIVE
     handleParts roleName (EnumeratedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
       (Tuple roleIdentifier actions) <- traversePerspectiveE pe roleName
-      pure (EnumeratedRole roleUnderConstruction {perspectives = (insert roleIdentifier actions perspectives)})
+      -- A bot can also insert a perspective and in doing so will overwrite the user
+      -- actions (or vv). Hence we must check whether there is an entry under
+      -- roleIdentifier, and if so, add the actions to the actions already present!
+      case lookup roleIdentifier perspectives of
+        Nothing -> pure (EnumeratedRole roleUnderConstruction {perspectives = (insert roleIdentifier actions perspectives)})
+        Just acts -> pure (EnumeratedRole roleUnderConstruction {perspectives = (insert roleIdentifier (actions <> acts) perspectives)})
 
     -- VIEW
     handleParts roleName (EnumeratedRole roleUnderConstruction@{views}) (VE pe) = do
