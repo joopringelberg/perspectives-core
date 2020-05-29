@@ -47,7 +47,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binds, context, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, makeBoolean)
+import Perspectives.Instances.ObjectGetters (binding, boundBy, context, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
@@ -249,7 +249,7 @@ compileFunction (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) = do
 
 compileFunction (UQD _ (UnaryCombinator BindsF) f1 _ _ _) = do
   f1' <- compileFunction f1
-  pure (unsafeCoerce $ binds (unsafeCoerce f1'))
+  pure (unsafeCoerce $ boundBy (unsafeCoerce f1'))
 
 compileFunction (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) = do
   f1' <- compileFunction f1

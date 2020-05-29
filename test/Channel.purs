@@ -9,7 +9,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (log, logShow)
+import Effect.Class.Console (logShow)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes ((##>), (##>>))
 import Perspectives.Couchdb.Databases (addDocument, createDatabase, deleteDatabase, endReplication, getDocument)
@@ -147,3 +147,40 @@ theSuite = suite "Perspectives.Sync.Channel" do
             -- Clean up: end replication, remove the channel, clear the user entities database
             void $ endReplication channelId post
             deleteDatabase channelId
+
+  test "test Me and You" $ runP $ withSystem do
+  -- testOnly "test Me and You" $ runP $ withModel_ (DomeinFileId "model:System") false do
+    achannel <- runMonadPerspectivesTransaction createChannel
+    case head achannel of
+      Nothing -> liftAff $ assert "Failed to create a channel" false
+      Just channel -> do
+        -- load a second user
+        -- channelContext <- getPerspectEntiteit channel
+        -- logShow channelContext
+        void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+        host <- getHost
+        port <- getPort
+        void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
+
+        getYou <- getRoleFunction "sys:Channel$You"
+        myou <- channel ##> getYou
+
+        getMe <- getRoleFunction "sys:Channel$Me"
+        mme <- channel ##> getMe
+
+        getInitiator <- getRoleFunction "sys:Channel$Initiator"
+        mInitiator <- channel ##> getInitiator
+
+        getConnectedPartner <- getRoleFunction "sys:Channel$ConnectedPartner"
+        mConnectedPartner <- channel ##> getConnectedPartner
+
+        -- log $ "me = " <> show mme
+        -- log $ "you = " <> show myou
+        liftAff $ assert "'Me' should be the Initiator" (mme == mInitiator)
+
+        liftAff $ assert "'You' should be the ConnectedPartner" (myou == mConnectedPartner)
+
+        getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+        (Value channelId) <- channel ##>> externalRole >=> getChannelId
+        -- Comment out to prepare for a test of Transaction distribution.
+        deleteDatabase channelId

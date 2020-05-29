@@ -174,9 +174,13 @@ setChannelReplication channel = do
   case mchannel of
     Nothing -> pure unit
     Just (Value channelId) -> do
-      connectedPartner <- getRoleFunction "sys:Channel$ConnectedPartner"
-      -- 'you' is the ConnectedPartner, if it is not 'me'.
-      myou <- channel ##> filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not))
+      getYou <- getRoleFunction "sys:Channel$You"
+      myou <- channel ##> getYou
+
+      -- connectedPartner <- getRoleFunction "sys:Channel$ConnectedPartner"
+      -- -- 'you' is the ConnectedPartner, if it is not 'me'.
+      -- myou <- channel ##> filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not))
+
       case myou of
         Nothing -> pure unit
         Just you -> do
@@ -202,10 +206,10 @@ setChannelReplication channel = do
                         Nothing -> pure unit
                         -- Push local copy of channel to RelayHost. Author = you
                         Just (Value p) -> setPushAndPullReplication channelId h p userBehindYou
-            Just (Value h) -> do
+            Just (Value yourHost) -> do
               -- if h equals the host of this PDR, just stop.
               myHost <- getHost
-              if myHost == h
+              if myHost == yourHost
                 then pure unit
                 else do
                   port <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Port"
@@ -213,9 +217,9 @@ setChannelReplication channel = do
                   case portValue of
                     Nothing -> pure unit
                     -- Push local copy of channel to PeerHost. Author = me
-                    Just (Value p) -> do
+                    Just (Value yourPort) -> do
                       me <- getUserIdentifier
-                      setPushReplication channelId h p me
+                      setPushReplication channelId yourHost yourPort me
           post <- postDbName
           localReplication channelId post (Just userBehindYou)
 

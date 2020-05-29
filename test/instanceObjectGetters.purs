@@ -65,6 +65,10 @@ theSuite = suite "Test.Instances.ObjectGetters" do
     if null errs
       then do
         r <- (RoleInstance "model:User$test$User") ##= binds \_ -> pure (RoleInstance "model:User$Initiator")
-        logShow r
+        -- logShow r
         liftAff $ assert "Initator should bind User" (r == [Value "true"])
+
+        s <- (RoleInstance "model:User$test$TheTrustedCluster") ##= binds \_ -> pure (RoleInstance "model:User$Initiator")
+        liftAff $ assert "Initiator should not bind TheTrustedCluster" (s == [Value "false"])
+
       else liftAff $ assert ("There are model errors" <> (show errs)) false

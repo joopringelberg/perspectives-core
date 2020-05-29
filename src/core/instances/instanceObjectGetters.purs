@@ -202,23 +202,41 @@ isMe ri = do
       Nothing -> pure false
       Just b -> isMe b
 
+-- | Binding `boundBy` Binder is true,
+-- | iff either Binding is the direct binding of Binder, or (binding Binder) `binds` Binding is true.
+boundBy :: (RoleInstance ~~> RoleInstance) ->
+  (RoleInstance ~~> Value)
+boundBy sourceOfBoundRoles binder = ArrayT do
+  (bools :: Array Boolean) <- lift (binder ##= sourceOfBoundRoles >=> bindsRole binder)
+  pure [Value $ show $ ala Conj foldMap bools]
+  where
+    -- role `bindsRole` bnd'
+    bindsRole :: RoleInstance -> RoleInstance ~~> Boolean
+    bindsRole role bnd' = ArrayT $
+      if role == bnd'
+        then pure [true]
+        else do
+          (bs :: Array RoleInstance) <- runArrayT $ binding role
+          case head bs of
+            Nothing -> pure [false]
+            Just b -> runArrayT $ bindsRole b bnd'
+
 -- | Binder `binds` Binding is true,
 -- | iff either Binding is the direct binding of Binder, or (binding Binder) `binds` Binding is true.
 -- | Query syntax: {step-that-produces-binder} >> binds {step-that-produces-binding}
 binds :: (RoleInstance ~~> RoleInstance) ->
   (RoleInstance ~~> Value)
 binds sourceOfBindingRoles bnd = ArrayT do
-  (bools :: Array Boolean) <- lift (bnd ##= sourceOfBindingRoles >=> bindsRole bnd)
+  (bools :: Array Boolean) <- lift (bnd ##= sourceOfBindingRoles >=> boundByRole bnd)
   pure [Value $ show $ ala Conj foldMap bools]
-
   where
-
-  bindsRole :: RoleInstance -> RoleInstance ~~> Boolean
-  bindsRole bnd' role = ArrayT $
-    if role == bnd'
-      then pure [true]
-      else do
-        (bs :: Array RoleInstance) <- runArrayT $ binding role
-        case head bs of
-          Nothing -> pure [false]
-          Just b -> runArrayT $ bindsRole bnd' b
+    -- bnd' `boundByRole` role
+    boundByRole :: RoleInstance -> RoleInstance ~~> Boolean
+    boundByRole bnd' role = ArrayT $
+      if role == bnd'
+        then pure [true]
+        else do
+          (bs :: Array RoleInstance) <- runArrayT $ binding role
+          case head bs of
+            Nothing -> pure [false]
+            Just b -> runArrayT $ boundByRole bnd' b
