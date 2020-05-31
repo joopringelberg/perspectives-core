@@ -53,7 +53,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole, getView)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (functional, mandatory, propertySet)
+import Perspectives.Representation.Class.Role (allProperties, functional, mandatory, propertySet)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (isElementOf)
@@ -70,8 +70,8 @@ setInvertedQueriesForUserAndRole user (ST role) props qWithAkink = case props of
   All -> do
     -- store qWithAkink in onContextDelta_context of role
     addToRole qWithAkink role
-  -- for each property of role, store (Value2Role >> invertedQ) in onPropertyDelta of that property
-    (lift2 $ getEnumeratedRole role) >>= \(EnumeratedRole{properties}) -> addToProperties qWithAkink properties
+    -- for each property of role, store (Value2Role >> invertedQ) in onPropertyDelta of that property
+    (lift2 $ allProperties (ST role)) >>= \properties -> addToProperties qWithAkink properties
     -- get the binding of role
     (b :: ADT EnumeratedRoleType) <- (lift2 $ getEnumeratedRole role) >>= pure <<< _.binding <<< unwrap
     -- recursive call

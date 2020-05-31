@@ -24,6 +24,7 @@ module Perspectives.Query.Kinked where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, cons, foldr, null, uncons, unsnoc)
+import Data.FoldableWithIndex (forWithIndex_)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Map (Map)
@@ -31,6 +32,7 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.InvertedQuery (QueryWithAKink(..), RelevantProperties)
+import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setPathForStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -45,7 +47,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Show, Unit, append, bind, join, map, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
+import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
@@ -57,7 +59,7 @@ derive instance genericQueryWithAKink_ :: Generic QueryWithAKink_ _
 
 instance showQueryWithAKink_ :: Show QueryWithAKink_ where
   show = genericShow
-  
+
 --------------------------------------------------------------------------------------------------------------
 ---- INVERT
 --------------------------------------------------------------------------------------------------------------
@@ -142,15 +144,20 @@ invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q
 setInvertedQueries :: Map RoleType RelevantProperties -> QueryFunctionDescription -> PhaseThree Unit
 setInvertedQueries userTypes qfd = do
   (zqs :: (Array QueryWithAKink)) <- ensureContextDomain qfd >>= invert
-  for_ zqs \qwk@(ZQ backward forward) -> case backward of
-    (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk userTypes
-    (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
-    -- Assuming an SQD otherwise
-    -- (Just b) -> unsafePartial $ setPathForStep b b userTypes
-    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk userTypes
-    (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
-    Nothing -> pure unit
-
+  for_ zqs \qwk@(ZQ backward forward) -> do
+    case backward of
+      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk userTypes
+      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
+      -- Assuming an SQD otherwise
+      -- (Just b) -> unsafePartial $ setPathForStep b b userTypes
+      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk userTypes
+      (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
+      Nothing -> pure unit
+    -- TODO. Voor de rol zetten we nu voor de tweede keer de InvertedQuery.
+    case forward, backward, domain <$> backward of
+      Nothing, Just bw, Just (RDOM role) -> (forWithIndex_ userTypes
+        \user props -> setInvertedQueriesForUserAndRole user role props qwk)
+      _, _, _ -> pure unit
   where
     -- For a query that has a Role domain, we add a step from context to role.
     -- This guarantees that the inverse query has a context domain.

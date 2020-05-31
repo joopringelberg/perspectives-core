@@ -162,8 +162,8 @@ addChannel invitation = createChannel >>= \channel -> do
 -- | Create a database with the given name, if it does not yet exist (it may exist if the Initiator uses the same
 -- | Couchdb installation as the ConnectedPartner).
 -- | Also set up sync with the post database.
-createCopyOfChannelDatabase :: ContextInstance -> Array String -> MPT Unit
-createCopyOfChannelDatabase invitation arrWithChannelName = case ARR.head arrWithChannelName of
+createCopyOfChannelDatabase :: Array String -> ContextInstance -> MPT Unit
+createCopyOfChannelDatabase arrWithChannelName invitation = case ARR.head arrWithChannelName of
   Just channelName -> lift2 $ do
     base <- getCouchdbBaseURL
     exsts <- databaseExists (base <> channelName)

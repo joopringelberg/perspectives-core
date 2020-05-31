@@ -23,13 +23,13 @@ domain: System
     user: User (mandatory, functional)
       property: Achternaam (mandatory, not functional, String)
       property: Voornaam (mandatory, not functional, String)
-      -- LET OP: dit zijn er dus heel veel! En tegelijk zijn het alleen de kanalen waar je zelf de initiatiefnemer bent.
+      -- LET OP: dit zijn er dus heel veel!
       property: Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       indexed: sys:Me
       view: VolledigeNaam (Voornaam, Achternaam)
       perspective on: User
-    -- TODO: dit is eigenlijk overbodig
-    context: Channels filledBy: Channel
+    -- moet hier geen >> extern achter?
+    context: Channels = User >> (binder Initiator union binder ConnectedPartner) >> context >> extern
     -- Het type van ModellenM bepalen we met de clause 'returns:'
     context: Modellen = callExternal cdb:Models() returns: Model$External
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
@@ -53,7 +53,7 @@ domain: System
           bind object to IndexedContexts
 
     context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
-    -- An entry in IndexedContexts is dangling if its model is no in use.
+    -- An entry in IndexedContexts is dangling if its model is not in use.
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
     -- On moving a model to ModelsInUse for the second time, the bot with the perspective on UnloadedModel will not work. We need a third rule for that.
     -- An UnconnectedIndexedContext is model in use that has no entry in IndexedContexts.
