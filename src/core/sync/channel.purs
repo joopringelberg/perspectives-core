@@ -28,23 +28,21 @@ import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Object (empty, fromFoldable)
+import Foreign.Object (fromFoldable)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, MPT, (##=), (##>), (##>>), type (~~>))
 import Perspectives.Couchdb (selectOnField)
-import Perspectives.Couchdb.Databases (createDatabase, ensureAuthentication, replicateContinuously)
+import Perspectives.Couchdb.Databases (createDatabase, deleteDocument_, endReplication, ensureAuthentication, replicateContinuously)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, disjunction)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
-import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Names (getUserIdentifier)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
@@ -55,7 +53,6 @@ import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<
 -- | Create a new database for the communication between `me` and another user.
 -- | Create an instance of sys:Channel. Bind `me` in the role Initiator. Set the value of ChannelDatabaseName to
 -- | that of the new database.
--- | Bind the new Channel to MySystem in the role Channels.
 createChannel :: MonadPerspectivesTransaction ContextInstance
 createChannel = do
   g <- liftEffect guid
@@ -84,18 +81,9 @@ createChannelContext channelName = do
        )]
     , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
     }
-  -- TODO: dit is eigenlijk niet nodig.
   case eChannel of
     Left e -> throwError (error ("createChannel could not create channel: " <> show e))
-    Right (channel :: ContextInstance) -> do
-      sysId <- lift2 getMySystem
-      void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$PerspectivesSystem$Channels")
-        sysId
-        (RolSerialization
-          { id: Nothing
-          , properties: PropertySerialization empty,
-          binding: Just (buitenRol $ unwrap channel)})
-      pure channel
+    Right (channel :: ContextInstance) -> pure channel
 
 -- | Add the second user to the channel: not the Initiator, but the ConnectedPartner.
 addPartnerToChannel :: RoleInstance -> ContextInstance -> Host -> Port -> MonadPerspectivesTransaction Unit
@@ -111,6 +99,7 @@ addPartnerToChannel (RoleInstance usr) (ContextInstance channel) host port = voi
 
 type Host = String
 type Port = Int
+type Port_ = String
 
 -- | Get either the Initiator or the ConnectedPartner - whomever is filled by me.
 getMeFromChannel :: MonadPerspectives (ContextInstance ~~> RoleInstance)
@@ -171,18 +160,14 @@ setChannelReplication :: ContextInstance -> MonadPerspectives Unit
 setChannelReplication channel = do
   getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
   mchannel <- channel ##> externalRole >=> getChannelId
+  post <- postDbName
   case mchannel of
     Nothing -> pure unit
     Just (Value channelId) -> do
       getYou <- getRoleFunction "sys:Channel$You"
       myou <- channel ##> getYou
-
-      -- connectedPartner <- getRoleFunction "sys:Channel$ConnectedPartner"
-      -- -- 'you' is the ConnectedPartner, if it is not 'me'.
-      -- myou <- channel ##> filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not))
-
       case myou of
-        Nothing -> pure unit
+        Nothing -> localReplication channelId post Nothing
         Just you -> do
           -- yourIdentifier
           (RoleInstance userBehindYou) <- you ##>> bottom
@@ -220,7 +205,6 @@ setChannelReplication channel = do
                     Just (Value yourPort) -> do
                       me <- getUserIdentifier
                       setPushReplication channelId yourHost yourPort me
-          post <- postDbName
           localReplication channelId post (Just userBehindYou)
 
 postDbName :: MonadPerspectives String
@@ -265,3 +249,45 @@ localReplication source target author = do
     (base <> source)
     (base <> target)
     (maybe Nothing (\a -> Just $ selectOnField "author" a) author)
+
+-- | Stop replicating the channel to the post database.
+-- | Stop replicating the channel database to the remote version.
+endChannelReplication :: ContextInstance -> MonadPerspectives Unit
+endChannelReplication channel = do
+  getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+  mchannel <- channel ##> externalRole >=> getChannelId
+  post <- postDbName
+  case mchannel of
+    Nothing -> pure unit
+    Just (Value channelId) -> do
+      void $ endReplication channelId post
+      void $ deleteDocument_ "_replicator" channelId
+
+-- Not used.
+getYourHostAndPort :: ContextInstance -> MonadPerspectives (Maybe (Tuple Host Port_))
+getYourHostAndPort channel = do
+  getYou <- getRoleFunction "sys:Channel$You"
+  myou <- channel ##> getYou
+  case myou of
+    Nothing -> pure Nothing
+    Just you -> do
+      host <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Host"
+      hostValue <- you ##> host
+      case hostValue of
+        Nothing -> do
+          relayHost <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayHost"
+          relayHostValue <- you ##> relayHost
+          case relayHostValue of
+            Nothing -> pure Nothing
+            Just (Value h) -> do
+              relayPort <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayPort"
+              portValue <- you ##> relayPort
+              case portValue of
+                Nothing -> pure Nothing
+                Just (Value p) -> pure $ Just $ Tuple h p
+        Just (Value yourHost) -> do
+          port <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Port"
+          portValue <- you ##> port
+          case portValue of
+            Nothing -> pure Nothing
+            Just (Value yourPort) -> pure $ Just $ Tuple yourHost yourPort

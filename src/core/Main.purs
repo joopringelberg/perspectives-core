@@ -22,30 +22,37 @@ module Main where
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Writer (runWriterT)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.Tuple (fst)
 import Effect (Effect)
 import Effect.Aff (Error, forkAff, runAff)
 import Effect.Aff.AVar (AVar, new)
 import Effect.Console (log)
 import Perspectives.Api (setupApi, setupTcpApi)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
+import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
 import Perspectives.LocalAuthentication (AuthenticationResult(..))
 import Perspectives.LocalAuthentication (authenticate) as LA
-import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.Names (getMySystem)
+import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState)
+import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithState)
 import Perspectives.SetupCouchdb (partyMode, setupCouchdbForFirstUser)
 import Perspectives.SetupUser (setupUser)
+import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.Sync.IncomingPost (incomingPost)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (<$>))
+import Perspectives.User (getSystemIdentifier)
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (<$>), (>=>), (>>=), (<<<))
 
 -- | Runs the PDR with default credentials. Used for testing clients without authentication.
 main :: Effect Unit
@@ -104,9 +111,20 @@ authenticate usr pwd callback = void $ runAff handler do
 -- | This is for development only! Assumes the user identifier equals the user name.
 resetAccount :: String -> String -> Effect Unit
 resetAccount usr pwd = void $ runAff handler (runPerspectives usr pwd usr do
+  -- Get all Channels
+  getChannels <- getRoleFunction "sys:PerspectivesSystem$Channels"
+  system <- getMySystem
+  (channels :: Array ContextInstance) <- (ContextInstance system) ##= getChannels >=> context
+  -- End their replication
+  for_ channels endChannelReplication
+  -- remove the databases
+  getChannelDbId <- getPropertyFunction "sys:Channel$External$ChannelDatabaseName"
+  for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDatabase <<< unwrap
   clearUserDatabase
-  clearModelDatabase)
+  clearModelDatabase
+  clearPostDatabase)
   where
+
     clearUserDatabase :: MonadPerspectives Unit
     clearUserDatabase = do
       userDatabaseName <- entitiesDatabaseName
@@ -115,6 +133,11 @@ resetAccount usr pwd = void $ runAff handler (runPerspectives usr pwd usr do
     clearModelDatabase :: MonadPerspectives Unit
     clearModelDatabase = do
       dbname <- modelsDatabaseName
+      deleteDatabase dbname
+      createDatabase dbname
+    clearPostDatabase :: MonadPerspectives Unit
+    clearPostDatabase = do
+      dbname <- postDatabaseName
       deleteDatabase dbname
       createDatabase dbname
     handler :: Either Error Unit -> Effect Unit
