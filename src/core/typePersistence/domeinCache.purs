@@ -41,7 +41,7 @@ import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntitei
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
 import Perspectives.User (getCouchdbPassword, getUser)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<<<), (<>))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<<<), (<>), (<$>))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
 storeDomeinFileInCache ns df= cacheEntity (DomeinFileId ns) df
@@ -70,6 +70,10 @@ modifyDomeinFileInCache modifier ns =
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
 retrieveDomeinFile ns = catchError (getPerspectEntiteit (DomeinFileId ns))
   \e -> throwError $ error ("retrieveDomeinFile: " <> show e)
+
+tryRetrieveDomeinFile :: Namespace -> MonadPerspectives (Maybe DomeinFile)
+tryRetrieveDomeinFile id = catchError (Just <$> (getPerspectEntiteit (DomeinFileId id)))
+  \_ -> pure Nothing
 
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String

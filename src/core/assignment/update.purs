@@ -36,28 +36,34 @@ module Perspectives.Assignment.Update where
 
 import Prelude
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (difference, find, union)
 import Data.Array.NonEmpty (NonEmptyArray, toArray, head)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isNothing)
+import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
+import Effect.Exception (error)
 import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, aisInRoleDelta, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeContext_me, changeRol_binding, changeRol_isMe, context_me, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_context, rol_id, rol_isMe, rol_pspType, setRol_property)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##>))
 import Perspectives.Deltas (addContextDelta, addCorrelationIdentifiersToTransactie, addPropertyDelta, addRoleDelta, addUniverseRoleDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findPropertyRequests, findRoleRequests)
+import Perspectives.DomeinCache (tryRetrieveDomeinFile)
+import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (isMe)
+import Perspectives.Instances.ObjectGetters (getProperty, isMe)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
-import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
@@ -84,7 +90,18 @@ setBinding roleId (newBindingId :: RoleInstance) = do
   (lift2 $ findBinderRequests newBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
   (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
 
-  newBinding@(PerspectRol{isMe}) <- lift2 $ getPerspectEntiteit newBindingId
+  newBinding@(PerspectRol{isMe, pspType}) <- lift2 $ getPerspectEntiteit newBindingId
+  -- If the type of the new binding is unknown, load the model. There is only one
+  -- circumstance that we can have a RoleInstance of an unknown type and that is when
+  -- it is the external role of a sys:Model context. This role has a property Url that
+  -- we can fetch the model from.
+  mDomeinFile <- lift2 $ traverse tryRetrieveDomeinFile (deconstructModelName $ unwrap pspType)
+  when (isNothing mDomeinFile)
+    (do
+      murl <- lift2 (newBindingId ##> getProperty (EnumeratedPropertyType "model:System$Model$External$Url"))
+      case murl of
+        Nothing -> throwError (error $ "System error: no url found to load model for unknown type " <> (unwrap pspType))
+        Just (Value url) -> addModelToLocalStore [url] newBindingId)
   -- Handle isMe (on the binding role) and me (on its context).
   if isMe
     then do
@@ -302,7 +319,7 @@ moveRoleInstancesToAnotherContext originContextId destinationContextId rolName r
   case me of
     Nothing -> do
       (lift2 $ modifyContext_rolInContext destination rolName (append (toArray rolInstances))) >>= saveEntiteit destinationContextId
-      (lift2 $ modifyContext_rolInContext origin rolName (flip difference (toArray rolInstances))) >>= saveEntiteit originContextId 
+      (lift2 $ modifyContext_rolInContext origin rolName (flip difference (toArray rolInstances))) >>= saveEntiteit originContextId
     Just m -> do
       destination' <- lift2 (modifyContext_rolInContext destination rolName (append (toArray rolInstances)))
       saveEntiteit destinationContextId (changeContext_me destination' me)
