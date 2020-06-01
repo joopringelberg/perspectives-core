@@ -23,21 +23,21 @@ module Perspectives.TypePersistence.LoadArc where
 
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (delete)
+import Data.Array (delete, filterA, findIndex, head)
 import Data.Either (Either(..))
-import Data.Foldable (find, foldl)
-import Data.Maybe (Maybe(..))
+import Data.Foldable (foldl)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
-import Foreign.Object (Object, empty, keys, lookup)
+import Foreign.Object (Object, empty, keys, lookup, values)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Node.Process (cwd)
 import Perspectives.ContextRoleParser (userData)
-import Perspectives.CoreTypes (MonadPerspectives, (##=))
+import Perspectives.CoreTypes (MonadPerspectives, (##=), (###=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.IndentParser (runIndentParser')
@@ -53,7 +53,8 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Prelude (bind, discard, pure, show, void, ($), (*>), (<>), (==), (>=>))
+import Perspectives.Types.ObjectGetters (aspectsOfRole)
+import Prelude (bind, discard, pure, show, void, ($), (*>), (<>), (==), (>=>), (<$>))
 import Text.Parsing.Parser (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
@@ -117,7 +118,12 @@ loadArcAndCrl fileName directoryName = do
       case parseResult of
         Left e -> pure $ Left $ [Custom (show e)]
         Right _ -> do
-          modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roleInstances
+          (modelDescription :: Maybe PerspectRol) <- head <$> filterA
+            (\(PerspectRol{pspType}) -> do
+              aspects <- pspType ###= aspectsOfRole
+              pure $ isJust $ findIndex ((==) (EnumeratedRoleType "model:System$Model$External")) aspects)
+            (values roleInstances)
+          -- modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roleInstances
           (Tuple indexedRoles indexedContexts) <- case modelDescription of
             Nothing -> pure $ Tuple [] []
             Just m -> do

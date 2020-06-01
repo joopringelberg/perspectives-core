@@ -3,11 +3,11 @@ UserData
 import model:System as sys
 import model:SimpleChat as chat
 
-sys:Model usr:SimpleChatModel
-  extern $Name = "Simple Chat"
-  extern $Description = "A (very) simple chat application."
-  extern $Url = "http://127.0.0.1:5984/repository/model:SimpleChat"
-  $IndexedContext =>
+chat:Model usr:SimpleChatModel
+  extern sys:Model$External$Name = "Simple Chat"
+  extern sys:Model$External$Description = "A (very) simple chat application."
+  extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:SimpleChat"
+  sys:Model$IndexedContext =>
     chat:ChatApp usr:MyChatApp
       extern sys:NamedContext$External$Name = "Simple Chat"
       $Chatter -> sys:Me

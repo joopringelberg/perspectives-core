@@ -2,6 +2,11 @@
 domain: TestBotActie
   use: sys for model:System
 
+  case: Model
+    external:
+      aspect: sys:Model$External
+    aspect: sys:Model
+
   case: Tests
     external:
       aspect: sys:NamedContext$External

@@ -36,29 +36,22 @@ domain: System
     context: IndexedContexts (not mandatory, not functional) filledBy: sys:NamedContext
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
     bot: for User
-      -- This rule creates an entry in IndexedContexts if its model has been taken in use for the first time.
-      perspective on: UnloadedModel
-        if exists UnloadedModel then
-          callEffect cdb:AddModelToLocalStore( object >> binding >> Url )
-          bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
+      -- This rule creates an entry in IndexedContexts if its model has been taken in use.
+      perspective on: UnconnectedIndexedContext
+        if exists UnconnectedIndexedContext then
+          bind object to IndexedContexts
 
       -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
       perspective on: DanglingIndexedContext
         if exists DanglingIndexedContext then
           remove object
 
-      -- This rule creates an entry in IndexedContexts if the model is taken in use again.
-      perspective on: UnconnectedIndexedContext
-        if exists UnconnectedIndexedContext then
-          bind object to IndexedContexts
-
     context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
     -- An entry in IndexedContexts is dangling if its model is not in use.
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
     -- On moving a model to ModelsInUse for the second time, the bot with the perspective on UnloadedModel will not work. We need a third rule for that.
     -- An UnconnectedIndexedContext is model in use that has no entry in IndexedContexts.
-    context: UnconnectedIndexedContext = (filter ModelsInUse >> binding with available context) >> filter (context >> IndexedContext >> binding) with not exists binder IndexedContexts
-
+    context: UnconnectedIndexedContext = ModelsInUse >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts
   case: PhysicalContext
     user: UserWithAddress
       -- The public URL of the PDR of the UserWithAddress.

@@ -3,6 +3,11 @@ domain: SimpleChat
   use: sys for model:System
   use: cdb for model:Couchdb
 
+  case: Model
+    external:
+      aspect: sys:Model$External
+    aspect: sys:Model
+
   case: ChatApp
     external:
       aspect: sys:NamedContext$External
