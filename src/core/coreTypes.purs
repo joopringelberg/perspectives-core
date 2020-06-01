@@ -76,6 +76,8 @@ type PerspectivesExtraState =
   , indexedContexts :: Object ContextInstance
 
   , post :: Maybe EventSource
+
+  , repositoryUrl :: String
   )
 
 -----------------------------------------------------------

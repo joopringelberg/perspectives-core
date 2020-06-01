@@ -45,6 +45,7 @@ newPerspectivesState uinfo av =
   , indexedRoles: empty
   , indexedContexts: empty
   , post: Nothing
+  , repositoryUrl: "http://127.0.0.1:5984/repository/"
   }
 
 -----------------------------------------------------------
@@ -74,6 +75,8 @@ queryAssumptionRegister = gets _.queryAssumptionRegister
 queryAssumptionRegisterModify :: (AssumptionRegister -> AssumptionRegister) -> MonadPerspectives Unit
 queryAssumptionRegisterModify f = modify \(s@{queryAssumptionRegister: q}) -> s {queryAssumptionRegister = f q}
 
+repositoryUrl :: MonadPerspectives String
+repositoryUrl = gets _.repositoryUrl
 -----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS
 -----------------------------------------------------------
