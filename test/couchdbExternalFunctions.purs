@@ -95,7 +95,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
       else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
 
-  testOnly "upload model:SimpleChat to repository from files" $ runP $ withSystem do
+  test "upload model:SimpleChat to repository from files" $ runP $ withSystem do
     errs <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
     if null errs
       then do
@@ -103,7 +103,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
       else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
 
-  test "upload model:TestBotActie to repository from files" $ runP $ withSystem do
+  testOnly "upload model:TestBotActie to repository from files" $ runP $ withSystem do
     errs <- loadCompileAndCacheArcFile "testBotActie" modelDirectory
     if null errs
       then do

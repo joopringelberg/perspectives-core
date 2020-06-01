@@ -72,6 +72,14 @@ theSuite = suite "Perspectives.loadArc" do
         liftAff $ assert "The file could not be parsed or compiled" false
       _ -> pure unit
 
+  test "Load TestBotActie and cache it" $ runP $ withSystem do
+    messages <- loadAndCompileArcFile "testBotActie" modelDirectory
+    case messages of
+      Left m -> do
+        logShow messages
+        liftAff $ assert "The file could not be parsed or compiled" false
+      _ -> pure unit
+
   test "Load model:Couchdb from file and store it in Couchdb" do
     messages <- runP do
       catchError (loadCompileAndSaveArcFile' "couchdb" modelDirectory)
