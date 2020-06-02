@@ -27,18 +27,19 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (fst)
 import Effect (Effect)
-import Effect.Aff (Error, forkAff, runAff)
+import Effect.Aff (Error, forkAff, runAff, try)
 import Effect.Aff.AVar (AVar, new)
-import Effect.Console (log)
-import Perspectives.Api (setupApi, setupTcpApi)
+import Effect.Class.Console (log)
+import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
+import Perspectives.Couchdb (DatabaseName)
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
-import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
+import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.LocalAuthentication (AuthenticationResult(..))
 import Perspectives.LocalAuthentication (authenticate) as LA
 import Perspectives.Names (getMySystem)
@@ -51,7 +52,6 @@ import Perspectives.SetupCouchdb (partyMode, setupCouchdbForFirstUser)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.Sync.IncomingPost (incomingPost)
-import Perspectives.User (getSystemIdentifier)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (<$>), (>=>), (>>=), (<<<))
 
 -- | Runs the PDR with default credentials. Used for testing clients without authentication.
@@ -119,7 +119,7 @@ resetAccount usr pwd = void $ runAff handler (runPerspectives usr pwd usr do
   for_ channels endChannelReplication
   -- remove the databases
   getChannelDbId <- getPropertyFunction "sys:Channel$External$ChannelDatabaseName"
-  for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDatabase <<< unwrap
+  for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDb <<< unwrap
   clearUserDatabase
   clearModelDatabase
   clearPostDatabase)
@@ -143,6 +143,13 @@ resetAccount usr pwd = void $ runAff handler (runPerspectives usr pwd usr do
     handler :: Either Error Unit -> Effect Unit
     handler (Left e) = log $ "An error condition in resetAccount: " <> (show e)
     handler (Right e) = log $ "Cleared the account " <> usr
+
+    deleteDb :: DatabaseName -> MonadPerspectives Unit
+    deleteDb dbname = do
+      r <- try (deleteDatabase dbname)
+      case r of
+        Left e -> log (show e)
+        Right _ -> pure unit
 
 
 -- | Retrieve all instances of sys:Model$IndexedRole and sys:Model$IndexedContext and create a table of

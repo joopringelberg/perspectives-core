@@ -23,13 +23,14 @@
 
 module Perspectives.Sync.Channel where
 
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (fromFoldable)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
@@ -260,8 +261,12 @@ endChannelReplication channel = do
   case mchannel of
     Nothing -> pure unit
     Just (Value channelId) -> do
-      void $ endReplication channelId post
-      void $ deleteDocument_ "_replicator" channelId
+      r <- try do
+        void $ endReplication channelId post
+        void $ deleteDocument_ "_replicator" channelId
+      case r of
+        Left e -> log $ show e
+        Right _ -> pure unit
 
 -- Not used.
 getYourHostAndPort :: ContextInstance -> MonadPerspectives (Maybe (Tuple Host Port_))
