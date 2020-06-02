@@ -23,15 +23,14 @@
 
 module Perspectives.Extern.Couchdb where
 
-import Affjax (Request, URL, printResponseFormatError, request)
+import Affjax (Request, URL, request)
 import Affjax.RequestBody (string) as RequestBody
-import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.AvarMonadAsk (modify) as AMA
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.State (State, StateT, execState, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
-import Data.Array (cons, elemIndex, head)
+import Data.Array (cons, head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -56,9 +55,10 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, chan
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (DocWithAttachmentInfo(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
-import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, defaultPerspectRequest, documentNamesInDatabase, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, retrieveDocumentVersion, version)
+import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, defaultPerspectRequest, documentNamesInDatabase, getAttachmentFromUrl, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, SeparateInvertedQuery(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
@@ -206,7 +206,8 @@ addModelToLocalStore' url = do
           forWithIndex_ invertedQueriesInOtherDomains
             \domainName queries -> do
               DomeinFile dfr <- lift2 $ getDomeinFile (DomeinFileId domainName)
-              lift2 (saveEntiteit_ (DomeinFileId domainName) (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+              -- Here we must take care to preserve the screens.js attachment.
+              lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
 
           -- Copy the attachment
           lift $ lift $ addA url _id
@@ -274,18 +275,13 @@ addModelToLocalStore' url = do
     -- url is the path to the document in the repository.
     addA :: String -> String -> MP Unit
     addA url' modelName = do
-      (rq :: (Request String)) <-  defaultPerspectRequest
-      res <- liftAff $ request $ rq {url = url' <> "/screens.js"}
-      case elemIndex res.status [StatusCode 200, StatusCode 304] of
+      mAttachment <- getAttachmentFromUrl url' "screens.js"
+      case mAttachment of
         Nothing -> pure unit
-        Just _ -> do
-          void $ case res.body of
-            Left e -> throwError $ error ("addModelToLocalStore: Errors on retrieving attachment: " <> (printResponseFormatError e))
-            -- Left e -> pure unit
-            Right attachment -> do
-              perspect_models <- modelsDatabaseName
-              void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
-              updateRevision (DomeinFileId modelName)
+        Just attachment -> do
+          perspect_models <- modelsDatabaseName
+          void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
+          updateRevision (DomeinFileId modelName)
 
     repository :: String -> MP String
     repository url' = case getFirstMatch (unsafeRegex "^(.*/).+$" noFlags) url' of
