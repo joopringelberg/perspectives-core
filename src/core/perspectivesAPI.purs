@@ -49,16 +49,18 @@ import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGette
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (buitenRol, isQualifiedName)
+import Perspectives.Identifiers (buitenRol, isQualifiedName, unsafeDeconstructModelName)
+import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, roleType)
+import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (rangeOfRoleCalculation')
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Perspectives.User (getSystemIdentifier)
@@ -214,7 +216,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       sendResponse (Result corrId [sysId]) setter
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
-      (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> void $ runMonadPerspectivesTransaction $ do
+      (Right (ContextSerialization cd@{ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> void $ runMonadPerspectivesTransaction $ do
         g <- liftEffect guid
         ctxt <- runExceptT $ constructContext (ContextSerialization cd {id = "model:User$c" <> (show g)})
         case ctxt of
@@ -224,7 +226,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (Left e :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextsSerialisation ctxts) :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> void $
         runMonadPerspectivesTransaction' false do
-          result <- runExceptT $ traverse constructContext ctxts
+          result <- runExceptT $ traverse
+            (\ctxt@(ContextSerialization{ctype}) -> do
+              lift $ loadModelIfMissing $ unsafeDeconstructModelName ctype
+              constructContext ctxt)
+            ctxts
           case result of
             Left e -> lift2 $ sendResponse (Error corrId (show e)) setter
             Right ids -> lift2 $ sendResponse (Result corrId (unwrap <$> ids)) setter
@@ -287,6 +293,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case head typeOfRolesToBindTo of
         Nothing -> sendResponse (Error corrId ("No roltype found for '" <> predicate <> "'.")) setter
         (Just typeOfRolToBindTo) -> do
+          PerspectRol{pspType} <- getPerspectRol (RoleInstance object)
+          void $ runMonadPerspectivesTransaction' false (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
           ok <- checkBinding typeOfRolToBindTo (RoleInstance object)
           sendResponse (Result corrId [(show ok)]) setter
     Api.Unsubscribe -> unregisterSupportedEffect corrId

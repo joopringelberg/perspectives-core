@@ -36,10 +36,11 @@ import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.Update (addProperty, addRoleInstancesToContext, deleteProperty, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, OrderedDelta(..), MonadPerspectives, (##=))
+import Perspectives.Identifiers (unsafeDeconstructModelName)
 import Perspectives.Instances.Builders (constructEmptyContext, constructEmptyRole_)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Persistent (saveEntiteit)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeContextInstance, removeRoleInstance)
 import Perspectives.SerializableNonEmptyArray (toNonEmptyArray)
 import Perspectives.Sync.Class.DeltaClass (getSequenceNumber)
@@ -71,16 +72,20 @@ executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property}) = 
     -- log ("setProperty " <> show property <> " of " <> show id <> " to " <> show values)
     setProperty [id] property values
 
+-- | Retrieves from the repository the model that holds the ContextType, if necessary.
 executeUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
 executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) = case deltaType of
   ConstructEmptyContext -> do
     -- log ("constructEmptyContext " <> show id <> " with type " <> show contextType)
+    loadModelIfMissing (unsafeDeconstructModelName $ unwrap contextType)
     void $ runExceptT $ constructEmptyContext id (unwrap contextType) "" (PropertySerialization empty)
   RemoveContextInstance -> removeContextInstance id
 
+-- | Retrieves from the repository the model that holds the RoleType, if necessary.
 executeUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
 executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaType}) = case deltaType of
   ConstructEmptyRole -> do
+    loadModelIfMissing (unsafeDeconstructModelName $ unwrap roleType)
     -- find the number of roleinstances in the context.
     offset <- lift2 ((id ##= getEnumeratedRoleInstances roleType) >>= pure <<< length)
     forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do

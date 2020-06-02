@@ -28,7 +28,7 @@ import Data.Array (cons, elemIndex, filterA, find, foldM, foldr, null, sort, uni
 import Data.Array (filter) as ARR
 import Data.Array.NonEmpty (fromArray, head, toArray)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -40,17 +40,20 @@ import Perspectives.CoreTypes (ActionInstance(..), Assumption, MonadPerspectives
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
+import Perspectives.DomeinCache (tryRetrieveDomeinFile)
+import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMe)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.Names (getUserIdentifier)
+import Perspectives.PerspectivesState (repositoryUrl)
 import Perspectives.Representation.TypeIdentifiers (ActionType, RoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (actionsClosure, isAutomatic, specialisesRoleType_)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (==), (&&))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, when, ($), (&&), (<$>), (<<<), (<>), (=<<), (==), (>=>), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -180,3 +183,16 @@ getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift
+
+-----------------------------------------------------------
+-- LOADMODELIFMISSING
+-----------------------------------------------------------
+-- | Retrieves from the repository the model, if necessary.
+-- TODO. This function relies on a repository URL in PerspectivesState. That is a stub.
+loadModelIfMissing :: String -> MonadPerspectivesTransaction Unit
+loadModelIfMissing modelName = do
+  mDomeinFile <- lift2 $ tryRetrieveDomeinFile modelName
+  when (isNothing mDomeinFile)
+    do
+      repositoryUrl <- lift2 repositoryUrl
+      addModelToLocalStore' (repositoryUrl <> modelName)

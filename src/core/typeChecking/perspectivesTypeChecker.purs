@@ -24,18 +24,14 @@ module Perspectives.Checking.PerspectivesTypeChecker where
 import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, elemIndex)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.Maybe (Maybe(..), isJust)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
-import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.Extern.Couchdb (addModelToLocalStore')
-import Perspectives.Identifiers (unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
 import Perspectives.Persistent (getPerspectContext)
-import Perspectives.PerspectivesState (repositoryUrl)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
@@ -44,8 +40,7 @@ import Perspectives.Representation.Context (Context, contextAspects, contextRole
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleKind(..), RoleType(..))
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
-import Prelude (Unit, bind, discard, pure, unit, void, when, ($), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (==), (>=>), (>>=))
 
 checkDomeinFile :: DomeinFile -> MonadPerspectives (Array PerspectivesError)
 checkDomeinFile df = pure []
@@ -107,15 +102,11 @@ checkContext c = do
 -----------------------------------------------------------
 -- CHECKBINDING
 -----------------------------------------------------------
+-- | Retrieves from the repository the model that holds the RoleType, if necessary.
 checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding roletype instanceToBind = do
   -- If the model is not available locally, try to get it from the repository.
   rtype@(EnumeratedRoleType rtype') <- roleType_ instanceToBind
-  mDomeinFile <- tryRetrieveDomeinFile (unsafeDeconstructModelName rtype')
-  when (isNothing mDomeinFile)
-    do
-      repositoryUrl <- repositoryUrl
-      void $ runMonadPerspectivesTransaction' false $ addModelToLocalStore' (repositoryUrl <> (unsafeDeconstructModelName rtype'))
   instanceType' <- (getEnumeratedRole >=> roleAspectsBindingADT) rtype
   -- TODO. Voor de rol moet ik alleen de binding ophalen.
   -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRole

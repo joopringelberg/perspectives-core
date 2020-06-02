@@ -51,32 +51,34 @@ import Foreign.Object (isEmpty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
-import Perspectives.Assignment.Update (addRoleInstancesToContext, handleNewPeer_, setBinding, setProperty)
+import Perspectives.Assignment.Update (addRoleInstancesToContext, setBinding, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (##>>))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addUniverseContextDelta_, increaseDeltaIndex)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), Binding)
-import Perspectives.Instances.ObjectGetters (context, getEnumeratedRoleInstances, isMe)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
+-- import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..))
-import Prelude (bind, discard, flip, not, pure, unit, void, when, ($), (*>), (<$>), (<<<), (<>), (>>=), (==), (&&))
+import Prelude (bind, discard, not, pure, unit, void, when, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setBinding on each role.
 -- | Calls setProperty for each property value.
 -- | calls addRoleInstancesToContext on the role instances.
 -- | This function is complete w.r.t. the five responsibilities, for the context and its roles.
+-- | Retrieves from the repository the model that holds the ContextType, if necessary.
 constructContext :: ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
 constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
   contextInstanceId <- ContextInstance <$> (lift $ lift2 $ expandDefaultNamespaces id)
@@ -183,8 +185,9 @@ constructEmptyRole_ roleType contextInstance i rolInstanceId = do
 -- | Construct a Role instance for an existing Context instance.
 -- | This function is complete w.r.t. the five responsibilities.
 -- | Notice that roleType must be a well-formed identifier!
+-- | Retrieves from the repository the model that holds the RoleType, if necessary.
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction RoleInstance
-createAndAddRoleInstance roleType id (RolSerialization{id: mRoleId, properties, binding}) = do
+createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerialization{id: mRoleId, properties, binding}) = do
   contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces id)
   rolInstances <- lift2 (contextInstanceId ##= getEnumeratedRoleInstances roleType)
   (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole roleType
