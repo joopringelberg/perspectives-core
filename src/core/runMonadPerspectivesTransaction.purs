@@ -33,21 +33,26 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
+import Foreign.Object (empty)
 import Perspectives.Actions (compileBotAction)
-import Perspectives.ApiTypes (CorrelationIdentifier)
+import Perspectives.ApiTypes (CorrelationIdentifier, PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (retrieveAction)
 import Perspectives.CoreTypes (ActionInstance(..), Assumption, MonadPerspectives, MonadPerspectivesTransaction, (##>), (###=))
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
+import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMe)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
-import Perspectives.Names (getUserIdentifier)
+import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Persistent (getDomeinFile)
 import Perspectives.PerspectivesState (repositoryUrl)
-import Perspectives.Representation.TypeIdentifiers (ActionType, RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
@@ -196,3 +201,12 @@ loadModelIfMissing modelName = do
     do
       repositoryUrl <- lift2 repositoryUrl
       addModelToLocalStore' (repositoryUrl <> modelName)
+      -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
+      DomeinFile{modelDescription} <- lift2 $ getDomeinFile (DomeinFileId modelName)
+      mySys <- lift2 $ getMySystem
+      case modelDescription of
+        Nothing -> pure unit
+        Just (PerspectRol{_id}) -> void $ createAndAddRoleInstance
+          (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse")
+          mySys
+          (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just $ unwrap _id})
