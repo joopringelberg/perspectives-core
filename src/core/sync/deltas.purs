@@ -26,7 +26,7 @@ import Affjax.RequestBody as RequestBody
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (length, nub, union)
+import Data.Array (nub, union)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
@@ -48,12 +48,12 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Sync.Class.DeltaClass (setIndex)
+import Perspectives.Sync.Class.DeltaClass (addToSet)
 import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, transactionCloneWithDelta, users)
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (class Show, Unit, bind, discard, pure, show, unit, void, ($), (+), (<>), (==), (>=>), (>>>))
+import Prelude (class Show, Unit, bind, discard, pure, show, unit, void, ($), (+), (<>), (>=>), (>>>))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -115,58 +115,23 @@ addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changed
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
 addContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
-addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas, nextDeltaIndex} ->
-  let
-    -- Notice that, on comparing two deltas, we do not consider their indices.
-    s = union [(setIndex nextDeltaIndex d)] contextDeltas
-  in
-    if length s == length contextDeltas
-      then t
-      else t {contextDeltas = s, nextDeltaIndex = nextDeltaIndex + 1})
+addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas, nextDeltaIndex} -> t {contextDeltas = addToSet d contextDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
 
 addRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
-addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas, nextDeltaIndex} ->
-  let
-    -- Notice that, on comparing two deltas, we do not consider their indices.
-    s = union [(setIndex nextDeltaIndex d)] roleDeltas
-  in
-    if length s == length roleDeltas
-      then t
-      else t {roleDeltas = s, nextDeltaIndex = nextDeltaIndex + 1})
+addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas, nextDeltaIndex} -> t {roleDeltas = addToSet d roleDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
 
 addPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
-addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas, nextDeltaIndex} ->
-  let
-    -- Notice that, on comparing two deltas, we do not consider their indices.
-    s = union [(setIndex nextDeltaIndex d)] propertyDeltas
-  in
-    if length s == length propertyDeltas
-      then t
-      else t {propertyDeltas = s, nextDeltaIndex = nextDeltaIndex + 1})
+addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas, nextDeltaIndex} -> t {propertyDeltas = addToSet d propertyDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
 
 addUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
-addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas, nextDeltaIndex} ->
-  let
-    -- Notice that, on comparing two deltas, we do not consider their indices.
-    s = union [(setIndex nextDeltaIndex d)] universeContextDeltas
-  in
-    if length s == length universeContextDeltas
-      then t
-      else t {universeContextDeltas = s, nextDeltaIndex = nextDeltaIndex + 1})
+addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas, nextDeltaIndex} -> t {universeContextDeltas = addToSet d universeContextDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
 
 -- | Add a context delta with a fixed index.
 addUniverseContextDelta_ :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
 addUniverseContextDelta_ d = lift $ AA.modify (over Transaction \t@{universeContextDeltas} -> t {universeContextDeltas = union [d] universeContextDeltas})
 
 addUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
-addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas, nextDeltaIndex} ->
-  let
-    -- Notice that, on comparing two deltas, we do not consider their indices.
-    s = union [(setIndex nextDeltaIndex d)] universeRoleDeltas
-  in
-    if length s == length universeRoleDeltas
-      then t
-      else t {universeRoleDeltas = s, nextDeltaIndex = nextDeltaIndex + 1})
+addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas, nextDeltaIndex} -> t {universeRoleDeltas = addToSet d universeRoleDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
 
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
 addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})

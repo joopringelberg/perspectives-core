@@ -32,7 +32,8 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray)
-import Prelude (class Show, eq)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint')
+import Prelude (class Show, show, (<>), (==), (&&))
 
 -----------------------------------------------------------
 -- GENERIC
@@ -49,18 +50,22 @@ newtype UniverseContextDelta = UniverseContextDelta (DeltaRecord
   ))
 
 derive instance genericUniverseContextDelta :: Generic UniverseContextDelta _
+derive instance newtypeUniverseContextDelta :: Newtype UniverseContextDelta _
 
 instance showUniverseContextDelta :: Show UniverseContextDelta where
   show = genericShow
 
 instance eqUniverseContextDelta :: Eq UniverseContextDelta where
-  eq (UniverseContextDelta r1@{}) (UniverseContextDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
+  eq (UniverseContextDelta {id: i1, contextType: c1, deltaType: d1}) (UniverseContextDelta {id: i2, contextType: c2, deltaType: d2}) = i1 == i2 && c1 == c2 && d1 == d2
 
 instance encodeUniverseContextDelta :: Encode UniverseContextDelta where
   encode = genericEncode defaultOptions
 instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
   decode = genericDecode defaultOptions
 
+-----------------------------------------------------------
+-- UNIVERSECONTEXTDELTATYPE
+-----------------------------------------------------------
 data UniverseContextDeltaType = ConstructEmptyContext | RemoveContextInstance
 derive instance genericUniverseContextDeltaType :: Generic UniverseContextDeltaType _
 instance showUniverseContextDeltaType :: Show UniverseContextDeltaType where
@@ -73,6 +78,12 @@ instance encodeUniverseContextDeltaType :: Encode UniverseContextDeltaType where
   encode = genericEncode defaultOptions
 instance decodeUniverseContextDeltaType :: Decode UniverseContextDeltaType where
   decode = genericDecode defaultOptions
+
+instance prettyPrintUniverseContextDelta :: PrettyPrint UniverseContextDelta where
+  prettyPrint' t (UniverseContextDelta r) = "UniverseContextDelta " <> prettyPrint' (t <> "  ") r
+
+instance prettyPrintUniverseContextDeltaType :: PrettyPrint UniverseContextDeltaType where
+  prettyPrint' t = show
 
 -----------------------------------------------------------
 -- UNIVERSEROLEDELTA
@@ -93,13 +104,19 @@ instance showUniverseRoleDelta :: Show UniverseRoleDelta where
   show = genericShow
 
 instance eqUniverseRoleDelta :: Eq UniverseRoleDelta where
-  eq (UniverseRoleDelta r1@{}) (UniverseRoleDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
+  eq (UniverseRoleDelta {id:i1, roleType:r1, roleInstances:ri1, deltaType:d1}) (UniverseRoleDelta {id:i2, roleType:r2, roleInstances:ri2, deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && d1 == d2
 
 instance encodeUniverseRoleDelta :: Encode UniverseRoleDelta where
   encode = genericEncode defaultOptions
 instance decodeUniverseRoleDelta :: Decode UniverseRoleDelta where
   decode = genericDecode defaultOptions
 
+instance prettyPrintUniverseRoleDelta :: PrettyPrint UniverseRoleDelta where
+  prettyPrint' t (UniverseRoleDelta r) = "UniverseRoleDelta " <> prettyPrint' (t <> "  ") r
+
+-----------------------------------------------------------
+-- UNIVERSEROLEDELTATYPE
+-----------------------------------------------------------
 data UniverseRoleDeltaType = ConstructEmptyRole | ConstructExternalRole | RemoveRoleInstance
 derive instance genericUniverseRoleDeltaType :: Generic UniverseRoleDeltaType _
 instance showUniverseRoleDeltaType :: Show UniverseRoleDeltaType where
@@ -112,6 +129,8 @@ instance encodeUniverseRoleDeltaType :: Encode UniverseRoleDeltaType where
   encode = genericEncode defaultOptions
 instance decodeUniverseRoleDeltaType :: Decode UniverseRoleDeltaType where
   decode = genericDecode defaultOptions
+instance prettyPrintUniverseRoleDeltaType :: PrettyPrint UniverseRoleDeltaType where
+  prettyPrint' t = show
 
 -----------------------------------------------------------
 -- CONTEXTDELTA
@@ -124,23 +143,30 @@ newtype ContextDelta = ContextDelta (DeltaRecord
   , deltaType :: ContextDeltaType
   ))
 
-data ContextDeltaType =
-  AddRoleInstancesToContext |
-  MoveRoleInstancesToAnotherContext |
-  NoOp
-
 derive instance genericContextDelta :: Generic ContextDelta _
+derive instance newtypeContextDelta :: Newtype ContextDelta _
 
 instance showContextDelta :: Show ContextDelta where
   show = genericShow
 
 instance eqContextDelta :: Eq ContextDelta where
-  eq (ContextDelta r1@{}) (ContextDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
+  eq (ContextDelta {id:i1, roleType:r1, roleInstances:ri1, destinationContext: dc1, deltaType:d1}) (ContextDelta {id:i2, roleType:r2, roleInstances:ri2, destinationContext: dc2, deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && dc1 == dc2 && d1 == d2
 
 instance encodeContextDelta :: Encode ContextDelta where
   encode = genericEncode defaultOptions
 instance decodeContextDelta :: Decode ContextDelta where
   decode = genericDecode defaultOptions
+
+instance prettyPrintContextDelta :: PrettyPrint ContextDelta where
+  prettyPrint' t (ContextDelta r) = "ContextDelta " <> prettyPrint' (t <> "  ") r
+
+-----------------------------------------------------------
+-- CONTEXTDELTATYPE
+-----------------------------------------------------------
+data ContextDeltaType =
+  AddRoleInstancesToContext |
+  MoveRoleInstancesToAnotherContext |
+  NoOp
 
 derive instance genericContextDeltaType :: Generic ContextDeltaType _
 instance showContextDeltaType :: Show ContextDeltaType where
@@ -153,6 +179,8 @@ instance encodeContextDeltaType :: Encode ContextDeltaType where
   encode = genericEncode defaultOptions
 instance decodeContextDeltaType :: Decode ContextDeltaType where
   decode = genericDecode defaultOptions
+instance prettyPrintContextDeltaType :: PrettyPrint ContextDeltaType where
+  prettyPrint' t = show
 
 -----------------------------------------------------------
 -- ROLEBINDINGDELTA
@@ -166,21 +194,27 @@ newtype RoleBindingDelta = RoleBindingDelta (DeltaRecord
   -- Remove, Change
   ))
 
-data RoleBindingDeltaType = SetBinding | RemoveBinding
-
 derive instance genericRoleDelta :: Generic RoleBindingDelta _
+derive instance newtypeRoleBindingDelta :: Newtype RoleBindingDelta _
 
 instance showRoleDelta :: Show RoleBindingDelta where
   show = genericShow
 
 instance eqRoleDelta :: Eq RoleBindingDelta where
-  eq (RoleBindingDelta r1@{}) (RoleBindingDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
-
+  eq (RoleBindingDelta {id:i1, binding:b1, oldBinding:ob1, deltaType:d1, roleWillBeRemoved:r1}) (RoleBindingDelta {id:i2, binding:b2, oldBinding:ob2, deltaType:d2, roleWillBeRemoved:r2}) = i1 == i2 && b1 == b2 && ob1 == ob2 && d1 == d2 && r1 == r2
 
 instance encodeRoleDelta :: Encode RoleBindingDelta where
   encode = genericEncode defaultOptions
 instance decodeRoleDelta :: Decode RoleBindingDelta where
   decode = genericDecode defaultOptions
+
+instance prettyPrintRoleBindingDelta :: PrettyPrint RoleBindingDelta where
+  prettyPrint' t (RoleBindingDelta r) = "RoleBindingDelta " <> prettyPrint' (t <> "  ") r
+
+-----------------------------------------------------------
+-- ROLEBINDINGDELTATYPE
+-----------------------------------------------------------
+data RoleBindingDeltaType = SetBinding | RemoveBinding
 
 derive instance genericRoleBindingDeltaType :: Generic RoleBindingDeltaType _
 
@@ -190,11 +224,12 @@ instance showRoleBindingDeltaType :: Show RoleBindingDeltaType where
 instance eqRoleBindingDeltaType :: Eq RoleBindingDeltaType where
   eq = genericEq
 
-
 instance encodeRoleBindingDeltaType :: Encode RoleBindingDeltaType where
   encode = genericEncode defaultOptions
 instance decodeRoleBindingDeltaType :: Decode RoleBindingDeltaType where
   decode = genericDecode defaultOptions
+instance prettyPrintRoleBindingDeltaType :: PrettyPrint RoleBindingDeltaType where
+  prettyPrint' t = show
 
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTA
@@ -207,17 +242,21 @@ newtype RolePropertyDelta = RolePropertyDelta (DeltaRecord
   ))
 
 derive instance genericPropertyDelta :: Generic RolePropertyDelta _
+derive instance newtypeRolePropertyDelta :: Newtype RolePropertyDelta _
 
 instance showPropertyDelta :: Show RolePropertyDelta where
   show = genericShow
 
 instance eqPropertyDelta :: Eq RolePropertyDelta where
-  eq (RolePropertyDelta r1@{}) (RolePropertyDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
+  eq (RolePropertyDelta {id:i1, property:p1, values:v1, deltaType:d1}) (RolePropertyDelta {id:i2, property:p2, values:v2, deltaType:d2}) = i1 == i2 && p1 == p2 && v1 == v2 && d1 == d2
 
 instance encodePropertyDelta :: Encode RolePropertyDelta where
   encode = genericEncode defaultOptions
 instance decodePropertyDelta :: Decode RolePropertyDelta where
   decode = genericDecode defaultOptions
+
+instance prettyPrintRolePropertyDelta :: PrettyPrint RolePropertyDelta where
+  prettyPrint' t (RolePropertyDelta r) = "RolePropertyDelta " <> prettyPrint' (t <> "  ") r
 
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTATYPE
@@ -234,3 +273,6 @@ instance encodeRolePropertyDeltaType :: Encode RolePropertyDeltaType where
   encode = genericEncode defaultOptions
 instance decodeRolePropertyDeltaType :: Decode RolePropertyDeltaType where
   decode = genericDecode defaultOptions
+
+instance prettyPrintRolePropertyDeltaType :: PrettyPrint RolePropertyDeltaType where
+  prettyPrint' t = show

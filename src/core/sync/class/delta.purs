@@ -21,35 +21,59 @@
 
 module Perspectives.Sync.Class.DeltaClass where
 
+import Data.Array (cons, findIndex, union, unsafeIndex, updateAt)
+import Data.Maybe (Maybe(..), fromJust)
+import Data.Newtype (over2)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
-import Prelude ((+))
+import Prelude ((+), class Eq, (==), ($))
 
-class DeltaClass d where
+class Eq d <= DeltaClass d where
   addBase :: Int -> d -> d
   setIndex :: Int -> d -> d
   getSequenceNumber :: d -> Int
+  unionOfUsers :: d -> d -> d
 
 instance contextDeltaDeltaUsers :: DeltaClass ContextDelta where
   addBase i (ContextDelta r@{sequenceNumber}) = ContextDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (ContextDelta r) = ContextDelta r {sequenceNumber = i}
   getSequenceNumber (ContextDelta{sequenceNumber}) = sequenceNumber
+  unionOfUsers = over2 ContextDelta unionOfUsers_
 
 instance roleBindingDeltaDeltaUsers :: DeltaClass RoleBindingDelta where
   addBase i (RoleBindingDelta r@{sequenceNumber}) = RoleBindingDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (RoleBindingDelta r) = RoleBindingDelta r {sequenceNumber = i}
   getSequenceNumber (RoleBindingDelta{sequenceNumber}) = sequenceNumber
+  unionOfUsers = over2 RoleBindingDelta unionOfUsers_
 
 instance rolePropertyDeltaDeltaUsers :: DeltaClass RolePropertyDelta where
   addBase i (RolePropertyDelta r@{sequenceNumber}) = RolePropertyDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (RolePropertyDelta r) = RolePropertyDelta r {sequenceNumber = i}
   getSequenceNumber (RolePropertyDelta{sequenceNumber}) = sequenceNumber
+  unionOfUsers = over2 RolePropertyDelta unionOfUsers_
 
 instance deltaUsersUniverseContextDelta :: DeltaClass UniverseContextDelta where
   addBase i (UniverseContextDelta r@{sequenceNumber}) = UniverseContextDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (UniverseContextDelta r) = UniverseContextDelta r {sequenceNumber = i}
   getSequenceNumber (UniverseContextDelta{sequenceNumber}) = sequenceNumber
+  unionOfUsers = over2 UniverseContextDelta unionOfUsers_
 
 instance deltaUsersUniverseRoleDelta :: DeltaClass UniverseRoleDelta where
   addBase i (UniverseRoleDelta r@{sequenceNumber}) = UniverseRoleDelta r {sequenceNumber = sequenceNumber + i}
   setIndex i (UniverseRoleDelta r) = UniverseRoleDelta r {sequenceNumber = i}
   getSequenceNumber (UniverseRoleDelta{sequenceNumber}) = sequenceNumber
+  unionOfUsers = over2 UniverseRoleDelta unionOfUsers_
+
+unionOfUsers_ :: forall f. {users :: Array RoleInstance | f} -> {users :: Array RoleInstance | f} -> {users :: Array RoleInstance | f}
+unionOfUsers_ r1@{users: u1} {users: u2} = r1 {users = u1 `union` u2}
+
+addToSet :: forall d. DeltaClass d => d -> Array d -> Int -> Array d
+addToSet d ds i = let
+  old = findIndex ((==) d) ds
+  in
+    case old of
+      Nothing -> cons (setIndex i d) ds
+      Just ind -> let
+        x = unsafePartial $ unsafeIndex ds ind
+        in unsafePartial $ fromJust $ updateAt ind (unionOfUsers d x) ds
