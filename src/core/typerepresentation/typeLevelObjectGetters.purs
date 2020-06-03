@@ -23,10 +23,10 @@ module Perspectives.Types.ObjectGetters where
 
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (filter, find, findIndex, intersect, null, singleton)
+import Data.Array (filter, findIndex, intersect, null, singleton)
 import Data.List (toUnfoldable)
 import Data.Map.Internal (keys) as MAP
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (isJust)
 import Data.Newtype (unwrap)
 import Foreign.Object (keys, values)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=))
@@ -38,7 +38,7 @@ import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, providesPerspectiveOnRole)
-import Perspectives.Representation.Class.PersistentType (getAction, getContext, getEnumeratedProperty, getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (getAction, getCalculatedRole, getContext, getEnumeratedProperty, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, allProperties, allRoles, getRole, greaterThanOrEqualTo, propertiesOfADT, roleAspects, roleAspectsBindingADT, typeIncludingAspects, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextAspectsADT)
@@ -161,6 +161,14 @@ actionsClosure = aspectsClosure >=> actionsOfRole
 
 isAutomatic :: ActionType ~~~> Boolean
 isAutomatic at = ArrayT (getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
+
+actionsClosure_ :: RoleType ~~~> ActionType
+actionsClosure_ (ENR t) = actionsClosure t
+actionsClosure_ t = actionsOfRole_ t
+
+actionsOfRole_ :: RoleType ~~~> ActionType
+actionsOfRole_ (ENR rt) = ArrayT (getEnumeratedRole rt >>= unwrap >>> _.perspectives >>> values >>> join >>> pure)
+actionsOfRole_ (CR rt) = ArrayT (getCalculatedRole rt >>= unwrap >>> _.perspectives >>> values >>> join >>> pure)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ROLETYPES

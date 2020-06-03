@@ -47,18 +47,17 @@ import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
-import Perspectives.Instances.ObjectGetters (getMe, getMyType)
-import Perspectives.Instances.ObjectGetters (roleType) as OG
+import Perspectives.Instances.ObjectGetters (getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.PerspectivesState (repositoryUrl)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
-import Perspectives.Types.ObjectGetters (actionsClosure, isAutomatic, specialisesRoleType_)
+import Perspectives.Types.ObjectGetters (actionsClosure_, isAutomatic, specialisesRoleType_)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, when, ($), (&&), (<$>), (<<<), (<>), (=<<), (==), (>=>), (>>=))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, when, ($), (&&), (<$>), (<<<), (<>), (=<<), (==), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -173,17 +172,17 @@ contextsAffectedByTransaction = do
 
 getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
 getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
-  -- mmyType <- lift2 (head contextInstances ##> getMyType)
-  mmyType <- lift2 (head contextInstances ##> getMe >=> OG.roleType)
+  mmyType <- lift2 (head contextInstances ##> getMyType)
+  -- mmyType <- lift2 (head contextInstances ##> getMe >=> OG.roleType)
   case mmyType of
     Nothing -> pure []
     Just myType -> do
       -- myType should be equal to or a specialisation of one of the userTypes.
       -- TODO. Optimalisatie: stop bij het eerste type. Gebruik een state?
-      r <- lift2 $ filterA (\userType -> (ENR myType) `specialisesRoleType_` userType) userTypes
+      r <- lift2 $ filterA (\userType -> myType `specialisesRoleType_` userType) userTypes
       if not $ null r
         then do
-          (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure isAutomatic)
+          (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure_ isAutomatic)
           pure $ join $ ((\affectedContext -> (ActionInstance affectedContext) <$> automaticActions) <$> toArray contextInstances)
         else pure []
 
