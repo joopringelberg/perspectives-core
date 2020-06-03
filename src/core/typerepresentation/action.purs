@@ -33,7 +33,7 @@ import Perspectives.Query.QueryTypes (Calculation)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Representation.SideEffect (SideEffect)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, RoleType, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, RoleType, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 
 -----------------------------------------------------------
@@ -47,7 +47,7 @@ type ActionRecord =
   , displayName :: String
 
   -- TODO: For synchronization, we might need to allow CalculatedRoles as subject of an action.
-  , subject :: EnumeratedRoleType
+  , subject :: RoleType
   , verb :: Verb
   , object :: RoleType -- TODO: Maybe Step ofzo? Of QueryFunctionDescription.
   , requiredObjectProperties :: Maybe ViewType

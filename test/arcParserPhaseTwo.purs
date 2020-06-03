@@ -479,7 +479,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               (let
                 _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf_bot$ConsultAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "subject"))
                 in case (preview _s dr') of
-                  (Just (EnumeratedRoleType "model:MyTestDomain$MySelf")) -> true
+                  (Just (ENR (EnumeratedRoleType "model:MyTestDomain$MySelf"))) -> true
                   otherwise -> false
                 )
             assert "The Action 'model:MyTestDomain$MySelf_bot$ConsultAnotherRole' should have as Verb 'Consult'."

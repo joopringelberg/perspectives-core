@@ -32,7 +32,7 @@ import Perspectives.Representation.Action (Action(..), Verb)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getView)
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, PropertyType, RoleType, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, PropertyType, RoleType, ViewType)
 import Perspectives.Representation.View (propertyReferences)
 import Prelude (pure, ($), (<<<), (<>), (==), (||), (>>=), (<$>), (<*>))
 
@@ -40,7 +40,7 @@ import Prelude (pure, ($), (<<<), (<>), (==), (||), (>>=), (<$>), (<*>))
 -- ACTION TYPE CLASS
 -----------------------------------------------------------
 class ActionClass c where
-  subject :: c -> EnumeratedRoleType
+  subject :: c -> RoleType
   verb :: c -> Verb
   object :: c -> RoleType
   indirectObject :: c -> Maybe RoleType

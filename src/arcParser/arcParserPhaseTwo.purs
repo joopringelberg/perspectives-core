@@ -58,7 +58,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEn
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), roletype2string)
 import Perspectives.Representation.View (View(..))
 import Prelude (bind, discard, map, not, pure, show, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (<*))
 
@@ -219,7 +219,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 
     -- PERSPECTIVE
     handleParts roleName (EnumeratedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
-      (Tuple roleIdentifier actions) <- traversePerspectiveE pe roleName
+      (Tuple roleIdentifier actions) <- traversePerspectiveE pe (ENR rn)
       -- A bot can also insert a perspective and in doing so will overwrite the user
       -- actions (or vv). Hence we must check whether there is an entry under
       -- roleIdentifier, and if so, add the actions to the actions already present!
@@ -360,7 +360,7 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
 
     -- PERSPECTIVE
     handleParts (CalculatedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
-      (Tuple roleIdentifier actions) <- traversePerspectiveE pe (unwrap roleName)
+      (Tuple roleIdentifier actions) <- traversePerspectiveE pe (CR roleName)
       -- A bot can also insert a perspective and in doing so will overwrite the user
       -- actions (or vv). Hence we must check whether there is an entry under
       -- roleIdentifier, and if so, add the actions to the actions already present!
@@ -423,7 +423,7 @@ addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties}
 -- | Returns the fully qualified string that identifies the Object of the Action and the qualified identifiers of the Actions
 -- | (we need not know what kind of Role that Object is, to be able to store the
 -- | Perspective in the Role itself).
-traversePerspectiveE :: PerspectiveE -> Namespace -> PhaseTwo (Tuple String (Array ActionType))
+traversePerspectiveE :: PerspectiveE -> RoleType -> PhaseTwo (Tuple String (Array ActionType))
 traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
 
   -- First identify the Object of the Perspective. We need to hand it down to treatment
@@ -475,7 +475,7 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
 traverseActionE :: Partial =>                     -- The function is partial because we just handle ActionE.
   String ->                                       -- The unqualified identifier of the Object.
   Maybe ViewType ->                               -- The unqualified identifier of the Default View on the Object.
-  Namespace ->                                    -- The namespace, i.e. the qualified identifier of the Role.
+  RoleType ->                                     -- The namespace, i.e. the qualified identifier of the Role.
   (Array ActionType) ->                           -- Accumulator: an array of Actions.
   PerspectivePart ->                              -- The ActionE element.
   PhaseTwo (Array ActionType)
@@ -483,14 +483,14 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
   isabot <- isSubjectBot
   actionId <- if isabot
     -- Different names for the same verb and object for the bot and its master, otherwise they will overwrite.
-    then pure (rolename <> "_bot$" <> show verb <> object)
-    else pure (rolename <> "$" <> show verb <> object)
+    then pure (roletype2string rolename <> "_bot$" <> show verb <> object)
+    else pure (roletype2string rolename <> "$" <> show verb <> object)
   executedByBot <- isSubjectBot
   action <- pure $ Action
     { _id: ActionType actionId
     , _rev: Nothing
     , displayName: id
-    , subject: EnumeratedRoleType rolename
+    , subject: rolename
     , verb: verb
     , object: (ENR $ EnumeratedRoleType object) -- But it may be Calculated!
     , requiredObjectProperties: defaultObjectView
@@ -502,7 +502,7 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     , executedByBot: executedByBot
     , pos
   }
-  action' <- foldM (handleParts $ deconstructNamespace_ rolename) action actionParts
+  action' <- foldM (handleParts $ deconstructNamespace_ (roletype2string rolename)) action actionParts
   modifyDF (\df -> df {actions = (insert actionId action' df.actions)})
   pure (cons (identifier action') actions)
 

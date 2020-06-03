@@ -110,7 +110,7 @@ domain: System
         if exists Invitee then
           -- bind object to ConnectedPartner in PrivateChannel >> binding >> context
           callEffect ser:AddConnectedPartnerToChannel( object, PrivateChannel >> binding >> context )
-    bot: for Invitee
+    bot: for Guest
       perspective on: PrivateChannel
         if exists PrivateChannel then
           callEffect ser:CreateCopyOfChannelDatabase( PrivateChannel >> ChannelDatabaseName )
