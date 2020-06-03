@@ -32,7 +32,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
-import Perspectives.Representation.TypeIdentifiers (RoleKind)
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 
 newtype ContextE = ContextE
   { id :: String
@@ -45,11 +45,32 @@ type ModelName = String
 
 data ContextPart = RE RoleE | CE ContextE | PREFIX Prefix ModelName | ContextAspect String ArcPosition | IndexedContext String ArcPosition
 
+-- We are only interested in ordering RE dataconstructors.
+instance eqContextPart :: Eq ContextPart where
+  eq (RE r1) (RE r2) = eq r1 r1
+  eq _ _ = false
+
+instance ordContextPart :: Ord ContextPart where
+  compare (RE r1) (RE r2) = compare r1 r2
+  compare _ _ = EQ
+
 newtype RoleE = RoleE
   { id :: String
   , kindOfRole :: RoleKind
   , roleParts :: List RolePart
   , pos :: ArcPosition}
+
+instance eqRoleE :: Eq RoleE where
+  eq (RoleE{id:id1}) (RoleE{id:id2}) = id1 == id2
+
+instance ordRoleE :: Ord RoleE where
+  compare (RoleE{kindOfRole:kor1}) (RoleE{kindOfRole:kor2}) = if kor1 == BotRole
+    then if kor2 == BotRole
+      then EQ
+      else GT
+    else if kor2 == BotRole
+      then EQ
+      else LT
 
 type FunctionName = String
 type ComputedType = String

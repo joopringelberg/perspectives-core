@@ -50,6 +50,7 @@ main = runTest do
   QDC.theSuite
   QR.theSuite
   ADT.theSuite
+  CDB.theSuite
   LCRL.theSuite
   LARC.theSuite
   CAR.theSuite
@@ -59,7 +60,6 @@ main = runTest do
   SACC.theSuite
   RMPT.theSuite
   COMB.theSuite
-  CDB.theSuite
   TMS.theSuite
   TTO.theSuite
   SCDB.theSuite

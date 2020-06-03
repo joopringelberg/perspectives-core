@@ -24,6 +24,7 @@ module Perspectives.Representation.InstanceIdentifiers where
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
+import Perspectives.Utilities (class PrettyPrint)
 import Prelude (class Eq, class Ord, class Show, compare, show, (<<<), (==), (<>))
 
 newtype ContextInstance = ContextInstance String
@@ -38,6 +39,9 @@ instance eqContextInstance :: Eq ContextInstance where
 instance ordContextInstance :: Ord ContextInstance where
   compare (ContextInstance a) (ContextInstance b) = compare a b
 
+instance prettyPrintContextInstance :: PrettyPrint ContextInstance where
+  prettyPrint' t = show
+
 newtype RoleInstance = RoleInstance String
 derive instance newtypeRoleInstance :: Newtype RoleInstance _
 derive instance genericRepRoleInstance :: Generic RoleInstance _
@@ -50,6 +54,9 @@ instance eqRoleInstance :: Eq RoleInstance where
 instance ordRoleInstance :: Ord RoleInstance where
   compare (RoleInstance a) (RoleInstance b) = compare a b
 
+instance prettyPrintRoleInstance :: PrettyPrint RoleInstance where
+  prettyPrint' t = show
+
 newtype Value = Value String
 derive instance newtypeValue :: Newtype Value _
 derive instance genericRepValue :: Generic Value _
@@ -61,6 +68,9 @@ instance eqValue :: Eq Value where
   eq (Value id1) (Value id2) = id1 == id2
 instance ordValue :: Ord Value where
   compare (Value v1) (Value v2) = compare v1 v2
+
+instance prettyPrintValue :: PrettyPrint Value where
+  prettyPrint' t = show
 
 externalRole :: ContextInstance -> RoleInstance
 externalRole ct = RoleInstance (unwrap ct <> "_External")

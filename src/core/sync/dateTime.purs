@@ -28,6 +28,7 @@ import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Time.Duration (Milliseconds(..))
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Utilities (class PrettyPrint)
 import Prelude (class Show, pure, show, ($), (>>=), (<>))
 
 -----------------------------------------------------------
@@ -47,3 +48,6 @@ instance showSerializableDateTime :: Show SerializableDateTime where
 
 instance decodeSerializableDateTime :: Decode SerializableDateTime where
   decode d = decode d >>= \m -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds m)
+
+instance prettyPrintSerializableDateTime :: PrettyPrint SerializableDateTime where
+  prettyPrint' t = show

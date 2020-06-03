@@ -41,6 +41,7 @@ import Perspectives.Sync.AffectedContext (AffectedContext)
 import Perspectives.Sync.Class.DeltaClass (addBase)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<$>), (==), (+), (-))
 
 -----------------------------------------------------------
@@ -104,6 +105,9 @@ instance semiGroupTransactie :: Semigroup Transaction where
 instance revisionTransaction :: Revision Transaction where
   rev t = Nothing
   changeRevision _ t = t
+
+instance prettyPrintTransaction :: PrettyPrint Transaction where
+  prettyPrint' t (Transaction r) = "Transaction " <> prettyPrint' (t <> "  ") r
 
 createTransactie :: String -> Aff Transaction
 createTransactie author =

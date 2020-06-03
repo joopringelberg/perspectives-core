@@ -91,6 +91,17 @@ theSuite = suite "Perspectives.loadArc" do
         assert "The file could not be parsed, compiled or saved" false
     runP $ removeDomeinFileFromCouchdb "model:Couchdb"
 
+  test "Load model:Serialise from file and store it in Couchdb" do
+    messages <- runP do
+      catchError (loadCompileAndSaveArcFile' "serialise" modelDirectory)
+        \e -> logShow e *> pure []
+    if null messages
+      then pure unit
+      else do
+        logShow messages
+        assert "The file could not be parsed, compiled or saved" false
+    runP $ removeDomeinFileFromCouchdb "model:Serialise"
+
   test "Load a model file and instances and store it in Couchdb" do
     messages <- runP do
       catchError (do

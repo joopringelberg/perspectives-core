@@ -46,6 +46,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Utilities (class PrettyPrint)
 
 newtype ContextType = ContextType String
 derive instance newtypeContextType :: Newtype ContextType _
@@ -56,6 +57,8 @@ instance showContextType :: Show ContextType where
   show i = "ContextType " <> (unwrap i)
 instance eqContextType :: Eq ContextType where
   eq (ContextType id1) (ContextType id2) = id1 == id2
+instance prettyPrintContextType :: PrettyPrint ContextType where
+  prettyPrint' t = show
 
 newtype EnumeratedRoleType = EnumeratedRoleType String
 derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRoleType _
@@ -68,6 +71,8 @@ instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
   eq (EnumeratedRoleType id1) (EnumeratedRoleType id2) = id1 == id2
 instance ordEnumeratedRoleType :: Ord EnumeratedRoleType where
   compare (EnumeratedRoleType p1) (EnumeratedRoleType p2) = compare p1 p2
+instance prettyPrintEnumeratedRoleType :: PrettyPrint EnumeratedRoleType where
+  prettyPrint' t = show
 
 newtype CalculatedRoleType = CalculatedRoleType String
 derive instance newtypeComputedRolType :: Newtype CalculatedRoleType _
@@ -80,6 +85,8 @@ instance eqComputedRolType :: Eq CalculatedRoleType where
   eq (CalculatedRoleType id1) (CalculatedRoleType id2) = id1 == id2
 instance ordCalculatedRoleType :: Ord CalculatedRoleType where
   compare (CalculatedRoleType p1) (CalculatedRoleType p2) = compare p1 p2
+instance prettyPrintCalculatedRoleType :: PrettyPrint CalculatedRoleType where
+  prettyPrint' t = show
 
 data RoleType = ENR EnumeratedRoleType | CR CalculatedRoleType
 derive instance genericRepRoleType :: Generic RoleType _
@@ -97,6 +104,8 @@ instance eqRoleType :: Eq RoleType where
   eq (ENR r1) (ENR r2) = r1 == r2
 instance ordRoleType :: Ord RoleType where
   compare = genericCompare
+instance prettyPrintRoleType :: PrettyPrint RoleType where
+  prettyPrint' t = show
 
 -- | We have rare occasions where we want to lose the difference between
 -- | CalculatedRoletype and EnumeratedRoleType.
@@ -144,6 +153,8 @@ instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
   eq (EnumeratedPropertyType id1) (EnumeratedPropertyType id2) = id1 == id2
 instance ordEnumeratedPropertyType :: Ord EnumeratedPropertyType where
   compare (EnumeratedPropertyType p1) (EnumeratedPropertyType p2) = compare p1 p2
+instance prettyPrintEnumeratedPropertyType :: PrettyPrint EnumeratedPropertyType where
+  prettyPrint' t = show
 
 newtype CalculatedPropertyType = CalculatedPropertyType String
 derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
@@ -156,6 +167,8 @@ instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
   eq (CalculatedPropertyType id1) (CalculatedPropertyType id2) = id1 == id2
 instance ordCalculatedPropertyType :: Ord CalculatedPropertyType where
   compare (CalculatedPropertyType p1) (CalculatedPropertyType p2) = compare p1 p2
+instance prettyPrintCalculatedPropertyType :: PrettyPrint CalculatedPropertyType where
+  prettyPrint' t = show
 
 data PropertyType = ENP EnumeratedPropertyType | CP CalculatedPropertyType
 
@@ -179,6 +192,8 @@ instance eqPropertyType :: Eq PropertyType where
   eq (CP _) (ENP _) = false
   eq (CP r1) (CP r2) = r1 == r2
   eq (ENP r1) (ENP r2) = r1 == r2
+instance prettyPrintPropertyType :: PrettyPrint PropertyType where
+  prettyPrint' t = show
 
 newtype ViewType = ViewType String
 derive instance newtypeViewType :: Newtype ViewType _
@@ -191,6 +206,8 @@ instance eqViewType :: Eq ViewType where
   eq (ViewType id1) (ViewType id2) = id1 == id2
 instance ordViewType :: Ord ViewType where
   compare (ViewType p1) (ViewType p2) = compare p1 p2
+instance prettyPrintViewType :: PrettyPrint ViewType where
+  prettyPrint' t = show
 
 newtype ActionType = ActionType String
 derive instance newtypeActionType :: Newtype ActionType _
@@ -203,6 +220,8 @@ instance eqActionType :: Eq ActionType where
   eq (ActionType id1) (ActionType id2) = id1 == id2
 instance ordActionType :: Ord ActionType where
   compare (ActionType a1) (ActionType a2) = compare a1 a2
+instance prettyPrintActionType :: PrettyPrint ActionType where
+  prettyPrint' t = show
 
 externalRoleType :: ContextType -> EnumeratedRoleType
 externalRoleType (ContextType ct) = EnumeratedRoleType (ct <> "$External")

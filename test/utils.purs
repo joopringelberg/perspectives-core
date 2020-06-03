@@ -76,8 +76,10 @@ setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "geheim"
 -- | Load the model, compute the value in MonadPerspectives, unload the model and remove the instances.
 -- | Notice: dependencies of the model are not automatically removed!
 withModel :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
-withModel m@(DomeinFileId id) a = withModel_ m true a 
+withModel m@(DomeinFileId id) a = withModel_ m true a
 
+-- | Load the model, compute the value in MonadPerspectives, unload the model.
+-- | Either removes instances, or lets them sit in the database.
 withModel_ :: forall a. DomeinFileId -> Boolean -> MonadPerspectives a -> MonadPerspectives a
 withModel_ m@(DomeinFileId id) clear a = do
   result <- try $ withModel' m a
@@ -87,6 +89,7 @@ withModel_ m@(DomeinFileId id) clear a = do
     Right r -> pure r
 
 -- | Load the model, compute the value in MonadPerspectives, unload the model.
+-- | Leaves instances from the computation in the database.
 withModel' :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
 withModel' m@(DomeinFileId id) a = do
   cdbUrl <- getCouchdbBaseURL

@@ -33,6 +33,7 @@ class Eq d <= DeltaClass d where
   addBase :: Int -> d -> d
   setIndex :: Int -> d -> d
   getSequenceNumber :: d -> Int
+  -- | Add the users of the second delta to those of the first delta, returning that new delta as the function result.
   unionOfUsers :: d -> d -> d
 
 instance contextDeltaDeltaUsers :: DeltaClass ContextDelta where
@@ -68,6 +69,8 @@ instance deltaUsersUniverseRoleDelta :: DeltaClass UniverseRoleDelta where
 unionOfUsers_ :: forall f. {users :: Array RoleInstance | f} -> {users :: Array RoleInstance | f} -> {users :: Array RoleInstance | f}
 unionOfUsers_ r1@{users: u1} {users: u2} = r1 {users = u1 `union` u2}
 
+-- | Add a Delta to the Array of the same Delta type. If that contains a Delta that is equal except for
+-- | the users and the index, modify that found Delta by adding the users of the new Delta to it.
 addToSet :: forall d. DeltaClass d => d -> Array d -> Int -> Array d
 addToSet d ds i = let
   old = findIndex ((==) d) ds
@@ -76,4 +79,4 @@ addToSet d ds i = let
       Nothing -> cons (setIndex i d) ds
       Just ind -> let
         x = unsafePartial $ unsafeIndex ds ind
-        in unsafePartial $ fromJust $ updateAt ind (unionOfUsers d x) ds
+        in unsafePartial $ fromJust $ updateAt ind (unionOfUsers x d) ds

@@ -27,12 +27,13 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Object (Object, empty)
+import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Couchdb.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleKind)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), RoleKind)
 import Prelude (class Eq, class Show, (<<<), (==), ($))
 
 -----------------------------------------------------------
@@ -49,6 +50,9 @@ type CalculatedRoleRecord =
   , calculation :: Calculation
   , context :: ContextType
 
+  -- An array of ActionTypes, indexed by their object-types.
+  , perspectives :: Object (Array ActionType)
+
   , pos :: ArcPosition
   }
 
@@ -61,6 +65,8 @@ defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
 
   , calculation: S $ Simple $ Identity $ ArcPosition{column: 0, line: 0}
   , context: ContextType context
+
+  , perspectives: empty
 
   , pos: pos
   }

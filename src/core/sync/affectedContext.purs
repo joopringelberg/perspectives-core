@@ -31,6 +31,7 @@ import Foreign.Class (class Encode, encode)
 import Foreign.Generic (defaultOptions, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (RoleType)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -- | By construction the contextInstances will be of the same type and the userTypes are roles in that type of Context.
 newtype AffectedContext = AffectedContext {contextInstances :: NonEmptyArray ContextInstance, userTypes :: Array RoleType}
@@ -53,3 +54,6 @@ instance encodeAffectedContext :: Encode AffectedContext where
 instance eqAffectedContext :: Eq AffectedContext where
   eq (AffectedContext {contextInstances: c1, userTypes: u1}) (AffectedContext {contextInstances: c2, userTypes: u2}) =
     ARR.null (difference c1 c2) && ARR.null (ARR.difference u1 u2)
+
+instance prettyPrintAffectedContext :: PrettyPrint AffectedContext where
+  prettyPrint' t (AffectedContext r@{contextInstances}) = "AffectedContext " <> prettyPrint' (t <> "  ") (r {contextInstances = toArray contextInstances})

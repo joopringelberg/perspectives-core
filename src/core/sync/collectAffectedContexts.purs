@@ -183,10 +183,11 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
       for binderCalculations (\(InvertedQuery{backwardsCompiled, userTypes}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
         affectedContexts <- lift2 $ catchError (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
-        handleAffectedContexts affectedContexts userTypes) >>= pure <<< join >>= lift2 <<< filterA (getPerspectRol >=> pure <<< not <<< rol_isMe)
+        handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
     otherwise -> pure []
 
-  pure $ RoleBindingDelta dr {users = (nub $ union users1 (union users2 users3))}
+  users <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (nub $ union users1 (union users2 users3))
+  pure $ RoleBindingDelta dr {users = users}
 
   where
 

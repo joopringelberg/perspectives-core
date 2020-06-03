@@ -47,7 +47,7 @@ import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
-import Perspectives.Instances.ObjectGetters (getMe)
+import Perspectives.Instances.ObjectGetters (getMe, getMyType)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getDomeinFile)
@@ -173,6 +173,7 @@ contextsAffectedByTransaction = do
 
 getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
 getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
+  -- mmyType <- lift2 (head contextInstances ##> getMyType)
   mmyType <- lift2 (head contextInstances ##> getMe >=> OG.roleType)
   case mmyType of
     Nothing -> pure []

@@ -28,7 +28,7 @@ import Data.Array (cons, elemIndex, fromFoldable)
 import Data.Foldable (foldl)
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
-import Data.List (List(..), filter, findIndex, foldM, head, null, (:))
+import Data.List (List(..), filter, findIndex, foldM, head, null, sort, (:))
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
@@ -60,7 +60,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (bind, discard, map, not, pure, show, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, map, not, pure, show, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (<*))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
@@ -84,7 +84,9 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
         otherwise -> false) contextParts)) of
           Nothing -> pure $ Cons (RE (RoleE{id: "External", kindOfRole: ExternalRole, roleParts: Nil, pos})) contextParts
           otherwise -> pure contextParts
-      context' <- foldM handleParts context contextParts'
+      -- RoleE elements that are BotRoles are handled last, so we can lookup their users.
+      context' <- foldM handleParts context (sort contextParts')
+      -- context' <- foldM handleParts context contextParts'
       modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
       pure context'
 
@@ -154,40 +156,52 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
 traverseRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseRoleE r ns = if isCalculatedRole r
   then traverseCalculatedRoleE r ns
-  else traverseEnumeratedRoleE r ns
+  else if isBotRole r
+    then traverseBotRole r ns
+    else traverseEnumeratedRoleE r ns
   where
     isCalculatedRole :: RoleE -> Boolean
     -- isCalculatedRole _ = true
     isCalculatedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
       (Calculation _) -> true
       otherwise -> false) roleParts))
+    isBotRole :: RoleE -> Boolean
+    isBotRole (RoleE{kindOfRole}) = kindOfRole == BotRole
 
--- | Traverse a RoleE that results in an EnumeratedRole.
+-- | The User, Enumerated or Calculated, must be present by now because we handle BotRoles last.
+traverseBotRole :: RoleE -> Namespace -> PhaseTwo Role
+traverseBotRole r@(RoleE {id, roleParts, pos}) ns = do
+  subjectIsBot
+  servedUserLocalName <- userServedByBot pos id roleParts
+  servedUserId <- pure (ns <> "$" <> servedUserLocalName)
+  df@{enumeratedRoles, calculatedRoles} <- getDF
+  case lookup servedUserId enumeratedRoles of
+    Just user -> traverseEnumeratedRoleE_ user roleParts <* subjectIsNotABot
+    -- Nothing -> throwError $ UnknownRole pos servedUserLocalName
+    Nothing -> case lookup servedUserId calculatedRoles of
+      Just user -> traverseCalculatedRoleE_ user roleParts <* subjectIsNotABot
+      Nothing -> traverseEnumeratedRoleE_ (defaultEnumeratedRole servedUserId servedUserLocalName UserRole ns pos) roleParts <* subjectIsNotABot
+  where
+    userServedByBot :: ArcPosition -> String -> List RolePart -> PhaseTwo String
+    userServedByBot pos' localBotName parts = let
+      f = foldl
+        (\found next -> if isJust found then found else case next of
+          (ForUser user) -> Just user
+          otherwise -> Nothing)
+        Nothing
+        parts
+      in case f of
+        (Just user) -> pure user
+        otherwise -> throwError (MissingForUser pos' localBotName)
+
 traverseEnumeratedRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
-  -- If we have a BotRole, we add its parts (perspectives with actions) to the UserRole
-  -- that it serves.
-  df@{enumeratedRoles} <- getDF
-  role@(EnumeratedRole{_id:roleName}) <-
-    case kindOfRole of
-      BotRole -> do
-        subjectIsBot
-        servedUserLocalName <- userServedByBot pos id roleParts
-        servedUserId <- pure (ns <> "$" <> servedUserLocalName)
-        case lookup servedUserId enumeratedRoles of
-          (Just user) -> pure user
-          Nothing -> pure (defaultEnumeratedRole servedUserId servedUserLocalName UserRole ns pos)
-      UserRole -> do
-        userId <- pure (ns <> "$" <> id)
-        case lookup userId enumeratedRoles of
-          (Just user) -> pure user
-          Nothing -> pure (defaultEnumeratedRole userId id kindOfRole ns pos)
-      otherwise -> do
-        roleName <- pure (ns <> "$" <> id)
-        pure (defaultEnumeratedRole roleName id kindOfRole ns pos)
-  role' <- foldM (unsafePartial $ handleParts (unwrap roleName)) role roleParts
-  -- Now we've handled traverseActionE (where we set executedByBot), we can restore the 'bot' member of state.
-  subjectIsNotABot
+  role <- pure (defaultEnumeratedRole (ns <> "$" <> id) id kindOfRole ns pos)
+  traverseEnumeratedRoleE_ role roleParts
+
+traverseEnumeratedRoleE_ :: EnumeratedRole -> List RolePart -> PhaseTwo Role
+traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = do
+  role' <- foldM (unsafePartial $ handleParts (unwrap rn)) role roleParts
   modifyDF (\domeinFile -> addRoleToDomeinFile (E role') domeinFile)
   pure (E role')
 
@@ -318,9 +332,9 @@ addRoleToDomeinFile (C r@(CalculatedRole{_id})) domeinFile = LN.over
 traverseCalculatedRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   role <- pure (defaultCalculatedRole (ns <> "$" <> id) id kindOfRole ns pos)
-  role' <- foldM (unsafePartial $ handleParts) role roleParts
-  modifyDF (\domeinFile -> addRoleToDomeinFile (C role') domeinFile)
-  pure (C role')
+  role' <- traverseCalculatedRoleE_ role roleParts
+  modifyDF (\domeinFile -> addRoleToDomeinFile role' domeinFile)
+  pure role'
 
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
@@ -328,6 +342,35 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
     handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) = do
       expandedCalc <- expandPrefix calc
       pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc})
+
+traverseCalculatedRoleE_ :: CalculatedRole -> List RolePart -> PhaseTwo Role
+traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) roleParts = do
+  role' <- foldM (unsafePartial $ handleParts) role roleParts
+  modifyDF (\domeinFile -> addRoleToDomeinFile (C role') domeinFile)
+  pure (C role')
+
+  where
+    handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
+    -- Parse the query expression.
+
+    -- CALCULATION
+    handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) = do
+      expandedCalc <- expandPrefix calc
+      pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc})
+
+    -- PERSPECTIVE
+    handleParts (CalculatedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
+      (Tuple roleIdentifier actions) <- traversePerspectiveE pe (unwrap roleName)
+      -- A bot can also insert a perspective and in doing so will overwrite the user
+      -- actions (or vv). Hence we must check whether there is an entry under
+      -- roleIdentifier, and if so, add the actions to the actions already present!
+      case lookup roleIdentifier perspectives of
+        Nothing -> pure (CalculatedRole roleUnderConstruction {perspectives = (insert roleIdentifier actions perspectives)})
+        Just acts -> pure (CalculatedRole roleUnderConstruction {perspectives = (insert roleIdentifier (actions <> acts) perspectives)})
+
+    -- FORUSER
+    handleParts (CalculatedRole roleUnderConstruction) (ForUser _) = pure (CalculatedRole $ roleUnderConstruction)
+
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
 -- | and insert it into a DomeinFileRecord.

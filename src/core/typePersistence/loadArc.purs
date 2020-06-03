@@ -119,9 +119,11 @@ loadArcAndCrl fileName directoryName = do
         Left e -> pure $ Left $ [Custom (show e)]
         Right _ -> do
           (modelDescription :: Maybe PerspectRol) <- head <$> filterA
-            (\(PerspectRol{pspType}) -> do
-              aspects <- pspType ###= aspectsOfRole
-              pure $ isJust $ findIndex ((==) (EnumeratedRoleType "model:System$Model$External")) aspects)
+            (\(PerspectRol{pspType}) -> if pspType == (EnumeratedRoleType "model:System$Model$External")
+                then pure true
+                else do
+                  aspects <- pspType ###= aspectsOfRole
+                  pure $ isJust $ findIndex ((==) (EnumeratedRoleType "model:System$Model$External")) aspects)
             (values roleInstances)
           -- modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roleInstances
           (Tuple indexedRoles indexedContexts) <- case modelDescription of

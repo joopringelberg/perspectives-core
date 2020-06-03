@@ -12,7 +12,7 @@ import Effect.AVar (AVar)
 import Effect.Aff (Milliseconds(..), delay, forkAff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (PerspectivesState, (##=), (##>), (##>>))
 import Perspectives.Couchdb.ChangesFeed (EventSource, closeEventSource)
@@ -29,6 +29,7 @@ import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, localRepli
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.IncomingPost (incomingPost)
 import Perspectives.User (getHost, getPort)
+import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (clearPostDatabase, runP, runPCor, runPJoop, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -40,7 +41,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Sync.HandleTransaction" do
+theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
 
   test "create channel, add user, check for channel on the other side" do
     mdbName <- (runP $ withSystem do
@@ -71,6 +72,7 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
               case mt of
                 Nothing -> liftAff $ assert "There should be a transaction document" false
                 Just t -> do
+                  -- log $ prettyPrint t
                   executeTransaction t
                   -- Now check:
                   --  * there should be a channel document
@@ -116,7 +118,9 @@ theSuite = suite "Perspectives.Sync.HandleTransaction" do
       (pstate :: AVar PerspectivesState) <- ask
       -- Handle post in parallel
       -- TODO. Dit proces stopt niet, ondanks killFiber
+      log "1"
       postFiber <- lift $ forkAff (runPerspectivesWithState incomingPost pstate)
+      log "2"
       -- Wait a little
       liftAff $ delay (Milliseconds 8000.0)
 

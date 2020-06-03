@@ -389,7 +389,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                 (Just (EnumeratedRole{_id})) -> _id == EnumeratedRoleType "model:MyTestDomain$MySelf"
 
   test "Properties of a UserRole and its BotRole are integrated into the UserRole" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Property : StringProperty : NickName\n  Agent : UserRole : MySelf\n    Property : BooleanProperty : Happy" domain
+    -- (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Property : StringProperty : NickName\n  Agent : UserRole : MySelf\n    Property : BooleanProperty : Happy" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  bot: for MySelf\n    property: NickName\n  user: MySelf\n    property: Happy (not mandatory, functional, Boolean)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
