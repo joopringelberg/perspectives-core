@@ -87,7 +87,7 @@ rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> 
 instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
   roleAspects = rangeOfCalculatedRole >=> roleAspectsOfADT
-  context = rangeOfCalculatedRole >=> contextOfADT
+  context r = (rangeOfCalculatedRole >=> contextOfADT >=> \adt -> pure $ product [ST (unwrap r).context, adt]) r
   contextOfRepresentation r = (unwrap r).context
   binding = rangeOfCalculatedRole >=> bindingOfADT
   functional r = calculation r >>= pure <<< pessimistic <<< QT.functional

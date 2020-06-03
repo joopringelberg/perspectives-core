@@ -138,31 +138,34 @@ qualifyActionRoles = do
       \rt -> case rt of
         (ENR (EnumeratedRoleType ur)) -> case lookup ur enumeratedRoles of
           Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> ur <> "' in model.")
-          (Just (EnumeratedRole {perspectives})) -> do
-            for_ (values perspectives)
-              \acts -> for_ acts
-                \(ActionType a) -> case lookup a actions of
-                  Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
-                  (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
-                    ar' <- do
-                      qname <- case object of
-                        (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
-                        other -> qualifiedRoleType ctxtId pos (roletype2string other)
-                      pure $ ar {object = qname}
-                    ar'' <- case mindirectObject of
-                      (Just indirectObject) -> do
-                        qname <- case object of
-                          (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
-                          other -> qualifiedRoleType ctxtId pos (roletype2string indirectObject)
-                        pure $ ar' {indirectObject = Just qname}
-                      otherwise -> pure ar'
-                    if ar'' == ar
-                      then pure unit
-                      -- A change, so modify the DomeinFileRecord
-                      else modifyDF (\df@{actions: actions'} -> df {actions = insert (unwrap actId) (Action ar'') actions'})
-        -- No perspectives for Calculated Users yet!
-        (CR (CalculatedRoleType ur)) -> pure unit
+          (Just (EnumeratedRole {perspectives})) -> for_ (values perspectives) (qualifyActionRoles'' ctxtId)
+        (CR (CalculatedRoleType ur)) -> case lookup ur calculatedRoles of
+          Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> ur <> "' in model.")
+          (Just (CalculatedRole {perspectives})) -> for_ (values perspectives) (qualifyActionRoles'' ctxtId)
     where
+      qualifyActionRoles'' :: ContextType -> Array ActionType -> PhaseThree Unit
+      qualifyActionRoles'' ctxtId acts = for_ acts
+        \(ActionType a) -> case lookup a actions of
+          Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
+          (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
+            ar' <- do
+              qname <- case object of
+                (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
+                other -> qualifiedRoleType ctxtId pos (roletype2string other)
+              pure $ ar {object = qname}
+            ar'' <- case mindirectObject of
+              (Just indirectObject) -> do
+                qname <- case object of
+                  (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ externalRoleType ctxtId
+                  other -> qualifiedRoleType ctxtId pos (roletype2string indirectObject)
+                pure $ ar' {indirectObject = Just qname}
+              otherwise -> pure ar'
+            if ar'' == ar
+              then pure unit
+              -- A change, so modify the DomeinFileRecord
+              else modifyDF (\df@{actions: actions'} -> df {actions = insert (unwrap actId) (Action ar'') actions'})
+
+
       -- The role (being used as object of an Action) should be a role of the context type.
       -- Fetch all roles of the context, including its Aspects.
       qualifiedRoleType :: ContextType -> ArcPosition -> String -> PhaseThree RoleType

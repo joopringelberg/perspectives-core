@@ -25,7 +25,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.loadArc" do
+theSuite = suite "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
     messages <- runP $ withSystem $ loadCompileAndSaveArcFile' "contextAndRole" testDirectory
@@ -48,7 +48,7 @@ theSuite = suiteOnly "Perspectives.loadArc" do
           (eq (changeRevision Nothing retrievedModel) (changeRevision Nothing reParsedModel))
     runP $ removeDomeinFileFromCouchdb "model:ContextAndRole"
 
-  testOnly "Load model:System and cache it" do
+  test "Load model:System and cache it" do
     messages <- runP do
       addAllExternalFunctions
       -- 1. Load the required model:Couchdb.

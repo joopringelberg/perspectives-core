@@ -37,7 +37,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Extern.Couchdb" do
+theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   test "models" $ runP $ withSystem do
 
@@ -103,7 +103,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
       else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
 
-  test "upload model:TestBotActie to repository from files" $ runP $ withSystem do
+  testOnly "upload model:TestBotActie to repository from files" $ runP $ withSystem do
     errs <- loadCompileAndCacheArcFile "testBotActie" modelDirectory
     if null errs
       then do
