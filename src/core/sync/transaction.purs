@@ -86,8 +86,8 @@ instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, nextDeltaIndex: base})
-    t2@(Transaction {author: a, timeStamp: t, contextDeltas: r, roleDeltas: b, propertyDeltas: p, universeContextDeltas: uc, universeRoleDeltas: ur, changedDomeinFiles: cd, nextDeltaIndex: extra}) = Transaction
+  append t1@(Transaction {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, correlationIdentifiers, nextDeltaIndex: base})
+    t2@(Transaction {author: a, timeStamp: t, contextDeltas: r, roleDeltas: b, propertyDeltas: p, universeContextDeltas: uc, universeRoleDeltas: ur, changedDomeinFiles: cd, correlationIdentifiers: ci, nextDeltaIndex: extra}) = Transaction
       { author: author
       , timeStamp: timeStamp
       , contextDeltas: union contextDeltas (addBase base <$> r)
@@ -97,7 +97,7 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , universeRoleDeltas: union universeRoleDeltas (addBase base <$> ur)
       , changedDomeinFiles: union changedDomeinFiles cd
       , affectedContexts: []
-      , correlationIdentifiers: []
+      , correlationIdentifiers: union correlationIdentifiers ci
       , nextDeltaIndex: base + extra - 1
     }
 
