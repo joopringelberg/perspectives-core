@@ -46,7 +46,7 @@ import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.ObjectGetters (bottom, context, getEnumeratedRoleInstances, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, bottom, context, getEnumeratedRoleInstances, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..), externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
@@ -168,7 +168,7 @@ createCopyOfChannelDatabase arrWithChannelName invitation = case ARR.head arrWit
     base <- getCouchdbBaseURL
     exsts <- databaseExists (base <> channelName)
     when (not exsts) (ensureAuthentication (createDatabase channelName))
-    mchannelContext <- invitation ##> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Invitation$PrivateChannel") >=> context
+    mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Invitation$PrivateChannel") >=> binding >=> context)
     case mchannelContext of
       Just channelContext -> setChannelReplication channelContext
       Nothing -> pure unit
