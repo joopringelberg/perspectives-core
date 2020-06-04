@@ -193,6 +193,20 @@ allProperties = reduce magic
           props <- reduce magic otherwise
           pure $ props <> properties
 
+-- | All properties, computed recursively over the role ADT and its Aspects - but excluding the binding.
+allLocallyRepresentedProperties :: ADT EnumeratedRoleType -> MP (Array PropertyType)
+allLocallyRepresentedProperties = reduce magic
+  where
+    magic :: EnumeratedRoleType -> MP (Array PropertyType)
+    magic rt = do
+      EnumeratedRole{roleAspects, properties} <- getEnumeratedRole rt
+      x <- pure $ product (ST <$> roleAspects)
+      case x of
+        EMPTY -> pure properties
+        otherwise -> do
+          props <- reduce magic otherwise
+          pure $ props <> properties
+
 --------------------------------------------------------------------------------------------------
 ---- ROLESET
 --------------------------------------------------------------------------------------------------

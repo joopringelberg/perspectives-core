@@ -72,6 +72,8 @@ sendTransactieToUser :: String -> Transaction -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
   -- TODO controleer of hier authentication nodig is!
   userType <- roleType_ (RoleInstance userId)
+  -- TODO. We use dynamic lookup here for now. Try to replace it with static lookup as defined
+  -- in Perspectives.Query.PropertyGetter.
   getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" userType
   mchannel <- (RoleInstance userId) ##> getChannel
   case mchannel of

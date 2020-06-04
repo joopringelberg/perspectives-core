@@ -47,11 +47,12 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, boundBy, context, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, makeBoolean)
+import Perspectives.Instances.ObjectGetters (binding, boundBy, context, contextType, externalRole, getEnumeratedRoleInstances, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
+import Perspectives.Query.PropertyGetter (getPropertyGetter)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -81,7 +82,11 @@ compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
   RC.calculation ct >>= compileFunction
 
-compileFunction (SQD _ (PropertyGetter (ENP pt)) _ _ _) = pure $ unsafeCoerce $ getProperty pt
+compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP pt)) _ _ _) = do
+  g <- getPropertyGetter pt roleAdt
+  case g of
+    Nothing -> throwError (error $ "UnsafeCompiler: cannot construct property getter for " <> show pt <> " on role " <> show roleAdt)
+    Just g' -> pure $ unsafeCoerce g'
 
 compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
   (cp :: CalculatedProperty) <- getPerspectType pt
@@ -404,8 +409,9 @@ role2context qd = unsafeCoerce $ compileFunction qd
 context2propertyValue :: QueryFunctionDescription -> MP (ContextInstance ~~> Value)
 context2propertyValue qd = unsafeCoerce $ compileFunction qd
 
--- From a string that maybe identifies a Property(Enumerated or Calculated), retrieve or construct a function to
--- get values for that Property from a Role instance. Notice that this function may fail.
+-- | From a string that maybe identifies a Property(Enumerated or Calculated), retrieve or construct a function to
+-- | get values for that Property from a Role instance. Notice that this function may fail.
+-- TODO: make this function cache.
 getPropertyFunction ::
   String -> MonadPerspectives (RoleInstance ~~> Value)
 getPropertyFunction id = do
@@ -424,6 +430,8 @@ getPropertyFunction id = do
       unsafeCoerce $ PC.calculation p >>= compileFunction
       )
 
+-- | From a PropertyType, retrieve or construct a function to get values for that Property from a Role instance.
+-- | Caches the result.
 getterFromPropertyType :: PropertyType -> MP (RoleInstance ~~> Value)
 getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) = case lookupPropertyValueGetterByName id of
   Nothing -> do
