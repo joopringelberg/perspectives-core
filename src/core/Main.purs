@@ -27,7 +27,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (fst)
 import Effect (Effect)
-import Effect.Aff (Error, forkAff, runAff, try)
+import Effect.Aff (Error, catchError, forkAff, runAff, try)
 import Effect.Aff.AVar (AVar, new)
 import Effect.Class.Console (log)
 import Perspectives.Api (setupApi)
@@ -128,17 +128,20 @@ resetAccount usr pwd = void $ runAff handler (runPerspectives usr pwd usr do
     clearUserDatabase :: MonadPerspectives Unit
     clearUserDatabase = do
       userDatabaseName <- entitiesDatabaseName
-      deleteDatabase userDatabaseName
+      catchError (deleteDatabase userDatabaseName)
+        \_ -> createDatabase userDatabaseName
       createDatabase userDatabaseName
     clearModelDatabase :: MonadPerspectives Unit
     clearModelDatabase = do
       dbname <- modelsDatabaseName
-      deleteDatabase dbname
+      catchError (deleteDatabase dbname)
+        \_ -> createDatabase dbname
       createDatabase dbname
     clearPostDatabase :: MonadPerspectives Unit
     clearPostDatabase = do
       dbname <- postDatabaseName
-      deleteDatabase dbname
+      catchError (deleteDatabase dbname)
+        \_ -> createDatabase dbname
       createDatabase dbname
     handler :: Either Error Unit -> Effect Unit
     handler (Left e) = log $ "An error condition in resetAccount: " <> (show e)
