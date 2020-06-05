@@ -32,11 +32,12 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (intersect, union, length)
+import Data.Array (intersect, length, uncons, union)
 import Data.Array.Partial (head) as AP
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
+import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
@@ -176,7 +177,9 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do
     (arrays :: Array (Array b)) <- traverse (reduce f) adts
-    pure $ foldl intersect [] arrays
+    case uncons arrays of
+      Nothing -> pure []
+      Just {head, tail} -> pure $ foldl intersect head tail
   reduce f (PROD adts) = do
     (arrays :: Array (Array b)) <- traverse (reduce f) adts
     pure $ foldl union [] arrays
