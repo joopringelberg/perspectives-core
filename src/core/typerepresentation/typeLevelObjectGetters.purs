@@ -39,7 +39,7 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, providesPerspectiveOnRole)
 import Perspectives.Representation.Class.PersistentType (getAction, getCalculatedRole, getContext, getEnumeratedProperty, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, allProperties, allRoles, getRole, greaterThanOrEqualTo, propertiesOfADT, roleAspects, roleAspectsBindingADT, typeIncludingAspects, viewsOfADT)
+import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, allProperties, allRoles, getRole, greaterThanOrEqualTo, propertiesOfADT, roleADT, roleAspects, roleAspectsBindingADT, typeIncludingAspects, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextAspectsADT)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
@@ -131,10 +131,10 @@ lookForProperty criterium adt = ArrayT (allProperties adt >>= pure <<< filter cr
 -- lookForProperty criterium = COMB.filter' (ArrayT <<< allProperties) criterium
 
 propertiesOfRole :: String ~~~> PropertyType
-propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRole_ (CalculatedRoleType s) <|> empty
-  where
-    propertiesOfRole_ :: forall r i. RoleClass r i => i ~~~> PropertyType
-    propertiesOfRole_ = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> roleAspectsBindingADT >=> propertiesOfADT)
+propertiesOfRole s =
+  ArrayT (allProperties (ST $ EnumeratedRoleType s))
+  <|>
+  ArrayT (getPerspectType (CalculatedRoleType s) >>= roleADT >>= allProperties)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR ASPECTS
