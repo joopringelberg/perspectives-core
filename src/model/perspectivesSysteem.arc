@@ -99,12 +99,14 @@ domain: System
     external:
       property: IWantToInviteAnUnconnectedUser (not mandatory, functional, Boolean)
       property: SerialisedInvitation (not mandatory, functional, String)
+      property: Message (not mandatory, functional, String)
     user: Guest = sys:Me
     user: Invitee (mandatory, functional) filledBy: Guest
       perspective on: Inviter
       perspective on: PrivateChannel
       -- Invitee needs to see the Channel's Initiator in order to access Host and Port.
       perspective on: ChannelInitiator
+      perspective on: External
     bot: for Invitee
       perspective on: Invitee
         if exists Invitee then
@@ -118,7 +120,7 @@ domain: System
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
     bot: for Inviter
       perspective on: External
-        if extern >> IWantToInviteAnUnconnectedUser then
+        if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then
           -- Creates a Channel, binds it to PrivateChannel.
           callEffect ser:AddChannel()
           SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
