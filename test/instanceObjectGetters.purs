@@ -13,8 +13,9 @@ import Effect.Class.Console (log, logShow)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.CoreTypes ((##>), (##=))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Instances.Builders (constructEmptyContext)
-import Perspectives.Instances.ObjectGetters (binds, getMyType)
+import Perspectives.Instances.ObjectGetters (binds, bottom, getMyType)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), RoleType(..))
@@ -70,5 +71,22 @@ theSuite = suite "Test.Instances.ObjectGetters" do
 
         s <- (RoleInstance "model:User$test$TheTrustedCluster") ##= binds \_ -> pure (RoleInstance "model:User$Initiator")
         liftAff $ assert "Initiator should not bind TheTrustedCluster" (s == [Value "false"])
+
+      else liftAff $ assert ("There are model errors" <> (show errs)) false
+
+  test "bottom" $ runP $ withSimpleChat do
+    -- Construct an instance of a Chat with an Initiator.
+    -- The Initiator is filled with the Chatter of ChatApp.
+    -- Chatter is filled by User.
+    -- Then check that the bottom of Initiator is User.
+    errs <- loadAndSaveCrlFile "chatInitiator.crl" testDirectory
+    if null errs
+      then do
+        i1 <- (RoleInstance "model:User$Initiator") ##> bottom
+        liftAff $ assert "The bottom of Initiator should be User" (i1 == (Just $ RoleInstance "model:User$test$User"))
+
+        i2 <- (unit ##= (\_ -> ArrayT (pure [(RoleInstance "model:User$Initiator")])) >=> bottom)
+        -- logShow i2
+        liftAff $ assert "(\\_ -> ArrayT (pure [(RoleInstance \"model:User$Initiator\")])) is an ObjectGetter" (i2 == [RoleInstance "model:User$test$User"])
 
       else liftAff $ assert ("There are model errors" <> (show errs)) false
