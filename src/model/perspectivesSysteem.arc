@@ -19,22 +19,26 @@ domain: System
       property: ModelOphaalTeller (mandatory, functional, Number)
     aspect: sys:NamedContext
     indexed: sys:MySystem
+
     context: TheTrustedCluster (not mandatory, functional) filledBy: TrustedCluster
+
     user: User (mandatory, functional)
       property: Achternaam (mandatory, not functional, String)
       property: Voornaam (mandatory, not functional, String)
-      -- LET OP: dit zijn er dus heel veel!
       property: Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       indexed: sys:Me
       view: VolledigeNaam (Voornaam, Achternaam)
       perspective on: User
-    -- moet hier geen >> extern achter?
+
     context: Channels = User >> (binder Initiator union binder ConnectedPartner) >> context >> extern
-    -- Het type van ModellenM bepalen we met de clause 'returns:'
+
     context: Modellen = callExternal cdb:Models() returns: Model$External
+
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context: IndexedContexts (not mandatory, not functional) filledBy: sys:NamedContext
+
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
+
     bot: for User
       -- This rule creates an entry in IndexedContexts if its model has been taken in use.
       perspective on: UnconnectedIndexedContext
@@ -52,6 +56,7 @@ domain: System
     -- On moving a model to ModelsInUse for the second time, the bot with the perspective on UnloadedModel will not work. We need a third rule for that.
     -- An UnconnectedIndexedContext is model in use that has no entry in IndexedContexts.
     context: UnconnectedIndexedContext = ModelsInUse >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts
+
   case: PhysicalContext
     user: UserWithAddress
       -- The public URL of the PDR of the UserWithAddress.

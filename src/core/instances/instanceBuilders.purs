@@ -53,7 +53,7 @@ import Foreign.Object (isEmpty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
-import Perspectives.Assignment.Update (addRoleInstancesToContext, setBinding, setProperty)
+import Perspectives.Assignment.Update (addRoleInstancesToContext, setBinding_, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
@@ -137,7 +137,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
         Just bnd -> do
           expandedBinding <- RoleInstance <$> (lift $ lift $ lift2 $ expandDefaultNamespaces bnd)
           -- setBinding saves, too.
-          lift $ lift $ setBinding roleInstance expandedBinding
+          lift $ lift $ setBinding_ roleInstance expandedBinding
       case properties of
         (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
           lift $ lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
@@ -223,7 +223,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
     Nothing -> pure unit
     Just bnd -> do
       expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
-      void $ setBinding roleInstance expandedBinding
+      void $ setBinding_ roleInstance expandedBinding
   -- Then add the properties
   case properties of
     (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
