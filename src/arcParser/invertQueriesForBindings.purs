@@ -55,7 +55,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole, getView)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (allProperties, functional, mandatory, propertySet)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, allProperties, functional, mandatory, propertySet)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (isElementOf)
@@ -80,7 +80,7 @@ setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWit
   roleHasRequestedProperties <- case props of
     All -> do
       -- for each property of role, store (Value2Role >> invertedQ) in onPropertyDelta of that property
-      (propsOfRole :: Array PropertyType) <- (lift2 $ allProperties (ST role)) >>= lift2 <<< filterA isPropertyOfRole
+      (propsOfRole :: Array PropertyType) <- lift2 $ allLocallyRepresentedProperties (ST role)
       addToProperties qWithAkink propsOfRole
       pure $ not $ null propsOfRole
     Properties relevant | not $ null relevant -> do
@@ -157,10 +157,10 @@ setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWit
       backwards' <- pure $ makeComposition (SQD (RDOM b) (DataTypeGetterWithParameter GetRoleBindersF (unwrap role)) (RDOM (ST role)) (bool2threeValued fun) (bool2threeValued man)) <$> backwards
       pure $ ZQ backwards' Nothing
 
-    -- | Collect the Properties defined on the EnumeratedRoleType and its Aspect Roles.
+    -- | Collect the Properties defined on the EnumeratedRoleType and its Aspect Roles (transitively closed).
     -- | Returns true iff the property is one of them.
     isPropertyOfRole :: PropertyType -> MP Boolean
-    isPropertyOfRole p = propertySet (ST role) >>= \ps -> pure $ isElementOf p ps
+    isPropertyOfRole p = allLocallyRepresentedProperties (ST role) >>= \ps -> pure $ isJust $ elemIndex p ps
 
 setInvertedQueriesForUserAndRole user (PROD terms) props perspectiveOnThisRole invertedQ = do
   x <- traverse
