@@ -114,7 +114,7 @@ domain: System
       perspective on: External
     bot: for Invitee
       perspective on: Invitee
-        if exists Invitee then
+        if (exists Invitee) and (exists PrivateChannel) then
           -- bind object to ConnectedPartner in PrivateChannel >> binding >> context
           callEffect ser:AddConnectedPartnerToChannel( object, PrivateChannel >> binding >> context )
     bot: for Guest
