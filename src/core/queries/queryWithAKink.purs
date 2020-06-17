@@ -156,7 +156,7 @@ setInvertedQueries userTypes qfd = do
     -- TODO. Voor de rol zetten we nu voor de tweede keer de InvertedQuery.
     case forward, backward, domain <$> backward of
       Nothing, Just bw, Just (RDOM role) -> (forWithIndex_ userTypes
-        \user props -> setInvertedQueriesForUserAndRole user role props qwk)
+        \user props -> setInvertedQueriesForUserAndRole user role props true qwk)
       _, _, _ -> pure unit
   where
     -- For a query that has a Role domain, we add a step from context to role.

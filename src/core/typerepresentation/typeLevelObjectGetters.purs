@@ -22,7 +22,7 @@
 module Perspectives.Types.ObjectGetters where
 
 import Control.Monad.Trans.Class (lift)
-import Control.Plus (empty, map, (<|>))
+import Control.Plus (map, (<|>))
 import Data.Array (filter, findIndex, intersect, null, singleton)
 import Data.List (toUnfoldable)
 import Data.Map.Internal (keys) as MAP
@@ -39,7 +39,7 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, providesPerspectiveOnRole)
 import Perspectives.Representation.Class.PersistentType (getAction, getCalculatedRole, getContext, getEnumeratedProperty, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, allProperties, allRoles, getRole, greaterThanOrEqualTo, propertiesOfADT, roleADT, roleAspects, roleAspectsBindingADT, typeIncludingAspects, viewsOfADT)
+import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, allProperties, allRoles, getRole, greaterThanOrEqualTo, roleADT, roleAspects, roleAspectsBindingADT, typeIncludingAspects, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextAspectsADT)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
@@ -241,6 +241,9 @@ qualifyContextInDomain localName namespace = ArrayT do
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A ROLETYPE
 ----------------------------------------------------------------------------------------
 -- TODO: handle Calculated user roles
+-- | <user RoleType> `hasPerspectiveOnRole` <RoleType>
+-- | True, iff the user RoleType or one of its aspects is a user target of one of the
+-- | InvertedQueries of Roletype.
 hasPerspectiveOnRole :: RoleType -> RoleType ~~~> Boolean
 hasPerspectiveOnRole (ENR ur) (ENR rt@(EnumeratedRoleType _)) = do
   EnumeratedRole{onContextDelta_context, onContextDelta_role, onRoleDelta_binder, onRoleDelta_binding} <- lift $ getEnumeratedRole rt

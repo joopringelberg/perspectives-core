@@ -26,7 +26,7 @@ import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader (lift)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (filterA, fold, head, nub, union)
+import Data.Array (filterA, fold, head, intercalate, nub, union)
 import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
 import Data.Foldable (traverse_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
@@ -40,9 +40,10 @@ import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_isMe)
-import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, WithAssumptions, runMonadPerspectivesQuery, (###=), (##=), (##>>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, WithAssumptions, runMonadPerspectivesQuery, (###=), (##=), (##>>), (##>))
 import Perspectives.Deltas (addContextDelta, addPropertyDelta, addRoleDelta, addUniverseContextDelta, addUniverseRoleDelta)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
@@ -52,7 +53,7 @@ import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, getEn
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), backwards, forwards)
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Query.QueryTypes (roleRange)
+import Perspectives.Query.QueryTypes (range, roleRange)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Role (allProperties)
@@ -64,7 +65,7 @@ import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, when, ($), (<<<), (==), (>=>), (>>=), (<$>))
+import Prelude (Unit, bind, const, discard, join, map, not, pure, show, unit, when, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -77,14 +78,16 @@ usersWithPerspectiveOnRoleInstance ::  ContextInstance -> EnumeratedRoleType -> 
 usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
   users1 <- do
     contextCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_context))
-    (for contextCalculations \(InvertedQuery{backwardsCompiled, userTypes}) -> do
+    (for contextCalculations \iq@(InvertedQuery{backwardsCompiled, userTypes}) -> do
       -- Find all affected contexts, starting from the role instance of the Delta.
       (affectedContexts :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
-      handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
+      handleAffectedContexts affectedContexts userTypes >>= runForwardsComputation roleInstance iq) >>= pure <<< join
   roleCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_role))
   users2 <- for roleCalculations (\(InvertedQuery{backwardsCompiled, userTypes}) -> do
-    -- Find all affected contexts, starting from the context instance of the Delta.
-    affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: ContextInstance ~~> ContextInstance)
+    -- Find all affected contexts, starting from the new role instance of the Delta.
+    -- We do not start on the context because the cardinality of the role getting step is larger than one and
+    -- we want to make sure that the new binding is in the path for the users.
+    affectedContexts <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
   -- Remove 'me'
   lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (nub $ union users1 users2)
@@ -168,12 +171,15 @@ aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction RoleBindingDe
 aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
   binderType <- lift2 (id ##>> OG.roleType)
   bindingCalculations <- lift2 $ compileDescriptions_ _onRoleDelta_binding binderType true
-  users1 <- for bindingCalculations (runInvertedQuery id) >>= pure <<< join
+  users1 <- (for bindingCalculations
+    -- Find all affected contexts, starting from the binder (id) instance of the Delta.
+    \iq -> (runInvertedQuery id iq) >>= runForwardsComputation id iq) >>= pure <<< join
   users2 <- case binding of
     Just bnd -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
-      binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binder bindingType
-      for binderCalculations (runInvertedQuery bnd) >>= pure <<< join
+      binderCalculations <- lift2 $ compileDescriptions_ _onRoleDelta_binder bindingType true
+      (for binderCalculations
+        \iq -> (runInvertedQuery id iq) >>= runForwardsComputation bnd iq) >>= pure <<< join
     Nothing -> pure []
 
   users3 <- case oldBinding of
@@ -181,7 +187,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
       bindingType <- lift2 (bnd ##>> OG.roleType)
       binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binder bindingType
       for binderCalculations (\(InvertedQuery{backwardsCompiled, userTypes}) -> do
-        -- Find all affected contexts, starting from the role instance of the Delta.
+        -- Find all affected contexts, starting from the binding instance of the Delta.
         affectedContexts <- lift2 $ catchError (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
         handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
     otherwise -> pure []
@@ -192,40 +198,57 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
   where
 
     runInvertedQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array RoleInstance)
-    runInvertedQuery roleInstance (InvertedQuery{description, backwardsCompiled, forwardsCompiled, userTypes}) = do
-      -- Find all affected contexts, starting from the role instance of the Delta.
+    runInvertedQuery roleInstance (InvertedQuery{description, backwardsCompiled, userTypes}) = do
+      -- Find all affected contexts, starting from the binding instance of the Delta.
       affectedContexts <- lift2 $ catchError (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
-      users <- handleAffectedContexts affectedContexts userTypes >>= lift2 <<< filterA (getPerspectRol >=> pure <<< not <<< rol_isMe)
-      case forwardsCompiled of
-        Nothing -> if isNothing (forwards description)
-          then do
-            arrayOfProperties <- case fold $ values userTypes of
-              All -> do
-                rtype <- lift2 (roleInstance ##>> OG.roleType)
-                lift2 $ allProperties (ST rtype)
-              Properties props -> pure props
-            Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
-              getter <- lift $ lift $ getterFromPropertyType prop
-              getter roleInstance
-            for_ (unwrap assumptions') (createDeltasFromAssumption users)
-          else pure unit
-        Just f -> do
-          -- Apply the forwards query to the same role instance as the backwards query.
-          (Tuple instances assumptions :: WithAssumptions RoleInstance) <- lift2 (runMonadPerspectivesQuery roleInstance (unsafeCoerce f))
-          -- Now create and push Deltas for each of the assumptions. These Delta's are valid for all users.
-          for_ (unwrap assumptions) (createDeltasFromAssumption users)
-          -- Then, for each separate user type, run all property getters in a single query for each value returned from the main query. The Assumptions thus gathered apply to that single user type.
-          -- TODO. We verzamelen hier alles in één grote Transactie en splitsen hem dan later weer uit. Dat kan veel beter.
-          arrayOfProperties <- case fold $ values userTypes of
-            All -> case forwards description of
-              Nothing -> pure []
-              Just qfd -> lift2 $ allProperties (unsafePartial $ roleRange qfd)
-            Properties props -> pure props
-          Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
-            getter <- lift $ lift $ getterFromPropertyType prop
-            for_ instances getter
-          for_ (unwrap assumptions') (createDeltasFromAssumption users)
-      pure users
+      handleAffectedContexts affectedContexts userTypes >>= lift2 <<< filterA (getPerspectRol >=> pure <<< not <<< rol_isMe)
+
+runForwardsComputation ::
+  RoleInstance ->
+  InvertedQuery ->
+  (Array RoleInstance) ->
+  MonadPerspectivesTransaction (Array RoleInstance)
+runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled, userTypes}) users = do
+  case forwardsCompiled of
+    Nothing -> if isNothing (forwards description)
+      then do
+        arrayOfProperties <- case fold $ values userTypes of
+          All -> do
+            rtype <- lift2 (roleInstance ##>> OG.roleType)
+            lift2 $ allProperties (ST rtype)
+          Properties props -> pure props
+        Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
+          getter <- lift $ lift $ getterFromPropertyType prop
+          getter roleInstance
+        rtype <- lift2 (roleInstance ##>> OG.roleType)
+        log $ "Running propertyGetters for InvertedQuery without forward part\n" <>
+          "\n\t for properties: " <> intercalate "\n\t\t" (show <$> arrayOfProperties) <>
+          "\n\t on role instance: " <> show roleInstance <> " having type " <> show rtype <>
+          "\n\t results in: " <> intercalate "\n\t\t" (show <$> unwrap assumptions') <>
+          "\n\tfor users: " <> show users
+        for_ (unwrap assumptions') (createDeltasFromAssumption users)
+      else pure unit
+    Just f -> do
+      -- Apply the forwards query to the same role instance as the backwards query.
+      (Tuple instances assumptions :: WithAssumptions RoleInstance) <- lift2 (runMonadPerspectivesQuery roleInstance (unsafeCoerce f))
+      -- Now create and push Deltas for each of the assumptions. These Delta's are valid for all users.
+      for_ (unwrap assumptions) (createDeltasFromAssumption users)
+      -- Then, for each separate user type, run all property getters in a single query for each value returned from the main query. The Assumptions thus gathered apply to that single user type.
+      -- TODO. We verzamelen hier alles in één grote Transactie en splitsen hem dan later weer uit. Dat kan veel beter.
+      arrayOfProperties <- case fold $ values userTypes of
+        All -> case forwards description of
+          Nothing -> pure []
+          Just qfd -> lift2 $ allProperties (unsafePartial $ roleRange qfd)
+        Properties props -> pure props
+      Tuple _ (assumptions' :: ArrayWithoutDoubles InformedAssumption) <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
+        getter <- lift $ lift $ getterFromPropertyType prop
+        for_ instances getter
+      log $ "Running forward part of Inverted Query" <>
+        "\n\t with result type: " <> show (range <$> forwards description) <>
+        "\n\t results in: " <> intercalate "\n\t\t" (show <$> unwrap assumptions') <>
+        "\n\tfor users: " <> show users
+      for_ (unwrap assumptions') (createDeltasFromAssumption users)
+  pure users
 
 createDeltasFromAssumption :: Array RoleInstance -> InformedAssumption -> MonadPerspectivesTransaction Unit
 createDeltasFromAssumption users (RoleAssumption ctxt roleTypeId) = do
@@ -241,19 +264,22 @@ createDeltasFromAssumption users (Me ctxt mRoleInstance) = case mRoleInstance of
     magic ctxt (SerializableNonEmptyArray $ ANE.singleton me) rtype users
 
 createDeltasFromAssumption users (Binding roleInstance) = do
-  bnd <- lift2 (roleInstance ##>> binding)
-  ctxt <- lift2 (bnd ##>> OG.context)
-  rtype <- lift2 (bnd ##>> OG.roleType)
-  magic ctxt (SerializableNonEmptyArray $ ANE.singleton bnd) rtype users
-  addRoleDelta $ RoleBindingDelta
-    { id: roleInstance
-    , binding: Just bnd
-    , oldBinding: Nothing
-    , roleWillBeRemoved: false
-    , deltaType: SetBinding
-    , users: users
-    , sequenceNumber: 0
-    }
+  mbnd <- lift2 (roleInstance ##> binding)
+  case mbnd of
+    Nothing -> pure unit
+    Just bnd -> do
+      ctxt <- lift2 (bnd ##>> OG.context)
+      rtype <- lift2 (bnd ##>> OG.roleType)
+      magic ctxt (SerializableNonEmptyArray $ ANE.singleton bnd) rtype users
+      addRoleDelta $ RoleBindingDelta
+        { id: roleInstance
+        , binding: Just bnd
+        , oldBinding: Nothing
+        , roleWillBeRemoved: false
+        , deltaType: SetBinding
+        , users: users
+        , sequenceNumber: 0
+        }
 
 createDeltasFromAssumption users (Binder roleInstance roleType) = do
   bndrs <- lift2 (roleInstance ##= getRoleBinders roleType)

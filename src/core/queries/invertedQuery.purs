@@ -31,7 +31,7 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, findIndex, modifyAt)
+import Data.Array (cons, findIndex, modifyAt, null)
 import Data.Array (union) as ARR
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -136,6 +136,10 @@ instance semigroupRelevantProperties :: Semigroup RelevantProperties where
 
 instance monoidRelevantProperties :: Monoid RelevantProperties where
   mempty = Properties []
+
+isEmpty :: RelevantProperties -> Boolean
+isEmpty All = false
+isEmpty (Properties ps) = null ps
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
 --------------------------------------------------------------------------------------------------------------

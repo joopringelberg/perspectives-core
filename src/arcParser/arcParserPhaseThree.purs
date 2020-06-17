@@ -354,9 +354,9 @@ invertedQueriesForLocalRolesAndProperties = do
             (Just (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory)))
             Nothing
           -- qfd <- pure $ (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) (bool2threeValued functional) (bool2threeValued mandatory))
-          for_ userTypes \user -> do
-            props <- lift $ lift (user `hasAccessToPropertiesOf` (ENR _id))
-            setInvertedQueriesForUserAndRole user (ST _id) props qwk
+          for_ userTypes \userType -> do
+            props <- lift $ lift (userType `hasAccessToPropertiesOf` (ENR _id))
+            setInvertedQueriesForUserAndRole userType (ST _id) props true qwk
 
 -- | The calculation of a CalculatedRole or a CalculatedProperty are both expressions. This function compiles the
 -- | parser AST output that represents these expressions to QueryFunctionDescriptions.

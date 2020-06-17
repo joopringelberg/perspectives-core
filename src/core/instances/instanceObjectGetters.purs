@@ -123,8 +123,8 @@ bottom r = ArrayT do
     Nothing -> pure [r]
     Just b -> runArrayT $ bottom b
 
--- | From the instance of a Rol of any kind, find the instances of the Rol of the given
--- | type that bind it (that have it as their binding). The type of rname (RolDef) may
+-- | From the instance of a Role of any kind, find the instances of the Role of the given
+-- | type that bind it (that have it as their binding). The type of rname (EnumeratedRoleType) may
 -- | be psp:Context$externalRole.
 getRoleBinders :: EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
 getRoleBinders rname r = ArrayT do

@@ -28,6 +28,7 @@ import Data.Array (foldMap, foldl, foldr, head, union)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Ordering (Ordering(..))
@@ -114,6 +115,9 @@ derive instance genericInformedAssumption :: Generic InformedAssumption _
 
 instance eqInformedAssumption :: Eq InformedAssumption where
   eq = genericEq
+
+instance showInformedAssumption :: Show InformedAssumption where
+  show = genericShow
 
 -----------------------------------------------------------
 -- ASSIGNMENT (RULE) DEPENDENCYTRACKING

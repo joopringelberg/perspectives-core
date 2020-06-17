@@ -130,8 +130,6 @@ serialiseAsJsonFor_ userType cid = do
     serialiseRoleInstance cid' roleTypeId roleInstance = do
       PerspectRol{binding, properties} <- lift $ getPerspectRol roleInstance
       (properties' :: (OBJ.Object (Array String))) <- lift $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
-      -- If the userType has a perspective on the role instance, add the context to
-      -- the todo list.
       case binding of
         Nothing -> pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: Nothing}
         Just b -> do
