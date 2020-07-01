@@ -23,7 +23,7 @@ parseFromCommandLine = do
   runY setup $ app <$> yarg "parse" [] (Just "Path to an .arc file") (Right "An arc file name is required") true
 
 app :: String -> Effect Unit
-app relativePath = void $ runAff handleError ((runPerspectives "cor" "geheim" "cor" (parse relativePath)) >>= log)
+app relativePath = void $ runAff handleError ((runPerspectives "cor" "geheim" "cor" "http://127.0.0.1" 5984 (parse relativePath)) >>= log)
 
 parse :: String -> MonadPerspectives String
 parse relativePath = do

@@ -56,7 +56,7 @@ import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (<$>), (
 
 -- | Runs the PDR with default credentials. Used for testing clients without authentication.
 main :: Effect Unit
-main = runPDR "cor" "geheim" "cor"
+main = runPDR "cor" "geheim" "cor" "http://127.0.0.1" 5984
 -- main = parseFromCommandLine
 
 -- NOTE: For release v0.1.0, I've commented out the original main function because it requires the perspectivesproxy
@@ -65,15 +65,14 @@ main = runPDR "cor" "geheim" "cor"
 
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
   -- TODO. Bewaar de fiber in state en kill om uit te loggen?
-runPDR :: String -> String -> String -> Effect Unit
-runPDR usr pwd ident = void $ runAff handleError do
-  url <- pure "http://127.0.0.1:5984/"
+runPDR :: String -> String -> String -> String -> Int -> Effect Unit
+runPDR usr pwd ident host port = void $ runAff handleError do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   state <- new $ newPerspectivesState (CouchdbUser
     { userName: UserName usr
     , couchdbPassword: pwd
-    , couchdbHost: "http://127.0.0.1"
-    , couchdbPort: 5984
+    , couchdbHost: host
+    , couchdbPort: port
     , systemIdentifier: ident
     , _rev: Nothing}) av
   runPerspectivesWithState (do
@@ -91,13 +90,13 @@ handleError (Right a) = log $ "Perspectives-core has started!"
 
 -- | The main entrance to the PDR for client programs. Runs the PDR on succesful login.
 -- | When Couchdb is in Party Mode, initialises the first admin.
-authenticate :: String -> String -> (Int -> Effect Unit) -> Effect Unit
-authenticate usr pwd callback = void $ runAff handler do
-  pm <- partyMode
+authenticate :: String -> String -> String -> Int -> (Int -> Effect Unit) -> Effect Unit
+authenticate usr pwd host port callback = void $ runAff handler do
+  pm <- partyMode host port
   if pm
-    then setupCouchdbForFirstUser usr pwd
+    then setupCouchdbForFirstUser usr pwd host port
     else pure unit
-  (LA.authenticate usr pwd)
+  (LA.authenticate usr pwd host port)
   where
     handler :: Either Error AuthenticationResult -> Effect Unit
     handler (Left e) = log $ "An error condition: " <> (show e)
@@ -105,12 +104,12 @@ authenticate usr pwd callback = void $ runAff handler do
       UnknownUser -> callback 0
       WrongPassword -> callback 1
       OK (CouchdbUser{systemIdentifier})-> do
-        runPDR usr pwd systemIdentifier
+        runPDR usr pwd systemIdentifier host port
         callback 2
 
 -- | This is for development only! Assumes the user identifier equals the user name.
-resetAccount :: String -> String -> Effect Unit
-resetAccount usr pwd = void $ runAff handler (runPerspectives usr pwd usr do
+resetAccount :: String -> String -> String -> Int -> (Boolean -> Effect Unit) -> Effect Unit
+resetAccount usr pwd host port callback = void $ runAff handler (runPerspectives usr pwd usr host port do
   -- Get all Channels
   getChannels <- getRoleFunction "sys:PerspectivesSystem$Channels"
   system <- getMySystem
@@ -144,8 +143,12 @@ resetAccount usr pwd = void $ runAff handler (runPerspectives usr pwd usr do
         \_ -> createDatabase dbname
       createDatabase dbname
     handler :: Either Error Unit -> Effect Unit
-    handler (Left e) = log $ "An error condition in resetAccount: " <> (show e)
-    handler (Right e) = log $ "Cleared the account " <> usr
+    handler (Left e) = do
+      log $ "An error condition in resetAccount: " <> (show e)
+      callback false
+    handler (Right e) = do
+      log $ "Cleared the account " <> usr
+      callback true
 
     deleteDb :: DatabaseName -> MonadPerspectives Unit
     deleteDb dbname = do

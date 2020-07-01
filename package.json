@@ -5,9 +5,9 @@
   "license": "GPL-3.0-or-later",
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
   "dependencies": {
-    "xhr2-cookies": "^1.1.0",
+    "eventsource": "^1.0.7",
     "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.4.0",
-    "eventsource": "^1.0.7"
+    "xhr2-cookies": "^1.1.0"
   },
   "repository": {
     "type": "git",
@@ -22,7 +22,8 @@
     "docs": "./gendocs.sh"
   },
   "devDependencies": {
+    "psc-package": "^3.0.1",
     "webpack": "^4.15.0",
-    "webpack-cli": "^3.0.8"
+    "webpack-cli": "^3.3.12"
   }
 }

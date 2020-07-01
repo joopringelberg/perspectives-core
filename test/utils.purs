@@ -17,9 +17,14 @@ import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser)
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Unit.Assert as Assert
 
+couchdbHost :: String
+couchdbHost = "http://127.0.0.1"
+
+couchdbPort :: Int
+couchdbPort = 5984
 
 runP_ :: forall a. String -> MonadPerspectives a -> Aff a
-runP_ username = runPerspectives username "geheim" username
+runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort
 
 runP :: forall a. MonadPerspectives a -> Aff a
 runP = runP_ "test"

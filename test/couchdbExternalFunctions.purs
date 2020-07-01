@@ -68,7 +68,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       clearUserDatabase
       void $ cascadeDeleteDomeinFile (DomeinFileId "model:System")
 
-  test "upload model:Serialise to repository from files" $ runP do
+  testOnly "upload model:Serialise to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile "serialise" modelDirectory
     if null errs
       then do
@@ -76,7 +76,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Serialise") (cdburl <> "repository"))
       else liftAff $ assert ("There are instance- or model errors for model:Serialise: " <> show errs) false
 
-  test "upload model:Couchdb to repository from files" $ runP do
+  testOnly "upload model:Couchdb to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     if null errs
       then do
@@ -84,7 +84,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") (cdburl <> "repository"))
       else liftAff $ assert ("There are instance- or model errors for model:Couchdb: " <> show errs) false
 
-  test "upload model:System to repository from files" $ runP do
+  testOnly "upload model:System to repository from files" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
@@ -95,7 +95,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
       else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
 
-  testOnly "upload model:SimpleChat to repository from files" $ runP $ withSystem do
+  test "upload model:SimpleChat to repository from files" $ runP $ withSystem do
     errs <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
     if null errs
       then do

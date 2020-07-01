@@ -46,9 +46,9 @@ instance eqAuthenticationResult :: Eq AuthenticationResult where
 -- | We solve this by using a special account `authenticator` who just has access to the `localusers` database.
 -- TODO: verander dit naar een query die in het document kijkt naar het veld userName. Anders kan de user
 -- zijn username niet meer veranderen.
-authenticate :: String -> String -> Aff AuthenticationResult
-authenticate usr pwd = do
-  muser <- runPerspectives "authenticator" "secret" "authenticator" (tryGetPerspectEntiteit $ UserName usr)
+authenticate :: String -> String -> String -> Int -> Aff AuthenticationResult
+authenticate usr pwd host port = do
+  muser <- runPerspectives "authenticator" "secret" "authenticator" host port (tryGetPerspectEntiteit $ UserName usr)
   case muser of
     Nothing -> pure UnknownUser
     Just cdbu@(CouchdbUser{couchdbPassword}) -> if pwd == couchdbPassword

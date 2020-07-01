@@ -7,7 +7,7 @@ import Effect.Aff.Class (liftAff)
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.Couchdb.Databases (setSecurityDocument)
 import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser, setupCouchdbForFirstUser)
-import Test.Perspectives.Utils (runP, runPJoop)
+import Test.Perspectives.Utils (runP, runPJoop, couchdbHost, couchdbPort)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -17,7 +17,7 @@ testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 theSuite :: Free TestF Unit
 theSuite = suiteSkip "Perspectives.SetupCouchdb" do
   test "setupCouchdbForFirstUser" do
-    setupCouchdbForFirstUser "cor" "geheim"
+    setupCouchdbForFirstUser "cor" "geheim" couchdbHost couchdbPort
     assert "Just ran 'setupCouchdbForFirstUser'" true
 
   test "setupCouchdbForAnotherUser" (runPJoop do

@@ -198,11 +198,10 @@ saveEntiteit_ entId entiteit = saveEntiteit' entId (Just entiteit)
 -- | Save an Entiteit and set its new _rev parameter in the cache.
 saveEntiteit' :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
 saveEntiteit' entId mentiteit = ensureAuthentication $ do
-  entityFromCache <- takeEntiteitFromCache entId
-  entiteit <- pure case mentiteit of
-    Nothing -> entityFromCache
-    Just e -> e
-  revParam <- pure case (rev entityFromCache) of
+  entiteit <- case mentiteit of
+    Nothing -> takeEntiteitFromCache entId
+    Just e -> pure e
+  revParam <- pure case (rev entiteit) of
     Nothing -> ""
     Just rev -> "?rev=" <> rev
   ebase <- database entId

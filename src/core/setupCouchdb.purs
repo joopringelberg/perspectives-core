@@ -39,17 +39,17 @@ import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase
 import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb)
 import Perspectives.Persistent (entitiesDatabaseName, saveEntiteit_)
 import Perspectives.RunPerspectives (runPerspectives)
-import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
+import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- SETUPCOUCHDBFORFIRSTUSER
 -- Notice: Requires Couchdb to be in partymode.
 -----------------------------------------------------------
-setupCouchdbForFirstUser :: String -> String -> Aff Unit
-setupCouchdbForFirstUser usr pwd = do
+setupCouchdbForFirstUser :: String -> String -> String -> Int -> Aff Unit
+setupCouchdbForFirstUser usr pwd host port = do
   -- TODO: genereer hier de systeemIdentifier als een guid.
-  runMonadCouchdb usr pwd usr do
+  runMonadCouchdb usr pwd usr host port do
     createFirstAdmin usr pwd
     -- Now authenticate
     ensureAuthentication do
@@ -57,7 +57,7 @@ setupCouchdbForFirstUser usr pwd = do
       getSystemIdentifier >>= createUserDatabases
       -- For now, we initialise the repository, too.
       initRepository
-  runPerspectives usr pwd usr do
+  runPerspectives usr pwd usr host port do
     createDatabase "localusers"
     addUserToLocalUsers
     createAuthenticatorAccount
@@ -72,7 +72,9 @@ setupCouchdbForAnotherUser :: String -> String -> MonadPerspectives Unit
 setupCouchdbForAnotherUser usr pwd = do
   createAnotherAdmin usr pwd
   -- TODO: genereer hier de systeemIdentifier als een guid.
-  lift $ runPerspectives usr pwd usr do
+  host <- getHost
+  port <- getPort
+  lift $ runPerspectives usr pwd usr host port do
     getSystemIdentifier >>= createUserDatabases
     addUserToLocalUsers
     entitiesDatabaseName >>= setRoleView
@@ -147,8 +149,8 @@ createUserDatabases user = do
 -- PARTYMODE
 -----------------------------------------------------------
 -- | PartyMode operationalized as Couchdb having no databases.
-partyMode :: Aff Boolean
-partyMode = runMonadCouchdb "authenticator" "secret" "authenticator"
+partyMode :: String -> Int -> Aff Boolean
+partyMode host port = runMonadCouchdb "authenticator" "secret" "authenticator" host port
   (allDbs >>= pure <<< null)
 
 -----------------------------------------------------------

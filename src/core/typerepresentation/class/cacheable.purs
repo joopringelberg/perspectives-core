@@ -95,7 +95,7 @@ retrieveFromCache :: forall a i. Cacheable a i => (AVar a -> Aff a) -> i -> Mona
 retrieveFromCache retrieve id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
-    Nothing -> throwError $ error ("readEntiteitFromCache needs a locally stored resource for " <>  unwrap id)
+    Nothing -> throwError $ error ("retrieveFromCache needs a locally stored resource for " <>  unwrap id)
     (Just avar) -> liftAff $ retrieve avar
 
 tryReadEntiteitFromCache :: forall a i. Cacheable a i => i -> MonadPerspectives (Maybe a)
