@@ -78,7 +78,9 @@ type PerspectivesExtraState =
 
   , post :: Maybe EventSource
 
-  , repositoryUrl :: String
+  , developmentRepository :: String
+
+  , publicRepository :: String
   )
 
 -----------------------------------------------------------

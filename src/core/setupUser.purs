@@ -26,11 +26,11 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Names (getMySystem)
+import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setRoleView)
-import Perspectives.User (getCouchdbBaseURL)
 import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>), (>>=))
 
 modelDirectory :: String
@@ -46,8 +46,8 @@ setupUser = do
   case mu of
     Nothing -> do
       -- First, upload model:System to perspect_models.
-      cdbUrl <- getCouchdbBaseURL
-      void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "/repository/model:System"] (RoleInstance ""))
+      repo <- publicRepository
+      void $ runSterileTransaction (addModelToLocalStore [repo <> "model:System"] (RoleInstance ""))
       entitiesDatabaseName >>= setRoleView
 
     otherwise -> pure unit

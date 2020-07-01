@@ -50,7 +50,7 @@ import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.PerspectivesState (repositoryUrl)
+import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
@@ -199,7 +199,7 @@ loadModelIfMissing modelName = do
   mDomeinFile <- lift2 $ tryRetrieveDomeinFile modelName
   when (isNothing mDomeinFile)
     do
-      repositoryUrl <- lift2 repositoryUrl
+      repositoryUrl <- lift2 publicRepository
       addModelToLocalStore' (repositoryUrl <> modelName)
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
       DomeinFile{modelDescription} <- lift2 $ getDomeinFile (DomeinFileId modelName)
