@@ -37,7 +37,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Extern.Couchdb" do
+theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   test "models" $ runP $ withSystem do
 
@@ -50,7 +50,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
   test "upload model to repository and to perspect_models from files" $ runP $ withSystem do
 
     cdburl <- developmentRepository
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
     -- now run the query that retrieves the modelDescription field of all models in repository.
     -- The result must include "model:System$Model$External"
     (descriptions :: Array RoleInstance) <- evalMonadPerspectivesQuery "" \_ -> models (ContextInstance "")
@@ -60,7 +60,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
   test "addModelToLocalStore" do
     runP $ withSystem do
       cdburl <- developmentRepository
-      void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+      void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
     runP do
       void $ runSterileTransaction $ addModelToLocalStore ["http://127.0.0.1:5984/repository/model:System"] (RoleInstance "")
       r <- tryGetPerspectEntiteit (ContextInstance "model:User$test")
@@ -73,7 +73,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
     if null errs
       then do
         cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Serialise") (cdburl <> "repository"))
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Serialise") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Serialise: " <> show errs) false
 
   test "upload model:Couchdb to repository from files" $ runP do
@@ -81,7 +81,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
     if null errs
       then do
         cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") (cdburl <> "repository"))
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Couchdb: " <> show errs) false
 
   test "upload model:System to repository from files" $ runP do
@@ -92,15 +92,17 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
     if null errs
       then do
         cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
 
-  test "upload model:SimpleChat to repository from files" $ runP $ withSystem do
+  testOnly "upload model:SimpleChat to repository from files" $ runP $ withSystem do
+    log "starting the test"
     errs <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
     if null errs
       then do
         cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
+        log $ "Repository url = " <> cdburl
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
 
   test "upload model:TestBotActie to repository from files" $ runP $ withSystem do
@@ -108,7 +110,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
     if null errs
       then do
         cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:TestBotActie: " <> show errs) false
 
   test "setModelDescriptionsView" do

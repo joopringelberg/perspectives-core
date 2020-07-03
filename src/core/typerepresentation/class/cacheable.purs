@@ -98,16 +98,19 @@ retrieveFromCache retrieve id = do
     Nothing -> throwError $ error ("retrieveFromCache needs a locally stored resource for " <>  unwrap id)
     (Just avar) -> liftAff $ retrieve avar
 
+tryTakeEntiteitFromCache :: forall a i. Cacheable a i => i -> MonadPerspectives (Maybe a)
+tryTakeEntiteitFromCache = tryRetrieveFromCache take
+
 tryReadEntiteitFromCache :: forall a i. Cacheable a i => i -> MonadPerspectives (Maybe a)
-tryReadEntiteitFromCache id = do
+tryReadEntiteitFromCache = tryRetrieveFromCache read
+
+tryRetrieveFromCache :: forall a i. Cacheable a i => (AVar a -> Aff a) -> i -> MonadPerspectives (Maybe a)
+tryRetrieveFromCache retrieve id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
     Nothing -> pure Nothing
-    (Just avar) -> do
-      empty <- liftAff $ (status >=> pure <<< isEmpty) avar
-      if empty
-        then pure Nothing
-        else Just <$> (liftAff $ read avar)
+    (Just avar) -> liftAff $ Just <$> retrieve avar
+
 
 -- | Blocks is AVar is empty; does nothing when id is not represented internally.
 setRevision :: forall a i. Cacheable a i => i -> Revision_ -> MonadPerspectives Unit

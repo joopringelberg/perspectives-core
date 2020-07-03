@@ -74,7 +74,7 @@ import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthenticat
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, takeEntiteitFromCache)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, takeEntiteitFromCache, tryReadEntiteitFromCache, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
 
@@ -198,12 +198,18 @@ saveEntiteit_ entId entiteit = saveEntiteit' entId (Just entiteit)
 -- | Save an Entiteit and set its new _rev parameter in the cache.
 saveEntiteit' :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
 saveEntiteit' entId mentiteit = ensureAuthentication $ do
+  mentityFromCache <- tryTakeEntiteitFromCache entId
   entiteit <- case mentiteit of
-    Nothing -> takeEntiteitFromCache entId
+    Nothing -> case mentityFromCache of
+      Nothing -> throwError $ error ("saveEntiteit' needs either an entity as parameter, or a locally stored resource for " <>  unwrap entId)
+      Just e -> pure e
     Just e -> pure e
-  revParam <- pure case (rev entiteit) of
+  revParam <- pure case mentityFromCache of
     Nothing -> ""
-    Just rev -> "?rev=" <> rev
+    Just e -> case rev e of
+      Nothing -> ""
+      Just rev -> "?rev=" <> rev
+
   ebase <- database entId
   (rq :: (Request String)) <- defaultPerspectRequest
   res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> revParam), content = Just $ RequestBody.string  (encodeJSON entiteit)}
