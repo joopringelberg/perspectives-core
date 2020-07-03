@@ -26,10 +26,12 @@ import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Foreign (MultipleErrors)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesExtraState)
 import Perspectives.Couchdb.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
+import Perspectives.Couchdb.Databases (deleteDocument_)
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.Transaction (Transaction)
@@ -49,13 +51,16 @@ incomingPost = do
   -- Produce new Transaction documents
   (transactionProducer :: DocProducer PerspectivesExtraState Transaction) <- pure $ docProducer es
   -- Handle them.
-  void $ runProcess $ transactionProducer $$ transactionConsumer
+  void $ runProcess $ transactionProducer $$ transactionConsumer post
   where
-    transactionConsumer :: Consumer (Either MultipleErrors (Maybe Transaction)) MonadPerspectives Unit
-    transactionConsumer = forever do
+    transactionConsumer :: String -> Consumer (Either MultipleErrors (Tuple String (Maybe Transaction))) MonadPerspectives Unit
+    transactionConsumer database = forever do
       change <- await
       case change of
         -- TODO: iets met deze errors doen? Loggen, naar support sturen...
         Left me -> pure unit
-        Right Nothing -> pure unit
-        Right (Just t) -> lift $ executeTransaction t
+        Right (Tuple _ Nothing) -> pure unit
+        Right (Tuple id (Just t)) -> do
+          -- Delete the document
+          _ <- lift $ deleteDocument_ database id
+          lift $ executeTransaction t
