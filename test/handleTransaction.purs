@@ -68,6 +68,8 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
           case head transactionDocNames of
             Nothing -> liftAff $ assert "There should be a transaction document" false
             Just docName -> do
+              -- NOTE. If this test fails, research getDocument. It has been refactored to throw errors when
+              -- the database is approached without proper credentials, where previously it just yielded Nothing.
               mt <- getDocument dbName docName
               case mt of
                 Nothing -> liftAff $ assert "There should be a transaction document" false

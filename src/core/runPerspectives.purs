@@ -39,12 +39,12 @@ runPerspectives userName password systemId host port mp = do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState (CouchdbUser
-      { userName: UserName userName
-      , couchdbPassword: password
-      , couchdbHost: host
-      , couchdbPort: port
-      , systemIdentifier: systemId
-      , _rev: Nothing})
+        { userName: UserName userName
+        , systemIdentifier: systemId
+        , _rev: Nothing})
+      host
+      port
+      password
       av) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
   runReaderT mp rf
 

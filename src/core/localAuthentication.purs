@@ -21,17 +21,18 @@
 
 module Perspectives.LocalAuthentication where
 
+import Control.Monad.Error.Class (catchJust)
+import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Effect.Aff (Aff)
-import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
-import Perspectives.Persistent (tryGetPerspectEntiteit)
-import Perspectives.RunPerspectives (runPerspectives)
-import Prelude (pure, bind, ($), (==), class Eq, class Show)
+import Effect.Aff (Aff, message)
+import Perspectives.Couchdb.Databases (getDocument)
+import Perspectives.CouchdbState (CouchdbUser, runMonadCouchdb)
+import Prelude (pure, bind, ($), (==), class Eq, class Show, (<$>))
 
-data AuthenticationResult = UnknownUser | WrongPassword | OK CouchdbUser
+data AuthenticationResult = UnknownUser | WrongCredentials | OK CouchdbUser
 
 derive instance genericRepAuthenticationResult :: Generic AuthenticationResult _
 
@@ -42,15 +43,14 @@ instance eqAuthenticationResult :: Eq AuthenticationResult where
   eq = genericEq
 
 -- | We authenticate by retrieving the Perspectives CouchdbUser document with the given user name.
--- | Because we do so using the Persistent class, we need a Perspectives user to retrieve the documents!
--- | We solve this by using a special account `authenticator` who just has access to the `localusers` database.
--- TODO: verander dit naar een query die in het document kijkt naar het veld userName. Anders kan de user
--- zijn username niet meer veranderen.
 authenticate :: String -> String -> String -> Int -> Aff AuthenticationResult
 authenticate usr pwd host port = do
-  muser <- runPerspectives "authenticator" "secret" "authenticator" host port (tryGetPerspectEntiteit $ UserName usr)
-  case muser of
-    Nothing -> pure UnknownUser
-    Just cdbu@(CouchdbUser{couchdbPassword}) -> if pwd == couchdbPassword
-      then pure $ OK cdbu
-      else pure WrongPassword
+  result <- catchJust
+    (\e -> if message e ==  "UNAUTHORIZED" then Just "UNAUTHORIZED" else Nothing)
+    (Right <$> runMonadCouchdb usr pwd "" host port (getDocument "localusers" usr))
+    (\_ -> pure $ Left WrongCredentials)
+  case result of
+    Left _ -> pure WrongCredentials
+    Right muser -> case muser of
+      Nothing -> pure UnknownUser
+      Just cdbu -> pure $ OK cdbu

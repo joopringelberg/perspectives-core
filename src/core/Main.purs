@@ -48,7 +48,7 @@ import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithState)
-import Perspectives.SetupCouchdb (partyMode, setupCouchdbForFirstUser)
+import Perspectives.SetupCouchdb (createAnotherPerspectivesUser, partyMode, setupCouchdbForFirstUser)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.Sync.IncomingPost (incomingPost)
@@ -56,7 +56,15 @@ import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (<$>), (
 
 -- | Runs the PDR with default credentials. Used for testing clients without authentication.
 main :: Effect Unit
-main = runPDR "cor" "geheim" "cor" "http://127.0.0.1" 5984
+main = runPDR
+  "cor"
+  "geheim"
+  (CouchdbUser
+    { userName: UserName "cor"
+    , systemIdentifier: "cor"
+    , _rev: Nothing})
+  "http://127.0.0.1"
+  5984
 -- main = parseFromCommandLine
 
 -- NOTE: For release v0.1.0, I've commented out the original main function because it requires the perspectivesproxy
@@ -65,16 +73,14 @@ main = runPDR "cor" "geheim" "cor" "http://127.0.0.1" 5984
 
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
   -- TODO. Bewaar de fiber in state en kill om uit te loggen?
-runPDR :: String -> String -> String -> String -> Int -> Effect Unit
-runPDR usr pwd ident host port = void $ runAff handleError do
+runPDR :: String -> String -> CouchdbUser -> String -> Int -> Effect Unit
+runPDR usr pwd couchdbUser host port = void $ runAff handleError do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
-  state <- new $ newPerspectivesState (CouchdbUser
-    { userName: UserName usr
-    , couchdbPassword: pwd
-    , couchdbHost: host
-    , couchdbPort: port
-    , systemIdentifier: ident
-    , _rev: Nothing}) av
+  state <- new $ newPerspectivesState couchdbUser
+    host
+    port
+    pwd
+    av
   runPerspectivesWithState (do
     void $ setupUser
     addAllExternalFunctions
@@ -99,13 +105,23 @@ authenticate usr pwd host port callback = void $ runAff handler do
   (LA.authenticate usr pwd host port)
   where
     handler :: Either Error AuthenticationResult -> Effect Unit
-    handler (Left e) = log $ "An error condition: " <> (show e)
+    handler (Left e) = do
+      log $ "An error condition: " <> (show e)
+      callback 1
     handler (Right r) = case r of
-      UnknownUser -> callback 0
-      WrongPassword -> callback 1
-      OK (CouchdbUser{systemIdentifier})-> do
-        runPDR usr pwd systemIdentifier host port
-        callback 2
+      -- Not a valid system administrator for Couchdb.
+      WrongCredentials -> callback 0
+      -- System administrator, but not a Perspectives User. We'll make him one.
+      UnknownUser -> void $ runAff runWithUser (createAnotherPerspectivesUser usr pwd host port)
+      -- System administrator and a Perspectives User.
+      OK couchdbUser -> runWithUser $ Right couchdbUser
+    runWithUser :: Either Error CouchdbUser -> Effect Unit
+    runWithUser (Left e) = do
+      log $ "Could not create another Perspectives user, because: " <> (show e)
+      callback 1
+    runWithUser (Right couchdbUser) = do
+      runPDR usr pwd couchdbUser host port
+      callback 2
 
 -- | This is for development only! Assumes the user identifier equals the user name.
 resetAccount :: String -> String -> String -> Int -> (Boolean -> Effect Unit) -> Effect Unit

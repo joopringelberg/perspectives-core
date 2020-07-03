@@ -32,8 +32,8 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void)
 
-newPerspectivesState :: CouchdbUser -> AVar String -> PerspectivesState
-newPerspectivesState uinfo av =
+newPerspectivesState :: CouchdbUser -> String -> Int -> String -> AVar String -> PerspectivesState
+newPerspectivesState uinfo host port password av =
   { rolInstances: new unit
   , contextInstances: new unit
   , domeinCache: new unit
@@ -42,6 +42,9 @@ newPerspectivesState uinfo av =
   , publicRepository: "http://www.joopringelberg.nl/cdb/repository/"
   -- CouchdbState
   , userInfo: uinfo
+  , couchdbHost: host
+  , couchdbPort: port
+  , couchdbPassword: password
   , couchdbSessionStarted: false
   , indexedRoles: empty
   , indexedContexts: empty

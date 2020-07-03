@@ -35,7 +35,7 @@ import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, SecurityDocument(..), User, View(..), onAccepted)
-import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, createUser, defaultPerspectRequest, ensureAuthentication, setSecurityDocument)
+import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, defaultPerspectRequest, ensureAuthentication, setSecurityDocument)
 import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb)
 import Perspectives.Persistent (entitiesDatabaseName, saveEntiteit_)
 import Perspectives.RunPerspectives (runPerspectives)
@@ -59,9 +59,8 @@ setupCouchdbForFirstUser usr pwd host port = do
       initRepository
   runPerspectives usr pwd usr host port do
     createDatabase "localusers"
-    addUserToLocalUsers
-    createAuthenticatorAccount
-    setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: ["authenticator"], roles: []}})
+    void addUserToLocalUsers
+    setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}})
     entitiesDatabaseName >>= setRoleView
 
 -----------------------------------------------------------
@@ -71,13 +70,18 @@ setupCouchdbForFirstUser usr pwd host port = do
 setupCouchdbForAnotherUser :: String -> String -> MonadPerspectives Unit
 setupCouchdbForAnotherUser usr pwd = do
   createAnotherAdmin usr pwd
-  -- TODO: genereer hier de systeemIdentifier als een guid.
   host <- getHost
   port <- getPort
-  lift $ runPerspectives usr pwd usr host port do
+  void $ lift $ createAnotherPerspectivesUser usr pwd host port
+
+createAnotherPerspectivesUser :: String -> String -> String -> Int -> Aff CouchdbUser
+createAnotherPerspectivesUser usr pwd host port =
+  -- TODO: genereer hier de systeemIdentifier als een guid.
+  runPerspectives usr pwd usr host port do
     getSystemIdentifier >>= createUserDatabases
-    addUserToLocalUsers
+    u <- addUserToLocalUsers
     entitiesDatabaseName >>= setRoleView
+    pure u
 
 -----------------------------------------------------------
 -- INITREPOSITORY
@@ -91,8 +95,8 @@ initRepository = do
 -----------------------------------------------------------
 -- ADDUSERTOLOCALUSERS
 -----------------------------------------------------------
-addUserToLocalUsers :: MonadPerspectives Unit
-addUserToLocalUsers = (gets _.userInfo) >>= \u@(CouchdbUser{userName}) -> void $ saveEntiteit_ userName u
+addUserToLocalUsers :: MonadPerspectives CouchdbUser
+addUserToLocalUsers = (gets _.userInfo) >>= \u@(CouchdbUser{userName}) -> saveEntiteit_ userName u
 
 -----------------------------------------------------------
 -- CREATEFIRSTADMIN
@@ -117,13 +121,6 @@ createAnotherAdmin user password = ensureAuthentication do
   (rq :: (Request String)) <- defaultPerspectRequest
   res <- liftAff $ request $ rq {method = Left PUT, url = (base <> "_node/couchdb@localhost/_config/admins/" <> user), content = Just $ RequestBody.json (fromString password)}
   liftAff $ onAccepted res.status [200] "createAnotherAdmin" $ pure unit
-
------------------------------------------------------------
--- CREATEAUTHENTICATORACCOUNT
--- Notice: authentication required!
------------------------------------------------------------
-createAuthenticatorAccount :: MonadPerspectives Unit
-createAuthenticatorAccount = createUser "authenticator" "secret" []
 
 -----------------------------------------------------------
 -- CREATESYSTEMDATABASES

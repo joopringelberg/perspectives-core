@@ -102,6 +102,8 @@ theSuite = suite "Perspectives.Sync.Channel" do
     -- Wait a bit
     liftAff $ delay (Milliseconds 5000.0)
     -- Now retrieve the document
+    -- NOTE. If this test fails, research getDocument. It has been refactored to throw errors when
+    -- the database is approached without proper credentials, where previously it just yielded Nothing.
     (muser :: Maybe Transaction) <- getDocument "post" "emptyTransaction"
     liftAff $ assert "The 'emptyTransaction' document should now be in the post database!" (isJust muser)
 
@@ -141,6 +143,8 @@ theSuite = suite "Perspectives.Sync.Channel" do
             liftAff $ delay (Milliseconds 5000.0)
             -- Now retrieve the document
             post <- postDbName
+            -- NOTE. If this test fails, research getDocument. It has been refactored to throw errors when
+            -- the database is approached without proper credentials, where previously it just yielded Nothing.
             (mt :: Maybe Transaction) <- getDocument post "emptyTransaction"
             liftAff $ assert "The 'emptyTransaction' document should now be in the post database!" (isJust mt)
 
