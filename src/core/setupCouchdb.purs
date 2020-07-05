@@ -31,7 +31,7 @@ import Data.Array (null)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Effect.Aff (Aff)
+import Effect.Aff (Aff, try)
 import Effect.Aff.Class (liftAff)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, SecurityDocument(..), User, View(..), onAccepted)
@@ -145,10 +145,14 @@ createUserDatabases user = do
 -----------------------------------------------------------
 -- PARTYMODE
 -----------------------------------------------------------
--- | PartyMode operationalized as Couchdb having no databases.
+-- | PartyMode operationalized as Couchdb having no databases, or failing.
 partyMode :: String -> Int -> Aff Boolean
 partyMode host port = runMonadCouchdb "authenticator" "secret" "authenticator" host port
-  (allDbs >>= pure <<< null)
+  do
+    r <- try $ allDbs
+    case r of
+      Left _ -> pure false
+      Right dbs -> pure $ null dbs
 
 -----------------------------------------------------------
 -- THE VIEW 'MODELDESCRIPTIONS'
