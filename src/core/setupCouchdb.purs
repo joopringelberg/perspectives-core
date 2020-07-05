@@ -35,12 +35,12 @@ import Effect.Aff (Aff, try)
 import Effect.Aff.Class (liftAff)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, SecurityDocument(..), User, View(..), onAccepted)
-import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, defaultPerspectRequest, ensureAuthentication, setSecurityDocument)
+import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, databaseExists, defaultPerspectRequest, ensureAuthentication, setSecurityDocument)
 import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb)
 import Perspectives.Persistent (entitiesDatabaseName, saveEntiteit_)
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, discard, not, pure, unit, void, when, ($), (<>), (>>=))
 
 -----------------------------------------------------------
 -- SETUPCOUCHDBFORFIRSTUSER
@@ -49,19 +49,32 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (<<<), (<>), (>>=))
 setupCouchdbForFirstUser :: String -> String -> String -> Int -> Aff Unit
 setupCouchdbForFirstUser usr pwd host port = do
   -- TODO: genereer hier de systeemIdentifier als een guid.
-  runMonadCouchdb usr pwd usr host port do
-    createFirstAdmin usr pwd
-    -- Now authenticate
-    ensureAuthentication do
-      createSystemDatabases
-      getSystemIdentifier >>= createUserDatabases
-      -- For now, we initialise the repository, too.
-      initRepository
+  runMonadCouchdb usr pwd usr host port (createFirstAdmin usr pwd)
+  setupPerspectivesInCouchdb usr pwd host port
   runPerspectives usr pwd usr host port do
-    createDatabase "localusers"
+    getSystemIdentifier >>= createUserDatabases
     void addUserToLocalUsers
-    setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}})
     entitiesDatabaseName >>= setRoleView
+
+-----------------------------------------------------------
+-- SETUPPERSPECTIVESINCOUCHDB
+-- Notice: Requires authentication.
+-----------------------------------------------------------
+-- | If it has not been done before,
+-- |  * create system databases
+-- |  * initialize the local repository
+-- |  * create the database `localusers` and set its security document.
+setupPerspectivesInCouchdb :: String -> String -> String -> Int -> Aff Unit
+setupPerspectivesInCouchdb usr pwd host port = runMonadCouchdb usr pwd usr host port
+  do
+    isFirstUser <- databaseExists "localusers"
+    when (not isFirstUser)
+      (ensureAuthentication do
+        createSystemDatabases
+        -- For now, we initialise the repository, too.
+        initRepository
+        createDatabase "localusers"
+        setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
 
 -----------------------------------------------------------
 -- SETUPCOUCHDBFORANOTHERUSER

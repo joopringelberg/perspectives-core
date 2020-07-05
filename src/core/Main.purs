@@ -48,11 +48,11 @@ import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithState)
-import Perspectives.SetupCouchdb (createAnotherPerspectivesUser, partyMode, setupCouchdbForFirstUser)
+import Perspectives.SetupCouchdb (createAnotherPerspectivesUser, partyMode, setupCouchdbForFirstUser, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.Sync.IncomingPost (incomingPost)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (<$>), (>=>), (>>=), (<<<))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=))
 
 -- | Runs the PDR with default credentials. Used for testing clients without authentication.
 main :: Effect Unit
@@ -112,7 +112,11 @@ authenticate usr pwd host port callback = void $ runAff handler do
       -- Not a valid system administrator for Couchdb.
       WrongCredentials -> callback 0
       -- System administrator, but not a Perspectives User. We'll make him one.
-      UnknownUser -> void $ runAff runWithUser (createAnotherPerspectivesUser usr pwd host port)
+      UnknownUser -> void $ runAff runWithUser do
+        -- There may not yet be another Perspectives user. If so, we need to set up
+        -- system databases etc.
+        setupPerspectivesInCouchdb usr pwd host port
+        createAnotherPerspectivesUser usr pwd host port
       -- System administrator and a Perspectives User.
       OK couchdbUser -> runWithUser $ Right couchdbUser
     runWithUser :: Either Error CouchdbUser -> Effect Unit
