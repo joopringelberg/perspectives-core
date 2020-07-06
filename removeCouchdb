@@ -2,4 +2,4 @@ sudo rm -r ~/Library/Application\ Support/CouchDB2/
 sudo rm -r ~/Library/caches/org.apache.couchdb
 sudo rm -r ~/Library/Preferences/couchdb2-local.ini
 sudo rm ~/Library/Logs/CouchDB2.log
-sudo rm -r /Applications/Apache\ CouchDB.app
+#sudo rm -r /Applications/Apache\ CouchDB.app

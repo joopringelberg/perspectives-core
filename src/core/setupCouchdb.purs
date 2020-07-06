@@ -67,7 +67,7 @@ setupCouchdbForFirstUser usr pwd host port = do
 setupPerspectivesInCouchdb :: String -> String -> String -> Int -> Aff Unit
 setupPerspectivesInCouchdb usr pwd host port = runMonadCouchdb usr pwd usr host port
   do
-    isFirstUser <- databaseExists "localusers"
+    isFirstUser <- databaseExists_ "localusers"
     when (not isFirstUser)
       (ensureAuthentication do
         createSystemDatabases
@@ -75,6 +75,11 @@ setupPerspectivesInCouchdb usr pwd host port = runMonadCouchdb usr pwd usr host 
         initRepository
         createDatabase "localusers"
         setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
+
+databaseExists_ :: forall f. String -> MonadCouchdb f Boolean
+databaseExists_ dbname = do
+  base <- getCouchdbBaseURL
+  databaseExists (base <> dbname)
 
 -----------------------------------------------------------
 -- SETUPCOUCHDBFORANOTHERUSER
@@ -141,9 +146,9 @@ createAnotherAdmin user password = ensureAuthentication do
 -----------------------------------------------------------
 createSystemDatabases :: forall f. MonadCouchdb f Unit
 createSystemDatabases = do
-  createDatabase "_users"
-  createDatabase "_replicator"
-  createDatabase "_global_changes"
+  databaseExists_ "_users" >>= \exists -> when (not exists) (createDatabase "_users")
+  databaseExists_ "_replicator" >>= \exists -> when (not exists) (createDatabase "_replicator")
+  databaseExists_ "_global_changes" >>= \exists -> when (not exists) (createDatabase "_global_changes")
 
 -----------------------------------------------------------
 -- CREATEUSERDATABASES
@@ -154,6 +159,9 @@ createUserDatabases user = do
   createDatabase $ user <> "_entities"
   createDatabase $ user <> "_post"
   createDatabase $ user <> "_models/"
+  -- Now set the security document such that there is no role restriction for members.
+  setSecurityDocument (user <> "_models/")
+    (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
 
 -----------------------------------------------------------
 -- PARTYMODE
