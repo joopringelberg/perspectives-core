@@ -28,6 +28,7 @@
     "kishimen",
     "validation",
     "profunctor-lenses",
-    "yargs"
+    "yargs",
+    "b64"
   ]
 }
