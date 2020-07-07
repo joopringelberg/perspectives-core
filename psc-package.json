@@ -1,6 +1,6 @@
 {
   "name": "perspectives-core",
-  "set": "pv0.5.0",
+  "set": "pv0.5.1",
   "source": "https://github.com/joopringelberg/package-sets.git",
   "depends": [
     "aff",

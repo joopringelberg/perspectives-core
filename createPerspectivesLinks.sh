@@ -2,7 +2,7 @@
 
 # NOTE: this script should be adapted with each new tagged version!
 
-cd .psc-package/pv0.5.0/aff-sockets
+cd .psc-package/pv0.5.1/aff-sockets
 
 rm -Rf v2.2.0
 
