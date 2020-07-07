@@ -48,7 +48,7 @@ import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithState)
-import Perspectives.SetupCouchdb (createAnotherPerspectivesUser, partyMode, setupCouchdbForFirstUser, setupPerspectivesInCouchdb)
+import Perspectives.SetupCouchdb (createAnotherPerspectivesUser, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.Sync.IncomingPost (incomingPost)
@@ -97,12 +97,7 @@ handleError (Right a) = log $ "Perspectives-core has started!"
 -- | The main entrance to the PDR for client programs. Runs the PDR on succesful login.
 -- | When Couchdb is in Party Mode, initialises the first admin.
 authenticate :: String -> String -> String -> Int -> (Int -> Effect Unit) -> Effect Unit
-authenticate usr pwd host port callback = void $ runAff handler do
-  pm <- partyMode host port
-  if pm
-    then setupCouchdbForFirstUser usr pwd host port
-    else pure unit
-  (LA.authenticate usr pwd host port)
+authenticate usr pwd host port callback = void $ runAff handler (LA.authenticate usr pwd host port)
   where
     handler :: Either Error AuthenticationResult -> Effect Unit
     handler (Left e) = do

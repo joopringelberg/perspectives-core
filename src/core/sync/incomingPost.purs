@@ -35,16 +35,17 @@ import Perspectives.Couchdb.Databases (deleteDocument_)
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.Transaction (Transaction)
-import Perspectives.User (getCouchdbBaseURL)
+import Perspectives.User (getCouchdbBaseURLWithCredentials)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>))
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
   -- get host and port
-  base <- getCouchdbBaseURL
+  base <- getCouchdbBaseURLWithCredentials
   -- get the post database
   post <- postDbName
   -- Create an EventSource
+  -- TODO: Geef credentials mee.
   (es :: EventSource) <- liftEffect $ createEventSource (base <> post) Nothing true
   -- Save in state, so we can close it.
   void $ modify \s -> s {post = Just es}
