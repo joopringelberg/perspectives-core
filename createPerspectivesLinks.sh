@@ -2,7 +2,7 @@
 
 # NOTE: this script should be adapted with each new tagged version!
 
-cd .psc-package/pv0.5.1/aff-sockets
+cd .psc-package/pv0.6.0/aff-sockets
 
 rm -Rf v2.2.0
 
@@ -24,6 +24,6 @@ cd ../perspectives-couchdb/
 
 rm -Rf v2.7.0
 
-ln -s ../../../../perspectives-couchdb v2.7.0
+ln -s ../../../../perspectives-couchdb v2.8.0
 
 cd ../../..
