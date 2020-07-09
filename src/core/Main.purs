@@ -32,8 +32,8 @@ import Effect.Aff.AVar (AVar, new)
 import Effect.Class.Console (log)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
-import Perspectives.Couchdb (DatabaseName)
-import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
+import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
+import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase, setSecurityDocument)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
@@ -151,6 +151,10 @@ resetAccount usr pwd host port callback = void $ runAff handler (runPerspectives
       catchError (deleteDatabase dbname)
         \_ -> createDatabase dbname
       createDatabase dbname
+      -- Now set the security document such that there is no role restriction for members.
+      setSecurityDocument dbname
+        (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+
     clearPostDatabase :: MonadPerspectives Unit
     clearPostDatabase = do
       dbname <- postDatabaseName
