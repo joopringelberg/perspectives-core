@@ -221,6 +221,8 @@ roleSet (PROD terms) = traverse roleSet terms >>= pure <<< unionPset
 roleSet UNIVERSAL = pure Universal
 roleSet EMPTY = pure Empty
 
+
+-- | The roles of this context and its aspects, recursively.
 allRoles :: ADT ContextType -> MP (Array RoleType)
 allRoles = reduce magic
   where

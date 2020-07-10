@@ -90,6 +90,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
       case mc of
         Just _ -> pure contextInstanceId
         Nothing -> do
+          -- RULE TRIGGERING
           void $ constructEmptyContext contextInstanceId ctype localName externeProperties
           -- Bump the index in the transaction, reserve the current index for the
           -- UniverseContextDelta.
@@ -147,6 +148,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
 -- | Whenever constructEmptyContext is applied, a UniverseContextDelta should be added
 -- | to the Transaction. However, in order to be able to add all users with a perspective,
 -- | it is better to construct that Delta in the calling function.
+-- | RULE TRIGGERING for the context through the step `role <Type of External Role of the Context`.
 constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
 constructEmptyContext contextInstanceId ctype localName externeProperties = do
   externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId

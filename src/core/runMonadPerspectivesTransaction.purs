@@ -86,17 +86,17 @@ runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< create
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
       -- log "==========ASSUMPTIONS============"
-      (corrIds :: Array CorrelationIdentifier) <- lift $ lift $ foldM (\bottom ass -> do
-        -- logShow ass
-        mcorrIds <- findDependencies ass
-        case mcorrIds of
-          Nothing -> pure bottom
-          (Just ids) -> pure (union bottom ids))
-        []
-        (assumptionsInTransaction ft)
+      -- (corrIds :: Array CorrelationIdentifier) <- lift $ lift $ foldM (\bottom ass -> do
+      --   -- logShow ass
+      --   mcorrIds <- findDependencies ass
+      --   case mcorrIds of
+      --     Nothing -> pure bottom
+      --     (Just ids) -> pure (union bottom ids))
+      --   []
+      --   (assumptionsInTransaction ft)
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
       -- log "==========RUNNING EFFECTS============"
-      lift $ lift $ for_ (sort $ correlationIdentifiers <> corrIds) \corrId -> do
+      lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do
         me <- pure $ lookupActiveSupportedEffect corrId
         case me of
           Nothing -> pure unit
@@ -110,21 +110,21 @@ runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPersp
 runSterileTransaction a = pure "" >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT a)
 
 -- | Derive Assumptions from the Deltas in a Transaction. Each Assumption in the result is unique.
-assumptionsInTransaction :: Transaction -> Array Assumption
-assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas, universeRoleDeltas, universeContextDeltas}) = union (filterRemovedContexts universeContextDeltas $ assumption <$> contextDeltas) (union (filterRemovedRoles universeRoleDeltas $ assumption <$> roleDeltas) (assumption <$> propertyDeltas))
-  where
-    filterRemovedRoles :: Array UniverseRoleDelta -> Array Assumption -> Array Assumption
-    filterRemovedRoles udeltas ass = let
-      (removedRoleInstances :: Array String) = foldr (\(UniverseRoleDelta{id, deltaType}) cumulator -> case deltaType of
-        RemoveRoleInstance -> cons (unwrap id) cumulator
-        _ -> cumulator) [] (udeltas :: Array UniverseRoleDelta)
-      in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedRoleInstances) ass
-    filterRemovedContexts :: Array UniverseContextDelta -> Array Assumption -> Array Assumption
-    filterRemovedContexts cdeltas ass = let
-      (removedContextInstances :: Array String) = foldr (\(UniverseContextDelta{id, deltaType}) cumulator -> case deltaType of
-        RemoveContextInstance -> cons (unwrap id) cumulator
-        _ -> cumulator) [] (cdeltas :: Array UniverseContextDelta)
-      in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedContextInstances) ass
+-- assumptionsInTransaction :: Transaction -> Array Assumption
+-- assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas, universeRoleDeltas, universeContextDeltas}) = union (filterRemovedContexts universeContextDeltas $ assumption <$> contextDeltas) (union (filterRemovedRoles universeRoleDeltas $ assumption <$> roleDeltas) (assumption <$> propertyDeltas))
+--   where
+--     filterRemovedRoles :: Array UniverseRoleDelta -> Array Assumption -> Array Assumption
+--     filterRemovedRoles udeltas ass = let
+--       (removedRoleInstances :: Array String) = foldr (\(UniverseRoleDelta{id, deltaType}) cumulator -> case deltaType of
+--         RemoveRoleInstance -> cons (unwrap id) cumulator
+--         _ -> cumulator) [] (udeltas :: Array UniverseRoleDelta)
+--       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedRoleInstances) ass
+--     filterRemovedContexts :: Array UniverseContextDelta -> Array Assumption -> Array Assumption
+--     filterRemovedContexts cdeltas ass = let
+--       (removedContextInstances :: Array String) = foldr (\(UniverseContextDelta{id, deltaType}) cumulator -> case deltaType of
+--         RemoveContextInstance -> cons (unwrap id) cumulator
+--         _ -> cumulator) [] (cdeltas :: Array UniverseContextDelta)
+--       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedContextInstances) ass
 
 -- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
 -- | Also execute ActionInstances for created contexts.
