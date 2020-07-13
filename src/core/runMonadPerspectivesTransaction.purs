@@ -21,7 +21,7 @@
 
 module Perspectives.RunMonadPerspectivesTransaction where
 
-import Control.Monad.AvarMonadAsk (get, modify) as AA
+import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Writer (Writer, execWriter, tell)
 import Data.Array (cons, elemIndex, filterA, find, foldM, foldr, null, sort, union)
@@ -136,7 +136,8 @@ runActions t = do
   -- Check if the type of 'me' is among them.
   -- If so, execute the automatic actions for 'me'.
   -- log "==========RUNNING ACTIONS============"
-  (as :: Array ActionInstance) <- contextsAffectedByTransaction >>= traverse getAllAutomaticActions >>= pure <<< join
+  -- (as :: Array ActionInstance) <- contextsAffectedByTransaction >>= traverse getAllAutomaticActions >>= pure <<< join
+  (as :: Array ActionInstance) <- (lift $ AA.gets (_.affectedContexts <<< unwrap)) >>= traverse getAllAutomaticActions >>= pure <<< join
   lift $ void $ AA.modify cloneEmptyTransaction
   for_ as \(ActionInstance ctxt atype) ->
       case retrieveAction atype of

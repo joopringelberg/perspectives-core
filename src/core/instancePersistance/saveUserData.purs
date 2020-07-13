@@ -36,16 +36,18 @@ module Perspectives.SaveUserData
 
   where
 
+import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.State (lift)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
-import Data.Array (nub)
-import Data.Array.NonEmpty (fromArray, singleton, head)
+import Data.Array (deleteAt, findIndex, index, modifyAt, nub, null)
+import Data.Array.NonEmpty (elemIndex, fromArray, head, singleton, filter)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (values)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (removeBinding, removeRoleInstancesFromContext)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, aisInRoleDelta, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType)
@@ -57,8 +59,10 @@ import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.Sync.AffectedContext (AffectedContext(..))
+import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..))
-import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>=), (<>))
+import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>=), (<>), eq)
 
 -- | This function takes care of
 -- | PERSISTENCE
@@ -119,6 +123,8 @@ removeContextInstance id = do
     , users
     , sequenceNumber: 0
   }
+  -- now remove id from the affectedContexts in the Transaction.
+  removeAffectedContext id
 
   where
     -- No need to take care of SYNCHRONISATION for individual role instances.
@@ -139,6 +145,25 @@ removeContextInstance id = do
           lift ((lift2 $ findRoleRequests id roleType) >>= addCorrelationIdentifiersToTransactie)
           -- PERSISTENCE
           for_ instances removeRoleInstance_
+
+    removeAffectedContext :: ContextInstance -> MonadPerspectivesTransaction Unit
+    removeAffectedContext cinst = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = let
+      i = findIndex
+        (\(AffectedContext{contextInstances}) -> isJust $ elemIndex cinst contextInstances)
+        affectedContexts
+      in
+        case i of
+          Nothing -> affectedContexts
+          Just n -> let
+            AffectedContext {contextInstances, userTypes} = unsafePartial $ fromJust $ index affectedContexts n
+            mcontextInstances' = fromArray $ filter (eq cinst) contextInstances
+            in
+              case mcontextInstances' of
+                Nothing -> unsafePartial $ fromJust $ deleteAt n affectedContexts
+                Just contextInstances' -> unsafePartial $ fromJust $ modifyAt n
+                  (\_ -> AffectedContext{contextInstances: contextInstances', userTypes})
+                  affectedContexts
+        })
 
 -- | Collects the union of the user role instances that occurr in the bindings.
 -- | Takes care of PERSISTENCE for the role instance that is removed.

@@ -35,7 +35,7 @@ import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, liftToInstanceLevel, (##=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
@@ -43,6 +43,7 @@ import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPers
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
+import Perspectives.TypesForDeltas (SubjectOfAction(..))
 import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (<<<), (<>), (==), (>>=), (>>>), (>=>), (<$>), show)
 
 -----------------------------------------------------------
@@ -240,3 +241,10 @@ binds sourceOfBindingRoles bnd = ArrayT do
           case head bs of
             Nothing -> pure [false]
             Just b -> runArrayT $ boundByRole bnd' b
+
+subjectForRoleInstance :: RoleInstance -> MonadPerspectivesTransaction SubjectOfAction
+subjectForRoleInstance roleId = do
+  msubject <- lift $ lift (roleId ##> context >=> getMe)
+  lift $ lift $ case msubject of
+    Nothing -> UserType <$> (roleId ##>> context >=> getMyType)
+    Just me -> pure $ UserInstance me

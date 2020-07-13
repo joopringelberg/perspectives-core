@@ -49,7 +49,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
-import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, getEnumeratedRoleInstances, getProperty, getRoleBinders)
+import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, getEnumeratedRoleInstances, getProperty, getRoleBinders, subjectForRoleInstance)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), backwards, forwards)
 import Perspectives.Persistent (getPerspectRol)
@@ -60,7 +60,7 @@ import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType)
-import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
+import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), toNonEmptyArray)
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
@@ -271,6 +271,7 @@ createDeltasFromAssumption users (Binding roleInstance) = do
       ctxt <- lift2 (bnd ##>> OG.context)
       rtype <- lift2 (bnd ##>> OG.roleType)
       magic ctxt (SerializableNonEmptyArray $ ANE.singleton bnd) rtype users
+      subject <- subjectForRoleInstance roleInstance
       addRoleDelta $ RoleBindingDelta
         { id: roleInstance
         , binding: Just bnd
@@ -279,6 +280,7 @@ createDeltasFromAssumption users (Binding roleInstance) = do
         , deltaType: SetBinding
         , users: users
         , sequenceNumber: 0
+        , subject
         }
 
 createDeltasFromAssumption users (Binder roleInstance roleType) = do
@@ -289,6 +291,7 @@ createDeltasFromAssumption users (Binder roleInstance roleType) = do
     Just someBndrs -> do
       ctxt <- lift2 (ANE.head someBndrs ##>> OG.context)
       magic ctxt (SerializableNonEmptyArray someBndrs) roleType users
+  subject <- subjectForRoleInstance roleInstance
   for_ bndrs \bndr ->
     addRoleDelta $ RoleBindingDelta
       { id: bndr
@@ -331,12 +334,14 @@ createDeltasFromAssumption users (External contextInstance) = pure unit
 magic :: ContextInstance -> SerializableNonEmptyArray RoleInstance -> EnumeratedRoleType ->  Array RoleInstance -> MonadPerspectivesTransaction Unit
 magic ctxt roleInstances rtype users =  do
   ctype <- lift2 (ctxt ##>> contextType)
+  subject <- subjectForRoleInstance (ANE.head $ toNonEmptyArray roleInstances)
   addUniverseContextDelta $ UniverseContextDelta
     { id: ctxt
     , contextType: ctype
     , deltaType: ConstructEmptyContext
     , users: users
     , sequenceNumber: 0
+    , subject
     }
   addUniverseRoleDelta $ UniverseRoleDelta
     { id: ctxt
@@ -345,6 +350,7 @@ magic ctxt roleInstances rtype users =  do
     , deltaType: ConstructEmptyRole
     , users: users
     , sequenceNumber: 0
+    , subject
     }
   addContextDelta $ ContextDelta
     { id: ctxt
@@ -354,6 +360,7 @@ magic ctxt roleInstances rtype users =  do
     , deltaType: AddRoleInstancesToContext
     , users: users
     , sequenceNumber: 0
+    , subject
     }
 
 

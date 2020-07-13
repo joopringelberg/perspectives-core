@@ -30,7 +30,7 @@ import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Show, show, (<>), (==), (&&))
@@ -38,7 +38,26 @@ import Prelude (class Show, show, (<>), (==), (&&))
 -----------------------------------------------------------
 -- GENERIC
 -----------------------------------------------------------
-type DeltaRecord f = {users :: Array RoleInstance, sequenceNumber :: Int | f}
+type DeltaRecord f = {users :: Array RoleInstance, sequenceNumber :: Int, subject :: SubjectOfAction | f}
+
+-----------------------------------------------------------
+-- SUBJECTOFACTION
+-----------------------------------------------------------
+data SubjectOfAction = UserInstance RoleInstance | UserType RoleType
+
+derive instance genericSubjectOfAction :: Generic SubjectOfAction _
+
+instance showSubjectOfAction :: Show SubjectOfAction where
+  show = genericShow
+
+instance prettyPrintSubjectOfAction :: PrettyPrint SubjectOfAction where
+  prettyPrint' t (UserInstance r) = prettyPrint' t r
+  prettyPrint' t (UserType r) = prettyPrint' t r
+
+instance encodeSubjectOfAction :: Encode SubjectOfAction where
+  encode = genericEncode defaultOptions
+instance decodeSubjectOfAction :: Decode SubjectOfAction where
+  decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
 -- UNIVERSECONTEXTDELTA
