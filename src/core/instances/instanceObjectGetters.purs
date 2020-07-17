@@ -242,6 +242,13 @@ binds sourceOfBindingRoles bnd = ArrayT do
             Nothing -> pure [false]
             Just b -> runArrayT $ boundByRole bnd' b
 
+subjectForContextInstance :: ContextInstance -> MonadPerspectivesTransaction SubjectOfAction
+subjectForContextInstance contextId = do
+  msubject <- lift $ lift (contextId ##> getMe)
+  lift $ lift $ case msubject of
+    Nothing -> UserType <$> (contextId ##>> getMyType)
+    Just me -> pure $ UserInstance me
+
 subjectForRoleInstance :: RoleInstance -> MonadPerspectivesTransaction SubjectOfAction
 subjectForRoleInstance roleId = do
   msubject <- lift $ lift (roleId ##> context >=> getMe)

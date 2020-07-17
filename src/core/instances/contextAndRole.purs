@@ -42,6 +42,7 @@ import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), EnumeratedPropertyType(..))
+import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Prelude (flip, identity, pure, show, ($), (+), (/), (<<<), (<>), bind, not, eq)
 
@@ -161,6 +162,7 @@ defaultContextRecord =
   , aliases: empty
   , me: Nothing
   , actionConditionState: empty
+  , universeContextDelta: SignedDelta{author: "", encryptedDelta: ""}
   }
 
 defaultRolRecord :: RolRecord
@@ -174,6 +176,10 @@ defaultRolRecord =
   , gevuldeRollen: empty
   , occurrence: 0
   , isMe: false
+  , universeRoleDelta: SignedDelta {author: "", encryptedDelta: ""}
+  , contextDelta: SignedDelta {author: "", encryptedDelta: ""}
+  , bindingDelta: Nothing
+  , propertyDeltas: empty
   }
 
 -- ROL

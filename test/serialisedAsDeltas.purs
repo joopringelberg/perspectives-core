@@ -65,43 +65,43 @@ theSuite = suite "SerialisedAsDeltas" do
     void $ runMonadPerspectivesTransaction do
       handleNewPeer unboundOtherRole
       void $ setBinding unboundOtherRole joop
-      t@(Transaction{universeContextDeltas, universeRoleDeltas, contextDeltas, roleDeltas, propertyDeltas}) <- lift get
-      -- log $ prettyPrint t
-
-      x1 <- pure $ find
-        (\(UniverseContextDelta{contextType, sequenceNumber}) -> contextType == (ContextType "model:Test$TestCase") && sequenceNumber == 0)
-        universeContextDeltas
-      case x1 of
-        Nothing -> liftAff $ assert "There should be a UniverseContextDelta with model:Test$TestCase and sequenceNumber 0" false
-        Just _ -> liftAff $ assert "There should be 3 UniverseContextDeltas" (length universeContextDeltas == 3)
-
-      x2 <- pure $ find
-        (\(UniverseRoleDelta{roleType, sequenceNumber}) -> roleType == (EnumeratedRoleType "model:Test$TestCase$ARole") && sequenceNumber == 2)
-        universeRoleDeltas
-      case x2 of
-        Nothing -> liftAff $ assert "There should be a UniverseRoleDelta for model:Test$TestCase$ARole and sequenceNumber 0" false
-        Just _ -> liftAff $ assert "There should be 8 UniverseRoleDeltas" (length universeRoleDeltas == 8)
-
-      x3 <- pure $ find
-        (\(RolePropertyDelta{property, sequenceNumber}) -> (property == (EnumeratedPropertyType "model:Test$TestCase$ARole$Prop1") && sequenceNumber == 3))
-        propertyDeltas
-      case x3 of
-        Nothing -> liftAff $ assert "There should be a RolePropertyDelta for model:Test$TestCase$ARole$Prop1 and sequenceNumber 3" false
-        Just _ -> liftAff $ assert "There should be 8 RolePropertyDeltas" (length propertyDeltas == 7)
-
-      x4 <- pure $ find
-        (\(ContextDelta{roleType, sequenceNumber}) -> (roleType == (EnumeratedRoleType "model:Test$TestCase$ARole") && sequenceNumber == 4))
-        contextDeltas
-      case x4 of
-        Nothing -> liftAff $ assert "There should be a ContextDelta for model:Test$TestCase$ARole and sequenceNumber 4" false
-        Just _ -> liftAff $ assert "There should be 8 RolePropertyDeltas" (length contextDeltas == 7)
-
-      x5 <- pure $ find
-        (\(RoleBindingDelta{id, sequenceNumber}) -> (id == (RoleInstance "model:User$MyTestCase$Other_0001") && sequenceNumber == 119))
-        roleDeltas
-      case x5 of
-        Nothing -> liftAff $ assert "There should be a RoleBindingDelta for model:User$MyTestCase$Other_0001 and sequenceNumber 119" false
-        Just _ -> liftAff $ assert "There should be 3 RoleBindingDeltas" (length roleDeltas == 3)
+      -- t@(Transaction{universeContextDeltas, universeRoleDeltas, contextDeltas, roleDeltas, propertyDeltas}) <- lift get
+      -- -- log $ prettyPrint t
+      --
+      -- x1 <- pure $ find
+      --   (\(UniverseContextDelta{contextType, sequenceNumber}) -> contextType == (ContextType "model:Test$TestCase") && sequenceNumber == 0)
+      --   universeContextDeltas
+      -- case x1 of
+      --   Nothing -> liftAff $ assert "There should be a UniverseContextDelta with model:Test$TestCase and sequenceNumber 0" false
+      --   Just _ -> liftAff $ assert "There should be 3 UniverseContextDeltas" (length universeContextDeltas == 3)
+      --
+      -- x2 <- pure $ find
+      --   (\(UniverseRoleDelta{roleType, sequenceNumber}) -> roleType == (EnumeratedRoleType "model:Test$TestCase$ARole") && sequenceNumber == 2)
+      --   universeRoleDeltas
+      -- case x2 of
+      --   Nothing -> liftAff $ assert "There should be a UniverseRoleDelta for model:Test$TestCase$ARole and sequenceNumber 0" false
+      --   Just _ -> liftAff $ assert "There should be 8 UniverseRoleDeltas" (length universeRoleDeltas == 8)
+      --
+      -- x3 <- pure $ find
+      --   (\(RolePropertyDelta{property, sequenceNumber}) -> (property == (EnumeratedPropertyType "model:Test$TestCase$ARole$Prop1") && sequenceNumber == 3))
+      --   propertyDeltas
+      -- case x3 of
+      --   Nothing -> liftAff $ assert "There should be a RolePropertyDelta for model:Test$TestCase$ARole$Prop1 and sequenceNumber 3" false
+      --   Just _ -> liftAff $ assert "There should be 8 RolePropertyDeltas" (length propertyDeltas == 7)
+      --
+      -- x4 <- pure $ find
+      --   (\(ContextDelta{roleType, sequenceNumber}) -> (roleType == (EnumeratedRoleType "model:Test$TestCase$ARole") && sequenceNumber == 4))
+      --   contextDeltas
+      -- case x4 of
+      --   Nothing -> liftAff $ assert "There should be a ContextDelta for model:Test$TestCase$ARole and sequenceNumber 4" false
+      --   Just _ -> liftAff $ assert "There should be 8 RolePropertyDeltas" (length contextDeltas == 7)
+      --
+      -- x5 <- pure $ find
+      --   (\(RoleBindingDelta{id, sequenceNumber}) -> (id == (RoleInstance "model:User$MyTestCase$Other_0001") && sequenceNumber == 119))
+      --   roleDeltas
+      -- case x5 of
+      --   Nothing -> liftAff $ assert "There should be a RoleBindingDelta for model:User$MyTestCase$Other_0001 and sequenceNumber 119" false
+      --   Just _ -> liftAff $ assert "There should be 3 RoleBindingDeltas" (length roleDeltas == 3)
 
       -- case head roleDeltas of
       --   Nothing -> liftAff $ assert "There should be one RoleBindingDelta" false

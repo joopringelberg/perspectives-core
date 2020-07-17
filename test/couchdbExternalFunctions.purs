@@ -43,8 +43,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
     getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
     models <- ((ContextInstance "model:User$test") ##= getModels)
-    -- hier komt ie niet
-    logShow models
+    -- logShow models
     liftAff $ assert "There should be some models" (length models > 0)
 
   test "upload model to repository and to perspect_models from files" $ runP $ withSystem do
@@ -68,7 +67,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       clearUserDatabase
       void $ cascadeDeleteDomeinFile (DomeinFileId "model:System")
 
-  test "upload model:Serialise to repository from files" $ runP do
+  testOnly "upload model:Serialise to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile "serialise" modelDirectory
     if null errs
       then do
@@ -76,7 +75,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Serialise") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Serialise: " <> show errs) false
 
-  test "upload model:Couchdb to repository from files" $ runP do
+  testOnly "upload model:Couchdb to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     if null errs
       then do
@@ -84,7 +83,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Couchdb: " <> show errs) false
 
-  testOnly "upload model:System to repository from files" $ runP do
+  test "upload model:System to repository from files" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
@@ -94,6 +93,18 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         cdburl <- developmentRepository
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
+
+  testOnly "upload model:SimpleChat to repository from files (without testuser)" $ runP do
+    addAllExternalFunctions
+    _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    errs <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
+    if null errs
+      then do
+        cdburl <- developmentRepository
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") cdburl)
+      else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
 
   test "upload model:SimpleChat to repository from files" $ runP $ withSystem do
     log "starting the test"

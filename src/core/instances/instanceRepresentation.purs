@@ -33,6 +33,7 @@ import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision,
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
+import Perspectives.Sync.SignedDelta (SignedDelta)
 import Prelude (class Show, class Eq, (==), (<<<), eq, bind, pure)
 
 -----------------------------------------------------------
@@ -62,8 +63,8 @@ type ContextRecord =
   , rolInContext :: F.Object (Array RoleInstance)
   , aliases :: F.Object String
   , me :: Maybe RoleInstance
-  -- A map of
   , actionConditionState :: F.Object Boolean
+  , universeContextDelta :: SignedDelta
   }
 
 derive instance genericRepPerspectContext :: Generic PerspectContext _
@@ -109,6 +110,10 @@ type RolRecord =
   , gevuldeRollen :: F.Object (Array RoleInstance)
   , occurrence :: Int
   , isMe :: Boolean
+  , universeRoleDelta :: SignedDelta
+  , contextDelta :: SignedDelta
+  , bindingDelta :: Maybe SignedDelta
+  , propertyDeltas :: F.Object (F.Object SignedDelta)
   }
 
 derive instance genericRepPerspectRol :: Generic PerspectRol _

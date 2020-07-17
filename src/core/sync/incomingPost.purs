@@ -34,7 +34,7 @@ import Perspectives.Couchdb.ChangesFeed (DocProducer, EventSource, createEventSo
 import Perspectives.Couchdb.Databases (deleteDocument_)
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
-import Perspectives.Sync.Transaction (Transaction)
+import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
 import Perspectives.User (getCouchdbBaseURLWithCredentials)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>))
 
@@ -50,11 +50,11 @@ incomingPost = do
   -- Save in state, so we can close it.
   void $ modify \s -> s {post = Just es}
   -- Produce new Transaction documents
-  (transactionProducer :: DocProducer PerspectivesExtraState Transaction) <- pure $ docProducer es
+  (transactionProducer :: DocProducer PerspectivesExtraState TransactionForPeer) <- pure $ docProducer es
   -- Handle them.
   void $ runProcess $ transactionProducer $$ transactionConsumer post
   where
-    transactionConsumer :: String -> Consumer (Either MultipleErrors (Tuple String (Maybe Transaction))) MonadPerspectives Unit
+    transactionConsumer :: String -> Consumer (Either MultipleErrors (Tuple String (Maybe TransactionForPeer))) MonadPerspectives Unit
     transactionConsumer database = forever do
       change <- await
       case change of

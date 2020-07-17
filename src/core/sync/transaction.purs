@@ -24,7 +24,7 @@ module Perspectives.Sync.Transaction where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-import Data.Array (union)
+import Data.Array (null, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -38,25 +38,20 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.AffectedContext (AffectedContext)
-import Perspectives.Sync.Class.DeltaClass (addBase)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
-import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
+import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<$>), (==), (+), (-))
+import Prelude (class Semigroup, class Show, bind, ($), (<>), pure)
 
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-newtype Transaction = Transaction (TransactionRecord( affectedContexts :: Array AffectedContext, correlationIdentifiers :: Array CorrelationIdentifier, nextDeltaIndex :: Int ))
+newtype Transaction = Transaction (TransactionRecord( affectedContexts :: Array AffectedContext, correlationIdentifiers :: Array CorrelationIdentifier))
 
 type TransactionRecord f =
   { author :: String
   , timeStamp :: SerializableDateTime
-  , contextDeltas :: Array ContextDelta
-  , roleDeltas :: Array RoleBindingDelta
-  , propertyDeltas :: Array RolePropertyDelta
-  , universeContextDeltas :: Array UniverseContextDelta
-  , universeRoleDeltas :: Array UniverseRoleDelta
+  , deltas :: Array DeltaInTransaction
   , changedDomeinFiles :: Array String
   | f
   }
@@ -72,33 +67,28 @@ instance showTransactie :: Show Transaction where
   show = genericShow
 
 instance encodeTransactie :: Encode Transaction where
-  encode (Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles})
+  encode (Transaction{author, timeStamp, deltas, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, deltas, changedDomeinFiles})
 
 instance encodeTransactie' :: Encode Transaction' where
   encode = genericEncode defaultOptions
 
 instance decodeTransactie :: Decode Transaction where
   decode f = do
-    ((Transaction' {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles}) :: Transaction') <- decode f
-    pure $ Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: [], nextDeltaIndex: 0}
+    ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- decode f
+    pure $ Transaction{author, timeStamp, deltas, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: []}
 
 instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, correlationIdentifiers, nextDeltaIndex: base})
-    t2@(Transaction {author: a, timeStamp: t, contextDeltas: r, roleDeltas: b, propertyDeltas: p, universeContextDeltas: uc, universeRoleDeltas: ur, changedDomeinFiles: cd, correlationIdentifiers: ci, nextDeltaIndex: extra}) = Transaction
+  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles})
+    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, correlationIdentifiers: ci}) = Transaction
       { author: author
       , timeStamp: timeStamp
-      , contextDeltas: union contextDeltas (addBase base <$> r)
-      , roleDeltas: union roleDeltas (addBase base <$> b)
-      , propertyDeltas: union propertyDeltas (addBase base <$> p)
-      , universeContextDeltas: union universeContextDeltas (addBase base <$> uc)
-      , universeRoleDeltas: union universeRoleDeltas (addBase base <$> ur)
+      , deltas: deltas `union` ds
       , changedDomeinFiles: union changedDomeinFiles cd
       , affectedContexts: []
       , correlationIdentifiers: union correlationIdentifiers ci
-      , nextDeltaIndex: base + extra - 1
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
@@ -116,32 +106,19 @@ createTransactie author =
     pure $ Transaction
       { author: author
       , timeStamp: SerializableDateTime (toDateTime n)
-      , contextDeltas: []
-      , roleDeltas: []
-      , propertyDeltas: []
-      , universeContextDeltas: []
-      , universeRoleDeltas: []
+      , deltas: []
       , changedDomeinFiles: []
       , affectedContexts: []
-      , correlationIdentifiers: []
-      , nextDeltaIndex: 0}
+      , correlationIdentifiers: [] }
 
 cloneEmptyTransaction :: Transaction -> Transaction
 cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
   { author: author
   , timeStamp: timeStamp
-  , contextDeltas: []
-  , roleDeltas: []
-  , propertyDeltas: []
-  , universeContextDeltas: []
-  , universeRoleDeltas: []
+  , deltas: []
   , changedDomeinFiles: []
   , affectedContexts: []
-  , correlationIdentifiers: []
-  , nextDeltaIndex: 0}
+  , correlationIdentifiers: []}
 
 isEmptyTransaction :: Transaction -> Boolean
-isEmptyTransaction (Transaction {nextDeltaIndex}) = nextDeltaIndex == 0
-
-transactieID :: Transaction -> String
-transactieID (Transaction{author, timeStamp}) = author <> "_" <> show timeStamp
+isEmptyTransaction (Transaction {deltas}) = null deltas

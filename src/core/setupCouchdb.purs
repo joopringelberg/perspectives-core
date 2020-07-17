@@ -109,6 +109,9 @@ initRepository :: forall f. MonadCouchdb f Unit
 initRepository = do
   createDatabase "repository"
   setModelDescriptionsView
+  setSecurityDocument "repository"
+    (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+
 
 -----------------------------------------------------------
 -- ADDUSERTOLOCALUSERS

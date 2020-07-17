@@ -26,10 +26,10 @@ import Affjax.RequestBody as RequestBody
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (nub, union)
+import Data.Array (insertAt, length, nub, snoc, union)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (over)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
@@ -37,6 +37,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, empty, insert, lookup)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##=))
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
@@ -48,12 +49,12 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Sync.Class.DeltaClass (addToSet)
-import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, transactionCloneWithDelta, users)
-import Perspectives.Sync.Transaction (Transaction(..), transactieID)
-import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
+import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
+import Perspectives.Sync.SignedDelta (SignedDelta)
+import Perspectives.Sync.Transaction (Transaction(..))
+import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (class Show, Unit, bind, discard, pure, show, unit, void, ($), (+), (<>), (>=>), (>>>))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (>=>), (>>>))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -68,7 +69,7 @@ distributeTransactie' t = do
   _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
-sendTransactieToUser :: String -> Transaction -> MonadPerspectives Unit
+sendTransactieToUser :: String -> TransactionForPeer -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
   -- TODO controleer of hier authentication nodig is!
   userType <- roleType_ (RoleInstance userId)
@@ -85,22 +86,16 @@ sendTransactieToUser userId t = do
       void $ onAccepted res.status [200, 201] "sendTransactieToUser"
         (onCorrectCallAndResponse "sendTransactieToUser" res.body (\(a :: PutCouchdbDocument) -> pure unit))
 
-type TransactionPerUser = Object Transaction
+type TransactionPerUser = Object TransactionForPeer
 
 -- | The Transaction holds Deltas and each Delta names user instances who should receive that Delta.
 -- | This function builds a custom version of the Transaction for each such user.
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
-transactieForEachUser t@(Transaction{contextDeltas, roleDeltas, propertyDeltas, universeRoleDeltas, universeContextDeltas}) = do
-  execStateT (do
-    for_ contextDeltas \d -> addDeltaToCustomisedTransactie d (users d)
-    for_ roleDeltas \d -> addDeltaToCustomisedTransactie d (users d)
-    for_ propertyDeltas \d -> addDeltaToCustomisedTransactie d (users d)
-    for_ universeRoleDeltas \d -> addDeltaToCustomisedTransactie d (users d)
-    for_ universeContextDeltas \d -> addDeltaToCustomisedTransactie d (users d)
-    )
+transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas}) = do
+  execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> addDeltaToCustomisedTransactie delta users)
     empty
   where
-    addDeltaToCustomisedTransactie :: forall d. Show d => DeltaUsers d => d -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
+    addDeltaToCustomisedTransactie :: SignedDelta -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
     addDeltaToCustomisedTransactie d users = do
       sysUsers <- lift (unit ##= (\_ -> ArrayT (pure users)) >=> bottom)
       for_
@@ -108,41 +103,28 @@ transactieForEachUser t@(Transaction{contextDeltas, roleDeltas, propertyDeltas, 
         (\(RoleInstance sysUser) -> do
           trs <- get
           case lookup sysUser trs of
-            Nothing -> put $ insert sysUser (transactionCloneWithDelta d t) trs
-            Just tr -> put $ insert sysUser (addToTransaction d tr) trs
+            Nothing -> put $ insert sysUser (TransactionForPeer {author, timeStamp, deltas: [d]}) trs
+            Just trans -> put $ insert sysUser (addToTransactionForPeer d trans) trs
         )
 
 addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
 addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changedDomeinFiles}) ->
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
-addContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
-addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas, nextDeltaIndex} -> t {contextDeltas = addToSet d contextDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
+-- | Add the delta at the end of the array.
+addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
+addDelta d = lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas = snoc deltas d})
 
-addRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
-addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas, nextDeltaIndex} -> t {roleDeltas = addToSet d roleDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
-
-addPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
-addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas, nextDeltaIndex} -> t {propertyDeltas = addToSet d propertyDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
-
-addUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
-addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas, nextDeltaIndex} -> t {universeContextDeltas = addToSet d universeContextDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
-
--- | Add a context delta with a fixed index.
-addUniverseContextDelta_ :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
-addUniverseContextDelta_ d = lift $ AA.modify (over Transaction \t@{universeContextDeltas} -> t {universeContextDeltas = union [d] universeContextDeltas})
-
-addUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
-addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas, nextDeltaIndex} -> t {universeRoleDeltas = addToSet d universeRoleDeltas nextDeltaIndex, nextDeltaIndex = nextDeltaIndex + 1})
+-- | Insert the delta at the index.
+insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
+insertDelta d i = lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas = unsafePartial $ fromJust $ insertAt i d deltas})
 
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
 addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})
 
-increaseDeltaIndex :: MonadPerspectivesTransaction Int
-increaseDeltaIndex = do
-  i <- lift $  AA.gets (\(Transaction{nextDeltaIndex}) -> nextDeltaIndex)
-  lift $ AA.modify (over Transaction \t@{nextDeltaIndex} -> t {nextDeltaIndex = nextDeltaIndex + 1})
-  pure i
+-- | Give the number of SignedDeltas in the Transaction.
+deltaIndex :: MonadPerspectivesTransaction Int
+deltaIndex = lift $ AA.gets \(Transaction{deltas}) -> length deltas
 
 -- Procedure om Delta's zuinig toe te voegen.
 -- 2. Bepaal of de rol functioneel is.

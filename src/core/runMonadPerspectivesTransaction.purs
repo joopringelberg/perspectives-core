@@ -23,24 +23,22 @@ module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
-import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (cons, elemIndex, filterA, find, foldM, foldr, null, sort, union)
-import Data.Array (filter) as ARR
-import Data.Array.NonEmpty (fromArray, head, toArray)
+import Data.Array (filterA, null, sort)
+import Data.Array.NonEmpty (head, toArray)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
 import Foreign.Object (empty)
 import Perspectives.Actions (compileBotAction)
-import Perspectives.ApiTypes (CorrelationIdentifier, PropertySerialization(..), RolSerialization(..))
+import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (retrieveAction)
-import Perspectives.CoreTypes (ActionInstance(..), Assumption, MonadPerspectives, MonadPerspectivesTransaction, (##>), (###=))
+import Perspectives.CoreTypes (ActionInstance(..), MonadPerspectives, MonadPerspectivesTransaction, (##>), (###=))
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
+import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
@@ -53,11 +51,9 @@ import Perspectives.Persistent (getDomeinFile)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
-import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (actionsClosure_, isAutomatic, specialisesRoleType_)
-import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, when, ($), (&&), (<$>), (<<<), (<>), (=<<), (==), (>>=))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, when, ($), (<$>), (<<<), (<>), (=<<), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -83,17 +79,6 @@ runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< create
       (ft@(Transaction{correlationIdentifiers}) :: Transaction) <- lift AA.get >>= runActions
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then lift $ lift $ distributeTransaction ft else pure unit
-      -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
-      -- administration to find the queries that should be re-run.
-      -- log "==========ASSUMPTIONS============"
-      -- (corrIds :: Array CorrelationIdentifier) <- lift $ lift $ foldM (\bottom ass -> do
-      --   -- logShow ass
-      --   mcorrIds <- findDependencies ass
-      --   case mcorrIds of
-      --     Nothing -> pure bottom
-      --     (Just ids) -> pure (union bottom ids))
-      --   []
-      --   (assumptionsInTransaction ft)
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
       -- log "==========RUNNING EFFECTS============"
       lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do
@@ -109,23 +94,6 @@ runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< create
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
 runSterileTransaction a = pure "" >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT a)
 
--- | Derive Assumptions from the Deltas in a Transaction. Each Assumption in the result is unique.
--- assumptionsInTransaction :: Transaction -> Array Assumption
--- assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas, universeRoleDeltas, universeContextDeltas}) = union (filterRemovedContexts universeContextDeltas $ assumption <$> contextDeltas) (union (filterRemovedRoles universeRoleDeltas $ assumption <$> roleDeltas) (assumption <$> propertyDeltas))
---   where
---     filterRemovedRoles :: Array UniverseRoleDelta -> Array Assumption -> Array Assumption
---     filterRemovedRoles udeltas ass = let
---       (removedRoleInstances :: Array String) = foldr (\(UniverseRoleDelta{id, deltaType}) cumulator -> case deltaType of
---         RemoveRoleInstance -> cons (unwrap id) cumulator
---         _ -> cumulator) [] (udeltas :: Array UniverseRoleDelta)
---       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedRoleInstances) ass
---     filterRemovedContexts :: Array UniverseContextDelta -> Array Assumption -> Array Assumption
---     filterRemovedContexts cdeltas ass = let
---       (removedContextInstances :: Array String) = foldr (\(UniverseContextDelta{id, deltaType}) cumulator -> case deltaType of
---         RemoveContextInstance -> cons (unwrap id) cumulator
---         _ -> cumulator) [] (cdeltas :: Array UniverseContextDelta)
---       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedContextInstances) ass
-
 -- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
 -- | Also execute ActionInstances for created contexts.
 -- | We need not trigger actions on a context instance that is deleted.
@@ -136,7 +104,6 @@ runActions t = do
   -- Check if the type of 'me' is among them.
   -- If so, execute the automatic actions for 'me'.
   -- log "==========RUNNING ACTIONS============"
-  -- (as :: Array ActionInstance) <- contextsAffectedByTransaction >>= traverse getAllAutomaticActions >>= pure <<< join
   (as :: Array ActionInstance) <- (lift $ AA.gets (_.affectedContexts <<< unwrap)) >>= traverse getAllAutomaticActions >>= pure <<< join
   lift $ void $ AA.modify cloneEmptyTransaction
   for_ as \(ActionInstance ctxt atype) ->
@@ -153,23 +120,6 @@ runActions t = do
   if isEmptyTransaction nt
     then pure t
     else pure <<< (<>) t =<< runActions nt
-
--- | Get all ContextInstances collected in the Transaction.
--- | If a context instance is removed, we run no actions in it.
-contextsAffectedByTransaction :: MonadPerspectivesTransaction (Array AffectedContext)
-contextsAffectedByTransaction = do
-  (Transaction{affectedContexts, universeContextDeltas}) <- lift AA.get
-  pure $ execWriter (for_ affectedContexts (skipRemovedContexts universeContextDeltas))
-  where
-    skipRemovedContexts :: Array UniverseContextDelta -> AffectedContext -> Writer (Array AffectedContext) Unit
-    skipRemovedContexts universeContextDeltas (AffectedContext acr@{contextInstances}) = let
-      remainingInstances = ARR.filter
-        (\ci -> not $ isJust $ find (\(UniverseContextDelta{id, deltaType}) -> id == ci && deltaType == RemoveContextInstance) universeContextDeltas)
-        (toArray contextInstances)
-      in
-        case fromArray remainingInstances of
-          Nothing -> pure unit
-          Just ri -> tell [(AffectedContext acr {contextInstances = ri})]
 
 getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
 getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do

@@ -14,6 +14,7 @@ import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.CoreTypes ((##>), (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.InstanceRepresentation (PerspectContext(..))
 import Perspectives.Instances.Builders (constructEmptyContext)
 import Perspectives.Instances.ObjectGetters (binds, bottom, getMyType)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
@@ -38,8 +39,8 @@ theSuite = suite "Test.Instances.ObjectGetters" do
     case head c of
       Nothing -> liftAff $ assert "Expected a contextinstance" false
       Just (Left e) -> liftAff $ assert ("Error on constructing a context: " <> show e) false
-      Just (Right ctxt) -> do
-        mytype <- ctxt ##> getMyType
+      Just (Right (PerspectContext{_id})) -> do
+        mytype <- _id ##> getMyType
         liftAff $ assert "my type should be sys:Invitation$Guest" (case mytype of
           Nothing -> false
           Just t -> t == (CR $ CalculatedRoleType "model:System$Invitation$Guest"))
@@ -50,8 +51,8 @@ theSuite = suite "Test.Instances.ObjectGetters" do
     case head c of
       Nothing -> liftAff $ assert "Expected a contextinstance" false
       Just (Left e) -> liftAff $ assert ("Error on constructing a context: " <> show e) false
-      Just (Right ctxt) -> do
-        mytype <- ctxt ##> getMyType
+      Just (Right (PerspectContext{_id})) -> do
+        mytype <- _id ##> getMyType
         liftAff $ assert "my type should be sys:Invitation$Guest" (case mytype of
           Nothing -> false
           Just t -> t == (CR $ CalculatedRoleType "model:System$Invitation$Guest"))

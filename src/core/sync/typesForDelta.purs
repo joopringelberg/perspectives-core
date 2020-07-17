@@ -38,7 +38,8 @@ import Prelude (class Show, show, (<>), (==), (&&))
 -----------------------------------------------------------
 -- GENERIC
 -----------------------------------------------------------
-type DeltaRecord f = {users :: Array RoleInstance, sequenceNumber :: Int, subject :: SubjectOfAction | f}
+-- type DeltaRecord f = {users :: Array RoleInstance, sequenceNumber :: Int, subject :: SubjectOfAction | f}
+type DeltaRecord f = {subject :: SubjectOfAction | f}
 
 -----------------------------------------------------------
 -- SUBJECTOFACTION
@@ -184,8 +185,7 @@ instance prettyPrintContextDelta :: PrettyPrint ContextDelta where
 -----------------------------------------------------------
 data ContextDeltaType =
   AddRoleInstancesToContext |
-  MoveRoleInstancesToAnotherContext |
-  NoOp
+  MoveRoleInstancesToAnotherContext
 
 derive instance genericContextDeltaType :: Generic ContextDeltaType _
 instance showContextDeltaType :: Show ContextDeltaType where
@@ -280,7 +280,7 @@ instance prettyPrintRolePropertyDelta :: PrettyPrint RolePropertyDelta where
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTATYPE
 -----------------------------------------------------------
-data RolePropertyDeltaType = AddProperty | RemoveProperty | DeleteProperty | SetProperty
+data RolePropertyDeltaType = AddProperty | RemoveProperty | DeleteProperty
 
 derive instance genericRolePropertyDeltaType :: Generic RolePropertyDeltaType _
 derive instance eqRolePropertyDeltaType :: Eq RolePropertyDeltaType

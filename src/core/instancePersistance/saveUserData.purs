@@ -39,29 +39,34 @@ module Perspectives.SaveUserData
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.State (lift)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
-import Data.Array (deleteAt, findIndex, index, modifyAt, nub, null)
+import Data.Array (deleteAt, findIndex, index, modifyAt, nub)
 import Data.Array.NonEmpty (elemIndex, fromArray, head, singleton, filter)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
+import Foreign.Generic (encodeJSON)
 import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (removeBinding, removeRoleInstancesFromContext)
+import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, aisInRoleDelta, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, Updater, (##=))
-import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addUniverseContextDelta)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, subjectForContextInstance)
+import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveEntiteit)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
+import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
+import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..))
+import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..))
 import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>=), (<>), eq)
 
 -- | This function takes care of
@@ -84,7 +89,7 @@ saveContextInstance id = do
       Just b -> (lift2 $ findBinderRequests b pspType) >>= addCorrelationIdentifiersToTransactie
     forWithIndex_ gevuldeRollen \_ instances -> for_ instances \binder ->
       (lift2 $ findBindingRequests binder) >>= addCorrelationIdentifiersToTransactie
-    -- For rule triggering:
+    -- For rule triggering, not for the delta or SYNCRONISATION:
     if isJust binding
       then void $ aisInRoleDelta $ RoleBindingDelta
         { id: rol
@@ -92,8 +97,8 @@ saveContextInstance id = do
         , oldBinding: Nothing
         , deltaType: SetBinding
         , roleWillBeRemoved: false
-        , users: []
-        , sequenceNumber: 0
+        -- we do not use the subject but have to provide it.
+        , subject: UserInstance (RoleInstance "")
         }
       else pure unit
   (_ :: PerspectRol) <- lift2 $ saveEntiteit (context_buitenRol ctxt)
@@ -116,13 +121,19 @@ removeContextInstance id = do
   -- PERSISTENCE
   (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
   -- SYNCHRONISATION
-  addUniverseContextDelta $ UniverseContextDelta
-    { id
-    , contextType: context_pspType ctxt
-    , deltaType: RemoveContextInstance
-    , users
-    , sequenceNumber: 0
-  }
+  subject <- subjectForContextInstance id
+  me <- lift2 getUserIdentifier
+  addDelta $ DeltaInTransaction
+    { users
+    , delta: SignedDelta
+        { author: me
+        , encryptedDelta: sign $ encodeJSON $ UniverseContextDelta
+          { id
+          , contextType: context_pspType ctxt
+          , deltaType: RemoveContextInstance
+          , subject
+          }}}
+
   -- now remove id from the affectedContexts in the Transaction.
   removeAffectedContext id
 
