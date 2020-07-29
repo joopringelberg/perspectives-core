@@ -25,7 +25,7 @@ module Perspectives.Actions where
 -- | that actually assigns a value or sorts an effect.
 import Prelude
 
-import Control.Monad.AvarMonadAsk (modify)
+import Control.Monad.AvarMonadAsk (modify, gets)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, null, uncons, unsafeIndex)
@@ -33,7 +33,7 @@ import Data.Array.NonEmpty (fromArray, head)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (alaF, unwrap)
+import Data.Newtype (alaF, over, unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Class.Console (log)
@@ -44,7 +44,7 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, handleNewPeer, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MPT, runMonadPerspectivesQuery, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
@@ -57,13 +57,15 @@ import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Action (condition, effect)
+import Perspectives.Representation.Class.Action (condition, effect, subject)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
+import Perspectives.Representation.TypeIdentifiers (RoleType)
 import Perspectives.SaveUserData (removeAllRoleInstances, removeRoleInstance)
+import Perspectives.Sync.Transaction (Transaction(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Compile the action to an Updater. Cache for later use.
@@ -74,7 +76,8 @@ compileBotAction actionType = do
     Nothing -> do
       (action :: Action) <- getPerspectType actionType
       eff <- effect action
-      (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff
+      subj <- pure $ subject action
+      (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff >>= pure <<< withAuthoringRole subj 
       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
       updater <- pure $ ruleRunner lhs effectFullFunction
       void $ pure $ cacheAction actionType (Tuple lhs updater)
@@ -100,6 +103,13 @@ compileBotAction actionType = do
         else if conditionWasTrue
           then (log "Condition not satisfied, rule fired before") *> (lift2 $ setConditionState actionType contextId false)
           else log "Condition not satisfied, rule did not fire before" *> pure unit
+
+    withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
+    withAuthoringRole aRole updater a = do
+      originalRole <- lift $ gets (_.authoringRole <<< unwrap)
+      lift $ modify (over Transaction \t -> t {authoringRole = aRole})
+      updater a
+      lift $ modify (over Transaction \t -> t {authoringRole = originalRole})
 
 compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
 compileAssignment (UQD _ QF.Remove rle _ _ mry) = do

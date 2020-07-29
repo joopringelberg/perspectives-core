@@ -30,7 +30,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
@@ -98,7 +98,8 @@ setupApi = runProcess $ (requestProducer $~ (forever (transform decodeRequest)))
         , corrId: -1
         , reactStateSetter: Just $ unsafeToForeign (\x -> pure unit :: Aff Unit)
         , contextDescription: unsafeToForeign ""
-        , rolDescription: Nothing}
+        , rolDescription: Nothing
+        , authoringRole: Nothing}
 
 -- | Create a process that consumes requests from a producer that connects to a source over TCP.
 setupTcpApi :: MonadPerspectives Unit
@@ -114,7 +115,7 @@ setupTcpApi = runProcess server
       where
         -- Here we add a callback to a Request (we don't receive a callback over TCP!).
         addCallback :: (Either MultipleErrors Request) -> Request
-        addCallback (Right (Request r@{request, subject, object, predicate, corrId, contextDescription, rolDescription})) =
+        addCallback (Right (Request r@{request, subject, object, predicate, corrId, contextDescription, rolDescription, authoringRole})) =
           Request
             { request: request
             , subject
@@ -123,7 +124,8 @@ setupTcpApi = runProcess server
             , corrId
             , reactStateSetter: Just setter
             , contextDescription
-            , rolDescription }
+            , rolDescription
+            , authoringRole }
         addCallback (Left e) =
           Request
             { request: Api.WrongRequest
@@ -133,7 +135,8 @@ setupTcpApi = runProcess server
             , corrId: -1
             , reactStateSetter: Just setter
             , contextDescription: unsafeToForeign ""
-            , rolDescription: Nothing }
+            , rolDescription: Nothing
+            , authoringRole: Nothing}
 
         setter :: Foreign
         setter = unsafeToForeign (launchAff_ <<< (writeData connection :: Response -> Aff Boolean))
@@ -146,7 +149,8 @@ consumeRequest = forever do
   lift $ dispatchOnRequest (unwrap request)
 
 dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
-dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription} =
+dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription, authoringRole: as} = do
+  authoringRole <- pure $ maybe (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (ENR <<< EnumeratedRoleType) as
   case request of
     -- Given the context instance identifier and the qualified name of the RolType.
     Api.GetRolBinding -> do
@@ -216,7 +220,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       sendResponse (Result corrId [sysId]) setter
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
-      (Right (ContextSerialization cd@{ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> void $ runMonadPerspectivesTransaction $ do
+      (Right (ContextSerialization cd@{ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> void $ runMonadPerspectivesTransaction authoringRole do
         g <- liftEffect guid
         ctxt <- runExceptT $ constructContext (ContextSerialization cd {id = "model:User$c" <> (show g)})
         case ctxt of
@@ -225,7 +229,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.ImportContexts -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextsSerialisation ctxts) :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> void $
-        runMonadPerspectivesTransaction' false do
+        runMonadPerspectivesTransaction' false authoringRole do
           result <- runExceptT $ traverse
             (\ctxt@(ContextSerialization{ctype}) -> do
               lift $ loadModelIfMissing $ unsafeDeconstructModelName ctype
@@ -235,17 +239,17 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             Left e -> lift2 $ sendResponse (Error corrId (show e)) setter
             Right ids -> lift2 $ sendResponse (Result corrId (unwrap <$> ids)) setter
     Api.DeleteContext -> do
-      void $ runMonadPerspectivesTransaction $ removeContextInstance (ContextInstance subject)
+      void $ runMonadPerspectivesTransaction authoringRole $ removeContextInstance (ContextInstance subject)
       sendResponse (Result corrId []) setter
     -- {request: "RemoveRol", subject: contextID, predicate: rolName, object: rolID}
     Api.RemoveRol -> do
-        void $ runMonadPerspectivesTransaction $ removeRoleInstance (RoleInstance object)
+        void $ runMonadPerspectivesTransaction authoringRole $ removeRoleInstance (RoleInstance object)
         sendResponse (Result corrId []) setter
     -- TODO: DeleteRol
     Api.CreateRol -> do
       if isQualifiedName predicate
         then do
-          (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
+          (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
           sendResponse (Result corrId (unwrap <$> rolInsts)) setter
         else sendResponse (Error corrId ("Not a value identifier: " <> predicate)) setter
     -- Check whether a role exists for ContextDef with the localRolName and then create a new instance of it according to the rolDescription.
@@ -258,17 +262,17 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           -- (CR ctype) -> pure unit
           (CR ctype) -> sendResponse (Error corrId ("Cannot construct an instance of CalculatedRole '" <> unwrap ctype <> "'!")) setter
           (ENR eroltype) -> do
-            rol <- runMonadPerspectivesTransaction $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
+            rol <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
             sendResponse (Result corrId (unwrap <$> rol)) setter
     Api.SetProperty -> catchError
       (do
-        void $ runMonadPerspectivesTransaction (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
+        void $ runMonadPerspectivesTransaction authoringRole (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
         sendResponse (Result corrId ["ok"]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- {request: "SetBinding", subject: rolID, object: bindingID},
     Api.SetBinding -> catchError
       do
-        void $ runMonadPerspectivesTransaction do
+        void $ runMonadPerspectivesTransaction authoringRole do
           void $ setBinding (RoleInstance subject) (RoleInstance object)
           handleNewPeer (RoleInstance subject)
         sendResponse (Result corrId ["ok"]) setter
@@ -276,14 +280,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- {request: "RemoveBinding", subject: rolID}
     Api.RemoveBinding -> catchError
       do
-        void $ runMonadPerspectivesTransaction $ removeBinding false (RoleInstance subject)
+        void $ runMonadPerspectivesTransaction authoringRole $ removeBinding false (RoleInstance subject)
         sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- Create a new instance of the roletype RolDef in Context and fill the role with RolID.
     -- subject :: Context, predicate :: RolDef, object :: RolID
     Api.BindInNewRol -> if isQualifiedName predicate
       then do
-        void $ runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
+        void $ runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
         sendResponse (Result corrId ["ok"]) setter
       else sendResponse (Error corrId ("Not a value identifier: " <> predicate)) setter
     -- Check whether a role exists for ContextDef with the localRolName and whether it allows RolID as binding.
@@ -294,7 +298,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         Nothing -> sendResponse (Error corrId ("No roltype found for '" <> predicate <> "'.")) setter
         (Just typeOfRolToBindTo) -> do
           PerspectRol{pspType} <- getPerspectRol (RoleInstance object)
-          void $ runMonadPerspectivesTransaction' false (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+          void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
           ok <- checkBinding typeOfRolToBindTo (RoleInstance object)
           sendResponse (Result corrId [(show ok)]) setter
     Api.Unsubscribe -> unregisterSupportedEffect corrId

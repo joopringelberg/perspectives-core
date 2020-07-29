@@ -9,9 +9,10 @@ domain: TestBotActie
 
   case: Tests
     external:
-      aspect: sys:NamedContext$External
-    aspect: sys:NamedContext
+      aspect: sys:RootContext$External
+    aspect: sys:RootContext
     user: Tester filledBy: sys:PerspectivesSystem$User
+      aspect: sys:RootContext$RootUser
     context: TestInstances (not mandatory, not functional) filledBy: Test
 
   case: Test

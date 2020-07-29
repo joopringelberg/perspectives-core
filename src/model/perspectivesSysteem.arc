@@ -11,13 +11,13 @@ domain: System
     user: ClusterGenoot (not mandatory, not functional) filledBy: User
       property: Url (mandatory, functional, String)
       view: Adressering (Url, Voornaam)
-      perspective on : ClusterGenoot (Adressering) Consult
+      perspective on: ClusterGenoot (Adressering) Consult
 
   case: PerspectivesSystem
     external:
-      aspect: sys:NamedContext$External
+      aspect: sys:RootContext$External
       property: ModelOphaalTeller (mandatory, functional, Number)
-    aspect: sys:NamedContext
+    aspect: sys:RootContext
     indexed: sys:MySystem
 
     context: TheTrustedCluster (not mandatory, functional) filledBy: TrustedCluster
@@ -29,13 +29,20 @@ domain: System
       indexed: sys:Me
       view: VolledigeNaam (Voornaam, Achternaam)
       perspective on: User
+      perspective on: ModelsInUse
+      perspective on: IndexedContextOfModel
+      perspective on: RootUsers
+
+    context: IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
+
+    thing: RootUsers = IndexedContexts >> binding >> context >> RootUser
 
     context: Channels = User >> (binder Initiator union binder ConnectedPartner) >> context >> extern
 
     context: Modellen = callExternal cdb:Models() returns: Model$External
 
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
-    context: IndexedContexts (not mandatory, not functional) filledBy: sys:NamedContext
+    context: IndexedContexts (not mandatory, not functional) filledBy: sys:RootContext
 
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
 
@@ -91,14 +98,16 @@ domain: System
       property: Description (mandatory, functional, String)
       property: Url (mandatory, functional, String)
     user: Author (not mandatory, functional) filledBy: User
-    context: IndexedContext (mandatory, functional) filledBy: sys:NamedContext
+      perspective on: External
+    context: IndexedContext (mandatory, functional) filledBy: sys:RootContext
       property: Name (mandatory, functional, String)
     thing: IndexedRole (not mandatory, not functional)
       property: Name (mandatory, functional, String)
 
-  case: NamedContext
+  case: RootContext
     external:
       property: Name (mandatory, functional, String)
+    user: RootUser filledBy: sys:PerspectivesSystem$User
 
   case: Invitation
     external:
@@ -106,6 +115,7 @@ domain: System
       property: SerialisedInvitation (not mandatory, functional, String)
       property: Message (not mandatory, functional, String)
     user: Guest = sys:Me
+      perspective on: Invitee
     user: Invitee (mandatory, functional) filledBy: Guest
       perspective on: Inviter
       perspective on: PrivateChannel
@@ -123,6 +133,7 @@ domain: System
           callEffect ser:CreateCopyOfChannelDatabase( PrivateChannel >> ChannelDatabaseName )
     user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
+      perspective on: PrivateChannel
     bot: for Inviter
       perspective on: External
         if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then

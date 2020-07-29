@@ -36,6 +36,7 @@ module Perspectives.Assignment.Update where
 
 import Prelude
 
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (difference, elemIndex, find, null, union)
@@ -63,7 +64,7 @@ import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getProperty, isMe, subjectForRoleInstance)
+import Perspectives.Instances.ObjectGetters (getProperty, isMe)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
@@ -75,7 +76,7 @@ import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 
 -----------------------------------------------------------
 -- UPDATE A ROLE (ADD OR REMOVE A BINDING)
@@ -156,7 +157,7 @@ setBinding_ roleId (newBindingId :: RoleInstance) = do
   -- Add this roleinstance as a binding role for the new binding.
   saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
-  subject <- subjectForRoleInstance roleId
+  subject <- authoringRole
   delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
                 { id : roleId
                 , binding: Just newBindingId
@@ -218,7 +219,7 @@ removeBinding roleWillBeRemoved roleId = do
         Nothing -> pure []
         Just oldBindingId -> do
           (lift2 $ findBinderRequests oldBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
-          subject <- subjectForRoleInstance roleId
+          subject <- authoringRole
           delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
                         { id : roleId
                         , binding: (rol_binding originalRole)
@@ -287,7 +288,7 @@ addRoleInstancesToContext contextId rolName rolInstances = do
       -- the transaction, too.
       users <- usersWithPerspectiveOnRoleInstance contextId rolName (head rolInstances)
       -- SYNCHRONISATION
-      subject <- subjectForRoleInstance (head rolInstances)
+      subject <- authoringRole
       for_ roles \(PerspectRol r@{_id, universeRoleDelta}) -> do
         pure unit
         addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
@@ -320,7 +321,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
   -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
   -- the transaction, too.
   users <- usersWithPerspectiveOnRoleInstance contextId rolName (head rolInstances)
-  subject <- subjectForRoleInstance (head rolInstances)
+  subject <- authoringRole
 -- SYNCHRONISATION
   author <- lift2 getUserIdentifier
   addDelta $ DeltaInTransaction
@@ -412,7 +413,7 @@ addProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array V
 addProperty rids propertyName values = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
-    subject <- subjectForRoleInstance roleId
+    subject <- authoringRole
     author <- lift2 getUserIdentifier
     for_ rids \rid -> do
       (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
@@ -454,7 +455,7 @@ removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Arra
 removeProperty rids propertyName values = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
-    subject <- subjectForRoleInstance roleId
+    subject <- authoringRole
     for_ rids \rid -> do
       (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
       users <- aisInPropertyDelta rid propertyName
@@ -488,7 +489,7 @@ deleteProperty :: Array RoleInstance -> EnumeratedPropertyType -> MonadPerspecti
 deleteProperty rids propertyName = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
-    subject <- subjectForRoleInstance roleId
+    subject <- authoringRole
     for_ rids \rid -> do
       (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
       users <- aisInPropertyDelta rid propertyName
@@ -546,3 +547,6 @@ setMe cid me = do
   ctxt <- lift2 $ getPerspectContext cid
   saveEntiteit cid (changeContext_me ctxt me)
   (lift2 $ findRoleRequests cid (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+
+authoringRole :: MonadPerspectivesTransaction SubjectOfAction
+authoringRole = lift $ UserType <$> gets (_.authoringRole <<< unwrap)

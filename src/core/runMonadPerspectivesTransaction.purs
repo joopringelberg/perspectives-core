@@ -35,7 +35,7 @@ import Foreign.Object (empty)
 import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (retrieveAction)
-import Perspectives.CoreTypes (ActionInstance(..), MonadPerspectives, MonadPerspectivesTransaction, (##>), (###=))
+import Perspectives.CoreTypes (ActionInstance(..), MonadPerspectives, MonadPerspectivesTransaction, (###=), (##>))
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
@@ -49,7 +49,7 @@ import Perspectives.Instances.ObjectGetters (getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.PerspectivesState (publicRepository)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (actionsClosure_, isAutomatic, specialisesRoleType_)
@@ -61,15 +61,17 @@ import Prelude (Unit, bind, discard, join, not, pure, unit, void, when, ($), (<$
 -- | Runs an update function (a function in MonadPerspectivesTransaction that produces deltas),
 -- | runs actions as long as they are triggered, sends deltas to other participants and re-runs active queries
 runMonadPerspectivesTransaction :: forall o.
+  RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives (Array o))
-runMonadPerspectivesTransaction a = runMonadPerspectivesTransaction' true a
+runMonadPerspectivesTransaction authoringRole a = runMonadPerspectivesTransaction' true authoringRole a
 
 runMonadPerspectivesTransaction' :: forall o.
   Boolean ->
+  RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives (Array o))
-runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT run)
+runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= lift <<< createTransactie authoringRole >>= lift <<< new >>= runReaderT (runArrayT run)
   where
     run :: MonadPerspectivesTransaction o
     run = do
@@ -92,7 +94,7 @@ runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< create
 
 -- | Run and discard the transaction.
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
-runSterileTransaction a = pure "" >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT a)
+runSterileTransaction a = pure "" >>= lift <<< createTransactie (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") >>= lift <<< new >>= runReaderT (runArrayT a)
 
 -- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
 -- | Also execute ActionInstances for created contexts.

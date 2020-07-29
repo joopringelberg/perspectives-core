@@ -53,7 +53,7 @@ import Foreign.Object (isEmpty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
-import Perspectives.Assignment.Update (addRoleInstancesToContext, setBinding_, setProperty)
+import Perspectives.Assignment.Update (addRoleInstancesToContext, setBinding_, setProperty, authoringRole)
 import Perspectives.Authenticate (selfAuthenticate, sign)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
@@ -62,7 +62,7 @@ import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, deltaIndex, i
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), Binding)
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, subjectForContextInstance)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Names (expandDefaultNamespaces, getUserIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -116,7 +116,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
           -- Add a UniverseContextDelta with the union of the users of the RoleBindingDeltas.
           contextType <- ContextType <$> (lift $ lift2 $ expandDefaultNamespaces ctype)
           -- By now, we know the role of the author: it is set in the context instance, or the author is in the Guest role. As we could only guess it while constructing the context, we repair it here.
-          subject <- lift $ subjectForContextInstance contextInstanceId
+          subject <- lift $ authoringRole
           author <- lift $ lift2 getUserIdentifier
           modifiedUniverseContextDelta <- modifyAuthor universeContextDelta author
           -- We also have to construct and add the UniverseRoleDeltas here, too, as we could not know the author
@@ -218,6 +218,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
       , binding = Nothing
       })
   (lift $ lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (EnumeratedRoleType $ unwrap pspType <> "$External")) >>= lift <<< addCorrelationIdentifiersToTransactie
+  -- TODO. Op dit moment van constructie aangekomen is nog niet vastgelegd wie 'me' is in de context.
   case externeProperties of
     (PropertySerialization props) -> lift do
       forWithIndex_ props \propertyTypeId values ->
@@ -245,7 +246,8 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
 
   -- Now replace the UniverseRoleDelta stub with a well-constructed one.
   author <- lift2 getUserIdentifier
-  subject <- subjectForContextInstance contextInstanceId
+  subject <- authoringRole
+  -- subject <- lift authoringRole
   lift2 $ void $ cacheEntity roleInstance
     (PerspectRol r { universeRoleDelta =
           SignedDelta

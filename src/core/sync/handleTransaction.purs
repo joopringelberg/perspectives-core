@@ -43,8 +43,9 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Builders (constructEmptyContext)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
-import Perspectives.Representation.Class.Cacheable (cacheEntity)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
+import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeContextInstance, removeRoleInstance)
 import Perspectives.SerializableNonEmptyArray (toNonEmptyArray)
@@ -120,7 +121,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
 
 -- | Execute all Deltas in a run that does not distrubute.
 executeTransaction :: TransactionForPeer -> MonadPerspectives Unit
-executeTransaction t@(TransactionForPeer{deltas}) = void $ runMonadPerspectivesTransaction' false (for_ deltas f)
+executeTransaction t@(TransactionForPeer{deltas}) = void $ runMonadPerspectivesTransaction' false (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (for_ deltas f)
   where
     f :: SignedDelta -> MonadPerspectivesTransaction Unit
     f s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta

@@ -40,6 +40,7 @@ import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (updateRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (saveContextInstance)
 
@@ -90,7 +91,7 @@ loadAndSaveCrlFile file directoryName = do
       -- Update the revision in cache by visiting Couchdb.
       forWithIndex_ contextInstances \i _ -> updateRevision (ContextInstance i)
       forWithIndex_ roleInstances \i _ -> updateRevision (RoleInstance i)
-      void $ runMonadPerspectivesTransaction' false (forWithIndex_ contextInstances
+      void $ runMonadPerspectivesTransaction' false (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (forWithIndex_ contextInstances
         \i _ -> do
           saveContextInstance (ContextInstance i))
       pure []

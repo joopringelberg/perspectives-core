@@ -49,7 +49,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Assignment.Update (removeBinding, removeRoleInstancesFromContext)
+import Perspectives.Assignment.Update (removeBinding, removeRoleInstancesFromContext, authoringRole)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, aisInRoleDelta, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType)
@@ -57,16 +57,16 @@ import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, 
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, subjectForContextInstance)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveEntiteit)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..))
+import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..))
 import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>=), (<>), eq)
 
 -- | This function takes care of
@@ -77,6 +77,7 @@ import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>=), (<>), e
 saveContextInstance :: Updater ContextInstance
 saveContextInstance id = do
   (ctxt :: PerspectContext) <- lift2 $ saveEntiteit id
+  subject <- authoringRole
   forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances' ->
     case fromArray instances' of
       Nothing -> pure unit
@@ -97,8 +98,7 @@ saveContextInstance id = do
         , oldBinding: Nothing
         , deltaType: SetBinding
         , roleWillBeRemoved: false
-        -- we do not use the subject but have to provide it.
-        , subject: UserInstance (RoleInstance "")
+        , subject
         }
       else pure unit
   (_ :: PerspectRol) <- lift2 $ saveEntiteit (context_buitenRol ctxt)
@@ -121,7 +121,7 @@ removeContextInstance id = do
   -- PERSISTENCE
   (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
   -- SYNCHRONISATION
-  subject <- subjectForContextInstance id
+  subject <- authoringRole
   me <- lift2 getUserIdentifier
   addDelta $ DeltaInTransaction
     { users

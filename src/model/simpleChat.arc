@@ -11,10 +11,12 @@ domain: SimpleChat
 
   case: ChatApp
     external:
-      aspect: sys:NamedContext$External
-    aspect: sys:NamedContext
+      aspect: sys:RootContext$External
+    aspect: sys:RootContext
+    indexed: cht:MyChats
     context: Chats = callExternal cdb:RoleInstances( "model:SimpleChat$Chat$External" ) returns: Chat$External
     user: Chatter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
+      aspect: sys:RootContext$RootUser
       perspective on: Chats
 
   case: Chat
