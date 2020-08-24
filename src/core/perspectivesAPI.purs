@@ -22,6 +22,7 @@
 module Perspectives.Api where
 
 import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
+import Control.Alt ((<|>))
 import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (Step(..), produce', Emitter)
 import Control.Monad.Except (runExceptT)
@@ -52,13 +53,14 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
+import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, roleType)
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
+import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (rangeOfRoleCalculation')
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance)
@@ -192,7 +194,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     --         Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
     --         (Just rtype) -> sendResponse (Result corrId [roletype2string rtype]) setter
     Api.GetProperty -> do
-      (f :: PropertyValueGetter) <- (getPropertyFunction predicate)
+      -- NOTE. For EnumeratedProperties, returns a getter that looks up the property in the role instance directly; not
+      -- recursing on binding.
+      (f :: PropertyValueGetter) <- (getPropertyGetter predicate (ENR $ EnumeratedRoleType object)) <|> (getPropertyGetter predicate (CR $ CalculatedRoleType object))
       registerSupportedEffect corrId setter f (RoleInstance subject)
       -- For a Role and a View, return the properties in that View.
       -- If View equals "allProperties", return all properties of the Role.

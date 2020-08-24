@@ -49,6 +49,7 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
+import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -75,7 +76,7 @@ sendTransactieToUser userId t = do
   userType <- roleType_ (RoleInstance userId)
   -- TODO. We use dynamic lookup here for now. Try to replace it with static lookup as defined
   -- in Perspectives.Query.PropertyGetter.
-  getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" userType
+  getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ENR userType)
   mchannel <- (RoleInstance userId) ##> getChannel
   case mchannel of
     Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> userId <> "\n" <> show t))
