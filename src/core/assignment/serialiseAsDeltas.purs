@@ -62,6 +62,8 @@ serialisedAsDeltasForUserType :: ContextInstance -> RoleType -> MonadPerspective
 serialisedAsDeltasForUserType cid userType = do
   me <- getUserIdentifier
   (t :: Transaction) <- execMonadPerspectivesTransaction
+    -- The authoringRole is used on *constructing* deltas. However, here we merely *read* deltas from the
+    -- context- and role representations. So this value is in effect ignored.
     (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
     (serialisedAsDeltasFor_ cid (RoleInstance me) userType)
   transactionsForUsers <- transactieForEachUser t

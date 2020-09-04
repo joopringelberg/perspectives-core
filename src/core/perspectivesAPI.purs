@@ -64,6 +64,8 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), Cont
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance)
+import Perspectives.Sync.HandleTransaction (executeTransaction)
+import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Perspectives.User (getSystemIdentifier)
 import Prelude (Unit, bind, discard, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
@@ -152,6 +154,7 @@ consumeRequest = forever do
 
 dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
 dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription, authoringRole: as} = do
+  -- The authoringRole is the System User by default.
   authoringRole <- pure $ maybe (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (ENR <<< EnumeratedRoleType) as
   case request of
     -- Given the context instance identifier and the qualified name of the RolType.
@@ -230,6 +233,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         case ctxt of
           (Left messages) -> lift2 $ sendResponse (Error corrId (show messages)) setter
           (Right id) -> lift2 $ sendResponse (Result corrId [buitenRol $ unwrap id]) setter
+    Api.ImportTransaction -> case unwrap $ runExceptT $ decode contextDescription of
+      (Left e :: Either (NonEmptyList ForeignError) TransactionForPeer) -> sendResponse (Error corrId (show e)) setter
+      (Right tfp@(TransactionForPeer _)) -> do
+        executeTransaction tfp
+        sendResponse (Result corrId []) setter
     Api.ImportContexts -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextsSerialisation ctxts) :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> void $
