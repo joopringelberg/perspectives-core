@@ -34,10 +34,9 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
-import Foreign.Class (encode)
 import Foreign.Object (Object, singleton, empty, toUnfoldable, fromFoldable) as OBJ
-import Global.Unsafe (unsafeStringify)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
+import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasForUserType)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MPQ, MPT, MonadPerspectives, (###>>), (##>>), (##>))
 import Perspectives.Couchdb.Databases (createDatabase, databaseExists, ensureAuthentication)
@@ -48,7 +47,7 @@ import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (binding, bottom, context, getEnumeratedRoleInstances, roleType, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..), externalRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value, externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, setChannelReplication)
@@ -64,9 +63,11 @@ serialiseFor :: Array RoleType -> RoleInstance -> MPQ Value
 serialiseFor userTypes externalRoleId = ArrayT $ case ARR.head userTypes of
   Nothing -> empty
   Just u -> do
-    (sers :: Array ContextSerialization) <- lift $ execStateT (serialiseAsJsonFor_ u (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId)) []
-    pure $ ARR.singleton $ Value $ unsafeStringify $ encode sers
+    lift $ ARR.singleton <$> serialisedAsDeltasForUserType (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId) u
+    -- (sers :: Array ContextSerialization) <- lift $ execStateT (serialiseAsJsonFor_ u (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId)) []
+    -- pure $ ARR.singleton $ Value $ unsafeStringify $ encode sers
 
+-- TODO. This function is not used.
 serialiseAsJsonFor :: RoleInstance -> ContextInstance -> MonadPerspectives (Array ContextSerialization)
 serialiseAsJsonFor userId cid = do
   userType <- roleType_ userId
@@ -99,6 +100,7 @@ type Collecting =  (ContextsDone MonadPerspectives)
 lift2Coll :: forall a. MonadPerspectives a -> Collecting a
 lift2Coll = lift
 
+-- TODO. This function is not used as it has been replaced in serialiseFor with delta serialisation.
 serialiseAsJsonFor_:: RoleType -> ContextInstance -> Collecting Unit
 serialiseAsJsonFor_ userType cid = do
   (PerspectContext{pspType, rolInContext}) <- lift2Coll $ getPerspectContext cid

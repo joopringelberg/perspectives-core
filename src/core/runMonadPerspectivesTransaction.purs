@@ -94,7 +94,11 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
 
 -- | Run and discard the transaction.
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
-runSterileTransaction a = pure "" >>= lift <<< createTransactie (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") >>= lift <<< new >>= runReaderT (runArrayT a)
+runSterileTransaction a =
+  getUserIdentifier
+  >>= lift <<< createTransactie (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+  >>= lift <<< new
+  >>= runReaderT (runArrayT a)
 
 -- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
 -- | Also execute ActionInstances for created contexts.
