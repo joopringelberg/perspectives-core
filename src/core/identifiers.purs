@@ -54,7 +54,7 @@ deconstructBuitenRol :: String -> String
 deconstructBuitenRol s = replaceAll (Pattern "_External") (Replacement "")(replaceAll (Pattern "$_External") (Replacement "") s)
 
 isExternalRole :: String -> Boolean
-isExternalRole n = n `endsWithSegments` "External"
+isExternalRole n = isJust $ stripSuffix (Pattern "External") n
 
 
 -- | Return the Namespace that is the last segment of the URL.

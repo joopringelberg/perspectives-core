@@ -56,11 +56,12 @@ import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContex
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, Updater, (##=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests)
+import Perspectives.Identifiers (deconstructBuitenRol, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveEntiteit)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -194,16 +195,19 @@ removeRoleInstance_ roleId = do
   -- Remove from couchdb, remove from the cache.
   void $ lift $ lift2 $ (removeEntiteit roleId :: MonadPerspectives PerspectRol)
 
+-- | If the role is an external role, removes the context instead.
 -- | Calls removeBinding for the role instance prior to removing it.
 -- | Calls removeBinding on all role instances that have this role as their binding.
 -- | Calls removeRoleInstancesFromContext.
 -- | This function is complete w.r.t. the five responsibilities.
 -- | The opposite of this function creates a role instance first and then adds it to a context: [createAndAddRoleInstance](Perspectives.Instances.Builders.html#t:createAndAddRoleInstance).
 removeRoleInstance :: RoleInstance -> MonadPerspectivesTransaction Unit
-removeRoleInstance roleId = do
-  PerspectRol{pspType, context} <- lift2 $ (getPerspectRol roleId)
-  removeRoleInstancesFromContext context pspType (singleton roleId)
-  void $ runWriterT $ removeRoleInstance_ roleId
+removeRoleInstance roleId@(RoleInstance id) = if isExternalRole id
+  then removeContextInstance $ ContextInstance (deconstructBuitenRol id)
+  else do
+    PerspectRol{pspType, context} <- lift2 $ (getPerspectRol roleId)
+    removeRoleInstancesFromContext context pspType (singleton roleId)
+    void $ runWriterT $ removeRoleInstance_ roleId
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
