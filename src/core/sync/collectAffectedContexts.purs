@@ -43,7 +43,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class.Console (log)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (rol_isMe)
+import Perspectives.ContextAndRole (rol_isMe, isDefaultContextDelta)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, WithAssumptions, runMonadPerspectivesQuery, (###=), (##=), (##>>), (##>))
 import Perspectives.Deltas (addDelta)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -51,7 +51,7 @@ import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, getEnumeratedRoleInstances, getRoleBinders, subjectForRoleInstance)
+import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, getEnumeratedRoleInstances, getRoleBinders)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), backwards, forwards)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
@@ -224,11 +224,11 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
           getter <- lift $ lift $ getterFromPropertyType prop
           getter roleInstance
         rtype <- lift2 (roleInstance ##>> OG.roleType)
-        log $ "Running propertyGetters for InvertedQuery without forward part\n" <>
-          "\n\t for properties: " <> intercalate "\n\t\t" (show <$> arrayOfProperties) <>
-          "\n\t on role instance: " <> show roleInstance <> " having type " <> show rtype <>
-          "\n\t results in: " <> intercalate "\n\t\t" (show <$> unwrap assumptions') <>
-          "\n\tfor users: " <> show users
+        -- log $ "Running propertyGetters for InvertedQuery without forward part\n" <>
+        --   "\n\t for properties: " <> intercalate "\n\t\t" (show <$> arrayOfProperties) <>
+        --   "\n\t on role instance: " <> show roleInstance <> " having type " <> show rtype <>
+        --   "\n\t results in: " <> intercalate "\n\t\t" (show <$> unwrap assumptions') <>
+        --   "\n\tfor users: " <> show users
         for_ (unwrap assumptions') (createDeltasFromAssumption users)
       else pure unit
     Just f -> do
@@ -246,10 +246,10 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
       Tuple _ (assumptions' :: ArrayWithoutDoubles InformedAssumption) <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
         getter <- lift $ lift $ getterFromPropertyType prop
         for_ instances getter
-      log $ "Running forward part of Inverted Query" <>
-        "\n\t with result type: " <> show (range <$> forwards description) <>
-        "\n\t results in: " <> intercalate "\n\t\t" (show <$> unwrap assumptions') <>
-        "\n\tfor users: " <> show users
+      -- log $ "Running forward part of Inverted Query" <>
+      --   "\n\t with result type: " <> show (range <$> forwards description) <>
+      --   "\n\t results in: " <> intercalate "\n\t\t" (show <$> unwrap assumptions') <>
+      --   "\n\tfor users: " <> show users
       for_ (unwrap assumptions') (createDeltasFromAssumption users)
   pure users
 
@@ -287,7 +287,6 @@ createDeltasFromAssumption users (Binder roleInstance roleType) = do
     Just someBndrs -> do
       ctxt <- lift2 (ANE.head someBndrs ##>> OG.context)
       magic ctxt (SerializableNonEmptyArray someBndrs) roleType users
-  subject <- subjectForRoleInstance roleInstance
   for_ bndrs \bndr -> do
     PerspectRol{bindingDelta} <- lift2 $ getPerspectRol bndr
     case bindingDelta of
@@ -326,7 +325,10 @@ magic ctxt roleInstances rtype users =  do
   for_ (toArray roleInstances) \roleInstance -> do
     PerspectRol{universeRoleDelta, contextDelta} <- lift2 $ getPerspectRol roleInstance
     addDelta $ DeltaInTransaction {users, delta: universeRoleDelta}
-    addDelta $ DeltaInTransaction {users, delta: contextDelta}
+    -- Not if the roleInstance is an external role!
+    if (not $ isDefaultContextDelta contextDelta)
+      then addDelta $ DeltaInTransaction {users, delta: contextDelta}
+      else pure unit
 
 -- | Adds users for SYNCHRONISATION, guarantees RULE TRIGGERING.
 aisInPropertyDelta :: RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction (Array RoleInstance)

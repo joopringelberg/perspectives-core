@@ -39,7 +39,8 @@ newPerspectivesState uinfo host port password av =
   , domeinCache: new unit
   , queryAssumptionRegister: empty
   , variableBindings: ENV.empty
-  , publicRepository: "http://www.joopringelberg.nl/cdb/repository/"
+  -- , publicRepository: "http://www.joopringelberg.nl/cdb/repository/"
+  , publicRepository: "http://127.0.0.1:5984/repository/"
   -- CouchdbState
   , userInfo: uinfo
   , couchdbHost: host

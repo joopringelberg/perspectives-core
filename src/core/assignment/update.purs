@@ -65,7 +65,6 @@ import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getProperty, isMe)
-import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
@@ -157,7 +156,7 @@ setBinding_ roleId (newBindingId :: RoleInstance) = do
   -- Add this roleinstance as a binding role for the new binding.
   saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
-  subject <- authoringRole
+  subject <- getSubject
   delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
                 { id : roleId
                 , binding: Just newBindingId
@@ -167,7 +166,7 @@ setBinding_ roleId (newBindingId :: RoleInstance) = do
                 , subject
                 }
   users <- aisInRoleDelta delta
-  author <- lift2 getUserIdentifier
+  author <- getAuthor
   signedDelta <- pure $ SignedDelta
     { author
     , encryptedDelta: sign $ encodeJSON $ delta}
@@ -219,7 +218,7 @@ removeBinding roleWillBeRemoved roleId = do
         Nothing -> pure []
         Just oldBindingId -> do
           (lift2 $ findBinderRequests oldBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
-          subject <- authoringRole
+          subject <- getSubject
           delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
                         { id : roleId
                         , binding: (rol_binding originalRole)
@@ -229,7 +228,7 @@ removeBinding roleWillBeRemoved roleId = do
                         , subject
                         }
           users <- aisInRoleDelta delta
-          author <- lift2 getUserIdentifier
+          author <- getAuthor
           signedDelta <- pure $ SignedDelta
             { author
             , encryptedDelta: sign $ encodeJSON $ delta}
@@ -288,12 +287,12 @@ addRoleInstancesToContext contextId rolName rolInstances = do
       -- the transaction, too.
       users <- usersWithPerspectiveOnRoleInstance contextId rolName (head rolInstances)
       -- SYNCHRONISATION
-      subject <- authoringRole
+      subject <- getSubject
+      author <- getAuthor
       for_ roles \(PerspectRol r@{_id, universeRoleDelta}) -> do
-        pure unit
         addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
         delta <- pure $ SignedDelta
-          { author: _.author $ unwrap universeRoleDelta
+          { author
           , encryptedDelta: sign $ encodeJSON $ ContextDelta
             { id : contextId
             , roleType: rolName
@@ -321,9 +320,9 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
   -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
   -- the transaction, too.
   users <- usersWithPerspectiveOnRoleInstance contextId rolName (head rolInstances)
-  subject <- authoringRole
+  subject <- getSubject
 -- SYNCHRONISATION
-  author <- lift2 getUserIdentifier
+  author <- getAuthor
   addDelta $ DeltaInTransaction
     { users
     , delta: SignedDelta
@@ -413,8 +412,8 @@ addProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array V
 addProperty rids propertyName values = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
-    subject <- authoringRole
-    author <- lift2 getUserIdentifier
+    subject <- getSubject
+    author <- getAuthor
     for_ rids \rid -> do
       (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
       -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
@@ -455,7 +454,7 @@ removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Arra
 removeProperty rids propertyName values = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
-    subject <- authoringRole
+    subject <- getSubject
     for_ rids \rid -> do
       (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
       users <- aisInPropertyDelta rid propertyName
@@ -467,7 +466,7 @@ removeProperty rids propertyName values = case ARR.head rids of
         , values: values
         , subject
         }
-      author <- lift2 getUserIdentifier
+      author <- getAuthor
       signedDelta <- pure $ SignedDelta
         { author
         , encryptedDelta: sign $ encodeJSON $ delta}
@@ -489,7 +488,7 @@ deleteProperty :: Array RoleInstance -> EnumeratedPropertyType -> MonadPerspecti
 deleteProperty rids propertyName = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
-    subject <- authoringRole
+    subject <- getSubject
     for_ rids \rid -> do
       (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
       users <- aisInPropertyDelta rid propertyName
@@ -501,7 +500,7 @@ deleteProperty rids propertyName = case ARR.head rids of
         , values: []
         , subject
         }
-      author <- lift2 getUserIdentifier
+      author <- getAuthor
       signedDelta <- pure $ SignedDelta
         { author
         , encryptedDelta: sign $ encodeJSON $ delta}
@@ -548,5 +547,8 @@ setMe cid me = do
   saveEntiteit cid (changeContext_me ctxt me)
   (lift2 $ findRoleRequests cid (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
 
-authoringRole :: MonadPerspectivesTransaction SubjectOfAction
-authoringRole = lift $ UserType <$> gets (_.authoringRole <<< unwrap)
+getSubject :: MonadPerspectivesTransaction SubjectOfAction
+getSubject = lift $ UserType <$> gets (_.authoringRole <<< unwrap)
+
+getAuthor :: MonadPerspectivesTransaction String
+getAuthor = lift $ gets (_.author <<< unwrap)

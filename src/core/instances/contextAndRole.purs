@@ -162,7 +162,7 @@ defaultContextRecord =
   , aliases: empty
   , me: Nothing
   , actionConditionState: empty
-  , universeContextDelta: SignedDelta{author: "", encryptedDelta: ""}
+  , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord"}
   }
 
 defaultRolRecord :: RolRecord
@@ -176,11 +176,14 @@ defaultRolRecord =
   , gevuldeRollen: empty
   , occurrence: 0
   , isMe: false
-  , universeRoleDelta: SignedDelta {author: "", encryptedDelta: ""}
-  , contextDelta: SignedDelta {author: "", encryptedDelta: ""}
+  , universeRoleDelta: SignedDelta {author: "", encryptedDelta: "UniverseRoleDelta from defaultRolRecord"}
+  , contextDelta: SignedDelta {author: "", encryptedDelta: "ContextDelta from defaultRolRecord"}
   , bindingDelta: Nothing
   , propertyDeltas: empty
   }
+
+isDefaultContextDelta :: SignedDelta -> Boolean
+isDefaultContextDelta (SignedDelta {encryptedDelta}) = encryptedDelta `eq` "ContextDelta from defaultRolRecord"
 
 -- ROL
 

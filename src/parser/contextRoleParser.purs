@@ -37,6 +37,7 @@ import Data.String.CodeUnits (fromCharArray)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..), fst)
+import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
 import Foreign.Object (alter)
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType, setRol_gevuldeRollen)
@@ -45,17 +46,21 @@ import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
 import Perspectives.IndentParser (IP, ContextRoleParserMonad, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
+import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
+import Perspectives.SerializableNonEmptyArray (singleton)
+import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
 import Perspectives.Types.ObjectGetters (aspectsClosure)
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (class Show, Unit, bind, discard, flip, identity, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
-import Text.Parsing.Parser (ParseError, ParseState(..), ParserT(..), fail)
+import Text.Parsing.Parser (ParseError, ParseState(..), ParserT, fail)
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
@@ -384,6 +389,32 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
       -- rolId <- pure $ RoleInstance ((show cname) <> "$" <> localRoleName <> "_" <> (rol_padOccurrence (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
+      me <- liftAffToIP getUserIdentifier
+      universeRoleDelta <- deltaSignedByMe $ encodeJSON $ UniverseRoleDelta
+        { subject: UserInstance $ RoleInstance me
+        , id: ContextInstance $ show cname
+        , roleType: EnumeratedRoleType $ show rname
+        , roleInstances: singleton rolId
+        , deltaType: ConstructEmptyRole
+        }
+      contextDelta <- deltaSignedByMe $ encodeJSON $ ContextDelta
+        { subject: UserInstance $ RoleInstance me
+        , id: ContextInstance $ show cname
+        , roleType: EnumeratedRoleType $ show rname
+        , roleInstances: singleton rolId
+        , destinationContext: Nothing
+        , deltaType: AddRoleInstancesToContext
+        }
+      bindingDelta <- case bindng of
+        Nothing -> pure Nothing
+        Just b -> Just <$> (deltaSignedByMe $ encodeJSON $ RoleBindingDelta
+          { subject: UserInstance $ RoleInstance me
+          , id: rolId
+          , binding: bindng
+          , oldBinding: Nothing
+          , roleWillBeRemoved: false
+          , deltaType: SetBinding
+          })
       cacheRol rolId
         (PerspectRol defaultRolRecord
           { _id = rolId
@@ -392,6 +423,9 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
           , binding = bindng
           , context = ContextInstance $ show cname
           , properties = FO.fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
+          , universeRoleDelta = universeRoleDelta
+          , contextDelta = contextDelta
+          , bindingDelta = bindingDelta
           })
 
       pure $ Tuple (show rname) rolId))
@@ -413,6 +447,11 @@ cacheContext ::  ContextInstance -> PerspectContext -> IP Unit
 cacheContext contextId ctxt = do
   _ <- liftAffToIP $ cacheEntity contextId ctxt
   addContextInstance contextId ctxt
+
+deltaSignedByMe :: String -> IP SignedDelta
+deltaSignedByMe encryptedDelta = do
+  me <- liftAffToIP getUserIdentifier
+  pure $ SignedDelta {author: me, encryptedDelta}
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.
@@ -529,7 +568,14 @@ context = withRoleCounting context' where
             (publicProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "External" (block publicContextPropertyAssignment))
             (rolebindings :: List (Tuple RolName RoleInstance)) <- option Nil (indented *> (block $ roleBinding instanceName))
             (aliases :: FO.Object String) <- execStateT (traverse (collectAlias <<< fst) rolebindings) FO.empty
-
+            me <- liftAffToIP getUserIdentifier
+            universeContextDelta <- deltaSignedByMe $ encodeJSON $
+              UniverseContextDelta
+                { subject: UserInstance $ RoleInstance me
+                , id: (ContextInstance $ show instanceName)
+                , contextType: ContextType $ show typeName
+                , deltaType: ConstructEmptyContext
+              }
             -- Storing
             cacheContext (ContextInstance (show instanceName))
               (PerspectContext defaultContextRecord
@@ -539,7 +585,15 @@ context = withRoleCounting context' where
                 , buitenRol = RoleInstance $ buitenRol (show instanceName)
                 , rolInContext = collect rolebindings
                 , aliases = aliases
+                , universeContextDelta = universeContextDelta
               })
+            universeRoleDelta <- deltaSignedByMe $ encodeJSON $ UniverseRoleDelta
+              { subject: UserInstance $ RoleInstance me
+              , id: (ContextInstance $ show instanceName)
+              , roleType: EnumeratedRoleType $ show typeName <> "$External"
+              , roleInstances: singleton $ RoleInstance $ buitenRol (show instanceName)
+              , deltaType: ConstructExternalRole
+              }
             cacheRol (RoleInstance $ buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
                 { _id = RoleInstance $ buitenRol (show instanceName)
@@ -547,6 +601,7 @@ context = withRoleCounting context' where
                 , context = (ContextInstance $ show instanceName)
                 , binding = RoleInstance <<< buitenRol <$> prototype
                 , properties = FO.fromFoldable publicProps
+                , universeRoleDelta = universeRoleDelta
                 })
             pure $ RoleInstance $ buitenRol (show instanceName)
   collect :: List (Tuple RolName RoleInstance) -> FO.Object (Array RoleInstance)
@@ -610,13 +665,40 @@ definition = do
   nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
   rolId <- pure $ RoleInstance $ enclContext <> "$" <> localName <> "_" <> rol_padOccurrence (maybe 0 identity nrOfRoleOccurrences)
+  me <- liftAffToIP getUserIdentifier
+  universeRoleDelta <- deltaSignedByMe $ encodeJSON $ UniverseRoleDelta
+    { subject: UserInstance $ RoleInstance me
+    , id: ContextInstance enclContext
+    , roleType: EnumeratedRoleType (show prop)
+    , roleInstances: singleton rolId
+    , deltaType: ConstructEmptyRole
+    }
+  contextDelta <- deltaSignedByMe $ encodeJSON $ ContextDelta
+    { subject: UserInstance $ RoleInstance me
+    , id: ContextInstance enclContext
+    , roleType: EnumeratedRoleType (show prop)
+    , roleInstances: singleton rolId
+    , destinationContext: Nothing
+    , deltaType: AddRoleInstancesToContext
+    }
+  bindingDelta <- Just <$> (deltaSignedByMe $ encodeJSON $ RoleBindingDelta
+      { subject: UserInstance $ RoleInstance me
+      , id: rolId
+      , binding: Just bindng
+      , oldBinding: Nothing
+      , roleWillBeRemoved: false
+      , deltaType: SetBinding
+      })
   cacheRol rolId
     (PerspectRol defaultRolRecord
       { _id = rolId
       , occurrence = maybe 0 identity nrOfRoleOccurrences
       , pspType = EnumeratedRoleType (show prop)
-      , binding = Just $ bindng
+      , binding = Just bindng
       , context = ContextInstance enclContext
+      , universeRoleDelta = universeRoleDelta
+      , contextDelta = contextDelta
+      , bindingDelta = bindingDelta
       })
   pure rolId
 

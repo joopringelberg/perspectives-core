@@ -24,7 +24,7 @@ module Perspectives.Sync.TransactionForPeer where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-import Data.Array (cons)
+import Data.Array (snoc)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
@@ -59,7 +59,7 @@ instance decodeTransactie :: Decode TransactionForPeer where
   decode = genericDecode defaultOptions
 
 addToTransactionForPeer :: SignedDelta -> TransactionForPeer -> TransactionForPeer
-addToTransactionForPeer d (TransactionForPeer r@{deltas}) = TransactionForPeer r {deltas = cons d deltas}
+addToTransactionForPeer d (TransactionForPeer r@{deltas}) = TransactionForPeer r {deltas = snoc deltas d}
 
 transactieID :: TransactionForPeer -> String
 transactieID (TransactionForPeer{author, timeStamp}) = author <> "_" <> show timeStamp

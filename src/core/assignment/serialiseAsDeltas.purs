@@ -92,7 +92,7 @@ serialisedAsDeltasFor_ cid userId userType = do
   PerspectContext{universeContextDelta, pspType, rolInContext} <- lift2 $ getPerspectContext cid
   addDelta $ DeltaInTransaction {users: [userId], delta: universeContextDelta}
   -- Serialise the external role.
-  serialiseRoleInstance cid (externalRoleType pspType) (externalRole cid)
+  serialiseRoleInstance cid (externalRoleType pspType) false (externalRole cid) 
   -- Now for each role, decide if the user may see it.
   -- If so, add a UniverseRoleDelta and a ContextDelta.
   forWithIndex_ rolInContext \roleTypeId roleInstances' -> do
@@ -102,15 +102,16 @@ serialisedAsDeltasFor_ cid userId userType = do
         case fromArray roleInstances' of
           Nothing -> pure unit
           Just roleInstances -> do
-            for_ roleInstances (serialiseRoleInstance cid (EnumeratedRoleType roleTypeId))
+            for_ roleInstances (serialiseRoleInstance cid (EnumeratedRoleType roleTypeId) true)
       else pure unit
 
   where
-  serialiseRoleInstance :: ContextInstance -> EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction Unit
-  serialiseRoleInstance cid' roleTypeId roleInstance = do
+  serialiseRoleInstance :: ContextInstance -> EnumeratedRoleType -> Boolean -> RoleInstance -> MonadPerspectivesTransaction Unit
+  serialiseRoleInstance cid' roleTypeId isNotExternal roleInstance = do
     PerspectRol{binding, properties, universeRoleDelta, contextDelta, bindingDelta, propertyDeltas} <- lift2 $ getPerspectRol roleInstance
     addDelta $ DeltaInTransaction { users: [userId], delta: universeRoleDelta}
-    addDelta  $ DeltaInTransaction { users: [userId], delta: contextDelta }
+    -- Not for external roles!
+    when isNotExternal (addDelta  $ DeltaInTransaction { users: [userId], delta: contextDelta })
     case binding of
       Nothing -> pure unit
       Just b -> do

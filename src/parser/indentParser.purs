@@ -92,7 +92,7 @@ runIndentParser s p = evalStateT (runIndent (runParserT s p)) initialContextRole
 runIndentParser' :: forall a. String -> IP a -> MonadPerspectives (Tuple (Either ParseError a) ContextRoleParserState)
 runIndentParser' s p = runStateT (runIndent (runParserT s p)) initialContextRoleParserMonadState
 
--- | As convienience, to lift functions on Aff all the way up:
+-- | As convienience, to lift functions on MonadPerspectives all the way up:
 liftAffToIP :: forall a. MonadPerspectives a -> IP a
 liftAffToIP = lift <<< lift <<< lift
 

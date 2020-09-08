@@ -49,7 +49,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Assignment.Update (removeBinding, removeRoleInstancesFromContext, authoringRole)
+import Perspectives.Assignment.Update (getAuthor, getSubject, removeBinding, removeRoleInstancesFromContext)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, aisInRoleDelta, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType)
@@ -59,7 +59,6 @@ import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindi
 import Perspectives.Identifiers (deconstructBuitenRol, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
-import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
@@ -78,7 +77,7 @@ import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>=), (<>), e
 saveContextInstance :: Updater ContextInstance
 saveContextInstance id = do
   (ctxt :: PerspectContext) <- lift2 $ saveEntiteit id
-  subject <- authoringRole
+  subject <- getSubject
   forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances' ->
     case fromArray instances' of
       Nothing -> pure unit
@@ -122,8 +121,8 @@ removeContextInstance id = do
   -- PERSISTENCE
   (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
   -- SYNCHRONISATION
-  subject <- authoringRole
-  me <- lift2 getUserIdentifier
+  subject <- getSubject
+  me <- getAuthor
   addDelta $ DeltaInTransaction
     { users
     , delta: SignedDelta
