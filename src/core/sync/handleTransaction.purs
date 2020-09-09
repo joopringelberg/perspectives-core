@@ -53,12 +53,13 @@ import Perspectives.SerializableNonEmptyArray (toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, map, pure, show, unit, void, when, ($), (+), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, discard, pure, show, unit, void, when, ($), (+), (<<<), (<>), (>>=))
 
 executeContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
 executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext} ) = do
   log (show deltaType <> " to/from " <> show contextId <> " and " <> show roleInstances)
   case deltaType of
+    -- The subject must be allowed to change the role: they must have a perspective on it that includes the verb Change.
     AddRoleInstancesToContext -> addRoleInstancesToContext contextId roleType (unwrap roleInstances)
     MoveRoleInstancesToAnotherContext -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
 
@@ -128,27 +129,24 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
 -- | Execute all Deltas in a run that does not distrubute.
 executeTransaction :: TransactionForPeer -> MonadPerspectives Unit
 executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectivesTransaction'
-  false
-  (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
-  (do
-    actions <- pure $ map f deltas
-    for_ actions (\g -> g unit)))
+    false
+    (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+    (for_ deltas f))
   where
-    f :: SignedDelta -> (Unit -> MonadPerspectivesTransaction Unit)
+    f :: SignedDelta -> MonadPerspectivesTransaction Unit
     f s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta
       where
-        executeDelta :: Maybe String -> (Unit -> MonadPerspectivesTransaction Unit)
+        executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
         -- For now, we fail silently on deltas that cannot be authenticated.
-        executeDelta Nothing = \_ -> pure unit
-        -- executeDelta (Just stringifiedDelta) = case runExcept $ decodeJSON stringifiedDelta of
+        executeDelta Nothing = pure unit
         executeDelta (Just stringifiedDelta) = case runExcept $ decodeJSON stringifiedDelta of
-          Right d1 -> \_ -> executeRolePropertyDelta d1
+          Right d1 -> executeRolePropertyDelta d1
           Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-            Right d2 -> \_ -> executeRoleBindingDelta d2
+            Right d2 -> executeRoleBindingDelta d2
             Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-              Right d3 -> \_ -> executeContextDelta d3
+              Right d3 -> executeContextDelta d3
               Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                Right d4 -> \_ -> executeUniverseRoleDelta d4 s
+                Right d4 -> executeUniverseRoleDelta d4 s
                 Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                  Right d5 -> \_ -> executeUniverseContextDelta d5
-                  Left _ -> \_ -> log ("Failing to parse and execute: " <> stringifiedDelta)
+                  Right d5 -> executeUniverseContextDelta d5
+                  Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta)
