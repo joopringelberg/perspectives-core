@@ -184,6 +184,7 @@ removeRoleInstance_ :: RoleInstance -> WriterT (Array RoleInstance) MonadPerspec
 removeRoleInstance_ roleId = do
   originalRole@(PerspectRol{gevuldeRollen, binding}) <- lift $ lift2 $ (getPerspectRol roleId)
   -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
+  -- TODO. Het kan zijn dat een externe rol niet meer gebonden is. In dat geval moet de hele context opgeruimd worden!
   forWithIndex_ gevuldeRollen \_ filledRollen ->
     for_ filledRollen \filledRolId -> do
       (lift $ removeBinding false filledRolId) >>= tell

@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars 2019
+-- Copyright Joop Ringelberg and Cor Baars 2019, 2020
 domain: SimpleChat
   use: sys for model:System
   use: cdb for model:Couchdb

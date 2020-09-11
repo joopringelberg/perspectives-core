@@ -68,7 +68,6 @@ import Perspectives.SaveUserData (removeAllRoleInstances, removeRoleInstance)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Unsafe.Coerce (unsafeCoerce)
 
--- | Compile the action to an Updater. Cache for later use.
 compileBotAction :: ActionType -> MP (Tuple LHS (Updater ContextInstance))
 compileBotAction actionType = do
   case retrieveAction actionType of
@@ -77,7 +76,7 @@ compileBotAction actionType = do
       (action :: Action) <- getPerspectType actionType
       eff <- effect action
       subj <- pure $ subject action
-      (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff >>= pure <<< withAuthoringRole subj 
+      (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff >>= pure <<< withAuthoringRole subj
       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
       updater <- pure $ ruleRunner lhs effectFullFunction
       void $ pure $ cacheAction actionType (Tuple lhs updater)

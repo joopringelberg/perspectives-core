@@ -250,12 +250,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           case result of
             Left e -> lift2 $ sendResponse (Error corrId (show e)) setter
             Right ids -> lift2 $ sendResponse (Result corrId (unwrap <$> ids)) setter
+    -- TODO. Dit is overbodig. Contexten verdwijnen alleen en automatisch als de laatste binding van hun buitenrol verdwijnt.
     Api.DeleteContext -> do
       void $ runMonadPerspectivesTransaction authoringRole $ removeContextInstance (ContextInstance subject)
       sendResponse (Result corrId []) setter
     -- {request: "RemoveRol", subject: contextID, predicate: rolName, object: rolID}
     Api.RemoveRol -> do
-        void $ runMonadPerspectivesTransaction authoringRole $ removeRoleInstance (RoleInstance object)
+        void $ runMonadPerspectivesTransaction authoringRole $ removeRoleInstance (RoleInstance object) -- hier kan ik predicate meegeven als type van de rol die verwijderd wordt. Dat kan een berekende zijn.
         sendResponse (Result corrId []) setter
     -- TODO: DeleteRol
     Api.CreateRol -> do

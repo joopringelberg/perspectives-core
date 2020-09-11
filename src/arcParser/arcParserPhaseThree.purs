@@ -441,6 +441,8 @@ qualifyReturnsClause pos qfd = pure qfd
 -- |  * the type of value that is returned from a computed role
 -- | This means we can look for the qualified version of a local name using the functions in
 -- | Perspectives.Types.ObjectGetters, as long as we make sure the model under construction is in the DomainCache.
+-- | Compile the action to an Updater. Cache for later use.
+-- TODO: Controleer of het type argument van de assignment operatoren wel hetzelfde zijn als het type van het object van de Actie.
 compileRules :: PhaseThree Unit
 compileRules = do
   df@{_id} <- lift $ gets _.dfr
@@ -510,6 +512,7 @@ compileRules = do
             -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
             -- The assignment functions arbitrarily return the currentContext. Hence,
             -- we declare the functions to be both functional and mandatory.
+            -- TODO: Controleer of de assignment operators wel corresponderen met de toegekende Verbs.
             describeAssignmentStatement :: Domain -> Assignment -> PhaseThree QueryFunctionDescription
             describeAssignmentStatement currentDomain ass = case ass of
               Remove {roleExpression} -> do
