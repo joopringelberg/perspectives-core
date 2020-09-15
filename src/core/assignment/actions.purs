@@ -83,7 +83,7 @@ compileBotAction actionType = do
       pure $ Tuple lhs updater
 
   where
-    -- | Actual effectfull function for which we track dependencies. If one of them changes,
+    -- | Actual effectful function for which we track dependencies. If one of them changes,
     -- | the function is executed again.
     ruleRunner :: (ContextInstance ~~> Value) ->
       (Updater ContextInstance) ->

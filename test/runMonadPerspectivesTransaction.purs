@@ -12,9 +12,8 @@ import Perspectives.Instances.ObjectGetters (getProperty, getEnumeratedRoleInsta
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
-import Test.Perspectives.Utils (clearUserDatabase, runP, withModel', withSystem)
+import Test.Perspectives.Utils (clearUserDatabase, runP, withModel', withSystem, runMonadPerspectivesTransaction)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 

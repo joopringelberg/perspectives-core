@@ -201,6 +201,7 @@ handleNewPeer_ me roleInstance = do
     else pure unit
 
 -- | Removes the binding R of the rol, if any.
+-- | If the binding is an external role, checks if it should be removed.
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
 -- | Modifies the Role instance.
 -- | If the the role instance has in fact no binding before the operation, this is a no-op without effect.
@@ -251,6 +252,9 @@ removeBinding roleWillBeRemoved roleId = do
         (Just oldBindingId) -> do
           -- Remove this roleinstance as a binding role from the old binding.
           (oldBinding :: PerspectRol) <- lift2 $ getPerspectEntiteit oldBindingId
+          -- If, after removing the binder, no binders are left AND the oldBinding is an external role,
+          -- remove the context!
+          
           saveEntiteit oldBindingId (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
       pure users'
     else pure []

@@ -255,6 +255,12 @@ compileUnaryStep currentDomain st@(Binds pos s) = do
     RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator BindsF) descriptionOfs (VDOM PBool Nothing) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
 
+compileUnaryStep currentDomain st@(BoundBy pos s) = do
+  descriptionOfs <- compileStep currentDomain s
+  case range descriptionOfs of
+    RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator BoundByF) descriptionOfs (VDOM PBool Nothing) True True
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+
 compileUnaryStep currentDomain st@(Available pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of

@@ -47,7 +47,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, boundBy, context, contextType, externalRole, getEnumeratedRoleInstances, getRoleBinders, makeBoolean)
+import Perspectives.Instances.ObjectGetters (binding, binds, boundBy, context, contextType, externalRole, getEnumeratedRoleInstances, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
@@ -67,7 +67,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, specialisesRoleType)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||))
+import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||), (>>>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -256,6 +256,10 @@ compileFunction (UQD _ (UnaryCombinator BindsF) f1 _ _ _) = do
   f1' <- compileFunction f1
   pure (unsafeCoerce $ boundBy (unsafeCoerce f1'))
 
+compileFunction (UQD _ (UnaryCombinator BoundByF) f1 _ _ _) = do
+  f1' <- compileFunction f1
+  pure (unsafeCoerce $ binds (unsafeCoerce f1'))
+
 compileFunction (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) = do
   f1' <- compileFunction f1
   pure (unsafeCoerce $ available_ f1')
@@ -372,7 +376,17 @@ getRoleFunction id = do
     <|>
     do
       (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType ident)
-      unsafeCoerce $ RC.calculation p >>= compileFunction)
+      -- TODO: introduceer een nieuwe scope en push daarin de waarde van de context!
+      -- unsafeCoerce $ RC.calculation p >>= compileFunction >>= pure <<< withFrame_ >>= pure <<< pushCurrentContext
+      unsafeCoerce $ RC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentContext)
+  )
+  where
+    pushCurrentContext :: (String ~~> String) -> (String ~~> String)
+    pushCurrentContext f contextId = do
+      -- save contextId in it under the name currentcontext
+      lift $ lift (addBinding "currentcontext" [contextId])
+      -- apply f to contextId
+      f contextId
 
 getRoleInstances :: RoleType -> (ContextInstance ~~> RoleInstance)
 getRoleInstances (ENR rt) c = do
@@ -427,8 +441,15 @@ getPropertyFunction id = do
     <|>
     do
       (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType ident)
-      unsafeCoerce $ PC.calculation p >>= compileFunction
+      unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentRole)
       )
+  where
+    pushCurrentRole :: (String ~~> String) -> (String ~~> String)
+    pushCurrentRole f roleId = do
+      -- save contextId in it under the name currentrole
+      lift $ lift (addBinding "currentrole" [roleId])
+      -- apply f to roleId
+      f roleId
 
 -- | From a PropertyType, retrieve or construct a function to get values for that Property from a Role instance.
 -- | Caches the result.

@@ -54,6 +54,7 @@ instance containsPrefixesUnaryStep :: ContainsPrefixes UnaryStep where
   expandPrefix (LogicalNot pos s) = LogicalNot pos <$> expandPrefix s
   expandPrefix (Exists pos s) = Exists pos <$> expandPrefix s
   expandPrefix (Binds pos s) = Binds pos <$> expandPrefix s
+  expandPrefix (BoundBy pos s) = BoundBy pos <$> expandPrefix s
   expandPrefix (Available pos s) = Available pos <$> expandPrefix s
 
 instance containsPrefixesLetStep :: ContainsPrefixes LetStep where

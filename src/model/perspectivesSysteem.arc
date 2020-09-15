@@ -114,7 +114,8 @@ domain: System
       property: IWantToInviteAnUnconnectedUser (not mandatory, functional, Boolean)
       property: SerialisedInvitation (not mandatory, functional, String)
       property: Message (not mandatory, functional, String)
-    user: Guest = sys:Me
+    user: Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
+    --user: Guest = sys:Me
       perspective on: Invitee
     user: Invitee (mandatory, functional) filledBy: Guest
       perspective on: Inviter
@@ -129,6 +130,7 @@ domain: System
           callEffect ser:AddConnectedPartnerToChannel( object, PrivateChannel >> binding >> context )
     bot: for Guest
       perspective on: PrivateChannel
+        -- meer conditie nodig: dit vuurt als we een chat verwijderen.
         if exists PrivateChannel then
           callEffect ser:CreateCopyOfChannelDatabase( PrivateChannel >> ChannelDatabaseName )
     user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator

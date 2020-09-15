@@ -18,15 +18,14 @@ import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
 import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
 import Perspectives.User (getHost, getPort)
 import Perspectives.Utilities (prettyPrint)
-import Test.Perspectives.Utils (clearUserDatabase, runP, withModel', withSystem)
+import Test.Perspectives.Utils (clearUserDatabase, runP, withModel', withSystem, runMonadPerspectivesTransaction)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -108,7 +107,7 @@ theSuite = suite "SerialisedAsDeltas" do
       --   Just (RoleBindingDelta{id, sequenceNumber}) -> liftAff $ assert "There should finally be a RoleBindingDelta on role model:User$MyTestCase$Other_0001 and its sequenceNumber should be 5" (id ==
       --   (RoleInstance "model:User$MyTestCase$Other_0001") && sequenceNumber == 5)
     userType <- roleType_ joop
-    getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" userType
+    getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ENR userType)
     channel <- joop ##>> getChannel
     deleteDatabase (unwrap channel)
     clearUserDatabase

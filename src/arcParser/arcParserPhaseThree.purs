@@ -385,7 +385,13 @@ compileExpressions = do
         userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (CR _id))
         -- Now for each userType get the properties relevant for the Perspective.
         userProps <- fromFoldable <$> traverse getRelevantProperties userTypes
-        descr <- compileAndDistributeStep userProps (CDOM $ ST context) stp
+        -- descr <- compileAndDistributeStep userProps (CDOM $ ST context) stp
+        dom <- pure (CDOM $ ST context)
+        descr' <- withFrame do
+          addBinding "currentcontext" (SQD dom (QF.VariableLookup "currentcontext") dom True True)
+          compileStep dom stp
+        descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
+        setInvertedQueries userProps descr
         pure $ CalculatedRole (cr {calculation = Q descr})
         where
           getRelevantProperties :: RoleType -> PhaseThree (Tuple RoleType RelevantProperties)
@@ -398,7 +404,13 @@ compileExpressions = do
         (EnumeratedRole{context}) <- lift $ lift $ getEnumeratedRole role
         userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnProperty (CP _id))
         userProps <- pure $ fromFoldable ((\u -> Tuple u (Properties [])) <$> userTypes)
-        descr <- compileAndDistributeStep userProps (RDOM $ ST role) stp
+        -- descr <- compileAndDistributeStep userProps (RDOM $ ST role) stp
+        dom <- pure (RDOM $ ST role)
+        descr' <- withFrame do
+          addBinding "currentrole" (SQD dom (QF.VariableLookup "currentrole") dom True True)
+          compileStep dom stp
+        descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
+        setInvertedQueries userProps descr
         pure $ CalculatedProperty (cr {calculation = Q descr})
 
 -- compileArg :: Array EnumeratedRoleType -> Domain -> Calculation -> PhaseThree Calculation
@@ -417,11 +429,11 @@ compileExpressions = do
 -- | also modify the DomeinFileRecord, but just the CalculatedRole, CalculatedProperty and Action definitions in it.
 -- | Hence we do not risk to modify a definition that will be overwritten soon after without including that modification.
 compileAndDistributeStep :: Map RoleType RelevantProperties -> Domain -> Step -> PhaseThree QueryFunctionDescription
-compileAndDistributeStep userTypes dom s = do
-  descr <- compileStep dom s
-  descr' <- traverseQfd (qualifyReturnsClause (startOf s)) descr
-  setInvertedQueries userTypes descr'
-  pure descr'
+compileAndDistributeStep userProps dom stp = do
+  descr' <- compileStep dom stp
+  descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
+  setInvertedQueries userProps descr
+  pure descr
 
 qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
 qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = do

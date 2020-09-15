@@ -4,14 +4,15 @@ import Prelude
 
 import Data.Either (Either(..))
 import Effect.Aff (Aff, throwError, try)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser)
 import Perspectives.User (getCouchdbBaseURL)
@@ -110,3 +111,10 @@ withSystem = withModel (DomeinFileId "model:System")
 
 withSimpleChat :: forall a. MonadPerspectives a -> MonadPerspectives a
 withSimpleChat = withModel (DomeinFileId "model:SimpleChat")
+
+-- | Runs an update function (a function in MonadPerspectivesTransaction that produces deltas),
+-- | runs actions as long as they are triggered, sends deltas to other participants and re-runs active queries
+runMonadPerspectivesTransaction :: forall o.
+  MonadPerspectivesTransaction o
+  -> (MonadPerspectives (Array o))
+runMonadPerspectivesTransaction a = runMonadPerspectivesTransaction' true (ENR $ EnumeratedRoleType "model:Perspectives$PerspectivesSystem$User") a

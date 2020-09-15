@@ -32,18 +32,19 @@ module Perspectives.SaveUserData
   ( saveContextInstance
   , removeContextInstance
   , removeRoleInstance
-  , removeAllRoleInstances)
+  , removeAllRoleInstances
+  , removeContextIfUnbound)
 
   where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.State (lift)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
-import Data.Array (deleteAt, findIndex, index, modifyAt, nub)
+import Data.Array (deleteAt, findIndex, index, modifyAt, nub, cons)
 import Data.Array.NonEmpty (elemIndex, fromArray, head, singleton, filter)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust, isJust)
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
 import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
 import Foreign.Generic (encodeJSON)
@@ -53,13 +54,13 @@ import Perspectives.Assignment.Update (getAuthor, getSubject, removeBinding, rem
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, aisInRoleDelta, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, Updater, (##=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests)
-import Perspectives.Identifiers (deconstructBuitenRol, isExternalRole)
+import Perspectives.Identifiers (deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
-import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveEntiteit)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, getEnumeratedRoleInstances)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
@@ -109,7 +110,14 @@ saveContextInstance id = do
 iedereRolInContext :: PerspectContext -> Array RoleInstance
 iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 
--- | Removes the ContextInstance both from the cache and from the database and adds it to the Transaction.
+removeContextIfUnbound :: Updater RoleInstance
+removeContextIfUnbound roleInstance@(RoleInstance rid) = do
+  mbinder <- lift (lift (roleInstance ##> allRoleBinders))
+  case mbinder of
+    Nothing -> removeContextInstance (ContextInstance $ deconstructBuitenRol rid)
+    otherwise -> pure unit
+
+-- | Removes the ContextInstance both from the cache and from the database.
 -- | This function is complete w.r.t. the five responsibilities (ignoring CURRENTUSER).
 removeContextInstance :: Updater ContextInstance
 removeContextInstance id = do
@@ -119,7 +127,7 @@ removeContextInstance id = do
     forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances' -> remove (EnumeratedRoleType roleName) instances'
     remove (EnumeratedRoleType ((unwrap pspType) <> "$External")) [(context_buitenRol ctxt)]
   -- PERSISTENCE
-  (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
+  _ <- scheduleContextRemoval id
   -- SYNCHRONISATION
   subject <- getSubject
   me <- getAuthor
@@ -193,21 +201,18 @@ removeRoleInstance_ roleId = do
     then (lift $ removeBinding true roleId) >>= tell
     else pure unit
   -- Remove from couchdb, remove from the cache.
-  void $ lift $ lift2 $ (removeEntiteit roleId :: MonadPerspectives PerspectRol)
+  void $ lift $ (scheduleRoleRemoval roleId)
 
--- | If the role is an external role, removes the context instead.
 -- | Calls removeBinding for the role instance prior to removing it.
 -- | Calls removeBinding on all role instances that have this role as their binding.
 -- | Calls removeRoleInstancesFromContext.
 -- | This function is complete w.r.t. the five responsibilities.
 -- | The opposite of this function creates a role instance first and then adds it to a context: [createAndAddRoleInstance](Perspectives.Instances.Builders.html#t:createAndAddRoleInstance).
 removeRoleInstance :: RoleInstance -> MonadPerspectivesTransaction Unit
-removeRoleInstance roleId@(RoleInstance id) = if isExternalRole id
-  then removeContextInstance $ ContextInstance (deconstructBuitenRol id)
-  else do
-    PerspectRol{pspType, context} <- lift2 $ (getPerspectRol roleId)
-    removeRoleInstancesFromContext context pspType (singleton roleId)
-    void $ runWriterT $ removeRoleInstance_ roleId
+removeRoleInstance roleId@(RoleInstance id) = do
+  PerspectRol{pspType, context} <- lift2 $ (getPerspectRol roleId)
+  removeRoleInstancesFromContext context pspType (singleton roleId)
+  void $ runWriterT $ removeRoleInstance_ roleId
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
@@ -221,3 +226,9 @@ removeAllRoleInstances et cid = do
     Just instances' -> do
       removeRoleInstancesFromContext cid et instances'
       void $ runWriterT $ for_ instances removeRoleInstance_
+
+scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
+scheduleRoleRemoval id = lift $ AA.modify (over Transaction \t@{rolesToBeRemoved} -> t {rolesToBeRemoved = cons id rolesToBeRemoved})
+
+scheduleContextRemoval :: ContextInstance -> MonadPerspectivesTransaction Unit
+scheduleContextRemoval id = lift $ AA.modify (over Transaction \t@{contextsToBeRemoved} -> t {contextsToBeRemoved = cons id contextsToBeRemoved})

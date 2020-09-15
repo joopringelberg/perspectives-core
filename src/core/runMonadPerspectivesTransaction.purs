@@ -28,7 +28,7 @@ import Data.Array.NonEmpty (head, toArray)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
 import Foreign.Object (empty)
@@ -42,14 +42,16 @@ import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
+import Perspectives.Identifiers (hasLocalName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
-import Perspectives.Persistent (getDomeinFile)
+import Perspectives.Persistent (getDomeinFile, removeEntiteit)
 import Perspectives.PerspectivesState (publicRepository)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getRoleFunction)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (actionsClosure_, isAutomatic, specialisesRoleType_)
@@ -78,7 +80,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
       -- 2. Now run actions, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
-      (ft@(Transaction{correlationIdentifiers}) :: Transaction) <- lift AA.get >>= runActions
+      (ft@(Transaction{correlationIdentifiers, contextsToBeRemoved, rolesToBeRemoved}) :: Transaction) <- lift AA.get >>= runActions
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then lift $ lift $ distributeTransaction ft else pure unit
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
@@ -90,6 +92,9 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
           (Just {runner}) -> do
             -- logShow corrId
             runner unit
+      -- Definitively remove instances
+      lift2 $ for_ contextsToBeRemoved removeEntiteit
+      lift2 $ for_ rolesToBeRemoved removeEntiteit
       pure r
 
 -- | Run and discard the transaction.
@@ -128,20 +133,36 @@ runActions t = do
     else pure <<< (<>) t =<< runActions nt
 
 getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
-getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
-  mmyType <- lift2 (head contextInstances ##> getMyType)
-  -- mmyType <- lift2 (head contextInstances ##> getMe >=> OG.roleType)
+getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = join <$> for (toArray contextInstances) \contextInstance -> do
+  (mmyType :: Maybe RoleType) <- lift2 (contextInstance ##> getMyType)
   case mmyType of
     Nothing -> pure []
-    Just myType -> do
-      -- myType should be equal to or a specialisation of one of the userTypes.
-      -- TODO. Optimalisatie: stop bij het eerste type. Gebruik een state?
-      r <- lift2 $ filterA (\userType -> myType `specialisesRoleType_` userType) userTypes
+    Just (CR myType) -> if isGuestRole myType
+      then do
+        mmguest <- lift2 (contextInstance ##> getCalculatedRoleInstances myType)
+        case mmguest of
+          -- If the Guest role is not filled, don't execute bots on its behalf!
+          Nothing -> pure []
+          otherwise -> do
+            (automaticActions :: Array ActionType) <- lift2 (CR myType ###= filter actionsClosure_ isAutomatic)
+            pure $ (ActionInstance contextInstance) <$> automaticActions
+      else do
+        r <- lift2 $ filterA (\userType -> (CR myType) `specialisesRoleType_` userType) userTypes
+        if not $ null r
+          then do
+            (automaticActions :: Array ActionType) <- lift2 (CR myType ###= filter actionsClosure_ isAutomatic)
+            pure $ (ActionInstance contextInstance) <$> automaticActions
+          else pure []
+    Just (ENR myType) -> do
+      r <- lift2 $ filterA (\userType -> (ENR myType) `specialisesRoleType_` userType) userTypes
       if not $ null r
         then do
-          (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure_ isAutomatic)
-          pure $ join $ ((\affectedContext -> (ActionInstance affectedContext) <$> automaticActions) <$> toArray contextInstances)
+          (automaticActions :: Array ActionType) <- lift2 (ENR myType ###= filter actionsClosure_ isAutomatic)
+          pure $ (ActionInstance contextInstance) <$> automaticActions
         else pure []
+  where
+    isGuestRole :: CalculatedRoleType -> Boolean
+    isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift

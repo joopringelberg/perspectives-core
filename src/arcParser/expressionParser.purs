@@ -137,6 +137,8 @@ unaryStep = try
   <|>
   Unary <$> (Binds <$> getPosition <*> (reserved "binds" *> (defer \_ -> step)))
   <|>
+  Unary <$> (BoundBy <$> getPosition <*> (reserved "boundBy" *> (defer \_ -> step)))
+  <|>
   Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step))))
   <?> "not <expr>, exists <step>, binds <step> or available <step>."
 
@@ -222,6 +224,7 @@ startOf stp = case stp of
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
     startOfUnary (Binds p _) = p
+    startOfUnary (BoundBy p _) = p
     startOfUnary (Available p _) = p
 
 endOf :: Step -> ArcPosition
@@ -254,6 +257,7 @@ endOf stp = case stp of
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}
     endOfUnary (Exists (ArcPosition{line, column}) step') = endOf step'
     endOfUnary (Binds (ArcPosition{line, column}) step') = endOf step'
+    endOfUnary (BoundBy (ArcPosition{line, column}) step') = endOf step'
     endOfUnary (Available (ArcPosition{line, column}) step') = endOf step'
 
     col_ :: ArcPosition -> Int

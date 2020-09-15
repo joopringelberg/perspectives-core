@@ -44,6 +44,7 @@ modelRegex = unsafeRegex "^model:(\\w*)$" noFlags
 isModelName :: String -> Boolean
 isModelName s = test modelRegex s
 
+-- | From a well-formed identifier of a ContextInstance, construct the identifier of its External Role.
 buitenRol :: String -> String
 buitenRol s = if isModelName s
   then s <> "$_External"
