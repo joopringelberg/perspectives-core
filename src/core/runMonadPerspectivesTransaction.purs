@@ -24,7 +24,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
 import Data.Array (filterA, null, sort)
-import Data.Array.NonEmpty (head, toArray)
+import Data.Array.NonEmpty (toArray)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
@@ -50,7 +50,7 @@ import Perspectives.Instances.ObjectGetters (getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getDomeinFile, removeEntiteit)
 import Perspectives.PerspectivesState (publicRepository)
-import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getRoleFunction)
+import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
@@ -84,6 +84,9 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then lift $ lift $ distributeTransaction ft else pure unit
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
+      -- Definitively remove instances
+      lift2 $ for_ contextsToBeRemoved removeEntiteit
+      lift2 $ for_ rolesToBeRemoved removeEntiteit
       -- log "==========RUNNING EFFECTS============"
       lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do
         me <- pure $ lookupActiveSupportedEffect corrId
@@ -92,9 +95,6 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
           (Just {runner}) -> do
             -- logShow corrId
             runner unit
-      -- Definitively remove instances
-      lift2 $ for_ contextsToBeRemoved removeEntiteit
-      lift2 $ for_ rolesToBeRemoved removeEntiteit
       pure r
 
 -- | Run and discard the transaction.
