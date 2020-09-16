@@ -117,12 +117,18 @@ unregisterSupportedEffect corrId = do
 findDependencies :: Assumption -> MP (Maybe (Array CorrelationIdentifier))
 findDependencies a@(Tuple resource tpe) = do
   r <- queryAssumptionRegister
-  case lookup resource r of
-    -- The resource "model:System$AnyContext" serves as a wildcard.
-    Nothing -> case lookup "model:System$AnyContext" r of
+  (wildCardIdentifiers :: Maybe (Array CorrelationIdentifier)) <- case lookup "model:System$AnyContext" r of
       Nothing -> pure Nothing
       Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
-    Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
+
+  case lookup resource r of
+    -- The resource "model:System$AnyContext" serves as a wildcard.
+    Nothing -> pure wildCardIdentifiers
+    Just (typesForResource :: Object (Array CorrelationIdentifier)) -> case lookup tpe typesForResource of
+      Nothing -> pure wildCardIdentifiers
+      Just resourceIdentifiers -> case wildCardIdentifiers of
+        Nothing -> pure $ Just resourceIdentifiers
+        Just x -> pure $ Just (x <> resourceIdentifiers)
 
 findResourceDependencies :: String -> MP (Array CorrelationIdentifier)
 findResourceDependencies resource = do
