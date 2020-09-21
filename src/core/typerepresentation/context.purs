@@ -21,7 +21,6 @@
 
 module Perspectives.Representation.Context where
 
-import Data.Array (cons, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
@@ -30,49 +29,10 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType)
-import Prelude (class Eq, class Show, map, (<<<), (<>), (==), (<$>), ($))
-
------------------------------------------------------------
--- CONTEXT TYPE CLASS
------------------------------------------------------------
-class ContextClass c where
-  contextAspects :: c -> Array ContextType
-  defaultPrototype :: c -> Maybe ContextInstance
-  roleInContext :: c -> Array RoleType
-  contextRole :: c -> Array RoleType
-  externalRole :: c -> EnumeratedRoleType
-  userRole :: c -> Array RoleType
-  actions :: c -> Array ActionType
-  aspects :: c -> Array ContextType
-  nestedContexts :: c -> Array ContextType
-  position :: c -> ArcPosition
-  roles :: c -> Array RoleType
-  contextADT :: c -> ADT ContextType
-  -- The product of the Context and its direct Aspects.
-  contextAspectsADT :: c -> ADT ContextType
-
-instance contextContextClass :: ContextClass Context where
-  contextAspects = _.contextAspects <<< unwrap
-  defaultPrototype = _.defaultPrototype <<< unwrap
-  roleInContext = _.rolInContext <<< unwrap
-  contextRole = _.contextRol <<< unwrap
-  externalRole (Context{_id}) = EnumeratedRoleType ((unwrap _id) <> "$External")
-  userRole = _.gebruikerRol <<< unwrap
-  actions = _.actions <<< unwrap
-  aspects = _.contextAspects <<< unwrap
-  nestedContexts = _.nestedContexts <<< unwrap
-  position = _.pos <<< unwrap
-  roles r = roleInContext r <> contextRole r <> userRole r
-  contextADT = ST <<< _._id <<< unwrap
-  contextAspectsADT c@(Context{contextAspects}) = let
-    aspects = ST <$> contextAspects in
-      if null aspects
-        then ST $ identifier c
-        else PROD (cons (ST $ identifier c) aspects)
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), RoleType)
+import Prelude (class Eq, class Show, map, (<<<), (==))
 
 -----------------------------------------------------------
 -- CONTEXT

@@ -84,7 +84,7 @@ import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
@@ -98,7 +98,6 @@ data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | Let LetSte
 data SimpleStep =
   ArcIdentifier ArcPosition String
   | Value ArcPosition Range String
-  | CreateContext ArcPosition String
   | CreateEnumeratedRole ArcPosition String
   | Binding ArcPosition
   | Binder ArcPosition String
@@ -159,6 +158,8 @@ type WithTextRange f = {start :: ArcPosition, end :: ArcPosition | f}
 data Assignment =
 	Remove (WithTextRange (roleExpression :: Step))
 	| CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
+  | CreateContext (WithTextRange (contextTypeIdentifier :: String, roleTypeIdentifier :: String, contextExpression :: Maybe Step))
+  | CreateContext_ (WithTextRange (contextTypeIdentifier :: String, roleExpression :: Step))
   | Move (WithTextRange (roleExpression :: Step, contextExpression :: Maybe Step))
   | Bind (WithTextRange (bindingExpression :: Step, roleIdentifier :: String, contextExpression :: Maybe Step))
   | Bind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
@@ -194,7 +195,6 @@ instance decodeSimpleStep :: Decode SimpleStep where
   decode = genericDecode defaultOptions
 instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (ArcIdentifier _ s) = "ArcIdentifier " <> s
-  prettyPrint' t (CreateContext _ s) = "CreateContext " <> s
   prettyPrint' t (CreateEnumeratedRole _ s) = "CreateEnumeratedRole " <> s
   prettyPrint' t (Binding _) = "Binding"
   prettyPrint' t (Binder _ s) = "Binder " <> s
@@ -297,6 +297,11 @@ instance decodeAssignment :: Decode Assignment where
 instance prettyPrintAssignment :: PrettyPrint Assignment where
   prettyPrint' t (Remove {roleExpression}) = "Remove " <> prettyPrint' t roleExpression
   prettyPrint' t (CreateRole {roleIdentifier, contextExpression}) = "CreateRole " <> roleIdentifier <> " " <> prettyPrint' t contextExpression
+  prettyPrint' t (CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression}) = let
+    context = if isNothing contextExpression then "current context" else prettyPrint' t contextExpression
+    in
+      "CreateContext " <> contextTypeIdentifier <> " bound to " <> roleTypeIdentifier <> " in " <> context
+  prettyPrint' t (CreateContext_ {contextTypeIdentifier, roleExpression}) = "CreateContext_ " <> contextTypeIdentifier <> " bound to " <> prettyPrint' t roleExpression
   prettyPrint' t (Move {roleExpression, contextExpression}) = "Move " <> prettyPrint' t roleExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
   prettyPrint' t (Bind {bindingExpression, contextExpression}) = "Bind " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
   prettyPrint' t (Bind_ {bindingExpression, binderExpression}) = "Bind_ " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") binderExpression

@@ -36,9 +36,9 @@ import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunction
 import Perspectives.Query.QueryTypes (functional, mandatory, range) as QT
 import Perspectives.Representation.ADT (ADT(..), product, reduce)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
+import Perspectives.Representation.Class.Context (contextAspects, externalRole, roles)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Context (contextAspects, externalRole, roles)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), elements, intersectionOfArrays, intersectionPset, subsetPSet, unionOfArrays, unionPset)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))

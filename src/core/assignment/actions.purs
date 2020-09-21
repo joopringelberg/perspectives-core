@@ -27,6 +27,7 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (modify, gets)
 import Control.Monad.Error.Class (throwError)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, null, uncons, unsafeIndex)
 import Data.Array.NonEmpty (fromArray, head)
@@ -36,19 +37,22 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, over, unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
+import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
+import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
+import Perspectives.Identifiers (buitenRol)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.Builders (createAndAddRoleInstance)
+import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Instances.ObjectGetters (getConditionState, setConditionState)
@@ -59,7 +63,7 @@ import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, cont
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect, subject)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
@@ -131,6 +135,38 @@ compileAssignment (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDelet
     ctxts <- lift $ lift (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
       removeAllRoleInstances qualifiedRoleIdentifier ctxt
+
+compileAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
+  pure \(contextId :: ContextInstance) -> do
+    ctxts <- lift2 (contextId ##= contextGetter)
+    for_ ctxts \ctxt -> do
+      -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
+      g <- liftEffect guid
+      newContext <- runExceptT $ constructContext (ContextSerialization defaultContextSerializationRecord
+        { id = "model:User$c" <> (show g)
+        , ctype = unwrap qualifiedContextTypeIdentifier
+        })
+      void $ createAndAddRoleInstance qualifiedRoleIdentifier (unwrap contextId) (RolSerialization
+        { id: Nothing
+        , properties: PropertySerialization empty
+        , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+
+compileAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) = do
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleGetterDescription
+  pure \(contextId :: ContextInstance) -> do
+    roles <- lift2 (contextId ##= roleGetter)
+    for_ roles \roleInstance -> do
+      -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
+      g <- liftEffect guid
+      newContextId <- pure $ "model:User$c" <> (show g)
+      newContext <- runExceptT $ constructContext (ContextSerialization defaultContextSerializationRecord
+        { id = newContextId
+        , ctype = unwrap qualifiedContextTypeIdentifier
+        })
+      -- now bind it in the role instance.
+      void $ setBinding roleInstance (RoleInstance $ buitenRol newContextId)
+      handleNewPeer (RoleInstance newContextId)
 
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription

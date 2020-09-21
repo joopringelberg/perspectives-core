@@ -32,7 +32,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
-import Data.Array (elemIndex, null, singleton, unsafeIndex)
+import Data.Array (elemIndex, null, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
@@ -281,8 +281,6 @@ compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ 
     GetRoleBindersF -> pure $ unsafeCoerce (getRoleBinders (EnumeratedRoleType parameter))
     SpecialisesRoleTypeF -> pure $ unsafeCoerce (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)))
 
-    -- CreateContextF ->
-    -- CreateRoleF ->
     _ -> throwError (error $ "Unknown function for DataTypeGetterWithParameter: " <> show functionName)
 
 -- Catch all

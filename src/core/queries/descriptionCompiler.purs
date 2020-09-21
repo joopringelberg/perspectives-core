@@ -55,8 +55,8 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
-import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..), PropertyType, RoleType(..))
+import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, ($), (&&), (<$>), (<*>), (==), (>>=))
 
 type FD = PhaseThree QueryFunctionDescription
@@ -196,19 +196,19 @@ compileSimpleStep currentDomain s@(Extern pos) = do
       pure $ SQD currentDomain (QF.DataTypeGetter ExternalRoleF) (RDOM $ rts) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
-compileSimpleStep currentDomain (CreateContext pos ident) = do
-  -- If `ident` is not qualified, try to qualify it in the Domain.
-  (qcontextType :: ContextType) <- if isQualifiedWithDomein ident
-    then pure $ ContextType ident
-    -- Try to qualify the name within the Domain.
-    else do
-      {_id:namespace} <- lift $ gets _.dfr
-      (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain ident (unsafePartial $ fromJust $ (deconstructModelName namespace))
-      case head qnames of
-        Nothing -> throwError $ UnknownContext pos ident
-        (Just qn) | length qnames == 1 -> pure qn
-        otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
-  pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateContextF (unwrap qcontextType)) (CDOM (ST qcontextType)) True True
+-- compileSimpleStep currentDomain (CreateContext pos ident) = do
+--   -- If `ident` is not qualified, try to qualify it in the Domain.
+--   (qcontextType :: ContextType) <- if isQualifiedWithDomein ident
+--     then pure $ ContextType ident
+--     -- Try to qualify the name within the Domain.
+--     else do
+--       {_id:namespace} <- lift $ gets _.dfr
+--       (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain ident (unsafePartial $ fromJust $ (deconstructModelName namespace))
+--       case head qnames of
+--         Nothing -> throwError $ UnknownContext pos ident
+--         (Just qn) | length qnames == 1 -> pure qn
+--         otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
+--   pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateContextF (unwrap qcontextType)) (CDOM (ST qcontextType)) True True
 
 compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
   -- If `ident` is not qualified, try to qualify it in the Domain.

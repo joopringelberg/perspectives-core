@@ -38,10 +38,11 @@ import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, providesPerspectiveOnRole)
+import Perspectives.Representation.Class.Context (allContextTypes)
+import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getAction, getCalculatedRole, getContext, getEnumeratedProperty, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, allProperties, allRoles, getRole, greaterThanOrEqualTo, roleADT, roleAspects, roleAspectsBindingADT, typeIncludingAspects, viewsOfADT)
-import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
-import Perspectives.Representation.Context (contextAspectsADT)
+import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (hasElementM)
@@ -56,14 +57,14 @@ import Prelude (bind, flip, join, not, pure, show, ($), (<$>), (<<<), (<>), (==)
 -- | If a role with the given qualified name is available in the Context or its (in)direct aspects,
 -- | return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
-lookForRoleType s c = (lift $ getContext c) >>= pure <<< contextAspectsADT >>= lookForRoleTypeOfADT s
+lookForRoleType s c = (lift $ getContext c) >>= pure <<< ContextClass.contextAspectsADT >>= lookForRoleTypeOfADT s
 
 lookForRoleTypeOfADT :: String -> (ADT ContextType ~~~> RoleType)
 lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s)) s
 
 -- | As lookForRoleType, but then with a local name that should string-match the end of the qualified name.
 lookForUnqualifiedRoleType :: String -> ContextType ~~~> RoleType
-lookForUnqualifiedRoleType s c = (lift $ getContext c) >>= pure <<< contextAspectsADT >>= lookForUnqualifiedRoleTypeOfADT s
+lookForUnqualifiedRoleType s c = (lift $ getContext c) >>= pure <<< ContextClass.contextAspectsADT >>= lookForUnqualifiedRoleTypeOfADT s
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleTypeOfADT :: String -> ADT ContextType ~~~> RoleType
@@ -75,20 +76,28 @@ lookForRoleOfADT :: (RoleType -> Boolean) -> String -> ADT ContextType ~~~> Role
 lookForRoleOfADT criterium rname adt =  ArrayT (allRoles adt >>= pure <<< filter criterium)
 
 ----------------------------------------------------------------------------------------
+------- FUNCTIONS TO FIND A CONTEXTTYPE WORKING FROM STRINGS OR ADT'S
+----------------------------------------------------------------------------------------
+-- | Returns all qualified context types whose names end with the given input.
+-- | Candidates are retrieved from the nested contexts of the given ADT ContextType, closed under Aspect.
+lookForUnqualifiedContextType :: String -> ADT ContextType ~~~> ContextType
+lookForUnqualifiedContextType s c = ArrayT (allContextTypes c >>= pure <<< filter ((areLastSegmentsOf s) <<< unwrap))
+
+----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON CONTEXT TYPE
 ----------------------------------------------------------------------------------------
 roleInContext :: ContextType ~~~> RoleType
-roleInContext = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.roleInContext)
+roleInContext = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< ContextClass.roleInContext)
 
 contextRole :: ContextType ~~~> RoleType
-contextRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.contextRole)
+contextRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< ContextClass.contextRole)
 
 userRole :: ContextType ~~~> RoleType
-userRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.userRole)
+userRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< ContextClass.userRole)
 
 -- | Returns RoleTypes that are guaranteed to be Enumerated.
 enumeratedUserRole :: ContextType ~~~> RoleType
-enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< filter isEnumerated <<< Context.userRole)
+enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< filter isEnumerated <<< ContextClass.userRole)
   where
     isEnumerated (ENR _) = true
     isEnumerated (CR _) = false
@@ -97,7 +106,7 @@ allRoleTypesInContext :: ContextType ~~~> RoleType
 allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole userRole'
   where
     userRole' :: ContextType ~~~> RoleType
-    userRole' = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.userRole)
+    userRole' = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< ContextClass.userRole)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S

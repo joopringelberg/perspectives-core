@@ -79,7 +79,7 @@ import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForRoleType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
+import Perspectives.Types.ObjectGetters (lookForRoleType, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
@@ -544,6 +544,21 @@ compileRules = do
                   (Just stp) -> ensureContext subject currentDomain stp
                 qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
                 pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain True True
+
+              CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
+                (cte :: QueryFunctionDescription) <- case contextExpression of
+                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                  (Just stp) -> ensureContext subject currentDomain stp
+                qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
+                (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
+                pure $ UQD currentDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte currentDomain True True
+
+              CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
+                cte <- pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                roleQfd <- ensureRole subject currentDomain roleExpression
+                qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
+                pure $ UQD currentDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd currentDomain True True
+
               Move {roleExpression, contextExpression} -> do
                 rle <- ensureRole subject currentDomain roleExpression
                 (cte :: QueryFunctionDescription) <- case contextExpression of
@@ -660,6 +675,17 @@ compileRules = do
                     Just (ENR et) -> pure et
                     Just (CR ct') -> throwError $ CannotCreateCalculatedRole ct' start end
                     otherwise -> throwError $ ContextHasNoRole ct roleIdentifier
+
+                qualifyContextTypeWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree ContextType
+                qualifyContextTypeWithRespectTo contextIdentifier contextFunctionDescription start end = do
+                  (ct :: ADT ContextType) <- case range contextFunctionDescription of
+                    (CDOM ct') -> pure ct'
+                    otherwise -> throwError $ NotAContextDomain otherwise start end
+                  mrt <- lift2 (ct ###> lookForUnqualifiedContextType contextIdentifier)
+                  case mrt of
+                    Just ctype -> pure ctype
+                    -- TODO specialiseer de foutmelding!
+                    otherwise -> throwError $ CannotFindContextType start end contextIdentifier
 
                 qualifyPropertyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedPropertyType
                 qualifyPropertyWithRespectTo propertyIdentifier roleQfdunctionDescription start end = do

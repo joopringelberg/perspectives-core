@@ -91,6 +91,7 @@ data PerspectivesError
     | NotAPropertyRange  ArcPosition ArcPosition RAN.Range
     | WrongNumberOfArguments ArcPosition ArcPosition String Int Int
     | UnknownExternalFunction ArcPosition ArcPosition String
+    | CannotFindContextType ArcPosition ArcPosition String
 
     | ParserError String ArcPosition
     | Custom String
@@ -142,7 +143,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotAPropertyRange start end expected) = "(NotAPropertyRange) Expression does not yield a property value. Expected the range '" <> show expected <> "', between " <> show start <> " and " <> show end
   show (WrongNumberOfArguments start end functionName nrExpected nrGiven) = "(WrongNumberOfArguments) The function '" <> functionName <> "' expects " <> show nrExpected <> " arguments but received " <> show nrGiven <> ", between " <> show start <> " and " <> show end
   show (UnknownExternalFunction start end functionName) = "(UnknownExternalFunction) The external function name '" <> functionName <> "' is unknown, between " <> show start <> " and " <> show end
-
+  show (CannotFindContextType start end ctype) = "(CannotFindContextType) The context type name '" <> ctype <> "' cannot be resolved, between " <> show start <> " and " <> show end
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
 type MultipleErrors = NonEmptyList PerspectivesError

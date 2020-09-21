@@ -139,8 +139,9 @@ data QueryFunction
   | RoleIndividual RoleInstance
   | ContextIndividual ContextInstance
 
+  | CreateContext ContextType EnumeratedRoleType
+  | CreateContext_ ContextType
   | CreateRole EnumeratedRoleType
-	| CreateContext' ContextType
 	| Bind EnumeratedRoleType
   | Bind_
 	| Unbind (Maybe EnumeratedRoleType)

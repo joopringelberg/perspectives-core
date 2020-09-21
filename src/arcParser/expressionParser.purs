@@ -91,8 +91,6 @@ simpleStep = try
   <|>
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
   <|>
-  Simple <$> (CreateContext <$> getPosition <*> (reserved "createContext" *> arcIdentifier))
-  <|>
   Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> arcIdentifier))
   <|>
   Simple <$> (SequenceFunction <$> getPosition <*> sequenceFunction)
@@ -211,7 +209,6 @@ startOf stp = case stp of
     startOfSimple (Binder p _) = p
     startOfSimple (Context p) = p
     startOfSimple (Extern p) = p
-    startOfSimple (CreateContext p _) = p
     startOfSimple (CreateEnumeratedRole p _) = p
     startOfSimple (SequenceFunction p _) = p
     startOfSimple (Identity p) = p
@@ -243,7 +240,6 @@ endOf stp = case stp of
     endOfSimple (Binder (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
-    endOfSimple (CreateContext (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length (show fname)}
     endOfSimple (Identity (ArcPosition{line, column})) = ArcPosition{line, column: column + 4}
@@ -294,6 +290,25 @@ roleCreation = do
   contextExpression <- optionMaybe (reserved "in" *> step)
   end <- getPosition
   pure $ CreateRole {start, end, roleIdentifier, contextExpression}
+
+-- createContext ContextType bound to RoleType [ in <contextExpression>]
+createContext :: IP Assignment
+createContext = do
+  start <- getPosition
+  contextTypeIdentifier <- reserved "createContext" *> arcIdentifier
+  roleTypeIdentifier <- reserved "bound" *> reserved "to" *> arcIdentifier
+  contextExpression <- optionMaybe (reserved "in" *> step)
+  end <- getPosition
+  pure $ CreateContext {start, end, contextTypeIdentifier, roleTypeIdentifier, contextExpression}
+
+-- createContext_ ContextType bound to <roleExpression>
+createContext_ :: IP Assignment
+createContext_ = do
+  start <- getPosition
+  contextTypeIdentifier <- reserved "createContext" *> arcIdentifier
+  roleExpression <- reserved "bound" *> reserved "to" *> step
+  end <- getPosition
+  pure $ CreateContext_ {start, end, contextTypeIdentifier, roleExpression}
 
 move :: IP Assignment
 move = do
