@@ -53,7 +53,7 @@ import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Instances.ObjectGetters (getConditionState, setConditionState)
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
-import Perspectives.PerspectivesState (addBinding, getVariableBindings)
+import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string)
 import Perspectives.Representation.Action (Action)
@@ -89,6 +89,8 @@ compileBotAction actionType = do
       (Updater ContextInstance) ->
       (Updater ContextInstance)
     ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
+      oldEnvironment <- lift2 pushFrame
+      lift2 $ addBinding "currentcontext" [unwrap contextId]
       conditionWasTrue <- lift2 $ getConditionState actionType contextId
       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
       log $ "Running " <> show actionType
@@ -102,6 +104,7 @@ compileBotAction actionType = do
         else if conditionWasTrue
           then (log "Condition not satisfied, rule fired before") *> (lift2 $ setConditionState actionType contextId false)
           else log "Condition not satisfied, rule did not fire before" *> pure unit
+      lift2 $ restoreFrame oldEnvironment
 
     withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
     withAuthoringRole aRole updater a = do

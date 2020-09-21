@@ -113,6 +113,7 @@ type RolRecord =
   , universeRoleDelta :: SignedDelta
   , contextDelta :: SignedDelta
   , bindingDelta :: Maybe SignedDelta
+  -- The first index is the propertytype; the second is the value.
   , propertyDeltas :: F.Object (F.Object SignedDelta)
   }
 

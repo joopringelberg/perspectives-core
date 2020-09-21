@@ -314,6 +314,7 @@ constructVerb v = case v of
   "Create" -> Create
   "Change" -> Change
   "Delete" -> Delete
+  "CreateAndBindContext" -> CreateAndBindContext
   s -> Custom s
 
 -- | Parses the following forms:

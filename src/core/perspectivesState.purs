@@ -116,6 +116,15 @@ withFrame computation = do
   void $ modify \s@{variableBindings} -> s {variableBindings = old}
   pure r
 
+pushFrame :: MonadPerspectives (ENV.Environment (Array String))
+pushFrame = do
+  old <- getVariableBindings
+  void $ modify \s@{variableBindings} -> s {variableBindings = (ENV._pushFrame old)}
+  pure old
+
+restoreFrame :: ENV.Environment (Array String) -> MonadPerspectives Unit
+restoreFrame frame = void $ modify \s@{variableBindings} -> s {variableBindings = frame}
+
 -----------------------------------------------------------
 -- FUNCTIONS TO MODIFY GLOBAL UNSAFE STRMAPS IN PERSPECTIVESSTATE
 -----------------------------------------------------------

@@ -472,31 +472,36 @@ compileRules = do
       modifyDF \dfr -> dfr {actions = compActions}
       where
         compileRule :: String -> Action -> PhaseThree Action
-        compileRule actionName a@(Action ar@{_id, subject, condition, effect, object}) = do
-          conditionDescription <- compileActionCondition
-          ctxt <- lift2 (contextOfRole subject)
-          currentDomain <- pure (CDOM ctxt)
-          objectCalculation <- lift $ lift $ getRole object >>= getCalculation
-          objectVar <- pure (UQD (domain objectCalculation) (QF.BindVariable "object") objectCalculation (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
-          -- The expression below returns a QueryFunctionDescription that describes either a single assignment, or
-          -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF).
-          case effect of
-            -- Compile a series of Assignments into a QueryDescription.
-            (Just (A assignments)) -> do
-              let_ <- withFrame do
-                addBinding "object" objectCalculation
-                makeSequence <$> pure objectVar <*> (sequenceOfAssignments currentDomain assignments)
-              (aStatements :: QueryFunctionDescription) <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
-              pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
-              -- Compile the LetStep into a QueryDescription.
-            (Just (L (LetStep {bindings, assignments}))) -> do
-              let_ <- withFrame do
-                addBinding "object" objectCalculation
-                (makeSequence <$> foldM addVarBindingToSequence objectVar (reverse bindings) <*> sequenceOfAssignments currentDomain assignments)
-              -- Add the runtime frame.
-              aStatements <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
-              pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
-            otherwise -> pure $ Action ar {condition = Q conditionDescription}
+        compileRule actionName a@(Action ar@{_id, subject, condition, effect, object, pos}) =
+          withFrame
+            do
+              ctxt <- lift2 (contextOfRole subject)
+              currentDomain <- pure (CDOM ctxt)
+              -- add declaraton for currentcontext. Replace currentcontext expr with
+              -- lookup in the runtime environment.
+              addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True False)
+              conditionDescription <- compileActionCondition
+              objectCalculation <- lift $ lift $ getRole object >>= getCalculation
+              objectVar <- pure (UQD (domain objectCalculation) (QF.BindVariable "object") objectCalculation (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
+              -- The expression below returns a QueryFunctionDescription that describes either a single assignment, or
+              -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF).
+              case effect of
+                -- Compile a series of Assignments into a QueryDescription.
+                (Just (A assignments)) -> do
+                  let_ <- withFrame do
+                    addBinding "object" objectCalculation
+                    makeSequence <$> pure objectVar <*> (sequenceOfAssignments currentDomain assignments)
+                  (aStatements :: QueryFunctionDescription) <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
+                  pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
+                  -- Compile the LetStep into a QueryDescription.
+                (Just (L (LetStep {bindings, assignments}))) -> do
+                  let_ <- withFrame do
+                    addBinding "object" objectCalculation
+                    (makeSequence <$> foldM addVarBindingToSequence objectVar (reverse bindings) <*> sequenceOfAssignments currentDomain assignments)
+                  -- Add the runtime frame.
+                  aStatements <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
+                  pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
+                otherwise -> pure $ Action ar {condition = Q conditionDescription}
 
           where
 
