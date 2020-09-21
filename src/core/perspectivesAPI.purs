@@ -44,7 +44,7 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (handleNewPeer, removeBinding, setBinding, setProperty)
+import Perspectives.Assignment.Update (setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MP, MonadPerspectives, PropertyValueGetter, RoleGetter, MonadPerspectivesTransaction, (##>))
@@ -55,19 +55,19 @@ import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, uns
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, roleType)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType)
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Query.QueryTypes (queryFunction)
+import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.ADT (reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (calculation, rangeOfRoleCalculation', roleADT)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
-import Perspectives.SaveUserData (removeAllRoleInstances, removeContextInstance, removeRoleInstance, removeContextIfUnbound)
+import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeRoleInstance, removeContextIfUnbound)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
@@ -168,6 +168,18 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- Given the rolinstance;
     Api.GetBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject)
     Api.GetBindingType -> registerSupportedEffect corrId setter (binding >=> roleType) (RoleInstance subject)
+    -- {request: "GetRoleBinders", subject: <RoleInstance>, predicate: <EnumeratedRoleType>}
+    Api.GetRoleBinders -> do
+      PerspectRol{pspType} <- getPerspectRol (RoleInstance subject)
+      void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+      registerSupportedEffect corrId setter (getRoleBinders (EnumeratedRoleType predicate)) (RoleInstance subject)
+
+    -- {request: "GetUnqualifiedRoleBinders", subject: <RoleInstance>, predicate: <local role name>}
+    Api.GetUnqualifiedRoleBinders -> do
+      PerspectRol{pspType} <- getPerspectRol (RoleInstance subject)
+      void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+      registerSupportedEffect corrId setter (getUnqualifiedRoleBinders predicate) (RoleInstance subject)
+
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
       registerSupportedEffect corrId setter f (ContextInstance subject)
@@ -272,10 +284,6 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           case result of
             Left e -> lift2 $ sendResponse (Error corrId (show e)) setter
             Right ids -> lift2 $ sendResponse (Result corrId (unwrap <$> ids)) setter
-    -- TODO. Dit is overbodig. Contexten verdwijnen alleen en automatisch als de laatste binding van hun buitenrol verdwijnt.
-    Api.DeleteContext -> do
-      void $ runMonadPerspectivesTransaction authoringRole $ removeContextInstance (ContextInstance subject)
-      sendResponse (Result corrId []) setter
     -- {request: "RemoveRol", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype}
     Api.RemoveRol -> do
       if (isExternalRole subject)
@@ -285,13 +293,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             (CR ctype) -> do
               isDBQ <- isDatabaseQueryRole ctype
               if isDBQ
-                then void $ runMonadPerspectivesTransaction authoringRole $ removeContextIfUnbound (RoleInstance subject)
+                then void $ runMonadPerspectivesTransaction authoringRole $ removeContextIfUnbound (RoleInstance subject) true
                 else sendResponse (Error corrId ("Cannot remove an external role from non-database query role " <> (unwrap ctype))) setter
             (ENR rtype) -> sendResponse (Error corrId ("Cannot remove an external role from enumerated role " <> (unwrap rtype) <> " - use unbind instead!")) setter
         else do
-          void $ runMonadPerspectivesTransaction authoringRole $ removeRoleInstance (RoleInstance object)
+          void $ runMonadPerspectivesTransaction authoringRole $ removeRoleInstance (RoleInstance subject)
           sendResponse (Result corrId []) setter
     Api.DeleteRole -> do
+      -- TODO. Hanteer het geval dat subject een DBQ role is. Of misschien veiliger om er DeleteAllInstances van te maken?
       void $ runMonadPerspectivesTransaction authoringRole $ removeAllRoleInstances (EnumeratedRoleType subject) (ContextInstance object)
       sendResponse (Result corrId []) setter
     -- subject :: ContextInstance, predicate :: EnumeratedRoleType
@@ -365,12 +374,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             (Left messages) -> lift2 $ sendResponse (Error corrId (show messages)) setter
             (Right ctxtId) -> effect ctxtId
 
+-- | Tests whether we have a sequence of which the last part applies an ExternalCoreRoleGetter function.
 isDatabaseQueryRole :: CalculatedRoleType -> MonadPerspectives Boolean
 isDatabaseQueryRole cr = do
   calculatedRole <- getPerspectType cr
   qfd <- calculation calculatedRole
   case queryFunction qfd of
-    ExternalCoreRoleGetter _ -> roleADT calculatedRole >>= isExternal
+    (BinaryCombinator SequenceF) -> case queryFunction <$> secondOperand qfd of
+      Just (ExternalCoreRoleGetter _) -> roleADT calculatedRole >>= isExternal
+      otherwise -> pure false
     otherwise -> pure false
   where
     isExternal = reduce (pure <<< isExternalRole <<< unwrap)

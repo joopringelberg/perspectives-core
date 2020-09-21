@@ -53,13 +53,14 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.InvertedQuery (QueryWithAKink(..), RelevantProperties(..))
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AE
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (hasAccessToPropertiesOf, setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeSequence)
+import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
 import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range, traverseQfd)
 import Perspectives.Representation.ADT (ADT(..), reduce)
@@ -385,12 +386,13 @@ compileExpressions = do
         userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (CR _id))
         -- Now for each userType get the properties relevant for the Perspective.
         userProps <- fromFoldable <$> traverse getRelevantProperties userTypes
-        -- descr <- compileAndDistributeStep userProps (CDOM $ ST context) stp
         dom <- pure (CDOM $ ST context)
-        descr' <- withFrame do
-          addBinding "currentcontext" (SQD dom (QF.VariableLookup "currentcontext") dom True True)
-          compileStep dom stp
-        descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
+
+        descr <- withFrame do
+          varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
+          compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
+          pure $ makeSequence varb compiledCalculation
+
         setInvertedQueries userProps descr
         pure $ CalculatedRole (cr {calculation = Q descr})
         where
@@ -404,12 +406,13 @@ compileExpressions = do
         (EnumeratedRole{context}) <- lift $ lift $ getEnumeratedRole role
         userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnProperty (CP _id))
         userProps <- pure $ fromFoldable ((\u -> Tuple u (Properties [])) <$> userTypes)
-        -- descr <- compileAndDistributeStep userProps (RDOM $ ST role) stp
         dom <- pure (RDOM $ ST role)
-        descr' <- withFrame do
-          addBinding "currentrole" (SQD dom (QF.VariableLookup "currentrole") dom True True)
-          compileStep dom stp
-        descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
+
+        descr <- withFrame do
+          varb <- compileVarBinding dom (VarBinding "currentrole" (Simple $ AE.Identity (startOf stp)))
+          compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
+          pure $ makeSequence varb compiledCalculation
+
         setInvertedQueries userProps descr
         pure $ CalculatedProperty (cr {calculation = Q descr})
 

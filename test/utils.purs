@@ -28,7 +28,7 @@ runP_ :: forall a. String -> MonadPerspectives a -> Aff a
 runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort
 
 runP :: forall a. MonadPerspectives a -> Aff a
-runP = runP_ "test"
+runP = runP_ "test" 
 
 runPJoop :: forall a. MonadPerspectives a -> Aff a
 runPJoop = runP_ "joop"

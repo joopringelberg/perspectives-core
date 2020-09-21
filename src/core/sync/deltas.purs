@@ -48,6 +48,7 @@ import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
+import Perspectives.PerspectivesState (nextTransactionNumber)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -83,7 +84,8 @@ sendTransactieToUser userId t = do
     Just (Value channel) -> do
       cdbUrl <- getCouchdbBaseURL
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (cdbUrl <> channel <> "/" <> transactieID t), content = Just $ RequestBody.string (encodeJSON t)}
+      transactionNumber <- nextTransactionNumber
+      res <- liftAff $ request $ rq {method = Left PUT, url = (cdbUrl <> channel <> "/" <> transactieID t <> "_" <> show transactionNumber), content = Just $ RequestBody.string (encodeJSON t)}
       void $ onAccepted res.status [200, 201] "sendTransactieToUser"
         (onCorrectCallAndResponse "sendTransactieToUser" res.body (\(a :: PutCouchdbDocument) -> pure unit))
 

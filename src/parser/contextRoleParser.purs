@@ -48,7 +48,7 @@ import Perspectives.IndentParser (IP, ContextRoleParserMonad, addContextInstance
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
-import Perspectives.Representation.Class.Cacheable (cacheEntity)
+import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
@@ -57,7 +57,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
 import Perspectives.Types.ObjectGetters (aspectsClosure)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (class Show, Unit, bind, discard, flip, identity, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), ParserT, fail)
@@ -377,7 +377,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
       instanceName <- sameLine *> optionMaybe (try roleInstanceName)
       _ <- (sameLine *> reservedOp (show arrow))
       (Tuple cmt bindng) <- p
-      props <- withExtendedTypeNamespace localRoleName $
+      (props :: List (Tuple ID (Array Value))) <- withExtendedTypeNamespace localRoleName $
             option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       _ <- incrementRoleInstances (show rname)
 
@@ -422,10 +422,21 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
           , pspType = EnumeratedRoleType $ show rname
           , binding = bindng
           , context = ContextInstance $ show cname
-          , properties = FO.fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
+          -- , properties = FO.fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
+          , properties = FO.fromFoldable props
           , universeRoleDelta = universeRoleDelta
           , contextDelta = contextDelta
           , bindingDelta = bindingDelta
+          , propertyDeltas = FO.fromFoldable $ (\(Tuple propId values) -> Tuple propId
+              (FO.fromFoldable $
+                ((\(Value value) -> Tuple value
+                  (deltaSignedByMe_ me (encodeJSON (RolePropertyDelta
+                    { id: rolId
+                    , property: EnumeratedPropertyType propId
+                    , values: [Value value]
+                    , deltaType: AddProperty
+                    , subject: UserInstance $ RoleInstance me})))) <$> values)
+                    )) <$> props
           })
 
       pure $ Tuple (show rname) rolId))
@@ -452,6 +463,9 @@ deltaSignedByMe :: String -> IP SignedDelta
 deltaSignedByMe encryptedDelta = do
   me <- liftAffToIP getUserIdentifier
   pure $ SignedDelta {author: me, encryptedDelta}
+
+deltaSignedByMe_ :: String -> String -> SignedDelta
+deltaSignedByMe_ me encryptedDelta = SignedDelta {author: me, encryptedDelta}
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.

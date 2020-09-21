@@ -32,7 +32,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
-import Data.Array (elemIndex, null, unsafeIndex)
+import Data.Array (elemIndex, null, singleton, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
@@ -80,6 +80,7 @@ compileFunction (SQD _ (RolGetter (ENR (EnumeratedRoleType r))) _ _ _) = if isEx
 
 compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
+  -- TODO moeten we hier de currentcontext pushen?
   RC.calculation ct >>= compileFunction
 
 compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP pt)) _ _ _) = do
@@ -90,11 +91,14 @@ compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP pt)) _ _ _) = do
 
 compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
   (cp :: CalculatedProperty) <- getPerspectType pt
+  -- TODO moeten we hier de currentrole pushen?
   PC.calculation cp >>= compileFunction
 
 compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ unsafeCoerce externalRole
 
 compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ unsafeCoerce context
+
+compileFunction (SQD _ (DataTypeGetter IdentityF) _ _ _) = pure $ (pure <<< identity)
 
 compileFunction (SQD _ (TypeGetter TypeOfContextF) _ _ _) = pure $ unsafeCoerce contextType
 
@@ -104,11 +108,15 @@ compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ unsafeCoerce bi
 
 compileFunction (SQD dom Identity _ _ _) = case dom of
   VDOM _ _ -> throwError (error "There is no identity function for value.")
-  otherwise -> pure $ (pure <<< identity)
+  -- otherwise -> pure \x -> ArrayT do -- goed
+    -- pure [x]
+  -- otherwise -> pure \x -> ArrayT (pure [x]) -- goed
+  otherwise -> pure \x -> pure x -- ook goed
 
 compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
   VDOM _ _ -> throwError (error "There is no constant function for value.")
-  otherwise -> pure $ unsafeCoerce \x -> (pure (Value value) :: MPQ Value)
+  -- otherwise -> pure $ unsafeCoerce \x -> (pure (Value value) :: MPQ Value) -- ook goed
+  otherwise -> pure \_ -> pure value -- goed
 
 -- compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ unsafeCoerce (\x -> lift $ lift $ maybe [] identity (lookupIndexedRole (unwrap individual)) :: MPQ RoleInstance)
 
@@ -308,9 +316,10 @@ compareFunction fname = case fname of
 -- BINDING AND FRAMES
 ---------------------------------------------------------------------------------------------------
 addBinding_ :: forall a b. String -> (a ~~> b) -> a ~~> b
-addBinding_ varName computation ctxt  = do
-  v <- computation ctxt
-  lift $ lift $ addBinding varName (unsafeCoerce v)
+addBinding_ varName computation ctxt  = ArrayT do
+  -- v <- computation ctxt
+  v <- lift (ctxt ##= computation)
+  lift $ addBinding varName (unsafeCoerce v)
   pure v
 
 withFrame_ :: forall a b. (a ~~> b) -> a ~~> b
@@ -376,17 +385,8 @@ getRoleFunction id = do
     <|>
     do
       (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType ident)
-      -- TODO: introduceer een nieuwe scope en push daarin de waarde van de context!
-      -- unsafeCoerce $ RC.calculation p >>= compileFunction >>= pure <<< withFrame_ >>= pure <<< pushCurrentContext
-      unsafeCoerce $ RC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentContext)
+      unsafeCoerce $ RC.calculation p >>= compileFunction
   )
-  where
-    pushCurrentContext :: (String ~~> String) -> (String ~~> String)
-    pushCurrentContext f contextId = do
-      -- save contextId in it under the name currentcontext
-      lift $ lift (addBinding "currentcontext" [contextId])
-      -- apply f to contextId
-      f contextId
 
 getRoleInstances :: RoleType -> (ContextInstance ~~> RoleInstance)
 getRoleInstances (ENR rt) c = do
@@ -443,13 +443,14 @@ getPropertyFunction id = do
       (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType ident)
       unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentRole)
       )
-  where
-    pushCurrentRole :: (String ~~> String) -> (String ~~> String)
-    pushCurrentRole f roleId = do
-      -- save contextId in it under the name currentrole
-      lift $ lift (addBinding "currentrole" [roleId])
-      -- apply f to roleId
-      f roleId
+
+-- TODO: opruimen!
+pushCurrentRole :: (String ~~> String) -> (String ~~> String)
+pushCurrentRole f roleId = do
+  -- save contextId in it under the name currentrole
+  lift $ lift (addBinding "currentrole" [roleId])
+  -- apply f to roleId
+  f roleId
 
 -- | From a PropertyType, retrieve or construct a function to get values for that Property from a Role instance.
 -- | Caches the result.
@@ -466,7 +467,7 @@ getterFromPropertyType (CP cp@(CalculatedPropertyType id)) = case lookupProperty
     p <- getPerspectType cp
     functional <- PC.functional p
     mandatory <- PC.mandatory p
-    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction
+    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentRole)
     void $ pure $ propertyGetterCacheInsert id getter functional mandatory
     pure getter
   Just g -> pure g

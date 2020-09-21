@@ -81,6 +81,8 @@ type PerspectivesExtraState =
   , developmentRepository :: String
 
   , publicRepository :: String
+
+  , transactionNumber :: Int
   )
 
 -----------------------------------------------------------

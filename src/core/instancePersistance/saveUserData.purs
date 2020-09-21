@@ -33,42 +33,55 @@ module Perspectives.SaveUserData
   , removeContextInstance
   , removeRoleInstance
   , removeAllRoleInstances
-  , removeContextIfUnbound)
+  , removeContextIfUnbound
+  , removeBinding
+  , setBinding
+  , setBinding_
+  , handleNewPeer
+  )
 
   where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (lift)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
 import Data.Array (deleteAt, findIndex, index, modifyAt, nub, cons)
 import Data.Array.NonEmpty (elemIndex, fromArray, head, singleton, filter)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (over, unwrap)
-import Data.Traversable (for_)
+import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
-import Foreign.Object (values)
+import Foreign.Object (isEmpty, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Assignment.Update (getAuthor, getSubject, removeBinding, removeRoleInstancesFromContext)
+import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
+import Perspectives.Assignment.Update (getAuthor, getSubject, removeRoleInstancesFromContext, setMe, cacheAndSave)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, aisInRoleDelta, lift2, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_isMe, context_buitenRol, context_iedereRolInContext, context_me, removeRol_binding, removeRol_gevuldeRollen, rol_binding, rol_context, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests)
-import Perspectives.Identifiers (deconstructBuitenRol)
+import Perspectives.DomeinCache (tryRetrieveDomeinFile)
+import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allRoleBinders, getEnumeratedRoleInstances)
-import Perspectives.Persistent (getPerspectContext, getPerspectRol, saveEntiteit)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.Instances.ObjectGetters (allRoleBinders, getEnumeratedRoleInstances, getProperty, isMe)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..))
+import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..))
-import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>=), (<>), eq)
+import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Prelude (Unit, bind, discard, eq, join, pure, unit, void, when, ($), (<>), (>>=), (&&), (==), not)
 
 -- | This function takes care of
 -- | PERSISTENCE
@@ -110,22 +123,24 @@ saveContextInstance id = do
 iedereRolInContext :: PerspectContext -> Array RoleInstance
 iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 
-removeContextIfUnbound :: Updater RoleInstance
-removeContextIfUnbound roleInstance@(RoleInstance rid) = do
+-- Only called when the external role is also 'bound' in a DBQ role.
+removeContextIfUnbound :: RoleInstance -> Boolean -> MonadPerspectivesTransaction Unit
+removeContextIfUnbound roleInstance@(RoleInstance rid) wasBoundInDBQRole = do
   mbinder <- lift (lift (roleInstance ##> allRoleBinders))
   case mbinder of
-    Nothing -> removeContextInstance (ContextInstance $ deconstructBuitenRol rid)
+    Nothing -> removeContextInstance (ContextInstance $ deconstructBuitenRol rid) wasBoundInDBQRole
     otherwise -> pure unit
 
 -- | Removes the ContextInstance both from the cache and from the database.
 -- | This function is complete w.r.t. the five responsibilities (ignoring CURRENTUSER).
-removeContextInstance :: Updater ContextInstance
-removeContextInstance id = do
+removeContextInstance :: ContextInstance -> Boolean -> MonadPerspectivesTransaction Unit
+removeContextInstance id wasBoundInDBQRole = do
   (ctxt@(PerspectContext{pspType})) <- lift $ lift $ getPerspectContext id
+  externalRoleType <- pure (EnumeratedRoleType ((unwrap pspType) <> "$External"))
   -- RULE TRIGGERING and QUERY UPDATES.
   (Tuple _ users) <- runWriterT $ do
     forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances' -> remove (EnumeratedRoleType roleName) instances'
-    remove (EnumeratedRoleType ((unwrap pspType) <> "$External")) [(context_buitenRol ctxt)]
+    remove externalRoleType [(context_buitenRol ctxt)]
   -- PERSISTENCE
   _ <- scheduleContextRemoval id
   -- SYNCHRONISATION
@@ -135,10 +150,16 @@ removeContextInstance id = do
     { users
     , delta: SignedDelta
         { author: me
-        , encryptedDelta: sign $ encodeJSON $ UniverseContextDelta
+        -- DIT MOET EEN UNIVERSEROLEDELTA WORDEN! MAAK EEN GEVALSONDERSCHEIDING OP BASIS VAN DBQ
+        -- If the external role was 'bound' in a DBQ role, add a UniverseRoleDelta in which
+        --    * deltaType is RemoveUnboundExternalRoleInstance
+        -- If the external role was bound in an EnumeratedRole, add a UniverseRoleDelta in which
+        --    * deltaType is RemoveExternalRoleInstance
+        , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
           { id
-          , contextType: context_pspType ctxt
-          , deltaType: RemoveContextInstance
+          , roleType: externalRoleType
+          , roleInstances: SNEA.singleton (context_buitenRol ctxt)
+          , deltaType: if wasBoundInDBQRole then RemoveUnboundExternalRoleInstance else RemoveExternalRoleInstance
           , subject
           }}}
 
@@ -192,7 +213,6 @@ removeRoleInstance_ :: RoleInstance -> WriterT (Array RoleInstance) MonadPerspec
 removeRoleInstance_ roleId = do
   originalRole@(PerspectRol{gevuldeRollen, binding}) <- lift $ lift2 $ (getPerspectRol roleId)
   -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
-  -- TODO. Het kan zijn dat een externe rol niet meer gebonden is. In dat geval moet de hele context opgeruimd worden!
   forWithIndex_ gevuldeRollen \_ filledRollen ->
     for_ filledRollen \filledRolId -> do
       (lift $ removeBinding false filledRolId) >>= tell
@@ -232,3 +252,192 @@ scheduleRoleRemoval id = lift $ AA.modify (over Transaction \t@{rolesToBeRemoved
 
 scheduleContextRemoval :: ContextInstance -> MonadPerspectivesTransaction Unit
 scheduleContextRemoval id = lift $ AA.modify (over Transaction \t@{contextsToBeRemoved} -> t {contextsToBeRemoved = cons id contextsToBeRemoved})
+
+--------------------------
+-- UPDATE A ROLE (ADD OR REMOVE A BINDING)
+-- All mutations on a binding should handle RULE TRIGGERING and QUERY UPDATES
+-- for both ways to traverse a binding.
+-- They should also take care of PERSISTENCE of the binding role and
+-- the bound role. SYNCHRONISATION should be taken care of by a RoleBindingDelta.
+-----------------------------------------------------------
+-- | The first argument represents the role instance that receives the new binding.
+-- | The second argument represents the new binding.
+-- | If the new binding is in fact bound to the role instance before the operation, this is a no-op without effect.
+-- | function, because of createAndAddRoleInstance.
+-- | PERSISTENCE of binding role, old binding and new binding.
+-- | SYNCHRONISATION by RoleBindingDelta.
+-- | RULE TRIGGERING for `binding <roleId`, `binder <TypeOfRoleId>` for both the new and the old binding.
+-- | QUERY UPDATES for `binding <roleId`, `binder <TypeOfRoleId>` for both the old binding and the new binding.
+-- | CURRENTUSER for roleId and its context.
+setBinding :: RoleInstance -> (RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance))
+setBinding roleId (newBindingId :: RoleInstance) = do
+  (originalRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId
+  if (rol_binding originalRole == Just newBindingId)
+    then pure []
+    else setBinding_ roleId newBindingId
+
+-- | The first argument represents the role instance that receives the new binding.
+-- | The second argument represents the new binding.
+-- | If the new binding is in fact bound to the role instance before the operation, we still have to execute the
+-- | function, because of createAndAddRoleInstance.
+-- | PERSISTENCE of binding role, old binding and new binding.
+-- | SYNCHRONISATION by RoleBindingDelta.
+-- | RULE TRIGGERING for `binding <roleId`, `binder <TypeOfRoleId>` for both the new and the old binding.
+-- | QUERY UPDATES for `binding <roleId`, `binder <TypeOfRoleId>` for both the old binding and the new binding.
+-- | CURRENTUSER for roleId and its context.
+setBinding_ :: RoleInstance -> (RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance))
+setBinding_ roleId (newBindingId :: RoleInstance) = do
+  (originalRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId
+  cacheAndSave roleId (changeRol_binding newBindingId originalRole)
+
+  (lift2 $ findBinderRequests newBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
+  (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
+
+  newBinding@(PerspectRol{isMe, pspType}) <- lift2 $ getPerspectEntiteit newBindingId
+  -- If the type of the new binding is unknown, load the model. There is only one
+  -- circumstance that we can have a RoleInstance of an unknown type and that is when
+  -- it is the external role of a sys:Model context. This role has a property Url that
+  -- we can fetch the model from.
+  mDomeinFile <- lift2 $ traverse tryRetrieveDomeinFile (deconstructModelName $ unwrap pspType)
+  when (isNothing mDomeinFile)
+    (do
+      murl <- lift2 (newBindingId ##> getProperty (EnumeratedPropertyType "model:System$Model$External$Url"))
+      case murl of
+        Nothing -> throwError (error $ "System error: no url found to load model for unknown type " <> (unwrap pspType))
+        Just (Value url) -> addModelToLocalStore [url] newBindingId)
+  -- Handle isMe (on the binding role) and me (on its context).
+  if isMe
+    then do
+      modifiedRole <- lift2 $ getPerspectEntiteit roleId
+      cacheAndSave roleId (changeRol_isMe modifiedRole isMe)
+      -- set roleId to be the value of Me of its context.
+      setMe (rol_context modifiedRole) (Just roleId)
+    else pure unit
+
+  -- Handle inverse binding.
+  case rol_binding originalRole of
+    Nothing -> pure unit
+    (Just (oldBindingId :: RoleInstance)) -> do
+      (lift2 $ findBinderRequests oldBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
+      -- Remove this roleinstance as a binding role from the old binding.
+      (oldBinding@(PerspectRol{isMe:oldIsMe}) :: PerspectRol) <- lift2 $ getPerspectEntiteit oldBindingId
+
+      oldBinding'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
+      if (isEmpty gevuldeRollen && isExternalRole (unwrap oldBindingId))
+        then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap oldBindingId)) false
+        else cacheAndSave oldBindingId oldBinding'
+
+      -- if the oldBinding has isMe and the new binding has not, than remove me from the context.
+      if oldIsMe && not isMe
+        then do
+          modifiedRole <- lift2 $ getPerspectEntiteit roleId
+          setMe (rol_context modifiedRole) Nothing
+        else pure unit
+
+  -- Add this roleinstance as a binding role for the new binding.
+  cacheAndSave newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
+
+  subject <- getSubject
+  delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
+                { id : roleId
+                , binding: Just newBindingId
+                , oldBinding: rol_binding originalRole
+                , deltaType: SetBinding
+                , roleWillBeRemoved: false
+                , subject
+                }
+  users <- aisInRoleDelta delta
+  author <- getAuthor
+  signedDelta <- pure $ SignedDelta
+    { author
+    , encryptedDelta: sign $ encodeJSON $ delta}
+  addDelta (DeltaInTransaction { users, delta: signedDelta })
+  -- Save the SignedDelta as the bindingDelta in the role.
+  (modifiedRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId
+  cacheAndSave roleId (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) modifiedRole)
+
+  pure users
+
+-- | If the type of the role has kind UserRole and is not the `me` role for its context,
+-- | we add a new user to the context. This user should have access to
+-- | this context. We will generate Deltas so his PDR can build it from scratch,
+-- | according to his perspective.
+-- | Notice that in order to establish whether this role represents `usr:Me`,
+-- | it needs a binding!
+handleNewPeer :: RoleInstance -> MonadPerspectivesTransaction Unit
+handleNewPeer roleInstance = do
+  PerspectRol{context, pspType} <- lift2 $ getPerspectRol roleInstance
+  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole pspType
+  me <- lift2 $ isMe roleInstance
+  if kindOfRole == UserRole && not me
+    then context `serialisedAsDeltasFor` roleInstance
+    else pure unit
+
+handleNewPeer_ :: Boolean -> RoleInstance -> MonadPerspectivesTransaction Unit
+handleNewPeer_ me roleInstance = do
+  PerspectRol{context, pspType} <- lift2 $ getPerspectRol roleInstance
+  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole pspType
+  if kindOfRole == UserRole && not me
+    then context `serialisedAsDeltasFor` roleInstance
+    else pure unit
+
+-- | Removes the binding R of the rol, if any.
+-- | If the binding is an external role, checks if it should be removed.
+-- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
+-- | Modifies the Role instance.
+-- | If the the role instance has in fact no binding before the operation, this is a no-op without effect.
+-- | PERSISTENCE of binding role and old binding.
+-- | RULE TRIGGERING for `binding <roleId`, `binder <TypeOfRoleId>` for the old binding.
+-- | QUERY UPDATES for `binding <roleId>` and `binder <TypeOfRoleId>`.
+-- | SYNCHRONISATION by RoleBindingDelta.
+-- | CURRENTUSER for roleId and its context.
+removeBinding :: Boolean -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+removeBinding roleWillBeRemoved roleId = do
+  (originalRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId
+  if (isJust $ rol_binding originalRole)
+    then do
+      users' <- case rol_binding originalRole of
+        Nothing -> pure []
+        Just oldBindingId -> do
+          (lift2 $ findBinderRequests oldBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
+          subject <- getSubject
+          delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
+                        { id : roleId
+                        , binding: (rol_binding originalRole)
+                        , oldBinding: (rol_binding originalRole)
+                        , deltaType: RemoveBinding
+                        , roleWillBeRemoved
+                        , subject
+                        }
+          users <- aisInRoleDelta delta
+          author <- getAuthor
+          signedDelta <- pure $ SignedDelta
+            { author
+            , encryptedDelta: sign $ encodeJSON $ delta}
+          addDelta (DeltaInTransaction { users, delta: signedDelta})
+
+          when (not roleWillBeRemoved)
+            do
+              (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
+              cacheAndSave roleId (over PerspectRol (\rl -> rl {bindingDelta = Nothing})
+                (changeRol_isMe (removeRol_binding originalRole) false))
+          ctxt <- lift2 $ getPerspectContext $ rol_context originalRole
+          if (context_me ctxt == (Just roleId))
+            then setMe (rol_context originalRole) Nothing
+            else pure unit
+          pure users
+
+      -- Handle inverse binding.
+      case rol_binding originalRole of
+        Nothing -> pure unit
+        (Just oldBindingId) -> do
+          -- Remove this roleinstance as a binding role from the old binding.
+          (oldBinding :: PerspectRol) <- lift2 $ getPerspectEntiteit oldBindingId
+          -- If, after removing the binder, no binders are left AND the oldBinding is an external role,
+          -- remove the context!
+          oldBinding'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
+          if (isEmpty gevuldeRollen && isExternalRole (unwrap oldBindingId))
+            then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap oldBindingId)) false
+            else cacheAndSave oldBindingId oldBinding'
+      pure users'
+    else pure []

@@ -23,7 +23,7 @@ module Perspectives.Instances.ObjectGetters where
 
 import Control.Alt ((<|>))
 import Control.Monad.Writer (lift, tell)
-import Data.Array (findIndex, head, index, singleton, foldMap)
+import Data.Array (findIndex, foldMap, head, index, null, singleton)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Monoid.Conj (Conj(..))
@@ -209,7 +209,10 @@ boundBy :: (RoleInstance ~~> RoleInstance) ->
   (RoleInstance ~~> Value)
 boundBy sourceOfBoundRoles binder = ArrayT do
   (bools :: Array Boolean) <- lift (binder ##= sourceOfBoundRoles >=> bindsRole binder)
-  pure [Value $ show $ ala Conj foldMap bools]
+  -- If there are no boundRoles, this function must return false.
+  if null bools
+    then pure [Value $ show false]
+    else pure [Value $ show $ ala Conj foldMap bools]
   where
     -- role `bindsRole` bnd'
     bindsRole :: RoleInstance -> RoleInstance ~~> Boolean
@@ -229,7 +232,10 @@ binds :: (RoleInstance ~~> RoleInstance) ->
   (RoleInstance ~~> Value)
 binds sourceOfBindingRoles bnd = ArrayT do
   (bools :: Array Boolean) <- lift (bnd ##= sourceOfBindingRoles >=> boundByRole bnd)
-  pure [Value $ show $ ala Conj foldMap bools]
+  -- If there are no bindingRoles, this function must return false.
+  if null bools
+    then pure [Value $ show false]
+    else pure [Value $ show $ ala Conj foldMap bools]
   where
     -- bnd' `boundByRole` role
     boundByRole :: RoleInstance -> RoleInstance ~~> Boolean

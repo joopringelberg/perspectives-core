@@ -168,18 +168,28 @@ setChannelReplication channel = do
       getYou <- getRoleFunction "sys:Channel$You"
       myou <- channel ##> getYou
       case myou of
-        Nothing -> localReplication channelId post Nothing
+        Nothing ->
+          -- REPLICATE CHANNEL TO POST, ALL TRANSACTIONS.
+          -- TODO: repliceer alleen transacties die niet van mijzelf zijn.
+          localReplication channelId post Nothing
         Just you -> do
+          -- OTHER KNOWN
           -- yourIdentifier
           (RoleInstance userBehindYou) <- you ##>> bottom
+          -- REPLICATE CHANNEL TO POST, JUST TRANSACTIONS AUTHORED BY OTHER.
+          localReplication channelId post (Just userBehindYou)
+
+          -- REPLICATING CHANNEL TO COPY OF OTHER:
           host <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Host"
           hostValue <- you ##> host
           case hostValue of
+            -- NO HOST
             Nothing -> do
               relayHost <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayHost"
               relayHostValue <- you ##> relayHost
               case relayHostValue of
                 Nothing -> pure unit
+                -- RELAYHOST
                 Just (Value h) -> do
                   -- if h equals the host of this PDR, just stop.
                   myHost <- getHost
@@ -190,9 +200,13 @@ setChannelReplication channel = do
                       portValue <- you ##> relayPort
                       case portValue of
                         Nothing -> pure unit
-                        -- Push local copy of channel to RelayHost. Author = you
-                        Just (Value p) -> setPushAndPullReplication channelId h p userBehindYou
+                        -- REPLICATE LOCAL CHANNEL TO RELAYHOST, JUST TRANSACTIONS AUTHORED BY ME.
+                        -- Push local copy of channel to RelayHost. Author = me
+                        Just (Value p) -> do
+                          me <- getUserIdentifier
+                          setPushAndPullReplication channelId h p me
             Just (Value yourHost) -> do
+              -- HOST
               -- if h equals the host of this PDR, just stop.
               myHost <- getHost
               if myHost == yourHost
@@ -202,11 +216,11 @@ setChannelReplication channel = do
                   portValue <- you ##> port
                   case portValue of
                     Nothing -> pure unit
+                    -- REPLICATE LOCAL CHANNEL TO HOST, JUST TRANSACTIONS AUTHORED BY ME.
                     -- Push local copy of channel to PeerHost. Author = me
                     Just (Value yourPort) -> do
                       me <- getUserIdentifier
                       setPushReplication channelId yourHost yourPort me
-          localReplication channelId post (Just userBehindYou)
 
 postDbName :: MonadPerspectives String
 postDbName = do

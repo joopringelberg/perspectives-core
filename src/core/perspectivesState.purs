@@ -30,7 +30,7 @@ import Perspectives.CouchdbState (CouchdbUser)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
-import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void)
+import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void, (+))
 
 newPerspectivesState :: CouchdbUser -> String -> Int -> String -> AVar String -> PerspectivesState
 newPerspectivesState uinfo host port password av =
@@ -51,6 +51,7 @@ newPerspectivesState uinfo host port password av =
   , indexedContexts: empty
   , post: Nothing
   , developmentRepository: "http://127.0.0.1:5984/repository/"
+  , transactionNumber: 0
   }
 
 -----------------------------------------------------------
@@ -85,6 +86,15 @@ publicRepository = gets _.publicRepository
 
 developmentRepository :: MonadPerspectives String
 developmentRepository = gets _.developmentRepository
+
+transactionNumber :: MonadPerspectives Int
+transactionNumber = gets _.transactionNumber
+
+nextTransactionNumber :: MonadPerspectives Int
+nextTransactionNumber = do
+  n <- transactionNumber
+  void $ modify \(s@{transactionNumber:cn}) -> s {transactionNumber = cn + 1}
+  pure n
 
 -----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS

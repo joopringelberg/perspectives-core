@@ -114,9 +114,7 @@ domain: System
       property: IWantToInviteAnUnconnectedUser (not mandatory, functional, Boolean)
       property: SerialisedInvitation (not mandatory, functional, String)
       property: Message (not mandatory, functional, String)
-    user: Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
-    --user: Guest = sys:Me
-      perspective on: Invitee
+
     user: Invitee (mandatory, functional) filledBy: Guest
       perspective on: Inviter
       perspective on: PrivateChannel
@@ -128,18 +126,25 @@ domain: System
         if (exists Invitee) and (exists PrivateChannel) then
           -- bind object to ConnectedPartner in PrivateChannel >> binding >> context
           callEffect ser:AddConnectedPartnerToChannel( object, PrivateChannel >> binding >> context )
-    bot: for Guest
-      perspective on: PrivateChannel
-        -- meer conditie nodig: dit vuurt als we een chat verwijderen.
-        if exists PrivateChannel then
-          callEffect ser:CreateCopyOfChannelDatabase( PrivateChannel >> ChannelDatabaseName )
-    user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator
+
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
       perspective on: PrivateChannel
     bot: for Inviter
+      -- TODO. als de uitnodiging wordt weggegooid en er is geen partner in het kanaal, verwijder dan het kanaal en de kanaaldatabase!
       perspective on: External
         if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then
           -- Creates a Channel, binds it to PrivateChannel.
           callEffect ser:AddChannel()
           SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
+
+    -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
+    user: Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
+      perspective on: Invitee
+    bot: for Guest
+      perspective on: PrivateChannel
+        if exists PrivateChannel then
+          callEffect ser:CreateCopyOfChannelDatabase( PrivateChannel >> ChannelDatabaseName )
+
     context: PrivateChannel (not mandatory, functional) filledBy: Channel
+
+    user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator

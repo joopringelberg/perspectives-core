@@ -101,6 +101,10 @@ queryFunction (UQD _ f _ _ _ _) = f
 queryFunction (BQD _ f _ _ _ _ _) = f
 queryFunction (MQD _ f _ _ _ _) = f
 
+secondOperand :: QueryFunctionDescription -> Maybe QueryFunctionDescription
+secondOperand (BQD _ _ _ s _ _ _) = Just s
+secondOperand _ = Nothing
+
 -----------------------------------------------------------------------------------------
 ---- REPLACE DOMAIN
 -----------------------------------------------------------------------------------------

@@ -42,7 +42,7 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, handleNewPeer, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding, setProperty)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
@@ -64,7 +64,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType)
-import Perspectives.SaveUserData (removeAllRoleInstances, removeRoleInstance)
+import Perspectives.SaveUserData (removeAllRoleInstances, handleNewPeer, removeRoleInstance, setBinding, removeBinding)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Unsafe.Coerce (unsafeCoerce)
 

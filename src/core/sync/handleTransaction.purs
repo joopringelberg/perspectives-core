@@ -34,7 +34,7 @@ import Foreign.Generic (decodeJSON)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..))
-import Perspectives.Assignment.Update (addProperty, addRoleInstancesToContext, deleteProperty, moveRoleInstancesToAnotherContext, removeBinding, removeProperty, setBinding)
+import Perspectives.Assignment.Update (addProperty, addRoleInstancesToContext, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty)
 import Perspectives.Authenticate (authenticate)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultRolRecord)
@@ -48,12 +48,12 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cach
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
-import Perspectives.SaveUserData (removeContextInstance, removeRoleInstance)
-import Perspectives.SerializableNonEmptyArray (toNonEmptyArray)
+import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, setBinding)
+import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, pure, show, unit, void, when, ($), (+), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, discard, flip, pure, show, unit, void, when, ($), (+), (<<<), (<>), (>>=))
 
 executeContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
 executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext} ) = do
@@ -89,7 +89,6 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) =
         do
           loadModelIfMissing (unsafeDeconstructModelName $ unwrap contextType)
           void $ runExceptT $ constructEmptyContext id (unwrap contextType) "" (PropertySerialization empty)
-    RemoveContextInstance -> removeContextInstance id
 
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
@@ -104,6 +103,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
         (exists :: Maybe PerspectRol) <- lift2 $ tryGetPerspectEntiteit roleInstance
         when (isNothing exists)
           (void $ constructEmptyRole_ id (offset + i) roleInstance)
+          -- TODO save it?
     ConstructExternalRole -> do
       externalRole <- pure (head $ toNonEmptyArray roleInstances)
       log ("ConstructExternalRole in " <> show id)
@@ -113,6 +113,8 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
           void $ constructEmptyRole_ id 0 externalRole
           lift2 $ void $ saveEntiteit externalRole
     RemoveRoleInstance -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
+    RemoveUnboundExternalRoleInstance -> for_ (toArray roleInstances) (flip removeContextIfUnbound false)
+    RemoveExternalRoleInstance -> pure unit
     where
       constructEmptyRole_ :: ContextInstance -> Int -> RoleInstance -> MonadPerspectivesTransaction RoleInstance
       constructEmptyRole_ contextInstance i rolInstanceId = do

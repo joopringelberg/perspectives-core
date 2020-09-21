@@ -21,7 +21,7 @@
 
 module Perspectives.ContextAndRole where
 
-import Data.Array (cons, foldl)
+import Data.Array (cons, foldl, null)
 import Data.Array (delete, difference, elemIndex, last, snoc, union) as Arr
 import Data.Int (floor, fromString, toNumber)
 import Data.Lens (Lens', Traversal', _Just, over, set, view)
@@ -294,7 +294,11 @@ removeRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
     (Just (roles :: Array RoleInstance)) -> do
       case Arr.elemIndex rolID roles of
         Nothing -> ct
-        otherwise -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) (Arr.delete rolID roles) gevuldeRollen}
+        otherwise -> let
+          roles' = Arr.delete rolID roles in
+            if null roles'
+              then PerspectRol cr {gevuldeRollen = delete (unwrap rolName) gevuldeRollen}
+              else PerspectRol cr {gevuldeRollen = insert (unwrap rolName) roles' gevuldeRollen}
 
 compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
 compareOccurrences a b = compare (rol_occurrence a) (rol_occurrence b)

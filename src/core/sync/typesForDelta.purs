@@ -86,7 +86,7 @@ instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
 -----------------------------------------------------------
 -- UNIVERSECONTEXTDELTATYPE
 -----------------------------------------------------------
-data UniverseContextDeltaType = ConstructEmptyContext | RemoveContextInstance
+data UniverseContextDeltaType = ConstructEmptyContext
 derive instance genericUniverseContextDeltaType :: Generic UniverseContextDeltaType _
 instance showUniverseContextDeltaType :: Show UniverseContextDeltaType where
   show = genericShow
@@ -137,7 +137,7 @@ instance prettyPrintUniverseRoleDelta :: PrettyPrint UniverseRoleDelta where
 -----------------------------------------------------------
 -- UNIVERSEROLEDELTATYPE
 -----------------------------------------------------------
-data UniverseRoleDeltaType = ConstructEmptyRole | ConstructExternalRole | RemoveRoleInstance
+data UniverseRoleDeltaType = ConstructEmptyRole | ConstructExternalRole | RemoveRoleInstance | RemoveUnboundExternalRoleInstance | RemoveExternalRoleInstance
 derive instance genericUniverseRoleDeltaType :: Generic UniverseRoleDeltaType _
 instance showUniverseRoleDeltaType :: Show UniverseRoleDeltaType where
   show = genericShow
