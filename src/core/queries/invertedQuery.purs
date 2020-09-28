@@ -31,7 +31,7 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, findIndex, modifyAt, null)
+import Data.Array (cons, findIndex, fold, modifyAt, null)
 import Data.Array (union) as ARR
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -42,16 +42,26 @@ import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Object (Object, keys, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.HiddenFunction (HiddenFunction)
+import Perspectives.Parsing.Arc (constructVerb)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -----------------------------------------------------------
 -- INVERTEDQUERY
 -----------------------------------------------------------
-newtype InvertedQuery = InvertedQuery {description :: QueryWithAKink, backwardsCompiled :: (Maybe HiddenFunction), forwardsCompiled :: (Maybe HiddenFunction), userTypes :: Map RoleType RelevantProperties}
+newtype InvertedQuery = InvertedQuery
+  { description :: QueryWithAKink
+  , backwardsCompiled :: (Maybe HiddenFunction)
+  , forwardsCompiled :: (Maybe HiddenFunction)
+  , userTypes :: Map RoleType PropsAndVerbs}
+
+-- | The keys of PropsAndVerbs are the show values of Verbs.
+type PropsAndVerbs = Object RelevantProperties
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _
 derive instance newtypeInvertedQuery :: Newtype InvertedQuery _
@@ -63,18 +73,25 @@ instance eqInvertedQuery :: Eq InvertedQuery where
   eq = genericEq
 
 instance encodeInvertedQuery :: Encode InvertedQuery where
-  encode (InvertedQuery {description, userTypes}) = genericEncode defaultOptions (InvertedQuery' {description, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: g userTypes})
+  encode (InvertedQuery {description, userTypes}) = genericEncode defaultOptions (InvertedQuery'
+    { description
+    , userTypes: g userTypes})
     where
-      g :: Map RoleType RelevantProperties -> Array UserProps
-      g m = (\(Tuple u props) -> UserProps {user: u, properties: props}) <$> toUnfoldable m
+      g :: Map RoleType PropsAndVerbs -> Array UserPropsAndVerbs
+      g m = (\(Tuple u props) -> UserPropsAndVerbs {user: u, properties: props}) <$> toUnfoldable m
 
 instance decodeInvertedQuery :: Decode InvertedQuery where
   decode x = do
     InvertedQuery' r <- genericDecode defaultOptions x
-    pure $ InvertedQuery (r {userTypes = f r.userTypes})
+    pure $ InvertedQuery
+      { description: r.description
+      , backwardsCompiled: Nothing
+      , forwardsCompiled: Nothing
+      , userTypes: f r.userTypes
+      }
     where
-      f :: Array UserProps -> Map RoleType RelevantProperties
-      f a = fromFoldable ((\(UserProps{user, properties}) -> Tuple user properties) <$> a)
+      f :: Array UserPropsAndVerbs -> Map RoleType PropsAndVerbs
+      f a = fromFoldable ((\(UserPropsAndVerbs{user, properties}) -> Tuple user properties) <$> a)
 
 instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
   prettyPrint' t (InvertedQuery{description, userTypes}) = "InvertedQuery " <> prettyPrint' (t <> "  ") description <> show userTypes
@@ -82,7 +99,7 @@ instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
 equalDescriptions :: InvertedQuery -> InvertedQuery -> Boolean
 equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}) = d1 == d2
 
-addUserTypes :: Map RoleType RelevantProperties -> InvertedQuery -> InvertedQuery
+addUserTypes :: Map RoleType PropsAndVerbs -> InvertedQuery -> InvertedQuery
 addUserTypes t (InvertedQuery r@{userTypes}) = InvertedQuery r {userTypes = union userTypes t}
 
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
@@ -90,24 +107,38 @@ addInvertedQuery q@(InvertedQuery{userTypes}) qs = case findIndex (equalDescript
   Nothing -> cons q qs
   Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes userTypes) qs
 
+allProps :: PropsAndVerbs -> RelevantProperties
+allProps o = fold $ values o
+
+allVerbs :: PropsAndVerbs -> Array Verb
+allVerbs o = constructVerb <$> keys o
+
+-- | Remove each verb-properties pair that does not include the PropertyType
+-- | and restrict the properties to the singleton with that property.
+restrictToProperty :: PropertyType -> PropsAndVerbs -> PropsAndVerbs
+restrictToProperty pt pAndV = pAndV
 -----------------------------------------------------------
 -- INVERTEDQUERY'
+-- As we cannot serialise a Map, we've to convert it to a serialisable form first.
 -----------------------------------------------------------
-newtype InvertedQuery' = InvertedQuery' {description :: QueryWithAKink, backwardsCompiled :: (Maybe HiddenFunction), forwardsCompiled :: (Maybe HiddenFunction), userTypes :: Array UserProps}
+newtype InvertedQuery' = InvertedQuery'
+  { description :: QueryWithAKink
+  , userTypes :: Array UserPropsAndVerbs
+  }
 
 derive instance genericInvertedQuery' :: Generic InvertedQuery' _
 
 -----------------------------------------------------------
--- USERPROPS
+-- UserPropsAndVerbs
 -----------------------------------------------------------
-newtype UserProps = UserProps {user :: RoleType, properties :: RelevantProperties}
+newtype UserPropsAndVerbs = UserPropsAndVerbs {user :: RoleType, properties :: PropsAndVerbs}
 
-derive instance genericUserProps :: Generic UserProps _
+derive instance genericUserProps :: Generic UserPropsAndVerbs _
 
-instance encodeUserProps :: Encode UserProps where
+instance encodeUserProps :: Encode UserPropsAndVerbs where
   encode = genericEncode defaultOptions
 
-instance decodeUserProps :: Decode UserProps where
+instance decodeUserProps :: Decode UserPropsAndVerbs where
   decode = genericDecode defaultOptions
 
 -----------------------------------------------------------

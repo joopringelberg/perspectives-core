@@ -28,7 +28,7 @@ import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable, Set)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
-import Foreign.Object (values)
+import Foreign.Object (values, Object)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -70,6 +70,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsBindingADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   views :: r -> MonadPerspectives (Array ViewType)
+  perspectives :: r -> Object (Array ActionType)
 
 rangeOfRoleCalculation' :: String -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> rangeOfRoleCalculation'_ (CalculatedRoleType r)
@@ -100,6 +101,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   roleAspectsADT = rangeOfCalculatedRole
   roleAspectsBindingADT = rangeOfCalculatedRole
   views =  rangeOfCalculatedRole >=> viewsOfADT
+  perspectives r = (unwrap r).perspectives
 
 rangeOfCalculatedRole :: CalculatedRole -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
@@ -144,6 +146,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
         sum@(SUM _) -> PROD (sum : (ST $ identifier r) : aspects)
         UNIVERSAL -> UNIVERSAL
   views r = roleAspectsBindingADT r >>= viewsOfADT
+  perspectives r = (unwrap r).perspectives
 
 -- | A pattern of computation shared in the recursive computation of roleAspects, properties and views of a role.
 -- | It computes the local value for an EnumeratedRole and then the value of the binding of the role, returning

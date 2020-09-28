@@ -29,7 +29,7 @@ import Data.Newtype (unwrap)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties)
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), PropsAndVerbs)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (domain2RoleType)
@@ -42,9 +42,9 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (Unit, pure, unit, ($))
 
-setPathForStep :: Partial => QueryFunctionDescription -> QueryWithAKink -> Map RoleType RelevantProperties -> PhaseThree Unit
+setPathForStep :: Partial => QueryFunctionDescription -> QueryWithAKink -> Map RoleType PropsAndVerbs -> PhaseThree Unit
 setPathForStep (SQD dom qf ran _ _) qWithAK userTypes = case qf of
-  QF.Value2Role pt -> case pt of
+  QF.Value2Role pt -> case pt of 
     ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
       Nothing -> addInvertedQueryForDomain (unwrap p)
         (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})

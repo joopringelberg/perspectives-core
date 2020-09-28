@@ -67,7 +67,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       clearUserDatabase
       void $ cascadeDeleteDomeinFile (DomeinFileId "model:System")
 
-  test "upload model:Serialise to repository from files" $ runP do
+  testOnly "upload model:Serialise to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile "serialise" modelDirectory
     if null errs
       then do
@@ -75,7 +75,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Serialise") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Serialise: " <> show errs) false
 
-  test "upload model:Couchdb to repository from files" $ runP do
+  testOnly "upload model:Couchdb to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     if null errs
       then do
@@ -83,7 +83,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Couchdb: " <> show errs) false
 
-  test "upload model:System to repository from files" $ runP do
+  testOnly "upload model:System to repository from files" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory

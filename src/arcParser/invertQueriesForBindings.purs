@@ -41,12 +41,12 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala, unwrap)
 import Data.Traversable (traverse)
-import Foreign.Object (lookup, insert)
+import Foreign.Object (lookup, insert, empty) as OBJ
 import Perspectives.CoreTypes (type (~~~>), MP, (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
 import Perspectives.Identifiers (deconstructLocalName_)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery)
+import Perspectives.InvertedQuery (InvertedQuery(..), PropsAndVerbs, QueryWithAKink(..), RelevantProperties(..), addInvertedQuery, allProps, restrictToProperty)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
 import Perspectives.Query.DescriptionCompiler (makeComposition)
@@ -71,12 +71,12 @@ import Perspectives.Types.ObjectGetters (aspectsClosure)
 -- | provided as third argument, store an InvertedQuery for each of them on the
 -- | PropertyType.
 -- | If the binding adds properties, store an InvertedQuery in onRoleDelta_binder of the role.
-setInvertedQueriesForUserAndRole :: RoleType -> ADT EnumeratedRoleType -> RelevantProperties -> Boolean -> QueryWithAKink -> PhaseThree Boolean
+setInvertedQueriesForUserAndRole :: RoleType -> ADT EnumeratedRoleType -> PropsAndVerbs -> Boolean -> QueryWithAKink -> PhaseThree Boolean
 setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWithAkink = do
   when perspectiveOnThisRole
     -- Add qWithAkink in onContextDelta_context of role.
     (addToOnContextDelta qWithAkink role)
-  roleHasRequestedProperties <- case props of
+  roleHasRequestedProperties <- case allProps props of
     All -> do
       -- for each property of role, store (Value2Role >> invertedQ) in onPropertyDelta of that property
       (propsOfRole :: Array PropertyType) <- lift2 $ allLocallyRepresentedProperties (ST role)
@@ -101,24 +101,28 @@ setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWit
   where
     addToOnContextDelta :: QueryWithAKink -> EnumeratedRoleType -> PhaseThree Unit
     addToOnContextDelta qwk@(ZQ backwards _) (EnumeratedRoleType roleId) = modifyDF \df@{enumeratedRoles:roles} ->
-        case lookup roleId roles of
+        case OBJ.lookup roleId roles of
           Nothing -> addInvertedQueryForDomain roleId
-            (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])})
+            (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user OBJ.empty})
             OnContextDelta_context
             df
-          Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])}) onContextDelta_context }) roles}
+          Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery
+            (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user OBJ.empty
+              -- add verbs here.
+              })
+            onContextDelta_context }) roles}
 
     addToOnRoleDelta :: QueryWithAKink -> EnumeratedRoleType -> PhaseThree Unit
     addToOnRoleDelta qwk (EnumeratedRoleType roleId) = modifyDF
       \df@{enumeratedRoles:roles} ->
         -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
         -- the binding. We skip the binding because its cardinality is larger than one.
-        case lookup roleId roles of
+        case OBJ.lookup roleId roles of
           Nothing -> addInvertedQueryForDomain roleId
             (InvertedQuery {description: removeFirstBackwardsStep qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user props})
             OnRoleDelta_binder
             df
-          Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: removeFirstBackwardsStep qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user props}) onRoleDelta_binder}) roles}
+          Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery {description: removeFirstBackwardsStep qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user props}) onRoleDelta_binder}) roles}
 
     addToProperties :: QueryWithAKink -> Array PropertyType -> PhaseThree Unit
     addToProperties qwk@(ZQ backwards forwards) roleProps = for_ roleProps \prop -> case prop of
@@ -126,12 +130,12 @@ setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWit
         backwards' <- lift2 $ traverse (prependValue2Role (ENP pr)) backwards
         forwards' <- lift2 $ traverse (postPendProp (ENP pr)) forwards
         modifyDF \df@{enumeratedProperties} -> do
-          case lookup p enumeratedProperties of
+          case OBJ.lookup p enumeratedProperties of
             Nothing -> addInvertedQueryForDomain p
-              (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [prop])})
+              (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (restrictToProperty prop props)})
               OnPropertyDelta
               df
-            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [prop])}) onPropertyDelta}) enumeratedProperties}
+            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = OBJ.insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (restrictToProperty prop props)}) onPropertyDelta}) enumeratedProperties}
         pure unit
       _ -> pure unit
 
@@ -185,6 +189,7 @@ isRelevant t (Properties set) = isJust $ elemIndex t set
 -- | This function only returns values for Enumerated User Role types.
 -- | <User> `hasAccessToPropertiesOf` <Role> == RelevantProperties
 -- | where both arguments are RoleTypes.
+-- TODO. THIS FUNCTION IS OBSOLETE.
 hasAccessToPropertiesOf :: RoleType -> RoleType -> MP RelevantProperties
 hasAccessToPropertiesOf (ENR user) role = do
   -- Find all Actions on the role as Object (consider Aspects, too!)
@@ -194,21 +199,22 @@ hasAccessToPropertiesOf (ENR user) role = do
   -- x2 <- user ###= (aspectsClosure >=> actionOnRole role)
   -- log $ show user <> " aspectsClosure >=> actionOnRole " <> show role <> " = " <> show x2
   -- log $ show user <> " hasAccessToPropertiesOf " <> show role <> " = " <> show props
+  -- If no view has been specified, props is empty so we assume ALL properties! (No view should be without properties).
   if null props
     then pure All
     else pure $ Properties props
 
   where
+    -- the actions of the EnumeratedRoleType (userRole) on the object Roletype (object)
     actionOnRole :: RoleType -> EnumeratedRoleType ~~~> ActionType
-    actionOnRole t r = ArrayT do
-      EnumeratedRole{perspectives} <- getEnumeratedRole r
-      pure $ maybe [] identity (lookup (deconstructLocalName_ $ roletype2string t) perspectives)
+    actionOnRole object userRole = ArrayT do
+      EnumeratedRole{perspectives} <- getEnumeratedRole userRole
+      pure $ maybe [] identity (OBJ.lookup (deconstructLocalName_ $ roletype2string object) perspectives)
 
     enumeratedPropertiesForActionObject :: ActionType ~~~> PropertyType
     enumeratedPropertiesForActionObject a = ArrayT do
       Action{requiredObjectProperties} <- getAction a
       case requiredObjectProperties of
-        -- If no view has been specified, we assume ALL properties!
         Nothing -> pure []
         Just v -> getView v >>= pure <<< _.propertyReferences <<< unwrap
 

@@ -120,7 +120,7 @@ domain: System
       perspective on: PrivateChannel
       -- Invitee needs to see the Channel's Initiator in order to access Host and Port.
       perspective on: ChannelInitiator
-      perspective on: External
+      perspective on: External Consult
     bot: for Invitee
       perspective on: Invitee
         if (exists Invitee) and (exists PrivateChannel) then
@@ -129,6 +129,8 @@ domain: System
 
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
       perspective on: PrivateChannel
+      perspective on: ChannelInitiator
+      perspective on: TheChannel
     bot: for Inviter
       -- TODO. als de uitnodiging wordt weggegooid en er is geen partner in het kanaal, verwijder dan het kanaal en de kanaaldatabase!
       perspective on: External
@@ -146,5 +148,6 @@ domain: System
           callEffect ser:CreateCopyOfChannelDatabase( PrivateChannel >> ChannelDatabaseName )
 
     context: PrivateChannel (not mandatory, functional) filledBy: Channel
+    context: TheChannel = PrivateChannel >> binding
 
     user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator

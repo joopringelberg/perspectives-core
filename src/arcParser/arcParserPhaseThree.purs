@@ -40,10 +40,10 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.String.CodeUnits (fromCharArray, uncons) as CU
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, keys, lookup, unions, values)
+import Foreign.Object (empty, insert, keys, lookup, unions, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
@@ -51,12 +51,12 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContext
 import Perspectives.External.CoreModules (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
-import Perspectives.InvertedQuery (QueryWithAKink(..), RelevantProperties(..))
+import Perspectives.InvertedQuery (QueryWithAKink(..), PropsAndVerbs)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AE
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.InvertQueriesForBindings (hasAccessToPropertiesOf, setInvertedQueriesForUserAndRole)
+import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
@@ -79,7 +79,7 @@ import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForRoleType, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
+import Perspectives.Types.ObjectGetters (lookForRoleType, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, propsAndVerbsForObjectRole, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
@@ -354,10 +354,10 @@ invertedQueriesForLocalRolesAndProperties = do
           qwk <- pure $ ZQ
             (Just (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory)))
             Nothing
-          -- qfd <- pure $ (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) (bool2threeValued functional) (bool2threeValued mandatory))
           for_ userTypes \userType -> do
-            props <- lift $ lift (userType `hasAccessToPropertiesOf` (ENR _id))
-            setInvertedQueriesForUserAndRole userType (ST _id) props true qwk
+            pv <- lift2 $ propsAndVerbsForObjectRole (ENR _id) userType
+            -- Now add those verbs to the inverted query.
+            setInvertedQueriesForUserAndRole userType (ST _id) pv true qwk
 
 -- | The calculation of a CalculatedRole or a CalculatedProperty are both expressions. This function compiles the
 -- | parser AST output that represents these expressions to QueryFunctionDescriptions.
@@ -384,8 +384,11 @@ compileExpressions = do
       Q _ -> pure $ CalculatedRole cr
       S stp -> do
         userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (CR _id))
-        -- Now for each userType get the properties relevant for the Perspective.
-        userProps <- fromFoldable <$> traverse getRelevantProperties userTypes
+        -- For each userType get the PropsAndVerbs for the calculated role:
+        (pAndV :: Map RoleType PropsAndVerbs) <- fromFoldable <$> for userTypes (\userType -> do
+          pv <- lift2 $ propsAndVerbsForObjectRole (CR _id) userType
+          pure $ Tuple userType pv
+          )
         dom <- pure (CDOM $ ST context)
 
         descr <- withFrame do
@@ -393,11 +396,8 @@ compileExpressions = do
           compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
           pure $ makeSequence varb compiledCalculation
 
-        setInvertedQueries userProps descr
+        setInvertedQueries pAndV descr
         pure $ CalculatedRole (cr {calculation = Q descr})
-        where
-          getRelevantProperties :: RoleType -> PhaseThree (Tuple RoleType RelevantProperties)
-          getRelevantProperties u = Tuple u <$> (lift2 $ u `hasAccessToPropertiesOf` (CR _id))
 
     compilePropertyExpr :: String -> CalculatedProperty -> PhaseThree CalculatedProperty
     compilePropertyExpr propertyName (CalculatedProperty cr@{_id, calculation, role}) = case calculation of
@@ -405,7 +405,12 @@ compileExpressions = do
       S stp -> do
         (EnumeratedRole{context}) <- lift $ lift $ getEnumeratedRole role
         userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnProperty (CP _id))
-        userProps <- pure $ fromFoldable ((\u -> Tuple u (Properties [])) <$> userTypes)
+        -- userProps <- pure $ fromFoldable ((\u -> Tuple u (Properties [])) <$> userTypes)
+
+        -- For each userType get the PropsAndVerbs for the calculated role:
+        (pAndV :: Map RoleType PropsAndVerbs) <- fromFoldable <$> for userTypes (\userType -> do
+          pure $ Tuple userType empty
+          )
         dom <- pure (RDOM $ ST role)
 
         descr <- withFrame do
@@ -413,7 +418,7 @@ compileExpressions = do
           compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
           pure $ makeSequence varb compiledCalculation
 
-        setInvertedQueries userProps descr
+        setInvertedQueries pAndV descr
         pure $ CalculatedProperty (cr {calculation = Q descr})
 
 -- compileArg :: Array EnumeratedRoleType -> Domain -> Calculation -> PhaseThree Calculation
@@ -431,7 +436,7 @@ compileExpressions = do
 -- | We only call `compileAndDistributeStep` in the functions `compileExpressions` and `compileRules`. These functions
 -- | also modify the DomeinFileRecord, but just the CalculatedRole, CalculatedProperty and Action definitions in it.
 -- | Hence we do not risk to modify a definition that will be overwritten soon after without including that modification.
-compileAndDistributeStep :: Map RoleType RelevantProperties -> Domain -> Step -> PhaseThree QueryFunctionDescription
+compileAndDistributeStep :: Map RoleType PropsAndVerbs -> Domain -> Step -> PhaseThree QueryFunctionDescription
 compileAndDistributeStep userProps dom stp = do
   descr' <- compileStep dom stp
   descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
@@ -510,7 +515,7 @@ compileRules = do
               Q d -> pure d
               S stp -> do
                 ctxt <- lift2 (contextOfRole subject)
-                descr <- compileAndDistributeStep (singleton subject (Properties [])) (CDOM ctxt) stp
+                descr <- compileAndDistributeStep (singleton subject empty) (CDOM ctxt) stp
                 pure descr
 
             -- This will return a QueryFunctionDescription that describes either a single assignment, or
@@ -633,7 +638,7 @@ compileRules = do
                   Just e -> ensureRole subject  currentDomain e
                 (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
                 -- Compile the value expression to a QueryFunctionDescription. Its range must comply with the range of the qualifiedProperty. It is compiled relative to the current context; not relative to the object!
-                valueQfd <- compileAndDistributeStep (singleton subject (Properties [])) currentDomain valueExpression
+                valueQfd <- compileAndDistributeStep (singleton subject empty) currentDomain valueExpression
                 rangeOfProperty <- lift $ lift $ getEnumeratedProperty qualifiedProperty >>= PT.range
                 fname <- case operator of
                   Set _ -> pure $ QF.SetPropertyValue qualifiedProperty
@@ -654,7 +659,7 @@ compileRules = do
                         Nothing -> throwError (UnknownExternalFunction start end effectName)
                         Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
                           then do
-                            compiledArguments <- traverse (\s -> compileAndDistributeStep (singleton subject (Properties [])) currentDomain s) arguments
+                            compiledArguments <- traverse (\s -> compileAndDistributeStep (singleton subject empty) currentDomain s) arguments
                             pure $ MQD currentDomain (QF.ExternalEffectFullFunction effectName) compiledArguments currentDomain Unknown Unknown
                           else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
                     -- TODO: behandel hier Foreign functions.
@@ -715,14 +720,14 @@ compileRules = do
 
 ensureContext :: RoleType -> Domain -> Step -> PhaseThree QueryFunctionDescription
 ensureContext userType currentDomain stp = do
-  qfd <- compileAndDistributeStep (singleton userType (Properties [])) currentDomain stp
+  qfd <- compileAndDistributeStep (singleton userType empty) currentDomain stp
   case range qfd of
     (CDOM _) -> pure qfd
     otherwise -> throwError $ NotAContextDomain (range qfd) (startOf stp) (endOf stp)
 
 ensureRole :: RoleType -> Domain -> Step -> PhaseThree QueryFunctionDescription
 ensureRole userType currentDomain stp = do
-  qfd <- compileAndDistributeStep (singleton userType (Properties [])) currentDomain stp
+  qfd <- compileAndDistributeStep (singleton userType empty) currentDomain stp
   case range qfd of
     (RDOM _) -> pure qfd
     otherwise -> throwError $ NotARoleDomain (range qfd) (startOf stp) (endOf stp)

@@ -37,7 +37,7 @@ domain: SimpleChat
       aspect: sys:Invitation$Invitee
       aspect: cht:WithText$TextWriter
       perspective on: Initiator
-      perspective on: External
+      perspective on: External Consult
       perspective on: Partner
     thing: PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns: sys:PerspectivesSystem$User) with not binds sys:Me
 

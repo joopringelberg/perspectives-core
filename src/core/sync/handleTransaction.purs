@@ -29,6 +29,7 @@ import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (unwrap)
+import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign.Generic (decodeJSON)
 import Foreign.Object (empty)
@@ -36,6 +37,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.Update (addProperty, addRoleInstancesToContext, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty)
 import Perspectives.Authenticate (authenticate)
+import Perspectives.Checking.Authorization (roleHasPerspectiveOnPropertyWithVerb)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=))
@@ -43,7 +45,9 @@ import Perspectives.Identifiers (unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Builders (constructEmptyContext)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
+import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
@@ -71,12 +75,27 @@ executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWi
     RemoveBinding -> void $ removeBinding roleWillBeRemoved roleId
 
 executeRolePropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
-executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property}) = do
+executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, subject}) = do
   log (show deltaType <> " for " <> show id <> " and property " <> show property)
   case deltaType of
-    AddProperty -> addProperty [id] property values
-    RemoveProperty -> removeProperty [id] property values
-    DeleteProperty -> deleteProperty [id] property
+    AddProperty -> do
+      -- we need not check whether the model is known if we assume valid transactions:
+      -- a role instance creation delta must have preceded the property delta.
+      (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Create) >>= case _ of
+        Left e -> handleError e
+        Right _ -> addProperty [id] property values
+    RemoveProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Change) >>= case _ of
+      Left e -> handleError e
+      Right _ -> removeProperty [id] property values
+    DeleteProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Delete) >>= case _ of
+      Left e -> handleError e
+      Right _ -> deleteProperty [id] property
+
+-- TODO. Wat we nodig hebben, is een secundair kanaal naar de client waarin we
+-- fouten en waarschuwingen kunnen sturen.
+-- Totdat we dat hebben, zetten we een waarschuwing op de console.
+handleError :: PerspectivesError -> MonadPerspectivesTransaction Unit
+handleError e = liftEffect $ log (show e)
 
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
 executeUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit

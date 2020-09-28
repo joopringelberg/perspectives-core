@@ -71,7 +71,7 @@ instance actionActionClass :: ActionClass Action where
     otherwise -> throwError (error ("Attempt to access the Effect of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
   isExecutedByBot r = (unwrap r).executedByBot
   providesPerspectiveOnRole rt r = rt == (unwrap r).object || (Just rt) == (unwrap r).indirectObject
-  providesPerspectiveOnProperty pt r = (||) <$> maybe (pure true) isInView (requiredObjectProperties r) <*> ((||) <$> maybe (pure true) isInView (requiredObjectProperties r) <*> maybe (pure true) isInView (requiredSubjectProperties r))
+  providesPerspectiveOnProperty pt r = (||) <$> maybe (pure true) isInView (requiredObjectProperties r) <*> ((||) <$> maybe (pure true) isInView (requiredIndirectObjectProperties r) <*> maybe (pure true) isInView (requiredSubjectProperties r))
     where
       isInView :: ViewType -> MonadPerspectives Boolean
       isInView vt = getView vt >>= \v -> pure $ isJust $ elemIndex pt (propertyReferences v)

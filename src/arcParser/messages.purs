@@ -35,8 +35,9 @@ import Perspectives.Parsing.Arc.Expression.AST (LetStep(..), PureLetStep(..), St
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedRoleType, RoleKind, RoleType)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
 
 -- | A Perspectives sourcefile (text or diagram) will be parsed in two passes.
@@ -93,6 +94,8 @@ data PerspectivesError
     | UnknownExternalFunction ArcPosition ArcPosition String
     | CannotFindContextType ArcPosition ArcPosition String
 
+    | UnauthorizedForProperty String RoleType EnumeratedRoleType EnumeratedPropertyType Verb
+
     | ParserError String ArcPosition
     | Custom String
 
@@ -144,6 +147,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (WrongNumberOfArguments start end functionName nrExpected nrGiven) = "(WrongNumberOfArguments) The function '" <> functionName <> "' expects " <> show nrExpected <> " arguments but received " <> show nrGiven <> ", between " <> show start <> " and " <> show end
   show (UnknownExternalFunction start end functionName) = "(UnknownExternalFunction) The external function name '" <> functionName <> "' is unknown, between " <> show start <> " and " <> show end
   show (CannotFindContextType start end ctype) = "(CannotFindContextType) The context type name '" <> ctype <> "' cannot be resolved, between " <> show start <> " and " <> show end
+  show (UnauthorizedForProperty author userRole role property verb) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> "."
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
 type MultipleErrors = NonEmptyList PerspectivesError

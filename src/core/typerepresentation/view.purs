@@ -53,6 +53,7 @@ type ViewRecord =
   , _rev :: Revision_
   , displayName :: String
 
+  -- TODO: maak er een NonEmpty Array van.
   , propertyReferences :: Array PropertyType
   , role :: EnumeratedRoleType
 

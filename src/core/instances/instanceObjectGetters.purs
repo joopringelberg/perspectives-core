@@ -261,3 +261,7 @@ subjectForRoleInstance roleId = do
   lift $ lift $ case msubject of
     Nothing -> UserType <$> (roleId ##>> context >=> getMyType)
     Just me -> pure $ UserInstance me
+
+typeOfSubjectOfAction :: SubjectOfAction -> MonadPerspectives RoleType
+typeOfSubjectOfAction (UserInstance r) = (r ##>> roleType) >>= pure <<< ENR
+typeOfSubjectOfAction (UserType t) = pure t
