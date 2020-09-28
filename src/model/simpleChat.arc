@@ -26,20 +26,24 @@ domain: SimpleChat
       aspect: sys:Invitation$External
       property: Title (not mandatory, functional, String)
       --property: WithPartner = You >> Voornaam
-    user: Me = filter (Initiator union Partner) with binds sys:Me
-    user: You = filter (Initiator union Partner) with not binds sys:Me
+
     user: Initiator (mandatory, functional) filledBy: Chatter
       aspect: sys:Invitation$Inviter
       aspect: cht:WithText$TextWriter
       perspective on: Partner
       perspective on: External
+
     user: Partner (not mandatory, functional) filledBy: sys:PerspectivesSystem$User
       aspect: sys:Invitation$Invitee
       aspect: cht:WithText$TextWriter
-      perspective on: Initiator
       perspective on: External Consult
+      perspective on: Initiator
       perspective on: Partner
+
     thing: PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns: sys:PerspectivesSystem$User) with not binds sys:Me
+
+    user: Me = filter (Initiator union Partner) with binds sys:Me
+    user: You = filter (Initiator union Partner) with not binds sys:Me
 
   case: WithText
     user: TextWriter filledBy: sys:PerspectivesSystem$User
