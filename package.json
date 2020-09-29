@@ -6,7 +6,7 @@
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
   "dependencies": {
     "eventsource": "^1.0.7",
-    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.4.0",
+    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.5.0",
     "xhr2-cookies": "^1.1.0"
   },
   "repository": {
