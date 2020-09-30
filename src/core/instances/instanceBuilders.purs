@@ -105,12 +105,12 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
             (rolInstances' :: NonEmptyArray (Tuple RolSerialization RoleInstance)) <- forWithIndex
               (unwrap rolDescriptions)
               (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId))
-            -- Add the completed Role instances to the context.
-            -- SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
-            lift $ lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) (snd <$> rolInstances')
             -- SYNCHRONISATION: through setBinding adds a RoleBindingDelta, also sets isMe.
             -- CURRENTUSER
             for_ rolInstances' addBindingToRoleInstance
+            -- Add the completed Role instances to the context.
+            -- SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
+            lift $ lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) (snd <$> rolInstances')
             pure $ toArray (snd <$> rolInstances')
 
           lift $ lift2 $ void $ saveEntiteit contextInstanceId
