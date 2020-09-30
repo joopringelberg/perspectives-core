@@ -37,7 +37,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, MPT, (##=), (##>), (##>>), type (~~>))
-import Perspectives.Couchdb (selectOnField)
+import Perspectives.Couchdb (selectOnFieldEqual, selectOnFieldNotEqual)
 import Perspectives.Couchdb.Databases (createDatabase, deleteDocument_, endReplication, ensureAuthentication, replicateContinuously)
 import Perspectives.Guid (guid)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
@@ -235,7 +235,7 @@ setPushReplication channelDatabaseName host port author = do
     channelDatabaseName
     (base <> channelDatabaseName)
     (host <> ":" <> port <> "/" <> channelDatabaseName)
-    (Just $ selectOnField "author" author)
+    (Just $ selectOnFieldEqual "author" author)
 
 -- | Push local channel to remote, pull remote channel on the RelayHost to local.
 setPushAndPullReplication :: String -> String -> String -> String -> MonadPerspectives Unit
@@ -247,23 +247,29 @@ setPushAndPullReplication channelDatabaseName host port author = do
     channelDatabaseName
     (base <> channelDatabaseName)
     (host <> ":" <> port <> "/" <> channelDatabaseName)
-    (Just $ selectOnField "author" me)
+    (Just $ selectOnFieldEqual "author" me)
   -- Pull in all Transactions from the partner inwards.
   replicateContinuously
     channelDatabaseName
     (host <> ":" <> port <> "/" <> channelDatabaseName)
     (base <> channelDatabaseName)
-    (Just $ selectOnField "author" author)
+    (Just $ selectOnFieldEqual "author" author)
 
 -- | Replicate source to target. Both databases are supposed to be local, so push or pull is unimportant.
+-- | If the author is not given, the criterium will be that the "author" field in the transaction must be
+-- | *different* from the own user id.
 localReplication :: String -> String -> Maybe String -> MonadPerspectives Unit
 localReplication source target author = do
   base <- getCouchdbBaseURL
+  me <- getUserIdentifier
   replicateContinuously
     (source <> "_" <> target)
     (base <> source)
     (base <> target)
-    (maybe Nothing (\a -> Just $ selectOnField "author" a) author)
+    (maybe
+      (Just $ selectOnFieldNotEqual "author" me)
+      (\a -> Just $ selectOnFieldEqual "author" a)
+      author)
 
 -- | Stop replicating the channel to the post database.
 -- | Stop replicating the channel database to the remote version.
