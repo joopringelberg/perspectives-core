@@ -76,7 +76,7 @@ import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, not, pure, unit, void, when, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>>=), (+))
+import Prelude (Unit, bind, discard, flip, not, pure, unit, void, when, ($), (&&), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setBinding on each role.
@@ -110,7 +110,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
             for_ rolInstances' addBindingToRoleInstance
             -- Add the completed Role instances to the context.
             -- SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
-            lift $ lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) (snd <$> rolInstances')
+            lift $ lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) (flip Tuple Nothing <$> (snd <$> rolInstances'))
             pure $ toArray (snd <$> rolInstances')
 
           lift $ lift2 $ void $ saveEntiteit contextInstanceId
@@ -149,7 +149,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
         Just bnd -> do
           expandedBinding <- RoleInstance <$> (lift $ lift $ lift2 $ expandDefaultNamespaces bnd)
           -- setBinding saves, too.
-          lift $ lift $ setBinding roleInstance expandedBinding
+          lift $ lift $ setBinding roleInstance expandedBinding Nothing
       case properties of
         (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
           lift $ lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
@@ -161,7 +161,13 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
 -- | we should sent these deltas to, and these are computed on constructing the roles of the context.
 -- | So each caller of constructEmptyContext should add these two deltas to the Transaction.
 -- | to the Transaction (and also a UniverseRoleDelta for the external role).
--- | RULE TRIGGERING for the context through the step `role <Type of External Role of the Context`.
+-- | QUERY UPDATES
+-- | PERSISTENCE of the external role, but not of the context itself.
+-- |
+-- | For properties:
+-- | SYNCHRONISATION by RolePropertyDelta.
+-- | RULE TRIGGERING
+-- | QUERY UPDATES
 constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction PerspectContext
 constructEmptyContext contextInstanceId ctype localName externeProperties = do
   externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
@@ -190,6 +196,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
       , pspType = EnumeratedRoleType (unwrap pspType <> "$External")
       , context = contextInstanceId
       , binding = Nothing
+      -- TODO binnenkomende delta?
       , universeRoleDelta =
           SignedDelta
             { author
@@ -200,11 +207,14 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
               , deltaType: ConstructEmptyRole
               , subject } }
       })
+  -- QUERY UPDATES
   (lift $ lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (EnumeratedRoleType $ unwrap pspType <> "$External")) >>= lift <<< addCorrelationIdentifiersToTransactie
   -- TODO. Op dit moment van constructie aangekomen is nog niet vastgelegd wie 'me' is in de context.
   case externeProperties of
     (PropertySerialization props) -> lift do
       forWithIndex_ props \propertyTypeId values ->
+        -- PERSISTENCE of the role instance.
+        -- CURRENTUSER: there can be no change to the current user.
         setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
       when (isEmpty props) (lift2 $ void $ saveEntiteit externalRole)
   pure contextInstance
@@ -224,6 +234,19 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
       constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) rolInstanceId
     Just roleId -> constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) (RoleInstance roleId)
 
+  -- Then add the new Role instance to the context.
+  addRoleInstancesToContext contextInstanceId roleType (singleton (Tuple roleInstance Nothing))
+  -- Then add the binding
+  case binding of
+    Nothing -> pure unit
+    Just bnd -> do
+      expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
+      void $ setBinding roleInstance expandedBinding Nothing
+  -- Then add the properties
+  case properties of
+    (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
+      setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
+
   -- Serialise as Deltas if we bind to a user that is not me.
   isMe <- getIsMe
   when (isJust binding && kindOfRole == UserRole && not isMe)
@@ -234,20 +257,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
       -- non-existing context!
       -- We assume here that a User has just one role in the context (otherwise the serialisation is superfluous).
       (contextInstanceId `serialisedAsDeltasFor` roleInstance)
-  -- Then add the new Role instance to the context.
-  addRoleInstancesToContext contextInstanceId roleType (singleton roleInstance)
-  -- Then add the binding
-  -- MAAR DIE IS ER AL!!
-  case binding of
-    Nothing -> pure unit
-    Just bnd -> do
-      expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
-      -- SETBINDING OVERSCHRIJFT DE BESTAANDE BINDING!!
-      void $ setBinding roleInstance expandedBinding
-  -- Then add the properties
-  case properties of
-    (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
-      setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
+
   pure roleInstance
   where
     getIsMe :: MonadPerspectivesTransaction Boolean

@@ -269,12 +269,12 @@ scheduleContextRemoval id = lift $ AA.modify (over Transaction \t@{contextsToBeR
 -- | RULE TRIGGERING for `binding <roleId`, `binder <TypeOfRoleId>` for both the new and the old binding.
 -- | QUERY UPDATES for `binding <roleId`, `binder <TypeOfRoleId>` for both the old binding and the new binding.
 -- | CURRENTUSER for roleId and its context.
-setBinding :: RoleInstance -> (RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance))
-setBinding roleId (newBindingId :: RoleInstance) = do
+setBinding :: RoleInstance -> RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
+setBinding roleId (newBindingId :: RoleInstance) msignedDelta = do
   (originalRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId
   if (rol_binding originalRole == Just newBindingId)
     then pure []
-    else setBinding_ roleId newBindingId
+    else setBinding_ roleId newBindingId msignedDelta
 
 -- | The first argument represents the role instance that receives the new binding.
 -- | The second argument represents the new binding.
@@ -285,8 +285,8 @@ setBinding roleId (newBindingId :: RoleInstance) = do
 -- | RULE TRIGGERING for `binding <roleId`, `binder <TypeOfRoleId>` for both the new and the old binding.
 -- | QUERY UPDATES for `binding <roleId`, `binder <TypeOfRoleId>` for both the old binding and the new binding.
 -- | CURRENTUSER for roleId and its context.
-setBinding_ :: RoleInstance -> (RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance))
-setBinding_ roleId (newBindingId :: RoleInstance) = do
+setBinding_ :: RoleInstance -> RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
+setBinding_ roleId (newBindingId :: RoleInstance) msignedDelta = do
   (originalRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId
   cacheAndSave roleId (changeRol_binding newBindingId originalRole)
 
@@ -339,18 +339,20 @@ setBinding_ roleId (newBindingId :: RoleInstance) = do
 
   subject <- getSubject
   delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
-                { id : roleId
-                , binding: Just newBindingId
-                , oldBinding: rol_binding originalRole
-                , deltaType: SetBinding
-                , roleWillBeRemoved: false
-                , subject
-                }
+    { id : roleId
+    , binding: Just newBindingId
+    , oldBinding: rol_binding originalRole
+    , deltaType: SetBinding
+    , roleWillBeRemoved: false
+    , subject
+    }
   users <- aisInRoleDelta delta
   author <- getAuthor
-  signedDelta <- pure $ SignedDelta
-    { author
-    , encryptedDelta: sign $ encodeJSON $ delta}
+  signedDelta <-  case msignedDelta of
+    Nothing -> pure $ SignedDelta
+      { author
+      , encryptedDelta: sign $ encodeJSON $ delta}
+    Just signedDelta -> pure signedDelta
   addDelta (DeltaInTransaction { users, delta: signedDelta })
   -- Save the SignedDelta as the bindingDelta in the role.
   (modifiedRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId

@@ -46,7 +46,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, lookup)
@@ -81,8 +81,10 @@ type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array Role
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
 -- | CURRENTUSER for contextId and one of rolInstances.
-addRoleInstancesToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (NonEmptyArray RoleInstance))
-addRoleInstancesToContext contextId rolName rolInstances = do
+-- | To handle incoming ContextDeltas, we include them optionally in the last argument.
+addRoleInstancesToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (NonEmptyArray (Tuple RoleInstance (Maybe SignedDelta))))
+addRoleInstancesToContext contextId rolName instancesAndDeltas = do
+  rolInstances <- pure $ fst <$> instancesAndDeltas
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
   when (not $ null (toArray rolInstances `difference` context_rolInContext pe rolName))
     do
@@ -104,16 +106,19 @@ addRoleInstancesToContext contextId rolName rolInstances = do
       author <- getAuthor
       for_ roles \(PerspectRol r@{_id, universeRoleDelta}) -> do
         addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
-        delta <- pure $ SignedDelta
-          { author
-          , encryptedDelta: sign $ encodeJSON $ ContextDelta
-            { id : contextId
-            , roleType: rolName
-            , deltaType: AddRoleInstancesToContext
-            , roleInstances: (singleton _id)
-            , destinationContext: Nothing
-            , subject
-            } }
+        (receivedDelta :: Maybe (Maybe SignedDelta)) <- pure $ snd <$> find (fst >>> eq _id) instancesAndDeltas
+        delta <- case receivedDelta of
+          Just (Just d) -> pure d
+          otherwise -> pure $ SignedDelta
+            { author
+            , encryptedDelta: sign $ encodeJSON $ ContextDelta
+              { id : contextId
+              , roleType: rolName
+              , deltaType: AddRoleInstancesToContext
+              , roleInstances: (singleton _id)
+              , destinationContext: Nothing
+              , subject
+              } }
         addDelta $ DeltaInTransaction {users, delta}
         cacheAndSave _id $ PerspectRol r { contextDelta = delta }
       -- QUERY UPDATES
@@ -221,30 +226,34 @@ type PropertyUpdater = Array RoleInstance -> EnumeratedPropertyType -> (Updater 
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
 -- | CURRENTUSER: there can be no change to the current user.
-addProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
-addProperty rids propertyName values = case ARR.head rids of
+addProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array (Tuple Value (Maybe SignedDelta))))
+addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
+    values <- pure $ fst <$> valuesAndDeltas
     subject <- getSubject
     author <- getAuthor
     for_ rids \rid -> do
       (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
       -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
       users <- aisInPropertyDelta rid propertyName
-      deltas <- for values \value -> do
-        -- Create a delta for each value.
-        delta <- pure $ RolePropertyDelta
-          { id : rid
-          , property: propertyName
-          , deltaType: AddProperty
-          , values: [value]
-          , subject
-          }
-        signedDelta <- pure $ SignedDelta
-          { author
-          , encryptedDelta: sign $ encodeJSON $ delta}
-        addDelta (DeltaInTransaction { users, delta: signedDelta})
-        pure (Tuple (unwrap value) signedDelta)
+      deltas <- for valuesAndDeltas \(Tuple value msignedDelta) -> do
+          delta <- case msignedDelta of
+            Nothing -> do
+              -- Create a delta for each value.
+              delta <- pure $ RolePropertyDelta
+                { id : rid
+                , property: propertyName
+                , deltaType: AddProperty
+                , values: [value]
+                , subject
+                }
+              pure $ SignedDelta
+                { author
+                , encryptedDelta: sign $ encodeJSON $ delta}
+            Just signedDelta -> pure signedDelta
+          addDelta (DeltaInTransaction { users, delta: delta })
+          pure (Tuple (unwrap value) delta)
       (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
       -- Apply all changes to the role and then save it:
       --  - change the property values in one go
@@ -335,7 +344,7 @@ deleteProperty rids propertyName = case ARR.head rids of
 setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 setProperty rids propertyName values = do
   deleteProperty rids propertyName
-  addProperty rids propertyName values
+  addProperty rids propertyName (flip Tuple Nothing <$> values)
 
 -----------------------------------------------------------
 -- CACHEANDSAVE

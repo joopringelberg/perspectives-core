@@ -264,7 +264,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.CreateContext_ -> withNewContext authoringRole
       \(ContextInstance id) -> do
         -- now bind it in the role instance.
-        void $ setBinding (RoleInstance subject) (RoleInstance $ buitenRol id)
+        void $ setBinding (RoleInstance subject) (RoleInstance $ buitenRol id) Nothing
         handleNewPeer (RoleInstance subject)
         lift2 $ sendResponse (Result corrId [buitenRol id]) setter
     Api.ImportTransaction -> case unwrap $ runExceptT $ decode contextDescription of
@@ -323,7 +323,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.Bind_ -> catchError
       do
         void $ runMonadPerspectivesTransaction authoringRole do
-          void $ setBinding (RoleInstance subject) (RoleInstance object)
+          void $ setBinding (RoleInstance subject) (RoleInstance object) Nothing
           handleNewPeer (RoleInstance subject)
         sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)

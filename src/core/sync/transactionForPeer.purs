@@ -24,17 +24,17 @@ module Perspectives.Sync.TransactionForPeer where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-import Data.Array (snoc)
+import Data.Array (elemIndex, snoc)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.DateTime (SerializableDateTime)
 import Perspectives.Sync.SignedDelta (SignedDelta)
-import Prelude (class Show, (<>), show)
+import Prelude (class Show, (<>), show, ($))
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -59,7 +59,9 @@ instance decodeTransactie :: Decode TransactionForPeer where
   decode = genericDecode defaultOptions
 
 addToTransactionForPeer :: SignedDelta -> TransactionForPeer -> TransactionForPeer
-addToTransactionForPeer d (TransactionForPeer r@{deltas}) = TransactionForPeer r {deltas = snoc deltas d}
+addToTransactionForPeer d (TransactionForPeer r@{deltas}) = TransactionForPeer r {deltas = if isJust $ elemIndex d deltas
+    then deltas
+    else snoc deltas d}
 
 transactieID :: TransactionForPeer -> String
 transactieID (TransactionForPeer{author, timeStamp}) = author <> "_" <> show timeStamp

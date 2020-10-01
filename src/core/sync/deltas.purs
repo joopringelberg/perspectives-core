@@ -26,10 +26,10 @@ import Affjax.RequestBody as RequestBody
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (insertAt, length, nub, snoc, union)
+import Data.Array (elemIndex, insertAt, length, nub, snoc, union)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (over)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
@@ -114,14 +114,21 @@ addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
 addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changedDomeinFiles}) ->
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
--- | Add the delta at the end of the array.
+-- | Add the delta at the end of the array, unless it is already in the transaction!
 addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
-addDelta d = lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas = snoc deltas d})
+addDelta d = lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas =
+  if isJust $ elemIndex d deltas
+    then deltas
+    else snoc deltas d})
 
--- | Insert the delta at the index.
+-- | Insert the delta at the index, unless it is already in the transaction.
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
-insertDelta d i = lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas = unsafePartial $ fromJust $ insertAt i d deltas})
+insertDelta d i = lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas =
+  if isJust $ elemIndex d deltas
+    then deltas
+    else unsafePartial $ fromJust $ insertAt i d deltas})
 
+-- | Instrumental for QUERY UPDATES.
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
 addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})
 

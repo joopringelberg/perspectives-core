@@ -21,7 +21,7 @@
 
 module Perspectives.Sync.HandleTransaction where
 
-import Control.Monad.Except (runExcept, runExceptT)
+import Control.Monad.Except (runExcept)
 import Data.Array (length)
 import Data.Array.NonEmpty (head)
 import Data.Either (Either(..))
@@ -29,27 +29,27 @@ import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (unwrap)
+import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign.Generic (decodeJSON)
-import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.Update (addProperty, addRoleInstancesToContext, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty)
 import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnPropertyWithVerb)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.ContextAndRole (defaultRolRecord)
+import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=))
-import Perspectives.Identifiers (unsafeDeconstructModelName)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.Builders (constructEmptyContext)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie)
+import Perspectives.DependencyTracking.Dependency (findRoleRequests)
+import Perspectives.Identifiers (buitenRol, unsafeDeconstructModelName)
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, setBinding)
@@ -57,25 +57,25 @@ import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, flip, pure, show, unit, void, when, ($), (+), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, discard, flip, pure, show, unit, void, when, ($), (+), (<<<), (<>), (>>=), (<$>))
 
-executeContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
-executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext} ) = do
+executeContextDelta :: ContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
+executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext} ) signedDelta = do
   log (show deltaType <> " to/from " <> show contextId <> " and " <> show roleInstances)
   case deltaType of
     -- The subject must be allowed to change the role: they must have a perspective on it that includes the verb Change.
-    AddRoleInstancesToContext -> addRoleInstancesToContext contextId roleType (unwrap roleInstances)
+    AddRoleInstancesToContext -> addRoleInstancesToContext contextId roleType ((flip Tuple (Just signedDelta)) <$> (unwrap roleInstances))
     MoveRoleInstancesToAnotherContext -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
 
-executeRoleBindingDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
-executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved}) = do
+executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
+executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved}) signedDelta = do
   log (show deltaType <> " of " <> show roleId <> " (to) " <> show binding)
   case deltaType of
-    SetBinding -> void $ setBinding roleId (unsafePartial $ fromJust binding)
+    SetBinding -> void $ setBinding roleId (unsafePartial $ fromJust binding) (Just signedDelta)
     RemoveBinding -> void $ removeBinding roleWillBeRemoved roleId
 
-executeRolePropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
-executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, subject}) = do
+executeRolePropertyDelta :: RolePropertyDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
+executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, subject}) signedDelta = do
   log (show deltaType <> " for " <> show id <> " and property " <> show property)
   case deltaType of
     AddProperty -> do
@@ -83,7 +83,7 @@ executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, sub
       -- a role instance creation delta must have preceded the property delta.
       (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Create) >>= case _ of
         Left e -> handleError e
-        Right _ -> addProperty [id] property values
+        Right _ -> addProperty [id] property (flip Tuple (Just signedDelta) <$> values)
     RemoveProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Change) >>= case _ of
       Left e -> handleError e
       Right _ -> removeProperty [id] property values
@@ -98,8 +98,8 @@ handleError :: PerspectivesError -> MonadPerspectivesTransaction Unit
 handleError e = liftEffect $ log (show e)
 
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
-executeUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
-executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) = do
+executeUniverseContextDelta :: UniverseContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
+executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) signedDelta = do
   log (show deltaType <> " with id " <> show id <> " and with type " <> show contextType)
   case deltaType of
     ConstructEmptyContext -> do
@@ -107,7 +107,17 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) =
       when (isNothing exists)
         do
           loadModelIfMissing (unsafeDeconstructModelName $ unwrap contextType)
-          void $ runExceptT $ constructEmptyContext id (unwrap contextType) "" (PropertySerialization empty)
+          contextInstance <- pure
+            (PerspectContext defaultContextRecord
+              { _id = id
+              , displayName = unwrap id
+              , pspType = contextType
+              , buitenRol = RoleInstance $ buitenRol $ unwrap id
+              , universeContextDelta = signedDelta
+              })
+          lift2 $ void $ cacheEntity id contextInstance
+          (lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (EnumeratedRoleType $ unwrap contextType <> "$External")) >>= addCorrelationIdentifiersToTransactie
+
 
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
@@ -124,6 +134,8 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
           (void $ constructEmptyRole_ id (offset + i) roleInstance)
           -- TODO save it?
     ConstructExternalRole -> do
+      -- Notice that merely constructing a role has no consequences for the responsibilities
+      -- QUERY UPDATES, RULE TRIGGERING, PERSISTENCE or CURRENTUSER.
       externalRole <- pure (head $ toNonEmptyArray roleInstances)
       log ("ConstructExternalRole in " <> show id)
       (exists :: Maybe PerspectRol) <- lift2 $ tryGetPerspectEntiteit externalRole
@@ -161,13 +173,13 @@ executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectives
         -- For now, we fail silently on deltas that cannot be authenticated.
         executeDelta Nothing = pure unit
         executeDelta (Just stringifiedDelta) = case runExcept $ decodeJSON stringifiedDelta of
-          Right d1 -> executeRolePropertyDelta d1
+          Right d1 -> executeRolePropertyDelta d1 s
           Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-            Right d2 -> executeRoleBindingDelta d2
+            Right d2 -> executeRoleBindingDelta d2 s
             Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-              Right d3 -> executeContextDelta d3
+              Right d3 -> executeContextDelta d3 s
               Left _ -> case runExcept $ decodeJSON stringifiedDelta of
                 Right d4 -> executeUniverseRoleDelta d4 s
                 Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                  Right d5 -> executeUniverseContextDelta d5
+                  Right d5 -> executeUniverseContextDelta d5 s
                   Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta)

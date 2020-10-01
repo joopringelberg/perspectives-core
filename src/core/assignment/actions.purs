@@ -165,7 +165,7 @@ compileAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) role
         , ctype = unwrap qualifiedContextTypeIdentifier
         })
       -- now bind it in the role instance.
-      void $ setBinding roleInstance (RoleInstance $ buitenRol newContextId)
+      void $ setBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
       handleNewPeer (RoleInstance newContextId)
 
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
@@ -224,7 +224,7 @@ compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
       Just binding'' -> case binder' of
         Nothing -> pure []
         Just binder'' -> do
-          setBinding binder'' binding'' <* handleNewPeer binder''
+          setBinding binder'' binding'' Nothing <* handleNewPeer binder''
 
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
@@ -270,7 +270,7 @@ compileAssignment (BQD _ (QF.AddPropertyValue qualifiedProperty) valueQfd roleQf
   pure \contextId -> do
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
     (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
-    addProperty roles qualifiedProperty values
+    addProperty roles qualifiedProperty (flip Tuple Nothing <$> values)
 
 compileAssignment (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
