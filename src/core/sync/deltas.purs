@@ -52,11 +52,11 @@ import Perspectives.PerspectivesState (nextTransactionNumber)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
-import Perspectives.Sync.SignedDelta (SignedDelta)
+import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (>=>), (>>>))
+import Prelude (Unit, bind, discard, pure, show, unit, void, when, ($), (<>), (>=>), (>>>), not, eq)
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -99,15 +99,16 @@ transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas}) = do
     empty
   where
     addDeltaToCustomisedTransactie :: SignedDelta -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
-    addDeltaToCustomisedTransactie d users = do
+    addDeltaToCustomisedTransactie d@(SignedDelta {author: deltaAuthor}) users = do
       sysUsers <- lift (unit ##= (\_ -> ArrayT (pure users)) >=> bottom)
       for_
         (nub sysUsers)
-        (\(RoleInstance sysUser) -> do
-          trs <- get
-          case lookup sysUser trs of
-            Nothing -> put $ insert sysUser (TransactionForPeer {author, timeStamp, deltas: [d]}) trs
-            Just trans -> put $ insert sysUser (addToTransactionForPeer d trans) trs
+        (\(RoleInstance sysUser) -> when (not $ eq sysUser deltaAuthor)
+          do
+            trs <- get
+            case lookup sysUser trs of
+              Nothing -> put $ insert sysUser (TransactionForPeer {author, timeStamp, deltas: [d]}) trs
+              Just trans -> put $ insert sysUser (addToTransactionForPeer d trans) trs
         )
 
 addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
