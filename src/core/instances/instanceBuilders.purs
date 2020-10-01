@@ -249,14 +249,15 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
 
   -- Serialise as Deltas if we bind to a user that is not me.
   isMe <- getIsMe
-  when (isJust binding && kindOfRole == UserRole && not isMe)
+  if (isJust binding && kindOfRole == UserRole && not isMe)
       -- If the binding is a User that is not me,
       -- serialise the context for that User.
       -- We must do that before we generate Deltas that add a role to the context,
       -- otherwise, on reconstructing from the Deltas, the peer'll try to add a rol to a
       -- non-existing context!
       -- We assume here that a User has just one role in the context (otherwise the serialisation is superfluous).
-      (contextInstanceId `serialisedAsDeltasFor` roleInstance)
+      then contextInstanceId `serialisedAsDeltasFor` roleInstance
+      else pure unit
 
   pure roleInstance
   where

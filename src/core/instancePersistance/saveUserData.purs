@@ -375,14 +375,6 @@ handleNewPeer roleInstance = do
     then context `serialisedAsDeltasFor` roleInstance
     else pure unit
 
-handleNewPeer_ :: Boolean -> RoleInstance -> MonadPerspectivesTransaction Unit
-handleNewPeer_ me roleInstance = do
-  PerspectRol{context, pspType} <- lift2 $ getPerspectRol roleInstance
-  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole pspType
-  if kindOfRole == UserRole && not me
-    then context `serialisedAsDeltasFor` roleInstance
-    else pure unit
-
 -- | Removes the binding R of the rol, if any.
 -- | If the binding is an external role, checks if it should be removed.
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
