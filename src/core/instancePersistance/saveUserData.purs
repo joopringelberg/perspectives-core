@@ -81,7 +81,7 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, eq, join, pure, unit, void, when, ($), (<>), (>>=), (&&), (==), not)
+import Prelude (Unit, bind, discard, eq, join, pure, unit, void, ($), (<>), (>>=), (&&), (==), not)
 
 -- | This function takes care of
 -- | PERSISTENCE
@@ -299,12 +299,13 @@ setBinding_ roleId (newBindingId :: RoleInstance) msignedDelta = do
   -- it is the external role of a sys:Model context. This role has a property Url that
   -- we can fetch the model from.
   mDomeinFile <- lift2 $ traverse tryRetrieveDomeinFile (deconstructModelName $ unwrap pspType)
-  when (isNothing mDomeinFile)
-    (do
+  if (isNothing mDomeinFile)
+    then do
       murl <- lift2 (newBindingId ##> getProperty (EnumeratedPropertyType "model:System$Model$External$Url"))
       case murl of
         Nothing -> throwError (error $ "System error: no url found to load model for unknown type " <> (unwrap pspType))
-        Just (Value url) -> addModelToLocalStore [url] newBindingId)
+        Just (Value url) -> addModelToLocalStore [url] newBindingId
+    else pure unit
   -- Handle isMe (on the binding role) and me (on its context).
   if isMe
     then do
@@ -410,11 +411,12 @@ removeBinding roleWillBeRemoved roleId = do
             , encryptedDelta: sign $ encodeJSON $ delta}
           addDelta (DeltaInTransaction { users, delta: signedDelta})
 
-          when (not roleWillBeRemoved)
-            do
+          if not roleWillBeRemoved
+            then do
               (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
               cacheAndSave roleId (over PerspectRol (\rl -> rl {bindingDelta = Nothing})
                 (changeRol_isMe (removeRol_binding originalRole) false))
+            else pure unit
           ctxt <- lift2 $ getPerspectContext $ rol_context originalRole
           if (context_me ctxt == (Just roleId))
             then setMe (rol_context originalRole) Nothing

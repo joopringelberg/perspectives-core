@@ -53,7 +53,7 @@ import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, setChannelReplication)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
 import Perspectives.User (getCouchdbBaseURL, getHost, getPort)
-import Prelude (class Monad, Unit, bind, discard, eq, map, not, pure, unit, when, ($), (&&), (<$>), (<>), (>>=), (>>>), (>=>))
+import Prelude (class Monad, Unit, bind, discard, eq, map, not, pure, unit, ($), (&&), (<$>), (<>), (>>=), (>>>), (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A function for the External Core Module `model:Serialise`. The first argument should be a singleton holding
@@ -140,14 +140,14 @@ serialiseAsJsonFor_ userType cid = do
           typeOfBinding <- lift (b ##>> roleType)
           allowed <- lift (userType ###>> roleIsInPerspectiveOf (ENR typeOfBinding))
           -- TODO. Serialiseer de context niet als de ander er al een rol bij speelt!
-          when (allowed && not doneBefore) (serialiseAsJsonFor_ userType c)
+          if allowed && not doneBefore then serialiseAsJsonFor_ userType c else pure unit
           pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: if allowed then map unwrap binding else Nothing}
 
     serialisePropertiesFor :: String -> Array Value -> WriterT (OBJ.Object (Array String)) MonadPerspectives Unit
     serialisePropertiesFor propertyTypeId values = do
       -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
       propAllowed <- lift (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))
-      when propAllowed $ tell (OBJ.singleton propertyTypeId (unwrap <$> values))
+      if propAllowed then tell (OBJ.singleton propertyTypeId (unwrap <$> values)) else pure unit
 
 -- | This function expects an instance of type sys:Invitation, creates a channel and binds it to the Invitation
 -- | in the role PrivateChannel.
@@ -167,7 +167,7 @@ createCopyOfChannelDatabase arrWithChannelName invitation = case ARR.head arrWit
   Just channelName -> lift2 $ do
     base <- getCouchdbBaseURL
     exsts <- databaseExists (base <> channelName)
-    when (not exsts) (ensureAuthentication (createDatabase channelName))
+    if not exsts then ensureAuthentication (createDatabase channelName) else pure unit
     mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Invitation$PrivateChannel") >=> binding >=> context)
     case mchannelContext of
       Just channelContext -> setChannelReplication channelContext

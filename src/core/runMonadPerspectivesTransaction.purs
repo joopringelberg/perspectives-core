@@ -55,7 +55,7 @@ import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleTy
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (actionsClosure_, isAutomatic, specialisesRoleType_)
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, when, ($), (<$>), (<<<), (<>), (=<<), (>>=))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -175,8 +175,8 @@ lift2 = lift <<< lift
 loadModelIfMissing :: String -> MonadPerspectivesTransaction Unit
 loadModelIfMissing modelName = do
   mDomeinFile <- lift2 $ tryRetrieveDomeinFile modelName
-  when (isNothing mDomeinFile)
-    do
+  if isNothing mDomeinFile
+    then do
       repositoryUrl <- lift2 publicRepository
       addModelToLocalStore' (repositoryUrl <> modelName)
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
@@ -188,3 +188,4 @@ loadModelIfMissing modelName = do
           (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse")
           mySys
           (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just $ unwrap _id})
+    else pure unit

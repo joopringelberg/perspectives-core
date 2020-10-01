@@ -57,7 +57,7 @@ import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, flip, pure, show, unit, void, when, ($), (+), (<<<), (<>), (>>=), (<$>))
+import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<<), (<>), (>>=), (<$>))
 
 executeContextDelta :: ContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext} ) signedDelta = do
@@ -104,8 +104,8 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) s
   case deltaType of
     ConstructEmptyContext -> do
       (exists :: Maybe PerspectContext) <- lift2 $ tryGetPerspectEntiteit id
-      when (isNothing exists)
-        do
+      if isNothing exists
+        then do
           loadModelIfMissing (unsafeDeconstructModelName $ unwrap contextType)
           contextInstance <- pure
             (PerspectContext defaultContextRecord
@@ -117,7 +117,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) s
               })
           lift2 $ void $ cacheEntity id contextInstance
           (lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (EnumeratedRoleType $ unwrap contextType <> "$External")) >>= addCorrelationIdentifiersToTransactie
-
+        else pure unit
 
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
@@ -130,8 +130,9 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
       offset <- lift2 ((id ##= getEnumeratedRoleInstances roleType) >>= pure <<< length)
       forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do
         (exists :: Maybe PerspectRol) <- lift2 $ tryGetPerspectEntiteit roleInstance
-        when (isNothing exists)
-          (void $ constructEmptyRole_ id (offset + i) roleInstance)
+        if isNothing exists
+          then void $ constructEmptyRole_ id (offset + i) roleInstance
+          else pure unit
           -- TODO save it?
     ConstructExternalRole -> do
       -- Notice that merely constructing a role has no consequences for the responsibilities
@@ -139,10 +140,11 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, deltaTy
       externalRole <- pure (head $ toNonEmptyArray roleInstances)
       log ("ConstructExternalRole in " <> show id)
       (exists :: Maybe PerspectRol) <- lift2 $ tryGetPerspectEntiteit externalRole
-      when (isNothing exists)
-        do
+      if isNothing exists
+        then do
           void $ constructEmptyRole_ id 0 externalRole
           lift2 $ void $ saveEntiteit externalRole
+        else pure unit
     RemoveRoleInstance -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
     RemoveUnboundExternalRoleInstance -> for_ (toArray roleInstances) (flip removeContextIfUnbound false)
     RemoveExternalRoleInstance -> pure unit

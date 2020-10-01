@@ -73,9 +73,10 @@ import Perspectives.Types.ObjectGetters (aspectsClosure)
 -- | If the binding adds properties, store an InvertedQuery in onRoleDelta_binder of the role.
 setInvertedQueriesForUserAndRole :: RoleType -> ADT EnumeratedRoleType -> PropsAndVerbs -> Boolean -> QueryWithAKink -> PhaseThree Boolean
 setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWithAkink = do
-  when perspectiveOnThisRole
+  if perspectiveOnThisRole
     -- Add qWithAkink in onContextDelta_context of role.
-    (addToOnContextDelta qWithAkink role)
+    then addToOnContextDelta qWithAkink role
+    else pure unit
   roleHasRequestedProperties <- case allProps props of
     All -> do
       -- for each property of role, store (Value2Role >> invertedQ) in onPropertyDelta of that property
@@ -85,7 +86,9 @@ setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWit
     Properties relevant | not $ null relevant -> do
       (propsOfRole :: Array PropertyType) <- lift2 $ filterA isPropertyOfRole relevant
       -- for each property in propsOfRole, store (Value2Role >> qWithAkink) in onPropertyDelta of that property
-      when (not $ null propsOfRole) (addToProperties qWithAkink propsOfRole)
+      if not $ null propsOfRole
+        then addToProperties qWithAkink propsOfRole
+        else pure unit
       pure $ not $ null propsOfRole
     Properties _ -> pure false
 

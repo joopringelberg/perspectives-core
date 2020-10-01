@@ -56,7 +56,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, show, unit, void, when, ($), (<>), (>=>), (>>>), not, eq)
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (>=>), (>>>), not, eq)
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -103,12 +103,13 @@ transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas}) = do
       sysUsers <- lift (unit ##= (\_ -> ArrayT (pure users)) >=> bottom)
       for_
         (nub sysUsers)
-        (\(RoleInstance sysUser) -> when (not $ eq sysUser deltaAuthor)
-          do
+        (\(RoleInstance sysUser) -> if not $ eq sysUser deltaAuthor
+          then do
             trs <- get
             case lookup sysUser trs of
               Nothing -> put $ insert sysUser (TransactionForPeer {author, timeStamp, deltas: [d]}) trs
               Just trans -> put $ insert sysUser (addToTransactionForPeer d trans) trs
+          else pure unit
         )
 
 addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit

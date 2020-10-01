@@ -51,7 +51,7 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..), createTransactie)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Prelude (Unit, bind, discard, pure, unit, void, when, ($), (>>=), (<<<), (<$>))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (>>=), (<<<), (<$>))
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor cid userId = do
@@ -107,8 +107,8 @@ runSerialiser x = evalStateT x []
 serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> RoleType -> Serializer Unit
 serialisedAsDeltasFor_ cid userId userType = do
   seenBefore <- get
-  when (isNothing $ elemIndex cid seenBefore)
-    do
+  if isNothing $ elemIndex cid seenBefore
+    then do
       void $ modify (cons cid)
       PerspectContext{universeContextDelta, pspType, rolInContext} <- liftToSerialiser $ getPerspectContext cid
       lift $ addDelta $ DeltaInTransaction {users: [userId], delta: universeContextDelta}
@@ -125,26 +125,30 @@ serialisedAsDeltasFor_ cid userId userType = do
               Just roleInstances -> do
                 for_ roleInstances (serialiseRoleInstance cid (EnumeratedRoleType roleTypeId) true)
           else pure unit
-
+    else pure unit
   where
   serialiseRoleInstance :: ContextInstance -> EnumeratedRoleType -> Boolean -> RoleInstance -> Serializer Unit
   serialiseRoleInstance cid' roleTypeId isNotExternal roleInstance = do
     PerspectRol{binding, properties, universeRoleDelta, contextDelta, bindingDelta, propertyDeltas} <- liftToSerialiser $ getPerspectRol roleInstance
     lift $ addDelta $ DeltaInTransaction { users: [userId], delta: universeRoleDelta}
     -- Not for external roles!
-    when isNotExternal (lift $ addDelta  $ DeltaInTransaction { users: [userId], delta: contextDelta })
+    if isNotExternal
+      then lift $ addDelta  $ DeltaInTransaction { users: [userId], delta: contextDelta }
+      else pure unit
     case binding of
       Nothing -> pure unit
       Just b -> do
         c <- liftToSerialiser (b ##>> context)
         typeOfBinding <- liftToSerialiser (b ##>> roleType)
         shouldBeSent <- liftToSerialiser (userType ###>> roleIsInPerspectiveOf (ENR typeOfBinding))
-        when shouldBeSent do
-          -- TODO. Serialiseer de context niet als de ander er al een rol bij speelt!
-          serialisedAsDeltasFor_ c userId userType
-          case bindingDelta of
-            Nothing -> pure unit
-            Just bd -> lift $ addDelta $ DeltaInTransaction {users: [userId], delta: bd }
+        if shouldBeSent
+          then do
+            -- TODO. Serialiseer de context niet als de ander er al een rol bij speelt!
+            serialisedAsDeltasFor_ c userId userType
+            case bindingDelta of
+              Nothing -> pure unit
+              Just bd -> lift $ addDelta $ DeltaInTransaction {users: [userId], delta: bd }
+          else pure unit
     -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
     forWithIndex_ properties \propertyTypeId values -> do
       propAllowed <- liftToSerialiser (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))

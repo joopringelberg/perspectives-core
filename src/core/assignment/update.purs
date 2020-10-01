@@ -86,8 +86,8 @@ addRoleInstancesToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (
 addRoleInstancesToContext contextId rolName instancesAndDeltas = do
   rolInstances <- pure $ fst <$> instancesAndDeltas
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
-  when (not $ null (toArray rolInstances `difference` context_rolInContext pe rolName))
-    do
+  if (not $ null (toArray rolInstances `difference` context_rolInContext pe rolName))
+    then do
       changedContext <- lift2 (modifyContext_rolInContext pe rolName (flip union (toArray rolInstances)))
       roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
       -- PERSISTENCE
@@ -123,6 +123,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
         cacheAndSave _id $ PerspectRol r { contextDelta = delta }
       -- QUERY UPDATES
       (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
+    else pure unit
 
 -- | Modifies the context instance by detaching the given role instances.
 -- | Notice that this function does neither uncache nor unsave the rolInstances

@@ -40,7 +40,7 @@ import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb
 import Perspectives.Persistent (entitiesDatabaseName, saveEntiteit_)
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
-import Prelude (Unit, bind, discard, not, pure, unit, void, when, ($), (<>), (>>=))
+import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (<>), (>>=))
 
 -----------------------------------------------------------
 -- SETUPCOUCHDBFORFIRSTUSER
@@ -68,13 +68,14 @@ setupPerspectivesInCouchdb :: String -> String -> String -> Int -> Aff Unit
 setupPerspectivesInCouchdb usr pwd host port = runMonadCouchdb usr pwd usr host port
   do
     isFirstUser <- databaseExists_ "localusers"
-    when (not isFirstUser)
-      (ensureAuthentication do
+    if not isFirstUser
+      then (ensureAuthentication do
         createSystemDatabases
         -- For now, we initialise the repository, too.
         initRepository
         createDatabase "localusers"
         setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
+      else pure unit
 
 databaseExists_ :: forall f. String -> MonadCouchdb f Boolean
 databaseExists_ dbname = do
@@ -149,9 +150,9 @@ createAnotherAdmin user password = ensureAuthentication do
 -----------------------------------------------------------
 createSystemDatabases :: forall f. MonadCouchdb f Unit
 createSystemDatabases = do
-  databaseExists_ "_users" >>= \exists -> when (not exists) (createDatabase "_users")
-  databaseExists_ "_replicator" >>= \exists -> when (not exists) (createDatabase "_replicator")
-  databaseExists_ "_global_changes" >>= \exists -> when (not exists) (createDatabase "_global_changes")
+  databaseExists_ "_users" >>= \exists -> if not exists then createDatabase "_users" else pure unit
+  databaseExists_ "_replicator" >>= \exists -> if not exists then createDatabase "_replicator" else pure unit
+  databaseExists_ "_global_changes" >>= \exists -> if not exists then createDatabase "_global_changes" else pure unit
 
 -----------------------------------------------------------
 -- CREATEUSERDATABASES

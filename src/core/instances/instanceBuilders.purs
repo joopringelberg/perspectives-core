@@ -76,7 +76,7 @@ import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, flip, not, pure, unit, void, when, ($), (&&), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, flip, not, pure, unit, void, ($), (&&), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setBinding on each role.
@@ -216,7 +216,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
         -- PERSISTENCE of the role instance.
         -- CURRENTUSER: there can be no change to the current user.
         setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
-      when (isEmpty props) (lift2 $ void $ saveEntiteit externalRole)
+      if isEmpty props then lift2 $ void $ saveEntiteit externalRole else pure unit
   pure contextInstance
 
 -- | Construct a Role instance for an existing Context instance.

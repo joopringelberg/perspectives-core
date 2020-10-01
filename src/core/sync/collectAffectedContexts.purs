@@ -67,7 +67,7 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
-import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, when, ($), (<$>), (<<<), (==), (>=>), (>>=))
+import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, ($), (<$>), (<<<), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -117,28 +117,34 @@ userHasPerspectiveOnRoleInstance_ ::  EnumeratedRoleType -> RoleInstance -> Role
 userHasPerspectiveOnRoleInstance_ roleType roleInstance peer = do
   (lift $ compileDescriptions _onContextDelta_context roleType) >>= traverse_ g
   notFound <- get
-  when notFound $ (lift $ compileDescriptions _onContextDelta_role roleType) >>= traverse_ g
+  if notFound then (lift $ compileDescriptions _onContextDelta_role roleType) >>= traverse_ g else pure unit
 
   where
     g :: InvertedQuery -> StateT Boolean MonadPerspectives Unit
     g (InvertedQuery{backwardsCompiled, userTypes}) = do
       notFound <- get
-      when notFound $
-        lift (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) >>= traverse_
+      if notFound
+        then lift (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) >>= traverse_
         -- Check if the peer has one of the userType roles in at least one of the context instances.
           \ctxt -> do
             notFound1 <- get
-            when notFound1 do
-              for_ ((toUnfoldable $ keys userTypes) :: Array RoleType) \ut -> do
-                notFound2 <- get
-                when notFound2 do
-                  roles <- lift (ctxt ##= getRoleInstances ut)
-                  for_ roles \role -> do
-                    notFound3 <- get
-                    when notFound3 do
-                      otherPeer <- lift (role ##>> bottom)
-                      when (otherPeer == peer) (put false)
-
+            if notFound1
+              then do
+                for_ ((toUnfoldable $ keys userTypes) :: Array RoleType) \ut -> do
+                  notFound2 <- get
+                  if notFound2
+                    then do
+                      roles <- lift (ctxt ##= getRoleInstances ut)
+                      for_ roles \role -> do
+                        notFound3 <- get
+                        if notFound3
+                          then do
+                            otherPeer <- lift (role ##>> bottom)
+                            if otherPeer == peer then put false else pure unit
+                          else pure unit
+                    else pure unit
+              else pure unit
+        else pure unit
 -----------------------------------------------------------
 -- OBSERVINGCONTEXTS
 -----------------------------------------------------------
