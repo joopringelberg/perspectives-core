@@ -50,7 +50,7 @@ import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, getEnumeratedRoleInstances, getRoleBinders)
+import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, externalRole, getEnumeratedRoleInstances, getRoleBinders)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), PropsAndVerbs, allProps, backwards, forwards)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
@@ -325,8 +325,11 @@ magic :: ContextInstance -> SerializableNonEmptyArray RoleInstance -> Enumerated
 magic ctxt roleInstances rtype users =  do
   ctype <- lift2 (ctxt ##>> contextType)
   -- Fetch the UniverseContextDelta from the context instance here.
-  PerspectContext{universeContextDelta} <- lift2 $ getPerspectContext ctxt
+  PerspectContext{universeContextDelta, buitenRol} <- lift2 $ getPerspectContext ctxt
   addDelta $ DeltaInTransaction {users, delta: universeContextDelta}
+  -- TODO. Overweeg de externe rol UniverseRoleDelta toe te voegen!
+  PerspectRol{universeRoleDelta: externalRoleDelta} <- lift2 $ getPerspectRol buitenRol
+  addDelta $ DeltaInTransaction {users, delta: externalRoleDelta}
   for_ (toArray roleInstances) \roleInstance -> do
     PerspectRol{universeRoleDelta, contextDelta} <- lift2 $ getPerspectRol roleInstance
     addDelta $ DeltaInTransaction {users, delta: universeRoleDelta}
