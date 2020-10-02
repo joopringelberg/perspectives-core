@@ -196,7 +196,6 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
       , pspType = EnumeratedRoleType (unwrap pspType <> "$External")
       , context = contextInstanceId
       , binding = Nothing
-      -- TODO binnenkomende delta?
       , universeRoleDelta =
           SignedDelta
             { author
@@ -204,7 +203,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
               { id: contextInstanceId
               , roleInstances: (SNEA.singleton externalRole)
               , roleType: EnumeratedRoleType (unwrap pspType <> "$External")
-              , deltaType: ConstructEmptyRole
+              , deltaType: ConstructExternalRole
               , subject } }
       })
   -- QUERY UPDATES
