@@ -12,7 +12,7 @@ cd ../perpectives-apitypes
 
 rm -Rf v2.6.0
 
-ln -s ../../../../perspectives-apitypes v2.5.0
+ln -s ../../../../perspectives-apitypes v2.6.0
 
 cd ../avar-monadask/
 
