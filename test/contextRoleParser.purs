@@ -76,6 +76,7 @@ theSuite = suite "ContextRoleParser" do
     void $ runMonadPerspectivesTransaction $ setBinding
       (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
       (RoleInstance "model:User$test$User")
+      Nothing
     ra <- getPerspectRol (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
     liftAff $ assert "Self should have isMe == true" (rol_isMe ra)
 
@@ -85,6 +86,7 @@ theSuite = suite "ContextRoleParser" do
     void $ runMonadPerspectivesTransaction $ setBinding
       (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
       (RoleInstance "model:User$test$User")
+      Nothing
     c <- getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
     liftAff $ assert "MyNestedCase3 should have 'me' equal to model:User$MyTestCase$MyNestedCase3$NestedSelf_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001"))
 

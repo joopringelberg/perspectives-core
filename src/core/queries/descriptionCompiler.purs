@@ -36,7 +36,7 @@ import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.External.CoreModules (addExternalFunctionForModule, isExternalCoreModule)
+import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
@@ -414,7 +414,9 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
     Nothing -> throwError (NotWellFormedName start functionName)
     Just modelName -> if isExternalCoreModule modelName
       then do
-        addExternalFunctionForModule modelName
+        -- We cannot do this without introducing a cycle.
+        -- Instead, we start up main with addAllExternalFunctions
+        -- addExternalFunctionForModule modelName
         compiledArgs <- traverse (compileStep currentDomain) arguments
         (let
           mexpectedNrOfArgs = lookupHiddenFunctionNArgs functionName

@@ -55,7 +55,13 @@ loadAndCacheCrlFile :: String ->
   MonadPerspectives (Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol)))
 loadAndCacheCrlFile file directoryName = do
   procesDir <- liftEffect cwd
-  text <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, file])
+  loadAndCacheCrlFile' (Path.concat [procesDir, directoryName, file])
+
+type FilePath = String
+
+loadAndCacheCrlFile' :: FilePath -> MonadPerspectives (Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol)))
+loadAndCacheCrlFile' filePath = do
+  text <- lift $ readTextFile UTF8 filePath
   parseResult <- replaceIndexedNames text >>= parseAndCache
   case parseResult of
     Left e -> pure $ Left [Custom (show e)]

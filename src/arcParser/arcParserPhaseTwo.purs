@@ -24,7 +24,7 @@ module Perspectives.Parsing.Arc.PhaseTwo where
 import Perspectives.Parsing.Arc.PhaseTwoDefs
 
 import Control.Monad.Except (throwError)
-import Data.Array (cons, elemIndex, fromFoldable)
+import Data.Array (cons, elemIndex, fromFoldable, length)
 import Data.Foldable (foldl)
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
@@ -34,7 +34,7 @@ import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, lookup)
+import Foreign.Object (insert, keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
@@ -481,9 +481,10 @@ traverseActionE :: Partial =>                     -- The function is partial bec
   PhaseTwo (Array ActionType)
 traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb, actionParts, pos})) = do
   isabot <- isSubjectBot
+  (n :: Int) <- getsDF \df -> length $ keys df.actions
   actionId <- if isabot
     -- Different names for the same verb and object for the bot and its master, otherwise they will overwrite.
-    then pure (roletype2string rolename <> "_bot$" <> show verb <> object)
+    then pure (roletype2string rolename <> "_bot$" <> show verb <> object <> (show n))
     else pure (roletype2string rolename <> "$" <> show verb <> object)
   executedByBot <- isSubjectBot
   action <- pure $ Action

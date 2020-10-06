@@ -40,7 +40,7 @@ import Perspectives.Parsing.Arc.AST (ContextPart(..))
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=), (<$>))
+import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=), (<$>), (>=>))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -120,6 +120,9 @@ modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
 
 getDF :: PhaseTwo DomeinFileRecord
 getDF = lift $ gets _.dfr
+
+getsDF :: forall m n. MonadState PhaseTwoState m => (DomeinFileRecord -> n) -> m n
+getsDF f = gets (f <<< _.dfr)
 
 getVariableBindings :: forall m. Monad m => PhaseTwo' (Environment QueryFunctionDescription) m
 getVariableBindings = lift $ gets _.variableBindings

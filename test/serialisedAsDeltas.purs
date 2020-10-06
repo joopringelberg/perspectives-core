@@ -63,7 +63,7 @@ theSuite = suite "SerialisedAsDeltas" do
     joop <- (ContextInstance "model:User$joop") ##>> userGetter
     void $ runMonadPerspectivesTransaction do
       handleNewPeer unboundOtherRole
-      void $ setBinding unboundOtherRole joop
+      void $ setBinding unboundOtherRole joop Nothing
       -- t@(Transaction{universeContextDeltas, universeRoleDeltas, contextDeltas, roleDeltas, propertyDeltas}) <- lift get
       -- -- log $ prettyPrint t
       --

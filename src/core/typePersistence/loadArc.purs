@@ -72,24 +72,30 @@ import Text.Parsing.Parser (ParseError(..))
 loadAndCompileArcFile :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
 loadAndCompileArcFile fileName directoryName = do
   procesDir <- liftEffect cwd
-  catchError do
-      text <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, fileName <> ".arc"])
-      (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
-      case r of
-        (Left e) -> pure $ Left [parseError2PerspectivesError e]
-        (Right ctxt) -> do
-          (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- pure $ unwrap $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty
-          case result of
-            (Left e) -> pure $ Left [e]
-            (Right (DomeinFile dr'@{_id})) -> do
-              dr'' <- pure dr' {referredModels = state.referredModels}
-              (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr''
-              case x' of
-                (Left e) -> pure $ Left [e]
-                (Right correctedDFR@{referredModels}) -> do
-                  -- Remove the self-referral
-                  pure $ Right $ DomeinFile correctedDFR {referredModels = delete (DomeinFileId _id) referredModels}
-    \e -> pure $ Left [Custom (show e)]
+  loadAndCompileArcFile_ (Path.concat [procesDir, directoryName, fileName <> ".arc"])
+
+type FilePath = String
+
+loadAndCompileArcFile_ :: FilePath -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadAndCompileArcFile_ filePath = catchError
+  do
+    text <- lift $ readTextFile UTF8 filePath
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
+    case r of
+      (Left e) -> pure $ Left [parseError2PerspectivesError e]
+      (Right ctxt) -> do
+        (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- pure $ unwrap $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty
+        case result of
+          (Left e) -> pure $ Left [e]
+          (Right (DomeinFile dr'@{_id})) -> do
+            dr'' <- pure dr' {referredModels = state.referredModels}
+            (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr''
+            case x' of
+              (Left e) -> pure $ Left [e]
+              (Right correctedDFR@{referredModels}) -> do
+                -- Remove the self-referral
+                pure $ Right $ DomeinFile correctedDFR {referredModels = delete (DomeinFileId _id) referredModels}
+  \e -> pure $ Left [Custom (show e)]
 
 type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)
 
@@ -98,7 +104,17 @@ type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesEr
 -- | NOTICE that the model instances are added to cache!
 loadArcAndCrl :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
 loadArcAndCrl fileName directoryName = do
-  r <- loadAndCompileArcFile fileName directoryName
+  procesDir <- liftEffect cwd
+  loadArcAndCrl'
+    (Path.concat [procesDir, directoryName, fileName <> ".arc"])
+    (Path.concat [procesDir, directoryName, fileName <> ".crl"])
+
+type ArcPath = String
+type CrlPath = String
+
+loadArcAndCrl' :: ArcPath -> CrlPath -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadArcAndCrl' arcPath crlPath = do
+  r <- loadAndCompileArcFile_ arcPath
   case r of
     Left m -> pure $ Left m
     Right df@(DomeinFile drf@{_id}) -> do
@@ -113,7 +129,7 @@ loadArcAndCrl fileName directoryName = do
     addModelDescriptionAndCrl :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
     addModelDescriptionAndCrl df = do
       procesDir <- liftEffect cwd
-      source <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, fileName <> ".crl"])
+      source <- lift $ readTextFile UTF8 crlPath
       (Tuple parseResult {roleInstances, prefixes}) <- runIndentParser' source userData
       case parseResult of
         Left e -> pure $ Left $ [Custom (show e)]
