@@ -18,7 +18,13 @@ domain: ModelManagement
 
     context: Models filledBy: ManagedModel
 
+    thing: Repository (mandatory, functional)
+      property: Name (mandatory, functional, String)
+      property: Url (mandatory, functional, String)
+
     user: Manager filledBy: sys:User
+      perspective on: Models
+      perspective on: Repository
 
   case: ManagedModel
     external:
@@ -30,8 +36,7 @@ domain: ModelManagement
       property: CrlOK = CrlFeedback == "OK"
       property: Name (mandatory, functional, String)
 
-    thing: Repository (mandatory, functional)
-      property: Url (mandatory, functional, String)
+    thing: Repository (mandatory, functional) filledBy: ModelManagementApp$Repository
 
     context: ModelDescription (not mandatory, functional) filledBy: sys:Model
 

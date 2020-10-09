@@ -35,7 +35,7 @@ import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
-import Effect.Aff (Aff, catchError, launchAff_)
+import Effect.Aff (Aff, catchError, launchAff_, try)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
@@ -212,11 +212,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     --       case head rtypes of
     --         Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
     --         (Just rtype) -> sendResponse (Result corrId [roletype2string rtype]) setter
+
     Api.GetProperty -> do
       -- NOTE. For EnumeratedProperties, returns a getter that looks up the property in the role instance directly; not
       -- recursing on binding.
-      (f :: PropertyValueGetter) <- (getPropertyGetter predicate (ENR $ EnumeratedRoleType object)) <|> (getPropertyGetter predicate (CR $ CalculatedRoleType object))
-      registerSupportedEffect corrId setter f (RoleInstance subject)
+      result <- try ((getPropertyGetter predicate (ENR $ EnumeratedRoleType object)) <|> (getPropertyGetter predicate (CR $ CalculatedRoleType object)))
+      case result of
+        Left _ -> sendResponse (Error corrId ("No propertytype '" <> object <> "' found on roletype '" <> predicate <> "'.")) setter
+        Right (f :: PropertyValueGetter) -> registerSupportedEffect corrId setter f (RoleInstance subject)
+
       -- For a Role and a View, return the properties in that View.
       -- If View equals "allProperties", return all properties of the Role.
     -- {request: "GetViewProperties", subject: RoleType, predicate: unqualifiedViewName}
