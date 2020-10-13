@@ -55,16 +55,16 @@ import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, uns
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType, roleType_)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.ADT (reduce)
-import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Class.Role (calculation, rangeOfRoleCalculation', roleADT)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.Role (calculation, kindOfRole, rangeOfRoleCalculation', roleADT)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeRoleInstance, removeContextIfUnbound)
@@ -240,8 +240,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             (props :: Array PropertyType) <- ((getPerspectType v) :: MP View) >>= pure <<< propertyReferences
             sendResponse (Result corrId (propertytype2string <$> props)) setter
     -- E.g. send in an External Role instance, get back the type of role the current user plays in the context. Returns the role type with local name "Guest" if the user has no role.
+    -- If the role is a contextrole, we treat it as if we got its binding.
     Api.GetMeForContext -> do
-      registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
+      roleKind <- roleType_ (RoleInstance subject) >>= getEnumeratedRole >>= pure <<< kindOfRole
+      case roleKind of
+        ContextRole -> registerSupportedEffect corrId setter (map toRoleType_ <<< (binding >=> context >=> getMyType)) (RoleInstance subject)
+        otherwise -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
     Api.GetUserIdentifier -> do
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
