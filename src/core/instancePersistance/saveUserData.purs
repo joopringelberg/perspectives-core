@@ -215,11 +215,11 @@ removeRoleInstance_ roleId = do
   -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
   forWithIndex_ gevuldeRollen \_ filledRollen ->
     for_ filledRollen \filledRolId -> do
-      (lift $ removeBinding false filledRolId) >>= tell
+      (lift $ removeBinding true filledRolId) >>= tell
   -- Remove the binding.
-  if isJust binding
-    then (lift $ removeBinding true roleId) >>= tell
-    else pure unit
+  case binding of
+    Just bnd -> (lift $ (roleId `removedAsFilledFrom` bnd))
+    otherwise -> pure unit
   -- Remove from couchdb, remove from the cache.
   void $ lift $ (scheduleRoleRemoval roleId)
 
@@ -381,59 +381,63 @@ handleNewPeer roleInstance = do
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
 -- | Modifies the Role instance.
 -- | If the the role instance has in fact no binding before the operation, this is a no-op without effect.
+-- | Parameter `bindingRemoved` is true iff the role that is the binding of the role will be removed.
 -- | PERSISTENCE of binding role and old binding.
 -- | RULE TRIGGERING for `binding <roleId`, `binder <TypeOfRoleId>` for the old binding.
 -- | QUERY UPDATES for `binding <roleId>` and `binder <TypeOfRoleId>`.
 -- | SYNCHRONISATION by RoleBindingDelta.
 -- | CURRENTUSER for roleId and its context.
 removeBinding :: Boolean -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
-removeBinding roleWillBeRemoved roleId = do
+removeBinding bindingRemoved roleId = do
   (originalRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId
-  if (isJust $ rol_binding originalRole)
-    then do
-      users' <- case rol_binding originalRole of
-        Nothing -> pure []
-        Just oldBindingId -> do
-          (lift2 $ findBinderRequests oldBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
-          subject <- getSubject
-          delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
-                        { id : roleId
-                        , binding: (rol_binding originalRole)
-                        , oldBinding: (rol_binding originalRole)
-                        , deltaType: RemoveBinding
-                        , roleWillBeRemoved
-                        , subject
-                        }
-          users <- aisInRoleDelta delta
-          author <- getAuthor
-          signedDelta <- pure $ SignedDelta
-            { author
-            , encryptedDelta: sign $ encodeJSON $ delta}
-          addDelta (DeltaInTransaction { users, delta: signedDelta})
+  case rol_binding originalRole of
+    Nothing -> pure []
+    Just bindingId -> do
+      (lift2 $ findBinderRequests bindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
+      subject <- getSubject
+      delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
+                    { id : roleId
+                    , binding: (rol_binding originalRole)
+                    , oldBinding: (rol_binding originalRole)
+                    , deltaType: RemoveBinding
+                    , roleWillBeRemoved: bindingRemoved
+                    , subject
+                    }
+      users <- aisInRoleDelta delta
+      author <- getAuthor
+      signedDelta <- pure $ SignedDelta
+        { author
+        , encryptedDelta: sign $ encodeJSON $ delta}
+      addDelta (DeltaInTransaction { users, delta: signedDelta})
 
-          if not roleWillBeRemoved
-            then do
-              (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
-              cacheAndSave roleId (over PerspectRol (\rl -> rl {bindingDelta = Nothing})
-                (changeRol_isMe (removeRol_binding originalRole) false))
-            else pure unit
-          ctxt <- lift2 $ getPerspectContext $ rol_context originalRole
-          if (context_me ctxt == (Just roleId))
-            then setMe (rol_context originalRole) Nothing
-            else pure unit
-          pure users
+      if not bindingRemoved
+        then do
+          (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
+          roleId `removedAsFilledFrom` bindingId
+        -- the role that has the binding will be removed anyway.
+        else pure unit
 
-      -- Handle inverse binding.
-      case rol_binding originalRole of
-        Nothing -> pure unit
-        (Just oldBindingId) -> do
-          -- Remove this roleinstance as a binding role from the old binding.
-          (oldBinding :: PerspectRol) <- lift2 $ getPerspectEntiteit oldBindingId
-          -- If, after removing the binder, no binders are left AND the oldBinding is an external role,
-          -- remove the context!
-          oldBinding'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
-          if (isEmpty gevuldeRollen && isExternalRole (unwrap oldBindingId))
-            then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap oldBindingId)) false
-            else cacheAndSave oldBindingId oldBinding'
-      pure users'
-    else pure []
+      cacheAndSave roleId (over PerspectRol (\rl -> rl {bindingDelta = Nothing})
+        (changeRol_isMe (removeRol_binding originalRole) false))
+
+      ctxt <- lift2 $ getPerspectContext $ rol_context originalRole
+      if (context_me ctxt == (Just roleId))
+        then setMe (rol_context originalRole) Nothing
+        else pure unit
+
+      pure users
+
+-- | <filledId> `removedAsFilledFrom` <fillerId>
+-- | Removes filled from gevuldeRollen of filler (because filled no longer has filler as binding).
+-- | If gevuldeRollen becomes empty, and filler is an external role, removes the context of filler (cascade delete).
+removedAsFilledFrom :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
+removedAsFilledFrom fillerId filledId = do
+  (filler :: PerspectRol) <- lift2 $ getPerspectEntiteit fillerId
+  (filled :: PerspectRol) <- lift2 $ getPerspectEntiteit filledId
+  -- If, after removing the binder, no binders (filled roles) are left on the filler  AND it is an external role,
+  -- remove the context! This is because we then have a context whose external role fills no other role (is not
+  -- bound anywhere).
+  filler'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen filler (rol_pspType filled) filledId)
+  if (isEmpty gevuldeRollen && isExternalRole (unwrap fillerId))
+    then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap fillerId)) false
+    else cacheAndSave fillerId filler'

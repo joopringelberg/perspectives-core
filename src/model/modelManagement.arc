@@ -36,12 +36,19 @@ domain: ModelManagement
       property: CrlOK = CrlFeedback == "OK"
       property: Name (mandatory, functional, String)
 
+      view: Paths (ArcPath, CrlPath)
+      view: Feedback (ArcFeedback, CrlFeedback)
+
     thing: Repository (mandatory, functional) filledBy: ModelManagementApp$Repository
 
     context: ModelDescription (not mandatory, functional) filledBy: sys:Model
 
     user: Author (mandatory, functional) filledBy: Manager
-      perspective on: External
+      perspective on: External Consult
+        --Create (Paths)
+        --Change (Paths)
+        --Delete (Feedback)
+
       perspective on: ModelDescription
       perspective on: Repository
 
