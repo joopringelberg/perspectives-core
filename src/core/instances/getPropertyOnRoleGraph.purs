@@ -32,29 +32,31 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MP, type (~~>))
+import Perspectives.CoreTypes (type (~~>), MP)
+import Perspectives.Instances.ObjectGetters (binding_)
 import Perspectives.Instances.ObjectGetters (roleType_, binding) as OG
-import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
+import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getterFromPropertyType)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Role (binding, propertiesOfADT, roleAspectsADT, typeExcludingBinding_)
+import Perspectives.Representation.Class.Property (getProperType)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, binding, propertiesOfADT, roleAspectsADT, typeExcludingBinding_)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleType(..), propertytype2string)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType(..), propertytype2string)
 
-getPropertyGetter :: String -> RoleType -> MP (RoleInstance ~~> Value)
-getPropertyGetter pt (ENR rt) = do
+getStaticPropertyGetter :: String -> RoleType -> MP (RoleInstance ~~> Value)
+getStaticPropertyGetter pt (ENR rt) = do
   isLocal <- pt `isLocallyRepresentedOn` rt
   if isLocal
     then getPropertyFunction pt
     else do
       g <- (getEnumeratedRole rt >>= binding) >>= dispatchOnBindingType pt
       pure (OG.binding >=> g)
-getPropertyGetter pt rt@(CR _) = typeExcludingBinding_ rt >>= dispatchOnBindingType pt
+getStaticPropertyGetter pt rt@(CR _) = typeExcludingBinding_ rt >>= dispatchOnBindingType pt
 
 -- From a string that maybe identifies a Property (Enumerated or Calculated), construct a function to get values
 -- for that Property from a Role instance. Notice that this function may fail.
-getPropertyGetter' :: String -> EnumeratedRoleType -> MP (RoleInstance ~~> Value)
-getPropertyGetter' pt rt = do
+getStaticPropertyGetter' :: String -> EnumeratedRoleType -> MP (RoleInstance ~~> Value)
+getStaticPropertyGetter' pt rt = do
   isLocal <- pt `isLocallyRepresentedOn` rt
   if isLocal
     then getPropertyFunction pt
@@ -70,7 +72,7 @@ isLocallyRepresentedOn pt rt = do
   pure $ isJust $ elemIndex pt localProps
 
 dispatchOnBindingType :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
-dispatchOnBindingType pt (ST r) = getPropertyGetter' pt r
+dispatchOnBindingType pt (ST r) = getStaticPropertyGetter' pt r
 dispatchOnBindingType pt EMPTY = throwError (error ("dispatchOnBindingType: cannot handle EMPTY for " <> pt))
 dispatchOnBindingType pt UNIVERSAL = throwError (error ("dispatchOnBindingType: cannot handle UNIVERSAL for " <> pt))
 dispatchOnBindingType pt (PROD _) = throwError (error ("dispatchOnBindingType: cannot handle PRODUCT for " <> pt))
@@ -95,10 +97,34 @@ dispatchOnBindingType pt (SUM roles) = do
 
     dispatchOn :: Partial => ADT EnumeratedRoleType -> MP Dispatcher
     dispatchOn (ST rt) = do
-      getter <- getPropertyGetter' pt rt
+      getter <- getStaticPropertyGetter' pt rt
       guard <- pure (\typeOfInstance -> pure (typeOfInstance == rt))
       pure $ Tuple guard getter
 
 type Dispatcher = Tuple Guard Getter
 type Guard = EnumeratedRoleType -> MP Boolean
 type Getter = RoleInstance ~~> Value
+
+-----------------------------------------------------------
+-- RUNTIME STRUCTURE
+-----------------------------------------------------------
+-- | From a string that represents either a Calculated or an Enumerated property,
+-- | for a given abstract datatype of roles, retrieve the values from a role instance.
+getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
+getDynamicPropertyGetter p adt = do
+  (pt :: PropertyType) <- getProperType p
+  allProps <- allLocallyRepresentedProperties adt
+  if (isJust $ elemIndex pt allProps)
+    then getterFromPropertyType pt
+    else pure f
+
+  where
+    f :: (RoleInstance ~~> Value)
+    f roleInstance = do
+      bnd <- lift $ lift $ binding_ roleInstance
+      case bnd of
+        Nothing -> empty
+        Just bnd' -> do
+          (bndType :: EnumeratedRoleType) <- lift $ lift $ OG.roleType_ bnd'
+          getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)
+          getter bnd'

@@ -116,34 +116,35 @@ allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole user
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S
 ----------------------------------------------------------------------------------------
--- | Look for a Property on a given EnumeratedRoleType (recursing on its
--- | aspects), using a criterium.
+-- | Look for a Property on a given EnumeratedRoleType (including its own aspects - not
+-- | recursively - and its own binding - not recursively), using a criterium.
 lookForPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
 lookForPropertyType_ s i = (lift $ getRole (ENR i)) >>= lift <<< adtOfRole >>= lookForProperty (propertytype2string >>> ((==) s))
 
 -- | Look for an unqualified Property on a given EnumeratedRoleType
--- | (recursing on its aspects), using a criterium.
+-- | (recursing on aspects and on the binding of Enumerated Roles), using a criterium.
 lookForUnqualifiedPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
 lookForUnqualifiedPropertyType_ s i = lookForProperty (propertytype2string >>> areLastSegmentsOf s) (ST i)
 -- lookForUnqualifiedPropertyType_ s i = (lift $ getRole (ENR i)) >>= lift <<< adtOfRole >>= lookForProperty (propertytype2string >>> areLastSegmentsOf s)
 
--- | Look for a Property on a given ADT, using a qualified name, recursing
--- | on aspects of EnumeratedRoleTypes.
+-- | Look for a Property on a given ADT, using a qualified name (recursing on aspects
+-- | and on the binding of Enumerated Roles).
 -- | Note: use this function to check that the property is actually defined.
 lookForPropertyType :: String -> (ADT EnumeratedRoleType ~~~> PropertyType)
 lookForPropertyType s = lookForProperty (propertytype2string >>> ((==) s))
 
--- | Look for a Property on a given ADT, recursing
--- | on aspects of EnumeratedRoleTypes, using the postfix of a name.
+-- | Look for a Property on a given ADT (recursing on aspects and on the binding of
+-- | Enumerated Roles) using the postfix of a name.
 lookForUnqualifiedPropertyType :: String -> (ADT EnumeratedRoleType ~~~> PropertyType)
 lookForUnqualifiedPropertyType s = lookForProperty (propertytype2string >>> areLastSegmentsOf s)
 
--- | Look for a Property on a given ADT (recursing on aspects of
+-- | Look for a Property on a given ADT (recursing on aspects and on the binding of
 -- | Enumerated Roles), using a criterium.
 lookForProperty :: (PropertyType -> Boolean) -> ADT EnumeratedRoleType ~~~> PropertyType
 lookForProperty criterium adt = ArrayT (allProperties adt >>= pure <<< filter criterium)
 -- lookForProperty criterium = COMB.filter' (ArrayT <<< allProperties) criterium
 
+-- | All properties, computed recursively over binding and Aspects, of the Role.
 propertiesOfRole :: String ~~~> PropertyType
 propertiesOfRole s =
   ArrayT (allProperties (ST $ EnumeratedRoleType s))

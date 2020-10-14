@@ -22,7 +22,6 @@
 module Perspectives.Api where
 
 import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
-import Control.Alt ((<|>))
 import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (Step(..), produce', Emitter)
 import Control.Monad.Except (runExceptT)
@@ -44,7 +43,7 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (setProperty)
+import Perspectives.Assignment.Update (deleteProperty, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MP, MonadPerspectives, PropertyValueGetter, RoleGetter, MonadPerspectivesTransaction, (##>))
@@ -54,17 +53,17 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
+import Perspectives.Instances.GetPropertyOnRoleGraph (getDynamicPropertyGetter)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType, roleType_)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
-import Perspectives.Representation.ADT (reduce)
+import Perspectives.Representation.ADT (ADT, reduce)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (calculation, kindOfRole, rangeOfRoleCalculation', roleADT)
+import Perspectives.Representation.Class.Role (calculation, getRoleType, kindOfRole, rangeOfRoleCalculation, rangeOfRoleCalculation', roleADT)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeRoleInstance, removeContextIfUnbound)
@@ -213,12 +212,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     --         Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
     --         (Just rtype) -> sendResponse (Result corrId [roletype2string rtype]) setter
 
+    -- Looks up a property on the role instance and recursively on its binding.
+    -- {request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType},
     Api.GetProperty -> do
-      -- NOTE. For EnumeratedProperties, returns a getter that looks up the property in the role instance directly; not
-      -- recursing on binding.
-      result <- try ((getPropertyGetter predicate (ENR $ EnumeratedRoleType object)) <|> (getPropertyGetter predicate (CR $ CalculatedRoleType object)))
+      (adt :: ADT EnumeratedRoleType) <- getRoleType object >>= rangeOfRoleCalculation
+      result <- try (getDynamicPropertyGetter predicate adt)
       case result of
-        Left _ -> sendResponse (Error corrId ("No propertytype '" <> object <> "' found on roletype '" <> predicate <> "'.")) setter
+        Left e -> sendResponse (Error corrId ("No propertytype '" <> predicate <> "' found on roletype '" <> object <> "': " <> show e)) setter
         Right (f :: PropertyValueGetter) -> registerSupportedEffect corrId setter f (RoleInstance subject)
 
       -- For a Role and a View, return the properties in that View.
@@ -355,6 +355,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         void $ runMonadPerspectivesTransaction authoringRole (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
         sendResponse (Result corrId ["ok"]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
+    Api.DeleteProperty -> catchError
+      (do
+        void $ runMonadPerspectivesTransaction authoringRole (deleteProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate))
+        sendResponse (Result corrId ["Ok"]) setter)
+        (\e -> sendResponse (Error corrId (show e)) setter)
     Api.Unsubscribe -> unregisterSupportedEffect corrId
     Api.WrongRequest -> sendResponse (Error corrId subject) setter
     otherwise -> sendResponse (Error corrId ("Perspectives could not handle this request: '" <> (showRequestRecord r) <> "'")) (mkApiEffect reactStateSetter)

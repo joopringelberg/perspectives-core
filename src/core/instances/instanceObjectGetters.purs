@@ -155,9 +155,22 @@ getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn r = ArrayT do
   ((IP.PerspectRol{properties}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
   tell $ ArrayWithoutDoubles [Property r pn]
-  -- tell [assumption (unwrap r)(unwrap pn)]
   case (lookup (unwrap pn) properties) of
     Nothing -> pure []
+    (Just p) -> pure p
+
+-- | Get a property on a chain of EnumeratedRole instances that are filled by each other.
+-- | The function [getDynamicPropertyGetter](Perspectives.Instances.GetPropertyOnRoleGraph.html#t:getDynamicPropertyGetter)
+-- | will compute the Values for a PropertyType (Enumerated or Calculated).
+getPropertyFromTelescope :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
+getPropertyFromTelescope pn r = ArrayT do
+  ((IP.PerspectRol{properties, binding: bnd}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
+  tell $ ArrayWithoutDoubles [Property r pn]
+  case (lookup (unwrap pn) properties) of
+    Nothing -> do
+      case bnd of
+        Nothing -> pure []
+        Just b -> runArrayT $ getPropertyFromTelescope pn b
     (Just p) -> pure p
 
 -- | Turn a function that returns strings into one that returns Booleans.

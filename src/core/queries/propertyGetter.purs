@@ -46,26 +46,27 @@ type PropertyGetter = RoleInstance ~~> Value
 
 -- TODO. Cache.
 
-getPropertyGetter :: EnumeratedPropertyType -> ADT EnumeratedRoleType -> MonadPerspectives (Maybe PropertyGetter)
-getPropertyGetter enp enr@(ST role) = do
+-- TODO. These functions seem to be a double of those in  Perspectives.Instances.GetPropertyOnRoleGraph. 
+getDynamicPropertyGetter :: EnumeratedPropertyType -> ADT EnumeratedRoleType -> MonadPerspectives (Maybe PropertyGetter)
+getDynamicPropertyGetter enp enr@(ST role) = do
   props <- allLocallyRepresentedProperties enr
   if isJust $ elemIndex (ENP enp) props
     then pure $ Just $ IOG.getProperty enp
     else do
       bnd <- getEnumeratedRole role >>= binding
-      g <- getPropertyGetter enp bnd
+      g <- getDynamicPropertyGetter enp bnd
       case g of
         Nothing -> pure Nothing
         Just g' -> pure $ Just (IOG.binding >=> g')
 
-getPropertyGetter enp enr@(PROD roles) = do
-  getters <- traverse (getPropertyGetter enp) roles
+getDynamicPropertyGetter enp enr@(PROD roles) = do
+  getters <- traverse (getDynamicPropertyGetter enp) roles
   case head $ catMaybes getters of
     Nothing -> pure Nothing
     Just g -> pure $ Just g
 
-getPropertyGetter enp enr@(SUM roles) = case head roles of
+getDynamicPropertyGetter enp enr@(SUM roles) = case head roles of
   Nothing -> pure Nothing
-  Just r -> getPropertyGetter enp r
+  Just r -> getDynamicPropertyGetter enp r
 
-getPropertyGetter _ _ = pure Nothing
+getDynamicPropertyGetter _ _ = pure Nothing

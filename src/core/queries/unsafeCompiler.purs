@@ -52,7 +52,7 @@ import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.PropertyGetter (getPropertyGetter)
+import Perspectives.Query.PropertyGetter (getDynamicPropertyGetter)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -84,7 +84,7 @@ compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   RC.calculation ct >>= compileFunction
 
 compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP pt)) _ _ _) = do
-  g <- getPropertyGetter pt roleAdt
+  g <- getDynamicPropertyGetter pt roleAdt
   case g of
     Nothing -> throwError (error $ "UnsafeCompiler: cannot construct property getter for " <> show pt <> " on role " <> show roleAdt)
     Just g' -> pure $ unsafeCoerce g'
@@ -424,23 +424,25 @@ context2propertyValue qd = unsafeCoerce $ compileFunction qd
 -- | From a string that maybe identifies a Property(Enumerated or Calculated), retrieve or construct a function to
 -- | get values for that Property from a Role instance. Notice that this function may fail.
 -- TODO: make this function cache.
-getPropertyFunction ::
-  String -> MonadPerspectives (RoleInstance ~~> Value)
-getPropertyFunction id = do
-  ident <- expandDefaultNamespaces id
-  (unsafePartial $
-    case lookupPropertyValueGetterByName ident of
-      Nothing -> empty
-      (Just g) -> pure g
-    <|>
-    do
-      (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType ident)
-      unsafeCoerce $ PC.calculation p >>= compileFunction
-    <|>
-    do
-      (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType ident)
-      unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentRole)
-      )
+getPropertyFunction :: String -> MonadPerspectives (RoleInstance ~~> Value)
+getPropertyFunction p = getterFromPropertyType (ENP (EnumeratedPropertyType p)) <|>
+  getterFromPropertyType (CP (CalculatedPropertyType p))
+
+-- getPropertyFunction id = do
+--   ident <- expandDefaultNamespaces id
+--   (unsafePartial $
+--     case lookupPropertyValueGetterByName ident of
+--       Nothing -> empty
+--       (Just g) -> pure g
+--     <|>
+--     do
+--       (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType ident)
+--       unsafeCoerce $ PC.calculation p >>= compileFunction
+--     <|>
+--     do
+--       (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType ident)
+--       unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentRole)
+--       )
 
 -- TODO: opruimen!
 pushCurrentRole :: (String ~~> String) -> (String ~~> String)

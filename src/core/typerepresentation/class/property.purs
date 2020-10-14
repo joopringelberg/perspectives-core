@@ -22,6 +22,7 @@
 module Perspectives.Representation.Class.Property where
 
 import Control.Monad.Error.Class (throwError)
+import Control.Plus ((<|>))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
@@ -36,7 +37,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType, PropertyType(..))
 import Prelude (pure, (>>=), ($), (<>), bind, (>=>), (<<<))
 
 -- TODO. Controleer of de opzet van RoleClass.expandedADT hier van toepassing is.
@@ -97,3 +98,10 @@ propertyTypeIsMandatory :: PropertyType -> MonadPerspectives Boolean
 propertyTypeIsMandatory = getProperty >=> (case _ of
   E r -> mandatory r
   C r -> mandatory r)
+
+-----------------------------------------------------------
+-- FUNCTIONS ON STRING
+-----------------------------------------------------------
+getProperType :: String -> MonadPerspectives PropertyType
+getProperType s = ((getEnumeratedProperty $ EnumeratedPropertyType s) >>= pure <<< ENP <<< identifier)
+  <|> ((getCalculatedProperty $ CalculatedPropertyType s) >>= pure <<< CP <<< identifier)

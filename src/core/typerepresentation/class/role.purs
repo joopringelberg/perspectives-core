@@ -372,6 +372,8 @@ getCalculation :: Role -> MonadPerspectives QueryFunctionDescription
 getCalculation (E r) = calculation r
 getCalculation (C r) = calculation r
 
+-- | Includes: the type of the Role, its own binding (not the bindings transitive closure!) and its own aspects (not their transitive closure!).
+-- | For a CalculatedRole it is the range of its calculation.
 adtOfRole :: Role -> MP (ADT EnumeratedRoleType)
 adtOfRole (E e) = roleAspectsBindingADT e
 adtOfRole (C c) = roleAspectsBindingADT c

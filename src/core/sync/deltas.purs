@@ -46,7 +46,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
+import Perspectives.Instances.GetPropertyOnRoleGraph (getStaticPropertyGetter)
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.PerspectivesState (nextTransactionNumber)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
@@ -77,7 +77,7 @@ sendTransactieToUser userId t = do
   userType <- roleType_ (RoleInstance userId)
   -- TODO. We use dynamic lookup here for now. Try to replace it with static lookup as defined
   -- in Perspectives.Query.PropertyGetter.
-  getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ENR userType)
+  getChannel <- getStaticPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ENR userType)
   mchannel <- (RoleInstance userId) ##> getChannel
   case mchannel of
     Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> userId <> "\n" <> show t))
