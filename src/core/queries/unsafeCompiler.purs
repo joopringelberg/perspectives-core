@@ -425,8 +425,9 @@ context2propertyValue qd = unsafeCoerce $ compileFunction qd
 -- | get values for that Property from a Role instance. Notice that this function may fail.
 -- TODO: make this function cache.
 getPropertyFunction :: String -> MonadPerspectives (RoleInstance ~~> Value)
-getPropertyFunction p = getterFromPropertyType (ENP (EnumeratedPropertyType p)) <|>
-  getterFromPropertyType (CP (CalculatedPropertyType p))
+getPropertyFunction p = do
+  ident <- expandDefaultNamespaces p
+  getterFromPropertyType (ENP (EnumeratedPropertyType ident)) <|> getterFromPropertyType (CP (CalculatedPropertyType ident))
 
 -- getPropertyFunction id = do
 --   ident <- expandDefaultNamespaces id
