@@ -216,9 +216,9 @@ removeRoleInstance_ roleId = do
   forWithIndex_ gevuldeRollen \_ filledRollen ->
     for_ filledRollen \filledRolId -> do
       (lift $ removeBinding true filledRolId) >>= tell
-  -- Remove the binding.
+  -- Remove the inverse binding administration: bnd is no longer filled by roleId.
   case binding of
-    Just bnd -> (lift $ (roleId `removedAsFilledFrom` bnd))
+    Just bnd -> (lift $ (bnd `removedAsFilledFrom` roleId))
     otherwise -> pure unit
   -- Remove from couchdb, remove from the cache.
   void $ lift $ (scheduleRoleRemoval roleId)
@@ -413,6 +413,7 @@ removeBinding bindingRemoved roleId = do
       if not bindingRemoved
         then do
           (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
+          -- Remove the inverse binding administration: roleId is no longer filled by bindingId.
           roleId `removedAsFilledFrom` bindingId
         -- the role that has the binding will be removed anyway.
         else pure unit
