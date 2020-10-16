@@ -94,6 +94,11 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
       Nothing -> pure []
       Just qfd -> invert_ (compose qfd r)
 
+  (BQD _ (BinaryCombinator SequenceF) qfd1 qfd2 ran _ _) -> do
+    q1 <- invert_ qfd1
+    q2 <- invert_ qfd2
+    pure $ join $ [q1, q2]
+
   otherwise -> do
     left <- invert_ l
     case uncons left of
@@ -103,7 +108,7 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
           -- Now we invert_ the order of l and r.
           pure $ cons (ZQ_ l_ (Just q))
             (map (\(ZQ_ r_ q') -> ZQ_ (r_ <> l_) q') zippedQueries)
-        else throwError (Custom $ "Perspectives.Query.Zipped invert_: expected single term on the left in composition: " <> prettyPrint l)
+        else throwError (Custom $ "Perspectives.Query.Zipped invert_: expected single term on the left in composition:\n" <> prettyPrint l)
       Nothing -> pure [ZQ_ [] Nothing]
 
 invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ (compose source criterium)
