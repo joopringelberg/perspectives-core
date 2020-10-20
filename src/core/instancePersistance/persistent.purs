@@ -48,6 +48,7 @@ module Perspectives.Persistent
 , entitiesDatabaseName
 , postDatabaseName
 , updateRevision
+, entityExists
   )
 where
 
@@ -74,7 +75,7 @@ import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthenticat
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, takeEntiteitFromCache, tryReadEntiteitFromCache, tryTakeEntiteitFromCache)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
 
@@ -132,6 +133,10 @@ getDomeinFile = getPerspectEntiteit
 tryGetPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
   \_ -> pure Nothing
+
+entityExists :: forall a i. Persistent a i => i -> MonadPerspectives Boolean
+entityExists id = catchError ((getPerspectEntiteit id) >>= (pure <<< const true))
+  \_ -> pure false
 
 getAVarRepresentingPerspectEntiteit :: forall a i. Persistent a i  => i -> MonadPerspectives (AVar a)
 getAVarRepresentingPerspectEntiteit id =

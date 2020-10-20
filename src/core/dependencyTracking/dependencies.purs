@@ -36,6 +36,7 @@ import Foreign.Object (Object, insert, lookup, singleton, values)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
+import Perspectives.Persistent (class Persistent, entityExists)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..))
@@ -68,7 +69,7 @@ activeSupportedEffects = GLS.new unit
 -- | As a result:
 -- |  1. we have cached a new SupportedEffect in the ActiveSupportedEffects.
 -- |  2. we have registered the dependency of this SupportedEffect in the AssumptionRegister in the PerspectivesState.
-registerSupportedEffect :: forall a b. Newtype b String =>
+registerSupportedEffect :: forall a b x. Persistent x a => Newtype b String =>
   CorrelationIdentifier ->
   ApiEffect ->
   (a ~~> b) ->
@@ -83,27 +84,35 @@ registerSupportedEffect corrId ef q arg = do
   where
     apiEffectRunner :: Unit -> MP Unit
     apiEffectRunner _ = do
-      (Tuple result (informedAssumptions :: ArrayWithoutDoubles InformedAssumption)) <- runMonadPerspectivesQuery arg q
-      assumptions <- pure (map toAssumption (filter canBeUntypedAssumption (unwrap informedAssumptions)))
-      -- destructively set the assumptions in the ActiveSupportedEffects
-      (moldSupports :: Maybe SupportedEffect) <- pure $ GLS.peek activeSupportedEffects (show corrId)
-      -- The original request may be retracted by the client.
-      case moldSupports of
-        Nothing -> pure unit
-        Just x -> do
-          (oldSupports :: Array Assumption) <- pure x.assumptions
-          -- (oldSupports :: Array Assumption) <- pure <<< unsafePartial $ (fromJust moldSupports).assumptions
-          _ <- pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: assumptions}
-          -- destructively register the correlationIdentifier with new assumptions
-          {no: new} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex oldSupports) assumptions
-          for_ new (registerDependency corrId)
-          -- destructively deregister the correlationIdentifier from vanished assumptions
-          {no: vanished} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex assumptions) oldSupports
-          for_ vanished (deregisterDependency corrId)
-          -- Re-run the effect
-          r <- queryAssumptionRegister
-          liftEffect $ ef (Result corrId (map unwrap result))
-          pure unit
+      exists <- entityExists arg
+      if exists
+        then do
+          (Tuple result (informedAssumptions :: ArrayWithoutDoubles InformedAssumption)) <- runMonadPerspectivesQuery arg q
+          assumptions <- pure (map toAssumption (filter canBeUntypedAssumption (unwrap informedAssumptions)))
+          -- destructively set the assumptions in the ActiveSupportedEffects
+          (moldSupports :: Maybe SupportedEffect) <- pure $ GLS.peek activeSupportedEffects (show corrId)
+          -- The original request may be retracted by the client.
+          case moldSupports of
+            Nothing -> pure unit
+            Just x -> do
+              (oldSupports :: Array Assumption) <- pure x.assumptions
+              -- (oldSupports :: Array Assumption) <- pure <<< unsafePartial $ (fromJust moldSupports).assumptions
+              _ <- pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: assumptions}
+              -- destructively register the correlationIdentifier with new assumptions
+              {no: new} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex oldSupports) assumptions
+              for_ new (registerDependency corrId)
+              -- destructively deregister the correlationIdentifier from vanished assumptions
+              {no: vanished} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex assumptions) oldSupports
+              for_ vanished (deregisterDependency corrId)
+              -- Re-run the effect
+              r <- queryAssumptionRegister
+              liftEffect $ ef (Result corrId (map unwrap result))
+              pure unit
+        else do
+          -- Remove this effect and
+          unregisterSupportedEffect corrId
+          -- send an empty result (for the last time).
+          liftEffect $ ef (Result corrId [])
 
 unregisterSupportedEffect :: CorrelationIdentifier -> MP Unit
 unregisterSupportedEffect corrId = do
