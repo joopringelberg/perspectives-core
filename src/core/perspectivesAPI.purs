@@ -27,10 +27,10 @@ import Control.Coroutine.Aff (Step(..), produce', Emitter)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (head)
+import Data.Array (elemIndex, head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
@@ -46,7 +46,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..
 import Perspectives.Assignment.Update (deleteProperty, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (MP, MonadPerspectives, PropertyValueGetter, RoleGetter, MonadPerspectivesTransaction, (##>))
+import Perspectives.CoreTypes (MP, MonadPerspectives, PropertyValueGetter, RoleGetter, MonadPerspectivesTransaction, (##>), (##=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
@@ -54,7 +54,8 @@ import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, uns
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getDynamicPropertyGetter)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getEnumeratedRoleInstances, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType, roleType_, siblings)
+import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
@@ -325,15 +326,33 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       \(qrolname :: RoleType) -> case qrolname of
         (CR ctype) -> sendResponse (Error corrId ("Cannot construct an instance of CalculatedRole '" <> unwrap ctype <> "'!")) setter
         (ENR eroltype) -> do
-          rol <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
-          sendResponse (Result corrId (unwrap <$> rol)) setter
+          RolSerialization{binding: mbnd} <- pure $ unsafePartial $ fromJust rolDescription
+          case mbnd of
+            Just bnd -> do
+              contextInstanceId <- ContextInstance <$> (expandDefaultNamespaces subject)
+              bindings <- contextInstanceId ##= (getEnumeratedRoleInstances eroltype >=> binding)
+              if isJust $ elemIndex (RoleInstance bnd) bindings
+                then sendResponse (Error corrId ("Cannot not bind the same role instance twice in the same role type")) setter
+                else do
+                  rol <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
+                  sendResponse (Result corrId (unwrap <$> rol)) setter
+            Nothing -> do
+              rol <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
+              sendResponse (Result corrId (unwrap <$> rol)) setter
     -- {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
     Api.Bind_ -> catchError
       do
-        void $ runMonadPerspectivesTransaction authoringRole do
-          void $ setBinding (RoleInstance subject) (RoleInstance object) Nothing
-          handleNewPeer (RoleInstance subject)
-        sendResponse (Result corrId ["ok"]) setter
+        -- Find the other role instances of the same type as subject in this context and check whether one of them
+        -- binds the object.
+        bindings <- (RoleInstance subject) ##= siblings >=> binding
+        if isJust $ elemIndex (RoleInstance object) bindings
+          then sendResponse (Error corrId ("Cannot not bind the same role instance twice in the same role type")) setter
+          else do
+            void $ runMonadPerspectivesTransaction authoringRole
+              do
+                void $ setBinding (RoleInstance subject) (RoleInstance object) Nothing
+                handleNewPeer (RoleInstance subject)
+            sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- {request: "RemoveBinding", subject: rolID}
     Api.RemoveBinding -> catchError

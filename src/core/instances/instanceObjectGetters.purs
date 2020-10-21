@@ -278,3 +278,8 @@ subjectForRoleInstance roleId = do
 typeOfSubjectOfAction :: SubjectOfAction -> MonadPerspectives RoleType
 typeOfSubjectOfAction (UserInstance r) = (r ##>> roleType) >>= pure <<< ENR
 typeOfSubjectOfAction (UserType t) = pure t
+
+siblings :: RoleInstance ~~> RoleInstance
+siblings rid = do
+  IP.PerspectRol{pspType, context:ctxt} <- lift $ lift $ getPerspectRol rid
+  getEnumeratedRoleInstances pspType ctxt
