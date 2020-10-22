@@ -40,8 +40,8 @@ import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleKind(..), RoleType(..))
-import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (==), (>=>), (>>=))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleKind(..), RoleType(..))
+import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (==), (>=>), (>>=), (&&), not)
 
 checkDomeinFile :: DomeinFile -> MonadPerspectives (Array PerspectivesError)
 checkDomeinFile df = pure []
@@ -103,13 +103,16 @@ checkContext c = do
 -----------------------------------------------------------
 -- CHECKBINDING
 -----------------------------------------------------------
+-- | The allowed binding of the given role type must be equal to or more general than the type of the proposed binding.
+-- | The type of the proposed binding may not be equal to the given role type (we disallow a role binding to itself).
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding roletype instanceToBind = do
   -- If the model is not available locally, try to get it from the repository.
-  rtype@(EnumeratedRoleType rtype') <- roleType_ instanceToBind
+  rtype <- roleType_ instanceToBind
   instanceType' <- (getEnumeratedRole >=> roleAspectsBindingADT) rtype
   -- TODO. Voor de rol moet ik alleen de binding ophalen.
   -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRole
   roleType' <- bindingOfRole roletype
-  roleType' `lessThanOrEqualTo` instanceType'
+  b1 <- roleType' `lessThanOrEqualTo` instanceType'
+  pure $ b1 && not (roletype == ENR rtype)
