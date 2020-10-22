@@ -40,7 +40,7 @@ import Perspectives.Parsing.Arc.AST (ContextPart(..))
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=), (<$>), (>=>))
+import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=), (<$>))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.

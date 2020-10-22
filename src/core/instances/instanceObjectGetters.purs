@@ -23,6 +23,7 @@ module Perspectives.Instances.ObjectGetters where
 
 import Control.Alt ((<|>))
 import Control.Monad.Writer (lift, tell)
+import Control.Plus (empty)
 import Data.Array (findIndex, foldMap, head, index, null, singleton)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -37,10 +38,10 @@ import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInCo
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
-import Perspectives.Identifiers (LocalName)
+import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
@@ -279,7 +280,16 @@ typeOfSubjectOfAction :: SubjectOfAction -> MonadPerspectives RoleType
 typeOfSubjectOfAction (UserInstance r) = (r ##>> roleType) >>= pure <<< ENR
 typeOfSubjectOfAction (UserType t) = pure t
 
+-- | Returns all the instances of the same role (including the argument instance!).
 siblings :: RoleInstance ~~> RoleInstance
 siblings rid = do
   IP.PerspectRol{pspType, context:ctxt} <- lift $ lift $ getPerspectRol rid
   getEnumeratedRoleInstances pspType ctxt
+
+-- | Returns the name of the model that defines the role type as a String Value.
+roleModelName :: RoleInstance ~~> Value
+roleModelName (RoleInstance rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
+
+-- | Returns the name of the model that defines the context type as a String Value.
+contextModelName :: ContextInstance ~~> Value
+contextModelName (ContextInstance cid) = maybe empty (pure <<< Value) (deconstructModelName cid)

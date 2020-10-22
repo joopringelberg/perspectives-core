@@ -495,7 +495,7 @@ compileRules = do
                 (Just (A assignments)) -> do
                   let_ <- withFrame do
                     addBinding "object" objectCalculation
-                    makeSequence <$> pure objectVar <*> (sequenceOfAssignments currentDomain assignments)
+                    makeSequence <$> pure objectVar <*> (sequenceOfAssignments currentDomain (reverse assignments))
                   (aStatements :: QueryFunctionDescription) <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
                   pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
                   -- Compile the LetStep into a QueryDescription.
@@ -521,7 +521,7 @@ compileRules = do
             -- This will return a QueryFunctionDescription that describes either a single assignment, or
             -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
             sequenceOfAssignments :: Domain -> Array Assignment -> PhaseThree QueryFunctionDescription
-            sequenceOfAssignments currentDomain assignments' = sequenceOfAssignments_ (reverse assignments')
+            sequenceOfAssignments currentDomain assignments' = sequenceOfAssignments_ assignments'
               where
                 sequenceOfAssignments_ :: Array Assignment -> PhaseThree QueryFunctionDescription
                 sequenceOfAssignments_ assignments = case uncons assignments of

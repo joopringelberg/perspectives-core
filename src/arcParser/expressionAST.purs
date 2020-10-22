@@ -105,6 +105,7 @@ data SimpleStep =
   | Extern ArcPosition
   | SequenceFunction ArcPosition QF.FunctionName
   | Identity ArcPosition
+  | Modelname ArcPosition
   | Variable ArcPosition String
 
   | TypeOfContext ArcPosition
@@ -202,6 +203,7 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (Extern _) = "Extern"
   prettyPrint' t (SequenceFunction _ s) = "SequenceFunction " <> show s
   prettyPrint' t (Identity _ ) = "Identity"
+  prettyPrint' t (Modelname _) = "Modelname"
   prettyPrint' t (Variable _ s) = "Variable " <> s
   prettyPrint' t (Value _ range s) = "Value " <> show range <> " " <> s
   prettyPrint' t (RoleTypes _) = "RoleTypes"

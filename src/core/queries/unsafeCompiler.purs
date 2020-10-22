@@ -47,7 +47,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binds, boundBy, context, contextType, externalRole, getEnumeratedRoleInstances, getRoleBinders, makeBoolean)
+import Perspectives.Instances.ObjectGetters (binding, binds, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getRoleBinders, makeBoolean, roleModelName)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
@@ -65,7 +65,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, specialisesRoleType)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||), (>>>))
 import Unsafe.Coerce (unsafeCoerce)
@@ -99,6 +99,13 @@ compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ unsafeCoer
 compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ unsafeCoerce context
 
 compileFunction (SQD _ (DataTypeGetter IdentityF) _ _ _) = pure $ (pure <<< identity)
+
+compileFunction (SQD dom (DataTypeGetter ModelNameF) _ _ _) = case dom of
+  RDOM _ -> pure $ unsafeCoerce roleModelName
+  CDOM _ -> pure $ unsafeCoerce contextModelName
+  ContextKind -> pure $ unsafeCoerce contextTypeModelName'
+  RoleKind -> pure $ unsafeCoerce roleTypeModelName'
+  _ -> throwError (error $ "UnsaveCompiler: cannot retrieve modelname from " <> show dom)
 
 compileFunction (SQD _ (TypeGetter TypeOfContextF) _ _ _) = pure $ unsafeCoerce contextType
 

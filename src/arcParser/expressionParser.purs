@@ -97,6 +97,8 @@ simpleStep = try
   <|>
   Simple <$> (Identity <$> getPosition <* reserved "this")
   <|>
+  Simple <$> (Modelname <$> getPosition <* reserved "modelname")
+  <|>
   Simple <$> (TypeOfContext <$> (getPosition <* reserved "contextType"))
   <|>
   Simple <$> (RoleTypes <$> (getPosition <* reserved "roleTypes"))
@@ -212,6 +214,7 @@ startOf stp = case stp of
     startOfSimple (CreateEnumeratedRole p _) = p
     startOfSimple (SequenceFunction p _) = p
     startOfSimple (Identity p) = p
+    startOfSimple (Modelname p) = p
     startOfSimple (Variable p _) = p
 
     startOfSimple (TypeOfContext p) = p
@@ -243,6 +246,7 @@ endOf stp = case stp of
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length (show fname)}
     endOfSimple (Identity (ArcPosition{line, column})) = ArcPosition{line, column: column + 4}
+    endOfSimple (Modelname (ArcPosition{line, column})) = ArcPosition{line, column: column + 9}
     endOfSimple (Variable (ArcPosition{line, column}) v) = ArcPosition{line, column: column + length v}
 
     endOfSimple (TypeOfContext (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}

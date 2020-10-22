@@ -58,7 +58,7 @@ import Perspectives.Couchdb (DocWithAttachmentInfo(..), PutCouchdbDocument, onAc
 import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, defaultPerspectRequest, documentNamesInDatabase, getAttachmentFromUrl, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, getViewOnDatabase_, retrieveDocumentVersion, version)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
+import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, SeparateInvertedQuery(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
@@ -329,6 +329,11 @@ uploadToRepository_ dfId url df = lift $ lift $ do
     Nothing -> pure unit
     Just attachment -> void $ addAttachmentToUrl docUrl attName attachment mimetype
 
+-- | The argument of type Array String contains a model identifier.
+removeModelFromLocalStore :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
+removeModelFromLocalStore rs _ = case head rs of
+  Nothing -> pure unit
+  Just r -> lift2 $ removeDomeinFileFromCouchdb r
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
@@ -338,4 +343,5 @@ externalFunctions =
   , Tuple "model:Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
   , Tuple "model:Couchdb$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
   , Tuple "model:Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
+  , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
 ]

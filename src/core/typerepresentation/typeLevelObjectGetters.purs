@@ -22,7 +22,7 @@
 module Perspectives.Types.ObjectGetters where
 
 import Control.Monad.Trans.Class (lift)
-import Control.Plus (map, (<|>))
+import Control.Plus (empty, map, (<|>))
 import Data.Array (elemIndex, filter, findIndex, intersect, null, singleton)
 import Data.List (toUnfoldable)
 import Data.Map.Internal (keys) as MAP
@@ -31,11 +31,11 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (fromFoldable, keys, lookup, values)
-import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=))
+import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (areLastSegmentsOf, deconstructLocalName_, endsWithSegments)
+import Perspectives.Identifiers (areLastSegmentsOf, deconstructLocalName_, deconstructModelName, endsWithSegments)
 import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.InvertedQuery (RelevantProperties(..), PropsAndVerbs)
@@ -112,6 +112,13 @@ allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole user
   where
     userRole' :: ContextType ~~~> RoleType
     userRole' = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< ContextClass.userRole)
+
+-- | Returns the name of the model that defines the role type as a String Value.
+contextTypeModelName :: ContextType ~~~> Value
+contextTypeModelName (ContextType rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
+
+contextTypeModelName' :: ContextType ~~> Value
+contextTypeModelName' (ContextType rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S
@@ -254,6 +261,12 @@ specialisesRoleType_ t1 t2 = do
   t1' <- typeIncludingAspects t1
   t2' <- typeIncludingAspects t2
   t1' `greaterThanOrEqualTo` t2'
+
+roleTypeModelName :: RoleType ~~~> Value
+roleTypeModelName rt = maybe empty (pure <<< Value) (deconstructModelName (roletype2string rt))
+
+roleTypeModelName' :: RoleType ~~> Value
+roleTypeModelName' rt = maybe empty (pure <<< Value) (deconstructModelName (roletype2string rt))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS AND ON VIEWS

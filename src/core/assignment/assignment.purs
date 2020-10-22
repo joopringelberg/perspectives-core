@@ -23,21 +23,15 @@
 
 module Perspectives.Representation.Assignment where
 
-import Data.Array (cons)
-import Data.Array.Partial (head, tail)
-import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.List (List)
-import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign, F)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.Instances.Environment (Environment)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..))
-import Prelude (class Eq, class Show, pure, ($), (<>), show, (<$>), (<*>))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
+import Prelude (class Eq, class Show)
 
 type FunctionName = String
 

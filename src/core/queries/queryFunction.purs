@@ -40,6 +40,7 @@ data FunctionName =
   | BindingF
   | ExternalRoleF
   | IdentityF           -- TODO IN QUERYCOMPILER
+  | ModelNameF
   | SequenceF
   | NotF
   | ExistsF
@@ -79,6 +80,7 @@ isFunctionalFunction fn = case fn of
   BindingF -> True
   ExternalRoleF -> True
   IdentityF -> Unknown
+  ModelNameF -> True
   SequenceF -> Unknown
   NotF -> True
   ExistsF -> True
@@ -182,6 +184,7 @@ instance showFunctionName :: Show FunctionName where
     show BindingF = "binding"
     show ExternalRoleF = "external" -- TODO klopt dit met de parser?
     show IdentityF = "identity"
+    show ModelNameF = "Namespace"
     show SequenceF = "sequence"
     show NotF = "not"
     show ExistsF = "exists"

@@ -226,6 +226,8 @@ compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
 
 compileSimpleStep currentDomain (Identity _) = pure $ SQD currentDomain (QF.DataTypeGetter IdentityF) currentDomain Unknown True
 
+compileSimpleStep currentDomain (Modelname _) =pure $ SQD currentDomain (QF.DataTypeGetter ModelNameF) currentDomain Unknown True
+
 -- We compile the SequenceFunction as a UnaryCombinator, which is a stretch.
 compileSimpleStep currentDomain (SequenceFunction _ fname) = pure $ SQD currentDomain (QF.UnaryCombinator fname) currentDomain (isFunctionalFunction fname) True
 
