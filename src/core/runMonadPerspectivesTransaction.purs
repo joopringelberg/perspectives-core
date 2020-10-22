@@ -48,7 +48,7 @@ import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
-import Perspectives.Persistent (getDomeinFile, removeEntiteit)
+import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
@@ -83,11 +83,13 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       (ft@(Transaction{correlationIdentifiers, contextsToBeRemoved, rolesToBeRemoved}) :: Transaction) <- lift AA.get >>= runActions
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then lift $ lift $ distributeTransaction ft else pure unit
-      -- Sort from low to high, so we can never actualise a client side component after it has been removed.
       -- Definitively remove instances
-      lift2 $ for_ contextsToBeRemoved removeEntiteit
-      lift2 $ for_ rolesToBeRemoved removeEntiteit
+      -- log ("Will remove these contexts: " <> show contextsToBeRemoved)
+      lift2 $ for_ contextsToBeRemoved tryRemoveEntiteit
+      -- log ("Will remove these roles: " <> show rolesToBeRemoved)
+      lift2 $ for_ rolesToBeRemoved tryRemoveEntiteit
       -- log "==========RUNNING EFFECTS============"
+      -- Sort from low to high, so we can never actualise a client side component after it has been removed.
       lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do
         me <- pure $ lookupActiveSupportedEffect corrId
         case me of
