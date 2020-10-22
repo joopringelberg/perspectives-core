@@ -46,11 +46,11 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Instances.GetPropertyOnRoleGraph (getStaticPropertyGetter)
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.PerspectivesState (nextTransactionNumber)
+import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -75,9 +75,7 @@ sendTransactieToUser :: String -> TransactionForPeer -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
   -- TODO controleer of hier authentication nodig is!
   userType <- roleType_ (RoleInstance userId)
-  -- TODO. We use dynamic lookup here for now. Try to replace it with static lookup as defined
-  -- in Perspectives.Query.PropertyGetter.
-  getChannel <- getStaticPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ENR userType)
+  getChannel <- getDynamicPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ST $ userType)
   mchannel <- (RoleInstance userId) ##> getChannel
   case mchannel of
     Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> userId <> "\n" <> show t))

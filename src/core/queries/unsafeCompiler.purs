@@ -47,19 +47,20 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binds, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getRoleBinders, makeBoolean, roleModelName)
+import Perspectives.Instances.ObjectGetters (binding, binding_, binds, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, makeBoolean, roleModelName, roleType_)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.PropertyGetter (getDynamicPropertyGetter)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
+import Perspectives.Representation.Class.Property (getProperType)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.Class.Role (calculation) as RC
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
@@ -83,11 +84,9 @@ compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   -- TODO moeten we hier de currentcontext pushen?
   RC.calculation ct >>= compileFunction
 
-compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP pt)) _ _ _) = do
+compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) = do
   g <- getDynamicPropertyGetter pt roleAdt
-  case g of
-    Nothing -> throwError (error $ "UnsafeCompiler: cannot construct property getter for " <> show pt <> " on role " <> show roleAdt)
-    Just g' -> pure $ unsafeCoerce g'
+  pure $ unsafeCoerce g
 
 compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
   (cp :: CalculatedProperty) <- getPerspectType pt
@@ -465,10 +464,7 @@ pushCurrentRole f roleId = do
 getterFromPropertyType :: PropertyType -> MP (RoleInstance ~~> Value)
 getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) = case lookupPropertyValueGetterByName id of
   Nothing -> do
-    p@(EnumeratedProperty {functional, mandatory}) <- getPerspectType ep
-    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction
-    void $ pure $ propertyGetterCacheInsert id getter functional mandatory
-    pure getter
+    pure $ getProperty ep
   Just g -> pure g
 getterFromPropertyType (CP cp@(CalculatedPropertyType id)) = case lookupPropertyValueGetterByName id of
   Nothing -> do
@@ -482,3 +478,24 @@ getterFromPropertyType (CP cp@(CalculatedPropertyType id)) = case lookupProperty
 
 getHiddenFunction :: QueryFunctionDescription -> MP HiddenFunction
 getHiddenFunction = unsafeCoerce $ compileFunction
+
+-- | From a string that represents either a Calculated or an Enumerated property,
+-- | for a given abstract datatype of roles, retrieve the values from a role instance.
+getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
+getDynamicPropertyGetter p adt = do
+  (pt :: PropertyType) <- getProperType p
+  allProps <- allLocallyRepresentedProperties adt
+  if (isJust $ elemIndex pt allProps)
+    then getterFromPropertyType pt
+    else pure f
+
+  where
+    f :: (RoleInstance ~~> Value)
+    f roleInstance = do
+      bnd <- lift $ lift $ binding_ roleInstance
+      case bnd of
+        Nothing -> empty
+        Just bnd' -> do
+          (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd'
+          getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)
+          getter bnd'

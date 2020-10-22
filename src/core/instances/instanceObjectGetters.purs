@@ -161,7 +161,7 @@ getProperty pn r = ArrayT do
     (Just p) -> pure p
 
 -- | Get a property on a chain of EnumeratedRole instances that are filled by each other.
--- | The function [getDynamicPropertyGetter](Perspectives.Instances.GetPropertyOnRoleGraph.html#t:getDynamicPropertyGetter)
+-- | The function [getDynamicPropertyGetter](Perspectives.Query.UnsafeCompiler.html#t:getDynamicPropertyGetter)
 -- | will compute the Values for a PropertyType (Enumerated or Calculated).
 getPropertyFromTelescope :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getPropertyFromTelescope pn r = ArrayT do
