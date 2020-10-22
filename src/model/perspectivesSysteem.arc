@@ -55,13 +55,21 @@ domain: System
       -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
       perspective on: DanglingIndexedContext
         if exists DanglingIndexedContext then
-          remove object
+          -- After removing the object, we can no longer find the name, so bind it first.
+          let* model <- object >> binding >> context >> contextType >> modelname
+          in
+            remove object
+            -- remove the model last, as we refer to it while removing the object.
+            callEffect cdb:RemoveModelFromLocalStore (model)
+            -- Now reload the models, as we've inadvertently removed the description
+            -- of the model we've just removed, too.
+            --callExternal cdb:Models() returns: Model$External
 
-    context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
     -- An entry in IndexedContexts is dangling if its model is not in use.
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
-    -- On moving a model to ModelsInUse for the second time, the bot with the perspective on UnloadedModel will not work. We need a third rule for that.
-    -- An UnconnectedIndexedContext is model in use that has no entry in IndexedContexts.
+
+    -- On moving a model to ModelsInUse, the contexts bound to its IndexedContext show up in this role. The bot with a perspective on this role
+    -- binds it to IndexedContexts of sys:PerspectivesSystem.
     context: UnconnectedIndexedContext = ModelsInUse >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts
 
   case: PhysicalContext
@@ -96,6 +104,7 @@ domain: System
     external:
       property: Name (mandatory, functional, String)
       property: Description (mandatory, functional, String)
+      property: ModelIdentification (mandatory, functional, String)
       property: Url (mandatory, functional, String)
     user: Author (not mandatory, functional) filledBy: User
       perspective on: External

@@ -34,7 +34,7 @@ domain: ModelManagement
       property: CrlPath (mandatory, functional, String)
       property: CrlFeedback (mandatory, functional, String)
       property: CrlOK = CrlFeedback == "OK"
-      property: Name (mandatory, functional, String)
+      property: Name = context >> ModelDescription >> Name
 
       view: Paths (ArcPath, CrlPath)
       view: Feedback (ArcFeedback, CrlFeedback)

@@ -7,6 +7,7 @@ chat:Model usr:SimpleChatModel
   extern sys:Model$External$Name = "Simple Chat"
   extern sys:Model$External$Description = "A (very) simple chat application."
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:SimpleChat"
+  extern $ModelIdentification = "model:SimpleChat"
   sys:Model$IndexedContext =>
     chat:ChatApp usr:MyChatApp
       extern sys:RootContext$External$Name = "Simple Chat"
