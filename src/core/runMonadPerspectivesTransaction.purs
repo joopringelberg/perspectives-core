@@ -80,7 +80,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
       -- 2. Now run actions, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
-      (ft@(Transaction{correlationIdentifiers, contextsToBeRemoved, rolesToBeRemoved}) :: Transaction) <- lift AA.get >>= runActions
+      (ft@(Transaction{correlationIdentifiers, contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved}) :: Transaction) <- lift AA.get >>= runActions
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then lift $ lift $ distributeTransaction ft else pure unit
       -- Definitively remove instances
@@ -88,6 +88,8 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       lift2 $ for_ contextsToBeRemoved tryRemoveEntiteit
       -- log ("Will remove these roles: " <> show rolesToBeRemoved)
       lift2 $ for_ rolesToBeRemoved tryRemoveEntiteit
+      -- log ("Will remove these models: " <> show modelsToBeRemoved)
+      lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- log "==========RUNNING EFFECTS============"
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
       lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do

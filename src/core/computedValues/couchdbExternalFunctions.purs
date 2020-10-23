@@ -38,7 +38,7 @@ import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.MediaType (MediaType(..))
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for)
@@ -58,7 +58,7 @@ import Perspectives.Couchdb (DocWithAttachmentInfo(..), PutCouchdbDocument, onAc
 import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, defaultPerspectRequest, documentNamesInDatabase, getAttachmentFromUrl, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, getViewOnDatabase_, retrieveDocumentVersion, version)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, storeDomeinFileInCouchdbPreservingAttachments)
+import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, SeparateInvertedQuery(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
@@ -74,6 +74,7 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.User (getSystemIdentifier)
 import Prelude (Unit, append, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
@@ -333,7 +334,10 @@ uploadToRepository_ dfId url df = lift $ lift $ do
 removeModelFromLocalStore :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
 removeModelFromLocalStore rs _ = case head rs of
   Nothing -> pure unit
-  Just r -> lift2 $ removeDomeinFileFromCouchdb r
+  Just r -> scheduleDomeinFileRemoval (DomeinFileId r)
+
+scheduleDomeinFileRemoval :: DomeinFileId -> MonadPerspectivesTransaction Unit
+scheduleDomeinFileRemoval id = lift $ AMA.modify (over Transaction \t@{modelsToBeRemoved} -> t {modelsToBeRemoved = cons id modelsToBeRemoved})
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.

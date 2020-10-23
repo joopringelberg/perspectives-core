@@ -47,6 +47,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Perspectives.Representation.View (View)
+import Perspectives.Utilities (class PrettyPrint)
 import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, pure, unit, void, ($), (<<<), (==))
 
 newtype DomeinFile = DomeinFile DomeinFileRecord
@@ -143,6 +144,8 @@ instance eqDomeinFileId :: Eq DomeinFileId where
   eq (DomeinFileId id1) (DomeinFileId id2) = id1 == id2
 instance ordDomeinFileId :: Ord DomeinFileId where
   compare (DomeinFileId a) (DomeinFileId b) = compare a b
+instance prettyPrintDomeinFileId :: PrettyPrint DomeinFileId where
+  prettyPrint' t (DomeinFileId n) = n
 
 defaultDomeinFileRecord :: DomeinFileRecord
 defaultDomeinFileRecord =
