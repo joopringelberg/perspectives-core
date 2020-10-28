@@ -174,9 +174,13 @@ available_ source id = ArrayT do
     r
   pure $ [Value $ show (result HA.&& (HA.not (null r)))]
 
+-- | Implements negation by failure in the sense that if the source returns no values, it is interpreted
+-- | as `false`, hence `not` returns `true`.
 not :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->
   (s -> ArrayT m Value)
 not source id = ArrayT do
   r <- runArrayT $ source id
-  pure $ (Value <<< show <<< ((==) (Value "false"))) <$> r
+  if null r
+    then pure [Value "true"]
+    else pure $ (Value <<< show <<< ((==) (Value "false"))) <$> r
