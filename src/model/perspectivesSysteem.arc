@@ -39,7 +39,7 @@ domain: System
 
     context: Channels = User >> (binder Initiator union binder ConnectedPartner) >> context >> extern
 
-    context: Modellen = callExternal cdb:Models() returns: Model$External
+    context: Modellen = filter callExternal cdb:Models() returns: sys:Model$External with not IsLibrary
 
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context: IndexedContexts (not mandatory, not functional) filledBy: sys:RootContext
@@ -103,6 +103,7 @@ domain: System
       property: Description (mandatory, functional, String)
       property: ModelIdentification (mandatory, functional, String)
       property: Url (mandatory, functional, String)
+      property: IsLibrary (mandatory, functional, Boolean)
     user: Author (not mandatory, functional) filledBy: User
       perspective on: External
     context: IndexedContext (mandatory, functional) filledBy: sys:RootContext
