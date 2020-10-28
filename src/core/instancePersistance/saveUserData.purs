@@ -439,6 +439,7 @@ removedAsFilledFrom fillerId filledId = do
   -- remove the context! This is because we then have a context whose external role fills no other role (is not
   -- bound anywhere).
   filler'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen filler (rol_pspType filled) filledId)
-  if (isEmpty gevuldeRollen && isExternalRole (unwrap fillerId))
-    then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap fillerId)) false
-    else cacheAndSave fillerId filler'
+  -- if (isEmpty gevuldeRollen && isExternalRole (unwrap fillerId))
+  --   then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap fillerId)) false
+  --   else cacheAndSave fillerId filler'
+  cacheAndSave fillerId filler'

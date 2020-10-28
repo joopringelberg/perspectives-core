@@ -49,6 +49,8 @@ module Perspectives.Persistent
 , postDatabaseName
 , updateRevision
 , entityExists
+, tryFetchEntiteit
+, entiteitExistsInDatabase
   )
 where
 
@@ -71,7 +73,7 @@ import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse, version)
-import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
+import Perspectives.Couchdb.Databases (defaultPerspectRequest, documentExists, ensureAuthentication, getDocumentFromUrl, retrieveDocumentVersion)
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
@@ -193,6 +195,20 @@ fetchEntiteit id = ensureAuthentication $ catchError
       Nothing -> pure unit
       Just av -> liftAff $ kill (error ("Cound not find " <> unwrap id)) av
     throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
+
+-- | Fetch the definition of a document if it can be found. DOES NOT CACHE THE ENTITY!
+tryFetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives (Maybe a)
+tryFetchEntiteit id = do
+  ebase <- database id
+  getDocumentFromUrl (ebase <> (unwrap id))
+
+-- | Tests whether the entity is stored in the database. Errors in the process are silently caught and result in false.
+entiteitExistsInDatabase :: forall a i. Persistent a i => i -> MonadPerspectives Boolean
+entiteitExistsInDatabase id = ensureAuthentication $ catchError
+  do
+    ebase <- database id
+    documentExists (ebase <> (unwrap id))
+  \e -> pure false
 
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveEntiteit id = saveEntiteit' id Nothing

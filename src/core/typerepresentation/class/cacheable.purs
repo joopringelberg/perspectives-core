@@ -24,6 +24,7 @@ module Perspectives.Representation.Class.Cacheable
   , module Perspectives.Couchdb.Revision
   , module Perspectives.Representation.TypeIdentifiers
   , cacheEntity
+  , overwriteEntity
   ) where
 
 -- | Members of Cacheable trade identifiers for a representation.
@@ -82,6 +83,17 @@ cacheEntity id e = do
         else do
           oldE <- liftAff $ take avar
           liftAff $ put (changeRevision (rev oldE) e) avar *> pure avar
+
+-- | Put the entity in the existing AVar (overwriting it completely) or create a new AVar.
+overwriteEntity :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
+overwriteEntity id e = do
+  mAvar <- retrieveInternally id
+  case mAvar of
+    Nothing -> do
+      (av :: AVar a) <- representInternally id
+      liftAff $ put e av
+      pure av
+    Just avar -> liftAff $ put e avar *> pure avar
 
 -- | Returns an entity. Throws an error if the resource is not represented in cache or not
 -- | immediately available in cache.

@@ -59,11 +59,8 @@ domain: System
           let* model <- object >> binding >> context >> contextType >> modelname
           in
             remove object
-            -- remove the model last, as we refer to it while removing the object.
-            callEffect cdb:RemoveModelFromLocalStore (model)
-            -- Now reload the models, as we've inadvertently removed the description
-            -- of the model we've just removed, too.
-            --callExternal cdb:Models() returns: Model$External
+            -- Until we've got sound and complete cascade delete, do not remove the model.
+            -- callEffect cdb:RemoveModelFromLocalStore (model)
 
     -- An entry in IndexedContexts is dangling if its model is not in use.
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
