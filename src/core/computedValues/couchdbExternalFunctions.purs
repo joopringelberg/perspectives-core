@@ -174,9 +174,11 @@ addModelToLocalStore' url = do
               Nothing -> do
                 g <- liftEffect guid
                 pure $ Tuple (unwrap iContext) (ContextInstance ("model:User$" <> show g))) >>= pure <<< fromFoldable
-                
+
           mySystem <- lift2 (ContextInstance <$> getMySystem)
           me <- lift2 (RoleInstance <$> getUserIdentifier)
+          -- TODO. Do we really have to reassert Me and MySystem every time? Presumably this is for the
+          -- situation where we do not yet have model:System.
           void $ lift2 $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
 
           -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
@@ -206,6 +208,7 @@ addModelToLocalStore' url = do
                   (\i a -> do
                     (mrole :: Maybe PerspectRol) <- lift $  tryFetchEntiteit (RoleInstance i)
                     case mrole of
+                      -- If we find a previous version in the database, obviously we don't have to save it to the database.
                       Just role -> void $ lift $ overwriteEntity (RoleInstance i) role
                       -- For each role instance with a binding that is not one of the other imported role instances,
                       -- set the inverse binding administration on that binding.
@@ -218,6 +221,7 @@ addModelToLocalStore' url = do
                             newBinding <- lift $ getPerspectEntiteit newBindingId
                             void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType a) (RoleInstance i))
                             void $ lift $ saveEntiteit newBindingId
+                            saveRoleInstance i a
                             -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
                             -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
                 ))
