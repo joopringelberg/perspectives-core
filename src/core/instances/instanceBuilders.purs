@@ -233,19 +233,6 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
       constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) rolInstanceId
     Just roleId -> constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) (RoleInstance roleId)
 
-  -- Then add the new Role instance to the context.
-  addRoleInstancesToContext contextInstanceId roleType (singleton (Tuple roleInstance Nothing))
-  -- Then add the binding
-  case binding of
-    Nothing -> pure unit
-    Just bnd -> do
-      expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
-      void $ setBinding roleInstance expandedBinding Nothing
-  -- Then add the properties
-  case properties of
-    (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
-      setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
-
   -- Serialise as Deltas if we bind to a user that is not me.
   isMe <- getIsMe
   if (isJust binding && kindOfRole == UserRole && not isMe)
@@ -257,6 +244,19 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
       -- We assume here that a User has just one role in the context (otherwise the serialisation is superfluous).
       then contextInstanceId `serialisedAsDeltasFor` roleInstance
       else pure unit
+
+  -- Then add the new Role instance to the context. Takes care of SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
+  addRoleInstancesToContext contextInstanceId roleType (singleton (Tuple roleInstance Nothing))
+  -- Then add the binding
+  case binding of
+    Nothing -> pure unit
+    Just bnd -> do
+      expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
+      void $ setBinding roleInstance expandedBinding Nothing
+  -- Then add the properties
+  case properties of
+    (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
+      setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
 
   pure roleInstance
   where

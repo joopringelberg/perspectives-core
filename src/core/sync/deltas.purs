@@ -93,12 +93,14 @@ type TransactionPerUser = Object TransactionForPeer
 -- | This function builds a custom version of the Transaction for each such user.
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
 transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas}) = do
-  execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> addDeltaToCustomisedTransactie delta users)
+  execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do
+      sysUsers <- lift (unit ##= (\_ -> ArrayT (pure users)) >=> bottom)
+      addDeltaToCustomisedTransactie delta (nub sysUsers))
     empty
   where
     addDeltaToCustomisedTransactie :: SignedDelta -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
-    addDeltaToCustomisedTransactie d@(SignedDelta {author: deltaAuthor}) users = for_
-      users
+    addDeltaToCustomisedTransactie d@(SignedDelta {author: deltaAuthor}) sysUsers = for_
+      sysUsers
       (\(RoleInstance sysUser) -> if not $ eq sysUser deltaAuthor
         then do
           trs <- get
@@ -114,23 +116,19 @@ addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changed
 
 -- | Add the delta at the end of the array, unless it is already in the transaction!
 addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
-addDelta (DeltaInTransaction dr@{users}) = do
-  sysUsers <- lift $ lift (unit ##= (\_ -> ArrayT (pure users)) >=> bottom)
-  d <- pure (DeltaInTransaction dr {users = nub sysUsers})
+addDelta dt =
   lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas =
-    if isJust $ elemIndex d deltas
+    if isJust $ elemIndex dt deltas
       then deltas
-      else snoc deltas d})
+      else snoc deltas dt})
 
 -- | Insert the delta at the index, unless it is already in the transaction.
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
-insertDelta (DeltaInTransaction dr@{users}) i = do
-  sysUsers <- lift $ lift (unit ##= (\_ -> ArrayT (pure users)) >=> bottom)
-  d <- pure (DeltaInTransaction dr {users = nub sysUsers})
+insertDelta dt i = 
   lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas =
-    if isJust $ elemIndex d deltas
+    if isJust $ elemIndex dt deltas
       then deltas
-      else unsafePartial $ fromJust $ insertAt i d deltas})
+      else unsafePartial $ fromJust $ insertAt i dt deltas})
 
 -- | Instrumental for QUERY UPDATES.
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit

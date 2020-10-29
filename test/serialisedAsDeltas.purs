@@ -12,10 +12,10 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Perspectives.CoreTypes ((##>>))
 import Perspectives.Couchdb.Databases (deleteDatabase)
-import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
-import Perspectives.Query.UnsafeCompiler (getRoleFunction)
+import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter, getRoleFunction)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SaveUserData (handleNewPeer, setBinding)
@@ -107,7 +107,7 @@ theSuite = suite "SerialisedAsDeltas" do
       --   Just (RoleBindingDelta{id, sequenceNumber}) -> liftAff $ assert "There should finally be a RoleBindingDelta on role model:User$MyTestCase$Other_0001 and its sequenceNumber should be 5" (id ==
       --   (RoleInstance "model:User$MyTestCase$Other_0001") && sequenceNumber == 5)
     userType <- roleType_ joop
-    getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ENR userType)
+    getChannel <- getDynamicPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ST userType)
     channel <- joop ##>> getChannel
     deleteDatabase (unwrap channel)
     clearUserDatabase

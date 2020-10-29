@@ -58,6 +58,7 @@ instance encodeTransactionForPeer :: Encode TransactionForPeer where
 instance decodeTransactie :: Decode TransactionForPeer where
   decode = genericDecode defaultOptions
 
+-- | Add the new delta to the end of the array, in the Transaction.
 addToTransactionForPeer :: SignedDelta -> TransactionForPeer -> TransactionForPeer
 addToTransactionForPeer d (TransactionForPeer r@{deltas}) = TransactionForPeer r {deltas = if isJust $ elemIndex d deltas
     then deltas
