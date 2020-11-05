@@ -19,7 +19,7 @@
 
 -- END LICENSE
 
-module Perspectives.AMQP.Stomp -- 3
+module Perspectives.AMQP.Stomp
 
   ( messageProducer
   , StompClient
@@ -28,18 +28,24 @@ module Perspectives.AMQP.Stomp -- 3
   , AcknowledgeFunction
   , unsubscribe
   , send
+  , StructuredMessage
   )
 
 where
 
 import Prelude
 
-import Control.Coroutine (Producer)
-import Control.Coroutine.Aff (Emitter, Step(..), produce)
+import Control.Coroutine (Producer, transform, ($~))
+import Control.Coroutine.Aff (Emitter, Step(..), produce, produce')
+import Control.Monad.Except (runExcept)
+import Control.Monad.Rec.Class (forever)
+import Data.Either (Either(..))
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn5, runEffectFn1, runEffectFn2, runEffectFn3, runEffectFn5)
-import Foreign (Foreign)
+import Foreign (Foreign, MultipleErrors)
+import Foreign.Class (class Decode, decode)
+import Perspectives.CouchdbState (MonadCouchdb)
 
 -----------------------------------------------------------
 -- STOMPURL
@@ -104,9 +110,20 @@ connectAndSubscribe stompClient params = runEffectFn5 connectAndSubscribeImpl
 -- MESSAGEPRODUCER
 -----------------------------------------------------------
 -- | A Producer of Messages.
-messageProducer :: StompClient -> ConnectAndSubscriptionParameters -> Producer Message Aff Unit
-messageProducer stompClient params = produce (connectAndSubscribe stompClient params)
+messageProducer' :: forall f. StompClient -> ConnectAndSubscriptionParameters -> Producer Message (MonadCouchdb f) Unit
+messageProducer' stompClient params = produce' (connectAndSubscribe stompClient params)
 
+type StructuredMessage f =
+  { body :: f
+  , ack :: AcknowledgeFunction}
+
+messageProducer :: forall t f. Decode t => StompClient -> ConnectAndSubscriptionParameters -> Producer (Either MultipleErrors (StructuredMessage t)) (MonadCouchdb f) Unit
+messageProducer stompClient params = (messageProducer' stompClient params) $~ (forever (transform decodeMessage))
+  where
+    decodeMessage :: Message -> Either MultipleErrors (StructuredMessage t)
+    decodeMessage {body, ack} = case runExcept $ decode body of
+      Left e -> Left e
+      Right m -> Right {body: m, ack}
 -----------------------------------------------------------
 -- UNSUBSCRIBE
 -----------------------------------------------------------
