@@ -43,7 +43,7 @@ import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, toArray, head)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..), fst, snd)
@@ -54,14 +54,18 @@ import Foreign.Object (union) as OBJ
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_property, changeContext_me, context_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_property, rol_id, rol_isMe)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findPropertyRequests, findRoleRequests)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Instances.ObjectGetters (binding_, roleType)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.TypeIdentifiers (PropertyType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -234,32 +238,47 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
     values <- pure $ fst <$> valuesAndDeltas
     subject <- getSubject
     author <- getAuthor
-    for_ rids \rid -> do
-      (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
-      -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
-      users <- aisInPropertyDelta rid propertyName
-      deltas <- for valuesAndDeltas \(Tuple value msignedDelta) -> do
-          delta <- case msignedDelta of
-            Nothing -> do
-              -- Create a delta for each value.
-              delta <- pure $ RolePropertyDelta
-                { id : rid
-                , property: propertyName
-                , deltaType: AddProperty
-                , values: [value]
-                , subject
-                }
-              pure $ SignedDelta
-                { author
-                , encryptedDelta: sign $ encodeJSON $ delta}
-            Just signedDelta -> pure signedDelta
-          addDelta (DeltaInTransaction { users, delta: delta })
-          pure (Tuple (unwrap value) delta)
-      (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
-      -- Apply all changes to the role and then save it:
-      --  - change the property values in one go
-      --  - add all propertyDeltas.
-      cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (OBJ.union (fromFoldable deltas)) propertyDeltas}) (addRol_property pe propertyName values))
+    for_ rids \rid' -> do
+      mrid <- lift2 $ getPropertyBearingRoleInstance propertyName rid'
+      case mrid of
+        Nothing -> pure unit
+        Just rid -> do
+          (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
+          -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
+          users <- aisInPropertyDelta rid propertyName
+          deltas <- for valuesAndDeltas \(Tuple value msignedDelta) -> do
+              delta <- case msignedDelta of
+                Nothing -> do
+                  -- Create a delta for each value.
+                  delta <- pure $ RolePropertyDelta
+                    { id : rid
+                    , property: propertyName
+                    , deltaType: AddProperty
+                    , values: [value]
+                    , subject
+                    }
+                  pure $ SignedDelta
+                    { author
+                    , encryptedDelta: sign $ encodeJSON $ delta}
+                Just signedDelta -> pure signedDelta
+              addDelta (DeltaInTransaction { users, delta: delta })
+              pure (Tuple (unwrap value) delta)
+          (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
+          -- Apply all changes to the role and then save it:
+          --  - change the property values in one go
+          --  - add all propertyDeltas.
+          cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (OBJ.union (fromFoldable deltas)) propertyDeltas}) (addRol_property pe propertyName values))
+
+-- | Get the property bearing role individual in the chain.
+-- | If the property is defined on role instance's type (either directly or by Aspect), return it; otherwise
+-- | recursively apply this function to its binding.
+getPropertyBearingRoleInstance :: EnumeratedPropertyType -> RoleInstance -> MonadPerspectives (Maybe RoleInstance)
+getPropertyBearingRoleInstance prop roleId = do
+  tp <- roleId ##>> roleType
+  allProps <- allLocallyRepresentedProperties (ST tp)
+  if isJust $ elemIndex (ENP prop) allProps
+    then pure $ Just roleId
+    else binding_ roleId >>= maybe (pure Nothing) (getPropertyBearingRoleInstance prop)
 
 setDeltasForProperty :: EnumeratedPropertyType -> (Object SignedDelta -> Object SignedDelta) -> (Object (Object SignedDelta)) -> (Object (Object SignedDelta))
 setDeltasForProperty propertyName modifier allDeltas = case lookup (unwrap propertyName) allDeltas of
@@ -278,27 +297,31 @@ removeProperty rids propertyName values = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
     subject <- getSubject
-    for_ rids \rid -> do
-      (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
-      users <- aisInPropertyDelta rid propertyName
-      -- Create a delta for all values at once.
-      delta <- pure $ RolePropertyDelta
-        { id : rid
-        , property: propertyName
-        , deltaType: RemoveProperty
-        , values: values
-        , subject
-        }
-      author <- getAuthor
-      signedDelta <- pure $ SignedDelta
-        { author
-        , encryptedDelta: sign $ encodeJSON $ delta}
-      addDelta (DeltaInTransaction { users, delta: signedDelta})
-      (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
-      -- Apply all changes to the role and then save it:
-      --  - change the property values in one go
-      --  - remove all propertyDeltas.
-      cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (filterKeys (\key -> isJust $ elemIndex (Value key) values)) propertyDeltas}) (removeRol_property pe propertyName values))
+    for_ rids \rid' -> do
+      mrid <- lift2 $ getPropertyBearingRoleInstance propertyName rid'
+      case mrid of
+        Nothing -> pure unit
+        Just rid -> do
+          (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
+          users <- aisInPropertyDelta rid propertyName
+          -- Create a delta for all values at once.
+          delta <- pure $ RolePropertyDelta
+            { id : rid
+            , property: propertyName
+            , deltaType: RemoveProperty
+            , values: values
+            , subject
+            }
+          author <- getAuthor
+          signedDelta <- pure $ SignedDelta
+            { author
+            , encryptedDelta: sign $ encodeJSON $ delta}
+          addDelta (DeltaInTransaction { users, delta: signedDelta})
+          (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
+          -- Apply all changes to the role and then save it:
+          --  - change the property values in one go
+          --  - remove all propertyDeltas.
+          cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (filterKeys (\key -> isJust $ elemIndex (Value key) values)) propertyDeltas}) (removeRol_property pe propertyName values))
 
 -- | Delete all property values from the role for the EnumeratedPropertyType.
 -- | If there are no values for the property on the role instance, this is a no-op.
@@ -312,27 +335,31 @@ deleteProperty rids propertyName = case ARR.head rids of
   Nothing -> pure unit
   Just roleId -> do
     subject <- getSubject
-    for_ rids \rid -> do
-      (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
-      users <- aisInPropertyDelta rid propertyName
-      -- Create a delta for all values.
-      delta <- pure $ RolePropertyDelta
-        { id : rid
-        , property: propertyName
-        , deltaType: DeleteProperty
-        , values: []
-        , subject
-        }
-      author <- getAuthor
-      signedDelta <- pure $ SignedDelta
-        { author
-        , encryptedDelta: sign $ encodeJSON $ delta}
-      addDelta (DeltaInTransaction { users, delta: signedDelta})
-      (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
-      -- Apply all changes to the role and then save it:
-      --  - change the property values in one go
-      --  - remove all propertyDeltas for this property.
-      cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (const empty) propertyDeltas}) (deleteRol_property pe propertyName))
+    for_ rids \rid' -> do
+      mrid <- lift2 $ getPropertyBearingRoleInstance propertyName rid'
+      case mrid of
+        Nothing -> pure unit
+        Just rid -> do
+          (pe :: PerspectRol) <- lift2 $ getPerspectEntiteit rid
+          users <- aisInPropertyDelta rid propertyName
+          -- Create a delta for all values.
+          delta <- pure $ RolePropertyDelta
+            { id : rid
+            , property: propertyName
+            , deltaType: DeleteProperty
+            , values: []
+            , subject
+            }
+          author <- getAuthor
+          signedDelta <- pure $ SignedDelta
+            { author
+            , encryptedDelta: sign $ encodeJSON $ delta}
+          addDelta (DeltaInTransaction { users, delta: signedDelta})
+          (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
+          -- Apply all changes to the role and then save it:
+          --  - change the property values in one go
+          --  - remove all propertyDeltas for this property.
+          cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (const empty) propertyDeltas}) (deleteRol_property pe propertyName))
 
 -- | Modify the role instance with the new property values.
 -- | When all new values are in fact already in the set of values for the property of the role instance, this is
