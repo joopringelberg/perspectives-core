@@ -21,7 +21,7 @@ domain: BrokerServices
     context: ManagedBrokers filledBy: BrokerService
 
     -- The BrokerServices I use (have a contract with).
-    context: Contracts filledBy: BrokerContract
+    context: Contracts = sys:Me >> binder AccountHolder >> context
 
     user: Guest filledBy: sys:PerspectivesSystem$User
       perspective on: ManagedBrokers
@@ -34,7 +34,7 @@ domain: BrokerServices
       property: Url (mandatory, functional, String)
       property: Exchange (mandatory, functional, String)
 
-    user: Administrator
+    user: Administrator filledBy sys:PerspectivesSystem$User
       property: RegistryTopic (not mandatory, functional, String)
       property: GuestRolePassword (not mandatory, functional, String)
 
@@ -47,6 +47,7 @@ domain: BrokerServices
     external:
       property: Url = context >> Administrator >> binder model:BrokerServices$BrokerService$Administrator >> context >> extern >> Url
       property: Exchange = context >> Administrator >> binder model:BrokerServices$BrokerService$Administrator >> context >> extern >> Exchange
+      property: Name = context >> Administrator >> binder model:BrokerServices$BrokerService$Administrator >> context >> extern >> Name
 
     user: AccountHolder filledBy: sys:PerspectivesSystem$User
       property: AccountName (mandatory, functional, String)
