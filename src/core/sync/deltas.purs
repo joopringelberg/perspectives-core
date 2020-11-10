@@ -50,7 +50,7 @@ import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.PerspectivesState (nextTransactionNumber)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -124,7 +124,7 @@ addDelta dt =
 
 -- | Insert the delta at the index, unless it is already in the transaction.
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
-insertDelta dt i = 
+insertDelta dt i =
   lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas =
     if isJust $ elemIndex dt deltas
       then deltas
@@ -137,6 +137,13 @@ addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transacti
 -- | Give the number of SignedDeltas in the Transaction.
 deltaIndex :: MonadPerspectivesTransaction Int
 deltaIndex = lift $ AA.gets \(Transaction{deltas}) -> length deltas
+
+addCreatedContextToTransaction :: ContextInstance -> MonadPerspectivesTransaction Unit
+addCreatedContextToTransaction cid =
+  lift $ AA.modify (over Transaction \t@{createdContexts} -> t {createdContexts =
+    if isJust $ elemIndex cid createdContexts
+      then createdContexts
+      else snoc createdContexts cid})
 
 -- Procedure om Delta's zuinig toe te voegen.
 -- 2. Bepaal of de rol functioneel is.

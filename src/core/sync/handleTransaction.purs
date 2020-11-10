@@ -40,7 +40,7 @@ import Perspectives.Checking.Authorization (roleHasPerspectiveOnPropertyWithVerb
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=))
-import Perspectives.Deltas (addCorrelationIdentifiersToTransactie)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Identifiers (buitenRol, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
@@ -117,6 +117,8 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) s
               })
           lift2 $ void $ cacheEntity id contextInstance
           (lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (EnumeratedRoleType $ unwrap contextType <> "$External")) >>= addCorrelationIdentifiersToTransactie
+          -- TODO. Add the context as a createdContext to the transaction
+          addCreatedContextToTransaction id
         else pure unit
 
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.

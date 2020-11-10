@@ -485,26 +485,32 @@ compileRules = do
               -- add declaraton for currentcontext. Replace currentcontext expr with
               -- lookup in the runtime environment.
               addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True False)
-              conditionDescription <- compileActionCondition
               objectCalculation <- lift $ lift $ getRole object >>= getCalculation
-              objectVar <- pure (UQD (domain objectCalculation) (QF.BindVariable "object") objectCalculation (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
+              addBinding "object" (SQD currentDomain (QF.VariableLookup "object") (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
+              conditionDescription <- compileActionCondition
+              -- objectCalculation <- lift $ lift $ getRole object >>= getCalculation
+              -- objectVar <- pure (UQD (domain objectCalculation) (QF.BindVariable "object") objectCalculation (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
               -- The expression below returns a QueryFunctionDescription that describes either a single assignment, or
               -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF).
               case effect of
                 -- Compile a series of Assignments into a QueryDescription.
                 (Just (A assignments)) -> do
-                  let_ <- withFrame do
-                    addBinding "object" objectCalculation
-                    makeSequence <$> pure objectVar <*> (sequenceOfAssignments currentDomain (reverse assignments))
-                  (aStatements :: QueryFunctionDescription) <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
+
+                  -- let_ <- withFrame do
+                  --   addBinding "object" objectCalculation -- dit lijkt overbodig.
+                  --   makeSequence <$> pure objectVar <*> (sequenceOfAssignments currentDomain (reverse assignments))
+
+                  aStatements <- sequenceOfAssignments currentDomain (reverse assignments)
+                  -- (aStatements :: QueryFunctionDescription) <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
                   pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
                   -- Compile the LetStep into a QueryDescription.
                 (Just (L (LetStep {bindings, assignments}))) -> do
-                  let_ <- withFrame do
-                    addBinding "object" objectCalculation
-                    (makeSequence <$> foldM addVarBindingToSequence objectVar (reverse bindings) <*> sequenceOfAssignments currentDomain assignments)
+                  -- let_ <- withFrame do
+                  --   addBinding "object" objectCalculation
+                  --   (makeSequence <$> foldM addVarBindingToSequence objectVar (reverse bindings) <*> sequenceOfAssignments currentDomain assignments)
+                  aStatements <- sequenceOfAssignments currentDomain assignments
                   -- Add the runtime frame.
-                  aStatements <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
+                  -- aStatements <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
                   pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
                 otherwise -> pure $ Action ar {condition = Q conditionDescription}
 

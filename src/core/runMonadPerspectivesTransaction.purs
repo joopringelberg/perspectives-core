@@ -29,7 +29,6 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, traverse)
-import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
 import Foreign.Object (empty)
 import Perspectives.Actions (compileBotAction)
@@ -51,6 +50,7 @@ import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
@@ -120,21 +120,40 @@ runActions t = do
   -- If so, execute the automatic actions for 'me'.
   -- log "==========RUNNING ACTIONS============"
   (as :: Array ActionInstance) <- (lift $ AA.gets (_.affectedContexts <<< unwrap)) >>= traverse getAllAutomaticActions >>= pure <<< join
+  -- Collect all contexts that are created
+  (ccs :: Array ContextInstance) <- lift $ AA.gets (_.createdContexts <<< unwrap)
+  -- Only now install a fresh transaction.
   lift $ void $ AA.modify cloneEmptyTransaction
-  for_ as \(ActionInstance ctxt atype) ->
-      case retrieveAction atype of
-        (Just (Tuple _ updater)) -> do
-          -- log ("Evaluating " <> unwrap atype)
-          updater ctxt
-        Nothing -> do
-          (Tuple _ updater) <- lift2 $ compileBotAction atype
-          -- log ("Evaluating " <> unwrap atype)
-          updater ctxt
-          pure unit
+  -- Run the actions on all combinations of an actiontype and context instance that were in the original transaction.
+  for_ as \(ActionInstance ctxt atype) -> run ctxt atype
+  -- Run all the automatic actions defined for the Me in each new context.
+  for_ ccs
+    \ctxt -> do
+      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
+      case mmyType of
+        Nothing -> pure unit
+        Just myType -> do
+          (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure_ isAutomatic)
+          for_ automaticActions (run ctxt)
+
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure t
     else pure <<< (<>) t =<< runActions nt
+
+  where
+
+    run :: ContextInstance -> ActionType -> MonadPerspectivesTransaction Unit
+    run ctxt atype = case retrieveAction atype of
+      (Just updater) -> do
+        -- log ("Evaluating " <> unwrap atype)
+        updater ctxt
+      Nothing -> do
+        updater <- lift2 $ compileBotAction atype
+        -- log ("Evaluating " <> unwrap atype)
+        updater ctxt
+        pure unit
+
 
 getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
 getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = join <$> for (toArray contextInstances) \contextInstance -> do

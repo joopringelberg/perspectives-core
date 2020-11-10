@@ -43,7 +43,7 @@ import Effect.Exception (error)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
-import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
+import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
@@ -59,10 +59,11 @@ import Perspectives.Instances.ObjectGetters (getConditionState, setConditionStat
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
-import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string)
+import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, getRoleInstances)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Action (condition, effect, subject)
+import Perspectives.Representation.Class.Action (condition, effect, object, subject)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
+import Perspectives.Representation.Class.Role (getCalculation, getRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
@@ -72,7 +73,7 @@ import Perspectives.SaveUserData (removeAllRoleInstances, handleNewPeer, removeR
 import Perspectives.Sync.Transaction (Transaction(..))
 import Unsafe.Coerce (unsafeCoerce)
 
-compileBotAction :: ActionType -> MP (Tuple LHS (Updater ContextInstance))
+compileBotAction :: ActionType -> MP (Updater ContextInstance)
 compileBotAction actionType = do
   case retrieveAction actionType of
     (Just a) -> pure a
@@ -80,35 +81,52 @@ compileBotAction actionType = do
       (action :: Action) <- getPerspectType actionType
       eff <- effect action
       subj <- pure $ subject action
+      objectCalculation <- getRole (object action) >>= getCalculation
       (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff >>= pure <<< withAuthoringRole subj
       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
-      updater <- pure $ ruleRunner lhs effectFullFunction
-      void $ pure $ cacheAction actionType (Tuple lhs updater)
-      pure $ Tuple lhs updater
+      updater <- pure $ ruleRunner lhs effectFullFunction (object action)
+      void $ pure $ cacheAction actionType updater
+      pure updater
 
   where
     -- | Actual effectful function for which we track dependencies. If one of them changes,
     -- | the function is executed again.
     ruleRunner :: (ContextInstance ~~> Value) ->
       (Updater ContextInstance) ->
+      RoleType ->
       (Updater ContextInstance)
-    ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
+    ruleRunner lhs effectFullFunction objectType (contextId :: ContextInstance) = do
       oldEnvironment <- lift2 pushFrame
       lift2 $ addBinding "currentcontext" [unwrap contextId]
-      conditionWasTrue <- lift2 $ getConditionState actionType contextId
-      (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
-      log $ "Running " <> show actionType
-      if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
-        then if conditionWasTrue
-          then log "Condition satisfied, but rule fired before." *> pure unit
-          else do
-            log "Condition satifisfied, will run right hand side."
-            lift2 $ setConditionState actionType contextId true
-            effectFullFunction contextId
-        else if conditionWasTrue
-          then (log "Condition not satisfied, rule fired before") *> (lift2 $ setConditionState actionType contextId false)
-          else log "Condition not satisfied, rule did not fire before" *> pure unit
+      objects <- lift2 (contextId ##= getRoleInstances objectType)
+      if null objects
+        then (lift2 $ addBinding "object" []) *> run Nothing
+        else for_ objects (\object -> (lift2 $ addBinding "object" [unwrap object]) *> run (Just object))
       lift2 $ restoreFrame oldEnvironment
+
+      where
+          run :: Maybe RoleInstance -> MonadPerspectivesTransaction Unit
+          run Nothing = do
+            (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+            log $ "Running " <> show actionType
+            if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
+              then log "Condition satisfied, will run right hand side without object" *> effectFullFunction contextId
+              else log "Condition not satisfied, will not run right hand side without ojbect"
+          run (Just object) = do
+            conditionWasTrue <- lift2 $ getConditionState actionType object
+            (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+            log $ "Running " <> show actionType
+            if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
+              then if conditionWasTrue
+                then log ("Condition satisfied, but rule fired before on " <> show object <> ".") *> pure unit
+                else do
+                  log $ "Condition satifisfied, will run right hand side on " <> show object <> "."
+                  lift2 $ setConditionState actionType object true
+                  effectFullFunction contextId
+              else if conditionWasTrue
+                then (log $ "Condition not satisfied, rule fired before on " <> show object <> ".") *> (lift2 $ setConditionState actionType object false)
+                else log ("Condition not satisfied, rule did not fire before on " <> show object <> ".") *> pure unit
+
 
     withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
     withAuthoringRole aRole updater a = do

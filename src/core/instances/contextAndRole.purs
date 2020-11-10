@@ -161,7 +161,6 @@ defaultContextRecord =
   , rolInContext: empty
   , aliases: empty
   , me: Nothing
-  , actionConditionState: empty
   , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord"}
   }
 
@@ -180,6 +179,7 @@ defaultRolRecord =
   , contextDelta: SignedDelta {author: "", encryptedDelta: "ContextDelta from defaultRolRecord"}
   , bindingDelta: Nothing
   , propertyDeltas: empty
+  , actionConditionState: empty
   }
 
 isDefaultContextDelta :: SignedDelta -> Boolean

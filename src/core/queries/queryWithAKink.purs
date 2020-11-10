@@ -47,7 +47,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
+import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (==))
 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
@@ -88,10 +88,11 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
 
   (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _) -> invert_ (BQD dom (BinaryCombinator ComposeF) qfd1 (BQD (range qfd1) (BinaryCombinator ComposeF) qfd2 r ran f m) ran f m)
 
-  (SQD _ (VariableLookup varName) _ _ _) -> do
+  qq@(SQD _ (VariableLookup varName) _ _ _) -> do
     varExpr <- lookupVariableBinding varName
     case varExpr of
       Nothing -> pure []
+      Just qfd | qq == qfd -> pure []
       Just qfd -> invert_ (compose qfd r)
 
   (BQD _ (BinaryCombinator SequenceF) qfd1 qfd2 ran _ _) -> do
@@ -128,10 +129,11 @@ invert_ (SQD dom (PropertyGetter (CP prop)) ran _ _) = (lift2 $ (getCalculatedPr
 invert_ (SQD dom (DataTypeGetter CountF) ran _ _) = pure []
 
   -- Treat a variable by looking up its definition (a QueryFunctionDescription), inverting it and inserting it.
-invert_ (SQD dom (VariableLookup varName) _ _ _) = do
+invert_ q@(SQD dom (VariableLookup varName) _ _ _) = do
   varExpr <- lookupVariableBinding varName
   case varExpr of
     Nothing -> pure []
+    Just qfd | qfd == q -> pure []
     Just qfd -> invert_ qfd
 
 invert_ (SQD dom f ran _ _) = do

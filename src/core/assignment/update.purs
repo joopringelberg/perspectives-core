@@ -267,7 +267,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
           -- Apply all changes to the role and then save it:
           --  - change the property values in one go
           --  - add all propertyDeltas.
-          cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (OBJ.union (fromFoldable deltas)) propertyDeltas}) (addRol_property pe propertyName values))
+          cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (OBJ.union (fromFoldable deltas)) propertyDeltas}) (addRol_property pe propertyName values))
 
 -- | Get the property bearing role individual in the chain.
 -- | If the property is defined on role instance's type (either directly or by Aspect), return it; otherwise
@@ -321,7 +321,7 @@ removeProperty rids propertyName values = case ARR.head rids of
           -- Apply all changes to the role and then save it:
           --  - change the property values in one go
           --  - remove all propertyDeltas.
-          cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (filterKeys (\key -> isJust $ elemIndex (Value key) values)) propertyDeltas}) (removeRol_property pe propertyName values))
+          cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (filterKeys (\key -> isJust $ elemIndex (Value key) values)) propertyDeltas}) (removeRol_property pe propertyName values))
 
 -- | Delete all property values from the role for the EnumeratedPropertyType.
 -- | If there are no values for the property on the role instance, this is a no-op.
@@ -359,7 +359,7 @@ deleteProperty rids propertyName = case ARR.head rids of
           -- Apply all changes to the role and then save it:
           --  - change the property values in one go
           --  - remove all propertyDeltas for this property.
-          cacheAndSave roleId (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (const empty) propertyDeltas}) (deleteRol_property pe propertyName))
+          cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty propertyName (const empty) propertyDeltas}) (deleteRol_property pe propertyName))
 
 -- | Modify the role instance with the new property values.
 -- | When all new values are in fact already in the set of values for the property of the role instance, this is

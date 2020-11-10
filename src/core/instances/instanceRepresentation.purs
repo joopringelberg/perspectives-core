@@ -63,7 +63,6 @@ type ContextRecord =
   , rolInContext :: F.Object (Array RoleInstance)
   , aliases :: F.Object String
   , me :: Maybe RoleInstance
-  , actionConditionState :: F.Object Boolean
   , universeContextDelta :: SignedDelta
   }
 
@@ -115,6 +114,7 @@ type RolRecord =
   , bindingDelta :: Maybe SignedDelta
   -- The first index is the propertytype; the second is the value.
   , propertyDeltas :: F.Object (F.Object SignedDelta)
+  , actionConditionState :: F.Object Boolean
   }
 
 derive instance genericRepPerspectRol :: Generic PerspectRol _

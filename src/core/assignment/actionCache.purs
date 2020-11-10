@@ -23,24 +23,21 @@ module Perspectives.Assignment.ActionCache where
 
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
-import Data.Tuple (Tuple)
-import Perspectives.CoreTypes (Updater, type (~~>))
+import Perspectives.CoreTypes (Updater)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Prelude (unit)
 
-type LHS = ContextInstance ~~> Value
-
-type ActionCache = GLStrMap (Tuple LHS (Updater ContextInstance))
+type ActionCache = GLStrMap (Updater ContextInstance)
 
 -- | A global store of SupportedEffect-s
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 actionCache :: ActionCache
 actionCache = new unit
 
-cacheAction :: ActionType -> (Tuple LHS (Updater ContextInstance)) -> ActionCache
+cacheAction :: ActionType -> (Updater ContextInstance) -> ActionCache
 cacheAction a u = poke actionCache (unwrap a) u
 
-retrieveAction :: ActionType -> (Maybe (Tuple LHS (Updater ContextInstance)))
+retrieveAction :: ActionType -> (Maybe (Updater ContextInstance))
 retrieveAction a = peek actionCache (unwrap a)

@@ -57,7 +57,7 @@ import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
-import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, deltaIndex, insertDelta)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, deltaIndex, insertDelta)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
@@ -116,6 +116,8 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
           lift $ lift2 $ void $ saveEntiteit contextInstanceId
           -- Add a UniverseContextDelta to the Transaction with the union of the users of the RoleBindingDeltas.
           lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) i
+          -- TODO. Add the context as a createdContext to the transaction
+          lift $ addCreatedContextToTransaction contextInstanceId
           -- Add a UniverseRoleDelta to the Transaction for the external role.
           PerspectRol{universeRoleDelta} <- lift $ lift $ lift $ getPerspectRol buitenRol
           lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i + 1)

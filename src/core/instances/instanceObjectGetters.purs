@@ -39,7 +39,7 @@ import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (LocalName, deconstructModelName)
-import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
+import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
@@ -67,13 +67,13 @@ getEnumeratedRoleInstances rn c = ArrayT do
 contextType :: ContextInstance ~~> ContextType
 contextType = ArrayT <<< lift <<< (getContextMember \c -> [context_pspType c])
 
-getConditionState :: ActionType -> ContextInstance -> MonadPerspectives Boolean
-getConditionState a c = getPerspectContext c >>= \(IP.PerspectContext{actionConditionState}) -> pure $ maybe false identity (lookup (unwrap a) actionConditionState)
+getConditionState :: ActionType -> RoleInstance -> MonadPerspectives Boolean
+getConditionState a c = getPerspectRol c >>= \(IP.PerspectRol{actionConditionState}) -> pure $ maybe false identity (lookup (unwrap a) actionConditionState)
 
-setConditionState :: ActionType -> ContextInstance -> Boolean -> MonadPerspectives Unit
+setConditionState :: ActionType -> RoleInstance -> Boolean -> MonadPerspectives Unit
 setConditionState a c b = do
-  (IP.PerspectContext r@{actionConditionState}) <- getPerspectContext c
-  void $ saveEntiteit_ c (IP.PerspectContext r {actionConditionState = insert (unwrap a) b actionConditionState})
+  (IP.PerspectRol r@{actionConditionState}) <- getPerspectRol c
+  void $ saveEntiteit_ c (IP.PerspectRol r {actionConditionState = insert (unwrap a) b actionConditionState})
 
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT do

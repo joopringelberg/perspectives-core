@@ -27,6 +27,7 @@ import Control.Coroutine.Aff (Step(..), produce', Emitter)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
+import Control.Plus ((<|>))
 import Data.Array (elemIndex, head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
@@ -46,7 +47,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..
 import Perspectives.Assignment.Update (deleteProperty, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (MP, MonadPerspectives, PropertyValueGetter, RoleGetter, MonadPerspectivesTransaction, (##>), (##=))
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, (##=), (##>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
@@ -59,11 +60,11 @@ import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction, getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT, reduce)
-import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (calculation, getRoleType, kindOfRole, rangeOfRoleCalculation, rangeOfRoleCalculation', roleADT)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeRoleInstance, removeContextIfUnbound)
@@ -196,6 +197,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetRolContext -> registerSupportedEffect corrId setter context (RoleInstance subject)
     Api.GetContextType -> registerSupportedEffect corrId setter contextType (ContextInstance subject)
     Api.GetRolType -> registerSupportedEffect corrId setter roleType (RoleInstance subject)
+    Api.GetRoleKind -> do
+      kind <- ((getEnumeratedRole $ EnumeratedRoleType subject) >>= pure <<< kindOfRole) <|> ((getCalculatedRole $ CalculatedRoleType subject) >>= pure <<< kindOfRole)
+      sendResponse (Result corrId [show kind]) setter
     -- {request: "GetUnqualifiedRolType", subject: contextType, predicate: localRolName}
     Api.GetUnqualifiedRolType -> do
       rtypes <- runArrayT $ lookForUnqualifiedRoleType predicate (ContextType subject)
@@ -263,11 +267,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         (ENR eroltype) -> withNewContext authoringRole
           \(ContextInstance id) ->  do
             -- now bind it in a new instance of the roletype in the given context.
-            void $ createAndAddRoleInstance eroltype subject (RolSerialization
+            -- TODO vang de nieuwe contextrol op en geef die (ook) terug?
+            contextRole <- createAndAddRoleInstance eroltype subject (RolSerialization
               { id: Nothing
               , properties: PropertySerialization empty
               , binding: Just $ buitenRol id })
-            lift2 $ sendResponse (Result corrId [buitenRol id]) setter
+            lift2 $ sendResponse (Result corrId [buitenRol id, unwrap contextRole]) setter
     -- {request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype}
     Api.CreateContext_ -> withNewContext authoringRole
       \(ContextInstance id) -> do
