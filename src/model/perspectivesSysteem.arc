@@ -48,9 +48,9 @@ domain: System
 
     bot: for User
       -- This rule creates an entry in IndexedContexts if its model has been taken in use.
-      perspective on: UnconnectedIndexedContext
-        if exists UnconnectedIndexedContext then
-          bind object to IndexedContexts
+      perspective on: ModelsInUse
+        if object >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts then
+          bind ModelsInUse >> binding >> context >> IndexedContext to IndexedContexts
 
       -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
       perspective on: DanglingIndexedContext
@@ -64,10 +64,6 @@ domain: System
 
     -- An entry in IndexedContexts is dangling if its model is not in use.
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
-
-    -- On moving a model to ModelsInUse, the contexts bound to its IndexedContext show up in this role. The bot with a perspective on this role
-    -- binds it to IndexedContexts of sys:PerspectivesSystem.
-    context: UnconnectedIndexedContext = ModelsInUse >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts
 
   case: PhysicalContext
     user: UserWithAddress
