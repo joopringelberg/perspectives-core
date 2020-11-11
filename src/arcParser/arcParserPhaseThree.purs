@@ -46,7 +46,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (empty, insert, keys, lookup, unions, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
-import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
+import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
@@ -60,9 +60,9 @@ import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForU
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
+import Perspectives.Query.DescriptionCompiler (compileStep, compileVarBinding, makeSequence)
 import Perspectives.Query.Kinked (setInvertedQueries)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain2roleType, functional, mandatory, range, traverseQfd)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -368,10 +368,10 @@ compileExpressions = do
   withDomeinFile
     _id
     (DomeinFile df)
-    (compileExpressions' df)
+    (compileExpressions' df _id)
   where
-    compileExpressions' :: DomeinFileRecord -> PhaseThree Unit
-    compileExpressions' {calculatedRoles, calculatedProperties} = do
+    compileExpressions' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
+    compileExpressions' {calculatedRoles, calculatedProperties} ns = do
       -- TODO. Collect references to Calculated Properties from the QueryFunctionDescriptions and sort
       -- the calculatedRoles accordingly before compiling the descriptions. That will detect cycles
       -- (throw an error) and prevent forward reference errors.
@@ -379,47 +379,48 @@ compileExpressions = do
       compProps <- traverseWithIndex compilePropertyExpr calculatedProperties
       modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps}
 
-    compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
-    compileRolExpr roleName (CalculatedRole cr@{_id, calculation, context}) = case calculation of
-      Q _ -> pure $ CalculatedRole cr
-      S stp -> do
-        userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (CR _id))
-        -- For each userType get the PropsAndVerbs for the calculated role:
-        (pAndV :: Map RoleType PropsAndVerbs) <- fromFoldable <$> for userTypes (\userType -> do
-          pv <- lift2 $ propsAndVerbsForObjectRole (CR _id) userType
-          pure $ Tuple userType pv
-          )
-        dom <- pure (CDOM $ ST context)
+      where
+        compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
+        compileRolExpr roleName (CalculatedRole cr@{_id, calculation, context}) = case calculation of
+          Q _ -> pure $ CalculatedRole cr
+          S stp -> do
+            userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (CR _id))
+            -- For each userType get the PropsAndVerbs for the calculated role:
+            (pAndV :: Map RoleType PropsAndVerbs) <- fromFoldable <$> for userTypes (\userType -> do
+              pv <- lift2 $ propsAndVerbsForObjectRole (CR _id) userType
+              pure $ Tuple userType pv
+              )
+            dom <- pure (CDOM $ ST context)
 
-        descr <- withFrame do
-          varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
-          compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
-          pure $ makeSequence varb compiledCalculation
+            descr <- withFrame do
+              varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
+              compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
+              pure $ makeSequence varb compiledCalculation
 
-        setInvertedQueries pAndV descr
-        pure $ CalculatedRole (cr {calculation = Q descr})
+            setInvertedQueries pAndV descr
+            lift2 $ modifyCalculatedRoleInDomeinFile ns (CalculatedRole (cr {calculation = Q descr}))
 
-    compilePropertyExpr :: String -> CalculatedProperty -> PhaseThree CalculatedProperty
-    compilePropertyExpr propertyName (CalculatedProperty cr@{_id, calculation, role}) = case calculation of
-      Q _ -> pure $ CalculatedProperty cr
-      S stp -> do
-        (EnumeratedRole{context}) <- lift $ lift $ getEnumeratedRole role
-        userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnProperty (CP _id))
-        -- userProps <- pure $ fromFoldable ((\u -> Tuple u (Properties [])) <$> userTypes)
+        compilePropertyExpr :: String -> CalculatedProperty -> PhaseThree CalculatedProperty
+        compilePropertyExpr propertyName (CalculatedProperty cr@{_id, calculation, role}) = case calculation of
+          Q _ -> pure $ CalculatedProperty cr
+          S stp -> do
+            (EnumeratedRole{context}) <- lift $ lift $ getEnumeratedRole role
+            userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnProperty (CP _id))
+            -- userProps <- pure $ fromFoldable ((\u -> Tuple u (Properties [])) <$> userTypes)
 
-        -- For each userType get the PropsAndVerbs for the calculated role:
-        (pAndV :: Map RoleType PropsAndVerbs) <- fromFoldable <$> for userTypes (\userType -> do
-          pure $ Tuple userType empty
-          )
-        dom <- pure (RDOM $ ST role)
+            -- For each userType get the PropsAndVerbs for the calculated role:
+            (pAndV :: Map RoleType PropsAndVerbs) <- fromFoldable <$> for userTypes (\userType -> do
+              pure $ Tuple userType empty
+              )
+            dom <- pure (RDOM $ ST role)
 
-        descr <- withFrame do
-          varb <- compileVarBinding dom (VarBinding "currentrole" (Simple $ AE.Identity (startOf stp)))
-          compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
-          pure $ makeSequence varb compiledCalculation
+            descr <- withFrame do
+              varb <- compileVarBinding dom (VarBinding "currentrole" (Simple $ AE.Identity (startOf stp)))
+              compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
+              pure $ makeSequence varb compiledCalculation
 
-        setInvertedQueries pAndV descr
-        pure $ CalculatedProperty (cr {calculation = Q descr})
+            setInvertedQueries pAndV descr
+            lift2 $ modifyCalculatedPropertyInDomeinFile ns (CalculatedProperty (cr {calculation = Q descr}))
 
 -- compileArg :: Array EnumeratedRoleType -> Domain -> Calculation -> PhaseThree Calculation
 -- compileArg userTypes dom (S s) = compileAndDistributeStep userTypes dom s >>= pure <<< Q
@@ -488,29 +489,17 @@ compileRules = do
               objectCalculation <- lift $ lift $ getRole object >>= getCalculation
               addBinding "object" (SQD currentDomain (QF.VariableLookup "object") (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
               conditionDescription <- compileActionCondition
-              -- objectCalculation <- lift $ lift $ getRole object >>= getCalculation
-              -- objectVar <- pure (UQD (domain objectCalculation) (QF.BindVariable "object") objectCalculation (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
               -- The expression below returns a QueryFunctionDescription that describes either a single assignment, or
               -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF).
               case effect of
                 -- Compile a series of Assignments into a QueryDescription.
                 (Just (A assignments)) -> do
-
-                  -- let_ <- withFrame do
-                  --   addBinding "object" objectCalculation -- dit lijkt overbodig.
-                  --   makeSequence <$> pure objectVar <*> (sequenceOfAssignments currentDomain (reverse assignments))
-
                   aStatements <- sequenceOfAssignments currentDomain (reverse assignments)
-                  -- (aStatements :: QueryFunctionDescription) <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
                   pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
                   -- Compile the LetStep into a QueryDescription.
                 (Just (L (LetStep {bindings, assignments}))) -> do
-                  -- let_ <- withFrame do
-                  --   addBinding "object" objectCalculation
-                  --   (makeSequence <$> foldM addVarBindingToSequence objectVar (reverse bindings) <*> sequenceOfAssignments currentDomain assignments)
                   aStatements <- sequenceOfAssignments currentDomain assignments
                   -- Add the runtime frame.
-                  -- aStatements <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
                   pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
                 otherwise -> pure $ Action ar {condition = Q conditionDescription}
 

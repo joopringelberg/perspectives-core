@@ -99,6 +99,8 @@ addEnumeratedRoleToDomeinFile c (DomeinFile dff@{enumeratedRoles}) = DomeinFile 
 -- addQueryFunctionToDomeinFile :: String -> QueryFunction -> DomeinFile -> DomeinFile
 -- addQueryFunctionToDomeinFile id c (DomeinFile dff@{queries}) = DomeinFile dff {queries = FO.insert (unwrap $ (identifier c :: QueryFunctionType)) c queries}
 
+-----------------------------------------------------------
+-----------------------------------------------------------
 ifNamespace :: forall i. Newtype i String => i -> (DomeinFile -> DomeinFile) -> MP Unit
 ifNamespace i modifier = maybe (pure unit) (modifyDomeinFileInCache modifier) (deconstructModelName (unwrap i))
 

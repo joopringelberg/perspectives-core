@@ -32,15 +32,19 @@ import Data.Foldable (for_)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Data.MediaType (MediaType(..))
+import Data.Newtype (unwrap)
 import Effect.Aff.AVar (AVar, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
+import Foreign.Object (insert)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb.Databases (addAttachment, getAttachment)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove)
+import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
+import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
 import Perspectives.User (getCouchdbPassword, getSystemIdentifier, getUser)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<<<), (<>), (<$>))
@@ -64,6 +68,21 @@ modifyDomeinFileInCache modifier ns =
         -- unless that is what our modifier does.
         _ <- cacheEntity (DomeinFileId ns) (modifier df)
         pure unit
+
+-----------------------------------------------------------
+-- MODIFY ELEMENTS OF A DOMEINFILE
+-----------------------------------------------------------
+modifyCalculatedRoleInDomeinFile :: Namespace -> CalculatedRole -> MonadPerspectives CalculatedRole
+modifyCalculatedRoleInDomeinFile ns cr@(CalculatedRole {_id}) = modifyDomeinFileInCache modifier ns *> pure cr
+  where
+    modifier :: DomeinFile -> DomeinFile
+    modifier (DomeinFile dff@{calculatedRoles}) = DomeinFile dff {calculatedRoles = insert (unwrap _id) cr calculatedRoles}
+
+modifyCalculatedPropertyInDomeinFile :: Namespace -> CalculatedProperty -> MonadPerspectives CalculatedProperty
+modifyCalculatedPropertyInDomeinFile ns cr@(CalculatedProperty {_id}) = modifyDomeinFileInCache modifier ns *> pure cr
+  where
+    modifier :: DomeinFile -> DomeinFile
+    modifier (DomeinFile dff@{calculatedProperties}) = DomeinFile dff {calculatedProperties = insert (unwrap _id) cr calculatedProperties}
 
 -----------------------------------------------------------
 -- RETRIEVE A DOMAINFILE
