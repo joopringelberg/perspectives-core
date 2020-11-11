@@ -425,6 +425,10 @@ contextOfRole :: RoleType -> MonadPerspectives (ADT ContextType)
 contextOfRole (ENR e) = getPerspectType e >>= context
 contextOfRole (CR c) = getPerspectType c >>= context
 
+contextOfRepresentationOfRole :: RoleType -> MonadPerspectives (ADT ContextType)
+contextOfRepresentationOfRole (ENR e) = getPerspectType e >>= pure <<< ST <<< contextOfRepresentation
+contextOfRepresentationOfRole (CR c) = getPerspectType c >>= pure <<< ST <<< contextOfRepresentation
+
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------

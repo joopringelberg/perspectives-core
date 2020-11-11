@@ -149,7 +149,7 @@ compileSimpleStep currentDomain s@(Binder pos binderName) = do
       (bindingOfBinder :: (ADT EnumeratedRoleType)) <- lift2 $ getEnumeratedRole qBinderType >>= binding
       lessEq <- lift2 $ hasNotMorePropertiesThan bindingOfBinder r
       if lessEq
-        then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter GetRoleBindersF (unwrap qBinderType)) (RDOM $ ST qBinderType) False False
+        then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter GetRoleBindersF (unwrap qBinderType)) (RDOM $ ST qBinderType) True False
         else throwError $ RoleDoesNotBind pos (ENR qBinderType) r
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 

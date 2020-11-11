@@ -70,7 +70,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, contextOfRole, getCalculation, getRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
+import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, contextOfRepresentationOfRole, contextOfRole, getCalculation, getRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -481,7 +481,9 @@ compileRules = do
         compileRule actionName a@(Action ar@{_id, subject, condition, effect, object, pos}) =
           withFrame
             do
-              ctxt <- lift2 (contextOfRole subject)
+              -- This must be the context that the rule is defined in. All expressions, and the assignments as well,
+              -- should start in that context.
+              ctxt <- lift2 (contextOfRepresentationOfRole subject)
               currentDomain <- pure (CDOM ctxt)
               -- add declaraton for currentcontext. Replace currentcontext expr with
               -- lookup in the runtime environment.
