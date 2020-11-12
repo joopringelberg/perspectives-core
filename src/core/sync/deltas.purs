@@ -78,7 +78,7 @@ sendTransactieToUser userId t = do
   getChannel <- getDynamicPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ST $ userType)
   mchannel <- (RoleInstance userId) ##> getChannel
   case mchannel of
-    Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> userId <> "\n" <> show t))
+    Nothing -> pure unit
     Just (Value channel) -> do
       cdbUrl <- getCouchdbBaseURL
       (rq :: (Request String)) <- defaultPerspectRequest
