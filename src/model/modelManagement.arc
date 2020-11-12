@@ -21,6 +21,7 @@ domain: ModelManagement
     thing: Repository (mandatory, functional)
       property: Name (mandatory, functional, String)
       property: Url (mandatory, functional, String)
+      property: Description (not mandatory, functional, String)
 
     user: Manager filledBy: sys:User
       perspective on: Models
