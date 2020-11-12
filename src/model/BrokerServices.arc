@@ -37,8 +37,11 @@ domain: BrokerServices
     user: Administrator filledBy: sys:PerspectivesSystem$User
       property: RegistryTopic (not mandatory, functional, String)
       property: GuestRolePassword (not mandatory, functional, String)
+      view: Admin (RegistryTopic, GuestRolePassword)
 
       perspective on: Accounts
+      perspective on: Administrator
+      perspective on: External
 
     user: Guest = sys:Me
 
@@ -48,7 +51,7 @@ domain: BrokerServices
           bind sys:Me to Administrator
 
     context: Accounts filledBy: BrokerContract
-      view: Account (FirstNameOfAccountHolder)
+      view: Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
 
   -- The contract between an end user and a BrokerService.
   case: BrokerContract
@@ -57,15 +60,34 @@ domain: BrokerServices
       property: Exchange = context >> Administrator >> binder model:BrokerServices$BrokerService$Administrator >> context >> extern >> Exchange
       property: Name = context >> Administrator >> binder model:BrokerServices$BrokerService$Administrator >> context >> extern >> Name
       property: FirstNameOfAccountHolder = context >> AccountHolder >> Voornaam
+      property: LastNameOfAccountHolder = context >> AccountHolder >> Achternaam
+
+      view: ForAccountHolder (Url, Exchange)
 
     user: AccountHolder filledBy: sys:PerspectivesSystem$User
       property: AccountName (mandatory, functional, String)
       property: AccountPassword (mandatory, functional, String)
+      property: QueueName (mandatory, functional, String)
       property: ConfirmationCode (not mandatory, functional, String)
+
+      view: ForAdministrator (AccountName, AccountPassword, QueueName)
 
       perspective on: External
 
     user: Administrator filledBy: bs:BrokerService$Administrator
       property: ConfirmationCode (not mandatory, functional, String)
+      view: Confirmation (ConfirmationCode)
 
       perspective on: AccountHolder
+
+    user: Guest = sys:Me
+
+    bot: for Guest
+      perspective on: Administrator
+        if not exists object then
+          bind extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
+
+    bot: for Guest
+      perspective on: AccountHolder
+        if not exists object then
+          createRole AccountHolder
