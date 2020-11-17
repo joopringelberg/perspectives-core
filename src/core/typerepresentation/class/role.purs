@@ -314,14 +314,28 @@ viewsOfADT :: ADT EnumeratedRoleType -> MP (Array ViewType)
 viewsOfADT (ST r) = getEnumeratedRole r >>= pure <<< _.views <<< unwrap
 viewsOfADT adt@(SUM terms) = do
   (allProps :: Set PropertyType) <- propertySet adt >>= pure <<< fromFoldable <<< unsafePartial elements
-  (allViews :: Array ViewType) <- traverse viewsOfADT terms >>= pure <<< unionOfArrays
-  filterA (propertiesOfView >=> pure <<< (flip subset allProps)) allViews
+  (allViews' :: Array ViewType) <- traverse viewsOfADT terms >>= pure <<< unionOfArrays
+  filterA (propertiesOfView >=> pure <<< (flip subset allProps)) allViews'
   where
     propertiesOfView :: ViewType -> MP (Set PropertyType)
     propertiesOfView = (getPerspectType >=> pure <<< fromFoldable <<< propertyReferences)
 viewsOfADT (PROD terms) = traverse viewsOfADT terms >>= pure <<< unionOfArrays
 viewsOfADT EMPTY = pure []
 viewsOfADT UNIVERSAL = throwError (error $ show UniversalRoleHasNoParts)
+
+-- | All views, computed recursively over binding and Aspects, of the Role ADT.
+allViews :: ADT EnumeratedRoleType -> MP (Array ViewType)
+allViews = reduce magic
+  where
+    magic :: EnumeratedRoleType -> MP (Array ViewType)
+    magic rt = do
+      EnumeratedRole{roleAspects, binding, views} <- getEnumeratedRole rt
+      x <- pure $ product (cons binding (ST <$> roleAspects))
+      case x of
+        EMPTY -> pure views
+        otherwise -> do
+          vws <- reduce magic otherwise
+          pure $ vws <> views
 
 -----------------------------------------------------------
 -- ROLEASPECTSOFADT
@@ -435,3 +449,13 @@ contextOfRepresentationOfRole (CR c) = getPerspectType c >>= pure <<< ST <<< con
 getRoleType :: String -> MonadPerspectives RoleType
 getRoleType s = ((getEnumeratedRole $ EnumeratedRoleType s) >>= pure <<< ENR <<< identifier)
   <|> ((getCalculatedRole $ CalculatedRoleType s) >>= pure <<< CR <<< identifier)
+
+getViewsFromString :: String -> MonadPerspectives (Array ViewType)
+getViewsFromString s =
+  (getEnumeratedRole (EnumeratedRoleType s) >>= views) <|>
+  (getCalculatedRole (CalculatedRoleType s) >>= views)
+
+getRoleADTFromString :: String -> MonadPerspectives (ADT EnumeratedRoleType)
+getRoleADTFromString s =
+  (getEnumeratedRole (EnumeratedRoleType s) >>= roleADT) <|>
+  (getCalculatedRole (CalculatedRoleType s) >>= roleADT)

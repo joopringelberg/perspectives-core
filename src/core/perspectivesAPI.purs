@@ -159,7 +159,9 @@ consumeRequest = forever do
 dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
 dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription, authoringRole: as} = do
   -- The authoringRole is the System User by default.
-  authoringRole <- pure $ maybe (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (ENR <<< EnumeratedRoleType) as
+  authoringRole <- case as of
+    Nothing -> pure $ ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User"
+    Just x -> getRoleType x
   case request of
     -- Given the context instance identifier and the qualified name of the RolType.
     Api.GetRolBinding -> do

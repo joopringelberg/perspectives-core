@@ -46,7 +46,7 @@ import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, 
 import Perspectives.Representation.Class.Context (allContextTypes)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getAction, getCalculatedRole, getContext, getEnumeratedProperty, getEnumeratedRole, getPerspectType, getView)
-import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, allProperties, allRoles, getRole, greaterThanOrEqualTo, perspectives, roleADT, roleAspects, roleAspectsBindingADT, typeIncludingAspects, viewsOfADT)
+import Perspectives.Representation.Class.Role (class RoleClass, actionSet, adtOfRole, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, perspectives, roleADT, roleAspects, roleAspectsBindingADT, typeIncludingAspects, viewsOfADT)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -168,7 +168,7 @@ aspectsClosure :: EnumeratedRoleType ~~~> EnumeratedRoleType
 aspectsClosure = closure_ aspectsOfRole
 
 roleTypeAspectsClosure :: RoleType ~~~> RoleType
-roleTypeAspectsClosure (ENR r) = ENR <$> (closure_ aspectsOfRole) r
+roleTypeAspectsClosure (ENR r) = ENR <$> aspectsClosure r
 roleTypeAspectsClosure (CR r) = pure $ CR r
 
 hasAspect :: EnumeratedRoleType -> (EnumeratedRoleType ~~~> Boolean)
@@ -226,10 +226,17 @@ getPerspective objectTypeId (CR crole) = ArrayT do
   (r :: CalculatedRole) <- getCalculatedRole crole
   pure (maybe [] identity (lookup (deconstructLocalName_ objectTypeId) (perspectives r)))
 
+getPerspectives :: RoleType ~~~> ActionType
+getPerspectives (ENR erole) = ArrayT (getEnumeratedRole erole >>= pure <<< join <<< values <<< perspectives)
+
+getPerspectives (CR crole) = ArrayT (getCalculatedRole crole >>= pure <<< join <<< values <<< perspectives)
+
 -- | For the user role (second argument), and the object role (first argument), compute
 -- | for each verb in the perspective the former has on the latter, the properties,
 -- | indexed with the Action Verb (PropsAndVerbs).
 -- | Results are computed for the user rule and its Aspects.
+-- | Notice that only RelevantProperties are returned. In case of All, this symbolically
+-- | also represents properties of Aspects and the binding hierarchy, but does not make them explicit.
 propsAndVerbsForObjectRole :: RoleType -> RoleType -> MonadPerspectives PropsAndVerbs
 propsAndVerbsForObjectRole objectRole userRole' = do
   actions <- userRole' ###= (roleTypeAspectsClosure >=> getPerspective (roletype2string objectRole))
@@ -286,7 +293,7 @@ lookForUnqualifiedViewType :: String -> (ADT EnumeratedRoleType ~~~> ViewType)
 lookForUnqualifiedViewType s = lookForView (unwrap >>> areLastSegmentsOf s)
 
 lookForView :: (ViewType -> Boolean) -> ADT EnumeratedRoleType ~~~> ViewType
-lookForView criterium = COMB.filter' (ArrayT <<< viewsOfADT) criterium
+lookForView criterium = COMB.filter' (ArrayT <<< allViews) criterium
 
 -- | If no view is specified, all properties can be accessed.
 hasProperty :: PropertyType -> ViewType ~~~> Boolean

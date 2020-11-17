@@ -23,60 +23,63 @@ module Perspectives.Checking.Authorization where
 
 import Prelude
 
-import Data.Array (elemIndex, findIndex)
+import Control.Monad.State (StateT, execStateT, get, lift, put)
+import Data.Array (elemIndex)
 import Data.Either (Either(..))
-import Data.Map (lookup)
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
-import Foreign.Object (lookup) as OBJ
-import Perspectives.CoreTypes (MonadPerspectives, (##>>))
+import Perspectives.CoreTypes (MonadPerspectives, (##>>), (###=))
 import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
-import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Representation.Action (Verb)
-import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty)
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
+import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Action (Action(..), Verb)
+import Perspectives.Representation.Class.PersistentType (getAction)
+import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, PropertyType(..), RoleType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType)
+import Perspectives.Types.ObjectGetters (getPerspectives, propertiesOfView, roleTypeAspectsClosure)
 import Perspectives.TypesForDeltas (SubjectOfAction)
 
--- | True iff the user role represented by the SubjectOfAction argument has perspective
+type Found a = StateT Boolean MonadPerspectives a
+
+-- | True iff the user role represented by the SubjectOfAction argument has a perspective
 -- | on the role type that includes an Action
 -- |  * with a view that holds the property,
 -- |  * and the given Verb.
 roleHasPerspectiveOnPropertyWithVerb :: SubjectOfAction -> RoleInstance -> EnumeratedPropertyType -> Verb -> MonadPerspectives (Either PerspectivesError Boolean)
-roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb = do
+roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
   (subjectType :: RoleType) <- typeOfSubjectOfAction subject
   role <- roleInstance ##>> roleType
-  EnumeratedProperty{onPropertyDelta} <- getEnumeratedProperty property
-  case findIndex
-    (\(InvertedQuery {userTypes}) -> case lookup subjectType userTypes of
-      Nothing -> false
-      Just pAndV -> case OBJ.lookup (show verb) pAndV of
-        Nothing -> false
-        Just All -> true
-        Just (Properties props) -> case elemIndex (ENP property) props of
-          Nothing -> false
-          _ -> true)
-    onPropertyDelta of
-      Nothing -> pure $ Left $ UnauthorizedForProperty "Auteur" subjectType role property verb
-      otherwise -> pure $ Right true
-
-
--- roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb = do
---   (subjectType :: RoleType) <- typeOfSubjectOfAction subject
---   role <- roleInstance ##>> roleType
---   (actions :: Array ActionType) <- subjectType ###=
---     (filter (getPerspectiveOnObject (ENR role)) (hasVerb verb))
---   if null actions
---     then pure $ Left $ UnauthorizedForProperty "Auteur" subjectType role property verb
---     else do
---       views <- "ignore" ###= (filter ((\_ -> ArrayT $ pure actions) >=> objectView) (hasProperty (ENP property)))
---       if null views
---         -- If no view has been provided to the relevant action, any property is accessible.
---         then pure $ Right true
---         else do
---           views' <- "ignore" ###= (filter (\_ -> ArrayT $ pure views)
---                 (hasProperty (ENP property)))
---           if null views'
---             then pure $ Left $ UnauthorizedForProperty "Auteur" subjectType role property verb
---             else pure $ Right true
+  (execStateT (run subjectType role) false) >>=
+    if _
+      then pure $ Right true
+      else pure $ Left $ UnauthorizedForProperty "Auteur" subjectType role property verb'
+  where
+    run :: RoleType -> EnumeratedRoleType -> Found Unit
+    run subjectType role = do
+      allSubjects <- lift (subjectType ###= roleTypeAspectsClosure)
+      for_ allSubjects
+        \userRole -> hasBeenFound >>= if _
+          then pure unit
+          else do
+            (as :: Array ActionType) <- lift (userRole ###= getPerspectives)
+            for_ as
+              \at -> hasBeenFound >>= if _
+                then pure unit
+                else do
+                  (Action{verb, requiredObjectProperties, object}) <- lift $ getAction at
+                  if verb == verb'
+                    then case requiredObjectProperties of
+                      Just vt -> do
+                        props <- lift (vt ###= propertiesOfView)
+                        case elemIndex (ENP property) props of
+                          Nothing -> pure unit
+                          otherwise -> put true
+                      Nothing -> do
+                        props <- lift (allProperties (ST role))
+                        case elemIndex (ENP property) props of
+                          Nothing -> pure unit
+                          otherwise -> put true
+                    else pure unit
+    hasBeenFound :: Found Boolean
+    hasBeenFound = get
