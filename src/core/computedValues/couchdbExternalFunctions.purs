@@ -123,6 +123,14 @@ roleInstancesFromCouchdb roleTypes _ = ArrayT do
         void $ lift $ cacheEntity _id r
         pure _id
 
+pendingInvitations :: ContextInstance ~~> RoleInstance
+pendingInvitations _ = ArrayT do
+  -- tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)]
+  (roles :: Array PerspectRol) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "pendingInvitations" Nothing
+  for roles \r@(PerspectRol{_id}) -> do
+    void $ lift $ cacheEntity _id r
+    pure _id
+
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
 -- | Load the dependencies first.
 -- | Load the acompanying instances, too.
@@ -376,5 +384,6 @@ externalFunctions =
   , Tuple "model:Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
   , Tuple "model:Couchdb$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
   , Tuple "model:Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
+  , Tuple "model:Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
   , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
 ]

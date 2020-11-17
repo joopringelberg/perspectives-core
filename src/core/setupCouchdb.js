@@ -7,3 +7,11 @@ exports.roleView = (function (doc)
 {
   emit(doc.contents.pspType, doc);
 }).toString();
+
+exports.pendingInvitations = (function(doc)
+{
+  if (doc.contents.properties["model:System$Invitation$External$Message"])
+  {
+    emit(doc._id, doc);
+  }
+}).toString();

@@ -201,3 +201,15 @@ setRoleView dbname = do
 
 -- | Import the view definition as a String.
 foreign import roleView :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'PENDINGINVITATIONS±'
+-- This view collects instances model:System$Invitation$External.
+-----------------------------------------------------------
+-- | Add a view to the couchdb installation in the 'repository' db.
+setPendingInvitationView :: forall f. String -> MonadCouchdb f Unit
+setPendingInvitationView dbname = do
+  addViewToDatabase dbname "defaultViews" "pendingInvitations" (View {map: pendingInvitations, reduce: Nothing})
+
+-- | Import the view definition as a String.
+foreign import pendingInvitations :: String
