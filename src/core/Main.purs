@@ -20,6 +20,7 @@
 
 module Main where
 import Control.Monad.AvarMonadAsk (modify)
+import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -27,7 +28,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (fst)
 import Effect (Effect)
-import Effect.Aff (Error, catchError, forkAff, runAff, try)
+import Effect.Aff (Error, catchError, forkAff, joinFiber, runAff, try)
 import Effect.Aff.AVar (AVar, new)
 import Effect.Class.Console (log)
 import Perspectives.Api (setupApi)
@@ -86,8 +87,18 @@ runPDR usr pwd couchdbUser host port = void $ runAff handleError do
     addAllExternalFunctions
     addIndexedNames)
     state
-  void $ forkAff $ runPerspectivesWithState setupApi state
-  void $ forkAff $ runPerspectivesWithState incomingPost state
+  void $ forever do
+    apiFiber <- forkAff $ runPerspectivesWithState setupApi state
+    catchError (joinFiber apiFiber)
+      \e -> do
+        log $ "API stopped because of: " <> show e
+        log "Will start the API again."
+  void $ forever do
+    postFiber <- forkAff $ runPerspectivesWithState incomingPost state
+    catchError (joinFiber postFiber)
+      \e -> do
+        log $ "Stopped handling incoming post because of: " <> show e
+        log "Will start the handler again."
   -- void $ forkAff $ runPerspectivesWithState setupTcpApi state
 
 handleError :: forall a. (Either Error a -> Effect Unit)
