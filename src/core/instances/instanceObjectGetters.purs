@@ -227,17 +227,17 @@ boundBy sourceOfBoundRoles binder = ArrayT do
   if null bools
     then pure [Value $ show false]
     else pure [Value $ show $ ala Conj foldMap bools]
-  where
-    -- role `bindsRole` bnd'
-    bindsRole :: RoleInstance -> RoleInstance ~~> Boolean
-    bindsRole role bnd' = ArrayT $
-      if role == bnd'
-        then pure [true]
-        else do
-          (bs :: Array RoleInstance) <- runArrayT $ binding role
-          case head bs of
-            Nothing -> pure [false]
-            Just b -> runArrayT $ bindsRole b bnd'
+
+-- role `bindsRole` bnd'
+bindsRole :: RoleInstance -> RoleInstance ~~> Boolean
+bindsRole role bnd' = ArrayT $
+  if role == bnd'
+    then pure [true]
+    else do
+      (bs :: Array RoleInstance) <- runArrayT $ binding role
+      case head bs of
+        Nothing -> pure [false]
+        Just b -> runArrayT $ bindsRole b bnd'
 
 -- | Binder `binds` Binding is true,
 -- | iff either Binding is the direct binding of Binder, or (binding Binder) `binds` Binding is true.
@@ -250,17 +250,17 @@ binds sourceOfBindingRoles bnd = ArrayT do
   if null bools
     then pure [Value $ show false]
     else pure [Value $ show $ ala Conj foldMap bools]
-  where
-    -- bnd' `boundByRole` role
-    boundByRole :: RoleInstance -> RoleInstance ~~> Boolean
-    boundByRole bnd' role = ArrayT $
-      if role == bnd'
-        then pure [true]
-        else do
-          (bs :: Array RoleInstance) <- runArrayT $ binding role
-          case head bs of
-            Nothing -> pure [false]
-            Just b -> runArrayT $ boundByRole bnd' b
+
+-- bnd' `boundByRole` role
+boundByRole :: RoleInstance -> RoleInstance ~~> Boolean
+boundByRole bnd' role = ArrayT $
+  if role == bnd'
+    then pure [true]
+    else do
+      (bs :: Array RoleInstance) <- runArrayT $ binding role
+      case head bs of
+        Nothing -> pure [false]
+        Just b -> runArrayT $ boundByRole bnd' b
 
 subjectForContextInstance :: ContextInstance -> MonadPerspectivesTransaction SubjectOfAction
 subjectForContextInstance contextId = do

@@ -83,6 +83,13 @@ rangeOfPropertyType (CP pt) = getCalculatedProperty pt >>= range
 data Property = E EnumeratedProperty | C CalculatedProperty
 
 -----------------------------------------------------------
+-- FUNCTIONS ON PROPERTY
+-----------------------------------------------------------
+getCalculation :: Property -> MonadPerspectives QueryFunctionDescription
+getCalculation (E r) = calculation r
+getCalculation (C r) = calculation r
+
+-----------------------------------------------------------
 -- FUNCTIONS ON PROPERTYTYPE
 -----------------------------------------------------------
 getProperty :: PropertyType -> MonadPerspectives Property

@@ -37,7 +37,7 @@ import Perspectives.Representation.Class.PersistentType (getAction)
 import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType)
-import Perspectives.Types.ObjectGetters (getPerspectives, propertiesOfView, roleTypeAspectsClosure)
+import Perspectives.Types.ObjectGetters (actionsOfRole_, propertiesOfView, roleTypeAspectsClosure)
 import Perspectives.TypesForDeltas (SubjectOfAction)
 
 type Found a = StateT Boolean MonadPerspectives a
@@ -62,7 +62,7 @@ roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
         \userRole -> hasBeenFound >>= if _
           then pure unit
           else do
-            (as :: Array ActionType) <- lift (userRole ###= getPerspectives)
+            (as :: Array ActionType) <- lift (userRole ###= actionsOfRole_)
             for_ as
               \at -> hasBeenFound >>= if _
                 then pure unit

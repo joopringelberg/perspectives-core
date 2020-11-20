@@ -51,34 +51,42 @@ domain: BrokerServices
           bind sys:Me to Administrator
 
     context: Accounts filledBy: BrokerContract
-      view: Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
 
   -- The contract between an end user and a BrokerService.
   case: BrokerContract
+    aspect: sys:Invitation
     external:
-      property: Url = context >> Administrator >> binder model:BrokerServices$BrokerService$Administrator >> context >> extern >> Url
-      property: Exchange = context >> Administrator >> binder model:BrokerServices$BrokerService$Administrator >> context >> extern >> Exchange
-      property: Name = context >> Administrator >> binder model:BrokerServices$BrokerService$Administrator >> context >> extern >> Name
+      aspect: sys:Invitation$External
+      property: Url = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url
+      property: Exchange = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Exchange
+      property: Name = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Name
       property: FirstNameOfAccountHolder = context >> AccountHolder >> Voornaam
       property: LastNameOfAccountHolder = context >> AccountHolder >> Achternaam
 
       view: ForAccountHolder (Url, Exchange)
+      view: ForAdministrator (IWantToInviteAnUnconnectedUser, Message, SerialisedInvitation)
+      view: Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
 
     user: AccountHolder filledBy: sys:PerspectivesSystem$User
+      aspect: sys:Invitation$Invitee
       property: AccountName (mandatory, functional, String)
       property: AccountPassword (mandatory, functional, String)
       property: QueueName (mandatory, functional, String)
       property: ConfirmationCode (not mandatory, functional, String)
 
       view: ForAdministrator (AccountName, AccountPassword, QueueName)
+      view: ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode)
 
-      perspective on: External
+      perspective on: External (ForAccountHolder)
+      perspective on: AccountHolder
 
     user: Administrator filledBy: bs:BrokerService$Administrator
+      aspect: sys:Invitation$Inviter
       property: ConfirmationCode (not mandatory, functional, String)
       view: Confirmation (ConfirmationCode)
 
       perspective on: AccountHolder
+      perspective on: External
 
     user: Guest = sys:Me
 

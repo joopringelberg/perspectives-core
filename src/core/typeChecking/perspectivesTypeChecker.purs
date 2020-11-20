@@ -112,7 +112,7 @@ checkBinding roletype instanceToBind = do
   rtype <- roleType_ instanceToBind
   instanceType' <- (getEnumeratedRole >=> roleAspectsBindingADT) rtype
   -- TODO. Voor de rol moet ik alleen de binding ophalen.
-  -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRole
+  -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRoleAspectsBinding
   roleType' <- bindingOfRole roletype
   b1 <- roleType' `lessThanOrEqualTo` instanceType'
   pure $ b1 && not (roletype == ENR rtype)

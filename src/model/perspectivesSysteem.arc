@@ -49,8 +49,8 @@ domain: System
     bot: for User
       -- This rule creates an entry in IndexedContexts if its model has been taken in use.
       perspective on: ModelsInUse
-        if object >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts then
-          bind ModelsInUse >> binding >> context >> IndexedContext to IndexedContexts
+        if exists (object >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts) then
+          bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
 
       -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
       perspective on: DanglingIndexedContext
@@ -64,6 +64,8 @@ domain: System
 
     -- An entry in IndexedContexts is dangling if its model is not in use.
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
+
+    context: PendingInvitations = callExternal cdb:PendingInvitations() returns: sys:Invitation$External
 
   case: PhysicalContext
     user: UserWithAddress
@@ -117,40 +119,21 @@ domain: System
       property: IWantToInviteAnUnconnectedUser (not mandatory, functional, Boolean)
       property: SerialisedInvitation (not mandatory, functional, String)
       property: Message (not mandatory, functional, String)
+      property: InviterLastName = context >> Inviter >> Achternaam
+
+      view: ForInvitee (InviterLastName, Message)
 
     user: Invitee (mandatory, functional) filledBy: Guest
       perspective on: Inviter
-      perspective on: PrivateChannel
-      -- Invitee needs to see the Channel's Initiator in order to access Host and Port.
-      perspective on: ChannelInitiator
-      perspective on: External Consult
-    bot: for Invitee
-      perspective on: Invitee
-        if (exists Invitee) and (exists PrivateChannel) then
-          -- bind object to ConnectedPartner in PrivateChannel >> binding >> context
-          callEffect ser:AddConnectedPartnerToChannel( object, PrivateChannel >> binding >> context )
+      perspective on: External (ForInvitee) Consult 
 
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
-      perspective on: PrivateChannel
-      perspective on: ChannelInitiator
-      perspective on: TheChannel
+
     bot: for Inviter
-      -- TODO. als de uitnodiging wordt weggegooid en er is geen partner in het kanaal, verwijder dan het kanaal en de kanaaldatabase!
       perspective on: External
         if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then
-          -- Creates a Channel, binds it to PrivateChannel.
-          callEffect ser:AddChannel()
           SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user: Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
       perspective on: Invitee
-    bot: for Guest
-      perspective on: PrivateChannel
-        if exists PrivateChannel then
-          callEffect ser:CreateCopyOfChannelDatabase( PrivateChannel >> ChannelDatabaseName )
-
-    context: PrivateChannel (not mandatory, functional) filledBy: Channel
-    context: TheChannel = PrivateChannel >> binding
-
-    user: ChannelInitiator = PrivateChannel >> binding >> context >> Initiator

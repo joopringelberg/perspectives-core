@@ -224,7 +224,6 @@ roleSet (PROD terms) = traverse roleSet terms >>= pure <<< unionPset
 roleSet UNIVERSAL = pure Universal
 roleSet EMPTY = pure Empty
 
-
 -- | The roles of this context and its aspects, recursively.
 allRoles :: ADT ContextType -> MP (Array RoleType)
 allRoles = reduce magic
@@ -388,9 +387,13 @@ getCalculation (C r) = calculation r
 
 -- | Includes: the type of the Role, its own binding (not the bindings transitive closure!) and its own aspects (not their transitive closure!).
 -- | For a CalculatedRole it is the range of its calculation.
+adtOfRoleAspectsBinding :: Role -> MP (ADT EnumeratedRoleType)
+adtOfRoleAspectsBinding (E e) = roleAspectsBindingADT e
+adtOfRoleAspectsBinding (C c) = roleAspectsBindingADT c
+
 adtOfRole :: Role -> MP (ADT EnumeratedRoleType)
-adtOfRole (E e) = roleAspectsBindingADT e
-adtOfRole (C c) = roleAspectsBindingADT c
+adtOfRole (E e) = roleADT e
+adtOfRole (C c) = roleADT c
 
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLETYPE

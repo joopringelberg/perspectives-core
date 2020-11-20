@@ -70,7 +70,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, contextOfRepresentationOfRole, contextOfRole, getCalculation, getRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
+import Perspectives.Representation.Class.Role (adtOfRoleAspectsBinding, bindingOfRole, contextOfRepresentationOfRole, contextOfRole, getCalculation, getRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -323,7 +323,7 @@ qualifyViewReferences = do
                 Nothing -> pure Nothing
                 (Just rqp) -> do
                   viewCandidates <- lift2 do
-                    adt <- getRole role >>= adtOfRole
+                    adt <- getRole role >>= adtOfRoleAspectsBinding
                     (adt ###= lookForUnqualifiedViewType (unwrap rqp))
                   case head viewCandidates of
                     Nothing -> throwError $ UnknownView pos (unwrap rqp)
