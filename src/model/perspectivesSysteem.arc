@@ -17,6 +17,7 @@ domain: System
     external:
       aspect: sys:RootContext$External
       property: ModelOphaalTeller (mandatory, functional, Number)
+      property: ConnectedToAMQPBroker (not mandatory, functional, Boolean)
     aspect: sys:RootContext
     indexed: sys:MySystem
 
@@ -125,7 +126,7 @@ domain: System
 
     user: Invitee (mandatory, functional) filledBy: Guest
       perspective on: Inviter
-      perspective on: External (ForInvitee) Consult 
+      perspective on: External (ForInvitee) Consult
 
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
 

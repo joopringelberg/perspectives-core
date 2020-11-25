@@ -19,6 +19,12 @@
 
 -- END LICENSE
 
+-- | This module wraps part of Stompjs.
+-- | See:
+-- |  * https://github.com/stomp-js/stompjs
+-- |  * https://stomp-js.github.io/guide/stompjs/using-stompjs-v5.html
+-- |  * https://stomp-js.github.io/api-docs/latest/classes/Client.html
+
 module Perspectives.AMQP.Stomp
 
   ( messageProducer
@@ -26,9 +32,15 @@ module Perspectives.AMQP.Stomp
   , createStompClient
   , Message
   , AcknowledgeFunction
+  , AcknowledgementHeaders
+  , acknowledge
   , unsubscribe
   , send
+  , sendToTopic
+  , sendToQueue
   , StructuredMessage
+  , ConnectAndSubscriptionParameters
+  , QueueId
   )
 
 where
@@ -36,16 +48,23 @@ where
 import Prelude
 
 import Control.Coroutine (Producer, transform, ($~))
-import Control.Coroutine.Aff (Emitter, Step(..), produce, produce')
+import Control.Coroutine.Aff (Emitter, Step(..), produce')
 import Control.Monad.Except (runExcept)
 import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
+import Data.List.NonEmpty (cons, singleton)
+import Data.Maybe (Maybe, fromJust, isJust)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect (Effect)
-import Effect.Aff (Aff)
-import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn5, runEffectFn1, runEffectFn2, runEffectFn3, runEffectFn5)
-import Foreign (Foreign, MultipleErrors)
-import Foreign.Class (class Decode, decode)
+import Effect.Class (liftEffect)
+import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn4, EffectFn5, runEffectFn1, runEffectFn2, runEffectFn4, runEffectFn5)
+import Foreign (ForeignError(..), MultipleErrors)
+import Foreign.Class (class Decode)
+import Foreign.Generic (decodeJSON)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CouchdbState (MonadCouchdb)
+import Perspectives.Identifiers (getFirstMatch)
 
 -----------------------------------------------------------
 -- STOMPURL
@@ -70,24 +89,27 @@ createStompClient stompUrl = runEffectFn1 createStompClientImpl stompUrl
 -----------------------------------------------------------
 type QueueId = String
 
-type ConnectAndSubscriptionParameters =
+type ConnectAndSubscriptionParameters p =
   { topic :: String       -- the routing / binding key
   , queueId :: QueueId    -- the (secret) identification of the queue that we subscribe to.
-  , login :: String      -- RabbitMQ login name
-  , passcode :: String   -- RabbitMQ password
+  , login :: String       -- RabbitMQ login name
+  , passcode :: String    -- RabbitMQ password
   , vhost :: String       -- vhost name on the RabbitMQ server that the user credentials belong to.
+  | p
   }
 
--- | We model a parameterless acknowledgement function, as we have no use case for parameters (yet).
-type AcknowledgeFunction = Unit -> Unit
+-- -- | We model a parameterless acknowledgement function, as we have no use case for parameters (yet).
+-- type AcknowledgeFunction = Unit -> Unit
+type AcknowledgementHeaders = {}
+type AcknowledgeFunction = EffectFn1 AcknowledgementHeaders Unit
 
 type Message =
-  { body :: Foreign
+  { body :: String
   , ack :: AcknowledgeFunction}
 
-foreign import connectAndSubscribeImpl :: EffectFn5
+foreign import connectAndSubscribeImpl :: forall p. EffectFn5
   StompClient
-  ConnectAndSubscriptionParameters
+  (ConnectAndSubscriptionParameters p)
   (Message -> Step Message Unit)
   (Unit -> Step Message Unit)
   (Emitter Effect Message Unit)
@@ -95,9 +117,9 @@ foreign import connectAndSubscribeImpl :: EffectFn5
 
 -- | Takes an EventSource and produces a function that takes an Emitter.
 -- | Apply `produce` or `produce'` to it to create a Producer of Foreign.
-connectAndSubscribe ::
+connectAndSubscribe :: forall p.
   StompClient ->
-  ConnectAndSubscriptionParameters ->
+  (ConnectAndSubscriptionParameters p) ->
   (Emitter Effect Message Unit) ->
   Effect Unit
 connectAndSubscribe stompClient params = runEffectFn5 connectAndSubscribeImpl
@@ -110,20 +132,39 @@ connectAndSubscribe stompClient params = runEffectFn5 connectAndSubscribeImpl
 -- MESSAGEPRODUCER
 -----------------------------------------------------------
 -- | A Producer of Messages.
-messageProducer' :: forall f. StompClient -> ConnectAndSubscriptionParameters -> Producer Message (MonadCouchdb f) Unit
+messageProducer' :: forall f p. StompClient -> ConnectAndSubscriptionParameters p -> Producer Message (MonadCouchdb f) Unit
 messageProducer' stompClient params = produce' (connectAndSubscribe stompClient params)
 
 type StructuredMessage f =
   { body :: f
   , ack :: AcknowledgeFunction}
 
-messageProducer :: forall t f. Decode t => StompClient -> ConnectAndSubscriptionParameters -> Producer (Either MultipleErrors (StructuredMessage t)) (MonadCouchdb f) Unit
+messageProducer :: forall t f p. Decode t => StompClient -> ConnectAndSubscriptionParameters p -> Producer (Either MultipleErrors (StructuredMessage t)) (MonadCouchdb f) Unit
 messageProducer stompClient params = (messageProducer' stompClient params) $~ (forever (transform decodeMessage))
   where
     decodeMessage :: Message -> Either MultipleErrors (StructuredMessage t)
-    decodeMessage {body, ack} = case runExcept $ decode body of
-      Left e -> Left e
+    decodeMessage {body, ack} = case runExcept $ decodeJSON body of
+      Left e -> case body of
+            "noConnection" -> Left $ singleton $ ForeignError "noConnection"
+            "connection" -> Left $ singleton $ ForeignError "connection"
+            -- NOTICE that we misuse / overload the TypeMismatch constructor here for our purposes.
+            s | isAReceipt s -> Left $ singleton (TypeMismatch "receipt" (unsafePartial $ fromJust $ getReceipt s))
+            otherwise -> Left $ cons (ForeignError body) e
       Right m -> Right {body: m, ack}
+
+    isAReceipt :: String -> Boolean
+    isAReceipt = isJust <<< getReceipt
+
+    getReceipt :: String -> Maybe String
+    getReceipt = getFirstMatch (unsafeRegex "receipt:(.+)" noFlags)
+
+-----------------------------------------------------------
+-- ACKNOWLEDGE
+-----------------------------------------------------------
+
+acknowledge :: forall f. AcknowledgeFunction -> MonadCouchdb f Unit
+acknowledge ack = liftEffect $ runEffectFn1 ack {}
+
 -----------------------------------------------------------
 -- UNSUBSCRIBE
 -----------------------------------------------------------
@@ -138,9 +179,19 @@ unsubscribe stompClient queueId = runEffectFn2 unsubscribeImpl stompClient queue
 -- SEND
 -----------------------------------------------------------
 type Destination = String
+type Topic = String
+type Queue = String
+type MessageId = String
 
-foreign import sendImpl :: EffectFn3 StompClient Destination String Unit
+foreign import sendImpl :: EffectFn4 StompClient Destination MessageId String Unit
 
 -- | Send a string to a destination.
-send :: StompClient -> Destination -> String -> Effect Unit
-send stompClient destination messageString = runEffectFn3 sendImpl stompClient destination messageString
+-- | Destinations start either with "/topic/" or with "/queue/".
+send :: StompClient -> Destination -> MessageId -> String -> Effect Unit
+send stompClient destination messageId messageString = runEffectFn4 sendImpl stompClient destination messageId messageString
+
+sendToTopic :: StompClient -> Topic -> MessageId -> String -> Effect Unit
+sendToTopic stompClient topic messageId messageString = runEffectFn4 sendImpl stompClient ("/topic/" <> topic) messageId messageString
+
+sendToQueue :: StompClient -> Queue -> MessageId -> String -> Effect Unit
+sendToQueue stompClient queue messageId messageString = runEffectFn4 sendImpl stompClient ("/queue/" <> queue) messageId messageString

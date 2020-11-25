@@ -25,7 +25,8 @@ import Control.Monad.AvarMonadAsk (gets, modify)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (AVar)
 import Foreign.Object (empty)
-import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState)
+import Perspectives.AMQP.Stomp (StompClient)
+import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState, BrokerService)
 import Perspectives.CouchdbState (CouchdbUser)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
@@ -52,6 +53,8 @@ newPerspectivesState uinfo host port password av =
   , post: Nothing
   , developmentRepository: "http://127.0.0.1:5984/repository/"
   , transactionNumber: 0
+  , brokerService: Nothing
+  , stompClient: Nothing
   }
 
 -----------------------------------------------------------
@@ -95,6 +98,18 @@ nextTransactionNumber = do
   n <- transactionNumber
   void $ modify \(s@{transactionNumber:cn}) -> s {transactionNumber = cn + 1}
   pure n
+
+brokerService :: MonadPerspectives (Maybe BrokerService)
+brokerService = gets _.brokerService
+
+setBrokerService :: Maybe BrokerService -> MonadPerspectives Unit
+setBrokerService bs = modify \s -> s {brokerService = bs}
+
+stompClient :: MonadPerspectives (Maybe StompClient)
+stompClient = gets _.stompClient
+
+setStompClient :: StompClient -> MonadPerspectives Unit
+setStompClient bs = modify \s -> s {stompClient = Just bs}
 
 -----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS

@@ -38,6 +38,7 @@ import Effect.Aff.AVar (AVar)
 import Effect.Exception (error)
 import Foreign.Object (Object)
 import Foreign.Object as F
+import Perspectives.AMQP.Stomp (ConnectAndSubscriptionParameters, StompClient)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.ChangesFeed (EventSource)
 import Perspectives.CouchdbState (CouchdbState)
@@ -57,6 +58,8 @@ import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, 
 type ContextInstances = GLStrMap (AVar PerspectContext)
 type RolInstances = GLStrMap (AVar PerspectRol)
 type DomeinCache = GLStrMap (AVar DomeinFile)
+
+type BrokerService = ConnectAndSubscriptionParameters ( url :: String )
 
 type PerspectivesState = CouchdbState PerspectivesExtraState
 
@@ -83,6 +86,11 @@ type PerspectivesExtraState =
   , publicRepository :: String
 
   , transactionNumber :: Int
+
+  , brokerService :: Maybe BrokerService
+
+  , stompClient :: Maybe StompClient
+
   )
 
 -----------------------------------------------------------

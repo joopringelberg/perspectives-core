@@ -19,12 +19,12 @@
 
 // END LICENSE
 
-var Stomp = require( "stompjs/lib/stomp.js" ).Stomp;
+var Stomp = require( "@stomp/stompjs" );
 
 
 function createStompClientImpl ( url )
 {
-  var client = Stomp.client(url);
+  var client = new Stomp.Client({ brokerURL: url});
 
   // Disable heartbeating: we don't need it because we acknowledge explicitly.
   // Commented this out because RabbitMQ seems to hang up pretty quick.
@@ -43,36 +43,60 @@ function createStompClientImpl ( url )
 // on server shutdown.
 function connectAndSubscribeImpl (stompClient, params, emitStep, finishStep, emit)
 {
-  var headers = {
-        login: params.login,
-        passcode: params.passcode,
-        host: params.vhost
-      };
-  stompClient.connect
-    ( headers
-    , function()
-      {
-        // result = {id, unsubscribe}
-        const result = stompClient.subscribe(
-          "/topic/" + params.topic,
-          function(message)
-          {
-            // Emit the change to Purescript. `emit` is in Effect:
-            // emit :: forall m a r. Emitter m a r -> a -> m Unit
-            // so we have to apply the result we get from emit to sort the effect.
-            emit( emitStep( message ) )();
-          },
-          { durable: true
-          , "auto-delete": false
-          , id: params.queueId
-          , ack: "client"
-          });
-      }
-    , function (error)
-      {
+  stompClient.connectHeaders =
+    { login: params.login
+    , passcode: params.passcode
+    , host: params.vhost
+  };
+  stompClient.debug = function (str)
+    {
+    console.log(str);
+  };
 
-      }
-    );
+  stompClient.emitToPurescript = function(message)
+    {
+      // Emit the change to Purescript. `emit` is in Effect:
+      // emit :: forall m a r. Emitter m a r -> a -> m Unit
+      // so we have to apply the result we get from emit to sort the effect.
+      emit( emitStep( message ) )();
+    };
+
+  stompClient.onConnect =
+    function()
+    {
+      // result = {id, unsubscribe}
+      const result = stompClient.subscribe(
+        "/queue/" + params.queueId,
+        stompClient.emitToPurescript,
+        { durable: true
+        , "auto-delete": false
+        , id: params.queueId // As soon as we create more than one subscription within a connection, we'll have to generate ids.
+        , ack: "client"
+        });
+        emit( emitStep( {body: "connection"} ) )();
+      };
+    stompClient.onStompError = function (frame) {
+        // Will be invoked in case of error encountered at Broker
+        // Bad login/passcode typically will cause an error
+        // Complaint brokers will set `message` header with a brief message. Body may contain details.
+        // Compliant brokers will terminate the connection after any error
+        console.log('Broker reported error: ' + frame.headers['message']);
+        console.log('Additional details: ' + frame.body);
+        emit( emitStep( {body: "noConnection"} ) )();
+      };
+    stompClient.onDisconnect = function ()
+      {
+        emit( emitStep( {body: "noConnection"} ) )();
+      };
+    stompClient.onWebSocketClose = function ()
+      {
+        emit( emitStep( {body: "noConnection"} ) )();
+      };
+    stompClient.onUnhandledMessage = function(message)
+    {
+      console.log( "UNHANDLED: " + message );
+    };
+    stompClient.activate();
   };
 
 // Unsubscribe from a queue.
@@ -82,9 +106,19 @@ function unsubscribeImpl( stompClient, queueId )
 }
 
 // Send a message. We do not support additional headers.
-function sendImpl( stompClient, destination, messageString )
+function sendImpl( stompClient, destination, receiptId, messageString )
 {
-  stompClient.send( destination, {}, messageString );
+  stompClient.watchForReceipt( receiptId,
+    function()
+    {
+      stompClient.emitToPurescript( {body: "receipt:" + receiptId} );
+    })
+  stompClient.publish(
+    { destination: destination
+    , body: messageString
+    , headers: {receipt: receiptId}
+    // , skipContentLengthHeader: true
+    });
 }
 
 module.exports =
