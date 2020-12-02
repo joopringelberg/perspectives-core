@@ -53,7 +53,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
@@ -226,7 +226,9 @@ compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
 
 compileSimpleStep currentDomain (Identity _) = pure $ SQD currentDomain (QF.DataTypeGetter IdentityF) currentDomain Unknown True
 
-compileSimpleStep currentDomain (Modelname _) =pure $ SQD currentDomain (QF.DataTypeGetter ModelNameF) currentDomain Unknown True
+compileSimpleStep currentDomain s@(Modelname _) = case currentDomain of
+  VDOM _ Nothing -> throwError $ NoPropertyTypeWithValue (startOf (Simple s)) (endOf (Simple s))
+  _ -> pure $ SQD currentDomain (QF.DataTypeGetter ModelNameF) (VDOM PString Nothing) Unknown True
 
 -- We compile the SequenceFunction as a UnaryCombinator, which is a stretch.
 compileSimpleStep currentDomain (SequenceFunction _ fname) = pure $ SQD currentDomain (QF.UnaryCombinator fname) currentDomain (isFunctionalFunction fname) True
@@ -277,7 +279,9 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       f2 <- compileStep (range f1) right
       -- f1 is the source to be filtered, f2 is the criterium.
       case range f2 of
-        VDOM PBool _ -> pure $ BQD currentDomain (QF.BinaryCombinator FilterF) f1 f2 (range f1) (functional f1) False
+        VDOM PBool _ -> if pessimistic $ functional f2
+          then pure $ BQD currentDomain (QF.BinaryCombinator FilterF) f1 f2 (range f1) (functional f1) False
+          else throwError $ NotFunctional (startOf right) (endOf right) right
         otherwise -> throwError $ NotABoolean (startOf right)
     Compose pos -> do
       f1 <- compileStep currentDomain left
@@ -348,16 +352,17 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 
     comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> FunctionName -> PhaseThree QueryFunctionDescription
     comparison pos left' right' functionName = do
-      -- Both ranges must be equal
-      gt <- lift2 $ pure ((range left') `eq` (range right'))
+      -- Both ranges must be equal, both sides must be functional.
+      gt <- lift2 $ pure (((range left') `eq` (range right')) && (pessimistic $ functional left') && (pessimistic $ functional right'))
       if gt
         then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM PBool Nothing) (isFunctionalFunction functionName) True
         else throwError $ TypesCannotBeCompared pos (range left') (range right')
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
+      -- Both ranges must be equal, both sides must be functional.
       (VDOM rc1 _), (VDOM rc2 _) | rc1 == rc2 ->
-        if  allowed rc1 && allowed rc2
+        if  allowed rc1 && allowed rc2  && (pessimistic $ functional left') && (pessimistic $ functional right')
           then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
           else throwError $ WrongTypeForOperator pos allowedRangeConstructors
       l, r -> throwError $ TypesCannotBeCompared pos l r

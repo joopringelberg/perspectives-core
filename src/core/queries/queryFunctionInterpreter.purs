@@ -24,26 +24,29 @@ module Perspectives.Query.Interpreter where
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Control.MonadZero (empty, guard, void)
-import Data.Array (elemIndex, null, union, unsafeIndex)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.List (List(..), head, singleton, snoc, uncons)
+import Control.MonadZero (empty, join, void)
+import Data.Array (elemIndex, null, union, unsafeIndex, head, cons, uncons)
+import Data.List (List(..))
 import Data.List.Types (List)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MP, MPQ, (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, MPQ, liftToInstanceLevel, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
+import Perspectives.Instances.Combinators (available', not')
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, roleModelName, roleType_)
+import Perspectives.Instances.Values (bool2Value, value2Date, value2Int)
+import Perspectives.Names (lookupIndexedRole)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
+import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.UnsafeCompiler (lookup, mapNumericOperator, orderFunction, performNumericOperation')
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -53,27 +56,16 @@ import Perspectives.Representation.Class.Property (getProperType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, calculation)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (class Eq, class Show, bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
+import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||))
 import Unsafe.Coerce (unsafeCoerce)
-
-data Dependency = C ContextInstance | R RoleInstance | V String Value | CT ContextType | RT RoleType
-
-derive instance genericDependency :: Generic Dependency _
-instance eqDependency :: Eq Dependency where
-  eq = genericEq
-
-instance showDependency :: Show Dependency where
-  show (C cid) = "C " <> show cid
-  show (R rid) = "R " <> show rid
-  show (V ptype val) = "V " <> show ptype <> " " <> show val
-  show (CT ctype) = "CT " <> show ctype
-  show (RT rtype) = "RT " <> show rtype
 
 lift2MPQ :: forall a. MP a -> MPQ a
 lift2MPQ = lift <<< lift
 
-interpret :: QueryFunctionDescription -> List Dependency ~~> (List Dependency)
+interpret :: QueryFunctionDescription -> DependencyPath ~~> DependencyPath
 
 -----------------------------------------------------------
 -- UQD
@@ -89,36 +81,42 @@ interpret (UQD _ WithFrame f1 _ _ _) a = do
   void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = old}
   pure x
 interpret (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) a = ArrayT do
-  (r :: Array (List Dependency)) <- runArrayT $ interpret f1 a
-  pure $ (Cons (V "ExistsF" $ Value (show $ null r))) <$> r
+  (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
+  pure $ (consOnMainPath (V "ExistsF" $ Value (show $ null r))) <$> r
 interpret (UQD _ (UnaryCombinator BindsF) f1 _ _ _) a = do
-  (boundRoleL :: List Dependency) <- interpret f1 a
-  -- If the head boundRole is a RoleInstance and a `bindsRole` head boundRole is true,
-  -- cons V (Value "true") op boundRole
-  case a, boundRoleL of
-    (Cons (R bindingRole) _), (Cons (R boundRole) _) -> do
+  (boundRoleL :: DependencyPath) <- interpret f1 a
+  -- If the head boundRole is a RoleInstance and (a `bindsRole` head boundRole) is true,
+  -- add V (Value "true") to boundRole
+  case a.head, boundRoleL.head of
+    (R bindingRole), (R boundRole) -> do
       b <- lift $ lift (boundRole ##>> bindsRole bindingRole)
       if b
-        then pure (Cons (V "BindsF" (Value "true")) boundRoleL)
-        else pure (Cons (V "BindsF" (Value "false")) boundRoleL)
-    _, Nil -> pure (Cons (V "BindsF" (Value "false")) boundRoleL)
-    _, _ -> throwError (error $ "Perspectives.Query.Interpreter: wrong argument types for BindsF")
+        then pure (consOnMainPath (V "BindsF" (Value "true")) boundRoleL)
+        else pure (consOnMainPath (V "BindsF" (Value "false")) boundRoleL)
+    _, _ -> pure (consOnMainPath (V "BindsF" (Value "false")) boundRoleL)
+
 interpret (UQD _ (UnaryCombinator BoundByF) f1 _ _ _) a =  do
-  (boundRoleL :: List Dependency) <- interpret f1 a
+  (boundRoleL :: DependencyPath) <- interpret f1 a
   -- If the head boundRole is a RoleInstance and a `bindsRole` head boundRole is true,
   -- cons V (Value "true") op boundRole
-  case a, boundRoleL of
-    (Cons (R bindingRole) _), (Cons (R boundRole) _) -> do
+  case a.head, boundRoleL.head of
+    (R bindingRole), (R boundRole) -> do
       b <- lift $ lift (boundRole ##>> boundByRole bindingRole)
       if b
-        then pure (Cons (V "BoundByF" (Value "true")) boundRoleL)
-        else pure (Cons (V "BoundByF" (Value "false")) boundRoleL)
-    _, Nil -> pure (Cons (V "BoundByF" (Value "false")) boundRoleL)
-    _, _ -> throwError (error $ "Perspectives.Query.Interpreter: wrong argument types for BoundByF")
+        then pure (consOnMainPath (V "BoundByF" (Value "true")) boundRoleL)
+        else pure (consOnMainPath (V "BoundByF" (Value "false")) boundRoleL)
+    _, _ -> pure (consOnMainPath (V "BoundByF" (Value "false")) boundRoleL)
 
--- TODO
-interpret (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) a = throwError (error $ "Perspectives.Query.Interpreter: no implementation for AvailableF")
-interpret (UQD _ (UnaryCombinator NotF) f1 _ _ _) a = throwError (error $ "Perspectives.Query.Interpreter: no implementation for NotF")
+interpret (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) a = ArrayT do
+  (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
+  result <- lift $ available' (toString <$> r)
+  pure $ [consOnMainPath (V "AvailableF" (Value $ show result)) a]
+
+interpret (UQD _ (UnaryCombinator NotF) f1 _ _ _) a = ArrayT do
+  (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
+  -- The DescriptionCompiler ensures that we have only Value type heads.
+  result <- lift $ not' (Value <<< toString <$> r)
+  pure $ [consOnMainPath (V "NotF" (Value $ show result)) a]
 
 -----------------------------------------------------------
 -- BQD
@@ -126,98 +124,182 @@ interpret (UQD _ (UnaryCombinator NotF) f1 _ _ _) a = throwError (error $ "Persp
 interpret (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (Constant _ _) _ _ _) _ _ _) a = interpret f2 a
 interpret (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) a =
   (interpret f1 >=> interpret f2) a
-interpret (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) a = do
-  (value :: List Dependency) <- interpret source a
-  (r :: List Dependency) <- interpret criterium value
-  guard case head r of
-    Just (V "FilterF" (Value "true")) -> true
-    otherwise -> false
-  -- TODO Also return the dependencies of the criterium!
-  pure value
-interpret (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) a = interpret f2 a
+interpret (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) a = ArrayT do
+  (values :: Array DependencyPath) <- runArrayT $ interpret source a
+  (results :: Array (Array DependencyPath)) <- for values (\v -> do
+    -- The DescriptionCompiler only allows functional criteria, so r is either empty or
+    -- contains a single result.
+    (r :: Array DependencyPath) <- runArrayT $ interpret criterium v
+    case head r of
+      Just l -> unsafePartial $ case l.head of
+        (V "FilterF" (Value "true")) -> pure $ [appendPaths v l]
+        (V "FilterF" (Value "false")) -> pure []
+      otherwise -> pure []
+    )
+  pure $ join results
+interpret (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) a = ArrayT $ do
+  f1r <- runArrayT $ interpret f1 a
+  f2r <- runArrayT $ interpret f2 a
+  -- All Dependencies in f1r should be preserved. Arbitrarily add them to the first DependencyPath in f2r.
+  case uncons f2r of
+    Nothing -> pure []
+    Just {head, tail} -> case head of
+      dp@{supportingPaths} -> pure $ cons
+        (dp {supportingPaths = join (allPaths <$> tail)})
+        tail
 interpret (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _ _ _) a = ArrayT do
-  (l :: Array (List Dependency)) <- runArrayT $ interpret f1 a
-  if null l
-    then runArrayT $ interpret f2 a
-    else pure l
+  (f1r :: Array DependencyPath) <- runArrayT $ interpret f1 a
+  if null f1r
+    then do
+      f2r <- runArrayT $ interpret f2 a
+      pure $ f1r `union` f2r
+    else pure f1r
 interpret (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) a = ArrayT do
-  (l :: Array (List Dependency)) <- runArrayT $ interpret f1 a
-  (r :: Array (List Dependency)) <- runArrayT $ interpret f2 a
+  (l :: Array DependencyPath) <- runArrayT $ interpret f1 a
+  (r :: Array DependencyPath) <- runArrayT $ interpret f2 a
   pure (l `union` r)
 
--- TODO
-interpret (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [EqualsF, NotEqualsF] = throwError (error $ "Perspectives.Query.Interpreter: no implementation for EqualsF, NotEqualsF")
-interpret (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = throwError (error $ "Perspectives.Query.Interpreter: no implementation for LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF")
-interpret (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [AndF, OrF] = throwError (error $ "Perspectives.Query.Interpreter: no implementation for EqualsF, AndF, OrF")
-interpret (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = throwError (error $ "Perspectives.Query.Interpreter: no implementation for AddF, SubtractF, DivideF, MultiplyF")
+-- The compiler only allows f1 and f2 if they're functional.
+interpret (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [EqualsF, NotEqualsF] = ArrayT do
+  -- Both are singleton arrays, or empty.
+  (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
+  fr2 <- runArrayT (interpret f1 a)
+  unsafePartial $ case g of
+    EqualsF -> case head fr1, head fr2 of
+      Just fr1h, Just fr2h -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show (x == y)) fr1h fr2h]
+      _, _ -> pure []
+    NotEqualsF -> case head fr1, head fr2 of
+      Just fr1h, Just fr2h -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show (x `notEq` y)) fr1h fr2h]
+      _, _ -> pure []
+
+-- The Description Compiler makes sure we only have Value types that can be ordered, here.
+-- It also ensures the f1 and f2 are functional.
+interpret (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = ArrayT do
+  -- Both are singleton arrays, or empty.
+  (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
+  fr2 <- runArrayT (interpret f1 a)
+  case head fr1, head fr2 of
+    Just fr1h, Just fr2h -> unsafePartial $ case ran of
+      VDOM PString _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
+      VDOM PBool _ -> pure [unsafePartial applyValueFunction (functionOnBooleans (orderFunction g)) fr1h fr2h]
+      VDOM PNumber _ -> pure [unsafePartial $ applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Int x) (value2Int y))) fr1h fr2h]
+      VDOM PDate _ -> pure [unsafePartial applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Date x) (value2Date y))) fr1h fr2h]
+    _, _ -> pure []
+
+  -- throwError (error $ "Perspectives.Query.Interpreter: no implementation for LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF")
+-- The Description Compiler ensuers we have only PBool Value types and that both f1 and f2 are functional.
+interpret (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [AndF, OrF] = ArrayT do
+  -- Both are singleton arrays, or empty.
+  (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
+  fr2 <- runArrayT (interpret f1 a)
+  case head fr1, head fr2 of
+    Just fr1h, Just fr2h -> do
+      bfunction <- if g == AndF then pure (&&) else pure (||)
+      pure [unsafePartial applyValueFunction (functionOnBooleans bfunction) fr1h fr2h]
+    _, _ -> pure []
+
+-- The Description Compiler ensures we have only Value types on which these operations are valid and that both f1 and f2 are functional.
+interpret (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = ArrayT do
+  -- Both are singleton arrays, or empty.
+  (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
+  fr2 <- runArrayT (interpret f1 a)
+  case head fr1, head fr2 of
+    Just fr1h, Just fr2h -> do
+      (result :: Array String) <- pure (performNumericOperation' g ran
+        [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
+        [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
+        (unsafeCoerce (unsafePartial mapNumericOperator) g ran))
+      pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
+        , mainPath: Nothing
+        , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
+        }]
+    _, _ -> pure []
 
 -----------------------------------------------------------
 -- MQD
 -----------------------------------------------------------
-interpret (MQD dom fun args _ _ _) a = do
+interpret (MQD dom fun args ran _ _) a = do
   functionName <- case fun of
     (ExternalCoreRoleGetter f) -> pure f
     (ExternalCorePropertyGetter f) -> pure f
     otherwise -> throwError (error $ "Unknown function construction: " <> show fun)
-  (f :: HiddenFunction) <- pure $ unsafeCoerce $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
-  (argValues :: Array (List Dependency)) <- traverse (flip interpret a) args
-  -- TODO. Hieronder worden weliswaar de resultaten berekend, maar die worden
-  -- niet als List Dependency teruggegeven!
-  -- Tevens moeten we uit de argValues wel de echte argumenten extraheren!
-  -- Bovendien moeten de resultaten uit de argument berekening ook teruggegeven worden.
+  (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
+  (argValues :: Array DependencyPath) <- traverse (flip interpret a) args
   case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
-    0 -> (unsafeCoerce f) (toString a)
-    1 -> (unsafeCoerce f)
-      (unsafePartial ( toString (unsafeIndex argValues 0)))
-      (toString a)
-    2 -> (unsafeCoerce f)
-      (unsafePartial ( toString (unsafeIndex argValues 0)))
-      (unsafePartial ( toString (unsafeIndex argValues 1)))
-      (toString a)
-    3 -> (unsafeCoerce f)
-      (unsafePartial ( toString (unsafeIndex argValues 0)))
-      (unsafePartial ( toString (unsafeIndex argValues 1)))
-      (unsafePartial ( toString (unsafeIndex argValues 2)))
-      (toString a)
-    4 -> (unsafeCoerce f)
-      (unsafePartial ( toString (unsafeIndex argValues 0)))
-      (unsafePartial ( toString (unsafeIndex argValues 1)))
-      (unsafePartial ( toString (unsafeIndex argValues 2)))
-      (unsafePartial ( toString (unsafeIndex argValues 3)))
-      (toString a)
+    0 -> do
+      r <- (unsafe1argFunction f) (toString a)
+      pure a {head = domain2Dependency ran r}
+    1 -> do
+      r <- (unsafe2argFunction f)
+        [ ( toString (first argValues))]
+        (toString a)
+      pure a {head = domain2Dependency ran r}
+    2 -> do
+      r <- (unsafe3argFunction f)
+        [ ( toString (first argValues))]
+        [ ( toString (second argValues))]
+        (toString a)
+      pure a {head = domain2Dependency ran r}
+    3 -> do
+      r <- (unsafe4argFunction f)
+        [ ( toString (first argValues))]
+        [ ( toString (second argValues))]
+        [ ( toString (third argValues))]
+        (toString a)
+      pure a {head = domain2Dependency ran r}
+    4 -> do
+      r <- (unsafe5argFunction f)
+        [ ( toString (first argValues))]
+        [ ( toString (second argValues))]
+        [ ( toString (third argValues))]
+        [ ( toString (fourth argValues))]
+        (toString a)
+      pure a {head = domain2Dependency ran r}
     otherwise -> throwError (error "Too many arguments for external core module: maximum is 4")
 
 -----------------------------------------------------------
 -- SQD
 -----------------------------------------------------------
-interpret (SQD _ (DataTypeGetter IdentityF) _ _ _) a = throwError (error $ "No implementation in Perspectives.Query.Interpreter for IdentityF")
+interpret (SQD _ (DataTypeGetter IdentityF) _ _ _) a = pure a
 
-interpret (SQD dom Identity _ _ _) a = throwError (error $ "No implementation in Perspectives.Query.Interpreter for Identity")
+interpret (SQD dom (DataTypeGetter ModelNameF) _ _ _) a = do
+  result <- unsafePartial case dom, a.head of
+    RDOM _, R rid  -> roleModelName rid
+    CDOM _, C cid -> contextModelName cid
+    VDOM _ (Just pt), V _ _ -> pure $ Value $ propertytype2string pt
+    ContextKind, CT ct -> unsafeCoerce contextTypeModelName' ct
+    RoleKind, RT rt ->  unsafeCoerce roleTypeModelName' rt
+  pure $ a {head = V "ModelNameF" result}
 
-interpret (SQD dom (DataTypeGetter ModelNameF) _ _ _) a = throwError (error $ "No implementation in Perspectives.Query.Interpreter for ModelNameF")
+interpret (SQD dom (Constant range value) _ _ _) a = pure a {head = V "ConstantF" (Value value)}
 
-interpret (SQD dom (Constant range value) _ _ _) a = throwError (error $ "No implementation in Perspectives.Query.Interpreter for RoleTypesF")
+interpret (SQD dom (RoleIndividual individual) _ _ _) a = ArrayT do
+  mi <- lift $ lookupIndexedRole (unwrap individual)
+  case mi of
+    Nothing -> pure [a]
+    Just i -> pure $ [consOnMainPath (R i) a]
 
-interpret (SQD dom (RoleIndividual individual) _ _ _) a = throwError (error $ "No implementation in Perspectives.Query.Interpreter for RoleIndividual")
+interpret (SQD dom (VariableLookup varName) range _ _) a = do
+  -- the lookup function ignores its second argument.
+  r <- lookup varName "ignore"
+  -- We do not need to record the dependencies of the computation behind the variable,
+  -- as we recorded them before actually storing the result in the variable.
+  pure a {head = domain2Dependency range r}
 
-interpret (SQD dom (VariableLookup varName) range _ _) a = throwError (error $ "No implementation in Perspectives.Query.Interpreter for VariableLookup")
-
-interpret qfd a = case uncons a of
-  Nothing -> pure Nil
-  Just {head, tail} -> case head of
+interpret qfd a = case a.head of
     -----------------------------------------------------------
     -- ContextInstance
     -----------------------------------------------------------
     (C cid) -> case qfd of
       (SQD _ (RolGetter (ENR (EnumeratedRoleType r))) _ _ _) -> if
         isExternalRole r
-          then (flip Cons a) <<< R <$> externalRole cid
-          else (flip Cons a) <<< R <$> getEnumeratedRoleInstances (EnumeratedRoleType r) cid
+          then (flip consOnMainPath a) <<< R <$> externalRole cid
+          else (flip consOnMainPath a) <<< R <$> getEnumeratedRoleInstances (EnumeratedRoleType r) cid
       (SQD _ (RolGetter (CR cr)) _ _ _) -> do
         (ct :: CalculatedRole) <- lift $ lift $ getPerspectType cr
         (lift $ lift $ calculation ct) >>= flip interpret a
-      (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) -> (flip Cons a) <<< R <$> externalRole cid
-      (SQD _ (TypeGetter TypeOfContextF) _ _ _) -> (flip Cons a) <<< CT <$> contextType cid
+      (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) -> (flip consOnMainPath a) <<< R <$> externalRole cid
+      (SQD _ (TypeGetter TypeOfContextF) _ _ _) -> (flip consOnMainPath a) <<< CT <$> contextType cid
 
       otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
 
@@ -225,16 +307,17 @@ interpret qfd a = case uncons a of
     -- RoleInstance
     -----------------------------------------------------------
     dep@(R rid) -> case qfd of
-      (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) -> getDynamicPropertyGetter pt roleAdt rid >>= \leadingDependencies -> do
-        -- the leadingDependencies end with (R rid)
-        pure (leadingDependencies <> tail)
+      (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) -> getDynamicPropertyGetter pt roleAdt rid >>= \(leadingDependencies :: DependencyPath) -> do
+        -- the leadingDependencies end with (R rid). Append the mainPath of a to the mainPath of leadingDependencies
+        -- and add all supportingPaths of a to those of leadingDependencies.
+        pure $ a #>> leadingDependencies
 
       (SQD _ (PropertyGetter (CP pt)) _ _ _) -> do
         (cp :: CalculatedProperty) <- lift2MPQ $ getPerspectType pt
         (lift2MPQ $ PC.calculation cp) >>= flip interpret a
-      (SQD _ (DataTypeGetter ContextF) _ _ _) -> (flip Cons a) <<< C <$> context rid
-      (SQD _ (DataTypeGetter BindingF) _ _ _) -> (flip Cons a) <<< R <$> binding rid
-      (SQD _ (DataTypeGetterWithParameter GetRoleBindersF parameter) _ _ _ ) -> (flip Cons a) <<< R <$> getRoleBinders (EnumeratedRoleType parameter) rid
+      (SQD _ (DataTypeGetter ContextF) _ _ _) -> (flip consOnMainPath a) <<< C <$> context rid
+      (SQD _ (DataTypeGetter BindingF) _ _ _) -> (flip consOnMainPath a) <<< R <$> binding rid
+      (SQD _ (DataTypeGetterWithParameter GetRoleBindersF parameter) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getRoleBinders (EnumeratedRoleType parameter) rid
 
       otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
 
@@ -243,8 +326,8 @@ interpret qfd a = case uncons a of
     -----------------------------------------------------------
     (V _ val) -> case qfd of
 
-      -- TODO
-      (SQD dom (Value2Role _) _ _ _) -> throwError (error $ "Perspectives.Query.Interpreter: no implementation for Value2Role")
+      -- We merely change the type of the head from Value to a RoleInstance.
+      (SQD dom (Value2Role _) _ _ _) -> pure a {head = R $ RoleInstance $ unwrap $ unsafePartial dependencyToValue a.head}
 
 
       otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
@@ -253,15 +336,15 @@ interpret qfd a = case uncons a of
     -- ContextKind
     -----------------------------------------------------------
     (CT contextType) -> case qfd of
+      (SQD _ (TypeGetter RoleTypesF) _ _ _) -> (flip consOnMainPath a) <<< RT <$> (liftToInstanceLevel allRoleTypesInContext) contextType
+
       otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
     -----------------------------------------------------------
-    -- ContextKind
+    -- RoleKind
     -----------------------------------------------------------
     (RT roleType) -> case qfd of
 
-      -- TODO
-      (SQD _ (DataTypeGetterWithParameter SpecialisesRoleTypeF parameter) _ _ _ ) -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for SpecialisesRoleTypeF " <> show parameter )
-      (SQD _ (TypeGetter RoleTypesF) _ _ _) -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for RoleTypesF.")
+      (SQD _ (DataTypeGetterWithParameter SpecialisesRoleTypeF parameter) _ _ _ ) -> (flip consOnMainPath a) <<< V "SpecialisesRoleType" <$> (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)) roleType)
 
       otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
 
@@ -269,19 +352,19 @@ toBool :: List Dependency -> Boolean
 toBool (Cons (V _ (Value s)) _) = s == "true"
 toBool _ = false
 
-toString :: List Dependency -> String
-toString (Cons (V _ (Value s)) _) = s
-toString (Cons (C (ContextInstance c)) _) = c
-toString (Cons (R (RoleInstance r)) _) = r
-toString (Cons (CT (ContextType r)) _) = r
-toString (Cons (RT (ENR (EnumeratedRoleType r))) _) = r
-toString (Cons (RT (CR (CalculatedRoleType r))) _) = r
-toString Nil = ""
+toString :: DependencyPath -> String
+toString {head} = case head of
+  (V _ (Value s)) -> s
+  (C (ContextInstance c)) -> c
+  (R (RoleInstance r)) -> r
+  (CT (ContextType r)) -> r
+  (RT (ENR (EnumeratedRoleType r))) -> r
+  (RT (CR (CalculatedRoleType r))) -> r
 
 -- | From a string that represents either a Calculated or an Enumerated property,
 -- | for a given abstract datatype of roles, retrieve the values from a role instance.
--- | Returns a List with (R roleId) as its last dependency, (V "SomeProperty" "value") as its first dependency.
-getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> RoleInstance ~~> List Dependency
+-- | Returns a DependencyPath with (R roleId) as the last dependency in the mainPath, (V "SomeProperty" "value") as its head.
+getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> RoleInstance ~~> DependencyPath
 getDynamicPropertyGetter p adt rid = do
   (pt :: PropertyType) <- lift2MPQ $ getProperType p
   allProps <- lift2MPQ $ allLocallyRepresentedProperties adt
@@ -290,25 +373,53 @@ getDynamicPropertyGetter p adt rid = do
     else f rid
 
   where
-    f :: RoleInstance ~~> List Dependency
+    f :: RoleInstance ~~> DependencyPath
     f roleInstance = do
       (bnd :: Maybe RoleInstance) <- lift2MPQ $ binding_ roleInstance
       case bnd of
         Nothing -> empty
         Just bnd' -> do
           (bndType :: EnumeratedRoleType) <- lift2MPQ $ roleType_ bnd'
-          (flip snoc (R roleInstance)) <$> getDynamicPropertyGetter p (ST bndType) bnd'
+          (flip snocOnMainPath (R roleInstance)) <$> getDynamicPropertyGetter p (ST bndType) bnd'
 
 -- | From a PropertyType, retrieve or construct a function to get values for that Property from a Role instance.
 -- | Returns a List with (R roleId) as its last dependency, (V "SomeProperty" "value") as its first dependency.
-getterFromPropertyType :: PropertyType -> RoleInstance ~~> List Dependency
-getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) roleId = (flip Cons (singleton $ R roleId)) <<< V id <$> getProperty ep roleId
+getterFromPropertyType :: PropertyType -> RoleInstance ~~> DependencyPath
+getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) roleId = (flip consOnMainPath (singletonPath $ R roleId)) <<< V id <$> getProperty ep roleId
 getterFromPropertyType (CP cp@(CalculatedPropertyType id)) roleId =
   (lift $ lift $ getPerspectType cp) >>=
     lift <<< lift <<< PC.calculation >>=
       \calc -> do
         old <- lift $ lift $ pushFrame
         lift $ lift (addBinding "currentrole" [unwrap roleId])
-        r <- interpret calc (Cons (R roleId) Nil)
+        r <- interpret calc (singletonPath (R roleId))
         lift $ lift $ restoreFrame old
         pure r
+
+
+unsafe1argFunction :: HiddenFunction -> String ~~> String
+unsafe1argFunction = unsafeCoerce
+
+unsafe2argFunction :: HiddenFunction -> Array String -> String ~~> String
+unsafe2argFunction = unsafeCoerce
+
+unsafe3argFunction :: HiddenFunction -> Array String -> Array String -> String ~~> String
+unsafe3argFunction = unsafeCoerce
+
+unsafe4argFunction :: HiddenFunction -> Array String -> Array String -> Array String -> String ~~> String
+unsafe4argFunction = unsafeCoerce
+
+unsafe5argFunction :: HiddenFunction -> Array String -> Array String -> Array String -> Array String -> String ~~> String
+unsafe5argFunction = unsafeCoerce
+
+first :: forall a. Array a -> a
+first = flip (unsafePartial unsafeIndex) 0
+
+second :: forall a. Array a -> a
+second = flip (unsafePartial unsafeIndex) 1
+
+third :: forall a. Array a -> a
+third = flip (unsafePartial unsafeIndex) 2
+
+fourth :: forall a. Array a -> a
+fourth = flip (unsafePartial unsafeIndex) 3

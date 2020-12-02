@@ -93,6 +93,7 @@ data PerspectivesError
     | WrongNumberOfArguments ArcPosition ArcPosition String Int Int
     | UnknownExternalFunction ArcPosition ArcPosition String
     | CannotFindContextType ArcPosition ArcPosition String
+    | NoPropertyTypeWithValue ArcPosition ArcPosition
 
     | UnauthorizedForProperty String RoleType EnumeratedRoleType EnumeratedPropertyType Verb
 
@@ -147,6 +148,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (WrongNumberOfArguments start end functionName nrExpected nrGiven) = "(WrongNumberOfArguments) The function '" <> functionName <> "' expects " <> show nrExpected <> " arguments but received " <> show nrGiven <> ", between " <> show start <> " and " <> show end
   show (UnknownExternalFunction start end functionName) = "(UnknownExternalFunction) The external function name '" <> functionName <> "' is unknown, between " <> show start <> " and " <> show end
   show (CannotFindContextType start end ctype) = "(CannotFindContextType) The context type name '" <> ctype <> "' cannot be resolved, between " <> show start <> " and " <> show end
+  show (NoPropertyTypeWithValue start end) = "(NoPropertyTypeWithValue) The property value computed by this expression is not associated with a Property Type (this throws up a problem in combination with, for example, `modelname`)"
   show (UnauthorizedForProperty author userRole role property verb) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> "."
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

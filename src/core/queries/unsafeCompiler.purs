@@ -32,7 +32,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
-import Data.Array (elemIndex, null, unsafeIndex)
+import Data.Array (elemIndex, null, unsafeIndex, head)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
@@ -48,11 +48,11 @@ import Perspectives.Instances.Combinators (available_, exists, logicalOperation,
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, binding_, binds, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, makeBoolean, roleModelName, roleType_)
-import Perspectives.Instances.Values (parseInt)
+import Perspectives.Instances.Values (parseInt, value2Int)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -64,11 +64,11 @@ import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.Range (Range(..)) as RAN
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||), (>>>))
+import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -102,6 +102,7 @@ compileFunction (SQD _ (DataTypeGetter IdentityF) _ _ _) = pure $ (pure <<< iden
 compileFunction (SQD dom (DataTypeGetter ModelNameF) _ _ _) = case dom of
   RDOM _ -> pure $ unsafeCoerce roleModelName
   CDOM _ -> pure $ unsafeCoerce contextModelName
+  VDOM _ (Just pt) -> pure \_ -> pure $ propertytype2string pt
   ContextKind -> pure $ unsafeCoerce contextTypeModelName'
   RoleKind -> pure $ unsafeCoerce roleTypeModelName'
   _ -> throwError (error $ "UnsaveCompiler: cannot retrieve modelname from " <> show dom)
@@ -112,17 +113,7 @@ compileFunction (SQD _ (TypeGetter RoleTypesF) _ _ _) = pure $ unsafeCoerce (lif
 
 compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ unsafeCoerce binding
 
-compileFunction (SQD dom Identity _ _ _) = case dom of
-  VDOM _ _ -> throwError (error "There is no identity function for value.")
-  -- otherwise -> pure \x -> ArrayT do -- goed
-    -- pure [x]
-  -- otherwise -> pure \x -> ArrayT (pure [x]) -- goed
-  otherwise -> pure \x -> pure x -- ook goed
-
-compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
-  VDOM _ _ -> throwError (error "There is no constant function for value.")
-  -- otherwise -> pure $ unsafeCoerce \x -> (pure (Value value) :: MPQ Value) -- ook goed
-  otherwise -> pure \_ -> pure value -- goed
+compileFunction (SQD dom (Constant range value) _ _ _) = pure \_ -> pure value
 
 -- compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ unsafeCoerce (\x -> lift $ lift $ maybe [] identity (lookupIndexedRole (unwrap individual)) :: MPQ RoleInstance)
 
@@ -230,6 +221,7 @@ compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) = do
   f2' <- compileFunction f2
   pure $ Combinators.conjunction f1' f2'
 
+-- The compiler only allows f1 and f2 if they're functional.
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [EqualsF, NotEqualsF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
@@ -238,6 +230,9 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
+  -- NOTE. We now order the string representations of the values. This is OK
+  -- for PString, PNumber, PDate and PBool.
+  -- Check for each new type added to Range in Perspectives.Representation.Range.
   pure $ order f1' f2' (unsafePartial $ orderFunction g)
 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [AndF, OrF] = do
@@ -249,10 +244,7 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
-  pure $ \c -> do
-    (a' :: Value) <- unsafeCoerce $ f1' c
-    (b' :: Value) <- unsafeCoerce $ f2' c
-    (unsafeCoerce $ unsafePartial $ mapNumericOperator g ran) a' b'
+  pure $ performNumericOperation g ran f1' f2' (unsafeCoerce $ unsafePartial $ mapNumericOperator g ran)
 
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
@@ -298,6 +290,7 @@ compileFunction qd = throwError (error $ "Cannot create a function out of '" <> 
 -- We handle no results for the two ObjectGetters as follows:
 --  * if both are empty, the result is true
 --  * if one of them is empty, the result is false.
+--  * because we know both a and b are functional, we just compare the first elements.
 compare :: forall a. Eq a =>
   (a ~~> a) ->
   (a ~~> a) ->
@@ -342,6 +335,10 @@ lookup varName _ = ArrayT do
 ---------------------------------------------------------------------------------------------------
 -- ORDERING
 ---------------------------------------------------------------------------------------------------
+-- | `order` follows the same pattern as `logicalOperation` and `compare`, but does
+-- | not have to deal with missing arguments in the same way. These functions, dealing
+-- | with Booleans, map a missing operator on a `false` result. That we cannot do for
+-- | ordering. Hence we return an empty result if one or both arguments are missing.
 order :: (String ~~> String) -> (String ~~> String) -> (String -> String -> Boolean) -> String ~~> String
 order a b f c = (show <$> (f <$> a c <*> b c))
 
@@ -356,15 +353,56 @@ mapLogicalOperator :: Partial => FunctionName -> (Value -> Value -> Value)
 mapLogicalOperator AndF = wrapLogicalOperator (&&)
 mapLogicalOperator OrF = wrapLogicalOperator (||)
 
+------------------------------------------------------------------------------------
+-- NUMERIC OPERATIONS
+------------------------------------------------------------------------------------
+-- | Just for Addition, Subtraction (on Strings and Integers), Multiplication and
+-- | Division (just on Integers).
+performNumericOperation ::
+  FunctionName ->
+  Range ->
+  (String ~~> String) ->
+  (String ~~> String) ->
+  (String -> String -> String) ->
+  (String ~~> String)
+performNumericOperation g ran a b f c = ArrayT do
+  (as :: Array String) <- runArrayT (a c)
+  (bs :: Array String) <- runArrayT (b c)
+  pure $ performNumericOperation' g ran as bs f
+
+performNumericOperation' ::
+  FunctionName ->
+  Range ->
+  Array String ->
+  Array String ->
+  (String -> String -> String) -> (Array String)
+performNumericOperation' g ran as bs f = do
+  case head as, head bs of
+    Just a1, Just b1 -> do
+      [f a1 b1]
+    Nothing, Just b1 -> case g of
+      -- Just return fr2
+      AddF -> [b1]
+      -- Subtract the second value from the first means: negate it, when a number.
+      SubtractF -> case ran of
+        VDOM RAN.PNumber _ -> [ show (0 - (unsafeCoerce value2Int b1)) ]
+        otherwise -> []
+      otherwise -> []
+    Just a1, Nothing -> case g of
+      AddF -> [a1]
+      SubtractF -> [a1]
+      otherwise -> []
+    _, _ -> []
+
 mapNumericOperator :: Partial => FunctionName -> Domain -> (Value -> Value ~~> Value)
-mapNumericOperator AddF (VDOM PNumber _) = wrapNumericOperator (+)
-mapNumericOperator AddF (VDOM PString _) = \(Value s1) (Value s2) -> pure (Value $ s1 <> s2)
-mapNumericOperator SubtractF (VDOM PNumber _) = wrapNumericOperator (-)
-mapNumericOperator SubtractF (VDOM PString _) = \v1@(Value s1) (Value s2) -> case (Pattern s1) `stripSuffix` s2 of
+mapNumericOperator AddF (VDOM RAN.PNumber _) = wrapNumericOperator (+)
+mapNumericOperator AddF (VDOM RAN.PString _) = \(Value s1) (Value s2) -> pure (Value $ s1 <> s2)
+mapNumericOperator SubtractF (VDOM RAN.PNumber _) = wrapNumericOperator (-)
+mapNumericOperator SubtractF (VDOM RAN.PString _) = \v1@(Value s1) (Value s2) -> case (Pattern s1) `stripSuffix` s2 of
   Nothing -> pure v1
   Just r -> pure $ Value r
-mapNumericOperator DivideF (VDOM PNumber _) = wrapNumericOperator (/)
-mapNumericOperator MultiplyF (VDOM PNumber _) = wrapNumericOperator (*)
+mapNumericOperator DivideF (VDOM RAN.PNumber _) = wrapNumericOperator (/)
+mapNumericOperator MultiplyF (VDOM RAN.PNumber _) = wrapNumericOperator (*)
 
 wrapNumericOperator :: (Int -> Int -> Int) -> (Value -> Value ~~> Value)
 wrapNumericOperator g (Value p) (Value q) = (Value <<< show) <$> (g <$> (lift $ parseInt p) <*> (lift $ parseInt q))

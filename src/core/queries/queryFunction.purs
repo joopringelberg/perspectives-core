@@ -129,7 +129,6 @@ data QueryFunction
   | VariableLookup VariableName
   | BindVariable VariableName
   | AssignmentOperator FunctionName
-  | Identity
   | WithFrame
 
   | TypeGetter FunctionName

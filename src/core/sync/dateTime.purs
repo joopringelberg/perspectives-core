@@ -29,7 +29,7 @@ import Data.Time.Duration (Milliseconds(..))
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (class PrettyPrint)
-import Prelude (class Show, pure, show, ($), (>>=), (<>))
+import Prelude (class Ord, class Show, class Eq, pure, show, ($), (<>), (>>=))
 
 -----------------------------------------------------------
 -- DATETIME
@@ -51,3 +51,6 @@ instance decodeSerializableDateTime :: Decode SerializableDateTime where
 
 instance prettyPrintSerializableDateTime :: PrettyPrint SerializableDateTime where
   prettyPrint' t = show
+
+derive instance eqSerializableDateTime :: Eq SerializableDateTime
+derive instance ordSerializableDateTime :: Ord SerializableDateTime

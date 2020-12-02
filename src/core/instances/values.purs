@@ -24,16 +24,24 @@ module Perspectives.Instances.Values where
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
 import Control.Monad.Error.Class (class MonadError, throwError)
+import Control.Monad.Except (runExceptT)
 import Data.DateTime (DateTime)
-import Data.Either (Either(..))
+import Data.DateTime.Instant (fromDateTime, unInstant)
+import Data.Either (Either(..), either, fromRight)
 import Data.JSDate (JSDate, parse, toDateTime)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (Error, error, try)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
 import Effect.Unsafe (unsafePerformEffect)
-import Prelude (bind, ($), pure, (<>), show)
+import Foreign (readInt, unsafeToForeign)
+import Foreign.Class (decode)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.Representation.InstanceIdentifiers (Value(..))
+import Perspectives.Sync.DateTime (SerializableDateTime(..))
+import Prelude (bind, ($), pure, (<>), show, (<<<))
 
 -- TODO. We gebruiken hier Error, het javascript error type. Liever zou ik een
 -- PerspectivesRuntimeError type gebruiken. Maar dan moeten we MonadPerspectives aanpassen.
@@ -57,3 +65,47 @@ parseInt s = do
   case r of
     Left e -> throwError (error $ "Cannot parse an integer from '" <> s <> "' (" <> show e <> ")")
     Right i -> pure i
+
+-------------------------------------------------------------------------------
+-- VALUE TO VARIOUS TYPES
+-------------------------------------------------------------------------------
+value2Int' :: Value -> Either Error Int
+value2Int' (Value is) = either
+  (Left <<< error <<< show)
+  Right
+  (unwrap $ runExceptT $ readInt $ unsafeToForeign is)
+
+-- | An UNSAFE operation!
+value2Int :: Value -> Int
+value2Int (Value is) = unsafePerformEffect $ parseInt_ is
+
+int2Value :: Int -> Value
+int2Value = Value <<< show
+
+value2Bool' :: Value -> Either Error Boolean
+value2Bool' (Value "true") = Right true
+value2Bool' (Value "false") = Right false
+value2Bool' x = Left $ error $ "value2Bool: not a boolean: " <> show x
+
+-- | An safe operation, but with subtly different semantics than value2Bool'.
+-- | Only (Value "true") is mapped to `true`; all other values are mapped to `false`.
+-- | However, value2Bool' will signal an error condition if the string is
+-- | is not the representation of a Boolean value.
+value2Bool :: Value -> Boolean
+value2Bool (Value "true") = true
+value2Bool _ = false
+
+bool2Value :: Boolean -> Value
+bool2Value = Value <<< show
+
+value2Date' :: Value -> Either Error SerializableDateTime
+value2Date' (Value dt) = case unwrap $ runExceptT $ decode $ unsafeToForeign dt of
+  Left el -> Left $ error ("value2Date: not a date: " <> show el)
+  Right d -> Right d
+
+-- | An UNSAFE operation!
+value2Date :: Value -> SerializableDateTime
+value2Date (Value dt) = unsafePartial $ fromRight $ unwrap $ runExceptT $ decode $ unsafeToForeign dt
+
+date2Value :: SerializableDateTime -> Value
+date2Value (SerializableDateTime sdt) = Value $ show (unwrap $ unInstant (fromDateTime sdt))

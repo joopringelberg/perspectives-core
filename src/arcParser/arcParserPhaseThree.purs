@@ -542,21 +542,21 @@ compileRules = do
                 pure $ UQD currentDomain QF.Remove rle currentDomain True True
               CreateRole {roleIdentifier, contextExpression, start, end} -> do
                 (cte :: QueryFunctionDescription) <- case contextExpression of
-                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                  Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
                   (Just stp) -> ensureContext subject currentDomain stp
                 qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
                 pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain True True
 
               CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
                 (cte :: QueryFunctionDescription) <- case contextExpression of
-                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                  Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
                   (Just stp) -> ensureContext subject currentDomain stp
                 qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
                 (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
                 pure $ UQD currentDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte currentDomain True True
 
               CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
-                cte <- pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                cte <- pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
                 roleQfd <- ensureRole subject currentDomain roleExpression
                 qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
                 pure $ UQD currentDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd currentDomain True True
@@ -564,7 +564,7 @@ compileRules = do
               Move {roleExpression, contextExpression} -> do
                 rle <- ensureRole subject currentDomain roleExpression
                 (cte :: QueryFunctionDescription) <- case contextExpression of
-                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                  Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
                   (Just (stp :: Step)) -> ensureContext subject currentDomain stp >>= ensureFunctional stp
                 pure $ BQD currentDomain QF.Move rle cte currentDomain True True
               Bind f@{bindingExpression, roleIdentifier, contextExpression} -> do
@@ -572,7 +572,7 @@ compileRules = do
                 -- bindingExpression should result in roles
                 (bindings :: QueryFunctionDescription) <- ensureRole subject currentDomain bindingExpression
                 (cte :: QueryFunctionDescription) <- case contextExpression of
-                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                  Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
                   (Just (stp :: Step)) -> ensureContext subject currentDomain stp
                 -- binderType should be an EnumeratedRoleType (local name should resolve w.r.t. the contextExpression)
                 (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
@@ -617,7 +617,7 @@ compileRules = do
 
               DeleteRole f@{roleIdentifier, contextExpression} -> do
                 (contextQfd :: QueryFunctionDescription) <- case contextExpression of
-                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                  Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
                   (Just stp) -> ensureContext subject currentDomain stp
                 (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier contextQfd f.start f.end
                 pure $ UQD currentDomain (QF.DeleteRole qualifiedRoleIdentifier) contextQfd currentDomain True True

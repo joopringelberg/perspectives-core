@@ -31,6 +31,7 @@ import Prelude (class Eq, class Show)
 -----------------------------------------------------------
 -- RANGE
 -----------------------------------------------------------
+-- | PDate is represented as SerializableDateTime.
 data Range = PString | PBool | PNumber | PDate
 
 derive instance genericRange :: Generic Range _

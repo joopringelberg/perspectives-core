@@ -23,14 +23,14 @@ module Perspectives.Instances.Combinators where
 
 import Control.Monad.Error.Class (class MonadError)
 import Control.Monad.Trans.Class (lift)
-import Control.MonadZero (guard)
+import Control.MonadZero (guard, map)
 import Data.Array (cons, elemIndex, foldM, foldMap, null, union)
 import Data.HeytingAlgebra (not, (&&)) as HA
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (class Newtype, ala, unwrap)
-import Perspectives.CoreTypes (MonadPerspectivesQuery)
+import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -160,8 +160,13 @@ available_ :: forall s.
   (s -> MonadPerspectivesQuery Value)
 available_ source id = ArrayT do
   r <- runArrayT $ source id
+  result <- lift $ available' r
+  pure $ [Value $ show result]
+
+available' :: Array String -> MonadPerspectives Boolean
+available' ids = do
   result <- foldM
-    (\allAvailable resId -> lift do
+    (\allAvailable resId -> do
       mr <- tryGetPerspectEntiteit (RoleInstance resId)
       case mr of
         Nothing -> do
@@ -171,8 +176,8 @@ available_ source id = ArrayT do
             otherwise -> pure allAvailable
         otherwise -> pure allAvailable)
     true
-    r
-  pure $ [Value $ show (result HA.&& (HA.not (null r)))]
+    ids
+  pure (result HA.&& (HA.not (null ids)))
 
 -- | Implements negation by failure in the sense that if the source returns no values, it is interpreted
 -- | as `false`, hence `not` returns `true`.
@@ -180,7 +185,10 @@ not :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->
   (s -> ArrayT m Value)
 not source id = ArrayT do
-  r <- runArrayT $ source id
-  if null r
-    then pure [Value "true"]
-    else pure $ (Value <<< show <<< ((==) (Value "false"))) <$> r
+  (r :: Array Value) <- runArrayT $ source id
+  map (Value <<< show) <$> not' r
+
+not' :: forall m. Monad m => Array Value -> m (Array Boolean)
+not' r = if null r
+  then pure [true]
+  else pure $ ((==) (Value "false")) <$> r

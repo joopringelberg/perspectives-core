@@ -27,7 +27,8 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.Partial (head) as PA
 import Data.Foldable (for_, traverse_)
-import Data.List (List(..), foldM, singleton)
+import Data.List.NonEmpty (foldM, head)
+import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (new)
@@ -46,7 +47,8 @@ import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
-import Perspectives.Query.Interpreter (Dependency(..), interpret)
+import Perspectives.Query.Interpreter (interpret)
+import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
 import Perspectives.Representation.Class.Role (adtOfRole, allProperties, getCalculation, getRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
@@ -55,7 +57,7 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..), createTransactie)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (actionObject, actionsClosure_, propsForObjectRole)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (>>=), (<<<), (<$>), (>=>), (*>), (<>), show, (==))
+import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor cid userId = do
@@ -111,9 +113,9 @@ serialisedAsDeltasFor_ cid userId userType = do
   for_ visibleRoleTypes
     \rt -> do
       -- All instances of this RoleType the user may see in this context.
-      (rinstances :: Array (List Dependency)) <- liftToMPT (cid ##= getRoleInstances rt)
+      (rinstances :: Array (DependencyPath)) <- liftToMPT (cid ##= getRoleInstances rt)
       -- Serialise all the dependencies.
-      for_ rinstances (foldM serialiseDependency Nothing)
+      for_ (join (allPaths <$> rinstances)) (foldM serialiseDependency Nothing)
       -- All PropertyTypes on this RoleType the user may see.
       (rProps :: RelevantProperties) <- liftToMPT $ propsForObjectRole rt userType
       (visiblePropertyTypes :: Array PropertyType) <- case rProps of
@@ -122,24 +124,23 @@ serialisedAsDeltasFor_ cid userId userType = do
       -- Compute all values and serialise the dependencies.
       for_ visiblePropertyTypes
         \pt -> do
-          for_ rinstances
-            \(depList :: List Dependency) -> do
-              (vals :: Array (List Dependency)) <- liftToMPT (depList ##= getPropertyValues pt)
-              for_ vals (foldM serialiseDependency Nothing)
+          for_ (join (allPaths <$> rinstances))
+            \(depList :: NonEmptyList Dependency) -> do
+              (vals :: Array DependencyPath) <- liftToMPT (depList ##= getPropertyValues pt)
+              for_ (join (allPaths <$> vals)) (foldM serialiseDependency Nothing)
       pure unit
   pure unit
 
   where
-    getRoleInstances :: RoleType -> (ContextInstance ~~> List Dependency)
+    getRoleInstances :: RoleType -> (ContextInstance ~~> DependencyPath)
     getRoleInstances rt c = do
       calc <- lift $ lift $ (getRole >=> getCalculation) rt
-      interpret calc (singleton (C c))
+      interpret calc (singletonPath (C c))
 
-    getPropertyValues :: PropertyType -> List Dependency ~~> List Dependency
-    getPropertyValues pt (Cons (R r) _) = do
+    getPropertyValues :: PropertyType -> NonEmptyList Dependency ~~> DependencyPath
+    getPropertyValues pt dl = do
       calc <- lift $ lift $ (PClass.getProperty >=> PClass.getCalculation) pt
-      interpret calc (singleton (R r))
-    getPropertyValues pt _ = pure Nil
+      interpret calc (singletonPath (head dl))
 
     -- Always returns the second argument in Maybe.
     serialiseDependency :: Maybe Dependency -> Dependency -> MonadPerspectivesTransaction (Maybe Dependency)
