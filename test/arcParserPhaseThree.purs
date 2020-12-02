@@ -477,7 +477,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                     case extractEffect effect of
                       (BQD _ (BinaryCombinator SequenceF) crea rem _ _ _) -> do
                           assert "There should be a CreateRole on Gast" (case crea of
-                            (UQD _ (CreateRole (EnumeratedRoleType "model:Test$Gast")) (SQD _ Identity _ _ _) _ _ _) -> true
+                            (UQD _ (CreateRole (EnumeratedRoleType "model:Test$Gast")) (SQD _ (DataTypeGetter IdentityF) _ _ _) _ _ _) -> true
                             otherwise -> false)
                           assert "There should be a Remove assignment on Gast" (case rem of
                             (UQD _ Remove (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$Gast"))) _ _ _) _ _ _) -> true
@@ -540,7 +540,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                         -- logShow rle
                         assert "The role to move should come from the current context, an instance of Company"
                           case cte of
-                            (SQD (CDOM (ST (ContextType "model:Test$Company"))) Identity _ _ _) -> true
+                            (SQD (CDOM (ST (ContextType "model:Test$Company"))) (DataTypeGetter IdentityF) _ _ _) -> true
                             otherwise -> false
                       otherwise -> assert "Side effect expected" false
                   Nothing -> assert "The effect should compile to a binary query function" false
@@ -879,8 +879,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                           (DeleteRole _) -> true
                           otherwise -> false )
                         case bndg of
-                          (SQD _ Identity _ _ _) ->
-                            assert "The binding should be Identity" true
+                          (SQD _ (DataTypeGetter IdentityF) _ _ _) ->
+                            assert "The binding should be (DataTypeGetter IdentityF)" true
                           otherwise -> assert "The binding should be a rolgetter" false
                       otherwise -> assert "Side effect expected" false
                   Nothing -> assert "The effect should compile to a binary query function" false

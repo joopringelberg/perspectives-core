@@ -186,7 +186,7 @@ compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
             Nothing -> throwError $ UnknownRole pos roleName
             (Just qn) | length qnames == 1 -> pure qn
             otherwise -> throwError $ NotUniquelyIdentifying pos roleName (map unwrap qnames)
-      pure $ SQD currentDomain (QF.DataTypeGetterWithParameter SpecialisesRoleTypeF (unwrap qRoleName)) (VDOM PBool Nothing) False False
+      pure $ SQD currentDomain (QF.DataTypeGetterWithParameter SpecialisesRoleTypeF (unwrap qRoleName)) (VDOM PBool Nothing) (isFunctionalFunction SpecialisesRoleTypeF) False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Extern pos) = do

@@ -268,6 +268,7 @@ propsForObjectRole objectRole userRole' = do
 -- | The result must be all role types that, indeed, specialise SomeRole.
 -- | hence in the QueryCompiler, we flip `specialisesRoleType`, so we can apply it to SomeRole first
 -- | and it is still bound to the second parameter.
+-- | This function yields a single result (it is functional in PL)
 specialisesRoleType :: RoleType -> (RoleType ~~~> Value)
 specialisesRoleType t1 t2 = lift do
   t1' <- typeIncludingAspects t1
