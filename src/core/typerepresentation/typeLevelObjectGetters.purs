@@ -23,16 +23,19 @@ module Perspectives.Types.ObjectGetters where
 
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (elemIndex, filter, findIndex, fold, intersect, null, singleton)
+import Data.Array (cons, elemIndex, filter, findIndex, fold, foldl, intersect, null, singleton)
 import Data.List (toUnfoldable)
 import Data.Map.Internal (keys) as MAP
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
+import Data.String.Regex (test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (fromFoldable, keys, lookup, values)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (areLastSegmentsOf, deconstructLocalName_, deconstructModelName, endsWithSegments)
@@ -100,12 +103,23 @@ contextRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives C
 userRole :: ContextType ~~~> RoleType
 userRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< ContextClass.userRole)
 
--- | Returns RoleTypes that are guaranteed to be Enumerated.
+-- | Returns User RoleTypes that are guaranteed to be Enumerated.
 enumeratedUserRole :: ContextType ~~~> RoleType
 enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< filter isEnumerated <<< ContextClass.userRole)
   where
+    isEnumerated :: RoleType -> Boolean
     isEnumerated (ENR _) = true
     isEnumerated (CR _) = false
+
+-- | Returns all Enumerated role types in the context
+allEnumeratedRoles :: ContextType ~~~> EnumeratedRoleType
+allEnumeratedRoles ct = ArrayT do
+  rs <- runArrayT $ allRoleTypesInContext ct
+  pure $ foldl f [] rs
+  where
+    f :: Array EnumeratedRoleType -> RoleType -> Array EnumeratedRoleType
+    f roles (ENR r) = cons r roles
+    f roles _ = roles
 
 allRoleTypesInContext :: ContextType ~~~> RoleType
 allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole userRole'
@@ -176,6 +190,10 @@ hasAspect aspect roleType = ArrayT do
   aspects <- roleType ###= aspectsClosure
   pure [isJust $ findIndex ((==) aspect) aspects]
 
+hasAspectWithLocalName :: String -> (EnumeratedRoleType ~~~> Boolean)
+hasAspectWithLocalName localAspectName roleType = ArrayT do
+  aspects <- roleType ###= aspectsClosure
+  pure [isJust $ findIndex (test (unsafeRegex (localAspectName <> "$") noFlags)) (unwrap <$> aspects)]
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR ACTIONS
 ----------------------------------------------------------------------------------------
@@ -287,6 +305,11 @@ roleTypeModelName rt = maybe empty (pure <<< Value) (deconstructModelName (rolet
 
 roleTypeModelName' :: RoleType ~~> Value
 roleTypeModelName' rt = maybe empty (pure <<< Value) (deconstructModelName (roletype2string rt))
+
+-- | For a given context type, find the locally defined Enumerated role type that has an aspect role
+-- | whose local name is the first parameter value.
+localRoleSpecialisation :: String -> ContextType ~~~> EnumeratedRoleType
+localRoleSpecialisation localAspectName = COMB.filter allEnumeratedRoles (hasAspectWithLocalName localAspectName) 
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS AND ON VIEWS

@@ -47,7 +47,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..
 import Perspectives.Assignment.Update (deleteProperty, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, (##=), (##>))
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), type (~~>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
@@ -70,7 +70,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransac
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeRoleInstance, removeContextIfUnbound)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
+import Perspectives.Types.ObjectGetters (localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Perspectives.User (getSystemIdentifier)
 import Prelude (Unit, bind, discard, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -252,6 +252,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case roleKind of
         ContextRole -> registerSupportedEffect corrId setter (map toRoleType_ <<< (binding >=> context >=> getMyType)) (RoleInstance subject)
         otherwise -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
+    -- { request: "GetLocalRoleSpecialisation", subject: contextInstance, predicate: localAspectName}
+    Api.GetLocalRoleSpecialisation -> registerSupportedEffect corrId setter (contextType >=> (liftToInstanceLevel $ localRoleSpecialisation predicate)) (ContextInstance subject)
     Api.GetUserIdentifier -> do
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
