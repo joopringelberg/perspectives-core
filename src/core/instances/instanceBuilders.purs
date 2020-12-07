@@ -70,7 +70,7 @@ import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedP
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType)
 import Perspectives.SaveUserData (setBinding)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -84,8 +84,8 @@ import Prelude (Unit, bind, discard, flip, not, pure, unit, void, ($), (&&), (*>
 -- | calls addRoleInstancesToContext on the role instances.
 -- | This function is complete w.r.t. the five responsibilities, for the context and its roles.
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
-constructContext :: ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
-constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
+constructContext :: Maybe RoleType -> ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
+constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
   contextInstanceId <- ContextInstance <$> (lift $ lift2 $ expandDefaultNamespaces id)
   case (deconstructLocalName $ unwrap contextInstanceId) of
     Nothing -> throwError (NotWellFormedName upperLeft (unwrap contextInstanceId))
@@ -95,7 +95,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
         Just _ -> pure contextInstanceId
         Nothing -> do
           -- RULE TRIGGERING
-          PerspectContext{universeContextDelta, buitenRol} <- constructEmptyContext contextInstanceId ctype localName externeProperties
+          PerspectContext{universeContextDelta, buitenRol} <- constructEmptyContext contextInstanceId ctype localName externeProperties mbindingRoleType
           -- Get the number of deltas in the transaction. Insert the
           -- UniverseContextDelta and the UniverseRoleDelta after that point.
           i <- lift deltaIndex
@@ -170,8 +170,8 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
 -- | SYNCHRONISATION by RolePropertyDelta.
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
-constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction PerspectContext
-constructEmptyContext contextInstanceId ctype localName externeProperties = do
+constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> Maybe RoleType -> ExceptT PerspectivesError MonadPerspectivesTransaction PerspectContext
+constructEmptyContext contextInstanceId ctype localName externeProperties authorizedRole = do
   externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
   pspType <- ContextType <$> (lift $ lift2 $ expandDefaultNamespaces ctype)
   author <- lift $ getAuthor
@@ -205,6 +205,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties = do
               { id: contextInstanceId
               , roleInstances: (SNEA.singleton externalRole)
               , roleType: EnumeratedRoleType (unwrap pspType <> "$External")
+              , authorizedRole
               , deltaType: ConstructExternalRole
               , subject } }
       })
@@ -294,6 +295,7 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
             { id: contextInstance
             , roleInstances: (SNEA.singleton rolInstanceId)
             , roleType
+            , authorizedRole: Nothing
             , deltaType: ConstructEmptyRole
             , subject } }
     })

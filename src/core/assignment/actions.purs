@@ -55,7 +55,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
-import Perspectives.Instances.ObjectGetters (getConditionState, setConditionState)
+import Perspectives.Instances.ObjectGetters (getConditionState, roleType_, setConditionState)
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
@@ -68,7 +68,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (RoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (removeAllRoleInstances, handleNewPeer, removeRoleInstance, setBinding, removeBinding)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -161,7 +161,7 @@ compileAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualif
     for_ ctxts \ctxt -> do
       -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
       g <- liftEffect guid
-      newContext <- runExceptT $ constructContext (ContextSerialization defaultContextSerializationRecord
+      newContext <- runExceptT $ constructContext (Just $ ENR qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
         { id = "model:User$c" <> (show g)
         , ctype = unwrap qualifiedContextTypeIdentifier
         })
@@ -176,9 +176,10 @@ compileAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) role
     roles <- lift2 (contextId ##= roleGetter)
     for_ roles \roleInstance -> do
       -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
+      rtype <- lift2 $ roleType_ roleInstance
       g <- liftEffect guid
       newContextId <- pure $ "model:User$c" <> (show g)
-      newContext <- runExceptT $ constructContext (ContextSerialization defaultContextSerializationRecord
+      newContext <- runExceptT $ constructContext (Just $ ENR rtype) (ContextSerialization defaultContextSerializationRecord
         { id = newContextId
         , ctype = unwrap qualifiedContextTypeIdentifier
         })

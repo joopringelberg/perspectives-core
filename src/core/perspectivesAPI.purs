@@ -31,7 +31,7 @@ import Control.Plus ((<|>))
 import Data.Array (elemIndex, head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
@@ -47,7 +47,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..
 import Perspectives.Assignment.Update (deleteProperty, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), type (~~>))
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
@@ -265,10 +265,10 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         (CR embeddingctype) -> do
           isDBQ <- isDatabaseQueryRole embeddingctype
           if isDBQ
-            then withNewContext authoringRole
+            then withNewContext authoringRole (Just qrolname)
               \(ContextInstance id) -> lift2 $ sendResponse (Result corrId [buitenRol id]) setter
             else sendResponse (Error corrId (predicate <> " is Calculated but not a Database Query Role!")) setter
-        (ENR eroltype) -> withNewContext authoringRole
+        (ENR eroltype) -> withNewContext authoringRole (Just qrolname)
           \(ContextInstance id) ->  do
             -- now bind it in a new instance of the roletype in the given context.
             -- TODO vang de nieuwe contextrol op en geef die (ook) terug?
@@ -278,17 +278,21 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
               , binding: Just $ buitenRol id })
             lift2 $ sendResponse (Result corrId [buitenRol id, unwrap contextRole]) setter
     -- {request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype}
-    Api.CreateContext_ -> withNewContext authoringRole
-      \(ContextInstance id) -> do
-        -- now bind it in the role instance.
-        void $ setBinding (RoleInstance subject) (RoleInstance $ buitenRol id) Nothing
-        handleNewPeer (RoleInstance subject)
-        lift2 $ sendResponse (Result corrId [buitenRol id]) setter
+    Api.CreateContext_ -> do
+      rtype <- roleType_ (RoleInstance subject)
+      withNewContext authoringRole (Just $ ENR rtype)
+        \(ContextInstance id) -> do
+          -- now bind it in the role instance.
+          void $ setBinding (RoleInstance subject) (RoleInstance $ buitenRol id) Nothing
+          handleNewPeer (RoleInstance subject)
+          lift2 $ sendResponse (Result corrId [buitenRol id]) setter
     Api.ImportTransaction -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) TransactionForPeer) -> sendResponse (Error corrId (show e)) setter
       (Right tfp@(TransactionForPeer _)) -> do
         executeTransaction tfp
         sendResponse (Result corrId []) setter
+    -- TODO/NOTE that we cannot provide a context role type that will bind these contexts.
+    -- This can only be correct if the contexts have the aspect RootContext.
     Api.ImportContexts -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextsSerialisation ctxts) :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> void $
@@ -296,7 +300,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           result <- runExceptT $ traverse
             (\ctxt@(ContextSerialization{ctype}) -> do
               lift $ loadModelIfMissing $ unsafeDeconstructModelName ctype
-              constructContext ctxt)
+              constructContext Nothing ctxt)
             ctxts
           case result of
             Left e -> lift2 $ sendResponse (Error corrId (show e)) setter
@@ -307,10 +311,10 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         -- now we must have a predicate and an object.
         then withLocalName predicate (ContextType object)
           \(qrolname :: RoleType) -> case qrolname of
-            (CR ctype) -> do
+            cr@(CR ctype) -> do
               isDBQ <- isDatabaseQueryRole ctype
               if isDBQ
-                then void $ runMonadPerspectivesTransaction authoringRole $ removeContextIfUnbound (RoleInstance subject) true
+                then void $ runMonadPerspectivesTransaction authoringRole $ removeContextIfUnbound (RoleInstance subject) (Just cr)
                 else sendResponse (Error corrId ("Cannot remove an external role from non-database query role " <> (unwrap ctype))) setter
             (ENR rtype) -> sendResponse (Error corrId ("Cannot remove an external role from enumerated role " <> (unwrap rtype) <> " - use unbind instead!")) setter
         else do
@@ -404,13 +408,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             Nothing -> sendResponse (Error corrId ("Cannot find Rol with name '" <> localRoleName <> "' on context type '" <> unwrap contextType <> "'!")) setter
             (Just (qrolname :: RoleType)) -> effect qrolname
 
-    withNewContext :: RoleType -> (ContextInstance -> MonadPerspectivesTransaction Unit) -> MonadPerspectives Unit
-    withNewContext authoringRole effect = case unwrap $ runExceptT $ decode contextDescription of
+    withNewContext :: RoleType -> (Maybe RoleType) -> (ContextInstance -> MonadPerspectivesTransaction Unit) -> MonadPerspectives Unit
+    withNewContext authoringRole mroleType effect = case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd@{ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
         void $ runMonadPerspectivesTransaction authoringRole do
           g <- liftEffect guid
-          ctxt <- runExceptT $ constructContext (ContextSerialization cd {id = "model:User$c" <> (show g)})
+          ctxt <- runExceptT $ constructContext mroleType (ContextSerialization cd {id = "model:User$c" <> (show g)})
           case ctxt of
             (Left messages) -> lift2 $ sendResponse (Error corrId (show messages)) setter
             (Right ctxtId) -> effect ctxtId

@@ -74,7 +74,7 @@ import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPers
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -124,17 +124,17 @@ iedereRolInContext :: PerspectContext -> Array RoleInstance
 iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 
 -- Only called when the external role is also 'bound' in a DBQ role.
-removeContextIfUnbound :: RoleInstance -> Boolean -> MonadPerspectivesTransaction Unit
-removeContextIfUnbound roleInstance@(RoleInstance rid) wasBoundInDBQRole = do
+removeContextIfUnbound :: RoleInstance -> Maybe RoleType ->  MonadPerspectivesTransaction Unit
+removeContextIfUnbound roleInstance@(RoleInstance rid) ctype = do
   mbinder <- lift (lift (roleInstance ##> allRoleBinders))
   case mbinder of
-    Nothing -> removeContextInstance (ContextInstance $ deconstructBuitenRol rid) wasBoundInDBQRole
+    Nothing -> removeContextInstance (ContextInstance $ deconstructBuitenRol rid) ctype
     otherwise -> pure unit
 
 -- | Removes the ContextInstance both from the cache and from the database.
 -- | This function is complete w.r.t. the five responsibilities (ignoring CURRENTUSER).
-removeContextInstance :: ContextInstance -> Boolean -> MonadPerspectivesTransaction Unit
-removeContextInstance id wasBoundInDBQRole = do
+removeContextInstance :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
+removeContextInstance id authorizedRole = do
   (ctxt@(PerspectContext{pspType})) <- lift $ lift $ getPerspectContext id
   externalRoleType <- pure (EnumeratedRoleType ((unwrap pspType) <> "$External"))
   -- RULE TRIGGERING and QUERY UPDATES.
@@ -146,20 +146,17 @@ removeContextInstance id wasBoundInDBQRole = do
   -- SYNCHRONISATION
   subject <- getSubject
   me <- getAuthor
+  -- (roleType ###>> hasAspect (EnumeratedRoleType "sys:RootContext$External"))
   addDelta $ DeltaInTransaction
     { users
     , delta: SignedDelta
         { author: me
-        -- DIT MOET EEN UNIVERSEROLEDELTA WORDEN! MAAK EEN GEVALSONDERSCHEIDING OP BASIS VAN DBQ
-        -- If the external role was 'bound' in a DBQ role, add a UniverseRoleDelta in which
-        --    * deltaType is RemoveUnboundExternalRoleInstance
-        -- If the external role was bound in an EnumeratedRole, add a UniverseRoleDelta in which
-        --    * deltaType is RemoveExternalRoleInstance
         , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
           { id
           , roleType: externalRoleType
+          , authorizedRole
           , roleInstances: SNEA.singleton (context_buitenRol ctxt)
-          , deltaType: if wasBoundInDBQRole then RemoveUnboundExternalRoleInstance else RemoveExternalRoleInstance
+          , deltaType: if isJust authorizedRole then RemoveUnboundExternalRoleInstance else RemoveExternalRoleInstance
           , subject
           }}}
 
@@ -325,7 +322,9 @@ setBinding_ roleId (newBindingId :: RoleInstance) msignedDelta = do
 
       oldBinding'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
       if (isEmpty gevuldeRollen && isExternalRole (unwrap oldBindingId))
-        then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap oldBindingId)) false
+        -- Pass on the contextrole type or Nothing. It is an external role, so the binding role is a contextrole.
+        -- So we pass on the type
+        then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap oldBindingId)) (Just $ ENR (rol_pspType originalRole))
         else cacheAndSave oldBindingId oldBinding'
 
       -- if the oldBinding has isMe and the new binding has not, than remove me from the context.

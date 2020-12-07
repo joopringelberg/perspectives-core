@@ -154,6 +154,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
         { id: contextId
         , roleInstances: (SerializableNonEmptyArray rolInstances)
         , roleType: rolName
+        , authorizedRole: Nothing
         , deltaType: RemoveRoleInstance
         , subject } }}
 

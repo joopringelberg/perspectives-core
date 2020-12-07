@@ -4,7 +4,7 @@ import model:System as sys
 import model:BrokerServices as bs
 
 bs:Model usr:BrokerServiceModel
-  extern sys:Model$External$Name = "Broker Services"
+  extern sys:RootContext$External$Name = "Broker Services"
   extern sys:Model$External$Description = "Manage any number of broker services and contracts."
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:BrokerServices"
   extern $ModelIdentification = "model:BrokerService"

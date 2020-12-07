@@ -100,7 +100,7 @@ theSuite = suite "ContextRoleParser" do
 
   test "me for a constructed context (isMe by implication)." $ runP $ withSystem do
     _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-    _ <- runMonadPerspectivesTransaction $ runExceptT $ constructContext $ ContextSerialization
+    _ <- runMonadPerspectivesTransaction $ runExceptT $ constructContext Nothing $ ContextSerialization
       { id: "model:User$MyTestCase$MyNestedCase4"
       , prototype: Nothing
       , ctype: "model:Test$TestCase$NestedCase"

@@ -51,7 +51,7 @@ import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (singleton)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
@@ -365,7 +365,7 @@ instance showArrow :: Show Arrow where
 roleBinding' ::
   QualifiedName ->
   Arrow ->
-  IP (Tuple (Array Comment) (Maybe RoleInstance)) ->
+  (QualifiedName -> IP (Tuple (Array Comment) (Maybe RoleInstance))) ->
   IP (Tuple RolName RoleInstance)
 roleBinding' cname arrow p = ("rolename => contextName" <??>
   (try do
@@ -376,7 +376,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
       occurrence <- sameLine *> optionMaybe (try roleOccurrence) -- The sequence number in text
       instanceName <- sameLine *> optionMaybe (try roleInstanceName)
       _ <- (sameLine *> reservedOp (show arrow))
-      (Tuple cmt bindng) <- p
+      (Tuple cmt bindng) <- p rname
       (props :: List (Tuple ID (Array Value))) <- withExtendedTypeNamespace localRoleName $
             option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       _ <- incrementRoleInstances (show rname)
@@ -394,6 +394,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         { subject: UserInstance $ RoleInstance me
         , id: ContextInstance $ show cname
         , roleType: EnumeratedRoleType $ show rname
+        , authorizedRole: Nothing
         , roleInstances: singleton rolId
         , deltaType: ConstructEmptyRole
         }
@@ -471,22 +472,22 @@ deltaSignedByMe_ me encryptedDelta = SignedDelta {author: me, encryptedDelta}
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.
 inlineContextBinding ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
-inlineContextBinding cName = roleBinding' cName ContextBinding do
+inlineContextBinding cName = roleBinding' cName ContextBinding \bindingRoleType -> do
   cmt <- inLineComment
   _ <- nextLine
-  (contextBuitenRol :: RoleInstance) <- indented *> context
+  (contextBuitenRol :: RoleInstance) <- indented *> context (Just $ ENR $ EnumeratedRoleType $ show bindingRoleType)
   pure $ Tuple cmt (Just contextBuitenRol)
 
 emptyBinding ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
-emptyBinding cName = roleBinding' cName ContextBinding do
+emptyBinding cName = roleBinding' cName ContextBinding \_ -> do
   _ <- token.parens whiteSpace
   cmt <- inLineComment
   pure $ Tuple cmt Nothing
 
 contextBindingByReference ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
-contextBindingByReference cName = roleBinding' cName ContextBinding do
+contextBindingByReference cName = roleBinding' cName ContextBinding \_ -> do
   ident <- (sameLine *> contextReference)
   cmt <- inLineComment
   pure $ Tuple cmt (Just $ RoleInstance ident)
@@ -498,7 +499,7 @@ contextBindingByReference cName = roleBinding' cName ContextBinding do
 
 roleBindingByReference ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
-roleBindingByReference cName = roleBinding' cName RoleBinding do
+roleBindingByReference cName = roleBinding' cName RoleBinding \_ -> do
   ident <- (sameLine *> rolReference)
   occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
   cmt <- inLineComment
@@ -511,7 +512,7 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
 
 indexedIndividualBinding ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
-indexedIndividualBinding cName = roleBinding' cName RoleBinding do
+indexedIndividualBinding cName = roleBinding' cName RoleBinding \_ -> do
   ident <- (sameLine *> (expandedName <|> prefixedContextName))
   cmt <- inLineComment
   pure $ Tuple cmt (Just $ RoleInstance (show ident))
@@ -563,8 +564,8 @@ withRoleCounting p = do
 -- | The parser never backtracks over a Context. This means we can safely perform the side
 -- | effect of storing its constituent roles and contexts.
 -- | NOTE: we do not construct an inverse binding from an eventual prototype.
-context ::  IP RoleInstance
-context = withRoleCounting context' where
+context ::  Maybe RoleType -> IP RoleInstance
+context contextRole = withRoleCounting context' where
 
   context' :: IP RoleInstance
   context' = do
@@ -605,6 +606,8 @@ context = withRoleCounting context' where
               { subject: UserInstance $ RoleInstance me
               , id: (ContextInstance $ show instanceName)
               , roleType: EnumeratedRoleType $ show typeName <> "$External"
+              -- the type of the contextrole.
+              , authorizedRole: contextRole
               , roleInstances: singleton $ RoleInstance $ buitenRol (show instanceName)
               , deltaType: ConstructExternalRole
               }
@@ -673,8 +676,9 @@ sectionHeading = do
 
 definition ::  IP RoleInstance
 definition = do
-  bindng <- context
   prop@(QualifiedName _ localName) <- getSection
+  roleType <- pure $ EnumeratedRoleType (show prop)
+  bindng <- context (Just $ ENR roleType)
   _ <- incrementRoleInstances (show prop)
   nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
@@ -683,7 +687,8 @@ definition = do
   universeRoleDelta <- deltaSignedByMe $ encodeJSON $ UniverseRoleDelta
     { subject: UserInstance $ RoleInstance me
     , id: ContextInstance enclContext
-    , roleType: EnumeratedRoleType (show prop)
+    , roleType: roleType
+    , authorizedRole: Nothing
     , roleInstances: singleton rolId
     , deltaType: ConstructEmptyRole
     }
@@ -736,7 +741,8 @@ userData = do
   withPos do
     _ <- userDataDeclaration
     _ <- AR.many importExpression
-    eroles <- AR.many context
+    -- These must be RootContexts.
+    eroles <- AR.many (context Nothing)
     (roles :: FO.Object PerspectRol) <- getRoleInstances
     -- Set the inverse bindings.
     setRoleInstances $ addGevuldeRollen roles <$> roles

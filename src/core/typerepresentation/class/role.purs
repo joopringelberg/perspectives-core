@@ -421,6 +421,11 @@ typeIncludingAspects = getRole >=> (case _ of
   E r -> roleAspectsADT r
   C r -> roleAspectsADT r)
 
+typeIncludingAspectsBinding :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
+typeIncludingAspectsBinding = getRole >=> (case _ of
+  E r -> roleAspectsBindingADT r
+  C r -> roleAspectsBindingADT r)
+
 roleTypeIsFunctional :: RoleType -> MonadPerspectives Boolean
 roleTypeIsFunctional = getRole >=> (case _ of
   E r -> functional r

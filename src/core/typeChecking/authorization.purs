@@ -27,17 +27,21 @@ import Control.Monad.State (StateT, execStateT, get, lift, put)
 import Data.Array (elemIndex)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
-import Perspectives.CoreTypes (MonadPerspectives, (##>>), (###=))
+import Data.Identity (Identity)
+import Data.Maybe (Maybe(..), isJust)
+import Data.Newtype (unwrap)
+import Effect.Class (liftEffect)
+import Perspectives.CoreTypes (MonadPerspectives, (##>>), (###=), (###>>))
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..), Verb)
 import Perspectives.Representation.Class.PersistentType (getAction)
-import Perspectives.Representation.Class.Role (allProperties)
+import Perspectives.Representation.Class.Role (allProperties, typeIncludingAspectsBinding)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType)
-import Perspectives.Types.ObjectGetters (actionsOfRole_, propertiesOfView, roleTypeAspectsClosure)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Types.ObjectGetters (actionsOfRole_, hasAspect, propertiesOfView, roleTypeAspectsClosure)
 import Perspectives.TypesForDeltas (SubjectOfAction)
 
 type Found a = StateT Boolean MonadPerspectives a
@@ -49,14 +53,14 @@ type Found a = StateT Boolean MonadPerspectives a
 roleHasPerspectiveOnPropertyWithVerb :: SubjectOfAction -> RoleInstance -> EnumeratedPropertyType -> Verb -> MonadPerspectives (Either PerspectivesError Boolean)
 roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
   (subjectType :: RoleType) <- typeOfSubjectOfAction subject
-  role <- roleInstance ##>> roleType
-  (execStateT (run subjectType role) false) >>=
+  roleType' <- roleInstance ##>> roleType
+  (execStateT (run subjectType roleType') false) >>=
     if _
       then pure $ Right true
-      else pure $ Left $ UnauthorizedForProperty "Auteur" subjectType role property verb'
+      else pure $ Left $ UnauthorizedForProperty "Auteur" subjectType roleType' property verb'
   where
     run :: RoleType -> EnumeratedRoleType -> Found Unit
-    run subjectType role = do
+    run subjectType roleType = do
       allSubjects <- lift (subjectType ###= roleTypeAspectsClosure)
       for_ allSubjects
         \userRole -> hasBeenFound >>= if _
@@ -67,7 +71,7 @@ roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
               \at -> hasBeenFound >>= if _
                 then pure unit
                 else do
-                  (Action{verb, requiredObjectProperties, object}) <- lift $ getAction at
+                  (Action{verb, requiredObjectProperties}) <- lift $ getAction at
                   if verb == verb'
                     then case requiredObjectProperties of
                       Just vt -> do
@@ -76,10 +80,80 @@ roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
                           Nothing -> pure unit
                           otherwise -> put true
                       Nothing -> do
-                        props <- lift (allProperties (ST role))
+                        props <- lift (allProperties (ST roleType))
                         case elemIndex (ENP property) props of
                           Nothing -> pure unit
                           otherwise -> put true
                     else pure unit
-    hasBeenFound :: Found Boolean
-    hasBeenFound = get
+
+hasBeenFound :: Found Boolean
+hasBeenFound = get
+
+-- | True if the user role represented by the SubjectOfAction argument has a perspective
+-- | on the role type that includes an Action with the given Verb,
+-- | OR if the role type has the aspect "sys:RootContext$RootUser"
+roleHasPerspectiveOnRoleWithVerb :: SubjectOfAction -> EnumeratedRoleType -> Array Verb -> MonadPerspectives (Either PerspectivesError Boolean)
+roleHasPerspectiveOnRoleWithVerb subject roleType verbs = (roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$RootUser")) >>=
+  if _
+    then pure $ Right true
+    else do
+      (subjectType :: RoleType) <- typeOfSubjectOfAction subject
+      (execStateT (hasPerspectiveWithVerb subjectType) false) >>=
+        if _
+          then pure $ Right true
+          else pure $ Left $ UnauthorizedForRole "Auteur" subjectType (ENR roleType) verbs
+  where
+    hasPerspectiveWithVerb :: RoleType -> Found Unit
+    hasPerspectiveWithVerb subjectType = do
+      allSubjects <- lift (subjectType ###= roleTypeAspectsClosure)
+      for_ allSubjects
+        \userRole -> hasBeenFound >>= if _
+          then pure unit
+          else do
+            (as :: Array ActionType) <- lift (userRole ###= actionsOfRole_)
+            for_ as
+              \at -> hasBeenFound >>= if _
+                then pure unit
+                else do
+                  (Action{verb, object}) <- lift $ getAction at
+                  if (isJust $ elemIndex verb verbs) && object == ENR roleType
+                    then put true
+                    else pure unit
+
+roleHasPerspectiveOnExternalRoleWithVerb :: SubjectOfAction -> Maybe RoleType -> Verb -> MonadPerspectives (Either PerspectivesError Boolean)
+roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleType of
+  Nothing -> do
+    (subjectType :: RoleType) <- typeOfSubjectOfAction subject
+    liftEffect $ logPerspectivesError $ Custom "roleHasPerspectiveOnExternalRoleWithVerb: no authorizedRole provided to construct external role"
+    pure $ Left $ Custom "roleHasPerspectiveOnExternalRoleWithVerb: no authorizedRole provided to construct external role"
+  Just rt -> do
+    (subjectType :: RoleType) <- typeOfSubjectOfAction subject
+    (execStateT (hasPerspectiveWithVerb subjectType rt) false) >>=
+      if _
+        then pure $ Right true
+        else pure $ Left $ UnauthorizedForRole "Auteur" subjectType rt [verb']
+    where
+      hasPerspectiveWithVerb :: RoleType -> RoleType -> Found Unit
+      hasPerspectiveWithVerb subjectType roleType = do
+        allSubjects <- lift (subjectType ###= roleTypeAspectsClosure)
+        for_ allSubjects
+          \userRole -> hasBeenFound >>= if _
+            then pure unit
+            else do
+              (as :: Array ActionType) <- lift (userRole ###= actionsOfRole_)
+              for_ as
+                \at -> hasBeenFound >>= if _
+                  then pure unit
+                  else do
+                    (Action{verb, object}) <- lift $ getAction at
+                    if verb == verb'
+                      then case object of
+                        CR _ -> if object == roleType then put true else pure unit
+                        ENR etype -> do
+                          -- By reducing the ADT that represents both the role and its binding, and, when the object is
+                          -- calculated, the end result of the calculation, we cover both bound contexts and unbound contexts.
+                          (adt :: ADT EnumeratedRoleType) <- lift $ typeIncludingAspectsBinding object
+                          if unwrap (reduce ((\rt -> pure (rt == etype)) :: EnumeratedRoleType -> Identity Boolean) adt)
+                            then put true
+                            else pure unit
+                        else pure unit

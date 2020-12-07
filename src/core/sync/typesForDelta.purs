@@ -30,7 +30,7 @@ import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Show, show, (<>), (==), (&&))
@@ -111,6 +111,8 @@ instance prettyPrintUniverseContextDeltaType :: PrettyPrint UniverseContextDelta
 newtype UniverseRoleDelta = UniverseRoleDelta (DeltaRecord
   ( id :: ContextInstance
   , roleType :: EnumeratedRoleType
+  -- To be provided when deltaType is ConstructExternalRole or RemoveUnboundExternalRoleInstance
+  , authorizedRole :: Maybe RoleType
   , roleInstances :: SerializableNonEmptyArray RoleInstance
   , deltaType :: UniverseRoleDeltaType
   -- Add, Remove

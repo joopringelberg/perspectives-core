@@ -97,13 +97,15 @@ domain: System
     user: You = filter (Initiator union ConnectedPartner) with not binds sys:Me
 
   case: Model
+    aspect: sys:RootContext
     external:
-      property: Name (mandatory, functional, String)
+      aspect: sys:RootContext$External
       property: Description (mandatory, functional, String)
       property: ModelIdentification (mandatory, functional, String)
       property: Url (mandatory, functional, String)
       property: IsLibrary (mandatory, functional, Boolean)
     user: Author (not mandatory, functional) filledBy: User
+      aspect: sys:RootContext$RootUser
       perspective on: External
     context: IndexedContext (mandatory, functional) filledBy: sys:RootContext
       property: Name (mandatory, functional, String)

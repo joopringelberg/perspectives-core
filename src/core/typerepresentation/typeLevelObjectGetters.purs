@@ -185,6 +185,8 @@ roleTypeAspectsClosure :: RoleType ~~~> RoleType
 roleTypeAspectsClosure (ENR r) = ENR <$> aspectsClosure r
 roleTypeAspectsClosure (CR r) = pure $ CR r
 
+-- aspect `hasAspect` roleType
+-- roleType ##>>> hasAspect aspect
 hasAspect :: EnumeratedRoleType -> (EnumeratedRoleType ~~~> Boolean)
 hasAspect aspect roleType = ArrayT do
   aspects <- roleType ###= aspectsClosure
@@ -309,7 +311,7 @@ roleTypeModelName' rt = maybe empty (pure <<< Value) (deconstructModelName (role
 -- | For a given context type, find the locally defined Enumerated role type that has an aspect role
 -- | whose local name is the first parameter value.
 localRoleSpecialisation :: String -> ContextType ~~~> EnumeratedRoleType
-localRoleSpecialisation localAspectName = COMB.filter allEnumeratedRoles (hasAspectWithLocalName localAspectName) 
+localRoleSpecialisation localAspectName = COMB.filter allEnumeratedRoles (hasAspectWithLocalName localAspectName)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS AND ON VIEWS

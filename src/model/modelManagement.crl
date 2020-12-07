@@ -4,7 +4,7 @@ import model:System as sys
 import model:ModelManagement as mm
 
 mm:Model usr:ModelManagementModel
-  extern sys:Model$External$Name = "Model management"
+  extern sys:RootContext$External$Name = "Model management"
   extern sys:Model$External$Description = "Rudimentary functions to parse and compile a model from source files."
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:ModelManagement"
   extern $ModelIdentification = "model:ModelManagement"

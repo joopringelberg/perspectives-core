@@ -96,6 +96,7 @@ data PerspectivesError
     | NoPropertyTypeWithValue ArcPosition ArcPosition
 
     | UnauthorizedForProperty String RoleType EnumeratedRoleType EnumeratedPropertyType Verb
+    | UnauthorizedForRole String RoleType RoleType (Array Verb)
 
     | ParserError String ArcPosition
     | Custom String
@@ -150,6 +151,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (CannotFindContextType start end ctype) = "(CannotFindContextType) The context type name '" <> ctype <> "' cannot be resolved, between " <> show start <> " and " <> show end
   show (NoPropertyTypeWithValue start end) = "(NoPropertyTypeWithValue) The property value computed by this expression is not associated with a Property Type (this throws up a problem in combination with, for example, `modelname`)"
   show (UnauthorizedForProperty author userRole role property verb) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> "."
+  show (UnauthorizedForRole author userRole role verbs) = "(UnauthorizedForRole) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes at least one of " <> show verbs
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
 type MultipleErrors = NonEmptyList PerspectivesError

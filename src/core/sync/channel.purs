@@ -46,7 +46,7 @@ import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNA
 import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
 import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>), (>>=))
@@ -66,7 +66,7 @@ createChannelContext :: String -> MonadPerspectivesTransaction ContextInstance
 createChannelContext channelName = do
   host <- lift2 getHost
   port <- lift2 getPort
-  eChannel <- runExceptT $ constructContext $ ContextSerialization
+  eChannel <- runExceptT $ constructContext (Just $ ENR $ EnumeratedRoleType "model:System$Invitation$PrivateChannel") $ ContextSerialization
     { id: "model:User$" <> channelName
     , prototype: Nothing
     , ctype: "sys:Channel"
