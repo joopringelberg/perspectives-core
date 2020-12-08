@@ -248,7 +248,8 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
           expandedBnd <- if kindOfRole == ContextRole
             then expandNamespace (bnd <> "$External")
             else expandNamespace bnd
-          pure (EnumeratedRole $ roleUnderConstruction {binding = augmentADT binding expandedBnd})
+          -- By default, comma separated types form a SUM wrt binding.
+          pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding expandedBnd})
 
     -- FORUSER
     handleParts roleName (EnumeratedRole roleUnderConstruction) (ForUser _) = pure (EnumeratedRole $ roleUnderConstruction)
@@ -276,14 +277,24 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
         (Just user) -> pure user
         otherwise -> throwError (MissingForUser pos' localBotName)
 
-    -- We assume we add roleName as another disjunct of a sum type.
+    -- We we add roleName as another disjunct of a sum type.
     -- `roleName` should be qualified.
-    augmentADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
-    augmentADT adt roleName = case adt of
-      EMPTY -> ST $ EnumeratedRoleType roleName
+    addToADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
+    addToADT adt roleName = case adt of
+      EMPTY -> EMPTY
       SUM terms -> SUM $ cons (ST $ EnumeratedRoleType roleName) terms
       p@(PROD _) -> SUM [p, ST $ EnumeratedRoleType roleName]
       s@(ST _) -> SUM [s, ST $ EnumeratedRoleType roleName]
+      UNIVERSAL -> ST $ EnumeratedRoleType roleName
+
+    -- We we add roleName as another conjunct of a product type.
+    -- `roleName` should be qualified.
+    multiplyWithADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
+    multiplyWithADT adt roleName = case adt of
+      EMPTY -> ST $ EnumeratedRoleType roleName
+      p@(SUM _) -> PROD [p, ST $ EnumeratedRoleType roleName]
+      PROD terms -> PROD $ cons (ST $ EnumeratedRoleType roleName) terms
+      s@(ST _) -> PROD [s, ST $ EnumeratedRoleType roleName]
       UNIVERSAL -> UNIVERSAL
 
     -- Insert a Property type into a Role type.
@@ -493,7 +504,7 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     , displayName: id
     , subject: rolename
     , verb: verb
-    , object: (ENR $ EnumeratedRoleType object) -- But it may be Calculated!
+    , object: (ST $ EnumeratedRoleType object) -- But it may be Calculated!
     , requiredObjectProperties: defaultObjectView
     , requiredSubjectProperties: Nothing
     , requiredIndirectObjectProperties: Nothing

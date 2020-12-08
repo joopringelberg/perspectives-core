@@ -28,11 +28,12 @@ import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, Calculation(..))
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..), Verb)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getView)
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType, PropertyType, RoleType, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), PropertyType, RoleType, ViewType)
 import Perspectives.Representation.View (propertyReferences)
 import Prelude (pure, ($), (<<<), (<>), (==), (||), (>>=), (<$>), (<*>))
 
@@ -42,7 +43,7 @@ import Prelude (pure, ($), (<<<), (<>), (==), (||), (>>=), (<$>), (<*>))
 class ActionClass c where
   subject :: c -> RoleType
   verb :: c -> Verb
-  object :: c -> RoleType
+  object :: c -> ADT EnumeratedRoleType
   indirectObject :: c -> Maybe RoleType
   requiredObjectProperties :: c -> Maybe ViewType
   requiredSubjectProperties :: c -> Maybe ViewType

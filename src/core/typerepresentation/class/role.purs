@@ -173,6 +173,8 @@ type PropertySet = ExplicitSet PropertyType
 
 -- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
 -- | This function is not transitive over binding or aspects.
+-- | It just collects the properties that are represented directly on the Enumerated roles
+-- | in the leaves of this ADT.
 propertySet :: ADT EnumeratedRoleType -> MP PropertySet
 -- propertySet (ST (ENR r)) = getEnumeratedRole r >>= pure <<< PSet <<< _.properties <<< unwrap
 -- propertySet (ST (CR r)) = getCalculatedRole r >>= (rangeOfCalculatedRole >=> propertySet)
@@ -183,6 +185,7 @@ propertySet UNIVERSAL = pure Universal
 propertySet EMPTY = pure Empty
 
 -- | All properties, computed recursively over binding and Aspects, of the Role ADT.
+-- | UNIVERSAL is treated like EMPTY.
 allProperties :: ADT EnumeratedRoleType -> MP (Array PropertyType)
 allProperties = reduce magic
   where
@@ -197,6 +200,7 @@ allProperties = reduce magic
           pure $ props <> properties
 
 -- | All properties, computed recursively over the role ADT and its Aspects - but excluding the binding.
+-- | UNIVERSAL is treated like EMPTY.
 allLocallyRepresentedProperties :: ADT EnumeratedRoleType -> MP (Array PropertyType)
 allLocallyRepresentedProperties = reduce magic
   where
@@ -209,6 +213,16 @@ allLocallyRepresentedProperties = reduce magic
         otherwise -> do
           props <- reduce magic otherwise
           pure $ props <> properties
+
+-- | Similar to propertySet, except for UNIVERSAL.
+-- | UNIVERSAL is treated like EMPTY.
+directProperties :: ADT EnumeratedRoleType -> MP (Array PropertyType)
+directProperties = reduce magic
+  where
+    magic :: EnumeratedRoleType -> MP (Array PropertyType)
+    magic rt = do
+      EnumeratedRole{properties} <- getEnumeratedRole rt
+      pure properties
 
 --------------------------------------------------------------------------------------------------
 ---- ROLESET

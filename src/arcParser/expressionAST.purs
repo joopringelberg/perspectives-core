@@ -146,6 +146,7 @@ data Operator =
   | Filter ArcPosition
   | Sequence ArcPosition
   | Join ArcPosition
+  -- | Intersect ArcPosition
 
 -- newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Maybe Step}
 

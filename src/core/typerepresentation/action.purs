@@ -28,12 +28,13 @@ import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Calculation)
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Representation.SideEffect (SideEffect)
-import Perspectives.Representation.TypeIdentifiers (ActionType, RoleType, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), RoleType, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 
 -----------------------------------------------------------
@@ -49,7 +50,7 @@ type ActionRecord =
   -- TODO: For synchronization, we might need to allow CalculatedRoles as subject of an action.
   , subject :: RoleType
   , verb :: Verb
-  , object :: RoleType -- TODO: Maybe Step ofzo? Of QueryFunctionDescription.
+  , object :: ADT EnumeratedRoleType -- TODO: Maybe Step ofzo? Of QueryFunctionDescription.
   , requiredObjectProperties :: Maybe ViewType
   , requiredSubjectProperties :: Maybe ViewType
   , requiredIndirectObjectProperties :: Maybe ViewType
