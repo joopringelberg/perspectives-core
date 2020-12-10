@@ -147,14 +147,14 @@ interpret (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) a = ArrayT $ do
       dp@{supportingPaths} -> pure $ cons
         (dp {supportingPaths = join (allPaths <$> tail)})
         tail
-interpret (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _ _ _) a = ArrayT do
+interpret (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) a = ArrayT do
   (f1r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   if null f1r
     then do
       f2r <- runArrayT $ interpret f2 a
       pure $ f1r `union` f2r
     else pure f1r
-interpret (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) a = ArrayT do
+interpret (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) a = ArrayT do
   (l :: Array DependencyPath) <- runArrayT $ interpret f1 a
   (r :: Array DependencyPath) <- runArrayT $ interpret f2 a
   pure (l `union` r)

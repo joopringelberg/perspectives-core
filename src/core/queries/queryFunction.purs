@@ -48,8 +48,8 @@ data FunctionName =
   | BoundByF
   | FilterF
   | ComposeF
-  | DisjunctionF
-  | ConjunctionF
+  | UnionF
+  | IntersectionF
   | CreateContextF      -- TODO
   | CreateRoleF         -- TODO
   | GetRoleBindersF
@@ -88,8 +88,8 @@ isFunctionalFunction fn = case fn of
   BoundByF -> True
   FilterF -> Unknown
   ComposeF -> Unknown
-  DisjunctionF -> Unknown
-  ConjunctionF -> False
+  UnionF -> False
+  IntersectionF -> False
   CreateContextF -> True
   CreateRoleF -> True
   GetRoleBindersF -> False
@@ -191,8 +191,8 @@ instance showFunctionName :: Show FunctionName where
     show BoundByF = "boundBy"
     show FilterF = "filter"
     show ComposeF = "compose"
-    show DisjunctionF = "disjunction"
-    show ConjunctionF = "conjunction"
+    show UnionF = "both"
+    show IntersectionF = "either"
     show CreateContextF = "createContext"
     show CreateRoleF = "createRole"
     show GetRoleBindersF = "binder" -- TODO en dit?

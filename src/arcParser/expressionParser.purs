@@ -174,7 +174,9 @@ operator =
   <|>
   (Multiply <$> (getPosition <* token.reservedOp "*"))
   <|>
-  (Join <$> (getPosition <* token.reservedOp "union"))
+  (Union <$> (getPosition <* token.reservedOp "both"))
+  <|>
+  (Intersection <$> (getPosition <* token.reservedOp "either"))
   ) <?> ">>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>=, union"
 
 operatorPrecedence :: Operator -> Int
@@ -193,7 +195,8 @@ operatorPrecedence (Divide _) = 4
 operatorPrecedence (Multiply _) = 5
 operatorPrecedence (Sequence _) = 8
 operatorPrecedence (Filter _) = 9
-operatorPrecedence (Join _) = 8
+operatorPrecedence (Union _) = 8
+operatorPrecedence (Intersection _) = 7
 
 startOf :: Step -> ArcPosition
 startOf stp = case stp of

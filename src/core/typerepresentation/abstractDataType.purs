@@ -173,6 +173,9 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
 
 -- | Reduce an `ADT a` with `forall a b m. Monad m => f :: a -> m (Array b)`
 -- | `reduce f` then has type `forall a b m. Monad m => ADT a -> m (Array b)`
+-- | We treat the UNIVERSAL case as if it were EMPTY (returns []). This is justified by the fact that by specifying
+-- | that a role can have no binding, we really say, with respect to properties, that there will be no properties
+-- | contributed by the binding.
 instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do
@@ -184,7 +187,7 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
     (arrays :: Array (Array b)) <- traverse (reduce f) adts
     pure $ foldl union [] arrays
   reduce f EMPTY = pure []
-  -- not quite sure about this...
+  --
   reduce f UNIVERSAL = pure []
 
 -- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`.

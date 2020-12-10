@@ -211,12 +211,12 @@ compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
   f2' <- compileFunction f2
   pure \c -> (f1' c *> f2' c)
 
-compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _ _ _) = do
+compileFunction (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   pure $ Combinators.disjunction f1' f2'
 
-compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) = do
+compileFunction (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   pure $ Combinators.conjunction f1' f2'

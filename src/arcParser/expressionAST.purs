@@ -145,8 +145,8 @@ data Operator =
   | Multiply ArcPosition
   | Filter ArcPosition
   | Sequence ArcPosition
-  | Join ArcPosition
-  -- | Intersect ArcPosition
+  | Union ArcPosition
+  | Intersection ArcPosition
 
 -- newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Maybe Step}
 
@@ -288,7 +288,8 @@ instance prettyPrintOperator :: PrettyPrint Operator where
   prettyPrint' t (Multiply _) = "Multiply"
   prettyPrint' t (Filter _) = "Filter"
   prettyPrint' t (Sequence _) = "Sequence"
-  prettyPrint' t (Join _) = "Join"
+  prettyPrint' t (Union _) = "Union"
+  prettyPrint' t (Intersection _) = "Intersection"
 
 derive instance genericAssignment :: Generic Assignment _
 instance showAssignment :: Show Assignment where show = genericShow
