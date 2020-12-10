@@ -45,7 +45,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range, roleRange, sumOfDomains)
-import Perspectives.Representation.ADT (ADT(..), product)
+import Perspectives.Representation.ADT (ADT(..), sum)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
@@ -74,7 +74,7 @@ makeConjunction :: Domain -> QueryFunctionDescription -> RoleType -> FD
 makeConjunction currentDomain left rt2 = do
   right <- lift2 $ makeRoleGetter currentDomain rt2
   (rightADT :: ADT EnumeratedRoleType) <- lift $ lift $ typeExcludingBinding_ rt2
-  pure $ BQD currentDomain (QF.BinaryCombinator ConjunctionF) left right (RDOM (product [unsafePartial roleRange left, rightADT])) THREE.False (THREE.or (mandatory left) (mandatory right))
+  pure $ BQD currentDomain (QF.BinaryCombinator ConjunctionF) left right (RDOM (sum [unsafePartial roleRange left, rightADT])) THREE.False (THREE.or (mandatory left) (mandatory right))
 
 makeRoleGetter :: Domain -> RoleType -> MonadPerspectives QueryFunctionDescription
 makeRoleGetter currentDomain rt = do

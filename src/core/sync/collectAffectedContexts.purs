@@ -24,11 +24,9 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader (lift)
-import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Writer (runWriterT)
 import Data.Array (filterA, fold, head, nub, union)
 import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
-import Data.Foldable (traverse_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -50,7 +48,7 @@ import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, bottom, contextType, getEnumeratedRoleInstances, getRoleBinders)
+import Perspectives.Instances.ObjectGetters (binding, contextType, getEnumeratedRoleInstances, getRoleBinders)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), PropsAndVerbs, allProps, backwards, forwards)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
@@ -106,45 +104,6 @@ handleAffectedContexts affectedContexts userProps = case ANE.fromArray affectedC
 addAffectedContext :: AffectedContext -> MonadPerspectivesTransaction Unit
 addAffectedContext as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [as] affectedContexts})
 
------------------------------------------------------------
--- USERSHASPERSPECTIVEONROLEINSTANCE
------------------------------------------------------------
--- | Parameter `peer` should be bound to an instance of model:System$User (the bottom of a user role chain).
-userHasNoPerspectiveOnRoleInstance ::  EnumeratedRoleType -> RoleInstance -> RoleInstance -> MonadPerspectives Boolean
-userHasNoPerspectiveOnRoleInstance roleType roleInstance peer = execStateT (userHasPerspectiveOnRoleInstance_ roleType roleInstance peer) true
-
-userHasPerspectiveOnRoleInstance_ ::  EnumeratedRoleType -> RoleInstance -> RoleInstance -> StateT Boolean MonadPerspectives Unit
-userHasPerspectiveOnRoleInstance_ roleType roleInstance peer = do
-  (lift $ compileDescriptions _onContextDelta_context roleType) >>= traverse_ g
-  notFound <- get
-  if notFound then (lift $ compileDescriptions _onContextDelta_role roleType) >>= traverse_ g else pure unit
-
-  where
-    g :: InvertedQuery -> StateT Boolean MonadPerspectives Unit
-    g (InvertedQuery{backwardsCompiled, userTypes}) = do
-      notFound <- get
-      if notFound
-        then lift (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) >>= traverse_
-        -- Check if the peer has one of the userType roles in at least one of the context instances.
-          \ctxt -> do
-            notFound1 <- get
-            if notFound1
-              then do
-                for_ ((toUnfoldable $ keys userTypes) :: Array RoleType) \ut -> do
-                  notFound2 <- get
-                  if notFound2
-                    then do
-                      roles <- lift (ctxt ##= getRoleInstances ut)
-                      for_ roles \role -> do
-                        notFound3 <- get
-                        if notFound3
-                          then do
-                            otherPeer <- lift (role ##>> bottom)
-                            if otherPeer == peer then put false else pure unit
-                          else pure unit
-                    else pure unit
-              else pure unit
-        else pure unit
 -----------------------------------------------------------
 -- OBSERVINGCONTEXTS
 -----------------------------------------------------------

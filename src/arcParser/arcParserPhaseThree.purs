@@ -79,7 +79,7 @@ import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForRoleType, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, propsAndVerbsForObjectRole, rolesWithPerspectiveOnProperty, rolesWithPerspectiveOnRole)
+import Perspectives.Types.ObjectGetters (lookForRoleType, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType, propsAndVerbsForObjectRole, rolesWithPerspectiveOnProperty, localEnumeratedRolesWithPerspectiveOnRole)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
@@ -350,7 +350,7 @@ invertedQueriesForLocalRolesAndProperties = do
     invertedQueriesForLocalRolesAndProperties' {enumeratedRoles} = do
       for_ enumeratedRoles
         \(EnumeratedRole {_id, context, mandatory, functional}) -> do
-          (userTypes :: Array RoleType) <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
+          (userTypes :: Array RoleType) <- lift $ lift (context ###= localEnumeratedRolesWithPerspectiveOnRole (ENR _id))
           qwk <- pure $ ZQ
             (Just (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory)))
             Nothing
@@ -384,7 +384,7 @@ compileExpressions = do
         compileRolExpr roleName (CalculatedRole cr@{_id, calculation, context}) = case calculation of
           Q _ -> pure $ CalculatedRole cr
           S stp -> do
-            userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (CR _id))
+            userTypes <- lift $ lift (context ###= localEnumeratedRolesWithPerspectiveOnRole (CR _id))
             -- For each userType get the PropsAndVerbs for the calculated role:
             (pAndV :: Map RoleType PropsAndVerbs) <- fromFoldable <$> for userTypes (\userType -> do
               pv <- lift2 $ propsAndVerbsForObjectRole (CR _id) userType
@@ -603,7 +603,7 @@ compileRules = do
 
               Unbind f@{bindingExpression, roleIdentifier} -> do
                 (bindings :: QueryFunctionDescription) <- ensureRole subject  currentDomain bindingExpression
-                -- binderType (roleIdentifier) should be an EnumeratedRoleType (local name should resolve w.r.t. the binders of the bindings). We try to resolve in the model and then filter candidates on whether they bind the bindings.
+                -- the type of the binder (indicated by roleIdentifier) should be an EnumeratedRoleType (local name should resolve w.r.t. the binders of the bindings). We try to resolve in the model and then filter candidates on whether they bind the bindings. If they don't, the expression has no meaning.
                 (qualifiedRoleIdentifier :: Maybe EnumeratedRoleType) <- qualifyBinderType roleIdentifier (unsafePartial $ domain2roleType $ range bindings) f.start f.end
                 pure $ UQD currentDomain (QF.Unbind qualifiedRoleIdentifier) bindings currentDomain True True
 
@@ -701,12 +701,15 @@ compileRules = do
                     otherwise -> throwError $ RoleHasNoProperty rt propertyIdentifier
 
                 -- | If the name is unqualified, look for an EnumeratedRole with matching local name in the Domain.
+                -- | Then, we check whether a candidate's binding type equals the second argument, or is less specialised. In other words: whether the candidate could bind it (the second argument).
                 qualifyBinderType :: Maybe String -> ADT EnumeratedRoleType -> ArcPosition -> ArcPosition -> PhaseThree (Maybe EnumeratedRoleType)
                 qualifyBinderType Nothing _ _ _ = pure Nothing
                 qualifyBinderType (Just ident) bindings start end = if isQualifiedWithDomein ident
                   then pure $ Just $ EnumeratedRoleType ident
                   else do
+                    -- EnumeratedRoles in the model with (end)matching name.
                     (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{_id:roleId}) -> (unwrap roleId) `endsWithSegments` ident) (values enumeratedRoles))
+                    -- EnumeratedRoles that can bind `bindings`.
                     (candidates :: Array EnumeratedRole) <-(filterA (\(EnumeratedRole{binding}) -> lift2 $ lessThanOrEqualTo binding bindings) nameMatches)
                     case head candidates of
                       Nothing -> if null nameMatches

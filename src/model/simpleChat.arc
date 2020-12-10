@@ -18,6 +18,8 @@ domain: SimpleChat
     user: Chatter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
       aspect: sys:RootContext$RootUser
       perspective on: Chats
+      --perspective on: Initiator in Chats: Become
+      perspective on: Chats >> context >> Initiator: Create, Bind
 
   case: Chat
     aspect: sys:Invitation
