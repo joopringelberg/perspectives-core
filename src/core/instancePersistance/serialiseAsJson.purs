@@ -119,7 +119,7 @@ serialiseAsJsonFor_ userType cid = do
     serialiseRoleInstances :: Tuple String (Array RoleInstance) -> Collecting (Maybe (Tuple String (SerializableNonEmptyArray RolSerialization)))
     serialiseRoleInstances (Tuple roleTypeId roleInstances) = do
       -- Now for each role, decide if the user may see it.
-      allowed <- lift $ (userType ###>> roleIsInPerspectiveOf (ENR $ EnumeratedRoleType roleTypeId))
+      allowed <- lift $ (userType ###>> roleIsInPerspectiveOf (EnumeratedRoleType roleTypeId))
       if allowed
         then case fromArray roleInstances of
           Nothing -> pure Nothing
@@ -138,7 +138,7 @@ serialiseAsJsonFor_ userType cid = do
           c <- lift (b ##>> context)
           doneBefore <- hasContextBeenDone c
           typeOfBinding <- lift (b ##>> roleType)
-          allowed <- lift (userType ###>> roleIsInPerspectiveOf (ENR typeOfBinding))
+          allowed <- lift (userType ###>> roleIsInPerspectiveOf typeOfBinding)
           -- TODO. Serialiseer de context niet als de ander er al een rol bij speelt!
           if allowed && not doneBefore then serialiseAsJsonFor_ userType c else pure unit
           pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: if allowed then map unwrap binding else Nothing}
@@ -146,7 +146,7 @@ serialiseAsJsonFor_ userType cid = do
     serialisePropertiesFor :: String -> Array Value -> WriterT (OBJ.Object (Array String)) MonadPerspectives Unit
     serialisePropertiesFor propertyTypeId values = do
       -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
-      propAllowed <- lift (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))
+      propAllowed <- lift (userType ###>> propertyIsInPerspectiveOf (EnumeratedPropertyType propertyTypeId))
       if propAllowed then tell (OBJ.singleton propertyTypeId (unwrap <$> values)) else pure unit
 
 -- | This function expects an instance of type sys:Invitation, creates a channel and binds it to the Invitation
