@@ -32,12 +32,13 @@ import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
 import Perspectives.Persistent (getPerspectContext)
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
+import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (bindingOfRole, kindOfRole, lessThanOrEqualTo, roleAspectsBindingADT)
 import Perspectives.Representation.Context (Context)
-import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleKind(..), RoleType(..))
@@ -109,10 +110,10 @@ checkContext c = do
 checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding roletype instanceToBind = do
   -- If the model is not available locally, try to get it from the repository.
-  rtype <- roleType_ instanceToBind
-  instanceType' <- (getEnumeratedRole >=> roleAspectsBindingADT) rtype
+  (instanceType :: EnumeratedRoleType) <- roleType_ instanceToBind
+  (instanceType' :: ADT EnumeratedRoleType) <- (getEnumeratedRole >=> roleAspectsBindingADT) instanceType
   -- TODO. Voor de rol moet ik alleen de binding ophalen.
   -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRoleAspectsBinding
-  roleType' <- bindingOfRole roletype
+  (roleType' :: ADT EnumeratedRoleType) <- bindingOfRole roletype
   b1 <- roleType' `lessThanOrEqualTo` instanceType'
-  pure $ b1 && not (roletype == ENR rtype)
+  pure $ b1 && not (roletype == ENR instanceType)

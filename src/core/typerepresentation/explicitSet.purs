@@ -71,6 +71,7 @@ hasElementM f (PSet arr) = foldM g false arr
         then pure found
         else f next
 
+-- | p `subsetPSet` q is true iff all elements in p are in q.
 subsetPSet :: forall a. Eq a => Ord a => ExplicitSet a -> ExplicitSet a -> Boolean
 subsetPSet p q = case p, q of
     a, b | a == b -> true
