@@ -36,7 +36,7 @@ import Control.Plus (empty)
 import Data.Array (elemIndex, filterA, foldMap, null)
 import Data.Foldable (for_)
 import Data.Map (singleton)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala, unwrap)
@@ -45,7 +45,6 @@ import Foreign.Object (lookup, insert, empty) as OBJ
 import Perspectives.CoreTypes (type (~~~>), MP, (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.Identifiers (deconstructLocalName_)
 import Perspectives.InvertedQuery (InvertedQuery(..), PropsAndVerbs, QueryWithAKink(..), RelevantProperties(..), addInvertedQuery, allProps, restrictToProperty)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
@@ -53,6 +52,7 @@ import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
+import Perspectives.Representation.Class.Action (providesPerspectiveOnRole)
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole, getView)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, functional, mandatory)
@@ -60,7 +60,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 
 -- | For a User RoleType, and an ADT EnumeratedRoleType that represents the Object of a Perspective,
@@ -212,7 +212,7 @@ hasAccessToPropertiesOf (ENR user) role = do
     actionOnRole :: RoleType -> EnumeratedRoleType ~~~> ActionType
     actionOnRole object userRole = ArrayT do
       EnumeratedRole{perspectives} <- getEnumeratedRole userRole
-      pure $ maybe [] identity (OBJ.lookup (deconstructLocalName_ $ roletype2string object) perspectives)
+      filterA (getAction >=> providesPerspectiveOnRole object) perspectives
 
     enumeratedPropertiesForActionObject :: ActionType ~~~> PropertyType
     enumeratedPropertiesForActionObject a = ArrayT do

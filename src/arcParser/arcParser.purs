@@ -294,7 +294,7 @@ perspectiveE = try do
   where
     perspective_ :: IP (List PerspectivePart)
     perspective_ = do
-      (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> token.identifier <|> reserved' "External" >>= pure <<< Object
+      (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> step >>= pure <<< Object
       (mdefaultView :: Maybe PerspectivePart) <- optionMaybe (token.parens $ arcIdentifier >>= pure <<< DefaultView)
       pos <- getPosition
       (actions :: List PerspectivePart) <- option Nil (colon *> token.commaSep minimalAction')

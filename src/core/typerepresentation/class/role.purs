@@ -23,16 +23,17 @@ module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, (<|>))
-import Data.Array (cons, null, (:))
+import Data.Array (cons, null, singleton, (:))
+import Data.Identity (Identity)
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
-import Foreign.Object (values, Object)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..))
-import Perspectives.Query.QueryTypes (functional, mandatory, range) as QT
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), range, domain2roleType)
+import Perspectives.Query.QueryTypes (functional, mandatory) as QT
 import Perspectives.Representation.ADT (ADT(..), product, reduce)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, externalRole, roles)
@@ -43,7 +44,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..), intersectionOfA
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
-import Prelude (class Show, bind, flip, join, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
+import Prelude (class Show, class Eq, bind, flip, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -66,7 +67,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   -- | Includes: the type of the Role, its own binding (not the bindings transitive closure!) and its own aspects (not their transitive closure!).
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsBindingADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
-  perspectives :: r -> Object (Array ActionType)
+  perspectives :: r -> Array ActionType
 
 rangeOfRoleCalculation' :: String -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> rangeOfRoleCalculation'_ (CalculatedRoleType r)
@@ -92,7 +93,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   calculation r = case (unwrap r).calculation of
     Q qd -> pure qd
     otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
-  roleADT = rangeOfCalculatedRole
+  roleADT r = calculation r >>= pure <<< unsafePartial domain2roleType <<< range
   roleAspectsADT = rangeOfCalculatedRole
   roleAspectsBindingADT = rangeOfCalculatedRole
   perspectives r = (unwrap r).perspectives
@@ -101,7 +102,7 @@ rangeOfCalculatedRole :: CalculatedRole -> MonadPerspectives (ADT EnumeratedRole
 rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
   where
     roleCalculationRange :: QueryFunctionDescription -> MonadPerspectives (ADT EnumeratedRoleType)
-    roleCalculationRange qfd = case QT.range qfd of
+    roleCalculationRange qfd = case range qfd of
       (RDOM p) -> pure p
       otherwise -> throwError (error ("range of calculation of a calculated role is not a role Domain."))
 
@@ -221,11 +222,17 @@ type ActionSet = ExplicitSet ActionType
 
 -- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
 actionSet :: ADT EnumeratedRoleType -> MP ActionSet
-actionSet (ST r) = getEnumeratedRole r >>= pure <<< PSet <<< join <<< values <<< _.perspectives <<< unwrap
+actionSet (ST r) = getEnumeratedRole r >>= pure <<< PSet <<< _.perspectives <<< unwrap
 actionSet (SUM terms) = traverse actionSet terms >>= pure <<< intersectionPset
 actionSet (PROD terms) = traverse actionSet terms >>= pure <<< unionPset
 actionSet UNIVERSAL = pure Universal
 actionSet EMPTY = pure Empty
+
+--------------------------------------------------------------------------------------------------
+---- ENUMERATEDTYPESINADT
+--------------------------------------------------------------------------------------------------
+leavesInADT :: forall a. Eq a => ADT a -> Array a
+leavesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Array a))
 
 -----------------------------------------------------------
 -- LESSTHANOREQUALTO
@@ -346,6 +353,10 @@ adtOfRole :: Role -> MP (ADT EnumeratedRoleType)
 adtOfRole (E e) = roleADT e
 adtOfRole (C c) = roleADT c
 
+contextOfRole :: Role -> MP (ADT ContextType)
+contextOfRole (E e) = context e
+contextOfRole (C c) = context c
+
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLETYPE
 -----------------------------------------------------------
@@ -394,14 +405,17 @@ bindingOfRole = getRole >=> binding'
     binding' (E r) = binding r
     binding' (C r) = binding r
 
-contextOfRole :: RoleType -> MonadPerspectives (ADT ContextType)
-contextOfRole (ENR e) = getPerspectType e >>= context
-contextOfRole (CR c) = getPerspectType c >>= context
+contextOfRoleType :: RoleType -> MonadPerspectives (ADT ContextType)
+contextOfRoleType (ENR e) = getPerspectType e >>= context
+contextOfRoleType (CR c) = getPerspectType c >>= context
 
 contextOfRepresentationOfRole :: RoleType -> MonadPerspectives (ADT ContextType)
 contextOfRepresentationOfRole (ENR e) = getPerspectType e >>= pure <<< ST <<< contextOfRepresentation
 contextOfRepresentationOfRole (CR c) = getPerspectType c >>= pure <<< ST <<< contextOfRepresentation
 
+perspectivesOfRoleType :: RoleType -> MonadPerspectives (Array ActionType)
+perspectivesOfRoleType (ENR e) = getPerspectType e >>= pure <<< perspectives
+perspectivesOfRoleType (CR c) = getPerspectType c >>= pure <<< perspectives
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------

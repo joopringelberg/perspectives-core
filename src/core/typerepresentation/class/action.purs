@@ -22,20 +22,22 @@
 module Perspectives.Representation.Class.Action where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (elemIndex)
+import Data.Array (difference, elemIndex, null)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, domain2roleType, range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..), Verb)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getView)
+import Perspectives.Representation.Class.Role (adtOfRole, getRole, leavesInADT)
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), PropertyType, RoleType, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, PropertyType, RoleType, ViewType)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (pure, ($), (<<<), (<>), (==), (||), (>>=), (<$>), (<*>))
+import Prelude (pure, ($), (<<<), (<>), (||), (>>=), (<$>), (<*>))
 
 -----------------------------------------------------------
 -- ACTION TYPE CLASS
@@ -43,7 +45,9 @@ import Prelude (pure, ($), (<<<), (<>), (==), (||), (>>=), (<$>), (<*>))
 class ActionClass c where
   subject :: c -> RoleType
   verb :: c -> Verb
-  object :: c -> ADT EnumeratedRoleType
+  object :: c -> Calculation
+  objectQfd :: c -> MonadPerspectives QueryFunctionDescription
+  objectType :: c -> MonadPerspectives (ADT EnumeratedRoleType)
   indirectObject :: c -> Maybe RoleType
   requiredObjectProperties :: c -> Maybe ViewType
   requiredSubjectProperties :: c -> Maybe ViewType
@@ -51,8 +55,9 @@ class ActionClass c where
   condition :: c -> MonadPerspectives QueryFunctionDescription
   effect :: c -> MonadPerspectives QueryFunctionDescription
   isExecutedByBot :: c -> Boolean
-  -- Either the object, or the indirect object of the action must equal the given RoleType.
-  providesPerspectiveOnRole :: RoleType -> c -> Boolean
+  -- | The object of the action must cover the given RoleType in the sense that all EnumeratedRoleTypes in the
+  -- | ADT of the latter must occur in that of the former.
+  providesPerspectiveOnRole :: RoleType -> c -> MonadPerspectives Boolean
   -- One of the views must contain PropertyType
   providesPerspectiveOnProperty :: PropertyType -> c -> MonadPerspectives Boolean
 
@@ -60,6 +65,13 @@ instance actionActionClass :: ActionClass Action where
   subject = _.subject <<< unwrap
   verb = _.verb <<< unwrap
   object = _.object <<< unwrap
+  objectQfd r = case object r of
+    Q calc -> pure calc
+    S _ -> throwError (error ("Attempt to acces Condition of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: ActionType))))
+  objectType r = objectQfd r >>= pure <<< unsafePartial domain2roleType <<< range
+  -- objectType r = case object r of
+  --   Q calc -> pure $ unsafePartial domain2roleType $ range calc
+  --   S _ -> throwError (error ("Attempt to acces Condition of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: ActionType))))
   indirectObject = _.indirectObject <<< unwrap
   requiredObjectProperties = _.requiredObjectProperties <<< unwrap
   requiredSubjectProperties = _.requiredSubjectProperties <<< unwrap
@@ -71,7 +83,7 @@ instance actionActionClass :: ActionClass Action where
     (Just (EF ar)) -> pure ar
     otherwise -> throwError (error ("Attempt to access the Effect of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
   isExecutedByBot r = (unwrap r).executedByBot
-  providesPerspectiveOnRole rt r = rt == (unwrap r).object || (Just rt) == (unwrap r).indirectObject
+  providesPerspectiveOnRole rt r = null <$> (difference <$> (leavesInADT <$> objectType r) <*> (leavesInADT <$> (getRole rt >>= adtOfRole)))
   providesPerspectiveOnProperty pt r = (||) <$> maybe (pure true) isInView (requiredObjectProperties r) <*> ((||) <$> maybe (pure true) isInView (requiredIndirectObjectProperties r) <*> maybe (pure true) isInView (requiredSubjectProperties r))
     where
       isInView :: ViewType -> MonadPerspectives Boolean

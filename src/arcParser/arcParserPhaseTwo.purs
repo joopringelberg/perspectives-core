@@ -33,10 +33,11 @@ import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..))
+import Effect.Unsafe (unsafePerformEffect)
 import Foreign.Object (insert, keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
+import Perspectives.Guid (guid)
 import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
@@ -219,13 +220,9 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 
     -- PERSPECTIVE
     handleParts roleName (EnumeratedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
-      (Tuple roleIdentifier actions) <- traversePerspectiveE pe (ENR rn)
-      -- A bot can also insert a perspective and in doing so will overwrite the user
-      -- actions (or vv). Hence we must check whether there is an entry under
-      -- roleIdentifier, and if so, add the actions to the actions already present!
-      case lookup roleIdentifier perspectives of
-        Nothing -> pure (EnumeratedRole roleUnderConstruction {perspectives = (insert roleIdentifier actions perspectives)})
-        Just acts -> pure (EnumeratedRole roleUnderConstruction {perspectives = (insert roleIdentifier (actions <> acts) perspectives)})
+      actions <- traversePerspectiveE pe (ENR rn)
+      -- As all actions are generated with a guid as identity, we can safely concatenate the new actions.
+      pure (EnumeratedRole roleUnderConstruction {perspectives = actions <> perspectives})
 
     -- VIEW
     handleParts roleName (EnumeratedRole roleUnderConstruction@{views}) (VE pe) = do
@@ -371,13 +368,9 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
 
     -- PERSPECTIVE
     handleParts (CalculatedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
-      (Tuple roleIdentifier actions) <- traversePerspectiveE pe (CR roleName)
-      -- A bot can also insert a perspective and in doing so will overwrite the user
-      -- actions (or vv). Hence we must check whether there is an entry under
-      -- roleIdentifier, and if so, add the actions to the actions already present!
-      case lookup roleIdentifier perspectives of
-        Nothing -> pure (CalculatedRole roleUnderConstruction {perspectives = (insert roleIdentifier actions perspectives)})
-        Just acts -> pure (CalculatedRole roleUnderConstruction {perspectives = (insert roleIdentifier (actions <> acts) perspectives)})
+      actions <- traversePerspectiveE pe (CR roleName)
+      -- As all actions are generated with a guid as identity, we can safely concatenate the new actions.
+      pure (CalculatedRole roleUnderConstruction {perspectives = actions <> perspectives})
 
     -- FORUSER
     handleParts (CalculatedRole roleUnderConstruction) (ForUser _) = pure (CalculatedRole $ roleUnderConstruction)
@@ -434,23 +427,21 @@ addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties}
 -- | Returns the fully qualified string that identifies the Object of the Action and the qualified identifiers of the Actions
 -- | (we need not know what kind of Role that Object is, to be able to store the
 -- | Perspective in the Role itself).
-traversePerspectiveE :: PerspectiveE -> RoleType -> PhaseTwo (Tuple String (Array ActionType))
+traversePerspectiveE :: PerspectiveE -> RoleType -> PhaseTwo (Array ActionType)
 traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
 
   -- First identify the Object of the Perspective. We need to hand it down to treatment
   -- of each separate Action.
-  (object :: String) <- case head $ filter (case _ of
+  (object :: Calculation) <- case head $ filter (case _ of
     (Object _) -> true
     otherwise -> false) perspectiveParts of
+      -- Object **must** be an expression that selects a role.
+
       -- Object **must** be a local role name. We do not expand it.
       -- Even though the object should be a role in the context,
       -- we cannot be sure at this point that it will actually be so.
       -- We pass the unqualified name and have PhaseThree look it up.
-      (Just (Object o)) -> pure o
-        -- TODO. Case analyse: als o een expressie (step) is, maak dan een CalculatedRole. We hoeven hem niet toe te voegen aan een context.
-        -- Immers, de enige referentie ernaar is vanuit de acties die we in het kader
-        -- van dit perspectief maken. We genereren een id en verspreiden die naar de
-        -- Acties.
+      (Just (Object objectExpression)) -> S <$> expandPrefix objectExpression
       otherwise -> throwError (MissingObject pos id)
 
   -- Similarly, find and use the DefaultObjectView, if the Action has not provided its own View.
@@ -468,7 +459,7 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
     Nothing -> pure Nothing
     Just (ViewType v) -> Just <<< ViewType <$> expandNamespace v
   -- Now construct all Actions. If there are no Actions and this is not a bot, fill in the defaults for Users.
-  actions <- do
+  (actions :: Array ActionType) <- do
     (acts :: List PerspectivePart) <- pure $ (filter (case _ of
         (Act _) -> true
         otherwise -> false) perspectiveParts)
@@ -478,25 +469,22 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
         (map (mkActionFromVerb pos) ("Consult" : "Change" : "Delete" : "Create" : "CreateAndBindContext" : Nil))
       else foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) [] acts
 
-  pure (Tuple object actions)
+  pure actions
 
 -- | Constructs an Action, using the provided Object and maybe the View on that Object,
 -- | from the ActionE. Returns the fully qualified name of the Action in the ActionType.
 -- | Adds each Action to the DomeinFileRecord.
 traverseActionE :: Partial =>                     -- The function is partial because we just handle ActionE.
-  String ->                                       -- The unqualified identifier of the Object.
+  Calculation ->                                  -- The parse tree of the Object expression, or the QueryFunctionDescription
   Maybe ViewType ->                               -- The unqualified identifier of the Default View on the Object.
   RoleType ->                                     -- The namespace, i.e. the qualified identifier of the Role.
   (Array ActionType) ->                           -- Accumulator: an array of Actions.
   PerspectivePart ->                              -- The ActionE element.
   PhaseTwo (Array ActionType)
-traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb, actionParts, pos})) = do
+traverseActionE objectCalculation defaultObjectView rolename actions (Act (ActionE{id, verb, actionParts, pos})) = do
   isabot <- isSubjectBot
   (n :: Int) <- getsDF \df -> length $ keys df.actions
-  actionId <- if isabot
-    -- Different names for the same verb and object for the bot and its master, otherwise they will overwrite.
-    then pure (roletype2string rolename <> "_bot$" <> show verb <> object <> (show n))
-    else pure (roletype2string rolename <> "$" <> show verb <> object)
+  actionId <- pure $ show $ unsafePerformEffect guid
   executedByBot <- isSubjectBot
   action <- pure $ Action
     { _id: ActionType actionId
@@ -504,7 +492,7 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     , displayName: id
     , subject: rolename
     , verb: verb
-    , object: (ST $ EnumeratedRoleType object) -- But it may be Calculated!
+    , object: objectCalculation
     , requiredObjectProperties: defaultObjectView
     , requiredSubjectProperties: Nothing
     , requiredIndirectObjectProperties: Nothing

@@ -27,7 +27,6 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Foreign.Object (Object, empty)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..))
@@ -50,8 +49,8 @@ type CalculatedRoleRecord =
   , calculation :: Calculation
   , context :: ContextType
 
-  -- An array of ActionTypes, indexed by their object-types.
-  , perspectives :: Object (Array ActionType)
+  -- An array of ActionTypes
+  , perspectives :: Array ActionType
 
   , pos :: ArcPosition
   }
@@ -66,7 +65,7 @@ defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
   , calculation: S $ Simple $ Identity $ ArcPosition{column: 0, line: 0}
   , context: ContextType context
 
-  , perspectives: empty
+  , perspectives: []
 
   , pos: pos
   }

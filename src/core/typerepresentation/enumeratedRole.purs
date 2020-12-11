@@ -27,7 +27,6 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Foreign.Object (Object, empty)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
@@ -56,8 +55,8 @@ type EnumeratedRoleRecord =
 
   , views :: Array ViewType
 
-  -- An array of ActionTypes, indexed by their object-types.
-  , perspectives :: Object (Array ActionType)
+  -- An array of ActionTypes
+  , perspectives :: Array ActionType
 
   , functional :: Boolean
   , mandatory :: Boolean
@@ -89,7 +88,7 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
 
   , views: []
 
-  , perspectives: empty
+  , perspectives: []
 
   , functional: true
   , mandatory: false

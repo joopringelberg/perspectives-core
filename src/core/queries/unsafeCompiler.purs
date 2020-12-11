@@ -437,6 +437,11 @@ getRoleInstances (ENR rt) c = do
   (unsafeCoerce f) c
 getRoleInstances (CR rt) c = getCalculatedRoleInstances rt c
 
+roleFunctionFromQfd :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> RoleInstance)
+roleFunctionFromQfd qfd = do
+  f <- compileFunction qfd
+  pure (unsafeCoerce f)
+
 getCalculatedRoleInstances :: CalculatedRoleType -> (ContextInstance ~~> RoleInstance)
 getCalculatedRoleInstances rt@(CalculatedRoleType ident) c = case lookupRoleGetterByName ident of
   (Just g) -> g c

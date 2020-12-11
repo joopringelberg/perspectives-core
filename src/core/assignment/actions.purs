@@ -59,11 +59,10 @@ import Perspectives.Instances.ObjectGetters (getConditionState, roleType_, setCo
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
-import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, getRoleInstances)
+import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, roleFunctionFromQfd)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Action (condition, effect, object, subject)
+import Perspectives.Representation.Class.Action (condition, effect, objectQfd, subject)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
-import Perspectives.Representation.Class.Role (getCalculation, getRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
@@ -81,10 +80,10 @@ compileBotAction actionType = do
       (action :: Action) <- getPerspectType actionType
       eff <- effect action
       subj <- pure $ subject action
-      objectCalculation <- getRole (object action) >>= getCalculation
+      (objectCalculation :: QueryFunctionDescription) <- objectQfd action
       (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff >>= pure <<< withAuthoringRole subj
       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
-      updater <- pure $ ruleRunner lhs effectFullFunction (object action)
+      updater <- pure $ ruleRunner lhs effectFullFunction objectCalculation
       void $ pure $ cacheAction actionType updater
       pure updater
 
@@ -93,12 +92,13 @@ compileBotAction actionType = do
     -- | the function is executed again.
     ruleRunner :: (ContextInstance ~~> Value) ->
       (Updater ContextInstance) ->
-      RoleType ->
+      QueryFunctionDescription ->
       (Updater ContextInstance)
-    ruleRunner lhs effectFullFunction objectType (contextId :: ContextInstance) = do
+    ruleRunner lhs effectFullFunction objectQfd (contextId :: ContextInstance) = do
       oldEnvironment <- lift2 pushFrame
       lift2 $ addBinding "currentcontext" [unwrap contextId]
-      objects <- lift2 (contextId ##= getRoleInstances objectType)
+      getter <- lift2 $ roleFunctionFromQfd objectQfd
+      objects <- lift2 (contextId ##= getter)
       if null objects
         then (lift2 $ addBinding "object" []) *> run Nothing
         else for_ objects (\object -> (lift2 $ addBinding "object" [unwrap object]) *> run (Just object))

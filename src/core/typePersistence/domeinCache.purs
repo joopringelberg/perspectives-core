@@ -43,6 +43,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
@@ -84,6 +85,11 @@ modifyCalculatedPropertyInDomeinFile ns cr@(CalculatedProperty {_id}) = modifyDo
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{calculatedProperties}) = DomeinFile dff {calculatedProperties = insert (unwrap _id) cr calculatedProperties}
 
+modifyActionInDomeinFile :: Namespace -> Action -> MonadPerspectives Action
+modifyActionInDomeinFile ns a@(Action{_id}) = modifyDomeinFileInCache modifier ns *> pure a
+  where
+    modifier :: DomeinFile -> DomeinFile
+    modifier (DomeinFile dff@{actions}) = DomeinFile dff {actions = insert (unwrap _id) a actions}
 -----------------------------------------------------------
 -- RETRIEVE A DOMAINFILE
 -----------------------------------------------------------

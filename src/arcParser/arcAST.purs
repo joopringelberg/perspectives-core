@@ -93,7 +93,7 @@ newtype PerspectiveE = PerspectiveE
   , pos :: ArcPosition}
 
 -- Rule is an obsolete constructor.
-data PerspectivePart = Object String | DefaultView String | Act ActionE | Rule RuleE
+data PerspectivePart = Object Step | DefaultView String | Act ActionE | Rule RuleE
 
 newtype ActionE = ActionE
   { id :: String

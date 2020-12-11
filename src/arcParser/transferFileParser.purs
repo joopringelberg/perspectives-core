@@ -154,7 +154,7 @@ perspectiveE = withBlock
         pure (Tuple uname pos)
 
     object :: IP PerspectivePart
-    object = try (reserved "ObjectRef" *> colon *> arcIdentifier >>= pure <<< Object)
+    object = try (reserved "ObjectRef" *> colon *> step >>= pure <<< Object)
 
     defaultView :: IP PerspectivePart
     defaultView = try (reserved "View" *> colon *> reserved "DefaultObjectViewRef" *> colon *> arcIdentifier >>= pure <<< DefaultView)

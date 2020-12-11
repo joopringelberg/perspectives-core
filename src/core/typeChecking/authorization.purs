@@ -26,18 +26,15 @@ import Prelude
 import Control.Monad.State (StateT, execStateT, get, lift, put)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Identity (Identity)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (MonadPerspectives, (##>>), (###=), (###>>))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Representation.ADT (ADT, reduce)
 import Perspectives.Representation.Action (Action(..), Verb)
+import Perspectives.Representation.Class.Action (providesPerspectiveOnRole)
 import Perspectives.Representation.Class.PersistentType (getAction)
-import Perspectives.Representation.Class.Role (typeIncludingAspectsBinding)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType, RoleType(..))
 import Perspectives.Types.ObjectGetters (actionsOfRole_, hasPerspectiveOnPropertyWithVerb, hasPerspectiveOnRoleWithVerbs, roleTypeAspectsClosure)
@@ -100,15 +97,20 @@ roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleTyp
                 \at -> hasBeenFound >>= if _
                   then pure unit
                   else do
-                    (Action{verb, object}) <- lift $ getAction at
+                    (act@Action{verb}) <- lift $ getAction at
                     if verb == verb'
-                      then case object of
-                        CR _ -> if object == roleType then put true else pure unit
-                        ENR etype -> do
-                          -- By reducing the ADT that represents both the role and its binding, and, when the object is
-                          -- calculated, the end result of the calculation, we cover both bound contexts and unbound contexts.
-                          (adt :: ADT EnumeratedRoleType) <- lift $ typeIncludingAspectsBinding object
-                          if unwrap (reduce ((\rt -> pure (rt == etype)) :: EnumeratedRoleType -> Identity Boolean) adt)
-                            then put true
-                            else pure unit
+                      -- TODO: dekt dit ook unbound contexts? Vermoedelijk niet, dan moeten we de binding van
+                      -- een enumerated role ook meenemen.
+                      then (lift $ providesPerspectiveOnRole roleType act) >>= put
+
+                      -- then case object of
+                      --   CR _ -> if object == roleType then put true else pure unit
+                      --   ENR etype -> do
+                      --     -- By reducing the ADT that represents both the role and its binding, and, when the object is
+                      --     -- calculated, the end result of the calculation, we cover both bound contexts and unbound contexts.
+                      --     (adt :: ADT EnumeratedRoleType) <- lift $ typeIncludingAspectsBinding object
+                      --     if unwrap (reduce ((\rt -> pure (rt == etype)) :: EnumeratedRoleType -> Identity Boolean) adt)
+                      --       then put true
+                      --       else pure unit
+
                         else pure unit

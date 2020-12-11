@@ -44,19 +44,19 @@ import Perspectives.Deltas (addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
-import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, range)
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
-import Perspectives.Representation.Class.Role (adtOfRole, allProperties, getCalculation, getRole)
+import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..), createTransactie)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (actionObject, actionsClosure_, propsForObjectRole)
+import Perspectives.Types.ObjectGetters (actionObjectQfd, actionsClosure_)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -108,19 +108,20 @@ liftToMPT = lift <<< lift
 
 serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> RoleType -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor_ cid userId userType = do
-  -- All Roletypes the user may see in this context.
-  visibleRoleTypes <- liftToMPT (userType ###= (actionsClosure_ >=> actionObject))
-  for_ visibleRoleTypes
-    \rt -> do
+  -- All Roletypes the user may see in this context, expressed as Calculations.
+  (roleQfds :: Array QueryFunctionDescription) <- liftToMPT (userType ###= (actionsClosure_ >=> actionObjectQfd))
+  for_ roleQfds
+    \roleQfd -> do
       -- All instances of this RoleType the user may see in this context.
-      (rinstances :: Array (DependencyPath)) <- liftToMPT (cid ##= getRoleInstances rt)
+      (rinstances :: Array (DependencyPath)) <- liftToMPT ((singletonPath (C cid)) ##= interpret roleQfd)
       -- Serialise all the dependencies.
       for_ (join (allPaths <$> rinstances)) (foldM serialiseDependency Nothing)
       -- All PropertyTypes on this RoleType the user may see.
-      (rProps :: RelevantProperties) <- liftToMPT $ propsForObjectRole rt userType
-      (visiblePropertyTypes :: Array PropertyType) <- case rProps of
-        All -> liftToMPT (getRole rt >>= adtOfRole >>= allProperties)
-        Properties props -> pure props
+      (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ allProperties (unsafePartial domain2roleType $ range roleQfd)
+      -- (rProps :: RelevantProperties) <- liftToMPT $ propsForObjectRole rt userType
+      -- (visiblePropertyTypes :: Array PropertyType) <- case rProps of
+      --   All -> liftToMPT (getRole rt >>= adtOfRole >>= allProperties)
+      --   Properties props -> pure props
       -- Compute all values and serialise the dependencies.
       for_ visiblePropertyTypes
         \pt -> do
@@ -132,10 +133,6 @@ serialisedAsDeltasFor_ cid userId userType = do
   pure unit
 
   where
-    getRoleInstances :: RoleType -> (ContextInstance ~~> DependencyPath)
-    getRoleInstances rt c = do
-      calc <- lift $ lift $ (getRole >=> getCalculation) rt
-      interpret calc (singletonPath (C c))
 
     getPropertyValues :: PropertyType -> NonEmptyList Dependency ~~> DependencyPath
     getPropertyValues pt dl = do
