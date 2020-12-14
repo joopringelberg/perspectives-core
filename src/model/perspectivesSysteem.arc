@@ -26,7 +26,7 @@ domain: System
     user: User (mandatory, functional)
       property: Achternaam (mandatory, not functional, String)
       property: Voornaam (mandatory, not functional, String)
-      property: Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
+      property: Channel = (binder Initiator both binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       indexed: sys:Me
       view: VolledigeNaam (Voornaam, Achternaam)
       perspective on: User
@@ -38,7 +38,7 @@ domain: System
 
     thing: RootUsers = IndexedContexts >> binding >> context >> RootUser
 
-    context: Channels = User >> (binder Initiator union binder ConnectedPartner) >> context >> extern
+    context: Channels = User >> (binder Initiator both binder ConnectedPartner) >> context >> extern
 
     context: Modellen = filter callExternal cdb:Models() returns: sys:Model$External with not IsLibrary
 
@@ -93,8 +93,8 @@ domain: System
       aspect: sys:PhysicalContext$UserWithAddress
       perspective on: Initiator
       perspective on: ConnectedPartner
-    user: Me = filter (Initiator union ConnectedPartner) with binds sys:Me
-    user: You = filter (Initiator union ConnectedPartner) with not binds sys:Me
+    user: Me = filter (Initiator both ConnectedPartner) with binds sys:Me
+    user: You = filter (Initiator both ConnectedPartner) with not binds sys:Me
 
   case: Model
     aspect: sys:RootContext
@@ -106,7 +106,7 @@ domain: System
       property: IsLibrary (mandatory, functional, Boolean)
     user: Author (not mandatory, functional) filledBy: User
       aspect: sys:RootContext$RootUser
-      perspective on: External
+      perspective on: extern
     context: IndexedContext (mandatory, functional) filledBy: sys:RootContext
       property: Name (mandatory, functional, String)
     thing: IndexedRole (not mandatory, not functional)
@@ -128,12 +128,12 @@ domain: System
 
     user: Invitee (mandatory, functional) filledBy: Guest
       perspective on: Inviter
-      perspective on: External (ForInvitee) Consult
+      perspective on: extern (ForInvitee) Consult
 
     user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
 
     bot: for Inviter
-      perspective on: External
+      perspective on: extern
         if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then
           SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
 
