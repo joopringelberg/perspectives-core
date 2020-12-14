@@ -84,6 +84,8 @@ invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
 invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
   (BQD _ (BinaryCombinator UnionF) conj1 conj2 _ _ _) -> append <$> invert_ (compose conj1 (replaceDomain r (range conj1))) <*> invert_ (compose conj2 (replaceDomain r (range conj2)))
 
+  (BQD _ (BinaryCombinator IntersectionF) conj1 conj2 _ _ _) -> append <$> invert_ (compose conj1 (replaceDomain r (range conj1))) <*> invert_ (compose conj2 (replaceDomain r (range conj2)))
+
   (BQD _ (BinaryCombinator FilterF) source criterium ran _ _) -> append <$> invert_ (compose source criterium) <*> invert_ (compose source r)
 
   (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _) -> invert_ (BQD dom (BinaryCombinator ComposeF) qfd1 (BQD (range qfd1) (BinaryCombinator ComposeF) qfd2 r ran f m) ran f m)
