@@ -33,11 +33,9 @@ import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Effect.Unsafe (unsafePerformEffect)
 import Foreign.Object (insert, keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Guid (guid)
 import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
@@ -276,9 +274,10 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 
     -- We we add roleName as another disjunct of a sum type.
     -- `roleName` should be qualified.
+    -- Notice that we treat roles as units here; not as collections of properties!
     addToADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
     addToADT adt roleName = case adt of
-      EMPTY -> EMPTY
+      EMPTY -> ST $ EnumeratedRoleType roleName
       SUM terms -> SUM $ cons (ST $ EnumeratedRoleType roleName) terms
       p@(PROD _) -> SUM [p, ST $ EnumeratedRoleType roleName]
       s@(ST _) -> SUM [s, ST $ EnumeratedRoleType roleName]
@@ -288,7 +287,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     -- `roleName` should be qualified.
     multiplyWithADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
     multiplyWithADT adt roleName = case adt of
-      EMPTY -> ST $ EnumeratedRoleType roleName
+      EMPTY -> EMPTY
       p@(SUM _) -> PROD [p, ST $ EnumeratedRoleType roleName]
       PROD terms -> PROD $ cons (ST $ EnumeratedRoleType roleName) terms
       s@(ST _) -> PROD [s, ST $ EnumeratedRoleType roleName]
@@ -483,8 +482,13 @@ traverseActionE :: Partial =>                     -- The function is partial bec
   PhaseTwo (Array ActionType)
 traverseActionE objectCalculation defaultObjectView rolename actions (Act (ActionE{id, verb, actionParts, pos})) = do
   isabot <- isSubjectBot
+  -- Each action in the domeinFile has a unique index.
   (n :: Int) <- getsDF \df -> length $ keys df.actions
-  actionId <- pure $ show $ unsafePerformEffect guid
+  actionId <- if isabot
+    -- Different names for the same verb and object for the bot and its master, otherwise they will overwrite.
+    then pure (roletype2string rolename <> "_bot$" <> show verb <> (show n))
+    else pure (roletype2string rolename <> "$" <> show verb <> (show n))
+
   executedByBot <- isSubjectBot
   action <- pure $ Action
     { _id: ActionType actionId
