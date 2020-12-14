@@ -67,7 +67,7 @@ instance actionActionClass :: ActionClass Action where
   object = _.object <<< unwrap
   objectQfd r = case object r of
     Q calc -> pure calc
-    S _ -> throwError (error ("Attempt to acces Condition of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: ActionType))))
+    S _ -> throwError (error ("Attempt to acces Object of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: ActionType))))
   objectType r = objectQfd r >>= pure <<< unsafePartial domain2roleType <<< range
   -- objectType r = case object r of
   --   Q calc -> pure $ unsafePartial domain2roleType $ range calc

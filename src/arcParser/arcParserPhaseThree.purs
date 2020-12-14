@@ -35,6 +35,7 @@ import Data.Array (filter, filterA, foldM, head, length, null, reverse, uncons)
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
+import Data.FoldableWithIndex (traverseWithIndex_)
 import Data.Map (Map, fromFoldable, singleton) as Map
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
@@ -98,9 +99,10 @@ phaseThree_ df@{_id, referredModels} = do
       qualifyActionRoles
       qualifyBindings
       qualifyPropertyReferences
-      qualifyViewReferences
       compileExpressions
+      qualifyViewReferences
       requalifyBindingsToCalculatedRoles
+      addInvertedQueries
       invertedQueriesForLocalRolesAndProperties
       compileRules
       )
@@ -139,15 +141,15 @@ qualifyActionRoles = do
       \rt -> case rt of
         (ENR (EnumeratedRoleType ur)) -> case lookup ur enumeratedRoles of
           Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> ur <> "' in model.")
-          (Just (EnumeratedRole {perspectives})) -> for_ perspectives (qualifyActionRoles'' ctxtId)
+          (Just (EnumeratedRole {perspectives})) -> for_ perspectives (qualifyIndirectObject ctxtId)
         (CR (CalculatedRoleType ur)) -> case lookup ur calculatedRoles of
           Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> ur <> "' in model.")
-          (Just (CalculatedRole {perspectives})) -> for_ perspectives (qualifyActionRoles'' ctxtId)
+          (Just (CalculatedRole {perspectives})) -> for_ perspectives (qualifyIndirectObject ctxtId)
     where
-      qualifyActionRoles'' :: ContextType -> ActionType -> PhaseThree Unit
-      qualifyActionRoles'' ctxtId (ActionType a) = case lookup a actions of
+      qualifyIndirectObject :: ContextType -> ActionType -> PhaseThree Unit
+      qualifyIndirectObject ctxtId (ActionType a) = case lookup a actions of
         Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
-        (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
+        (Just (Action ar@{_id: actId, indirectObject: mindirectObject, pos})) -> do
           ar' <- case mindirectObject of
             (Just indirectObject) -> do
               qname <- case indirectObject of
@@ -161,7 +163,7 @@ qualifyActionRoles = do
             else modifyDF (\df@{actions: actions'} -> df {actions = insert (unwrap actId) (Action ar') actions'})
 
 
-      -- The role (being used as object of an Action) should be a role of the context type.
+      -- The role (being used as indirectObject of an Action) should be a role of the context type.
       -- Fetch all roles of the context, including its Aspects.
       qualifiedRoleType :: ContextType -> ArcPosition -> String -> PhaseThree RoleType
       qualifiedRoleType ctxtId pos ident = do
@@ -302,7 +304,7 @@ qualifyViewReferences = do
         qualifyAction actionName (Action ar@{_id:actionId, subject, requiredSubjectProperties, object, requiredObjectProperties, indirectObject, requiredIndirectObjectProperties, pos}) = do
           (subjectView :: Maybe ViewType) <- (lift2 $ adtOfRoleType subject) >>= qualifyViewForRole requiredSubjectProperties
           (objectView :: Maybe ViewType) <- case object of
-            S _ -> throwError (Custom ("Attempt to acces Object of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ actionId)))
+            S _ -> throwError (Custom ("qualifyViewReferences: Attempt to acces Object of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ actionId)))
             Q calc -> qualifyViewForRole requiredObjectProperties (unsafePartial domain2roleType $ range calc)
           (indirectObjectView :: Maybe ViewType) <- case indirectObject of
             (Just indirectObject') -> (lift2 $ adtOfRoleType indirectObject') >>= qualifyViewForRole requiredIndirectObjectProperties
@@ -361,6 +363,7 @@ invertedQueriesForLocalRolesAndProperties = do
 compileExpressions :: PhaseThree Unit
 compileExpressions = do
   df@{_id} <- lift $ gets _.dfr
+  -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
     _id
     (DomeinFile df)
@@ -371,69 +374,104 @@ compileExpressions = do
       -- TODO. Collect references to Calculated Properties from the QueryFunctionDescriptions and sort
       -- the calculatedRoles accordingly before compiling the descriptions. That will detect cycles
       -- (throw an error) and prevent forward reference errors.
+      -- Currently, Action objects must not contain Calculated roles.
       compRoles <- traverseWithIndex compileRolExpr calculatedRoles
       compProps <- traverseWithIndex compilePropertyExpr calculatedProperties
       compActions <- traverseWithIndex compileActionObject actions
-      modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps}
+      -- Modify the DomeinFile we're building in PhaseTwoState.
+      modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps, actions = compActions}
 
       where
         compileActionObject :: String -> Action -> PhaseThree Action
         compileActionObject actionName (Action a@{subject, object, verb, requiredObjectProperties}) = case object of
           Q _ -> pure $ Action a
           S stp -> do
-            props <- case requiredObjectProperties of
-              Nothing -> pure All
-              Just v -> Properties <$> (lift2 (v ###= propertiesOfView))
-            (pAndV :: Map.Map RoleType PropsAndVerbs) <- pure $ Map.singleton subject (singleton (show verb) props)
             dom <- lift2 $ CDOM <$> contextOfRoleType subject
             descr <- withFrame do
               varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
               compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
               pure $ makeSequence varb compiledCalculation
-            setInvertedQueries pAndV descr
+            -- Save the Action in the DomeinCache. Notice that the cache temporarily contains
+            -- the version of the model we're compiling.
             lift2 $ modifyActionInDomeinFile ns (Action (a {object = Q descr}))
 
         compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
         compileRolExpr roleName (CalculatedRole cr@{_id, calculation, context}) = case calculation of
           Q _ -> pure $ CalculatedRole cr
           S stp -> do
-            userTypes <- lift $ lift (context ###= localEnumeratedRolesWithPerspectiveOnRole (CR _id))
-            -- For each userType get the PropsAndVerbs for the calculated role:
-            (pAndV :: Map.Map RoleType PropsAndVerbs) <- Map.fromFoldable <$> for userTypes (\userType -> do
-              pv <- lift2 $ propsAndVerbsForObjectRole (CR _id) userType
-              pure $ Tuple userType pv
-              )
             dom <- pure (CDOM $ ST context)
 
             descr <- withFrame do
               varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
               compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
               pure $ makeSequence varb compiledCalculation
-
-            setInvertedQueries pAndV descr
             lift2 $ modifyCalculatedRoleInDomeinFile ns (CalculatedRole (cr {calculation = Q descr}))
 
         compilePropertyExpr :: String -> CalculatedProperty -> PhaseThree CalculatedProperty
         compilePropertyExpr propertyName (CalculatedProperty cr@{_id, calculation, role}) = case calculation of
           Q _ -> pure $ CalculatedProperty cr
           S stp -> do
-            (EnumeratedRole{context}) <- lift $ lift $ getEnumeratedRole role
-            userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnProperty (CP _id))
-            -- userProps <- pure $ fromFoldable ((\u -> Tuple u (Properties [])) <$> userTypes)
-
-            -- For each userType get the PropsAndVerbs for the calculated role:
-            (pAndV :: Map.Map RoleType PropsAndVerbs) <- Map.fromFoldable <$> for userTypes (\userType -> do
-              pure $ Tuple userType empty
-              )
             dom <- pure (RDOM $ ST role)
 
             descr <- withFrame do
               varb <- compileVarBinding dom (VarBinding "currentrole" (Simple $ AE.Identity (startOf stp)))
               compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
               pure $ makeSequence varb compiledCalculation
-
-            setInvertedQueries pAndV descr
             lift2 $ modifyCalculatedPropertyInDomeinFile ns (CalculatedProperty (cr {calculation = Q descr}))
+
+addInvertedQueries :: PhaseThree Unit
+addInvertedQueries = do
+  df@{_id} <- lift $ gets _.dfr
+  -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (addInvertedQueries' df _id)
+  where
+    addInvertedQueries' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
+    addInvertedQueries' {calculatedRoles, calculatedProperties, actions} ns = do
+      traverseWithIndex_ addInvertedQueriesForActionObject actions
+      traverseWithIndex_ addInvertedQueriesForRole calculatedRoles
+      traverseWithIndex_ addInvertedQueriesForProperty calculatedProperties
+
+      where
+        addInvertedQueriesForActionObject :: String -> Action -> PhaseThree Unit
+        addInvertedQueriesForActionObject actionName (Action a@{subject, object, verb, requiredObjectProperties}) = case object of
+          S stp -> throwError $ Custom $ "addInvertedQueriesForActionObject: action object not compiled for " <> actionName
+          Q descr -> do
+            props <- case requiredObjectProperties of
+              Nothing -> pure All
+              Just v -> Properties <$> (lift2 (v ###= propertiesOfView))
+            (pAndV :: Map.Map RoleType PropsAndVerbs) <- pure $ Map.singleton subject (singleton (show verb) props)
+            dom <- lift2 $ CDOM <$> contextOfRoleType subject
+            -- Sets the inverted queries directly in the EnumeratedRoles and Properties in the
+            -- DomeinFile we keep in PhaseTwoState.
+            setInvertedQueries pAndV descr
+
+        addInvertedQueriesForRole :: String -> CalculatedRole -> PhaseThree Unit
+        addInvertedQueriesForRole roleName (CalculatedRole cr@{_id, calculation, context}) = case calculation of
+          S stp -> throwError $ Custom $ "addInvertedQueriesForRole: role expression not compiled for " <> roleName
+          Q descr -> do
+            userTypes <- lift $ lift (context ###= localEnumeratedRolesWithPerspectiveOnRole (CR _id))
+            -- For each userType get the PropsAndVerbs for the calculated role:
+            (pAndV :: Map.Map RoleType PropsAndVerbs) <- Map.fromFoldable <$> for userTypes (\userType -> do
+              pv <- lift2 $ propsAndVerbsForObjectRole (CR _id) userType
+              pure $ Tuple userType pv
+              )
+            setInvertedQueries pAndV descr
+
+        addInvertedQueriesForProperty :: String -> CalculatedProperty -> PhaseThree Unit
+        addInvertedQueriesForProperty propertyName (CalculatedProperty cr@{_id, calculation, role}) = case calculation of
+          S stp -> throwError $ Custom $ "addInvertedQueriesForProperty: property expression not compiled for " <> propertyName
+          Q descr -> do
+            (EnumeratedRole{context}) <- lift $ lift $ getEnumeratedRole role
+            userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnProperty (CP _id))
+
+            -- For each userType get the PropsAndVerbs for the calculated role:
+            (pAndV :: Map.Map RoleType PropsAndVerbs) <- Map.fromFoldable <$> for userTypes (\userType -> do
+              pure $ Tuple userType empty
+              )
+            setInvertedQueries pAndV descr
 
 -- compileArg :: Array EnumeratedRoleType -> Domain -> Calculation -> PhaseThree Calculation
 -- compileArg userTypes dom (S s) = compileAndDistributeStep userTypes dom s >>= pure <<< Q
@@ -502,7 +540,7 @@ compileRules = do
               -- lookup in the runtime environment.
               addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True False)
               objectCalculation <- case object of
-                S _ -> throwError (Custom ("Attempt to acces Object of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
+                S _ -> throwError (Custom ("compileRules: Attempt to acces Object of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
                 Q calc -> pure calc
               addBinding "object" (SQD currentDomain (QF.VariableLookup "object") (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
               conditionDescription <- compileActionCondition
