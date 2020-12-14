@@ -26,6 +26,7 @@ import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), Step(..))
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AST
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, evalPhaseTwo', expandNamespace, withNamespaces)
@@ -457,7 +458,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               (let
                 -- _p :: Traversal' DomeinFileRecord ActionType)
                 -- NOTE: the index at the end of the Traversal' is very dependent on the order of the Actions!
-                _p = prop (SProxy :: (SProxy "enumeratedRoles")) <<< at "model:MyTestDomain$MySelf" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "perspectives")) <<< at "AnotherRole" <<< traversed <<< ix 1
+                _p = prop (SProxy :: (SProxy "enumeratedRoles")) <<< at "model:MyTestDomain$MySelf" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "perspectives")) <<< ix 1
                 in case (preview _p dr') of
                   (Just (ActionType "model:MyTestDomain$MySelf_bot$ConsultAnotherRole")) -> true
                   otherwise -> false)
@@ -465,7 +466,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               (let
                 _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf_bot$ConsultAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
                 in case (preview _o dr') of
-                  (Just (ENR (EnumeratedRoleType "AnotherRole"))) -> true
+                  (Just (S (Simple (AST.ArcIdentifier _ "AnotherRole")))) -> true
+                  -- (Just (ENR (EnumeratedRoleType "AnotherRole"))) -> true
                   otherwise -> false
                 )
             assert "The Action 'model:MyTestDomain$MySelf_bot$ConsultAnotherRole' should be executed by the bot."

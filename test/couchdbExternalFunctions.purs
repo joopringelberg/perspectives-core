@@ -91,8 +91,8 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     if null errs
       then do
         pure unit
-        cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
+        -- cdburl <- developmentRepository
+        -- void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
 
   test "upload model:SimpleChat to repository from files (without testuser)" $ runP do

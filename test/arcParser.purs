@@ -14,7 +14,7 @@ import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE, ruleE, viewE)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), RuleE(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), ComputationStep(..), Operator(..), Step(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), ComputationStep(..), Operator(..), SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.Action (Verb(..))
@@ -357,7 +357,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
         -- logShow pre
         (assert "The Perspective should have the object 'External'"
           (isJust (findIndex (case _ of
-            (Object "External") -> true
+            (Object (Simple (ArcIdentifier _ "External"))) -> true
             otherwise -> false) perspectiveParts)))
       otherwise -> assert "Parsed an unexpected type" false
 

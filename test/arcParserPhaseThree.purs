@@ -21,6 +21,8 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
+import Perspectives.Parsing.Arc.Expression.AST (Step(..))
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AST
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
@@ -32,7 +34,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Class.Role (propertiesOfADT)
+import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
@@ -119,7 +121,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   (let
                     _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf_bot$ConsultAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
                     in case (preview _o correctedDFR) of
-                      (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
+                      (Just (S (Simple (AST.ArcIdentifier _ "model:MyTestDomain$AnotherRole")))) -> true
+                      -- (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
                       -- (Just (CR _)) -> true
                       otherwise -> false
                     )
@@ -151,7 +154,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   (let
                     _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$Driver$ConsultExternal" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
                     in case (preview _o correctedDFR) of
-                      (Just (ENR (EnumeratedRoleType "model:MyTestDomain$External"))) -> true
+                      (Just (S (Simple (AST.ArcIdentifier _ "model:MyTestDomain$External")))) -> true
+                      -- (Just (ENR (EnumeratedRoleType "model:MyTestDomain$External"))) -> true
                       -- (Just (CR _)) -> true
                       otherwise -> false
                     )
@@ -347,7 +351,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                         Nothing -> assert "We should be able to find the qualified version of 'Datum'" false
                         (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum")))  | length candidates == 1 -> assert "" true
                         otherwise -> assert "There is only one property with local name 'Datum' defined but we've found more?!" false
-                      xx <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) (propertiesOfADT (ST (EnumeratedRoleType "model:MyTestDomain$Feest")))
+                      xx <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) (allProperties (ST (EnumeratedRoleType "model:MyTestDomain$Feest")))
                       case head xx of
                         Nothing -> assert "geen properties" false
                         (Just p) | length xx == 1 -> assert "The properties of 'model:MyTestDomain$Feest' should include 'model:MyTestDomain$FeestVoorbereiding$Datum'" (p == ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))
