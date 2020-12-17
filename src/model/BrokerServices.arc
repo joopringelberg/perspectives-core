@@ -41,7 +41,7 @@ domain: BrokerServices
 
       perspective on: Accounts
       perspective on: Administrator
-      perspective on: External
+      perspective on: extern
 
     user: Guest = sys:Me
 
@@ -77,7 +77,7 @@ domain: BrokerServices
       view: ForAdministrator (AccountName, AccountPassword, QueueName)
       view: ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode)
 
-      perspective on: External (ForAccountHolder)
+      perspective on: extern (ForAccountHolder)
       perspective on: AccountHolder
 
     user: Administrator filledBy: bs:BrokerService$Administrator
@@ -86,7 +86,7 @@ domain: BrokerServices
       view: Confirmation (ConfirmationCode)
 
       perspective on: AccountHolder
-      perspective on: External
+      perspective on: extern
 
     user: Guest = sys:Me
 

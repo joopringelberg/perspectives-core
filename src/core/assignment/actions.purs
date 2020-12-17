@@ -26,7 +26,7 @@ module Perspectives.Actions where
 import Prelude
 
 import Control.Monad.AvarMonadAsk (modify, gets)
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, null, uncons, unsafeIndex)
@@ -47,6 +47,7 @@ import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
+import Perspectives.Error.Boundaries (handlePerspectRolError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -142,9 +143,7 @@ compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
     case uncons roles of
       Nothing -> pure unit
-      Just {head, tail} -> do
-        -- ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
-        for_ roles removeRoleInstance
+      Just {head, tail} -> for_ roles removeRoleInstance
 
 -- Delete all instances of the role. Model
 compileAssignment (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
@@ -192,7 +191,7 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
   pure \contextId -> do
     ctxts <- lift2 (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
-      roleIdentifier <- createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+      roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
       lift2 $ getPerspectRol roleIdentifier
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
@@ -204,9 +203,10 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
       (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
       case fromArray roles of
         Nothing -> pure unit
-        Just roles' -> do
-          ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (head roles')
-          moveRoleInstancesToAnotherContext context c pspType roles'
+        Just roles' ->  try (lift $ lift $ getPerspectEntiteit (head roles')) >>=
+          handlePerspectRolError "compileAssignment, Move"
+            (\((PerspectRol{context, pspType}) :: PerspectRol) -> moveRoleInstancesToAnotherContext context c pspType roles')
+
     else pure \contextId -> do
       ctxt <- lift $ lift (contextId ##> contextGetter)
       case ctxt of
@@ -215,9 +215,9 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
           (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
           case fromArray roles of
             Nothing -> pure unit
-            Just roles' -> do
-              ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (head roles')
-              moveRoleInstancesToAnotherContext context c pspType roles'
+            Just roles' ->  try (lift $ lift $ getPerspectEntiteit (head roles')) >>=
+              handlePerspectRolError "compileAssignment, Move"
+                (\((PerspectRol{context, pspType}) :: PerspectRol) -> moveRoleInstancesToAnotherContext context c pspType roles')
 
 compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn

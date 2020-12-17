@@ -26,7 +26,7 @@ domain: System
     user: User (mandatory, functional)
       property: Achternaam (mandatory, not functional, String)
       property: Voornaam (mandatory, not functional, String)
-      property: Channel = (binder Initiator both binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
+      property: Channel = (binder Initiator either binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       indexed: sys:Me
       view: VolledigeNaam (Voornaam, Achternaam)
       perspective on: User
@@ -38,7 +38,7 @@ domain: System
 
     thing: RootUsers = IndexedContexts >> binding >> context >> RootUser
 
-    context: Channels = User >> (binder Initiator both binder ConnectedPartner) >> context >> extern
+    context: Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
 
     context: Modellen = filter callExternal cdb:Models() returns: sys:Model$External with not IsLibrary
 
@@ -93,8 +93,8 @@ domain: System
       aspect: sys:PhysicalContext$UserWithAddress
       perspective on: Initiator
       perspective on: ConnectedPartner
-    user: Me = filter (Initiator both ConnectedPartner) with binds sys:Me
-    user: You = filter (Initiator both ConnectedPartner) with not binds sys:Me
+    user: Me = filter (Initiator either ConnectedPartner) with binds sys:Me
+    user: You = filter (Initiator either ConnectedPartner) with not binds sys:Me
 
   case: Model
     aspect: sys:RootContext

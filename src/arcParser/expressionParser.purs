@@ -174,9 +174,9 @@ operator =
   <|>
   (Multiply <$> (getPosition <* token.reservedOp "*"))
   <|>
-  (Union <$> (getPosition <* token.reservedOp "both"))
+  (Union <$> (getPosition <* token.reservedOp "either"))
   <|>
-  (Intersection <$> (getPosition <* token.reservedOp "either"))
+  (Intersection <$> (getPosition <* token.reservedOp "both"))
   ) <?> ">>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>=, union"
 
 operatorPrecedence :: Operator -> Int

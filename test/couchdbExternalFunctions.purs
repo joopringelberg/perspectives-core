@@ -19,7 +19,7 @@ import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore, models, uploadToRepository)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
-import Perspectives.Persistent (entitiesDatabaseName, removeEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, removeEntiteit, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (developmentRepository)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -83,7 +83,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Couchdb: " <> show errs) false
 
-  testOnly "upload model:System to repository from files" $ runP do
+  test "upload model:System to repository from files" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
@@ -91,8 +91,8 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     if null errs
       then do
         pure unit
-        -- cdburl <- developmentRepository
-        -- void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
+        cdburl <- developmentRepository
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
 
   test "upload model:SimpleChat to repository from files (without testuser)" $ runP do
@@ -103,6 +103,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     errs <- loadCompileAndCacheArcFile "simpleChat" modelDirectory
     if null errs
       then do
+        pure unit
         cdburl <- developmentRepository
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
@@ -115,23 +116,29 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Parsing") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Parsing: " <> show errs) false
 
-  test "upload model:ModelManagement to repository from files (without testuser)" $ runP do
+  testOnly "upload model:ModelManagement to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
+    _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     _ <- loadCompileAndCacheArcFile "parsing" modelDirectory
     errs <- loadCompileAndCacheArcFile "modelManagement" modelDirectory
     if null errs
       then do
+        pure unit
         cdburl <- developmentRepository
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:ModelManagement") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:ModelManagement: " <> show errs) false
 
   test "upload model:BrokerServices to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
+    _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     errs <- loadCompileAndCacheArcFile "BrokerServices" modelDirectory
     if null errs
       then do
+        pure unit
         cdburl <- developmentRepository
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:BrokerServices") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:BrokerServices: " <> show errs) false

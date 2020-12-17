@@ -35,8 +35,6 @@ import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
 -----------------------------------------------------------
 -- EXPAND DEFAULT NAMESPACES
 -----------------------------------------------------------
--- | Replace `sys:User` by `model:Systeem$User` if sys = `model:Systeem`
--- | Replace model:User$Me by "model:User$<guid>$User_0001".
 -- | Useful for expanding local names used in bindings, property- and view references.
 expandDefaultNamespaces :: String -> MonadPerspectives String
 expandDefaultNamespaces n = do
@@ -54,7 +52,6 @@ expandIndexedNames defaults expandedName =
     (Just ind) -> ind
     Nothing -> expandedName
 
--- | Replace `sys:User` by `model:Systeem$User` if sys = `model:Systeem`
 expandNamespaces :: OBJ.Object String -> String -> String
 expandNamespaces namespaces s = if isQualifiedWithDomein s then s else
   case deconstructPrefix s of

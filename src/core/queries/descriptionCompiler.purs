@@ -29,38 +29,143 @@ module Perspectives.Query.DescriptionCompiler where
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
-import Data.Array (elemIndex, foldM, fromFoldable, head, length, null, reverse, uncons)
+import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, reverse, uncons)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
+import Foreign.Object (keys)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
+import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
+import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range, roleRange, sumOfDomains)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range, roleRange, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..), sum)
-import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
+import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
+import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
+import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole)
+import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
+import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..), PropertyType, RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
-import Prelude (bind, discard, eq, map, pure, ($), (&&), (<$>), (<*>), (==), (>>=))
+import Prelude (bind, discard, eq, map, pure, show, void, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=))
 
+------------------------------------------------------------------------------------
+------ MONAD TYPE FOR DESCRIPTIONCOMPILER
+------------------------------------------------------------------------------------
 type FD = PhaseThree QueryFunctionDescription
 
+------------------------------------------------------------------------------------
+------ COMPILING ROLE REFERENCES
+------------------------------------------------------------------------------------
+-- Describe a conjunction of rolegetters.
+makeConjunction :: Domain -> QueryFunctionDescription -> RoleType -> FD
+makeConjunction currentDomain left rt2 = do
+  right <- makeRoleGetter currentDomain rt2
+  (rightADT :: ADT EnumeratedRoleType) <- lift2 $ typeExcludingBinding_ rt2
+  pure $ BQD currentDomain (QF.BinaryCombinator UnionF) left right (RDOM (sum [unsafePartial roleRange left, rightADT])) THREE.False (THREE.or (mandatory left) (mandatory right))
+
+-- | Constructs a QueryFunctionDescription that describes getting a role of the given type.
+-- | CalculatedRoles are compiled, when necessary. The result of such an on-the-fly compilation is saved
+-- | in the domeinCache.
+makeRoleGetter :: Domain -> RoleType -> PhaseThree QueryFunctionDescription
+makeRoleGetter currentDomain rt = do
+  (adt :: ADT EnumeratedRoleType) <- case rt of
+    ENR et -> lift2 (getEnumeratedRole et >>= roleADT)
+    CR ct -> do
+      crole@(CalculatedRole{calculation}) <- lift2 $ getCalculatedRole ct
+      case calculation of
+        Q qfd -> pure $ unsafePartial domain2roleType $ range qfd
+        S step -> compileAndSaveRole currentDomain step crole
+  isF <- lift2 $ roleTypeIsFunctional rt
+  isM <- lift2 $ roleTypeIsMandatory rt
+  pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
+
+-- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
+-- | Saves it in the DomainCache.
+compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT EnumeratedRoleType)
+compileAndSaveRole dom step (CalculatedRole cr@{_id}) = withFrame do
+  varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ Identity (startOf step)))
+  compiledExpression <- compileStep dom step >>= traverseQfd (qualifyReturnsClause (startOf step))
+  descr <- pure $ makeSequence varb compiledExpression
+  -- Save the result in DomeinCache.
+  lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q descr})
+  pure $ unsafePartial $ domain2roleType $ range compiledExpression
+
+qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = do
+  -- Note that it doesn't matter if we take the roles from the cache or from
+  -- PhaseThreeState: the role identifiers are identical.
+  enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
+  computedTypeADT <- ST <$> qualifyLocalEnumeratedRoleName pos computedType (keys enumeratedRoles)
+  case computedTypeADT of
+    ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure qfd
+    _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
+qualifyReturnsClause pos qfd = pure qfd
+
+qualifyLocalEnumeratedRoleName :: ArcPosition -> String -> Array String -> PhaseThree EnumeratedRoleType
+qualifyLocalEnumeratedRoleName pos ident roleIdentifiers = EnumeratedRoleType <$> (qualifyLocalRoleName_ pos ident roleIdentifiers )
+
+qualifyLocalCalculatedRoleName :: ArcPosition -> String -> Array String -> PhaseThree CalculatedRoleType
+qualifyLocalCalculatedRoleName pos ident roleIdentifiers = CalculatedRoleType <$> (qualifyLocalRoleName_ pos ident roleIdentifiers )
+
+qualifyLocalRoleName_ :: ArcPosition -> String -> Array String -> PhaseThree String
+qualifyLocalRoleName_ pos ident roleIdentifiers = if isQualifiedWithDomein ident
+  then pure ident
+  else do
+    (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) roleIdentifiers
+    case head candidates of
+      Nothing -> throwError $ UnknownRole pos ident
+      (Just qname) | length candidates == 1 -> pure qname
+      otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
+
+------------------------------------------------------------------------------------
+------ COMPILING PROPERTY REFERENCES
+------------------------------------------------------------------------------------
+
+-- | Constructs a QueryFunctionDescription that describes getting a property of the given type.
+-- | CalculatedRoles and Properties are compiled, when necessary. The result of such an on-the-fly compilation is saved
+-- | in the domeinCache.
+makePropertyGetter :: Domain -> PropertyType -> PhaseThree QueryFunctionDescription
+makePropertyGetter currentDomain pt = do
+  (ran :: QT.Range) <- case pt of
+    ENP ep -> lift2 (getEnumeratedProperty ep >>= PROP.range >>= \r -> pure $ VDOM r (Just pt))
+    CP cp -> do
+      cprop@(CalculatedProperty{calculation}) <- lift2 $ getCalculatedProperty cp
+      case calculation of
+        Q qfd -> pure (range qfd)
+        S step -> compileAndSaveProperty currentDomain step cprop
+  isF <- lift2 $ PROP.propertyTypeIsFunctional pt
+  isM <- lift2 $ PROP.propertyTypeIsMandatory pt
+  pure $ SQD currentDomain (QF.PropertyGetter pt) ran (bool2threeValued isF) (bool2threeValued isM)
+
+-- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
+-- | Saves it in the DomainCache.
+compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> PhaseThree QT.Range
+compileAndSaveProperty dom step (CalculatedProperty cp@{_id}) = withFrame do
+  varb <- compileVarBinding dom (VarBinding "currentrole" (Simple $ Identity (startOf step)))
+  compiledExpression <- compileStep dom step >>= traverseQfd (qualifyReturnsClause (startOf step))
+  descr <- pure $ makeSequence varb compiledExpression
+  -- Save the result in DomeinCache.
+  lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q descr})
+  pure $ range compiledExpression
+
+------------------------------------------------------------------------------------
+------ COMPILING STEPS
+------------------------------------------------------------------------------------
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
 compileStep currentDomain (Unary st) = compileUnaryStep currentDomain st
@@ -69,20 +174,9 @@ compileStep currentDomain (PureLet st) = compileLetStep currentDomain st
 compileStep currentDomain (Let st) = throwError $ NotAPureLet st
 compileStep currentDomain (Computation st) = compileComputationStep currentDomain st
 
--- Describe a conjunction of rolegetters.
-makeConjunction :: Domain -> QueryFunctionDescription -> RoleType -> FD
-makeConjunction currentDomain left rt2 = do
-  right <- lift2 $ makeRoleGetter currentDomain rt2
-  (rightADT :: ADT EnumeratedRoleType) <- lift $ lift $ typeExcludingBinding_ rt2
-  pure $ BQD currentDomain (QF.BinaryCombinator UnionF) left right (RDOM (sum [unsafePartial roleRange left, rightADT])) THREE.False (THREE.or (mandatory left) (mandatory right))
-
-makeRoleGetter :: Domain -> RoleType -> MonadPerspectives QueryFunctionDescription
-makeRoleGetter currentDomain rt = do
-  (adt :: ADT EnumeratedRoleType) <- typeExcludingBinding_ rt
-  isF <- roleTypeIsFunctional rt
-  isM <- roleTypeIsMandatory rt
-  pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
-
+------------------------------------------------------------------------------------
+------ COMPILING SIMPLE STEPS
+------------------------------------------------------------------------------------
 compileSimpleStep :: Domain -> SimpleStep -> FD
 compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
   mindexedContextType <- isIndexedContext ident
@@ -100,21 +194,21 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
             case uncons rts of
               Nothing -> throwError $ ContextHasNoRole c ident
               Just {head, tail} -> if null tail
-                then lift2 $ makeRoleGetter currentDomain head
+                then makeRoleGetter currentDomain head
                 else do
-                  head' <- lift2 $ makeRoleGetter currentDomain head
+                  -- TODO. Is dit wat we willen? Een conjunctie (disjunctie?)
+                  -- van rollen wier lokale namen matchen?
+                  head' <- makeRoleGetter currentDomain head
                   foldM (makeConjunction currentDomain) head' tail
           (RDOM r) -> do
             (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
               then  lift2 $ runArrayT $ lookForPropertyType ident r
               else lift2 $ runArrayT $ lookForUnqualifiedPropertyType ident r
-            case head pts of
+            case uncons pts of
               Nothing -> throwError $ RoleHasNoProperty r ident
-              (Just (pt :: PropertyType)) -> do
-                isF <- lift2 $ propertyTypeIsFunctional pt
-                isM <- lift2 $ propertyTypeIsMandatory pt
-                (rOfpt :: Range) <- lift2 $ rangeOfPropertyType pt
-                pure $ SQD currentDomain (QF.PropertyGetter pt) (VDOM rOfpt (Just pt)) (bool2threeValued isF) (bool2threeValued isM)
+              Just {head:pt, tail} -> if null tail
+                then makePropertyGetter currentDomain pt
+                else throwError $ NotUniquelyIdentifying pos ident (show <$> pts)
           otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $

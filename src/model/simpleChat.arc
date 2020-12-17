@@ -18,7 +18,6 @@ domain: SimpleChat
     user: Chatter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
       aspect: sys:RootContext$RootUser
       perspective on: Chats
-      --perspective on: Initiator in Chats: Become
       perspective on: Chats >> context >> Initiator: Create, Bind
 
   case: Chat
@@ -33,19 +32,19 @@ domain: SimpleChat
       aspect: sys:Invitation$Inviter
       aspect: cht:WithText$TextWriter
       perspective on: Partner
-      perspective on: External
+      perspective on: extern
 
     user: Partner (not mandatory, functional) filledBy: sys:PerspectivesSystem$User
       aspect: sys:Invitation$Invitee
       aspect: cht:WithText$TextWriter
-      perspective on: External Consult
+      perspective on: extern Consult
       perspective on: Initiator
       perspective on: Partner
 
     thing: PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns: sys:PerspectivesSystem$User) with not binds sys:Me
 
-    user: Me = filter (Initiator union Partner) with binds sys:Me
-    user: You = filter (Initiator union Partner) with not binds sys:Me
+    user: Me = filter (Initiator either Partner) with binds sys:Me
+    user: You = filter (Initiator either Partner) with not binds sys:Me
 
   case: WithText
     user: TextWriter filledBy: sys:PerspectivesSystem$User

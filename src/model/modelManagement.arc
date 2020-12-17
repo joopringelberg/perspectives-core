@@ -23,7 +23,7 @@ domain: ModelManagement
       property: Url (mandatory, functional, String)
       property: Description (not mandatory, functional, String)
 
-    user: Manager filledBy: sys:User
+    user: Manager filledBy: sys:PerspectivesSystem$User
       perspective on: Models
       perspective on: Repository
 
@@ -45,7 +45,7 @@ domain: ModelManagement
     context: ModelDescription (not mandatory, functional) filledBy: sys:Model
 
     user: Author (mandatory, functional) filledBy: Manager
-      perspective on: External Consult
+      perspective on: extern Consult
         --Create (Paths)
         --Change (Paths)
         --Delete (Feedback)
@@ -54,14 +54,14 @@ domain: ModelManagement
       perspective on: Repository
 
     bot: for Author
-      perspective on: External
+      perspective on: extern
         if extern >> ((exists ArcPath) and not exists ArcFeedback) then
           ArcFeedback = extern >> callExternal p:ParseAndCompileArc( ArcPath ) returns: String
     bot: for Author
-      perspective on: External
+      perspective on: extern
         if extern >> ((exists CrlPath) and not exists CrlFeedback) then
           CrlFeedback = extern >> callExternal p:ParseAndCompileCrl( CrlPath ) returns: String
     bot: for Author
-      perspective on: External
+      perspective on: extern
         if extern >> (ArcOK and CrlOK) then
           callEffect p:UploadToRepository( extern >> ArcPath, extern >> CrlPath, Repository >> Url )

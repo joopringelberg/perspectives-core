@@ -26,7 +26,7 @@ module Perspectives.Extern.Couchdb where
 import Affjax (Request, URL, request)
 import Affjax.RequestBody (string) as RequestBody
 import Control.Monad.AvarMonadAsk (modify) as AMA
-import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.State (State, StateT, execState, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
@@ -60,6 +60,8 @@ import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, SeparateInvertedQuery(..))
+import Perspectives.Error.Boundaries (handlePerspectRolError)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
@@ -67,6 +69,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
@@ -224,14 +227,16 @@ addModelToLocalStore' url = do
                         Nothing -> saveRoleInstance i a
                         Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
                           then saveRoleInstance i a
-                          else do
-                            -- set the inverse binding
-                            newBinding <- lift $ getPerspectEntiteit newBindingId
-                            void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType a) (RoleInstance i))
-                            void $ lift $ saveEntiteit newBindingId
-                            saveRoleInstance i a
-                            -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
-                            -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
+                          else (lift $ try $ getPerspectEntiteit newBindingId) >>=
+                            handlePerspectRolError
+                              "addModelToLocalStore'"
+                              -- set the inverse binding
+                              \newBinding -> do
+                                void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType a) (RoleInstance i))
+                                void $ lift $ saveEntiteit newBindingId
+                                saveRoleInstance i a
+                                -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
+                                -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
                 ))
                 contextInstances
 
@@ -336,8 +341,10 @@ addModelToLocalStore' url = do
 -- | they will be in the repository after uploading.
 uploadToRepository :: DomeinFileId -> URL -> MPQ Unit
 uploadToRepository dfId url = do
-  df <- lift $ lift $ getPerspectEntiteit dfId
-  uploadToRepository_ dfId url df
+  mdf <- lift $ lift $ try $ getPerspectEntiteit dfId
+  case mdf of
+    Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err)
+    Right df -> uploadToRepository_ dfId url df
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
 uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit

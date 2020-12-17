@@ -34,7 +34,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, filterA, foldM, head, length, null, reverse, uncons)
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
-import Data.Foldable (for_)
+import Data.Foldable (for_, traverse_)
 import Data.FoldableWithIndex (traverseWithIndex_)
 import Data.Map (Map, fromFoldable, singleton) as Map
 import Data.Maybe (Maybe(..), isJust)
@@ -47,8 +47,8 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (empty, insert, keys, lookup, unions, values, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
-import Perspectives.DomeinCache (modifyActionInDomeinFile, modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
+import Perspectives.DomeinCache (modifyActionInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
@@ -61,15 +61,15 @@ import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForU
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.DescriptionCompiler (compileStep, compileVarBinding, makeSequence)
+import Perspectives.Query.DescriptionCompiler (compileAndSaveProperty, compileAndSaveRole, compileStep, compileVarBinding, makeSequence, qualifyLocalEnumeratedRoleName, qualifyReturnsClause)
 import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain2roleType, functional, mandatory, range, traverseQfd)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.Identifiable (identifier_)
-import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole)
+import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
+import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
 import Perspectives.Representation.Class.Role (adtOfRoleAspectsBinding, bindingOfRole, contextOfRepresentationOfRole, contextOfRoleType, getRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
@@ -98,10 +98,10 @@ phaseThree_ df@{_id, referredModels} = do
     (do
       qualifyActionRoles
       qualifyBindings
-      qualifyPropertyReferences
       compileExpressions
-      qualifyViewReferences
       requalifyBindingsToCalculatedRoles
+      qualifyPropertyReferences
+      qualifyViewReferences
       addInvertedQueries
       invertedQueriesForLocalRolesAndProperties
       compileRules
@@ -123,7 +123,7 @@ withDomeinFile ns df mpa = do
   lift2 $ removeDomeinFileFromCache ns
   pure r
 
--- | Qualifies the identifiers used in the object- and indirectObject field of an Action.
+-- | Qualifies the identifiers used in the indirectObject field of an Action.
 -- | All Objects are by default constructed as enumerated; this function corrects that if
 -- | applicable.
 -- | Note that this function requires the DomeinFile to be available in the cache!
@@ -213,22 +213,6 @@ qualifyBindings = (lift $ gets _.dfr) >>= qualifyBindings'
             Left e -> throwError e
             Right adt -> pure adt
 
-qualifyLocalEnumeratedRoleName :: ArcPosition -> String -> Array String -> PhaseThree EnumeratedRoleType
-qualifyLocalEnumeratedRoleName pos ident roleIdentifiers = EnumeratedRoleType <$> (qualifyLocalRoleName_ pos ident roleIdentifiers )
-
-qualifyLocalCalculatedRoleName :: ArcPosition -> String -> Array String -> PhaseThree CalculatedRoleType
-qualifyLocalCalculatedRoleName pos ident roleIdentifiers = CalculatedRoleType <$> (qualifyLocalRoleName_ pos ident roleIdentifiers )
-
-qualifyLocalRoleName_ :: ArcPosition -> String -> Array String -> PhaseThree String
-qualifyLocalRoleName_ pos ident roleIdentifiers = if isQualifiedWithDomein ident
-  then pure ident
-  else do
-    (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) roleIdentifiers
-    case head candidates of
-      Nothing -> throwError $ UnknownRole pos ident
-      (Just qname) | length candidates == 1 -> pure qname
-      otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
-
 -- | For each (Enumerated) role with a binding to the name of a CalculatedRole (falsely declared to be Enumerated!),
 -- | replace that binding with the ADT of the (now compiled) CalculatedRole.
 requalifyBindingsToCalculatedRoles :: PhaseThree Unit
@@ -246,6 +230,8 @@ requalifyBindingsToCalculatedRoles = (lift $ gets _.dfr) >>= qualifyBindings'
         otherwise -> pure unit)
 
 -- | Qualify the references to Properties in each View.
+-- | Note that we need the DomeinFile with qualified bindings in the cache
+-- | for this function to work correctly!
 qualifyPropertyReferences :: PhaseThree Unit
 qualifyPropertyReferences = do
   df@{_id} <- lift $ gets _.dfr
@@ -267,8 +253,6 @@ qualifyPropertyReferences = do
 
         qualifyProperty :: EnumeratedRoleType -> ArcPosition -> PropertyType -> PhaseThree PropertyType
         qualifyProperty erole pos propType = do
-          -- Note that we need the DomeinFile with qualified bindings in the cache
-          -- for this function to work correctly!
           if isQualifiedWithDomein (propertytype2string propType)
             -- The modeller has provided a qualified property. He cannot say whether it is Calculated, or Enumerated,
             -- however. If it is Calculated, change now.
@@ -370,21 +354,18 @@ compileExpressions = do
     (compileExpressions' df _id)
   where
     compileExpressions' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
-    compileExpressions' {calculatedRoles, calculatedProperties, actions} ns = do
-      -- TODO. Collect references to Calculated Properties from the QueryFunctionDescriptions and sort
-      -- the calculatedRoles accordingly before compiling the descriptions. That will detect cycles
-      -- (throw an error) and prevent forward reference errors.
-      -- Currently, Action objects must not contain Calculated roles.
-      compRoles <- traverseWithIndex compileRolExpr calculatedRoles
-      compProps <- traverseWithIndex compilePropertyExpr calculatedProperties
-      compActions <- traverseWithIndex compileActionObject actions
-      -- Modify the DomeinFile we're building in PhaseTwoState.
-      modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps, actions = compActions}
+    compileExpressions' {_id,calculatedRoles, calculatedProperties, actions} ns = do
+      traverse_ compileRolExpr (identifier <$> calculatedRoles)
+      traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
+      traverseWithIndex_ compileActionObject actions
+      -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId ns)
+      modifyDF \dfr -> modifiedDomeinFile
 
       where
-        compileActionObject :: String -> Action -> PhaseThree Action
+        compileActionObject :: String -> Action -> PhaseThree Unit
         compileActionObject actionName (Action a@{subject, object, verb, requiredObjectProperties}) = case object of
-          Q _ -> pure $ Action a
+          Q _ -> pure unit
           S stp -> do
             dom <- lift2 $ CDOM <$> contextOfRoleType subject
             descr <- withFrame do
@@ -393,31 +374,23 @@ compileExpressions = do
               pure $ makeSequence varb compiledCalculation
             -- Save the Action in the DomeinCache. Notice that the cache temporarily contains
             -- the version of the model we're compiling.
-            lift2 $ modifyActionInDomeinFile ns (Action (a {object = Q descr}))
+            lift2 $ void $ modifyActionInDomeinFile ns (Action (a {object = Q descr}))
 
-        compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
-        compileRolExpr roleName (CalculatedRole cr@{_id, calculation, context}) = case calculation of
-          Q _ -> pure $ CalculatedRole cr
-          S stp -> do
-            dom <- pure (CDOM $ ST context)
+        compileRolExpr :: CalculatedRoleType -> PhaseThree Unit
+        compileRolExpr roleType = do
+          cr@(CalculatedRole {calculation, context}) <- lift2 $ getCalculatedRole roleType
+          case calculation of
+            Q _ -> pure unit
+            -- Compiles the parsed expression and stores the modified CalculatedRole in
+            -- the DomeinCache.
+            S stp -> void $ compileAndSaveRole (CDOM $ ST context) stp cr
 
-            descr <- withFrame do
-              varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
-              compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
-              pure $ makeSequence varb compiledCalculation
-            lift2 $ modifyCalculatedRoleInDomeinFile ns (CalculatedRole (cr {calculation = Q descr}))
-
-        compilePropertyExpr :: String -> CalculatedProperty -> PhaseThree CalculatedProperty
-        compilePropertyExpr propertyName (CalculatedProperty cr@{_id, calculation, role}) = case calculation of
-          Q _ -> pure $ CalculatedProperty cr
-          S stp -> do
-            dom <- pure (RDOM $ ST role)
-
-            descr <- withFrame do
-              varb <- compileVarBinding dom (VarBinding "currentrole" (Simple $ AE.Identity (startOf stp)))
-              compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
-              pure $ makeSequence varb compiledCalculation
-            lift2 $ modifyCalculatedPropertyInDomeinFile ns (CalculatedProperty (cr {calculation = Q descr}))
+        compilePropertyExpr :: CalculatedPropertyType -> PhaseThree Unit
+        compilePropertyExpr propertyType = do
+          cp@(CalculatedProperty {calculation, role}) <- lift2 $ getCalculatedProperty propertyType
+          case calculation of
+            Q _ -> pure unit
+            S stp -> void $ compileAndSaveProperty (RDOM $ ST role) stp cp
 
 addInvertedQueries :: PhaseThree Unit
 addInvertedQueries = do
@@ -494,15 +467,6 @@ compileAndDistributeStep userProps dom stp = do
   descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
   setInvertedQueries userProps descr
   pure descr
-
-qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = do
-  enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
-  computedTypeADT <- ST <$> qualifyLocalEnumeratedRoleName pos computedType (keys enumeratedRoles)
-  case computedTypeADT of
-    ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure qfd
-    _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
-qualifyReturnsClause pos qfd = pure qfd
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process. Notice that all other names are qualified, by now:

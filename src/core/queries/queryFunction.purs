@@ -191,8 +191,8 @@ instance showFunctionName :: Show FunctionName where
     show BoundByF = "boundBy"
     show FilterF = "filter"
     show ComposeF = "compose"
-    show UnionF = "both"
-    show IntersectionF = "either"
+    show UnionF = "either"
+    show IntersectionF = "both"
     show CreateContextF = "createContext"
     show CreateRoleF = "createRole"
     show GetRoleBindersF = "binder" -- TODO en dit?

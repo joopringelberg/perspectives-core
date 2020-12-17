@@ -1,2 +1,147 @@
-{"contents":{"views":{},"enumeratedRoles":{"model:Test$External":{"contents":{"views":[],"roleAspects":[],"properties":[],"pos":{"contents":{"line":1,"column":9},"tag":"ArcPosition"},"perspectives":{},"mandatory":false,"kindOfRole":{"tag":"ExternalRole"},"functional":true,"displayName":"External","context":"model:Test","binding":{"tag":"EMPTY"},"_rev":null,"_id":"model:Test$External"},"tag":"EnumeratedRole"},"model:Test$TestCase$External":{"contents":{"views":[],"roleAspects":[],"properties":[],"pos":{"contents":{"line":2,"column":9},"tag":"ArcPosition"},"perspectives":{},"mandatory":false,"kindOfRole":{"tag":"ExternalRole"},"functional":true,"displayName":"External","context":"model:Test$TestCase","binding":{"tag":"EMPTY"},"_rev":null,"_id":"model:Test$TestCase$External"},"tag":"EnumeratedRole"},"model:Test$TestCase$Self":{"contents":{"views":[],"roleAspects":[],"properties":[{"contents":"model:Test$TestCase$Self$Prop1","tag":"ENP"}],"pos":{"contents":{"line":3,"column":5},"tag":"ArcPosition"},"perspectives":{"Self":["model:Test$TestCase$Self_bot$ChangeSelf"]},"mandatory":false,"kindOfRole":{"tag":"UserRole"},"functional":true,"displayName":"Self","context":"model:Test$TestCase","binding":{"tag":"EMPTY"},"_rev":null,"_id":"model:Test$TestCase$Self"},"tag":"EnumeratedRole"},"model:Test$TestCase$SomeRole":{"contents":{"views":[],"roleAspects":[],"properties":[],"pos":{"contents":{"line":5,"column":5},"tag":"ArcPosition"},"perspectives":{},"mandatory":false,"kindOfRole":{"tag":"RoleInContext"},"functional":true,"displayName":"SomeRole","context":"model:Test$TestCase","binding":{"tag":"EMPTY"},"_rev":null,"_id":"model:Test$TestCase$SomeRole"},"tag":"EnumeratedRole"},"model:Test$TestCase$AContextRole":{"contents":{"views":[],"roleAspects":[],"properties":[],"pos":{"contents":{"line":6,"column":5},"tag":"ArcPosition"},"perspectives":{},"mandatory":false,"kindOfRole":{"tag":"ContextRole"},"functional":true,"displayName":"AContextRole","context":"model:Test$TestCase","binding":{"contents":"model:Test$TestCase$NestedCase$External","tag":"ST"},"_rev":null,"_id":"model:Test$TestCase$AContextRole"},"tag":"EnumeratedRole"},"model:Test$TestCase$NestedCase$External":{"contents":{"views":[],"roleAspects":[],"properties":[],"pos":{"contents":{"line":11,"column":11},"tag":"ArcPosition"},"perspectives":{},"mandatory":false,"kindOfRole":{"tag":"ExternalRole"},"functional":true,"displayName":"External","context":"model:Test$TestCase$NestedCase","binding":{"tag":"EMPTY"},"_rev":null,"_id":"model:Test$TestCase$NestedCase$External"},"tag":"EnumeratedRole"}},"enumeratedProperties":{"model:Test$TestCase$Self$Prop1":{"contents":{"role":"model:Test$TestCase$Self","range":{"tag":"PNumber"},"pos":{"contents":{"line":4,"column":7},"tag":"ArcPosition"},"mandatory":true,"functional":false,"displayName":"Prop1","_rev":null,"_id":"model:Test$TestCase$Self$Prop1"},"tag":"EnumeratedProperty"}},"contexts":{"model:Test$TestCase$NestedCase":{"contents":{"rolInContext":[],"pos":{"contents":{"line":11,"column":11},"tag":"ArcPosition"},"nestedContexts":[],"kindOfContext":{"tag":"Case"},"gebruikerRol":[],"displayName":"NestedCase","defaultPrototype":null,"contextRol":[],"contextAspects":[],"context":"model:Test$TestCase","actions":[],"_rev":null,"_id":"model:Test$TestCase$NestedCase"},"tag":"Context"},"model:Test$TestCase":{"contents":{"rolInContext":[{"contents":"model:Test$TestCase$SomeRole","tag":"ENR"}],"pos":{"contents":{"line":2,"column":9},"tag":"ArcPosition"},"nestedContexts":["model:Test$TestCase$NestedCase"],"kindOfContext":{"tag":"Case"},"gebruikerRol":["model:Test$TestCase$Self"],"displayName":"TestCase","defaultPrototype":null,"contextRol":[{"contents":"model:Test$TestCase$AContextRole","tag":"ENR"}],"contextAspects":[],"context":"model:Test","actions":[],"_rev":null,"_id":"model:Test$TestCase"},"tag":"Context"},"model:Test":{"contents":{"rolInContext":[],"pos":{"contents":{"line":1,"column":9},"tag":"ArcPosition"},"nestedContexts":["model:Test$TestCase"],"kindOfContext":{"tag":"Domain"},"gebruikerRol":[],"displayName":"Test","defaultPrototype":null,"contextRol":[],"contextAspects":[],"context":null,"actions":[],"_rev":null,"_id":"model:Test"},"tag":"Context"}},"calculatedRoles":{},"calculatedProperties":{},"actions":{"model:Test$TestCase$Self_bot$ChangeSelf":{"contents":{"verb":{"tag":"Change"},"subject":"model:Test$TestCase$Self","requiredSubjectProperties":null,"requiredObjectProperties":null,"requiredIndirectObjectProperties":null,"pos":{"contents":{"line":9,"column":9},"tag":"ArcPosition"},"object":{"contents":"model:Test$TestCase$Self","tag":"ENR"},"indirectObject":null,"executedByBot":true,"effect":{"contents":{"contents":[{"contents":{"contents":"model:Test$TestCase","tag":"ST"},"tag":"CDOM"},{"contents":"model:Test$TestCase$SomeRole","tag":"CreateRole"},{"contents":[{"contents":{"contents":"model:Test$TestCase","tag":"ST"},"tag":"CDOM"},{"tag":"Identity"},{"contents":{"contents":"model:Test$TestCase","tag":"ST"},"tag":"CDOM"},{"tag":"True"},{"tag":"True"}],"tag":"SQD"},{"contents":{"contents":"model:Test$TestCase","tag":"ST"},"tag":"CDOM"},{"tag":"True"},{"tag":"True"}],"tag":"UQD"},"tag":"EF"},"displayName":"","condition":{"contents":{"contents":[{"contents":{"contents":"model:Test$TestCase","tag":"ST"},"tag":"CDOM"},{"contents":[{"tag":"PBool"},"true"],"tag":"Constant"},{"contents":{"tag":"PBool"},"tag":"VDOM"},{"tag":"True"},{"tag":"True"}],"tag":"SQD"},"tag":"Q"},"_rev":null,"_id":"model:Test$TestCase$Self_bot$ChangeSelf"},"tag":"Action"}},"_rev":null,"_id":"model:Test"},"tag":"DomeinFile"}
-Parsed a file.
+{
+  "contents": {
+    "timeStamp": 1608110914741,
+    "deltas": [
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:SimpleChat$ChatApp$Chatter",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "id": "model:User$c63de5b2f_3046_45b5_824b_dc8bbb7e3fb2",
+              "deltaType": {
+                "tag": "ConstructEmptyContext"
+              },
+              "contextType": "model:SimpleChat$Chat"
+            },
+            "tag": "UniverseContextDelta"
+          },
+          "author": "model:User$joop$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:SimpleChat$ChatApp$Chatter",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:SimpleChat$Chat$External",
+              "roleInstances": [
+                "model:User$c63de5b2f_3046_45b5_824b_dc8bbb7e3fb2_External"
+              ],
+              "id": "model:User$c63de5b2f_3046_45b5_824b_dc8bbb7e3fb2",
+              "deltaType": {
+                "tag": "ConstructExternalRole"
+              },
+              "authorizedRole": {
+                "contents": "model:SimpleChat$ChatApp$Chats",
+                "tag": "CR"
+              }
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$joop$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": "ContextDelta from defaultRolRecord",
+          "author": ""
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "values": [
+                "Hallo Cor, onze eerste chat"
+              ],
+              "subject": {
+                "contents": {
+                  "contents": "model:SimpleChat$Chat$Initiator",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "property": "model:System$Invitation$External$Message",
+              "id": "model:User$c63de5b2f_3046_45b5_824b_dc8bbb7e3fb2_External",
+              "deltaType": {
+                "tag": "AddProperty"
+              }
+            },
+            "tag": "RolePropertyDelta"
+          },
+          "author": "model:User$joop$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "values": [
+                "true"
+              ],
+              "subject": {
+                "contents": {
+                  "contents": "model:SimpleChat$Chat$Initiator",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "property": "model:System$Invitation$External$IWantToInviteAnUnconnectedUser",
+              "id": "model:User$c63de5b2f_3046_45b5_824b_dc8bbb7e3fb2_External",
+              "deltaType": {
+                "tag": "AddProperty"
+              }
+            },
+            "tag": "RolePropertyDelta"
+          },
+          "author": "model:User$joop$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "values": [
+                "Hallo Cor"
+              ],
+              "subject": {
+                "contents": {
+                  "contents": "model:SimpleChat$Chat$Initiator",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "property": "model:SimpleChat$Chat$External$Title",
+              "id": "model:User$c63de5b2f_3046_45b5_824b_dc8bbb7e3fb2_External",
+              "deltaType": {
+                "tag": "AddProperty"
+              }
+            },
+            "tag": "RolePropertyDelta"
+          },
+          "author": "model:User$joop$User"
+        },
+        "tag": "SignedDelta"
+      }
+    ],
+    "author": "model:User$joop$User"
+  },
+  "tag": "TransactionForPeer"
+}

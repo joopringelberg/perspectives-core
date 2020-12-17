@@ -31,11 +31,11 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.Query.QueryTypes (range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
-import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
+import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getEnumeratedProperty, getPerspectType)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
-import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType, PropertyType(..))
 import Prelude (pure, (>>=), ($), (<>), bind, (>=>), (<<<))
@@ -57,7 +57,7 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty Cal
     c <- calculation r
     case QT.range c of
       (VDOM rn _) -> pure rn
-      otherwise -> throwError (error "")
+      otherwise -> throwError (error $ "Non-Value typed result for property " <> identifier_ r)
   -- Hoe bepaal je of een Calculated property mandatory is? En wat betekent het?
   -- De betekenis is praktisch: als de property mandatory is, weet je dat er altijd een waarde is (al dan niet berekend).
   -- Een berekende property is alleen mandatory als al zijn componenten dat zijn; anders kan de berekening altijd leeg zijn. Maar dat is dus niet waar: 'exists' levert altijd een waarde op, of zijn argument nu mandatory is of niet.

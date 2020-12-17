@@ -271,8 +271,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         (ENR eroltype) -> withNewContext authoringRole (Just qrolname)
           \(ContextInstance id) ->  do
             -- now bind it in a new instance of the roletype in the given context.
-            -- TODO vang de nieuwe contextrol op en geef die (ook) terug?
-            contextRole <- createAndAddRoleInstance eroltype subject (RolSerialization
+            contextRole <- unsafePartial $ fromJust <$> createAndAddRoleInstance eroltype subject (RolSerialization
               { id: Nothing
               , properties: PropertySerialization empty
               , binding: Just $ buitenRol id })
@@ -328,7 +327,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.CreateRol -> do
       if isQualifiedName predicate
         then do
-          (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance (EnumeratedRoleType predicate) subject (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+          (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction authoringRole $ unsafePartial $ fromJust <$> createAndAddRoleInstance (EnumeratedRoleType predicate) subject (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
           sendResponse (Result corrId (unwrap <$> rolInsts)) setter
         else sendResponse (Error corrId ("Could not create a role instance for: " <> predicate <> " in " <> subject)) setter
     -- {request: "Bind", subject: contextinstance, predicate: roleType, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
@@ -346,10 +345,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
               if isJust $ elemIndex (RoleInstance bnd) bindings
                 then sendResponse (Error corrId ("Cannot not bind the same role instance twice in the same role type")) setter
                 else do
-                  rol <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
-                  sendResponse (Result corrId (unwrap <$> rol)) setter
+                  rolarr <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
+                  case head rolarr of
+                    Nothing -> sendResponse (Error corrId ("Could not create role instance of " <> show eroltype)) setter
+                    Just Nothing -> sendResponse (Error corrId ("Could not create role instance of " <> show eroltype)) setter
+                    Just (Just rol) -> sendResponse (Result corrId [(unwrap rol)]) setter
             Nothing -> do
-              rol <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
+              rol <- runMonadPerspectivesTransaction authoringRole $ unsafePartial fromJust <$> createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
               sendResponse (Result corrId (unwrap <$> rol)) setter
     -- {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
     Api.Bind_ -> catchError
