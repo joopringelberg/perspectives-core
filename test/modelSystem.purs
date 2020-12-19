@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (head, length, null)
+import Data.Array (catMaybes, head, length, null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Effect.Aff.Class (liftAff)
@@ -78,7 +78,7 @@ theSuite = suiteSkip  "Model:System" do
         binder <- pure $ EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"
         roleIds <- runMonadPerspectivesTransaction $ createAndAddRoleInstance binder "model:User$test"
           (RolSerialization{ id: Nothing, properties: PropertySerialization empty, binding: Just descriptionId})
-        role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head roleIds)
+        role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head (catMaybes roleIds))
         b <- getPerspectRol (RoleInstance descriptionId)
         void $ cacheEntity (RoleInstance descriptionId) (addRol_gevuldeRollen b binder _id)
         void $ saveEntiteit (RoleInstance descriptionId)

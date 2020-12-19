@@ -15,3 +15,8 @@ exports.pendingInvitations = (function(doc)
     emit(doc._id, doc);
   }
 }).toString();
+
+exports.contextView = (function (doc)
+{
+  emit(doc.contents.pspType, doc);
+}).toString();

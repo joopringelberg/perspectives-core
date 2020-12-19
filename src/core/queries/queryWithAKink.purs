@@ -23,7 +23,7 @@ module Perspectives.Query.Kinked where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, cons, foldr, null, uncons, unsnoc)
+import Data.Array (catMaybes, cons, foldr, intercalate, null, uncons, unsnoc)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -46,7 +46,7 @@ import Perspectives.Representation.Class.Role (contextOfADT, getCalculation, get
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
-import Perspectives.Utilities (prettyPrint)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
 import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (==))
 
 --------------------------------------------------------------------------------------------------------------
@@ -60,6 +60,8 @@ derive instance genericQueryWithAKink_ :: Generic QueryWithAKink_ _
 instance showQueryWithAKink_ :: Show QueryWithAKink_ where
   show = genericShow
 
+instance prettyPrintQueryWithAKink_ :: PrettyPrint QueryWithAKink_ where
+  prettyPrint' tab (ZQ_ qfds mqfd) = "QueryWithAKink_\n[" <> (intercalate (",\n" <> tab) (prettyPrint' (tab <> "  ") <$> qfds) <> "]\n" <> prettyPrint' (tab <> "  ") mqfd)
 --------------------------------------------------------------------------------------------------------------
 ---- INVERT
 --------------------------------------------------------------------------------------------------------------
@@ -78,11 +80,17 @@ invert = invert_ >=> traverse h >=> pure <<< catMaybes
       -- Creates a right-associative composition that preserves the order in steps.
       Just {init, last} -> pure $ Just $ ZQ (Just $ foldr compose last init) q
 
+-- | The QueryFunctionDescriptions in the Array of each QueryWithAKink_
+-- | are inversed wrt the orinal query.
 invert_ :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink_)
+invert_ (MQD dom (ExternalCoreRoleGetter f) args ran _ _) = pure $ [ZQ_ [SQD ran (ExternalCoreContextGetter "model:Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
+
 invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
 
 invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
-  (BQD _ (BinaryCombinator UnionF) conj1 conj2 _ _ _) -> append <$> invert_ (compose conj1 (replaceDomain r (range conj1))) <*> invert_ (compose conj2 (replaceDomain r (range conj2)))
+  (BQD _ (BinaryCombinator UnionF) conj1 conj2 _ _ _) -> append <$>
+    invert_ (compose conj1 (replaceDomain r (range conj1))) <*>
+    invert_ (compose conj2 (replaceDomain r (range conj2)))
 
   (BQD _ (BinaryCombinator IntersectionF) conj1 conj2 _ _ _) -> append <$> invert_ (compose conj1 (replaceDomain r (range conj1))) <*> invert_ (compose conj2 (replaceDomain r (range conj2)))
 
@@ -103,16 +111,21 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
     pure $ join $ [q1, q2]
 
   otherwise -> do
-    left <- invert_ l
+    (left :: Array QueryWithAKink_) <- invert_ l
     case uncons left of
       Just {head:(ZQ_ l_ _), tail} -> if null tail
         then do
+          -- The inversion of left yielded just a single QueryWithAKink_.
           zippedQueries <- invert_ r
-          -- Now we invert_ the order of l and r.
+          -- Append the steps found in that single QueryWithAKink_ to the end
+          -- of each series of steps resulting from inverting the right.
+          -- TODO. Why do we add (ZQ_ l_ (Just q))?
           pure $ cons (ZQ_ l_ (Just q))
             (map (\(ZQ_ r_ q') -> ZQ_ (r_ <> l_) q') zippedQueries)
-        else throwError (Custom $ "Perspectives.Query.Zipped invert_: expected single term on the left in composition:\n" <> prettyPrint l)
-      Nothing -> pure [ZQ_ [] Nothing]
+        -- TODO. In het algemene geval kan de linkerkant wel degelijk meerdere
+        -- resultaten opleveren: denk aan een CalculatedRole met een join.
+        else throwError (Custom $ "Perspectives.Query.Zipped invert_: expected single term on the left in composition:\n" <> prettyPrint left)
+      Nothing -> pure []
 
 invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ (compose source criterium)
 

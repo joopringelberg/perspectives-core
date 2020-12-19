@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Free (Free)
-import Data.Array (head, length)
+import Data.Array (catMaybes, head, length)
 import Data.Array.NonEmpty (singleton)
 import Data.Either (Either(..), isRight)
 import Data.Maybe (Maybe(..), isJust)
@@ -125,7 +125,7 @@ theSuite = suite "ContextRoleParser" do
           { id: Nothing
           , properties: PropertySerialization empty
           , binding: Just "model:User$test$User"})
-    ra <- traverse getPerspectRol roleIdArray
+    ra <- traverse getPerspectRol (catMaybes roleIdArray)
     case head ra of
       Nothing -> liftAff $ assert "No role created" false
       Just role -> liftAff $ assert "The constructed Role should have 'isMe' == true" (rol_isMe role)

@@ -123,6 +123,7 @@ data QueryFunction
   -- 'External': call a Purescript function here.
   | ExternalCoreRoleGetter String
   | ExternalCorePropertyGetter String
+  | ExternalCoreContextGetter String
   -- 'Foreign': call a Javascript function here.
   | ForeignRoleGetter String
   | ForeignPropertyGetter String

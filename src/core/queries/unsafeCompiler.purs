@@ -52,7 +52,7 @@ import Perspectives.Instances.Values (parseInt, value2Int)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -65,7 +65,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..)) as RAN
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||))
@@ -96,6 +96,14 @@ compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
 compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ unsafeCoerce externalRole
 
 compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ unsafeCoerce context
+
+compileFunction (SQD _ (ExternalCoreContextGetter functionName) ran _ _) = do
+  (f :: HiddenFunction) <- pure $ unsafeCoerce $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
+  pure $ unsafeCoerce f [ctype ran]
+  where
+    ctype :: Domain -> String
+    ctype d = unsafePartial $ case domain2contextType d of
+      ST (ContextType ct) -> ct
 
 compileFunction (SQD _ (DataTypeGetter IdentityF) _ _ _) = pure $ (pure <<< identity)
 

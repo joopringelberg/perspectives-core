@@ -50,7 +50,7 @@ import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..), sum)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole)
+import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -59,7 +59,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, show, void, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=))
 
@@ -533,8 +533,14 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
             Nothing -> throwError (UnknownExternalFunction start end functionName)
             Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
               then case mapToRange computedType of
-                Nothing -> pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+                -- Collect property instances.
                 Just r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) Unknown Unknown
+                Nothing -> (lift $ lift $ typeExists (ContextType computedType)) >>= if _
+                  -- Collect Context instances.
+                  then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (ST (ContextType computedType))) Unknown Unknown
+
+                  -- Collect role instances.
+                  else pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
               else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
       else do
         compiledArgs <- traverse (compileStep currentDomain) arguments

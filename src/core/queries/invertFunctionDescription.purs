@@ -45,7 +45,8 @@ invertFunction dom qf ran = case qf of
       (RDOM EMPTY) -> Nothing
       otherwise -> Just $ DataTypeGetterWithParameter GetRoleBindersF (unwrap $ unsafePartial $ domain2RoleType dom)
     ExternalRoleF -> Just $ DataTypeGetter ContextF
-    IdentityF -> Just $ DataTypeGetter IdentityF
+    -- Identity steps add nothing to the query and can be left out.
+    IdentityF -> Nothing
 
     -- An expression like `step >>= sum` is compiled as an SQD with DataTypeGetter as constructor for QueryFunction.
     -- These function descriptions have the same domain as range. In general, the domain will be a VDOM, as the
@@ -65,6 +66,8 @@ invertFunction dom qf ran = case qf of
     _ -> Nothing
 
   PropertyGetter pt -> Just $ Value2Role pt
+
+  -- ExternalCoreContextGetter ct
 
   -- Catchall clause
   _ -> Nothing

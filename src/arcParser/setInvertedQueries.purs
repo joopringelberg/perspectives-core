@@ -44,7 +44,7 @@ import Prelude (Unit, pure, unit, ($))
 
 setPathForStep :: Partial => QueryFunctionDescription -> QueryWithAKink -> Map RoleType PropsAndVerbs -> PhaseThree Unit
 setPathForStep (SQD dom qf ran _ _) qWithAK userTypes = case qf of
-  QF.Value2Role pt -> case pt of 
+  QF.Value2Role pt -> case pt of
     ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
       Nothing -> addInvertedQueryForDomain (unwrap p)
         (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes})
@@ -89,7 +89,7 @@ setPathForStep (SQD dom qf ran _ _) qWithAK userTypes = case qf of
       Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_role en (removeFirstBackwardsStep qWithAK)) enumeratedRoles}
     CR _ -> throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
 
-  QF.DataTypeGetter QF.ContextF-> modifyDF \dfr@{enumeratedRoles} -> let
+  QF.DataTypeGetter QF.ContextF -> modifyDF \dfr@{enumeratedRoles} -> let
     roleName = unwrap $ unsafePartial $ domain2RoleType dom
     in case lookup roleName  enumeratedRoles of
       Nothing -> addInvertedQueryForDomain roleName
@@ -97,6 +97,10 @@ setPathForStep (SQD dom qf ran _ _) qWithAK userTypes = case qf of
         OnContextDelta_context
         dfr
       Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_context en qWithAK) enumeratedRoles}
+
+  -- As there is, by construction, no link from the range (an external role type)
+  -- to the domain (a context type), we can not attach an inverted query anywhere
+  QF.ExternalCoreContextGetter f -> pure unit
 
   -- The query would be added to onContextDelta_role of the external role. Such inverse queries are run when a new
   -- instance of the role type is added to the context (or when it is removed). But the external role never changes,

@@ -65,7 +65,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
@@ -124,6 +124,17 @@ roleInstancesFromCouchdb roleTypes _ = ArrayT do
       (roles :: Array PerspectRol) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
       for roles \r@(PerspectRol{_id}) -> do
         void $ lift $ cacheEntity _id r
+        pure _id
+
+contextInstancesFromCouchdb :: Array String -> (RoleInstance ~~> ContextInstance)
+contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
+  case head contextTypeArr of
+    Nothing -> pure []
+    Just ct -> do
+      -- push assumption!
+      (contexts :: Array PerspectContext) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "contextView" (head contextTypeArr)
+      for contexts \c@(PerspectContext{_id}) -> do
+        void $ lift $ cacheEntity _id c
         pure _id
 
 pendingInvitations :: ContextInstance ~~> RoleInstance
@@ -393,4 +404,5 @@ externalFunctions =
   , Tuple "model:Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
   , Tuple "model:Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
   , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
+  , Tuple "model:Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
 ]

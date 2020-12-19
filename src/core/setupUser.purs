@@ -30,7 +30,7 @@ import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
-import Perspectives.SetupCouchdb (setPendingInvitationView, setRoleView)
+import Perspectives.SetupCouchdb (setPendingInvitationView, setRoleView, setContextView)
 import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>), (>>=))
 
 modelDirectory :: String
@@ -50,5 +50,6 @@ setupUser = do
       void $ runSterileTransaction (addModelToLocalStore [repo <> "model:System"] (RoleInstance ""))
       entitiesDatabaseName >>= setRoleView
       entitiesDatabaseName >>= setPendingInvitationView
+      entitiesDatabaseName >>= setContextView
 
     otherwise -> pure unit
