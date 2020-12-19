@@ -113,20 +113,21 @@ compileBotAction actionType = do
             if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
               then log "Condition satisfied, will run right hand side without object" *> effectFullFunction contextId
               else log "Condition not satisfied, will not run right hand side without ojbect"
-          run (Just object) = do
-            conditionWasTrue <- lift2 $ getConditionState actionType object
-            (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
-            log $ "Running " <> show actionType
-            if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
-              then if conditionWasTrue
-                then log ("Condition satisfied, but rule fired before on " <> show object <> ".") *> pure unit
-                else do
-                  log $ "Condition satifisfied, will run right hand side on " <> show object <> "."
-                  lift2 $ setConditionState actionType object true
-                  effectFullFunction contextId
-              else if conditionWasTrue
-                then (log $ "Condition not satisfied, rule fired before on " <> show object <> ".") *> (lift2 $ setConditionState actionType object false)
-                else log ("Condition not satisfied, rule did not fire before on " <> show object <> ".") *> pure unit
+          run (Just object) = (lift2 $ try $ getConditionState actionType object) >>=
+            handlePerspectRolError "ruleRunner"
+              \conditionWasTrue -> do
+                (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+                log $ "Running " <> show actionType
+                if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
+                  then if conditionWasTrue
+                    then log ("Condition satisfied, but rule fired before on " <> show object <> ".") *> pure unit
+                    else do
+                      log $ "Condition satifisfied, will run right hand side on " <> show object <> "."
+                      lift2 $ setConditionState actionType object true
+                      effectFullFunction contextId
+                  else if conditionWasTrue
+                    then (log $ "Condition not satisfied, rule fired before on " <> show object <> ".") *> (lift2 $ setConditionState actionType object false)
+                    else log ("Condition not satisfied, rule did not fire before on " <> show object <> ".") *> pure unit
 
 
     withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
@@ -192,6 +193,7 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
     ctxts <- lift2 (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
       roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+      -- No need to handle retrieval errors as we've just created the role.
       lift2 $ getPerspectRol roleIdentifier
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do

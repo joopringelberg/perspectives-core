@@ -39,14 +39,14 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (difference, elemIndex, find, null, union)
+import Data.Array (cons, difference, elemIndex, find, null, foldM, union)
 import Data.Array (head) as ARR
-import Data.Array.NonEmpty (NonEmptyArray, toArray, head)
+import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (over, unwrap)
-import Data.Traversable (for, traverse)
+import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst, snd)
 import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
@@ -58,7 +58,7 @@ import Perspectives.ContextAndRole (addRol_property, changeContext_me, context_r
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findPropertyRequests, findRoleRequests)
-import Perspectives.Error.Boundaries (handlePerspectRolError)
+import Perspectives.Error.Boundaries (handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, roleType)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
@@ -95,7 +95,10 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
   if (not $ null (toArray rolInstances `difference` context_rolInContext pe rolName))
     then do
       changedContext <- lift2 (modifyContext_rolInContext pe rolName (flip union (toArray rolInstances)))
-      roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
+      (roles :: Array PerspectRol) <- foldM
+        (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
+        []
+        (toArray rolInstances)
       -- PERSISTENCE
       case find rol_isMe roles of
         Nothing -> cacheAndSave contextId changedContext
@@ -162,7 +165,10 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
 
   -- QUERY UPDATES.
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
-  roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
+  (roles :: Array PerspectRol) <- foldM
+    (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
+    []
+    (toArray rolInstances)
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
   changedContext <- lift2 (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
   -- PERSISTENCE.

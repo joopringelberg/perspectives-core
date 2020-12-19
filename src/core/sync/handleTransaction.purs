@@ -65,6 +65,7 @@ executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstan
   log (show deltaType <> " to/from " <> show contextId <> " and " <> show roleInstances)
   case deltaType of
     -- The subject must be allowed to change the role: they must have a perspective on it that includes the verb Change.
+    -- TODO. Als we hier controleren of die instanties er wel zijn, hoeven we dat in addRoleInstancesToContext niet meer te doen.
     AddRoleInstancesToContext -> addRoleInstancesToContext contextId roleType ((flip Tuple (Just signedDelta)) <$> (unwrap roleInstances))
     MoveRoleInstancesToAnotherContext -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
 

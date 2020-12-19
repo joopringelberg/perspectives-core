@@ -28,7 +28,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Prelude (pure, (>=>), (<<<))
 
 -- Can we safely assume that the PerspectContext will exist? If it does not because there is no model holding it,
--- this function will break.
+-- this function will break. Callers must handle errors.
 getContextMember :: forall a. Persistent PerspectContext ContextInstance => (PerspectContext -> a) -> (ContextInstance -> MonadPerspectives a)
 getContextMember f = getPerspectEntiteit >=> pure <<< f
 

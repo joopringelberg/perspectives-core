@@ -39,7 +39,7 @@ import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInCo
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
-import Perspectives.Error.Boundaries (handlePerspectRolError')
+import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
@@ -47,7 +47,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (<<<), (<>), (==), (>>=), (>>>), (>=>), (<$>), show)
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (<<<), (<>), (==), (>>=), (>>>), (>=>), (<$>), show, (*>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -55,27 +55,29 @@ import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($),
 -- | Because we never change the ExternalRole of a Context, we have no need
 -- | to track it as a dependency.
 externalRole :: ContextInstance ~~> RoleInstance
-externalRole ci = ArrayT do
-  tell $ ArrayWithoutDoubles [External ci]
-  lift (singleton <$> getContextMember IP.externalRole ci)
+externalRole ci = ArrayT $ (try $ lift $ getContextMember IP.externalRole ci) >>=
+  handlePerspectContextError' "externalRole" []
+    \erole -> (tell $ ArrayWithoutDoubles [External ci]) *> pure [erole]
 
 getEnumeratedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
-getEnumeratedRoleInstances rn c = ArrayT do
-  tell $ ArrayWithoutDoubles [RoleAssumption c rn]
-  lift $ getContextMember (flip context_rolInContext rn) c
+getEnumeratedRoleInstances rn c = ArrayT $ (lift $ try $ getContextMember (flip context_rolInContext rn) c) >>=
+  handlePerspectContextError' "getEnumeratedRoleInstances" []
+    \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
 
 -- | Because we never change the type of a Context, we have no real need
 -- | to track it as a dependency.
 contextType :: ContextInstance ~~> ContextType
-contextType = ArrayT <<< lift <<< (getContextMember \c -> [context_pspType c])
+contextType cid  = ArrayT $ (lift $ try $ getContextMember (\c -> [context_pspType c]) cid) >>=
+  handlePerspectRolError' "contextType" [] (pure <<< identity)
 
+-- | Note that this function has no error boundary: the caller has to handle errors.
 getConditionState :: ActionType -> RoleInstance -> MonadPerspectives Boolean
 getConditionState a c = getPerspectRol c >>= \(IP.PerspectRol{actionConditionState}) -> pure $ maybe false identity (lookup (unwrap a) actionConditionState)
 
 setConditionState :: ActionType -> RoleInstance -> Boolean -> MonadPerspectives Unit
-setConditionState a c b = do
-  (IP.PerspectRol r@{actionConditionState}) <- getPerspectRol c
-  void $ saveEntiteit_ c (IP.PerspectRol r {actionConditionState = insert (unwrap a) b actionConditionState})
+setConditionState a c b = (try $ getPerspectRol c) >>=
+  handlePerspectRolError "setConditionState"
+    \(IP.PerspectRol r@{actionConditionState}) -> void $ saveEntiteit_ c (IP.PerspectRol r {actionConditionState = insert (unwrap a) b actionConditionState})
 
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT do
@@ -217,14 +219,15 @@ allRoleBinders r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
       for_ (keys gevuldeRollen) (\key -> tell $ ArrayWithoutDoubles [Binder r (EnumeratedRoleType key)]) -- tell [assumption (unwrap r) key])
       pure $ join $ values gevuldeRollen
 
+-- | `isMe` has an internal error boundary. On failure, it returns false.
 isMe :: RoleInstance -> MP Boolean
-isMe ri = do
-  (IP.PerspectRol{isMe: me, binding: bnd, pspType}) <- getPerspectRol ri
-  if me
-    then pure true
-    else case bnd of
-      Nothing -> pure false
-      Just b -> isMe b
+isMe ri = (try $ getPerspectRol ri) >>=
+  handlePerspectRolError' "isMe" false
+    \(IP.PerspectRol{isMe: me, binding: bnd, pspType}) -> if me
+      then pure true
+      else case bnd of
+        Nothing -> pure false
+        Just b -> isMe b
 
 -- | Binding `boundBy` Binder is true,
 -- | iff either Binding is the direct binding of Binder, or (binding Binder) `binds` Binding is true.
@@ -291,9 +294,9 @@ typeOfSubjectOfAction (UserType t) = pure t
 
 -- | Returns all the instances of the same role (including the argument instance!).
 siblings :: RoleInstance ~~> RoleInstance
-siblings rid = do
-  IP.PerspectRol{pspType, context:ctxt} <- lift $ lift $ getPerspectRol rid
-  getEnumeratedRoleInstances pspType ctxt
+siblings rid = ArrayT $ (lift $ try $ getPerspectRol rid) >>=
+  handlePerspectRolError' "siblings" []
+    \(IP.PerspectRol{pspType, context:ctxt}) -> runArrayT $ getEnumeratedRoleInstances pspType ctxt
 
 -- | Returns the name of the model that defines the role type as a String Value.
 roleModelName :: RoleInstance ~~> Value

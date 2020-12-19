@@ -59,7 +59,7 @@ import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getN
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, deltaIndex, insertDelta)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
-import Perspectives.Error.Boundaries (handlePerspectRolError)
+import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
@@ -120,6 +120,9 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
           -- TODO. Add the context as a createdContext to the transaction
           lift $ addCreatedContextToTransaction contextInstanceId
           -- Add a UniverseRoleDelta to the Transaction for the external role.
+          -- As we've just constructed the context and its external rol, no need to
+          -- catch errors rising from not being able to exchange the identifier for the
+          -- resource.
           PerspectRol{universeRoleDelta} <- lift $ lift $ lift $ getPerspectRol buitenRol
           lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i + 1)
           pure contextInstanceId

@@ -25,25 +25,29 @@ import Data.Either (Either(..))
 import Effect.Class (class MonadEffect)
 import Effect.Exception (Error)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Prelude (Unit, show, ($), pure, unit, bind, (*>))
 
-handlePerspectRolError :: forall a m. MonadEffect m => String -> (PerspectRol -> m a) -> Either Error PerspectRol -> m Unit
+handlePerspectRolError :: forall a m r. MonadEffect m => String -> (r -> m a) -> Either Error r -> m Unit
 handlePerspectRolError boundaryName f erole = case erole of
   Left err -> logPerspectivesError $ RolErrorBoundary boundaryName (show err)
   Right role -> do
     _ <- f role
     pure unit
 
-handlePerspectRolError' :: forall a m. MonadEffect m => String -> a -> (PerspectRol -> m a) -> Either Error PerspectRol -> m a
+handlePerspectRolError' :: forall a m r. MonadEffect m => String -> a -> (r -> m a) -> Either Error r -> m a
 handlePerspectRolError' boundaryName default f erole = case erole of
   Left err -> (logPerspectivesError $ RolErrorBoundary boundaryName (show err)) *> pure default
   Right role -> f role
 
-handlePerspectContextError :: forall a m. MonadEffect m => String -> (PerspectContext -> m a) -> Either Error PerspectContext -> m Unit
+handlePerspectContextError :: forall a m r. MonadEffect m => String -> (r -> m a) -> Either Error r -> m Unit
 handlePerspectContextError boundaryName f econtext = case econtext of
   Left err -> logPerspectivesError $ ContextErrorBoundary boundaryName (show err)
   Right ctxt -> do
     _ <- f ctxt
     pure unit
+
+handlePerspectContextError' :: forall a m r. MonadEffect m => String -> a -> (r -> m a) -> Either Error r -> m a
+handlePerspectContextError' boundaryName default f econtext = case econtext of
+  Left err -> (logPerspectivesError $ ContextErrorBoundary boundaryName (show err)) *> pure default
+  Right ctxt -> f ctxt

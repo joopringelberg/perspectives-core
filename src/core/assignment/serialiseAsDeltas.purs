@@ -22,7 +22,7 @@
 module Perspectives.Assignment.SerialiseAsDeltas where
 
 import Control.Monad.AvarMonadAsk (get) as AMA
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.Partial (head) as PA
@@ -42,6 +42,7 @@ import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##>>), (###=), type (~~>), (##=))
 import Perspectives.Deltas (addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
+import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.Names (getUserIdentifier)
@@ -179,34 +180,39 @@ serialisedAsDeltasFor_ cid userId userType = do
       pure $ Just d
 
       where
+        -- | Returns true iff the binding of the first argument equals the second argument.
         addBindingDelta :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Boolean
-        addBindingDelta roleId1 roleId2 = do
-          PerspectRol{binding, bindingDelta} <- liftToMPT $ getPerspectRol roleId1
-          case binding of
+        addBindingDelta roleId1 roleId2 = (liftToMPT $ try $ getPerspectRol roleId1) >>= handlePerspectRolError' "addBindingDelta" false
+          \(PerspectRol{binding, bindingDelta}) -> case binding of
             Just b -> if b == roleId2
               then traverse_ (\bd -> addDelta $ DeltaInTransaction {users: [userId], delta: bd}) bindingDelta *> pure true
               else pure false
             Nothing -> pure false
 
         addPropertyDelta :: RoleInstance -> PropertyName -> String -> MonadPerspectivesTransaction Unit
-        addPropertyDelta roleId ptypeString val = do
-          PerspectRol{propertyDeltas} <- liftToMPT $ getPerspectRol roleId
-          case lookup ptypeString propertyDeltas of
-            Nothing -> pure unit
-            Just x -> case lookup val x of
-              Nothing -> throwError (error $ "No propertyDelta for value " <> val <> " on " <> show roleId)
-              Just pdelta -> addDelta $ DeltaInTransaction {users: [userId], delta: pdelta}
+        addPropertyDelta roleId ptypeString val = (liftToMPT $ try $ getPerspectRol roleId) >>=
+          handlePerspectRolError "addPropertyDelta"
+            \(PerspectRol{propertyDeltas}) -> case lookup ptypeString propertyDeltas of
+              Nothing -> pure unit
+              Just x -> case lookup val x of
+                Nothing -> throwError (error $ "No propertyDelta for value " <> val <> " on " <> show roleId)
+                Just pdelta -> addDelta $ DeltaInTransaction {users: [userId], delta: pdelta}
 
         addDeltasForRole :: RoleInstance -> MonadPerspectivesTransaction Unit
         addDeltasForRole roleId = do
           -- Todo: serialise the external role.
-          PerspectRol{context, universeRoleDelta, contextDelta} <- liftToMPT $ getPerspectRol roleId
-          PerspectContext{universeContextDelta, buitenRol} <- liftToMPT $ getPerspectContext context
-          PerspectRol{universeRoleDelta: eRoleDelta} <- liftToMPT $ getPerspectRol buitenRol
-          addDelta $ DeltaInTransaction {users: [userId], delta: universeContextDelta}
-          addDelta $ DeltaInTransaction {users: [userId], delta: eRoleDelta}
-          addDelta $ DeltaInTransaction {users: [userId], delta: universeRoleDelta}
-          addDelta $ DeltaInTransaction {users: [userId], delta: contextDelta}
+          (liftToMPT $ try $ getPerspectRol roleId) >>=
+            handlePerspectRolError "addDeltasForRole"
+              \(PerspectRol{context, universeRoleDelta, contextDelta}) -> do
+                addDelta $ DeltaInTransaction {users: [userId], delta: universeRoleDelta}
+                addDelta $ DeltaInTransaction {users: [userId], delta: contextDelta}
+                (liftToMPT $ try $ getPerspectContext context) >>=
+                  handlePerspectContextError "addDeltasForRole"
+                    \(PerspectContext{universeContextDelta, buitenRol}) -> do
+                      addDelta $ DeltaInTransaction {users: [userId], delta: universeContextDelta}
+                      (liftToMPT $ try $ getPerspectRol buitenRol) >>=
+                        handlePerspectRolError "addDeltasForRole"
+                          \(PerspectRol{universeRoleDelta: eRoleDelta}) -> addDelta $ DeltaInTransaction {users: [userId], delta: eRoleDelta}
 
         withContext :: Boolean
         withContext = true

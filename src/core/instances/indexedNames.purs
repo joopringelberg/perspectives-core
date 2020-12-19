@@ -24,24 +24,26 @@
 module Perspectives.Instances.Indexed where
 
 import Control.Monad.AvarMonadAsk (get) as AMA
-import Control.Monad.Error.Class (throwError)
-import Data.Array (foldl, head)
+import Control.Monad.Error.Class (throwError, try)
+import Data.Array (foldM, foldl, head, cons)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
-import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Foreign.Object (Object, fromFoldable, keys)
 import Foreign.Object.Unsafe (unsafeIndex)
 import Perspectives.ContextAndRole (rol_binding, rol_property)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>))
+import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.Identifiers (qualifyWith, unsafeDeconstructModelName)
+import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances)
 import Perspectives.Persistent (getPerspectRol)
+import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Prelude (bind, pure, ($), (<>), (>=>), (>>=))
+import Prelude (bind, pure, ($), (<>), (>=>), (>>=), (<<<), flip)
 
 -- | Replace any occurrence of any indexed name in the string.
 replaceIndexedNames :: String -> MonadPerspectives String
@@ -56,17 +58,19 @@ indexedRoles modelDescription = (modelDescription ##= context >=> getEnumeratedR
 
 indexedRoles_ :: Array RoleInstance -> MonadPerspectives (Object RoleInstance)
 indexedRoles_ roleIds = do
-  rows <- traverse f roleIds
+  rows <- foldM
+    (\rows roleId -> (try $ getPerspectRol roleId) >>=
+      handlePerspectRolError' "indexedRoles_" rows (f >=> (pure <<< flip cons rows)))
+    []
+    roleIds
   pure $ fromFoldable rows
   where
-    f :: RoleInstance -> MonadPerspectives (Tuple String RoleInstance)
-    f roleId = do
-      r <- getPerspectRol roleId
-      case rol_binding r of
-        Nothing -> throwError (error ("An instance of sys:Model$IndexedRole has no binding: " <> unwrap roleId))
-        Just b -> case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedRole$Name") of
-          Nothing -> throwError (error ("An instance of sys:Model$IndexedRole$Name has no value: " <> unwrap roleId))
-          Just (Value iname) -> pure (Tuple ("model:" <> iname) b)
+    f :: PerspectRol -> MonadPerspectives (Tuple String RoleInstance)
+    f r = case rol_binding r of
+      Nothing -> throwError (error ("An instance of sys:Model$IndexedRole has no binding: " <> identifier_ r))
+      Just b -> case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedRole$Name") of
+        Nothing -> throwError (error ("An instance of sys:Model$IndexedRole$Name has no value: " <> identifier_ r))
+        Just (Value iname) -> pure (Tuple ("model:" <> iname) b)
 
 -- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
 indexedContexts :: RoleInstance -> MonadPerspectives (Object ContextInstance)
@@ -74,16 +78,18 @@ indexedContexts modelDescription = (modelDescription ##= context >=> getEnumerat
 
 indexedContexts_ :: Array RoleInstance -> MonadPerspectives (Object ContextInstance)
 indexedContexts_ externalRoleIds = do
-  rows <- traverse f externalRoleIds
+  rows <- foldM
+    (\rows roleId -> (try $ getPerspectRol roleId) >>=
+      handlePerspectRolError' "indexedRoles_" rows (f >=> (pure <<< flip cons rows)))
+    []
+    externalRoleIds
   pure $ fromFoldable rows
   where
-    f :: RoleInstance -> MonadPerspectives (Tuple String ContextInstance)
-    f roleId = do
-      r <- getPerspectRol roleId
-      case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedContext$Name") of
-        Nothing -> throwError (error ("An instance of sys:Model$IndexedContext$Name has no value: " <> unwrap roleId))
+    f :: PerspectRol -> MonadPerspectives (Tuple String ContextInstance)
+    f r = case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedContext$Name") of
+        Nothing -> throwError (error ("An instance of sys:Model$IndexedContext$Name has no value: " <> identifier_ r))
         Just (Value iname) -> do
-          mcontextId <- roleId ##> binding >=> context
+          mcontextId <- (identifier r) ##> binding >=> context
           case mcontextId of
-            Nothing -> throwError (error ("An instance of sys:Model$IndexedContext has no context bound to it: " <> unwrap roleId))
+            Nothing -> throwError (error ("An instance of sys:Model$IndexedContext has no context bound to it: " <> identifier_ r))
             Just c -> pure (Tuple (qualifyWith (unsafeDeconstructModelName $ unwrap c) iname) c)

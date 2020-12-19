@@ -50,12 +50,14 @@ import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getEnumeratedRoleInstances, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType, roleType_, siblings)
 import Perspectives.Names (expandDefaultNamespaces)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction, getDynamicPropertyGetter)
@@ -170,21 +172,31 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- Given the rolinstance;
     Api.GetBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject)
     Api.GetBindingType -> registerSupportedEffect corrId setter (binding >=> roleType) (RoleInstance subject)
+
     -- {request: "GetRoleBinders", subject: <RoleInstance>, predicate: <EnumeratedRoleType>}
-    Api.GetRoleBinders -> do
-      PerspectRol{pspType} <- getPerspectRol (RoleInstance subject)
-      void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
-      registerSupportedEffect corrId setter (getRoleBinders (EnumeratedRoleType predicate)) (RoleInstance subject)
+    Api.GetRoleBinders -> (try $ getPerspectRol (RoleInstance subject)) >>=
+      case _ of
+        Left err -> do
+          logPerspectivesError $ RolErrorBoundary "Api.GetRoleBinders" (show err)
+          sendResponse (Error corrId (show $ RolErrorBoundary "Api.GetRoleBinders" (show err))) setter
+        Right (PerspectRol{pspType}) -> do
+          void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+          registerSupportedEffect corrId setter (getRoleBinders (EnumeratedRoleType predicate)) (RoleInstance subject)
 
     -- {request: "GetUnqualifiedRoleBinders", subject: <RoleInstance>, predicate: <local role name>}
-    Api.GetUnqualifiedRoleBinders -> do
-      PerspectRol{pspType} <- getPerspectRol (RoleInstance subject)
-      void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
-      registerSupportedEffect corrId setter (getUnqualifiedRoleBinders predicate) (RoleInstance subject)
+    Api.GetUnqualifiedRoleBinders -> (try $ getPerspectRol (RoleInstance subject)) >>=
+        case _ of
+          Left err -> do
+            logPerspectivesError $ RolErrorBoundary "Api.GetUnqualifiedRoleBinders" (show err)
+            sendResponse (Error corrId (show $ RolErrorBoundary "Api.GetUnqualifiedRoleBinders" (show err))) setter
+          Right (PerspectRol{pspType}) -> do
+            void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+            registerSupportedEffect corrId setter (getUnqualifiedRoleBinders predicate) (RoleInstance subject)
 
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
       registerSupportedEffect corrId setter f (ContextInstance subject)
+
     Api.GetUnqualifiedRol -> do
       mctype <- (ContextInstance subject) ##> contextType
       case mctype of
@@ -378,11 +390,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- Check whether a role exists for contextType with the localRolName and whether it allows RolID as binding.
     -- {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
     Api.CheckBinding -> withLocalName predicate (ContextType subject)
-      \(typeOfRolToBindTo :: RoleType) -> do
-        PerspectRol{pspType} <- getPerspectRol (RoleInstance object)
-        void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
-        ok <- checkBinding typeOfRolToBindTo (RoleInstance object)
-        sendResponse (Result corrId [(show ok)]) setter
+      \(typeOfRolToBindTo :: RoleType) -> (try $ getPerspectRol (RoleInstance object)) >>=
+        case _ of
+          Left err -> do
+            logPerspectivesError $ RolErrorBoundary "Api.CheckBinding" (show err)
+            sendResponse (Error corrId (show $ RolErrorBoundary "Api.CheckBinding" (show err))) setter
+          Right (PerspectRol{pspType}) -> do
+            void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+            ok <- checkBinding typeOfRolToBindTo (RoleInstance object)
+            sendResponse (Result corrId [(show ok)]) setter
     Api.SetProperty -> catchError
       (do
         void $ runMonadPerspectivesTransaction authoringRole (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])

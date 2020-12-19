@@ -208,18 +208,19 @@ removeContextInstance id authorizedRole = do
 -- | Takes care of the five responsibilities wrt the binding and the  binders
 -- | (the roles that bind the instance that is removed).
 removeRoleInstance_ :: RoleInstance -> WriterT (Array RoleInstance) MonadPerspectivesTransaction Unit
-removeRoleInstance_ roleId = do
-  originalRole@(PerspectRol{gevuldeRollen, binding}) <- lift $ lift2 $ (getPerspectRol roleId)
-  -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
-  forWithIndex_ gevuldeRollen \_ filledRollen ->
-    for_ filledRollen \filledRolId -> do
-      (lift $ removeBinding true filledRolId) >>= tell
-  -- Remove the inverse binding administration: bnd is no longer filled by roleId.
-  case binding of
-    Just bnd -> (lift $ (bnd `removedAsFilledFrom` roleId))
-    otherwise -> pure unit
-  -- Remove from couchdb, remove from the cache.
-  void $ lift $ (scheduleRoleRemoval roleId)
+removeRoleInstance_ roleId = (lift $ lift2 $ try (getPerspectRol roleId)) >>=
+  handlePerspectRolError "removeRoleInstance_"
+    \originalRole@(PerspectRol{gevuldeRollen, binding}) -> do
+    -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
+    forWithIndex_ gevuldeRollen \_ filledRollen ->
+      for_ filledRollen \filledRolId -> do
+        (lift $ removeBinding true filledRolId) >>= tell
+    -- Remove the inverse binding administration: bnd is no longer filled by roleId.
+    case binding of
+      Just bnd -> (lift $ (bnd `removedAsFilledFrom` roleId))
+      otherwise -> pure unit
+    -- Remove from couchdb, remove from the cache.
+    void $ lift $ (scheduleRoleRemoval roleId)
 
 -- | Calls removeBinding for the role instance prior to removing it.
 -- | Calls removeBinding on all role instances that have this role as their binding.
@@ -227,10 +228,10 @@ removeRoleInstance_ roleId = do
 -- | This function is complete w.r.t. the five responsibilities.
 -- | The opposite of this function creates a role instance first and then adds it to a context: [createAndAddRoleInstance](Perspectives.Instances.Builders.html#t:createAndAddRoleInstance).
 removeRoleInstance :: RoleInstance -> MonadPerspectivesTransaction Unit
-removeRoleInstance roleId@(RoleInstance id) = do
-  PerspectRol{pspType, context} <- lift2 $ (getPerspectRol roleId)
-  removeRoleInstancesFromContext context pspType (singleton roleId)
-  void $ runWriterT $ removeRoleInstance_ roleId
+removeRoleInstance roleId@(RoleInstance id) = (lift2 $ try $ (getPerspectRol roleId)) >>= handlePerspectRolError "removeRoleInstance"
+  \(PerspectRol{pspType, context}) -> do
+    removeRoleInstancesFromContext context pspType (singleton roleId)
+    void $ runWriterT $ removeRoleInstance_ roleId
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
@@ -375,13 +376,14 @@ setBinding_ roleId (newBindingId :: RoleInstance) msignedDelta = (lift2 $ try $ 
 -- | Notice that in order to establish whether this role represents `usr:Me`,
 -- | it needs a binding!
 handleNewPeer :: RoleInstance -> MonadPerspectivesTransaction Unit
-handleNewPeer roleInstance = do
-  PerspectRol{context, pspType} <- lift2 $ getPerspectRol roleInstance
-  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole pspType
-  me <- lift2 $ isMe roleInstance
-  if kindOfRole == UserRole && not me
-    then context `serialisedAsDeltasFor` roleInstance
-    else pure unit
+handleNewPeer roleInstance = (lift2 $ try$ getPerspectRol roleInstance) >>=
+  handlePerspectRolError "handleNewPeer"
+    \(PerspectRol{context, pspType}) -> do
+      (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole pspType
+      me <- lift2 $ isMe roleInstance
+      if kindOfRole == UserRole && not me
+        then context `serialisedAsDeltasFor` roleInstance
+        else pure unit
 
 -- | Removes the binding R of the rol, if any.
 -- | If the binding is an external role, checks if it should be removed.
