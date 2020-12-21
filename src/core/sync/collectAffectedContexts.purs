@@ -300,7 +300,8 @@ magic ctxt roleInstances rtype users =  do
               for_ (toArray roleInstances) \roleInstance -> do
                 (try $ lift2 $ getPerspectRol roleInstance) >>=
                   handlePerspectRolError "Perspectives.CollectAffectedContexts.magic"
-                    \(PerspectRol{universeRoleDelta, contextDelta}) ->
+                    \(PerspectRol{universeRoleDelta, contextDelta}) -> do
+                      addDelta $ DeltaInTransaction {users, delta: universeRoleDelta}
                       -- Not if the roleInstance is an external role!
                       if (not $ isDefaultContextDelta contextDelta)
                         then addDelta $ DeltaInTransaction {users, delta: contextDelta}

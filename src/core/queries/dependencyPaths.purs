@@ -75,6 +75,11 @@ consOnMainPath d p@{mainPath} = p {head = d, mainPath = Just $ maybe (singleton 
 snocOnMainPath :: DependencyPath -> Dependency -> DependencyPath
 snocOnMainPath p@{mainPath} d = p {head = d, mainPath = Just $ maybe (singleton d) (flip snoc d) mainPath}
 
+addAsSupportingPaths :: Array (NonEmptyList Dependency) -> DependencyPath -> DependencyPath
+addAsSupportingPaths paths dp@({supportingPaths}) = dp {supportingPaths = paths <> supportingPaths}
+
+-- | All paths in the second argument are added as a supporting path to the first argument.
+-- | In other words, the main path of the first argument is the main path of the result.
 appendPaths :: DependencyPath -> DependencyPath -> DependencyPath
 appendPaths dp1@{supportingPaths} dp2 = dp1 {supportingPaths = supportingPaths <> allPaths dp2}
 

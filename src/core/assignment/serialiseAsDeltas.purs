@@ -27,8 +27,7 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.Partial (head) as PA
 import Data.Foldable (for_, traverse_)
-import Data.List.NonEmpty (foldM, head)
-import Data.List.Types (NonEmptyList)
+import Data.List.NonEmpty (foldM)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (new)
@@ -126,19 +125,19 @@ serialisedAsDeltasFor_ cid userId userType = do
       -- Compute all values and serialise the dependencies.
       for_ visiblePropertyTypes
         \pt -> do
-          for_ (join (allPaths <$> rinstances))
-            \(depList :: NonEmptyList Dependency) -> do
-              (vals :: Array DependencyPath) <- liftToMPT (depList ##= getPropertyValues pt)
+          for_ (_.head <$> rinstances)
+            \(dep :: Dependency) -> do
+              (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
               for_ (join (allPaths <$> vals)) (foldM serialiseDependency Nothing)
       pure unit
   pure unit
 
   where
 
-    getPropertyValues :: PropertyType -> NonEmptyList Dependency ~~> DependencyPath
-    getPropertyValues pt dl = do
+    getPropertyValues :: PropertyType -> DependencyPath ~~> DependencyPath
+    getPropertyValues pt dep = do
       calc <- lift $ lift $ (PClass.getProperty >=> PClass.getCalculation) pt
-      interpret calc (singletonPath (head dl))
+      interpret calc dep
 
     -- Always returns the second argument in Maybe.
     serialiseDependency :: Maybe Dependency -> Dependency -> MonadPerspectivesTransaction (Maybe Dependency)
@@ -204,15 +203,17 @@ serialisedAsDeltasFor_ cid userId userType = do
           (liftToMPT $ try $ getPerspectRol roleId) >>=
             handlePerspectRolError "addDeltasForRole"
               \(PerspectRol{context, universeRoleDelta, contextDelta}) -> do
-                addDelta $ DeltaInTransaction {users: [userId], delta: universeRoleDelta}
-                addDelta $ DeltaInTransaction {users: [userId], delta: contextDelta}
                 (liftToMPT $ try $ getPerspectContext context) >>=
                   handlePerspectContextError "addDeltasForRole"
                     \(PerspectContext{universeContextDelta, buitenRol}) -> do
-                      addDelta $ DeltaInTransaction {users: [userId], delta: universeContextDelta}
                       (liftToMPT $ try $ getPerspectRol buitenRol) >>=
                         handlePerspectRolError "addDeltasForRole"
-                          \(PerspectRol{universeRoleDelta: eRoleDelta}) -> addDelta $ DeltaInTransaction {users: [userId], delta: eRoleDelta}
+                          \(PerspectRol{universeRoleDelta: eRoleDelta}) -> do
+                            -- ORDER IS OF THE ESSENCE, HERE!!
+                            addDelta $ DeltaInTransaction {users: [userId], delta: universeContextDelta}
+                            addDelta $ DeltaInTransaction {users: [userId], delta: eRoleDelta}
+                            addDelta $ DeltaInTransaction {users: [userId], delta: universeRoleDelta}
+                            addDelta $ DeltaInTransaction {users: [userId], delta: contextDelta}
 
         withContext :: Boolean
         withContext = true

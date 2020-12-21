@@ -25,9 +25,9 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (empty, join, void)
-import Data.Array (elemIndex, null, union, unsafeIndex, head, cons, uncons)
+import Data.Array (elemIndex, null, union, unsafeIndex, head)
 import Data.List (List(..))
-import Data.List.Types (List)
+import Data.List.Types (List, NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, traverse)
@@ -44,7 +44,7 @@ import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, bound
 import Perspectives.Instances.Values (bool2Value, value2Date, value2Int)
 import Perspectives.Names (lookupIndexedRole)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
-import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
+import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (lookup, mapNumericOperator, orderFunction, performNumericOperation')
 import Perspectives.Representation.ADT (ADT(..))
@@ -126,6 +126,10 @@ interpret (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) a =
   (interpret f1 >=> interpret f2) a
 interpret (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) a = ArrayT do
   (values :: Array DependencyPath) <- runArrayT $ interpret source a
+  -- Each result contains just a single DependencyPath, or is empty.
+  -- The main path of that result is the main path of the value path (v).
+  -- All paths resulting from the criterium are added as supporting paths to the result.
+  -- NOTICE that every result has at least a single supporting path.
   (results :: Array (Array DependencyPath)) <- for values (\v -> do
     -- The DescriptionCompiler only allows functional criteria, so r is either empty or
     -- contains a single result.
@@ -134,19 +138,28 @@ interpret (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) a = ArrayT d
       Just l -> unsafePartial $ case l.head of
         (V "FilterF" (Value "true")) -> pure $ [appendPaths v l]
         (V "FilterF" (Value "false")) -> pure []
+      -- interpret no criterium result as false.
       otherwise -> pure []
     )
   pure $ join results
 interpret (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) a = ArrayT $ do
-  f1r <- runArrayT $ interpret f1 a
+  (f1r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   f2r <- runArrayT $ interpret f2 a
-  -- All Dependencies in f1r should be preserved. Arbitrarily add them to the first DependencyPath in f2r.
-  case uncons f2r of
-    Nothing -> pure []
-    Just {head, tail} -> case head of
-      dp@{supportingPaths} -> pure $ cons
-        (dp {supportingPaths = join (allPaths <$> tail)})
-        tail
+  -- Let's assume both result in a single DependencyPath.
+  -- If the sequence represents a let statement, we should make the main path of the DependencyPath resulting from the
+  -- second expression the main path of the end result, to which we add all paths in the first as supporting paths.
+  -- This works out well for recursively nested sequences. In the end, the very last main path becomes
+  -- the main path of the entire expression; all others are supporting paths.
+  --
+  -- However, in general, the second expression may result in multiple DependencyPaths (think of obtaining the
+  -- instances of a role or of its binders).
+  -- We should apply the above to ALL those paths.
+  --
+  -- Finally, the first expression may yield more than one DependencyPath, too. We simply obtain all paths from
+  -- all of them and add them as secundary paths.
+  (allSecundaries :: Array (NonEmptyList Dependency)) <- pure $ join (allPaths <$> f1r)
+  pure (addAsSupportingPaths allSecundaries <$> f2r)
+
 interpret (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) a = ArrayT do
   (f1r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   if null f1r
@@ -301,7 +314,7 @@ interpret qfd a = case a.head of
       (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) -> (flip consOnMainPath a) <<< R <$> externalRole cid
       (SQD _ (TypeGetter TypeOfContextF) _ _ _) -> (flip consOnMainPath a) <<< CT <$> contextType cid
 
-      otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
+      otherwise -> throwError (error $ "(head=ContextInstance) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show cid)
 
     -----------------------------------------------------------
     -- RoleInstance
@@ -319,7 +332,7 @@ interpret qfd a = case a.head of
       (SQD _ (DataTypeGetter BindingF) _ _ _) -> (flip consOnMainPath a) <<< R <$> binding rid
       (SQD _ (DataTypeGetterWithParameter GetRoleBindersF parameter) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getRoleBinders (EnumeratedRoleType parameter) rid
 
-      otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
+      otherwise -> throwError (error $ "(head=RoleInstance) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show rid)
 
     -----------------------------------------------------------
     -- Value
@@ -330,7 +343,7 @@ interpret qfd a = case a.head of
       (SQD dom (Value2Role _) _ _ _) -> pure a {head = R $ RoleInstance $ unwrap $ unsafePartial dependencyToValue a.head}
 
 
-      otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
+      otherwise -> throwError (error $ "(head is Value) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show val)
 
     -----------------------------------------------------------
     -- ContextKind
@@ -338,7 +351,7 @@ interpret qfd a = case a.head of
     (CT contextType) -> case qfd of
       (SQD _ (TypeGetter RoleTypesF) _ _ _) -> (flip consOnMainPath a) <<< RT <$> (liftToInstanceLevel allRoleTypesInContext) contextType
 
-      otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
+      otherwise -> throwError (error $ "(head is ContextKind) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show contextType)
     -----------------------------------------------------------
     -- RoleKind
     -----------------------------------------------------------
@@ -346,7 +359,7 @@ interpret qfd a = case a.head of
 
       (SQD _ (DataTypeGetterWithParameter SpecialisesRoleTypeF parameter) _ _ _ ) -> (flip consOnMainPath a) <<< V "SpecialisesRoleType" <$> (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)) roleType)
 
-      otherwise -> throwError (error $ "No implementation in Perspectives.Query.Interpreter for " <> show qfd)
+      otherwise -> throwError (error $ "(head is RoleKind) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show roleType)
 
 toBool :: List Dependency -> Boolean
 toBool (Cons (V _ (Value s)) _) = s == "true"
