@@ -43,7 +43,6 @@ import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWi
 import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.InvertedQuery (RelevantProperties(..), PropsAndVerbs)
-import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..), Verb)
@@ -432,7 +431,7 @@ hasPerspectiveOnPropertyWithVerb subjectType roleType property verbs = do
           \at -> hasBeenFound >>= if _
             then pure unit
             else do
-              (Action{verb, requiredObjectProperties}) <- lift $ getAction at
+              act@(Action{verb, requiredObjectProperties}) <- lift $ getAction at
               if (null verbs || (isJust $ elemIndex verb verbs))
                 then case requiredObjectProperties of
                   Just vt -> do
@@ -441,7 +440,7 @@ hasPerspectiveOnPropertyWithVerb subjectType roleType property verbs = do
                       Nothing -> pure unit
                       otherwise -> put true
                   Nothing -> do
-                    props <- lift (allProperties (ST roleType))
+                    props <- lift (objectType act >>= allProperties)
                     case elemIndex (ENP property) props of
                       Nothing -> pure unit
                       otherwise -> put true

@@ -136,7 +136,8 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         else do
           -- Check if the author has a perspective on the role to be created that includes
           -- the verb Create.
-          (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Create, Become]) >>= case _ of
+          -- TODO. Ik heb 'Change' toegevoegd om het bot perspectief mee te laten tellen.
+          (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Create, Become, Change]) >>= case _ of
             Left e -> handleError e
             Right _ -> constructAnotherRole_
     ConstructExternalRole -> do
