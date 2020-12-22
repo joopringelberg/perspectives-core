@@ -70,7 +70,7 @@ roleHasPerspectiveOnRoleWithVerb subject roleType verbs = do
     else pure $ Left $ UnauthorizedForRole "Auteur" subjectType (ENR roleType) verbs
 
 -- | This function differs from `roleHasPerspectiveOnRoleWithVerb` in that it uses an
--- | `authorizedRole`. This is the role that binds the external role that we scrutinize,
+-- | `authorizedRole` (second parameter). This is the role that binds the external role that we scrutinize,
 -- | or it is the Calculated role that results in external roles.
 roleHasPerspectiveOnExternalRoleWithVerb :: SubjectOfAction -> Maybe RoleType -> Verb -> MonadPerspectives (Either PerspectivesError Boolean)
 roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleType of
@@ -86,7 +86,7 @@ roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleTyp
         else pure $ Left $ UnauthorizedForRole "Auteur" subjectType rt [verb']
     where
       hasPerspectiveWithVerb :: RoleType -> RoleType -> Found Unit
-      hasPerspectiveWithVerb subjectType roleType = do
+      hasPerspectiveWithVerb subjectType authorizedRoleType = do
         allSubjects <- lift (subjectType ###= roleTypeAspectsClosure)
         for_ allSubjects
           \userRole -> hasBeenFound >>= if _
@@ -99,18 +99,11 @@ roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleTyp
                   else do
                     (act@Action{verb}) <- lift $ getAction at
                     if verb == verb'
-                      -- TODO: dekt dit ook unbound contexts? Vermoedelijk niet, dan moeten we de binding van
-                      -- een enumerated role ook meenemen.
-                      then (lift $ providesPerspectiveOnRole roleType act) >>= put
-
-                      -- then case object of
-                      --   CR _ -> if object == roleType then put true else pure unit
-                      --   ENR etype -> do
-                      --     -- By reducing the ADT that represents both the role and its binding, and, when the object is
-                      --     -- calculated, the end result of the calculation, we cover both bound contexts and unbound contexts.
-                      --     (adt :: ADT EnumeratedRoleType) <- lift $ typeIncludingAspectsBinding object
-                      --     if unwrap (reduce ((\rt -> pure (rt == etype)) :: EnumeratedRoleType -> Identity Boolean) adt)
-                      --       then put true
-                      --       else pure unit
-
-                        else pure unit
+                      -- This also covers the case that authorizedRoleType is an EnumeratedRoleType.
+                      -- In that case, we really want to check whether the Action provides access to the *binding*
+                      -- of that EnumeratedRoleType.
+                      -- `providesPerspectiveOnRole` works by checking that all EnumeratedRoleTypes in the ADT
+                      -- **of its argument and its binding** are in the EnumeratedRoleTypes of the object of the
+                      -- action.
+                      then (lift $ providesPerspectiveOnRole authorizedRoleType act) >>= put
+                      else pure unit

@@ -52,7 +52,6 @@ import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
-import Perspectives.Representation.Class.Action (providesPerspectiveOnRole)
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole, getView)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, functional, mandatory)
@@ -186,39 +185,3 @@ setInvertedQueriesForUserAndRole user _ props perspectiveOnThisRole invertedQ = 
 isRelevant :: PropertyType -> RelevantProperties -> Boolean
 isRelevant t All = true
 isRelevant t (Properties set) = isJust $ elemIndex t set
-
--- | For a User Role, find the properties of another Role in the same context, that are relevant in the sense that
--- | they occur in the View on the Object of some Action of the perspective of the User.
--- | This function only returns values for Enumerated User Role types.
--- | <User> `hasAccessToPropertiesOf` <Role> == RelevantProperties
--- | where both arguments are RoleTypes.
--- TODO. THIS FUNCTION IS OBSOLETE.
-hasAccessToPropertiesOf :: RoleType -> RoleType -> MP RelevantProperties
-hasAccessToPropertiesOf (ENR user) role = do
-  -- Find all Actions on the role as Object (consider Aspects, too!)
-  props <- user ###= (aspectsClosure >=> actionOnRole role >=> enumeratedPropertiesForActionObject)
-  -- x1 <- user ###= aspectsClosure
-  -- log $ show user <> " aspectsClosure " <> show x1
-  -- x2 <- user ###= (aspectsClosure >=> actionOnRole role)
-  -- log $ show user <> " aspectsClosure >=> actionOnRole " <> show role <> " = " <> show x2
-  -- log $ show user <> " hasAccessToPropertiesOf " <> show role <> " = " <> show props
-  -- If no view has been specified, props is empty so we assume ALL properties! (No view should be without properties).
-  if null props
-    then pure All
-    else pure $ Properties props
-
-  where
-    -- the actions of the EnumeratedRoleType (userRole) on the object Roletype (object)
-    actionOnRole :: RoleType -> EnumeratedRoleType ~~~> ActionType
-    actionOnRole object userRole = ArrayT do
-      EnumeratedRole{perspectives} <- getEnumeratedRole userRole
-      filterA (getAction >=> providesPerspectiveOnRole object) perspectives
-
-    enumeratedPropertiesForActionObject :: ActionType ~~~> PropertyType
-    enumeratedPropertiesForActionObject a = ArrayT do
-      Action{requiredObjectProperties} <- getAction a
-      case requiredObjectProperties of
-        Nothing -> pure []
-        Just v -> getView v >>= pure <<< _.propertyReferences <<< unwrap
-
-hasAccessToPropertiesOf _ _ = empty

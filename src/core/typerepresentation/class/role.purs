@@ -61,6 +61,8 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   -- | The type of the Role. For an EnumeratedRole this is just `ST EnumeratedRoleType`.
   -- | For a CalculatedRole it is the range of its calculation.
   roleADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
+  -- | The type of the Role, combined with its binding type.
+  roleAndBinding :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   -- | The type of the Role, including its direct aspects: not their transitive closure!
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
@@ -94,6 +96,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
     Q qd -> pure qd
     otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
   roleADT r = calculation r >>= pure <<< unsafePartial domain2roleType <<< range
+  roleAndBinding = rangeOfCalculatedRole
   roleAspectsADT = rangeOfCalculatedRole
   roleAspectsBindingADT = rangeOfCalculatedRole
   perspectives r = (unwrap r).perspectives
@@ -119,6 +122,12 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   mandatory r = pure (unwrap r).mandatory
   calculation r = pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
   roleADT r = pure (ST $ identifier r)
+  roleAndBinding r = pure $ case (unwrap r).binding of
+    PROD terms -> PROD (cons (ST $ identifier r) terms)
+    EMPTY -> (ST $ identifier r)
+    st@(ST _) -> PROD [(ST $ identifier r), st]
+    sum@(SUM _) -> PROD [(ST $ identifier r), sum]
+    UNIVERSAL -> UNIVERSAL
   roleAspectsADT r@(EnumeratedRole{roleAspects}) = do
     aspects <- pure $ ST <$> roleAspects
     if null aspects
@@ -352,6 +361,10 @@ adtOfRoleAspectsBinding (C c) = roleAspectsBindingADT c
 adtOfRole :: Role -> MP (ADT EnumeratedRoleType)
 adtOfRole (E e) = roleADT e
 adtOfRole (C c) = roleADT c
+
+adtOfRoleAndBinding :: Role -> MP (ADT EnumeratedRoleType)
+adtOfRoleAndBinding (E e) = roleAndBinding e
+adtOfRoleAndBinding (C c) = roleAndBinding c
 
 contextOfRole :: Role -> MP (ADT ContextType)
 contextOfRole (E e) = context e
