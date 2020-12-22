@@ -292,11 +292,11 @@ magic ctxt roleInstances rtype users =  do
     handlePerspectContextError "Perspectives.CollectAffectedContexts.magic"
       -- Fetch the UniverseContextDelta from the context instance here.
       \(PerspectContext{universeContextDelta, buitenRol}) -> do
-        addDelta $ DeltaInTransaction {users, delta: universeContextDelta}
         (try $ lift2 $ getPerspectRol buitenRol) >>=
           handlePerspectRolError "Perspectives.CollectAffectedContexts.magic"
             \(PerspectRol{universeRoleDelta: externalRoleDelta}) -> do
               addDelta $ DeltaInTransaction {users, delta: externalRoleDelta}
+              addDelta $ DeltaInTransaction {users, delta: universeContextDelta}
               for_ (toArray roleInstances) \roleInstance -> do
                 (try $ lift2 $ getPerspectRol roleInstance) >>=
                   handlePerspectRolError "Perspectives.CollectAffectedContexts.magic"

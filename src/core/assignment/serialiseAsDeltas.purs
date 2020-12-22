@@ -210,8 +210,8 @@ serialisedAsDeltasFor_ cid userId userType = do
                         handlePerspectRolError "addDeltasForRole"
                           \(PerspectRol{universeRoleDelta: eRoleDelta}) -> do
                             -- ORDER IS OF THE ESSENCE, HERE!!
-                            addDelta $ DeltaInTransaction {users: [userId], delta: universeContextDelta}
                             addDelta $ DeltaInTransaction {users: [userId], delta: eRoleDelta}
+                            addDelta $ DeltaInTransaction {users: [userId], delta: universeContextDelta}
                             addDelta $ DeltaInTransaction {users: [userId], delta: universeRoleDelta}
                             addDelta $ DeltaInTransaction {users: [userId], delta: contextDelta}
 

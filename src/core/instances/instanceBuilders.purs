@@ -71,7 +71,7 @@ import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedP
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType, externalRoleType)
 import Perspectives.SaveUserData (setBinding)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -115,16 +115,16 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
             pure $ toArray (snd <$> rolInstances')
 
           lift $ lift2 $ void $ saveEntiteit contextInstanceId
-          -- Add a UniverseContextDelta to the Transaction with the union of the users of the RoleBindingDeltas.
-          lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) i
-          -- TODO. Add the context as a createdContext to the transaction
-          lift $ addCreatedContextToTransaction contextInstanceId
           -- Add a UniverseRoleDelta to the Transaction for the external role.
           -- As we've just constructed the context and its external rol, no need to
           -- catch errors rising from not being able to exchange the identifier for the
-          -- resource.
+          -- resources.
           PerspectRol{universeRoleDelta} <- lift $ lift $ lift $ getPerspectRol buitenRol
-          lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i + 1)
+          lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i)
+          -- Add a UniverseContextDelta to the Transaction with the union of the users of the RoleBindingDeltas.
+          lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) (i + 1)
+          -- Add the context as a createdContext to the transaction
+          lift $ addCreatedContextToTransaction contextInstanceId
           pure contextInstanceId
   where
 
@@ -199,7 +199,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
   _ <- lift $ lift2 $ cacheEntity externalRole
     (PerspectRol defaultRolRecord
       { _id = externalRole
-      , pspType = EnumeratedRoleType (unwrap pspType <> "$External")
+      , pspType = externalRoleType pspType
       , context = contextInstanceId
       , binding = Nothing
       , universeRoleDelta =
@@ -208,13 +208,13 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
             , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
               { id: contextInstanceId
               , roleInstances: (SNEA.singleton externalRole)
-              , roleType: EnumeratedRoleType (unwrap pspType <> "$External")
+              , roleType: externalRoleType pspType
               , authorizedRole
               , deltaType: ConstructExternalRole
               , subject } }
       })
   -- QUERY UPDATES
-  (lift $ lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (EnumeratedRoleType $ unwrap pspType <> "$External")) >>= lift <<< addCorrelationIdentifiersToTransactie
+  (lift $ lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType pspType)) >>= lift <<< addCorrelationIdentifiersToTransactie
   -- TODO. Op dit moment van constructie aangekomen is nog niet vastgelegd wie 'me' is in de context.
   case externeProperties of
     (PropertySerialization props) -> lift do

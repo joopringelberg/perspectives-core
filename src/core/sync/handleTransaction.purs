@@ -42,15 +42,16 @@ import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (buitenRol, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
-import Perspectives.Parsing.Messages (PerspectivesError)
-import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, typeOfSubjectOfAction)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, setBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
@@ -100,28 +101,34 @@ handleError :: PerspectivesError -> MonadPerspectivesTransaction Unit
 handleError e = liftEffect $ log (show e)
 
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
--- Note that (presuming that the external role is constructed first) we do not have to check the authorization.
+-- | The ConstructExternalRole always precedes the UniverseContextDelta for the context it is the external
+-- | role for. Hence we only have to check whether the external role exists.
 executeUniverseContextDelta :: UniverseContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
-executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType}) signedDelta = do
+executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, subject}) signedDelta = do
   log (show deltaType <> " with id " <> show id <> " and with type " <> show contextType)
-  case deltaType of
-    ConstructEmptyContext -> do
-      (exists :: Maybe PerspectContext) <- lift2 $ tryGetPerspectEntiteit id
-      if isNothing exists
-        then do
-          loadModelIfMissing (unsafeDeconstructModelName $ unwrap contextType)
-          contextInstance <- pure
-            (PerspectContext defaultContextRecord
-              { _id = id
-              , displayName = unwrap id
-              , pspType = contextType
-              , buitenRol = RoleInstance $ buitenRol $ unwrap id
-              , universeContextDelta = signedDelta
-              })
-          lift2 $ void $ cacheEntity id contextInstance
-          (lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (EnumeratedRoleType $ unwrap contextType <> "$External")) >>= addCorrelationIdentifiersToTransactie
-          addCreatedContextToTransaction id
-        else pure unit
+  externalRoleExists <- lift2 $ entityExists (RoleInstance $ buitenRol $ unwrap id)
+  if externalRoleExists
+    then case deltaType of
+      ConstructEmptyContext -> do
+        (exists :: Maybe PerspectContext) <- lift2 $ tryGetPerspectEntiteit id
+        if isNothing exists
+          then do
+            loadModelIfMissing (unsafeDeconstructModelName $ unwrap contextType)
+            contextInstance <- pure
+              (PerspectContext defaultContextRecord
+                { _id = id
+                , displayName = unwrap id
+                , pspType = contextType
+                , buitenRol = RoleInstance $ buitenRol $ unwrap id
+                , universeContextDelta = signedDelta
+                })
+            lift2 $ void $ cacheEntity id contextInstance
+            (lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
+            addCreatedContextToTransaction id
+          else pure unit
+    else do
+      (subjectType :: RoleType) <- lift2 $ typeOfSubjectOfAction subject
+      logPerspectivesError $ UnauthorizedForContext "auteur" subjectType contextType
 
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
