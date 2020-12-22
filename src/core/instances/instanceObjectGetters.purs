@@ -47,7 +47,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (<<<), (<>), (==), (>>=), (>>>), (>=>), (<$>), show, (*>))
+import Prelude (Unit, bind, discard, flip, identity, join, map, not, pure, show, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -228,6 +228,9 @@ isMe ri = (try $ getPerspectRol ri) >>=
       else case bnd of
         Nothing -> pure false
         Just b -> isMe b
+
+notIsMe :: RoleInstance -> MP Boolean
+notIsMe = isMe >=> pure <<< not
 
 -- | Binding `boundBy` Binder is true,
 -- | iff either Binding is the direct binding of Binder, or (binding Binder) `binds` Binding is true.

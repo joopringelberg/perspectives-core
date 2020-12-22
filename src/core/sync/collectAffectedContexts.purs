@@ -49,7 +49,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, contextType, getEnumeratedRoleInstances, getRoleBinders, isMe)
+import Perspectives.Instances.ObjectGetters (binding, contextType, getEnumeratedRoleInstances, getRoleBinders, notIsMe)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), PropsAndVerbs, allProps, backwards, forwards)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
@@ -91,8 +91,8 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
     affectedContexts <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
   -- Remove 'me'
-  -- If a role cannot be found, we remove it, erring on the safe side (isMe has an internal error boundary).
-  lift $ lift $ filterA isMe (nub $ union users1 users2)
+  -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
+  lift $ lift $ filterA notIsMe (nub $ union users1 users2)
 
 -- Adds an AffectedContext to the transaction and returns user instances.
 handleAffectedContexts :: Array ContextInstance -> Map RoleType PropsAndVerbs -> MonadPerspectivesTransaction (Array RoleInstance)
@@ -161,7 +161,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
         handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
     otherwise -> pure []
 
-  users <- lift $ lift $ filterA isMe (nub $ union users1 (union users2 users3))
+  users <- lift $ lift $ filterA notIsMe (nub $ union users1 (union users2 users3))
   pure users
 
   where
@@ -170,7 +170,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
     runInvertedQuery roleInstance (InvertedQuery{description, backwardsCompiled, userTypes}) = do
       -- Find all affected contexts, starting from the binding instance of the Delta.
       affectedContexts <- lift2 $ catchError (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
-      handleAffectedContexts affectedContexts userTypes >>= lift2 <<< filterA isMe
+      handleAffectedContexts affectedContexts userTypes >>= lift2 <<< filterA notIsMe
 
 runForwardsComputation ::
   RoleInstance ->
@@ -315,7 +315,7 @@ aisInPropertyDelta id property = do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
-  otherUsers <- lift $ lift $ filterA isMe (nub users)
+  otherUsers <- lift $ lift $ filterA notIsMe (nub users)
   pure otherUsers
   where
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Array InvertedQuery)
