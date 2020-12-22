@@ -51,7 +51,7 @@ import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..), externalRoleType_)
 import Perspectives.SerializableNonEmptyArray (singleton)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
@@ -605,7 +605,7 @@ context contextRole = withRoleCounting context' where
             universeRoleDelta <- deltaSignedByMe $ encodeJSON $ UniverseRoleDelta
               { subject: UserInstance $ RoleInstance me
               , id: (ContextInstance $ show instanceName)
-              , roleType: EnumeratedRoleType $ show typeName <> "$External"
+              , roleType: EnumeratedRoleType $ externalRoleType_ $ show typeName
               -- the type of the contextrole.
               , authorizedRole: contextRole
               , roleInstances: singleton $ RoleInstance $ buitenRol (show instanceName)
@@ -614,7 +614,7 @@ context contextRole = withRoleCounting context' where
             cacheRol (RoleInstance $ buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
                 { _id = RoleInstance $ buitenRol (show instanceName)
-                , pspType = EnumeratedRoleType $ show typeName <> "$External"
+                , pspType = EnumeratedRoleType $ externalRoleType_ $ show typeName
                 , context = (ContextInstance $ show instanceName)
                 , binding = RoleInstance <<< buitenRol <$> prototype
                 , properties = FO.fromFoldable publicProps

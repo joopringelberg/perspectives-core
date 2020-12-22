@@ -75,7 +75,7 @@ import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPers
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -137,11 +137,11 @@ removeContextIfUnbound roleInstance@(RoleInstance rid) ctype = do
 removeContextInstance :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
 removeContextInstance id authorizedRole = do
   (ctxt@(PerspectContext{pspType})) <- lift $ lift $ getPerspectContext id
-  externalRoleType <- pure (EnumeratedRoleType ((unwrap pspType) <> "$External"))
+  externalRoleType' <- pure $ externalRoleType pspType
   -- RULE TRIGGERING and QUERY UPDATES.
   (Tuple _ users) <- runWriterT $ do
     forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances' -> remove (EnumeratedRoleType roleName) instances'
-    remove externalRoleType [(context_buitenRol ctxt)]
+    remove externalRoleType' [(context_buitenRol ctxt)]
   -- PERSISTENCE
   _ <- scheduleContextRemoval id
   -- SYNCHRONISATION
@@ -154,7 +154,7 @@ removeContextInstance id authorizedRole = do
         { author: me
         , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
           { id
-          , roleType: externalRoleType
+          , roleType: externalRoleType'
           , authorizedRole
           , roleInstances: SNEA.singleton (context_buitenRol ctxt)
           , deltaType: if isJust authorizedRole then RemoveUnboundExternalRoleInstance else RemoveExternalRoleInstance

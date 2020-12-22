@@ -31,7 +31,7 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getContext)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedRoleType(..), RoleType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedRoleType, RoleType, externalRoleType)
 import Prelude ((<<<), (<>), (<$>), ($), bind, pure)
 
 -----------------------------------------------------------
@@ -58,7 +58,7 @@ instance contextContextClass :: ContextClass Context where
   defaultPrototype = _.defaultPrototype <<< unwrap
   roleInContext = _.rolInContext <<< unwrap
   contextRole = _.contextRol <<< unwrap
-  externalRole (Context{_id}) = EnumeratedRoleType ((unwrap _id) <> "$External")
+  externalRole (Context{_id}) = externalRoleType _id
   userRole = _.gebruikerRol <<< unwrap
   actions = _.actions <<< unwrap
   aspects = _.contextAspects <<< unwrap

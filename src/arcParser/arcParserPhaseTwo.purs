@@ -57,7 +57,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEn
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Prelude (bind, discard, map, not, pure, show, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (<*))
 
@@ -241,7 +241,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
           -- If the RoleKind is ContextRole, we should construct the name of the External
           -- Role of the binding (which then is a Context)
           expandedBnd <- if kindOfRole == ContextRole
-            then expandNamespace (bnd <> "$External")
+            then expandNamespace (externalRoleType_ bnd)
             else expandNamespace bnd
           -- By default, comma separated types form a SUM wrt binding.
           pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding expandedBnd})
