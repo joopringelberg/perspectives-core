@@ -62,13 +62,16 @@ import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), Role
 import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<<), (<>), (>>=), (<$>), (==))
 
 executeContextDelta :: ContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
-executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext} ) signedDelta = do
+executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext, subject} ) signedDelta = do
   log (show deltaType <> " to/from " <> show contextId <> " and " <> show roleInstances)
   case deltaType of
     -- The subject must be allowed to change the role: they must have a perspective on it that includes the verb Change.
-    -- TODO. Als we hier controleren of die instanties er wel zijn, hoeven we dat in addRoleInstancesToContext niet meer te doen.
-    AddRoleInstancesToContext -> addRoleInstancesToContext contextId roleType ((flip Tuple (Just signedDelta)) <$> (unwrap roleInstances))
-    MoveRoleInstancesToAnotherContext -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
+    AddRoleInstancesToContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Change]) >>= case _ of
+      Left e -> handleError e
+      Right _ -> addRoleInstancesToContext contextId roleType ((flip Tuple (Just signedDelta)) <$> (unwrap roleInstances))
+    MoveRoleInstancesToAnotherContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Delete, Change]) >>= case _ of
+      Left e -> handleError e
+      Right _ -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
 
 executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved}) signedDelta = do
