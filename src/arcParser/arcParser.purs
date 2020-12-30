@@ -320,6 +320,7 @@ constructVerb v = case v of
   "Change" -> Change
   "Delete" -> Delete
   "CreateAndBindContext" -> CreateAndBindContext
+  "Bind" -> Bind
   s -> Custom s
 
 -- | Parses the following forms:
@@ -343,7 +344,7 @@ actionE = try $ withEntireBlock
     actionE_ :: IP {pos :: ArcPosition, verb :: Verb, mview :: Maybe ActionPart}
     actionE_ = try do
       pos <- getPosition
-      verb <- (arcIdentifier <?> "Consult, Change, Create, Delete or a valid identifier") >>= pure <<< constructVerb
+      verb <- (arcIdentifier <?> "Consult, Change, Create, Delete, Bind, CreateAndBindContext or a valid identifier") >>= pure <<< constructVerb
       mview <- optionMaybe (reserved "with" *> arcIdentifier >>= pure <<< ObjectView)
       pure {pos, verb, mview}
 

@@ -468,7 +468,7 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
     isabot <- isSubjectBot
     if null acts && not isabot
       then foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) []
-        (map (mkActionFromVerb pos) ("Consult" : "Change" : "Delete" : "Create" : "CreateAndBindContext" : Nil))
+        (map (mkActionFromVerb pos) ("Consult" : "Change" : "Delete" : "Create" : "Bind" : "CreateAndBindContext" : Nil))
       else foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) [] acts
 
   pure actions

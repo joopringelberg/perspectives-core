@@ -38,13 +38,13 @@ import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerb, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (buitenRol, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (typeOfSubjectOfAction)
+import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
@@ -74,11 +74,14 @@ executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstan
       Right _ -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
 
 executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
-executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved}) signedDelta = do
+executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved, subject}) signedDelta = do
   log (show deltaType <> " of " <> show roleId <> " (to) " <> show binding)
-  case deltaType of
-    SetBinding -> void $ setBinding roleId (unsafePartial $ fromJust binding) (Just signedDelta)
-    RemoveBinding -> void $ removeBinding roleWillBeRemoved roleId
+  roleType' <- lift2 (roleId ##>> roleType)
+  (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Bind]) >>= case _ of
+    Left e -> handleError e
+    Right _ -> case deltaType of
+      SetBinding -> void $ setBinding roleId (unsafePartial $ fromJust binding) (Just signedDelta)
+      RemoveBinding -> void $ removeBinding roleWillBeRemoved roleId
 
 executeRolePropertyDelta :: RolePropertyDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, subject}) signedDelta = do

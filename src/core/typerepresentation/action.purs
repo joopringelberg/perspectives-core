@@ -86,7 +86,7 @@ instance identifiableAction :: Identifiable Action ActionType where
 -- VERB
 -----------------------------------------------------------
 
-data Verb = Create | Consult | Change | Delete | CreateAndBindContext | Become | Custom String
+data Verb = Create | Consult | Change | Delete | Bind | CreateAndBindContext | Become | Custom String
 
 derive instance genericRepVerb :: Generic Verb _
 instance encodeVerb :: Encode Verb where
