@@ -2,7 +2,7 @@
 
 # NOTE: this script should be adapted with each new tagged version!
 
-cd .psc-package/pv0.8.0/aff-sockets
+cd .psc-package/pv0.9.0/aff-sockets
 
 rm -Rf v2.2.0
 
@@ -12,7 +12,7 @@ cd ../perpectives-apitypes
 
 rm -Rf v2.7.0
 
-ln -s ../../../../perspectives-apitypes v2.7.0
+ln -s ../../../../perspectives-apitypes v2.8.0
 
 cd ../avar-monadask/
 
@@ -24,6 +24,6 @@ cd ../perspectives-couchdb/
 
 rm -Rf v2.8.1
 
-ln -s ../../../../perspectives-couchdb v2.8.1
+ln -s ../../../../perspectives-couchdb v2.8.2
 
 cd ../../..
