@@ -47,9 +47,9 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, binds, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, makeBoolean, roleModelName, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, binds, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, getUnlinkedRoleInstances, makeBoolean, roleModelName, roleType_)
 import Perspectives.Instances.Values (parseInt, value2Int)
-import Perspectives.Names (expandDefaultNamespaces, lookupIndexedRole)
+import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType)
@@ -62,7 +62,7 @@ import Perspectives.Representation.Class.Property (getProperType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
@@ -78,6 +78,8 @@ compileFunction :: QueryFunctionDescription -> MP (String ~~> String)
 compileFunction (SQD _ (RolGetter (ENR (EnumeratedRoleType r))) _ _ _) = if isExternalRole r
   then pure $ unsafeCoerce $ externalRole
   else pure $ unsafeCoerce $ getEnumeratedRoleInstances (EnumeratedRoleType r)
+
+compileFunction (SQD _ (DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF roleTypeName) _ _ _) = pure $ unsafeCoerce $ getUnlinkedRoleInstances (EnumeratedRoleType roleTypeName)
 
 compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
@@ -127,6 +129,12 @@ compileFunction (SQD dom (Constant range value) _ _ _) = pure \_ -> pure value
 
 compileFunction (SQD dom (RoleIndividual individual) _ _ _) = pure $ unsafeCoerce \x -> ArrayT do
   mi <- ((lift $ lookupIndexedRole (unwrap individual)) :: (WriterT (Array Assumption) MonadPerspectives) (Maybe RoleInstance))
+  case mi of
+    Nothing -> pure []
+    Just i -> pure [unwrap i]
+
+compileFunction (SQD dom (ContextIndividual (ContextInstance ident)) _ _ _) = pure $ unsafeCoerce \x -> ArrayT do
+  mi <- ((lift $ lookupIndexedContext ident) :: (WriterT (Array Assumption) MonadPerspectives)(Maybe ContextInstance))
   case mi of
     Nothing -> pure []
     Just i -> pure [unwrap i]

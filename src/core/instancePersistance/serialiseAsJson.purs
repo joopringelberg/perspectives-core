@@ -101,6 +101,7 @@ lift2Coll :: forall a. MonadPerspectives a -> Collecting a
 lift2Coll = lift
 
 -- TODO. This function is not used as it has been replaced in serialiseFor with delta serialisation.
+-- NOTICE that it accesses the PerspectContext member rolInContext directly. It will miss unlinked role instances!
 serialiseAsJsonFor_:: RoleType -> ContextInstance -> Collecting Unit
 serialiseAsJsonFor_ userType cid = do
   (PerspectContext{pspType, rolInContext}) <- lift2Coll $ getPerspectContext cid

@@ -71,6 +71,8 @@ type EnumeratedRoleRecord =
 
   , indexedRole :: Maybe RoleInstance
 
+  , unlinked :: Boolean
+
   }
 
 defaultEnumeratedRole :: String -> String -> RoleKind -> String -> ArcPosition -> EnumeratedRole
@@ -101,6 +103,7 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
   , onContextDelta_role: []
 
   , indexedRole: Nothing
+  , unlinked: false
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _

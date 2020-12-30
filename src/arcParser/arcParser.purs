@@ -176,7 +176,10 @@ roleE = try $ withEntireBlock
     roleAttributes = option Nil $ token.parens do
       ma <- mandatory
       fu <- token.comma *> functional
-      pure (Cons ma (Cons fu Nil))
+      munlinked <- optionMaybe (token.comma *> reserved "unlinked")
+      case munlinked of
+        Nothing -> pure (Cons ma (Cons fu Nil))
+        Just _ -> pure (Cons ma (Cons fu (Cons UnlinkedAttribute Nil)))
         where
           mandatory :: IP RolePart
           mandatory = do
@@ -193,6 +196,8 @@ roleE = try $ withEntireBlock
             case maybeNegated of
               Nothing -> pure $ FunctionalAttribute true
               otherwise -> pure $ FunctionalAttribute false
+
+
 
     filledBy :: IP (List RolePart)
     filledBy = (option Nil (reserved "filledBy" *> colon *> token.commaSep arcIdentifier >>= pure <<< map FilledByAttribute)) <* (nextLine <?> "valid filledBy clause")

@@ -60,6 +60,12 @@ import Perspectives.Representation.View (propertyReferences)
 import Prelude (Unit, bind, eq, flip, pure, show, unit, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&), (||))
 
 ----------------------------------------------------------------------------------------
+------- FUNCTIONS ON ENUMERATEDROLETYPES
+----------------------------------------------------------------------------------------
+isUnlinked_ :: EnumeratedRoleType -> MonadPerspectives Boolean
+isUnlinked_ et = getEnumeratedRole et >>= pure <<< _.unlinked <<< unwrap
+
+----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
 ----------------------------------------------------------------------------------------
 -- | If a role with the given qualified name is available in the Context or its (in)direct aspects,

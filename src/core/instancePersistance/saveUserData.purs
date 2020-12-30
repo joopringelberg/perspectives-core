@@ -70,8 +70,9 @@ import Perspectives.Error.Boundaries (handlePerspectRolError, handlePerspectRolE
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allRoleBinders, getEnumeratedRoleInstances, getProperty, isMe)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, getProperty, isMe)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit)
+import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -239,7 +240,7 @@ removeRoleInstance roleId@(RoleInstance id) = (lift2 $ try $ (getPerspectRol rol
 -- | ContextDelta's are not necessary (see removeRoleInstance).
 removeAllRoleInstances :: EnumeratedRoleType -> Updater ContextInstance
 removeAllRoleInstances et cid = do
-  instances <- lift2 (cid ##= getEnumeratedRoleInstances et)
+  instances <- lift2 (cid ##= getRoleInstances (ENR et))
   case fromArray instances of
     Nothing -> pure unit
     Just instances' -> do

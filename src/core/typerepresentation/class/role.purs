@@ -37,11 +37,11 @@ import Perspectives.Query.QueryTypes (functional, mandatory) as QT
 import Perspectives.Representation.ADT (ADT(..), product, reduce)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, externalRole, roles)
-import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
+import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), intersectionOfArrays, intersectionPset, subsetPSet, unionOfArrays, unionPset)
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
 import Prelude (class Show, class Eq, bind, flip, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
@@ -120,7 +120,9 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   binding r = pure (unwrap r).binding
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
+  calculation r = if (unwrap r).unlinked
+    then pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF (identifier_ r)) (RDOM (ST (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
+    else pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
   roleADT r = pure (ST $ identifier r)
   roleAndBinding r = pure $ case (unwrap r).binding of
     PROD terms -> PROD (cons (ST $ identifier r) terms)

@@ -95,7 +95,7 @@ models _ = ArrayT do
     getExternalRoles :: MP (Array RoleInstance)
     getExternalRoles = do
       repo <- publicRepository
-      (roles :: Array PerspectRol) <- catchError (getViewOnDatabase_ repo "" "defaultViews" "modeldescriptions" Nothing)
+      (roles :: Array PerspectRol) <- catchError (getViewOnDatabase_ repo "" "defaultViews" "modeldescriptions" (Nothing :: Maybe Unit))
         \_ -> pure []
       for roles \r@(PerspectRol{_id}) -> do
         -- If the model is already in use, this role has been saved before.
@@ -138,7 +138,7 @@ contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
 pendingInvitations :: ContextInstance ~~> RoleInstance
 pendingInvitations _ = ArrayT do
   -- tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)]
-  (roles :: Array PerspectRol) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "pendingInvitations" Nothing
+  (roles :: Array PerspectRol) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "pendingInvitations" (Nothing :: Maybe Unit)
   for roles \r@(PerspectRol{_id}) -> do
     void $ lift $ cacheEntity _id r
     pure _id

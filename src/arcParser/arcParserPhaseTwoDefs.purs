@@ -164,6 +164,7 @@ expandNamespace s = do
   pure $ expandNamespaces namespaces s
 
 -- | From an expanded name like "model:System$MySystem" returns a Maybe Context.
+-- | Note: returns indexed context names from PhaseTwoState.
 isIndexedContext :: forall m. Monad m => String -> (PhaseTwo' (Maybe ContextType)) m
 isIndexedContext n = do
   indexedContexts <- lift $ gets _.indexedContexts

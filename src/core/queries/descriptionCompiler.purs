@@ -54,13 +54,13 @@ import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, 
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
-import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
+import Perspectives.Types.ObjectGetters (isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, show, void, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=))
 
 ------------------------------------------------------------------------------------
@@ -82,17 +82,24 @@ makeConjunction currentDomain left rt2 = do
 -- | CalculatedRoles are compiled, when necessary. The result of such an on-the-fly compilation is saved
 -- | in the domeinCache.
 makeRoleGetter :: Domain -> RoleType -> PhaseThree QueryFunctionDescription
-makeRoleGetter currentDomain rt = do
-  (adt :: ADT EnumeratedRoleType) <- case rt of
-    ENR et -> lift2 (getEnumeratedRole et >>= roleADT)
-    CR ct -> do
-      crole@(CalculatedRole{calculation}) <- lift2 $ getCalculatedRole ct
-      case calculation of
-        Q qfd -> pure $ unsafePartial domain2roleType $ range qfd
-        S step -> compileAndSaveRole currentDomain step crole
+makeRoleGetter currentDomain rt@(CR ct) = do
+  (adt :: ADT EnumeratedRoleType) <- do
+    crole@(CalculatedRole{calculation}) <- lift2 $ getCalculatedRole ct
+    case calculation of
+      Q qfd -> pure $ unsafePartial domain2roleType $ range qfd
+      S step -> compileAndSaveRole currentDomain step crole
   isF <- lift2 $ roleTypeIsFunctional rt
   isM <- lift2 $ roleTypeIsMandatory rt
   pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
+
+makeRoleGetter currentDomain rt@(ENR et) = do
+  unlinked <- lift2 $ isUnlinked_ et
+  adt <- lift2 (getEnumeratedRole et >>= roleADT)
+  isF <- lift2 $ roleTypeIsFunctional rt
+  isM <- lift2 $ roleTypeIsMandatory rt
+  if unlinked
+    then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter QF.GetRoleInstancesForContextFromDatabaseF (unwrap et)) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
+    else pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
 
 -- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
 -- | Saves it in the DomainCache.

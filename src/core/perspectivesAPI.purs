@@ -55,12 +55,12 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getEnumeratedRoleInstances, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType, roleType_, siblings)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType, roleType_, siblings)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
-import Perspectives.Query.UnsafeCompiler (getRoleFunction, getDynamicPropertyGetter)
+import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT, reduce)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (calculation, getRoleType, kindOfRole, rangeOfRoleCalculation, rangeOfRoleCalculation', roleADT)
@@ -353,7 +353,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           case mbnd of
             Just bnd -> do
               contextInstanceId <- ContextInstance <$> (expandDefaultNamespaces subject)
-              bindings <- contextInstanceId ##= (getEnumeratedRoleInstances eroltype >=> binding)
+              bindings <- contextInstanceId ##= (getRoleInstances qrolname >=> binding)
               if isJust $ elemIndex (RoleInstance bnd) bindings
                 then sendResponse (Error corrId ("Cannot not bind the same role instance twice in the same role type")) setter
                 else do

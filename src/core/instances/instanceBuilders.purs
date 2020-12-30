@@ -62,16 +62,16 @@ import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType, externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..), externalRoleType)
 import Perspectives.SaveUserData (setBinding)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -240,7 +240,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
     go :: Boolean -> MonadPerspectivesTransaction (Maybe RoleInstance)
     go isMe = do
       contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces id)
-      rolInstances <- lift2 (contextInstanceId ##= getEnumeratedRoleInstances roleType)
+      rolInstances <- lift2 (contextInstanceId ##= getRoleInstances (ENR roleType))
       (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole roleType
       (PerspectRol r@{_id:roleInstance}) <- case mRoleId of
         Nothing -> do

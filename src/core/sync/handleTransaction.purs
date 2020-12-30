@@ -22,7 +22,6 @@
 module Perspectives.Sync.HandleTransaction where
 
 import Control.Monad.Except (runExcept)
-import Data.Array (length)
 import Data.Array.NonEmpty (NonEmptyArray, head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -38,16 +37,17 @@ import Perspectives.Assignment.Update (addProperty, addRoleInstancesToContext, d
 import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerb, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
+import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (buitenRol, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, typeOfSubjectOfAction)
+import Perspectives.Instances.ObjectGetters (typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -137,9 +137,9 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authorizedRole, deltaType, subject}) s = do
   log (show deltaType <> " for/from " <> show id <> " with ids " <> show roleInstances <> " with type " <> show roleType)
+  loadModelIfMissing (unsafeDeconstructModelName $ unwrap roleType)
   case deltaType of
     ConstructEmptyRole -> do
-      loadModelIfMissing (unsafeDeconstructModelName $ unwrap roleType)
       -- We have to check this case: a user is allowed to create himself.
       if userCreatesThemselves
         then constructAnotherRole_
@@ -182,7 +182,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       constructAnotherRole_ :: MonadPerspectivesTransaction Unit
       constructAnotherRole_ = do
         -- find the number of roleinstances in the context.
-        offset <- lift2 ((id ##= getEnumeratedRoleInstances roleType) >>= pure <<< length)
+        offset <- (lift2 (id ##= getRoleInstances (ENR roleType))) >>= pure <<< getNextRolIndex
         forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do
           (exists :: Maybe PerspectRol) <- lift2 $ tryGetPerspectEntiteit roleInstance
           if isNothing exists

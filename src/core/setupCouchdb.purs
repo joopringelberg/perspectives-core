@@ -202,6 +202,17 @@ setRoleView dbname = do
 -- | Import the view definition as a String.
 foreign import roleView :: String
 
+-- THE VIEW 'ROLEFROMCONTEXT'
+-- This view collects instances of a particular role type, **from a particular context instance**.
+-----------------------------------------------------------
+-- | Add a view to the couchdb installation in the 'repository' db.
+setRoleFromContextView :: forall f. String -> MonadCouchdb f Unit
+setRoleFromContextView dbname = do
+  addViewToDatabase dbname "defaultViews" "roleFromContext" (View {map: roleFromContextView, reduce: Nothing})
+
+-- | Import the view definition as a String.
+foreign import roleFromContextView :: String
+
 -----------------------------------------------------------
 -- THE VIEW 'PENDINGINVITATIONS'
 -- This view collects instances model:System$Invitation$External.

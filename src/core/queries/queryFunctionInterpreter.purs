@@ -40,9 +40,9 @@ import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available', not')
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, roleModelName, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, getUnlinkedRoleInstances, roleModelName, roleType_)
 import Perspectives.Instances.Values (bool2Value, value2Date, value2Int)
-import Perspectives.Names (lookupIndexedRole)
+import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
@@ -292,6 +292,12 @@ interpret (SQD dom (RoleIndividual individual) _ _ _) a = ArrayT do
     Nothing -> pure [a]
     Just i -> pure $ [consOnMainPath (R i) a]
 
+interpret (SQD dom (ContextIndividual (ContextInstance individual)) _ _ _) a = ArrayT do
+  mi <- lift $ lookupIndexedContext individual
+  case mi of
+    Nothing -> pure [a]
+    Just i -> pure $ [consOnMainPath (C i) a]
+
 interpret (SQD dom (VariableLookup varName) range _ _) a = do
   -- the lookup function ignores its second argument.
   r <- lookup varName "ignore"
@@ -313,6 +319,7 @@ interpret qfd a = case a.head of
         (lift $ lift $ calculation ct) >>= flip interpret a
       (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) -> (flip consOnMainPath a) <<< R <$> externalRole cid
       (SQD _ (TypeGetter TypeOfContextF) _ _ _) -> (flip consOnMainPath a) <<< CT <$> contextType cid
+      (SQD _ (DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF roleTypeName) _ _ _) -> (flip consOnMainPath a) <<< R <$> getUnlinkedRoleInstances (EnumeratedRoleType roleTypeName) cid
 
       otherwise -> throwError (error $ "(head=ContextInstance) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show cid)
 

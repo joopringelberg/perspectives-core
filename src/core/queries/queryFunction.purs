@@ -53,6 +53,7 @@ data FunctionName =
   | CreateContextF      -- TODO
   | CreateRoleF         -- TODO
   | GetRoleBindersF
+  | GetRoleInstancesForContextFromDatabaseF
   | EqualsF
   | NotEqualsF
   | LessThanF
@@ -93,6 +94,7 @@ isFunctionalFunction fn = case fn of
   CreateContextF -> True
   CreateRoleF -> True
   GetRoleBindersF -> False
+  GetRoleInstancesForContextFromDatabaseF -> False
   EqualsF -> True
   NotEqualsF -> True
   LessThanF -> True
@@ -197,6 +199,7 @@ instance showFunctionName :: Show FunctionName where
     show CreateContextF = "createContext"
     show CreateRoleF = "createRole"
     show GetRoleBindersF = "binder" -- TODO en dit?
+    show GetRoleInstancesForContextFromDatabaseF = "GetRoleInstancesForContextFromDatabaseF"
     show EqualsF = "="
     show NotEqualsF = "/="
     show LessThanF = "<"

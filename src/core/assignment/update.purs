@@ -71,6 +71,7 @@ import Perspectives.Representation.TypeIdentifiers (PropertyType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
+import Perspectives.Types.ObjectGetters (isUnlinked_)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 
 ---------------------------------
@@ -92,14 +93,20 @@ addRoleInstancesToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (
 addRoleInstancesToContext contextId rolName instancesAndDeltas = do
   rolInstances <- pure $ fst <$> instancesAndDeltas
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
-  if (not $ null (toArray rolInstances `difference` context_rolInContext pe rolName))
+  unlinked <- lift2 $ isUnlinked_ rolName
+  -- Do not add a roleinstance a second time.
+  if (not $ null (toArray rolInstances `difference` context_rolInContext pe rolName) || unlinked)
     then do
-      changedContext <- lift2 (modifyContext_rolInContext pe rolName (flip union (toArray rolInstances)))
+      changedContext <- if not unlinked
+        then lift2 (modifyContext_rolInContext pe rolName (flip union (toArray rolInstances)))
+        else pure pe
+      -- roles are the actual instances identified by `rolInstances`, i.e. the new ones.
       (roles :: Array PerspectRol) <- foldM
         (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
         []
         (toArray rolInstances)
       -- PERSISTENCE
+      -- In the new roleInstances, is one of them filled by me?
       case find rol_isMe roles of
         Nothing -> cacheAndSave contextId changedContext
         Just me -> do
