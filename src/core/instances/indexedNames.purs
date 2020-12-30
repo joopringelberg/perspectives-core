@@ -36,7 +36,6 @@ import Foreign.Object.Unsafe (unsafeIndex)
 import Perspectives.ContextAndRole (rol_binding, rol_property)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>))
 import Perspectives.Error.Boundaries (handlePerspectRolError')
-import Perspectives.Identifiers (qualifyWith, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances)
 import Perspectives.Persistent (getPerspectRol)
@@ -77,12 +76,12 @@ indexedContexts :: RoleInstance -> MonadPerspectives (Object ContextInstance)
 indexedContexts modelDescription = (modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedContext")) >>= indexedContexts_
 
 indexedContexts_ :: Array RoleInstance -> MonadPerspectives (Object ContextInstance)
-indexedContexts_ externalRoleIds = do
+indexedContexts_ contextRoleIds = do
   rows <- foldM
     (\rows roleId -> (try $ getPerspectRol roleId) >>=
-      handlePerspectRolError' "indexedRoles_" rows (f >=> (pure <<< flip cons rows)))
+      handlePerspectRolError' "indexedContexts_" rows (f >=> (pure <<< flip cons rows)))
     []
-    externalRoleIds
+    contextRoleIds
   pure $ fromFoldable rows
   where
     f :: PerspectRol -> MonadPerspectives (Tuple String ContextInstance)
@@ -92,4 +91,4 @@ indexedContexts_ externalRoleIds = do
           mcontextId <- (identifier r) ##> binding >=> context
           case mcontextId of
             Nothing -> throwError (error ("An instance of sys:Model$IndexedContext has no context bound to it: " <> identifier_ r))
-            Just c -> pure (Tuple (qualifyWith (unsafeDeconstructModelName $ unwrap c) iname) c)
+            Just c -> pure (Tuple ("model:" <> iname) c)
