@@ -10,7 +10,7 @@ ln -s ../../../../purescript-aff-sockets v2.2.0
 
 cd ../perpectives-apitypes
 
-rm -Rf v2.7.0
+rm -Rf v2.8.0
 
 ln -s ../../../../perspectives-apitypes v2.8.0
 
@@ -22,7 +22,7 @@ ln -s ../../../../purescript-avar-monadask v2.1.0
 
 cd ../perspectives-couchdb/
 
-rm -Rf v2.8.1
+rm -Rf v2.8.2
 
 ln -s ../../../../perspectives-couchdb v2.8.2
 
