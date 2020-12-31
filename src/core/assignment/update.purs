@@ -95,7 +95,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
   unlinked <- lift2 $ isUnlinked_ rolName
   -- Do not add a roleinstance a second time.
-  if (not $ null (toArray rolInstances `difference` context_rolInContext pe rolName) || unlinked)
+  if ((not $ null (toArray rolInstances `difference` context_rolInContext pe rolName)) || unlinked)
     then do
       changedContext <- if not unlinked
         then lift2 (modifyContext_rolInContext pe rolName (flip union (toArray rolInstances)))
@@ -172,12 +172,16 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
 
   -- QUERY UPDATES.
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
+  -- Modify the context: remove the role instances from those recorded with the role type.
   (roles :: Array PerspectRol) <- foldM
     (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
     []
     (toArray rolInstances)
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
-  changedContext <- lift2 (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
+  unlinked <- lift2 $ isUnlinked_ rolName
+  changedContext <- if unlinked
+    then lift2 (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
+    else pure pe
   -- PERSISTENCE.
   case find rol_isMe roles of
     Nothing -> cacheAndSave contextId changedContext
