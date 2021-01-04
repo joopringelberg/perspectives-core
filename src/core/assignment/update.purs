@@ -39,12 +39,12 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, difference, elemIndex, find, null, foldM, union)
+import Data.Array (cons, difference, elemIndex, filter, find, foldM, null, union)
 import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst, snd)
@@ -52,9 +52,10 @@ import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, lookup)
 import Foreign.Object (union) as OBJ
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, lift2, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, context_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_property, rol_id, rol_isMe)
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, removeRol_property, rol_id, rol_isMe)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findPropertyRequests, findRoleRequests)
@@ -65,6 +66,7 @@ import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspe
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..))
@@ -95,16 +97,34 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
   unlinked <- lift2 $ isUnlinked_ rolName
   -- Do not add a roleinstance a second time.
-  if ((not $ null (toArray rolInstances `difference` context_rolInContext pe rolName)) || unlinked)
+  if unlinked
+
     then do
-      changedContext <- if not unlinked
-        then lift2 (modifyContext_rolInContext pe rolName (flip union (toArray rolInstances)))
-        else pure pe
-      -- roles are the actual instances identified by `rolInstances`, i.e. the new ones.
       (roles :: Array PerspectRol) <- foldM
         (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
         []
         (toArray rolInstances)
+      roles' <- pure $ filter (\(PerspectRol{contextDelta}) -> isDefaultContextDelta contextDelta) roles
+      -- only apply f to those role instances that don't yet have a contextDelta (other than the default one).
+      if null roles'
+        then pure unit
+        else f roles' pe unlinked
+
+    else if null (toArray rolInstances `difference` context_rolInContext pe rolName)
+      then pure unit
+      else do
+        (roles :: Array PerspectRol) <- foldM
+          (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
+          []
+          (toArray rolInstances)
+        f roles pe unlinked
+
+  where
+    f :: Array PerspectRol -> PerspectContext -> Boolean -> MonadPerspectivesTransaction Unit
+    f roles pe unlinked = do
+      changedContext <- if not unlinked
+        then lift2 (modifyContext_rolInContext pe rolName (flip union (identifier <$> roles)))
+        else pure pe
       -- PERSISTENCE
       -- In the new roleInstances, is one of them filled by me?
       case find rol_isMe roles of
@@ -116,7 +136,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
 
       -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
       -- the transaction, too.
-      users <- usersWithPerspectiveOnRoleInstance contextId rolName (head rolInstances)
+      users <- usersWithPerspectiveOnRoleInstance contextId rolName (identifier $ unsafePartial $ fromJust $ ARR.head roles)
       -- SYNCHRONISATION
       subject <- getSubject
       author <- getAuthor
@@ -139,7 +159,6 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
         cacheAndSave _id $ PerspectRol r { contextDelta = delta }
       -- QUERY UPDATES
       (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
-    else pure unit
 
 -- | Modifies the context instance by detaching the given role instances.
 -- | Notice that this function does neither uncache nor unsave the rolInstances
