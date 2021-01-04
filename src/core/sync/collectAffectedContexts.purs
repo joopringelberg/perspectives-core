@@ -83,13 +83,14 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
       -- Find all affected contexts, starting from the role instance of the Delta.
       (affectedContexts :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
       handleAffectedContexts affectedContexts userTypes >>= runForwardsComputation roleInstance iq) >>= pure <<< join
-  roleCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_role))
-  users2 <- for roleCalculations (\(InvertedQuery{backwardsCompiled, userTypes}) -> do
-    -- Find all affected contexts, starting from the new role instance of the Delta.
-    -- We do not start on the context because the cardinality of the role getting step is larger than one and
-    -- we want to make sure that the new binding is in the path for the users.
-    affectedContexts <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
-    handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
+  users2 <- do
+    roleCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_role))
+    (for roleCalculations \iq@(InvertedQuery{backwardsCompiled, userTypes}) -> do
+      -- Find all affected contexts, starting from the new role instance of the Delta.
+      -- We do not start on the context because the cardinality of the role getting step is larger than one and
+      -- we want to make sure that the new binding is in the path for the users.
+      affectedContexts <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
+      handleAffectedContexts affectedContexts userTypes >>= runForwardsComputation roleInstance iq) >>= pure <<< join
   -- Remove 'me'
   -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
   lift $ lift $ filterA notIsMe (nub $ union users1 users2)
