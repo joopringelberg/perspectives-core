@@ -49,7 +49,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, contextType, getEnumeratedRoleInstances, getRoleBinders, notIsMe)
+import Perspectives.Instances.ObjectGetters (binding, contextType, getRoleBinders, notIsMe)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), RelevantProperties(..), PropsAndVerbs, allProps, backwards, forwards)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
@@ -59,7 +59,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), toArray)
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -222,7 +222,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
 
 createDeltasFromAssumption :: Array RoleInstance -> InformedAssumption -> MonadPerspectivesTransaction Unit
 createDeltasFromAssumption users (RoleAssumption ctxt roleTypeId) = do
-  instances <- lift2 (ctxt ##= getEnumeratedRoleInstances roleTypeId)
+  instances <- lift2 (ctxt ##= getRoleInstances (ENR roleTypeId))
   case SerializableNonEmptyArray <$> ANE.fromArray instances of
     Nothing -> pure unit
     Just instances' -> magic ctxt instances' roleTypeId users
