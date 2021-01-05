@@ -44,6 +44,7 @@ domain: BrokerServices
       perspective on: extern
 
     user: Guest = sys:Me
+      perspective on: Administrator: Bind
 
     bot: for Guest
       perspective on: Administrator
@@ -75,7 +76,7 @@ domain: BrokerServices
       property: ConfirmationCode (not mandatory, functional, String)
 
       view: ForAdministrator (AccountName, AccountPassword, QueueName)
-      view: ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode)
+      view: ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, Achternaam)
 
       perspective on: extern (ForAccountHolder)
       perspective on: AccountHolder
@@ -89,6 +90,7 @@ domain: BrokerServices
       perspective on: extern
 
     user: Guest = sys:Me
+      perspective on: Administrator: Bind
 
     bot: for Guest
       perspective on: Administrator

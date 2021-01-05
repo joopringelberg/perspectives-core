@@ -53,7 +53,7 @@ roleHasPerspectiveOnPropertyWithVerb :: SubjectOfAction -> RoleInstance -> Enume
 roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
   (subjectType :: RoleType) <- typeOfSubjectOfAction subject
   roleType' <- roleInstance ##>> roleType
-  execStateT (hasPerspectiveOnPropertyWithVerb subjectType roleType' property [verb']) false >>=
+  execStateT (hasPerspectiveOnPropertyWithVerb subjectType property [verb']) false >>=
     if _
       then pure $ Right true
       else pure $ Left $ UnauthorizedForProperty "Auteur" subjectType roleType' property verb'

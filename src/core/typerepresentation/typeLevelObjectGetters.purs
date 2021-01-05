@@ -25,7 +25,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (cons, elemIndex, filter, filterA, findIndex, fold, foldl, null, singleton)
+import Data.Array (cons, elemIndex, filter, filterA, findIndex, fold, foldl, intersect, null, singleton)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
@@ -50,14 +50,14 @@ import Perspectives.Representation.Class.Action (object, providesPerspectiveOnPr
 import Perspectives.Representation.Class.Context (allContextTypes)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (getAction, getCalculatedRole, getContext, getEnumeratedProperty, getEnumeratedRole, getPerspectType, getView)
+import Perspectives.Representation.Class.PersistentType (getAction, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView)
 import Perspectives.Representation.Class.Role (actionSet, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, leavesInADT, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.ExplicitSet (hasElementM)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (Unit, bind, eq, flip, pure, show, unit, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&), (||))
+import Prelude (Unit, bind, eq, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -383,6 +383,7 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
     then put true
     else do
       (allSubjects :: Array RoleType) <- lift (subjectType ###= roleTypeAspectsClosure)
+      (allObjects :: Array EnumeratedRoleType) <- lift (roleType ###= aspectsClosure)
       for_ allSubjects
         \userRole' -> hasBeenFound >>= if _
           then pure unit
@@ -395,7 +396,7 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
                   act@(Action{verb}) <- lift $ getAction at
                   adt <- lift $ objectType act
                   if (null verbs || (isJust $ elemIndex verb verbs)) &&
-                    (isJust $ elemIndex roleType (leavesInADT adt))
+                    (not $ null $ intersect allObjects (leavesInADT adt))
                     then put true
                     else pure unit
   where
@@ -417,16 +418,14 @@ localEnumeratedRolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole (r
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A PROPERTYTYPE
 ----------------------------------------------------------------------------------------
 hasPerspectiveOnProperty :: RoleType -> EnumeratedPropertyType ~~~> Boolean
-hasPerspectiveOnProperty ur pt = do
-  roleType <- lift (getEnumeratedProperty pt >>= pure <<< _.role <<< unwrap)
-  ArrayT (execStateT (hasPerspectiveOnPropertyWithVerb ur roleType pt []) false >>= pure <<< singleton)
+hasPerspectiveOnProperty ur pt = ArrayT (execStateT (hasPerspectiveOnPropertyWithVerb ur pt []) false >>= pure <<< singleton)
 
 -- | <RoleType> `propertyIsInPerspectiveOf` <userRole>
 propertyIsInPerspectiveOf :: EnumeratedPropertyType -> RoleType ~~~> Boolean
 propertyIsInPerspectiveOf = flip hasPerspectiveOnProperty
 
-hasPerspectiveOnPropertyWithVerb :: RoleType -> EnumeratedRoleType -> EnumeratedPropertyType -> Array Verb -> Found Unit
-hasPerspectiveOnPropertyWithVerb subjectType roleType property verbs = do
+hasPerspectiveOnPropertyWithVerb :: RoleType -> EnumeratedPropertyType -> Array Verb -> Found Unit
+hasPerspectiveOnPropertyWithVerb subjectType property verbs = do
   allSubjects <- lift (subjectType ###= roleTypeAspectsClosure)
   for_ allSubjects
     \userRole' -> hasBeenFound >>= if _
