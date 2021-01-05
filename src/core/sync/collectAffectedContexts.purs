@@ -93,16 +93,17 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
       handleAffectedContexts affectedContexts userTypes >>= runForwardsComputation roleInstance iq) >>= pure <<< join
   -- Remove 'me'
   -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
-  lift $ lift $ filterA notIsMe (nub $ union users1 users2)
+  pure $ nub $ union users1 users2
 
 -- Adds an AffectedContext to the transaction and returns user instances.
+--
 handleAffectedContexts :: Array ContextInstance -> Map RoleType PropsAndVerbs -> MonadPerspectivesTransaction (Array RoleInstance)
 handleAffectedContexts affectedContexts userProps = case ANE.fromArray affectedContexts of
   Nothing -> pure []
   Just contextInstances -> do
     userTypes <- pure $ toUnfoldable (keys userProps)
     addAffectedContext $ AffectedContext {contextInstances, userTypes}
-    (for userTypes \er -> for affectedContexts \ci -> lift $ lift $ (ci ##= getRoleInstances er)) >>= pure <<< join <<< join
+    (for userTypes \er -> for affectedContexts \ci -> lift $ lift $ (ci ##= getRoleInstances er)) >>= pure <<< join <<< join >>= lift2 <<< filterA notIsMe
 
 addAffectedContext :: AffectedContext -> MonadPerspectivesTransaction Unit
 addAffectedContext as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [as] affectedContexts})
@@ -162,8 +163,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
         handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
     otherwise -> pure []
 
-  users <- lift $ lift $ filterA notIsMe (nub $ union users1 (union users2 users3))
-  pure users
+  pure (nub $ union users1 (union users2 users3))
 
   where
 
@@ -173,6 +173,8 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
       affectedContexts <- lift2 $ catchError (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
       handleAffectedContexts affectedContexts userTypes >>= lift2 <<< filterA notIsMe
 
+-- RunForwardsComputation only uses the users provided to push deltas.
+-- This should not be done for the own user!
 runForwardsComputation ::
   RoleInstance ->
   InvertedQuery ->
