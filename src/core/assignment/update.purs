@@ -199,8 +199,8 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
   unlinked <- lift2 $ isUnlinked_ rolName
   changedContext <- if unlinked
-    then lift2 (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
-    else pure pe
+    then pure pe
+    else lift2 (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
   -- PERSISTENCE.
   case find rol_isMe roles of
     Nothing -> cacheAndSave contextId changedContext

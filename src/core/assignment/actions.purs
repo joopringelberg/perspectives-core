@@ -122,7 +122,7 @@ compileBotAction actionType = do
                   then if conditionWasTrue
                     then log ("Condition satisfied, but rule fired before on " <> show object <> ".") *> pure unit
                     else do
-                      log $ "Condition satifisfied, will run right hand side on " <> show object <> "."
+                      log $ "Condition satisfied, will run right hand side on " <> show object <> "."
                       lift2 $ setConditionState actionType object true
                       effectFullFunction contextId
                   else if conditionWasTrue
