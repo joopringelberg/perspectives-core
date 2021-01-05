@@ -9,7 +9,7 @@ chat:Model usr:SimpleChatModel
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:SimpleChat"
   extern $ModelIdentification = "model:SimpleChat"
   sys:Model$IndexedContext =>
-    chat:ChatApp usr:MyChatApp
+    chat:ChatApp chat:MyChats
       extern sys:RootContext$External$Name = "Simple Chat"
       $Chatter -> sys:Me
     sys:Model$IndexedContext$Name = "SimpleChat$MyChats"

@@ -9,7 +9,7 @@ mm:Model usr:ModelManagementModel
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:ModelManagement"
   extern $ModelIdentification = "model:ModelManagement"
   sys:Model$IndexedContext =>
-    mm:ModelManagementApp usr:MyModelManagementApp
+    mm:ModelManagementApp mm:MyManagedModels
       extern sys:RootContext$External$Name = "Model management"
       $Manager -> sys:Me
     sys:Model$IndexedContext$Name = "ModelManagement$MyManagedModels"
