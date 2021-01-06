@@ -40,7 +40,7 @@ import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.Couchdb.Databases (getViewOnDatabase)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
-import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError, handlePerspectRolError')
+import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectContextError', handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
@@ -86,10 +86,11 @@ setConditionState a c b = (try $ getPerspectRol c) >>=
     \(IP.PerspectRol r@{actionConditionState}) -> void $ saveEntiteit_ c (IP.PerspectRol r {actionConditionState = insert (unwrap a) b actionConditionState})
 
 getMe :: ContextInstance ~~> RoleInstance
-getMe ctxt = ArrayT do
-  c <- lift $ getPerspectContext ctxt
-  tell $ ArrayWithoutDoubles [Me ctxt (context_me c)]
-  pure $ maybe [] singleton (context_me c)
+getMe ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
+  handlePerspectContextError' "getMe" []
+    \c -> do
+      tell $ ArrayWithoutDoubles [Me ctxt (context_me c)]
+      pure $ maybe [] singleton (context_me c)
 
 -- | If the user has no role, return the role with the Aspect "model:System$Invitation$Guest".
 getMyType :: ContextInstance ~~> RoleType

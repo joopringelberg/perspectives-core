@@ -66,7 +66,7 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
-import Perspectives.Error.Boundaries (handlePerspectRolError, handlePerspectRolError')
+import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
@@ -137,33 +137,35 @@ removeContextIfUnbound roleInstance@(RoleInstance rid) ctype = do
 -- | This function is complete w.r.t. the five responsibilities (ignoring CURRENTUSER).
 removeContextInstance :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
 removeContextInstance id authorizedRole = do
-  (ctxt@(PerspectContext{pspType})) <- lift $ lift $ getPerspectContext id
-  externalRoleType' <- pure $ externalRoleType pspType
-  -- RULE TRIGGERING and QUERY UPDATES.
-  (Tuple _ users) <- runWriterT $ do
-    forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances' -> remove (EnumeratedRoleType roleName) instances'
-    remove externalRoleType' [(context_buitenRol ctxt)]
-  -- PERSISTENCE
-  _ <- scheduleContextRemoval id
-  -- SYNCHRONISATION
-  subject <- getSubject
-  me <- getAuthor
-  -- (roleType ###>> hasAspect (EnumeratedRoleType "sys:RootContext$External"))
-  addDelta $ DeltaInTransaction
-    { users
-    , delta: SignedDelta
-        { author: me
-        , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
-          { id
-          , roleType: externalRoleType'
-          , authorizedRole
-          , roleInstances: SNEA.singleton (context_buitenRol ctxt)
-          , deltaType: if isJust authorizedRole then RemoveUnboundExternalRoleInstance else RemoveExternalRoleInstance
-          , subject
-          }}}
+  (lift $ lift $ try $ getPerspectContext id) >>=
+    handlePerspectContextError "removeContextInstance"
+    \(ctxt@(PerspectContext{pspType})) -> do
+      externalRoleType' <- pure $ externalRoleType pspType
+      -- RULE TRIGGERING and QUERY UPDATES.
+      (Tuple _ users) <- runWriterT $ do
+        forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances' -> remove (EnumeratedRoleType roleName) instances'
+        remove externalRoleType' [(context_buitenRol ctxt)]
+      -- PERSISTENCE
+      _ <- scheduleContextRemoval id
+      -- SYNCHRONISATION
+      subject <- getSubject
+      me <- getAuthor
+      -- (roleType ###>> hasAspect (EnumeratedRoleType "sys:RootContext$External"))
+      addDelta $ DeltaInTransaction
+        { users
+        , delta: SignedDelta
+            { author: me
+            , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
+              { id
+              , roleType: externalRoleType'
+              , authorizedRole
+              , roleInstances: SNEA.singleton (context_buitenRol ctxt)
+              , deltaType: if isJust authorizedRole then RemoveUnboundExternalRoleInstance else RemoveExternalRoleInstance
+              , subject
+              }}}
 
-  -- now remove id from the affectedContexts in the Transaction.
-  removeAffectedContext id
+      -- now remove id from the affectedContexts in the Transaction.
+      removeAffectedContext id
 
   where
     -- No need to take care of SYNCHRONISATION for individual role instances.
@@ -431,10 +433,11 @@ removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId)
         cacheAndSave roleId (over PerspectRol (\rl -> rl {bindingDelta = Nothing})
           (changeRol_isMe (removeRol_binding originalRole) false))
 
-        ctxt <- lift2 $ getPerspectContext $ rol_context originalRole
-        if (context_me ctxt == (Just roleId))
-          then setMe (rol_context originalRole) Nothing
-          else pure unit
+        (lift2 $ try $ getPerspectContext $ rol_context originalRole) >>=
+          handlePerspectContextError "removeBinding"
+            \ctxt -> if (context_me ctxt == (Just roleId))
+              then setMe (rol_context originalRole) Nothing
+              else pure unit
 
         pure users
 

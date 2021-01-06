@@ -21,6 +21,7 @@
 
 module Perspectives.Checking.PerspectivesTypeChecker where
 
+import Control.Monad.Error.Class (try)
 import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, elemIndex)
 import Data.Foldable (for_)
@@ -28,6 +29,7 @@ import Data.Maybe (Maybe(..), isJust)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinFile (DomeinFile)
+import Perspectives.Error.Boundaries (handlePerspectContextError)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
@@ -57,10 +59,11 @@ checkContext c = do
   case defaultPrototype c of
     Nothing -> pure unit
     (Just pt) -> do
-      (p :: PerspectContext) <- lift $ getPerspectContext pt
-      if (pspType p == identifier c)
-        then pure unit
-        else fail $ DefaultPrototype (identifier c :: ContextType) (pspType p)
+      (lift $ try $ getPerspectContext pt) >>=
+        handlePerspectContextError "checkContext"
+        \(p :: PerspectContext) -> if (pspType p == identifier c)
+          then pure unit
+          else fail $ DefaultPrototype (identifier c :: ContextType) (pspType p)
 
   -- 2. The graph formed by the contextAspects may not be cyclic.
   -- I.e. when traversing the graph, the next node to be visited may not be in the path

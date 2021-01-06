@@ -59,7 +59,7 @@ import Perspectives.ContextAndRole (addRol_property, changeContext_me, context_r
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findPropertyRequests, findRoleRequests)
-import Perspectives.Error.Boundaries (handlePerspectRolError, handlePerspectRolError')
+import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, roleType)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
@@ -94,30 +94,32 @@ type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array Role
 addRoleInstancesToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (NonEmptyArray (Tuple RoleInstance (Maybe SignedDelta))))
 addRoleInstancesToContext contextId rolName instancesAndDeltas = do
   rolInstances <- pure $ fst <$> instancesAndDeltas
-  (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
-  unlinked <- lift2 $ isUnlinked_ rolName
-  -- Do not add a roleinstance a second time.
-  if unlinked
+  (lift2 $ try $ getPerspectContext contextId) >>=
+    handlePerspectContextError "addRoleInstancesToContext"
+      \(pe :: PerspectContext) -> do
+        unlinked <- lift2 $ isUnlinked_ rolName
+        -- Do not add a roleinstance a second time.
+        if unlinked
 
-    then do
-      (roles :: Array PerspectRol) <- foldM
-        (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
-        []
-        (toArray rolInstances)
-      roles' <- pure $ filter (\(PerspectRol{contextDelta}) -> isDefaultContextDelta contextDelta) roles
-      -- only apply f to those role instances that don't yet have a contextDelta (other than the default one).
-      if null roles'
-        then pure unit
-        else f roles' pe unlinked
+          then do
+            (roles :: Array PerspectRol) <- foldM
+              (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
+              []
+              (toArray rolInstances)
+            roles' <- pure $ filter (\(PerspectRol{contextDelta}) -> isDefaultContextDelta contextDelta) roles
+            -- only apply f to those role instances that don't yet have a contextDelta (other than the default one).
+            if null roles'
+              then pure unit
+              else f roles' pe unlinked
 
-    else if null (toArray rolInstances `difference` context_rolInContext pe rolName)
-      then pure unit
-      else do
-        (roles :: Array PerspectRol) <- foldM
-          (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
-          []
-          (toArray rolInstances)
-        f roles pe unlinked
+          else if null (toArray rolInstances `difference` context_rolInContext pe rolName)
+            then pure unit
+            else do
+              (roles :: Array PerspectRol) <- foldM
+                (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
+                []
+                (toArray rolInstances)
+              f roles pe unlinked
 
   where
     f :: Array PerspectRol -> PerspectContext -> Boolean -> MonadPerspectivesTransaction Unit
@@ -196,18 +198,20 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
     (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
     []
     (toArray rolInstances)
-  (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
-  unlinked <- lift2 $ isUnlinked_ rolName
-  changedContext <- if unlinked
-    then pure pe
-    else lift2 (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
-  -- PERSISTENCE.
-  case find rol_isMe roles of
-    Nothing -> cacheAndSave contextId changedContext
-    Just me -> do
-      (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
-      -- CURRENTUSER.
-      cacheAndSave contextId (changeContext_me changedContext Nothing)
+  (lift2 $ try $ getPerspectContext contextId) >>=
+    handlePerspectContextError "removeRoleInstancesFromContext"
+      \(pe :: PerspectContext) -> do
+        unlinked <- lift2 $ isUnlinked_ rolName
+        changedContext <- if unlinked
+          then pure pe
+          else lift2 (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
+        -- PERSISTENCE.
+        case find rol_isMe roles of
+          Nothing -> cacheAndSave contextId changedContext
+          Just me -> do
+            (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+            -- CURRENTUSER.
+            cacheAndSave contextId (changeContext_me changedContext Nothing)
 
 -- | Detach the role instances from their current context and attach them to the new context.
 -- | This is not just a convenience function. The combination of removeRoleInstancesFromContext and addRoleInstancesToContext would add UniverseRoleDeltas, which we don't need here.
@@ -432,9 +436,11 @@ cacheAndSave rid rol = do
 -- | This is because the value of Me is indexed and never communicated with other users.
 setMe :: ContextInstance -> Maybe RoleInstance -> MonadPerspectivesTransaction Unit
 setMe cid me = do
-  ctxt <- lift2 $ getPerspectContext cid
-  cacheAndSave cid (changeContext_me ctxt me)
-  (lift2 $ findRoleRequests cid (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+  (lift2 $ try $ getPerspectContext cid) >>=
+    handlePerspectContextError "setMe"
+      \ctxt -> do
+        cacheAndSave cid (changeContext_me ctxt me)
+        (lift2 $ findRoleRequests cid (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
 
 getSubject :: MonadPerspectivesTransaction SubjectOfAction
 getSubject = lift $ UserType <$> gets (_.authoringRole <<< unwrap)

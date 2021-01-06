@@ -1,6 +1,6 @@
 {
   "contents": {
-    "timeStamp": 1608403131133,
+    "timeStamp": 1609856029574,
     "deltas": [
       {
         "contents": {
@@ -13,15 +13,18 @@
                 },
                 "tag": "UserType"
               },
-              "roleType": "model:SimpleChat$Chat$Initiator",
+              "roleType": "model:SimpleChat$Chat$External",
               "roleInstances": [
-                "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74$Initiator_0000"
+                "model:User$cdf629541_e05c_48f6_b961_c35563c68090_External"
               ],
-              "id": "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74",
+              "id": "model:User$cdf629541_e05c_48f6_b961_c35563c68090",
               "deltaType": {
-                "tag": "ConstructEmptyRole"
+                "tag": "ConstructExternalRole"
               },
-              "authorizedRole": null
+              "authorizedRole": {
+                "contents": "model:SimpleChat$ChatApp$Chats",
+                "tag": "ENR"
+              }
             },
             "tag": "UniverseRoleDelta"
           },
@@ -40,34 +43,7 @@
                 },
                 "tag": "UserType"
               },
-              "roleType": "model:SimpleChat$Chat$Initiator",
-              "roleInstances": [
-                "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74$Initiator_0000"
-              ],
-              "id": "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74",
-              "destinationContext": null,
-              "deltaType": {
-                "tag": "AddRoleInstancesToContext"
-              }
-            },
-            "tag": "ContextDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:SimpleChat$ChatApp$Chatter",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "id": "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74",
+              "id": "model:User$cdf629541_e05c_48f6_b961_c35563c68090",
               "deltaType": {
                 "tag": "ConstructEmptyContext"
               },
@@ -85,50 +61,16 @@
             "contents": {
               "subject": {
                 "contents": {
-                  "contents": "model:SimpleChat$ChatApp$Chatter",
+                  "contents": "model:SimpleChat$Chat$Initiator",
                   "tag": "ENR"
                 },
                 "tag": "UserType"
               },
-              "roleType": "model:SimpleChat$Chat$External",
+              "roleType": "model:SimpleChat$Chat$Partner",
               "roleInstances": [
-                "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74_External"
+                "model:User$cdf629541_e05c_48f6_b961_c35563c68090$Partner_0000"
               ],
-              "id": "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74",
-              "deltaType": {
-                "tag": "ConstructExternalRole"
-              },
-              "authorizedRole": {
-                "contents": "model:SimpleChat$ChatApp$Chats",
-                "tag": "CR"
-              }
-            },
-            "tag": "UniverseRoleDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": "ContextDelta from defaultRolRecord",
-          "author": ""
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
-              },
-              "roleType": "model:System$PerspectivesSystem$User",
-              "roleInstances": [
-                "model:User$joop$User"
-              ],
-              "id": "model:User$joop",
+              "id": "model:User$cdf629541_e05c_48f6_b961_c35563c68090",
               "deltaType": {
                 "tag": "ConstructEmptyRole"
               },
@@ -145,317 +87,30 @@
           "encryptedDelta": {
             "contents": {
               "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
+                "contents": {
+                  "contents": "model:SimpleChat$Chat$Initiator",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
               },
-              "roleType": "model:System$PerspectivesSystem$User",
+              "roleType": "model:SimpleChat$Chat$Partner",
               "roleInstances": [
-                "model:User$joop$User"
+                "model:User$cdf629541_e05c_48f6_b961_c35563c68090$Partner_0000"
               ],
-              "id": "model:User$joop",
+              "id": "model:User$cdf629541_e05c_48f6_b961_c35563c68090",
               "destinationContext": null,
               "deltaType": {
                 "tag": "AddRoleInstancesToContext"
               }
             },
             "tag": "ContextDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
-              },
-              "id": "model:User$joop",
-              "deltaType": {
-                "tag": "ConstructEmptyContext"
-              },
-              "contextType": "model:System$PerspectivesSystem"
-            },
-            "tag": "UniverseContextDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
-              },
-              "roleType": "model:System$PerspectivesSystem$External",
-              "roleInstances": [
-                "model:User$joop_External"
-              ],
-              "id": "model:User$joop",
-              "deltaType": {
-                "tag": "ConstructExternalRole"
-              },
-              "authorizedRole": null
-            },
-            "tag": "UniverseRoleDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "Ringelberg"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:System$PerspectivesSystem$User",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:System$PerspectivesSystem$User$Achternaam",
-              "id": "model:User$joop$User",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
-              },
-              "roleType": "model:SimpleChat$ChatApp$Chatter",
-              "roleInstances": [
-                "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075$Chatter_0001"
-              ],
-              "id": "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075",
-              "deltaType": {
-                "tag": "ConstructEmptyRole"
-              },
-              "authorizedRole": null
-            },
-            "tag": "UniverseRoleDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
-              },
-              "roleType": "model:SimpleChat$ChatApp$Chatter",
-              "roleInstances": [
-                "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075$Chatter_0001"
-              ],
-              "id": "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075",
-              "destinationContext": null,
-              "deltaType": {
-                "tag": "AddRoleInstancesToContext"
-              }
-            },
-            "tag": "ContextDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
-              },
-              "id": "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075",
-              "deltaType": {
-                "tag": "ConstructEmptyContext"
-              },
-              "contextType": "model:SimpleChat$ChatApp"
-            },
-            "tag": "UniverseContextDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
-              },
-              "roleType": "model:SimpleChat$ChatApp$External",
-              "roleInstances": [
-                "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075_External"
-              ],
-              "id": "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075",
-              "deltaType": {
-                "tag": "ConstructExternalRole"
-              },
-              "authorizedRole": {
-                "contents": "model:System$Model$IndexedContext",
-                "tag": "ENR"
-              }
-            },
-            "tag": "UniverseRoleDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$joop$User",
-                "tag": "UserInstance"
-              },
-              "roleWillBeRemoved": false,
-              "oldBinding": null,
-              "id": "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075$Chatter_0001",
-              "deltaType": {
-                "tag": "SetBinding"
-              },
-              "binding": "model:User$joop$User"
-            },
-            "tag": "RoleBindingDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:SimpleChat$ChatApp$Chatter",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "roleWillBeRemoved": false,
-              "oldBinding": null,
-              "id": "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74$Initiator_0000",
-              "deltaType": {
-                "tag": "SetBinding"
-              },
-              "binding": "model:User$e7a1fe87_5d47_4c35_8372_e7e8262c8075$Chatter_0001"
-            },
-            "tag": "RoleBindingDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "Hallo Cor"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:SimpleChat$Chat$Initiator",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:System$Invitation$External$Message",
-              "id": "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74_External",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "true"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:SimpleChat$Chat$Initiator",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:System$Invitation$External$IWantToInviteAnUnconnectedUser",
-              "id": "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74_External",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$joop$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "Eerste"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:SimpleChat$Chat$Initiator",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:SimpleChat$Chat$External$Title",
-              "id": "model:User$c7d79b61a_b5cd_421d_8cb8_b61c509d1c74_External",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
           },
           "author": "model:User$joop$User"
         },
         "tag": "SignedDelta"
       }
     ],
-    "author": "model:User$joop$User"
+    "author": "model:User$cor$User"
   },
   "tag": "TransactionForPeer"
 }
