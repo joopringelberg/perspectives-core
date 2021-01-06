@@ -48,7 +48,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
 import Perspectives.User (getCouchdbPassword, getSystemIdentifier, getUser)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<<<), (<>), (<$>))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (<$>))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
 storeDomeinFileInCache ns df= cacheEntity (DomeinFileId ns) df
@@ -95,8 +95,7 @@ modifyActionInDomeinFile ns a@(Action{_id}) = modifyDomeinFileInCache modifier n
 -----------------------------------------------------------
 -- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the database and caches it.
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
-retrieveDomeinFile ns = catchError (getPerspectEntiteit (DomeinFileId ns))
-  \e -> throwError $ error ("retrieveDomeinFile: " <> show e)
+retrieveDomeinFile ns = getPerspectEntiteit (DomeinFileId ns)
 
 tryRetrieveDomeinFile :: Namespace -> MonadPerspectives (Maybe DomeinFile)
 tryRetrieveDomeinFile id = catchError (Just <$> (getPerspectEntiteit (DomeinFileId id)))

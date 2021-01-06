@@ -21,7 +21,7 @@
 
 module Perspectives.Types.ObjectGetters where
 
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
@@ -39,6 +39,7 @@ import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
+import Perspectives.Error.Boundaries (handleDomeinFileError')
 import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments)
 import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
@@ -339,25 +340,30 @@ hasProperty p = lift <<< getView >=> pure <<< isJust <<< elemIndex p <<< propert
 ----------------------------------------------------------------------------------------
 qualifyRoleInDomain :: String -> String ~~~> RoleType
 qualifyRoleInDomain localName namespace = ArrayT do
-  DomeinFile {calculatedRoles, enumeratedRoles} <- retrieveDomeinFile namespace
-  eCandidates <- pure $ map (ENR <<< EnumeratedRoleType) (filter (\_id -> _id `endsWithSegments` localName) (keys enumeratedRoles))
-  cCandidates <- pure $ map (CR <<< CalculatedRoleType) (filter (\_id -> _id `endsWithSegments` localName) (keys calculatedRoles))
-  pure $ eCandidates <> cCandidates
+  (try $ retrieveDomeinFile namespace) >>=
+    handleDomeinFileError' "qualifyRoleInDomain" []
+      \(DomeinFile {calculatedRoles, enumeratedRoles}) -> do
+        eCandidates <- pure $ map (ENR <<< EnumeratedRoleType) (filter (\_id -> _id `endsWithSegments` localName) (keys enumeratedRoles))
+        cCandidates <- pure $ map (CR <<< CalculatedRoleType) (filter (\_id -> _id `endsWithSegments` localName) (keys calculatedRoles))
+        pure $ eCandidates <> cCandidates
 
 qualifyEnumeratedRoleInDomain :: String -> String ~~~> EnumeratedRoleType
 qualifyEnumeratedRoleInDomain localName namespace = ArrayT do
-  DomeinFile {enumeratedRoles} <- retrieveDomeinFile namespace
-  pure $ map EnumeratedRoleType (filter (\_id -> _id `endsWithSegments` localName) (keys enumeratedRoles))
+  (try $ retrieveDomeinFile namespace) >>=
+    handleDomeinFileError' "qualifyEnumeratedRoleInDomain" []
+      \(DomeinFile {enumeratedRoles}) -> pure $ map EnumeratedRoleType (filter (\_id -> _id `endsWithSegments` localName) (keys enumeratedRoles))
 
 qualifyCalculatedRoleInDomain :: String -> String ~~~> CalculatedRoleType
 qualifyCalculatedRoleInDomain localName namespace = ArrayT do
-  DomeinFile {calculatedRoles} <- retrieveDomeinFile namespace
-  pure $ map CalculatedRoleType (filter (\_id -> _id `endsWithSegments` localName) (keys calculatedRoles))
+  (try $ retrieveDomeinFile namespace) >>=
+    handleDomeinFileError' "qualifyCalculatedRoleInDomain" []
+    \(DomeinFile {calculatedRoles}) -> pure $ map CalculatedRoleType (filter (\_id -> _id `endsWithSegments` localName) (keys calculatedRoles))
 
 qualifyContextInDomain :: String -> String ~~~> ContextType
 qualifyContextInDomain localName namespace = ArrayT do
-  DomeinFile {contexts} <- retrieveDomeinFile namespace
-  pure $ map ContextType (filter (\_id -> _id `endsWithSegments` localName) (keys contexts))
+  (try $ retrieveDomeinFile namespace) >>=
+    handleDomeinFileError' "qualifyContextInDomain" []
+      \(DomeinFile {contexts}) -> pure $ map ContextType (filter (\_id -> _id `endsWithSegments` localName) (keys contexts))
 
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A ROLETYPE

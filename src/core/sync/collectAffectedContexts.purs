@@ -46,7 +46,7 @@ import Perspectives.Deltas (addDelta)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
+import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding, contextType, getRoleBinders, notIsMe)
@@ -324,17 +324,19 @@ aisInPropertyDelta id property = do
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Array InvertedQuery)
     compileDescriptions' rt@(EnumeratedPropertyType ert) =  do
       modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
-      (df :: DomeinFile) <- retrieveDomeinFile modelName
-      -- Get the AffectedContextCalculations in onPropertyDelta.
-      (calculations :: Array InvertedQuery) <- pure $ unsafePartial $ fromJust $ preview (onPropertyDelta rt) df
-      -- Compile the descriptions.
-      if areCompiled calculations
-        then pure calculations
-        else do
-          compiledCalculations <- traverse compileBackwards calculations
-          -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
-          modifyDomeinFileInCache (over (onPropertyDelta rt) (const compiledCalculations)) modelName
-          pure compiledCalculations
+      (try $ retrieveDomeinFile modelName) >>=
+        handleDomeinFileError' "aisInPropertyDelta" []
+          \(df :: DomeinFile) -> do
+            -- Get the AffectedContextCalculations in onPropertyDelta.
+            (calculations :: Array InvertedQuery) <- pure $ unsafePartial $ fromJust $ preview (onPropertyDelta rt) df
+            -- Compile the descriptions.
+            if areCompiled calculations
+              then pure calculations
+              else do
+                compiledCalculations <- traverse compileBackwards calculations
+                -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
+                modifyDomeinFileInCache (over (onPropertyDelta rt) (const compiledCalculations)) modelName
+                pure compiledCalculations
       where
         onPropertyDelta :: EnumeratedPropertyType -> Traversal' DomeinFile (Array InvertedQuery)
         onPropertyDelta (EnumeratedPropertyType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedProperties") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "onPropertyDelta")
@@ -349,25 +351,27 @@ compileDescriptions onX rt = compileDescriptions_ onX rt false
 compileDescriptions_ :: CalculationsLens -> EnumeratedRoleType -> Boolean -> MonadPerspectives (Array InvertedQuery)
 compileDescriptions_ onX rt@(EnumeratedRoleType ert) forward = do
   modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
-  (df :: DomeinFile) <- retrieveDomeinFile modelName
-  -- Get the AffectedContextCalculations in onContextDelta_context.
-  (calculations :: Array InvertedQuery) <- pure $ unsafePartial $ fromJust $ preview (onDelta rt) df
-  -- Compile the descriptions.
-  if forward
-    then if areCompiled calculations
-      then pure calculations
-      else do
-        compiledCalculations <- traverse compileBoth calculations
-        -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
-        modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
-        pure compiledCalculations
-    else if areCompiled calculations
-      then pure calculations
-      else do
-        compiledCalculations <- traverse compileBackwards calculations
-        -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
-        modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
-        pure compiledCalculations
+  (try $ retrieveDomeinFile modelName) >>=
+    handleDomeinFileError' "compileDescriptions_" []
+    \(df :: DomeinFile) -> do
+      -- Get the AffectedContextCalculations in onContextDelta_context.
+      (calculations :: Array InvertedQuery) <- pure $ unsafePartial $ fromJust $ preview (onDelta rt) df
+      -- Compile the descriptions.
+      if forward
+        then if areCompiled calculations
+          then pure calculations
+          else do
+            compiledCalculations <- traverse compileBoth calculations
+            -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
+            modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
+            pure compiledCalculations
+        else if areCompiled calculations
+          then pure calculations
+          else do
+            compiledCalculations <- traverse compileBackwards calculations
+            -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
+            modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
+            pure compiledCalculations
   where
     onDelta :: EnumeratedRoleType -> Traversal' DomeinFile (Array InvertedQuery)
     onDelta (EnumeratedRoleType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedRoles") <<< at x <<< traversed <<< _Newtype <<< onX

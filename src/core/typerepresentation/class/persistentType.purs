@@ -104,6 +104,7 @@ addEnumeratedRoleToDomeinFile c (DomeinFile dff@{enumeratedRoles}) = DomeinFile 
 ifNamespace :: forall i. Newtype i String => i -> (DomeinFile -> DomeinFile) -> MP Unit
 ifNamespace i modifier = maybe (pure unit) (modifyDomeinFileInCache modifier) (deconstructModelName (unwrap i))
 
+-- Put error boundaries around calls to this function.
 retrieveFromDomein_ :: forall v i. PersistentType v i =>
   i
   -> (DomeinFile -> Maybe v)

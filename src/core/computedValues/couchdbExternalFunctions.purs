@@ -60,7 +60,7 @@ import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, SeparateInvertedQuery(..))
-import Perspectives.Error.Boundaries (handlePerspectRolError)
+import Perspectives.Error.Boundaries (handleDomeinFileError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
@@ -260,9 +260,11 @@ addModelToLocalStore' url = do
           -- Distribute the SeparateInvertedQueries over the other domains.
           forWithIndex_ invertedQueriesInOtherDomains
             \domainName queries -> do
-              DomeinFile dfr <- lift2 $ getDomeinFile (DomeinFileId domainName)
-              -- Here we must take care to preserve the screens.js attachment.
-              lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+              (lift2 $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+                handleDomeinFileError "addModelToLocalStore'"
+                \(DomeinFile dfr) -> do
+                  -- Here we must take care to preserve the screens.js attachment.
+                  lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
 
           -- Copy the attachment
           lift $ lift $ addA url _id
