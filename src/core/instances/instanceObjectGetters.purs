@@ -66,10 +66,9 @@ getEnumeratedRoleInstances rn c = ArrayT $ (lift $ try $ getContextMember (flip 
     \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
 
 getUnlinkedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
-getUnlinkedRoleInstances rn c = ArrayT $ do
-  (roles :: Array RoleInstance) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "roleFromContext" (Just $ [unwrap rn, unwrap c])
-  tell $ ArrayWithoutDoubles [RoleAssumption c rn]
-  pure roles
+getUnlinkedRoleInstances rn c = ArrayT $ try ((lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "roleFromContext" (Just $ [unwrap rn, unwrap c])) >>=
+  handlePerspectRolError' "getUnlinkedRoleInstances" []
+    \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure roles
 
 -- | Because we never change the type of a Context, we have no real need
 -- | to track it as a dependency.
