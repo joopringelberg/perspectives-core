@@ -40,7 +40,7 @@ import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.Couchdb.Databases (getViewOnDatabase)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
-import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectContextError', handlePerspectRolError, handlePerspectRolError')
+import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)

@@ -92,6 +92,7 @@ phaseThree df@{_id} = do
 
 phaseThree_ :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree_ df@{_id, referredModels} = do
+  -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
   indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
   indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
   (Tuple ei {dfr}) <- runPhaseTwo_'
@@ -359,6 +360,7 @@ compileExpressions = do
       traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
       traverseWithIndex_ compileActionObject actions
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
+      -- We will not have errors on trying to retrieve the DomeinFile here.
       DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId ns)
       modifyDF \dfr -> modifiedDomeinFile
 

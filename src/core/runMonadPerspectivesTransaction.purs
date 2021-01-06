@@ -22,6 +22,7 @@
 module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
+import Control.Monad.Error.Class (try)
 import Control.Monad.Reader (lift, runReaderT)
 import Data.Array (filterA, null, sort)
 import Data.Array.NonEmpty (toArray)
@@ -40,6 +41,7 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
+import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
@@ -203,12 +205,14 @@ loadModelIfMissing modelName = do
       repositoryUrl <- lift2 publicRepository
       addModelToLocalStore' (repositoryUrl <> modelName)
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
-      DomeinFile{modelDescription} <- lift2 $ getDomeinFile (DomeinFileId modelName)
-      mySys <- lift2 $ getMySystem
-      case modelDescription of
-        Nothing -> pure unit
-        Just (PerspectRol{_id}) -> void $ createAndAddRoleInstance
-          (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse")
-          mySys
-          (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just $ unwrap _id})
+      (lift2 $ try $ getDomeinFile (DomeinFileId modelName)) >>=
+        handleDomeinFileError "loadModelIfMissing"
+        \(DomeinFile{modelDescription}) -> do
+          mySys <- lift2 $ getMySystem
+          case modelDescription of
+            Nothing -> pure unit
+            Just (PerspectRol{_id}) -> void $ createAndAddRoleInstance
+              (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse")
+              mySys
+              (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just $ unwrap _id})
     else pure unit
