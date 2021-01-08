@@ -65,7 +65,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
-import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
@@ -120,11 +120,8 @@ roleInstancesFromCouchdb roleTypes _ = ArrayT do
   case head roleTypes of
     Nothing -> pure []
     Just rt -> do
-      tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)]
-      (roles :: Array PerspectRol) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
-      for roles \r@(PerspectRol{_id}) -> do
-        void $ lift $ cacheEntity _id r
-        pure _id
+      (tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)])
+      (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
 
 contextInstancesFromCouchdb :: Array String -> (RoleInstance ~~> ContextInstance)
 contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
@@ -132,18 +129,12 @@ contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
     Nothing -> pure []
     Just ct -> do
       -- push assumption!
-      (contexts :: Array PerspectContext) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "contextView" (head contextTypeArr)
-      for contexts \c@(PerspectContext{_id}) -> do
-        void $ lift $ cacheEntity _id c
-        pure _id
+      (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "contextView" (head contextTypeArr)
 
 pendingInvitations :: ContextInstance ~~> RoleInstance
 pendingInvitations _ = ArrayT do
   -- tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)]
-  (roles :: Array PerspectRol) <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "pendingInvitations" (Nothing :: Maybe Unit)
-  for roles \r@(PerspectRol{_id}) -> do
-    void $ lift $ cacheEntity _id r
-    pure _id
+  (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "pendingInvitations" (Nothing :: Maybe Unit)
 
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
 -- | Load the dependencies first.

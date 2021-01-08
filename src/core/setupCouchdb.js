@@ -8,20 +8,20 @@ exports.modelDescriptions = (function (doc)
 
 exports.roleView = (function (doc)
 {
-  emit(doc.contents.pspType, doc);
+  emit(doc.contents.pspType, doc._id);
 }).toString();
 
 exports.pendingInvitations = (function(doc)
 {
   if (doc.contents.properties["model:System$Invitation$External$Message"])
   {
-    emit(doc._id, doc);
+    emit(doc._id, doc._id);
   }
 }).toString();
 
 exports.contextView = (function (doc)
 {
-  emit(doc.contents.pspType, doc);
+  emit(doc.contents.pspType, doc._id);
 }).toString();
 
 // We want to filter the result on two criteria:
