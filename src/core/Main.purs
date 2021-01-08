@@ -30,7 +30,6 @@ import Data.Tuple (fst)
 import Effect (Effect)
 import Effect.Aff (Error, catchError, forkAff, joinFiber, runAff, try)
 import Effect.Aff.AVar (AVar, new)
-import Effect.Class.Console (log)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
@@ -38,6 +37,7 @@ import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase, setSecurityDocument)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
@@ -45,6 +45,7 @@ import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.LocalAuthentication (AuthenticationResult(..))
 import Perspectives.LocalAuthentication (authenticate) as LA
 import Perspectives.Names (getMySystem)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
@@ -92,24 +93,15 @@ runPDR usr pwd couchdbUser host port = void $ runAff handleError do
     apiFiber <- forkAff $ runPerspectivesWithState setupApi state
     catchError (joinFiber apiFiber)
       \e -> do
-        log $ "API stopped because of: " <> show e
-        log "Will start the API again."
-  -- connected <- runPerspectivesWithState (connectedToAMQPBroker >>= \c -> log ("Connected to RabbitMQ? = " <> show c)) state
+        logPerspectivesError $ Custom $ "API stopped and restarted because of: " <> show e
   postFiber <- forkAff $ runPerspectivesWithState incomingPost state
   catchError (joinFiber postFiber)
     \e -> do
-      log $ "Stopped handling incoming post because of: " <> show e
-  -- void $ forkAff $ forever do
-  --   postFiber <- forkAff $ runPerspectivesWithState incomingPost state
-  --   catchError (joinFiber postFiber)
-  --     \e -> do
-  --       log $ "Stopped handling incoming post because of: " <> show e
-  --       log "Will start the handler again."
-  -- void $ forkAff $ runPerspectivesWithState setupTcpApi state
+      logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
 
 handleError :: forall a. (Either Error a -> Effect Unit)
-handleError (Left e) = log $ "An error condition: " <> (show e)
-handleError (Right a) = log $ "Perspectives-core has started!"
+handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)
+handleError (Right a) = pure unit
 
 -- | The main entrance to the PDR for client programs. Runs the PDR on succesful login.
 -- | When Couchdb is in Party Mode, initialises the first admin.
@@ -118,7 +110,7 @@ authenticate usr pwd host port callback = void $ runAff handler (LA.authenticate
   where
     handler :: Either Error AuthenticationResult -> Effect Unit
     handler (Left e) = do
-      log $ "An error condition: " <> (show e)
+      logPerspectivesError $ Custom $ "An error condition: " <> (show e)
       callback 1
     handler (Right r) = case r of
       -- Not a valid system administrator for Couchdb.
@@ -133,7 +125,7 @@ authenticate usr pwd host port callback = void $ runAff handler (LA.authenticate
       OK couchdbUser -> runWithUser $ Right couchdbUser
     runWithUser :: Either Error CouchdbUser -> Effect Unit
     runWithUser (Left e) = do
-      log $ "Could not create another Perspectives user, because: " <> (show e)
+      logPerspectivesError $ Custom $ "Could not create another Perspectives user, because: " <> (show e)
       callback 1
     runWithUser (Right couchdbUser) = do
       runPDR usr pwd couchdbUser host port
@@ -180,17 +172,17 @@ resetAccount usr pwd host port callback = void $ runAff handler (runPerspectives
       createDatabase dbname
     handler :: Either Error Unit -> Effect Unit
     handler (Left e) = do
-      log $ "An error condition in resetAccount: " <> (show e)
+      logPerspectivesError $ Custom $ "An error condition in resetAccount: " <> (show e)
       callback false
     handler (Right e) = do
-      log $ "Cleared the account " <> usr
+      logPerspectivesError $ Custom $ "Cleared the account " <> usr
       callback true
 
     deleteDb :: DatabaseName -> MonadPerspectives Unit
     deleteDb dbname = do
       r <- try (deleteDatabase dbname)
       case r of
-        Left e -> log (show e)
+        Left e -> logPerspectivesError $ Custom (show e)
         Right _ -> pure unit
 
 

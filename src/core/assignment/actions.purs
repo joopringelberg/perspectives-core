@@ -73,6 +73,7 @@ import Perspectives.SaveUserData (removeAllRoleInstances, handleNewPeer, removeR
 import Perspectives.Sync.Transaction (Transaction(..))
 import Unsafe.Coerce (unsafeCoerce)
 
+-- Put an error boundary around this function.
 compileBotAction :: ActionType -> MP (Updater ContextInstance)
 compileBotAction actionType = do
   case retrieveAction actionType of

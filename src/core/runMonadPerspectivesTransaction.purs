@@ -26,6 +26,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.Reader (lift, runReaderT)
 import Data.Array (filterA, null, sort)
 import Data.Array.NonEmpty (toArray)
+import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
@@ -42,6 +43,7 @@ import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
@@ -49,6 +51,7 @@ import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
@@ -57,7 +60,7 @@ import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleTy
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (actionsClosure_, isAutomatic, specialisesRoleType_)
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=))
+import Prelude (Unit, bind, discard, join, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -150,12 +153,9 @@ runActions t = do
       (Just updater) -> do
         -- log ("Evaluating " <> unwrap atype)
         updater ctxt
-      Nothing -> do
-        updater <- lift2 $ compileBotAction atype
-        -- log ("Evaluating " <> unwrap atype)
-        updater ctxt
-        pure unit
-
+      Nothing -> (try $ lift2 $ compileBotAction atype) >>= case _ of
+        Left e -> logPerspectivesError $ Custom ("Cannot compile rule, because " <> show e)
+        Right updater -> updater ctxt
 
 getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
 getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = join <$> for (toArray contextInstances) \contextInstance -> do

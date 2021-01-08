@@ -61,6 +61,14 @@ import Perspectives.Types.ObjectGetters (hasAspect)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<<), (<>), (>>=), (<$>), (==))
 
+-- TODO. Each of the executing functions must catch errors that arise from unknown types.
+-- Inspect the model version of an unknown type and establish whether the resident model is newer or older than
+-- the arriving type. If newer, check whether the type is backwards compatible with the arriving older type.
+-- If older, retrieve the newer version of the model and check whether the arriving type is backwards compatible with
+-- the type in the resident model.
+-- If the types are truly incompatible, either ignore the incoming delta (best solution if the resident model is newer)
+-- or update to the newer model version (have the end user consent).
+
 executeContextDelta :: ContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstances, destinationContext, subject} ) signedDelta = do
   log (show deltaType <> " to/from " <> show contextId <> " and " <> show roleInstances)
@@ -119,7 +127,6 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
         (exists :: Maybe PerspectContext) <- lift2 $ tryGetPerspectEntiteit id
         if isNothing exists
           then do
-            loadModelIfMissing (unsafeDeconstructModelName $ unwrap contextType)
             contextInstance <- pure
               (PerspectContext defaultContextRecord
                 { _id = id

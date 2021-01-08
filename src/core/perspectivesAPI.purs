@@ -155,8 +155,13 @@ setupTcpApi = runProcess server
 
 consumeRequest :: Consumer Request MonadPerspectives Unit
 consumeRequest = forever do
-  request <- await
-  lift $ dispatchOnRequest (unwrap request)
+  (Request request@{corrId, reactStateSetter}) <- await
+  lift (catchError
+    (dispatchOnRequest request)
+    (\e -> do
+      logPerspectivesError (ApiErrorBoundary (show e))
+      sendResponse (Error corrId ("Request could not be handled, because: " <> (show e))) (mkApiEffect reactStateSetter))
+    )
 
 dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
 dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription, authoringRole: as} = do
@@ -438,6 +443,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             (Right ctxtId) -> effect ctxtId
 
 -- | Tests whether we have a sequence of which the last part applies an ExternalCoreRoleGetter function.
+-- | Returns `false` if the type cannot be found.
 isDatabaseQueryRole :: CalculatedRoleType -> MonadPerspectives Boolean
 isDatabaseQueryRole cr = do
   calculatedRole <- getPerspectType cr

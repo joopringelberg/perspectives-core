@@ -798,8 +798,6 @@ userData = do
 -----------------------------------------------------------
 -- ParseAndCache
 -----------------------------------------------------------
--- catchError :: forall a. m a -> (e -> m a) -> m a
-
 parseAndCache ::  String -> MonadPerspectives (Either ParseError (Tuple (FO.Object PerspectContext)(FO.Object PerspectRol)))
 parseAndCache text = do
   (Tuple parseResult {roleInstances, contextInstances}) <- runIndentParser' text userData
