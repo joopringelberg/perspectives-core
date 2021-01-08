@@ -160,8 +160,8 @@ instance showPerspectivesError :: Show PerspectivesError where
 
   show (RolErrorBoundary boundaryName err) = "(RolErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"
   show (ContextErrorBoundary boundaryName err) = "(ContextErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"
-  show (DomeinFileErrorBoundary boundaryName err) = "(ErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for DomeinFile (" <> err <> ")"
-
+  show (DomeinFileErrorBoundary boundaryName err) = "(DomeinFileErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for DomeinFile (" <> err <> ")"
+  
 -- | A type for accumulating multiple `PerspectivesErrors`s.
 type MultipleErrors = NonEmptyList PerspectivesError
 

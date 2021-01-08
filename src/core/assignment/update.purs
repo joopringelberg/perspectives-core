@@ -95,7 +95,7 @@ addRoleInstancesToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (
 addRoleInstancesToContext contextId rolName instancesAndDeltas = do
   rolInstances <- pure $ fst <$> instancesAndDeltas
   (lift2 $ try $ getPerspectContext contextId) >>=
-    handlePerspectContextError "addRoleInstancesToContext"
+    handlePerspectContextError "addRoleInstancesToContext1"
       \(pe :: PerspectContext) -> do
         unlinked <- lift2 $ isUnlinked_ rolName
         -- Do not add a roleinstance a second time.
@@ -103,7 +103,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
 
           then do
             (roles :: Array PerspectRol) <- foldM
-              (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
+              (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext2" roles (pure <<< (flip cons roles))))
               []
               (toArray rolInstances)
             roles' <- pure $ filter (\(PerspectRol{contextDelta}) -> isDefaultContextDelta contextDelta) roles
@@ -116,7 +116,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
             then pure unit
             else do
               (roles :: Array PerspectRol) <- foldM
-                (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
+                (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext3" roles (pure <<< (flip cons roles))))
                 []
                 (toArray rolInstances)
               f roles pe unlinked

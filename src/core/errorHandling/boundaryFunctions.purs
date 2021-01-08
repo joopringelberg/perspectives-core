@@ -54,8 +54,7 @@ handlePerspectContextError' boundaryName default f econtext = case econtext of
 
 handleDomeinFileError :: forall a m r. MonadEffect m => String -> (r -> m a) -> Either Error r -> m Unit
 handleDomeinFileError boundaryName f dfile = case dfile of
-  Left err -> logPerspectivesError $
-  DomeinFileErrorBoundary boundaryName (show err)
+  Left err -> logPerspectivesError $ DomeinFileErrorBoundary boundaryName (show err)
   Right ctxt -> do
     _ <- f ctxt
     pure unit
