@@ -35,9 +35,11 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, type (~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.LoadCRL (loadAndCacheCrlFile')
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_, loadArcAndCrl')
 import Unsafe.Coerce (unsafeCoerce)
@@ -78,12 +80,12 @@ uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crl
   Just arcSource, Just crlSource, Just url -> do
     r <- lift $ lift $ loadArcAndCrl' arcSource crlSource
     case r of
-      Left m -> pure unit
+      Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
       Right df@(DomeinFile drf@{_id}) -> do
         lift $ lift $ void $ storeDomeinFileInCache _id df
         -- construct the url from host and port.
         lift $ lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) url
-  _, _, _ -> pure unit
+  _, _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.

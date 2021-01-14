@@ -104,7 +104,7 @@ loadArcAndCrl' arcSource crlSource = do
   where
     addModelDescriptionAndCrl :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
     addModelDescriptionAndCrl df = do
-      (Tuple parseResult {roleInstances, prefixes}) <- runIndentParser' arcSource userData
+      (Tuple parseResult {roleInstances, prefixes}) <- runIndentParser' crlSource userData
       case parseResult of
         Left e -> pure $ Left $ [Custom (show e)]
         Right _ -> do
