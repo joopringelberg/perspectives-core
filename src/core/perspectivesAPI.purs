@@ -21,8 +21,8 @@
 
 module Perspectives.Api where
 
-import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
-import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
+-- import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
+import Control.Coroutine (Consumer, Producer, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (Step(..), produce', Emitter)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
@@ -35,10 +35,10 @@ import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
-import Effect.Aff (Aff, catchError, launchAff_, try)
+import Effect.Aff (Aff, catchError, try)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn3, runEffectFn3)
-import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
+import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
@@ -110,48 +110,6 @@ setupApi = runProcess $ (requestProducer $~ (forever (transform decodeRequest)))
         , contextDescription: unsafeToForeign ""
         , rolDescription: Nothing
         , authoringRole: Nothing}
-
--- | Create a process that consumes requests from a producer that connects to a source over TCP.
-setupTcpApi :: MonadPerspectives Unit
-setupTcpApi = runProcess server
-  where
-
-    server :: Process MonadPerspectives Unit
-    server = (connectionProducer defaultTCPOptions) $$ (connectionConsumer connectionHandler)
-
-    connectionHandler :: ConnectionProcess MonadPerspectives
-    connectionHandler connection =
-      (dataProducer connection $~ (forever (transform addCallback))) $$ consumeRequest
-      where
-        -- Here we add a callback to a Request (we don't receive a callback over TCP!).
-        addCallback :: (Either MultipleErrors Request) -> Request
-        addCallback (Right (Request r@{request, subject, object, predicate, corrId, contextDescription, rolDescription, authoringRole})) =
-          Request
-            { request: request
-            , subject
-            , predicate
-            , object
-            , corrId
-            , reactStateSetter: Just setter
-            , contextDescription
-            , rolDescription
-            , authoringRole }
-        addCallback (Left e) =
-          Request
-            { request: Api.WrongRequest
-            , subject: ("Perspectives could not decode this request: '" <> show e <> "'")
-            , predicate: ""
-            , object: ""
-            , corrId: -1
-            , reactStateSetter: Just setter
-            , contextDescription: unsafeToForeign ""
-            , rolDescription: Nothing
-            , authoringRole: Nothing}
-
-        setter :: Foreign
-        setter = unsafeToForeign (launchAff_ <<< (writeData connection :: Response -> Aff Boolean))
-
-        -- marshallRequest (Left e) = WrongRequest ("Perspectives does not recognise this request: '" <> show e <> "'") (launchAff_ <<< writeData connection) "universalErrorHandler"
 
 consumeRequest :: Consumer Request MonadPerspectives Unit
 consumeRequest = forever do

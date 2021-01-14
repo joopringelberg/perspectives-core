@@ -10,7 +10,7 @@ module.exports = {
   },
   watch: false,
   mode: "development",
-  target: "electron-renderer",
+  target: "webworker",
   module: {
     rules: []
   },
