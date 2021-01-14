@@ -10,7 +10,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, 
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
+import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile')
 import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)

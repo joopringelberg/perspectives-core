@@ -16,7 +16,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getP
 import Perspectives.Representation.Class.Role (allProperties, roleADT)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile)
+import Perspectives.TypePersistence.LoadArc.FS (loadAndCompileArcFile)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, propertiesOfRole, specialisesRoleType)
 import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP, withSimpleChat, withSystem)

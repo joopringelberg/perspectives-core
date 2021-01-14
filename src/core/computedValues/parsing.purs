@@ -43,40 +43,40 @@ import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_, loadArcAndC
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Read the .arc file, parse it and try to compile it.
-parseAndCompileArc :: Array ArcPath -> (ContextInstance ~~> Value)
-parseAndCompileArc arcPath_ _ = case head arcPath_ of
-  Nothing -> pure $ Value "No path to arc file given!"
-  Just arcPath -> do
-    r <- lift $ lift $ loadAndCompileArcFile_ arcPath
+parseAndCompileArc :: Array ArcSource -> (ContextInstance ~~> Value)
+parseAndCompileArc arcSource_ _ = case head arcSource_ of
+  Nothing -> pure $ Value "No arc source given!"
+  Just arcSource -> do
+    r <- lift $ lift $ loadAndCompileArcFile_ arcSource
     case r of
       Left errs -> ArrayT $ pure (Value <<< show <$> errs)
       Right _ -> pure $ Value "OK"
 
 -- | Read the .crl file, parse it and try to compile it.
-parseAndCompileCrl :: Array CrlPath -> (ContextInstance ~~> Value)
-parseAndCompileCrl crlPath_ _ = case head crlPath_ of
-  Nothing -> pure $ Value "No path to crl file given!"
-  Just crlPath -> do
-    r <- lift $ lift $ loadAndCacheCrlFile' crlPath
+parseAndCompileCrl :: Array CrlSource -> (ContextInstance ~~> Value)
+parseAndCompileCrl crlSource_ _ = case head crlSource_ of
+  Nothing -> pure $ Value "No crl source given!"
+  Just crlSource -> do
+    r <- lift $ lift $ loadAndCacheCrlFile' crlSource
     case r of
       Left errs -> ArrayT $ pure (Value <<< show <$> errs)
       Right _ -> pure $ Value "OK"
 
-type ArcPath = String
-type CrlPath = String
+type ArcSource = String
+type CrlSource = String
 type Url = String
 
 -- | Parse and compile the Arc and Crl file. Upload to the repository.
 -- | If the files are not valid, nothing happens.
 -- | host_ and port_ are currently ignored.
 uploadToRepository ::
-  Array ArcPath ->
-  Array CrlPath ->
+  Array ArcSource ->
+  Array CrlSource ->
   Array Url ->
   Array RoleInstance -> MonadPerspectivesTransaction Unit
-uploadToRepository arcPath_ crlPath_ url_ _ = case head arcPath_, head crlPath_, head url_ of
-  Just arcPath, Just crlPath, Just url -> do
-    r <- lift $ lift $ loadArcAndCrl' arcPath crlPath
+uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crlSource_, head url_ of
+  Just arcSource, Just crlSource, Just url -> do
+    r <- lift $ lift $ loadArcAndCrl' arcSource crlSource
     case r of
       Left m -> pure unit
       Right df@(DomeinFile drf@{_id}) -> do

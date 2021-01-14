@@ -29,15 +29,15 @@ domain: ModelManagement
 
   case: ManagedModel
     external:
-      property: ArcPath (mandatory, functional, String)
+      property: ArcSource (mandatory, functional, String)
       property: ArcFeedback (mandatory, functional, String)
       property: ArcOK = ArcFeedback == "OK"
-      property: CrlPath (mandatory, functional, String)
+      property: CrlSource (mandatory, functional, String)
       property: CrlFeedback (mandatory, functional, String)
       property: CrlOK = CrlFeedback == "OK"
       property: Name = context >> ModelDescription >> Name
 
-      view: Paths (ArcPath, CrlPath)
+      view: Paths (ArcSource, CrlSource)
       view: Feedback (ArcFeedback, CrlFeedback)
 
     thing: Repository (mandatory, functional) filledBy: ModelManagementApp$Repository
@@ -55,13 +55,13 @@ domain: ModelManagement
 
     bot: for Author
       perspective on: extern
-        if extern >> ((exists ArcPath) and not exists ArcFeedback) then
-          ArcFeedback = extern >> callExternal p:ParseAndCompileArc( ArcPath ) returns: String
+        if extern >> ((exists ArcSource) and not exists ArcFeedback) then
+          ArcFeedback = extern >> callExternal p:ParseAndCompileArc( ArcSource ) returns: String
     bot: for Author
       perspective on: extern
-        if extern >> ((exists CrlPath) and not exists CrlFeedback) then
-          CrlFeedback = extern >> callExternal p:ParseAndCompileCrl( CrlPath ) returns: String
+        if extern >> ((exists CrlSource) and not exists CrlFeedback) then
+          CrlFeedback = extern >> callExternal p:ParseAndCompileCrl( CrlSource ) returns: String
     bot: for Author
       perspective on: extern
         if extern >> (ArcOK and CrlOK) then
-          callEffect p:UploadToRepository( extern >> ArcPath, extern >> CrlPath, Repository >> Url )
+          callEffect p:UploadToRepository( extern >> ArcSource, extern >> CrlSource, Repository >> Url )

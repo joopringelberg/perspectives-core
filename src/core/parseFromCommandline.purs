@@ -13,7 +13,7 @@ import Node.Yargs.Applicative (runY, yarg)
 import Node.Yargs.Setup (example, usage)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.RunPerspectives (runPerspectives)
-import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile)
+import Perspectives.TypePersistence.LoadArc.FS (loadAndCompileArcFile)
 
 parseFromCommandLine :: Effect Unit
 parseFromCommandLine = do

@@ -18,7 +18,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization, R
 import Perspectives.CoreTypes ((##=))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Instances.SerialiseAsJson (serialiseAsJsonFor)
-import Perspectives.LoadCRL (loadAndCacheCrlFile)
+import Perspectives.LoadCRL.FS (loadAndCacheCrlFile)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
