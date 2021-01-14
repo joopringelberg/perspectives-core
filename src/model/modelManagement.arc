@@ -29,15 +29,17 @@ domain: ModelManagement
 
   case: ManagedModel
     external:
+      property: ArcUrl (mandatory, functional, String)
       property: ArcSource (mandatory, functional, String)
       property: ArcFeedback (mandatory, functional, String)
       property: ArcOK = ArcFeedback == "OK"
+      property: CrlUrl (mandatory, functional, String)
       property: CrlSource (mandatory, functional, String)
       property: CrlFeedback (mandatory, functional, String)
       property: CrlOK = CrlFeedback == "OK"
       property: Name = context >> ModelDescription >> Name
 
-      view: Paths (ArcSource, CrlSource)
+      view: Paths (ArcUrl, CrlUrl)
       view: Feedback (ArcFeedback, CrlFeedback)
 
     thing: Repository (mandatory, functional) filledBy: ModelManagementApp$Repository
@@ -64,4 +66,5 @@ domain: ModelManagement
     bot: for Author
       perspective on: extern
         if extern >> (ArcOK and CrlOK) then
+          -- TODO. Add a reload time property and set it after uploading.
           callEffect p:UploadToRepository( extern >> ArcSource, extern >> CrlSource, Repository >> Url )
