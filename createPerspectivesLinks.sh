@@ -8,6 +8,12 @@ rm -Rf v2.2.0
 
 ln -s ../../../../purescript-aff-sockets v2.2.0
 
+cd ../affjax
+
+rm -Rf pv9.0.1
+
+ln -s ../../../../purescript-affjax pv9.0.1
+
 cd ../perpectives-apitypes
 
 rm -Rf v2.8.0
@@ -27,3 +33,9 @@ rm -Rf v2.8.2
 ln -s ../../../../perspectives-couchdb v2.8.2
 
 cd ../../..
+
+cd ./node_modules
+
+rm -Rf perspectives-proxy
+
+ln -s ../../perspectives-proxy
