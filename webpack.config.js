@@ -4,7 +4,7 @@ module.exports = {
   entry: path.join(__dirname, "output/Main/index.js" ),
   output: {
     library: "perspectives-core",
-    libraryTarget: "commonjs2",
+    libraryTarget: "umd",
     filename: "perspectives-core.js",
     path: path.join(__dirname, "dist")
   },
@@ -19,7 +19,20 @@ module.exports = {
       commonjs: 'perspectives-proxy',
       commonjs2: 'perspectives-proxy',
       amd: 'perspectives-proxy',
-      root: "perspectivesProxy"
+      root: 'perspectives-proxy'
+    },
+    // These are Affjax dependencies when running on node.
+    "xhr2-cookies": {
+      commonjs: "xhr2-cookies",
+      commonjs2: "xhr2-cookies",
+      amd: "xhr2-cookies",
+      root: "xhr2-cookies"
+    },
+    "url": {
+      commonjs: "url",
+      commonjs2: "url",
+      amd: "url",
+      root: "url"
     }
   }
 };
