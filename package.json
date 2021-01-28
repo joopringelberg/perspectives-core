@@ -7,6 +7,7 @@
   "dependencies": {
     "@stomp/stompjs": "^6.0.0",
     "eventsource": "^1.0.7",
+    "fuzzysort": "^1.1.4",
     "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.7.0",
     "xhr2-cookies": "^1.1.0"
   },

@@ -40,6 +40,7 @@ import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
+import Foreign.Generic (encodeJSON)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
@@ -51,6 +52,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransacti
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.Fuzzysort (matchIndexedContextNames)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
@@ -229,6 +231,10 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         otherwise -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
     -- { request: "GetLocalRoleSpecialisation", subject: contextInstance, predicate: localAspectName}
     Api.GetLocalRoleSpecialisation -> registerSupportedEffect corrId setter (contextType >=> (liftToInstanceLevel $ localRoleSpecialisation predicate)) (ContextInstance subject)
+    -- {request: "matchContextName", subject: name}
+    Api.MatchContextName -> do
+      matches <- matchIndexedContextNames subject
+      sendResponse (Result corrId [encodeJSON matches]) setter
     Api.GetUserIdentifier -> do
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
