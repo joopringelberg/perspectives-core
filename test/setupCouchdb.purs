@@ -17,11 +17,11 @@ testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 theSuite :: Free TestF Unit
 theSuite = suiteSkip "Perspectives.SetupCouchdb" do
   test "setupCouchdbForFirstUser" do
-    setupCouchdbForFirstUser "cor" "geheim" couchdbHost couchdbPort
+    setupCouchdbForFirstUser "cor" "geheim" couchdbHost couchdbPort "http://joopringelberg.nl/cbd/repository"
     assert "Just ran 'setupCouchdbForFirstUser'" true
 
   test "setupCouchdbForAnotherUser" (runPJoop do
-    setupCouchdbForAnotherUser "test" "geheim"
+    setupCouchdbForAnotherUser "test" "geheim"  "http://joopringelberg.nl/cbd/repository"
     liftAff $ assert "Just ran 'setupCouchdbForAnotherUser'" true)
 
   testSkip "set security document on localusers" (runP do

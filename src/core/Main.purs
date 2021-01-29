@@ -67,6 +67,7 @@ main = runPDR
     , _rev: Nothing})
   "http://127.0.0.1"
   5984
+  "http://joopringelberg.nl/cbd/repository"
 -- main = parseFromCommandLine
 
 -- NOTE: For release v0.1.0, I've commented out the original main function because it requires the perspectivesproxy
@@ -75,13 +76,14 @@ main = runPDR
 
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
   -- TODO. Bewaar de fiber in state en kill om uit te loggen?
-runPDR :: String -> String -> CouchdbUser -> String -> Int -> Effect Unit
-runPDR usr pwd couchdbUser host port = void $ runAff handleError do
+runPDR :: String -> String -> CouchdbUser -> String -> Int -> String -> Effect Unit
+runPDR usr pwd couchdbUser host port publicRepo = void $ runAff handleError do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   state <- new $ newPerspectivesState couchdbUser
     host
     port
     pwd
+    publicRepo
     av
   runPerspectivesWithState (do
     void $ setupUser
@@ -105,8 +107,8 @@ handleError (Right a) = pure unit
 
 -- | The main entrance to the PDR for client programs. Runs the PDR on succesful login.
 -- | When Couchdb is in Party Mode, initialises the first admin.
-authenticate :: String -> String -> String -> Int -> (Int -> Effect Unit) -> Effect Unit
-authenticate usr pwd host port callback = void $ runAff handler (LA.authenticate usr pwd host port)
+authenticate :: String -> String -> String -> Int -> String -> (Int -> Effect Unit) -> Effect Unit
+authenticate usr pwd host port publicRepo callback = void $ runAff handler (LA.authenticate usr pwd host port)
   where
     handler :: Either Error AuthenticationResult -> Effect Unit
     handler (Left e) = do
@@ -120,7 +122,7 @@ authenticate usr pwd host port callback = void $ runAff handler (LA.authenticate
         -- There may not yet be another Perspectives user. If so, we need to set up
         -- system databases etc.
         setupPerspectivesInCouchdb usr pwd host port
-        createAnotherPerspectivesUser usr pwd host port
+        createAnotherPerspectivesUser usr pwd host port publicRepo
       -- System administrator and a Perspectives User.
       OK couchdbUser -> runWithUser $ Right couchdbUser
     runWithUser :: Either Error CouchdbUser -> Effect Unit
@@ -128,12 +130,12 @@ authenticate usr pwd host port callback = void $ runAff handler (LA.authenticate
       logPerspectivesError $ Custom $ "Could not create another Perspectives user, because: " <> (show e)
       callback 1
     runWithUser (Right couchdbUser) = do
-      runPDR usr pwd couchdbUser host port
+      runPDR usr pwd couchdbUser host port publicRepo
       callback 2
 
 -- | This is for development only! Assumes the user identifier equals the user name.
-resetAccount :: String -> String -> String -> Int -> (Boolean -> Effect Unit) -> Effect Unit
-resetAccount usr pwd host port callback = void $ runAff handler (runPerspectives usr pwd usr host port do
+resetAccount :: String -> String -> String -> Int -> String -> (Boolean -> Effect Unit) -> Effect Unit
+resetAccount usr pwd host port publicRepo callback = void $ runAff handler (runPerspectives usr pwd usr host port publicRepo do
   -- Get all Channels
   getChannels <- getRoleFunction "sys:PerspectivesSystem$Channels"
   system <- getMySystem

@@ -46,12 +46,12 @@ import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (<>), (>>=))
 -- SETUPCOUCHDBFORFIRSTUSER
 -- Notice: Requires Couchdb to be in partymode.
 -----------------------------------------------------------
-setupCouchdbForFirstUser :: String -> String -> String -> Int -> Aff Unit
-setupCouchdbForFirstUser usr pwd host port = do
+setupCouchdbForFirstUser :: String -> String -> String -> Int -> String -> Aff Unit
+setupCouchdbForFirstUser usr pwd host port publicRepo = do
   -- TODO: genereer hier de systeemIdentifier als een guid.
   runMonadCouchdb usr pwd usr host port (createFirstAdmin usr pwd)
   setupPerspectivesInCouchdb usr pwd host port
-  runPerspectives usr pwd usr host port do
+  runPerspectives usr pwd usr host port publicRepo do
     getSystemIdentifier >>= createUserDatabases
     void addUserToLocalUsers
     entitiesDatabaseName >>= setRoleView
@@ -86,17 +86,17 @@ databaseExists_ dbname = do
 -- SETUPCOUCHDBFORANOTHERUSER
 -- Notice: Requires authentication.
 -----------------------------------------------------------
-setupCouchdbForAnotherUser :: String -> String -> MonadPerspectives Unit
-setupCouchdbForAnotherUser usr pwd = do
+setupCouchdbForAnotherUser :: String -> String -> String -> MonadPerspectives Unit
+setupCouchdbForAnotherUser usr pwd publicRepo = do
   createAnotherAdmin usr pwd
   host <- getHost
   port <- getPort
-  void $ lift $ createAnotherPerspectivesUser usr pwd host port
+  void $ lift $ createAnotherPerspectivesUser usr pwd host port publicRepo
 
-createAnotherPerspectivesUser :: String -> String -> String -> Int -> Aff CouchdbUser
-createAnotherPerspectivesUser usr pwd host port =
+createAnotherPerspectivesUser :: String -> String -> String -> Int -> String ->Aff CouchdbUser
+createAnotherPerspectivesUser usr pwd host port publicRepo =
   -- TODO: genereer hier de systeemIdentifier als een guid.
-  runPerspectives usr pwd usr host port do
+  runPerspectives usr pwd usr host port publicRepo do
     getSystemIdentifier >>= createUserDatabases
     u <- addUserToLocalUsers
     entitiesDatabaseName >>= setRoleView

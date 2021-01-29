@@ -25,10 +25,10 @@ couchdbPort :: Int
 couchdbPort = 5984
 
 runP_ :: forall a. String -> MonadPerspectives a -> Aff a
-runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort
+runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort "http://joopringelberg.nl/cbd/repository"
 
 runP :: forall a. MonadPerspectives a -> Aff a
-runP = runP_ "test" 
+runP = runP_ "test"
 
 runPJoop :: forall a. MonadPerspectives a -> Aff a
 runPJoop = runP_ "joop"
@@ -77,7 +77,7 @@ clearPostDatabase = do
   createDatabase db
 
 setupCouchdbForTestUser :: MonadPerspectives Unit
-setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "geheim"
+setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "geheim" "http://joopringelberg.nl/cbd/repository"
 
 -- | Load the model, compute the value in MonadPerspectives, unload the model and remove the instances.
 -- | Notice: dependencies of the model are not automatically removed!

@@ -33,9 +33,9 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Prelude (bind, ($), (<>))
 
 -- | Run an action in MonadPerspectives, given a username and password.
-runPerspectives :: forall a. String -> String -> String -> String -> Int -> MonadPerspectives a
+runPerspectives :: forall a. String -> String -> String -> String -> Int -> String -> MonadPerspectives a
   -> Aff a
-runPerspectives userName password systemId host port mp = do
+runPerspectives userName password systemId host port publicRepo mp = do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState (CouchdbUser
@@ -45,6 +45,7 @@ runPerspectives userName password systemId host port mp = do
       host
       port
       password
+      publicRepo
       av) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
   runReaderT mp rf
 
