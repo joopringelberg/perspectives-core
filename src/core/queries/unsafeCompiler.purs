@@ -32,10 +32,13 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
-import Data.Array (elemIndex, null, unsafeIndex, head)
+import Data.Array (elemIndex, findIndex, head, index, null, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
+import Data.String.Regex (test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
@@ -557,4 +560,26 @@ getDynamicPropertyGetter p adt = do
         Just bnd' -> do
           (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd'
           getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)
+          getter bnd'
+
+-- | From a string that represents part of the name of either a Calculated or an Enumerated property,
+-- | for a given abstract datatype of roles, retrieve the values from a role instance.
+-- | When multiple matches could be made with properties in the role telescope,
+-- | the one closest to the root is preferred.
+getDynamicPropertyGetterFromLocalName :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
+getDynamicPropertyGetterFromLocalName ln adt = do
+  (allProps :: Array PropertyType) <- allLocallyRepresentedProperties adt
+  case findIndex ((test (unsafeRegex (ln <> "$") noFlags)) <<< propertytype2string) allProps of
+    Nothing -> pure f
+    (Just i) -> getterFromPropertyType (unsafePartial $ fromJust $ index allProps i)
+
+  where
+    f :: (RoleInstance ~~> Value)
+    f roleInstance = do
+      bnd <- lift $ lift $ binding_ roleInstance
+      case bnd of
+        Nothing -> empty
+        Just bnd' -> do
+          (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd'
+          getter <- lift $ lift $ getDynamicPropertyGetterFromLocalName ln (ST bndType)
           getter bnd'

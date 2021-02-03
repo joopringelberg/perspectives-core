@@ -62,7 +62,7 @@ import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
-import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter, getRoleFunction, getRoleInstances)
+import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT, reduce)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (calculation, getRoleType, kindOfRole, rangeOfRoleCalculation, rangeOfRoleCalculation', roleADT)
@@ -131,12 +131,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Just x -> getRoleType x
   case request of
     -- Given the context instance identifier and the qualified name of the RolType.
-    Api.GetRolBinding -> do
-      (f :: RoleGetter) <- (getRoleFunction predicate)
-      registerSupportedEffect corrId setter (f >=> binding) (ContextInstance subject)
+    -- Api.GetRolBinding -> do
+    --   (f :: RoleGetter) <- (getRoleFunction predicate)
+    --   registerSupportedEffect corrId setter (f >=> binding) (ContextInstance subject)
     -- Given the rolinstance;
     Api.GetBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject)
-    Api.GetBindingType -> registerSupportedEffect corrId setter (binding >=> roleType) (RoleInstance subject)
+    -- Api.GetBindingType -> registerSupportedEffect corrId setter (binding >=> roleType) (RoleInstance subject)
 
     -- {request: "GetRoleBinders", subject: <RoleInstance>, predicate: <EnumeratedRoleType>}
     Api.GetRoleBinders -> (try $ getPerspectRol (RoleInstance subject)) >>=
@@ -149,14 +149,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           registerSupportedEffect corrId setter (getRoleBinders (EnumeratedRoleType predicate)) (RoleInstance subject)
 
     -- {request: "GetUnqualifiedRoleBinders", subject: <RoleInstance>, predicate: <local role name>}
-    Api.GetUnqualifiedRoleBinders -> (try $ getPerspectRol (RoleInstance subject)) >>=
-        case _ of
-          Left err -> do
-            logPerspectivesError $ RolErrorBoundary "Api.GetUnqualifiedRoleBinders" (show err)
-            sendResponse (Error corrId (show $ RolErrorBoundary "Api.GetUnqualifiedRoleBinders" (show err))) setter
-          Right (PerspectRol{pspType}) -> do
-            void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
-            registerSupportedEffect corrId setter (getUnqualifiedRoleBinders predicate) (RoleInstance subject)
+    -- Api.GetUnqualifiedRoleBinders -> (try $ getPerspectRol (RoleInstance subject)) >>=
+    --     case _ of
+    --       Left err -> do
+    --         logPerspectivesError $ RolErrorBoundary "Api.GetUnqualifiedRoleBinders" (show err)
+    --         sendResponse (Error corrId (show $ RolErrorBoundary "Api.GetUnqualifiedRoleBinders" (show err))) setter
+    --       Right (PerspectRol{pspType}) -> do
+    --         void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+    --         registerSupportedEffect corrId setter (getUnqualifiedRoleBinders predicate) (RoleInstance subject)
 
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
@@ -196,10 +196,20 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     --         (Just rtype) -> sendResponse (Result corrId [roletype2string rtype]) setter
 
     -- Looks up a property on the role instance and recursively on its binding.
-    -- {request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType},
+    -- {request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType}
     Api.GetProperty -> do
       (adt :: ADT EnumeratedRoleType) <- getRoleType object >>= rangeOfRoleCalculation
       result <- try (getDynamicPropertyGetter predicate adt)
+      case result of
+        Left e -> sendResponse (Error corrId ("No propertytype '" <> predicate <> "' found on roletype '" <> object <> "': " <> show e)) setter
+        Right (f :: PropertyValueGetter) -> registerSupportedEffect corrId setter f (RoleInstance subject)
+
+    -- Looks up a property on the role instance and recursively on its binding,
+    -- given its local name.
+    -- {request: "GetPropertyFromLocalName", subject: rolID, predicate: propertyName, object: roleType}
+    Api.GetPropertyFromLocalName -> do
+      (adt :: ADT EnumeratedRoleType) <- getRoleType object >>= rangeOfRoleCalculation
+      result <- try (getDynamicPropertyGetterFromLocalName predicate adt)
       case result of
         Left e -> sendResponse (Error corrId ("No propertytype '" <> predicate <> "' found on roletype '" <> object <> "': " <> show e)) setter
         Right (f :: PropertyValueGetter) -> registerSupportedEffect corrId setter f (RoleInstance subject)

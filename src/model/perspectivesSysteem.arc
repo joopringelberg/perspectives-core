@@ -18,6 +18,7 @@ domain: System
       aspect: sys:RootContext$External
       property: ModelOphaalTeller (mandatory, functional, Number)
       property: ConnectedToAMQPBroker (not mandatory, functional, Boolean)
+      property: CardClipBoard (not mandatory, functional, String)
     aspect: sys:RootContext
     indexed: sys:MySystem
 
