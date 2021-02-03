@@ -1,6 +1,6 @@
 {
   "name": "perspectives-core",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Core functionality of Perspectives",
   "license": "GPL-3.0-or-later",
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
@@ -8,7 +8,7 @@
     "@stomp/stompjs": "^6.0.0",
     "eventsource": "^1.0.7",
     "fuzzysort": "^1.1.4",
-    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.7.0",
+    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.8.0",
     "xhr2-cookies": "^1.1.0"
   },
   "repository": {

@@ -10,15 +10,15 @@ ln -s ../../../../purescript-aff-sockets v2.2.0
 
 cd ../affjax
 
-rm -Rf pv9.0.1
+rm -Rf pv9.1.0
 
-ln -s ../../../../purescript-affjax pv9.0.1
+ln -s ../../../../purescript-affjax pv9.1.0
 
 cd ../perpectives-apitypes
 
-rm -Rf v2.8.0
+rm -Rf v2.9.0
 
-ln -s ../../../../perspectives-apitypes v2.8.0
+ln -s ../../../../perspectives-apitypes v2.9.0
 
 cd ../avar-monadask/
 
