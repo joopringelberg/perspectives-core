@@ -57,7 +57,7 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, getUnqualifiedRoleBinders, roleType, roleType_, siblings)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, roleType, roleType_, siblings)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectRol)
@@ -119,7 +119,7 @@ consumeRequest = forever do
   lift (catchError
     (dispatchOnRequest request)
     (\e -> do
-      logPerspectivesError (ApiErrorBoundary (show e))
+      logPerspectivesError (ApiErrorBoundary ((showRequestRecord request) <> ": " <> (show e)))
       sendResponse (Error corrId ("Request could not be handled, because: " <> (show e))) (mkApiEffect reactStateSetter))
     )
 
@@ -383,6 +383,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         void $ runMonadPerspectivesTransaction authoringRole (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
         sendResponse (Result corrId ["ok"]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
+    -- {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype}
     Api.DeleteProperty -> catchError
       (do
         void $ runMonadPerspectivesTransaction authoringRole (deleteProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate))
@@ -408,7 +409,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     withNewContext :: RoleType -> (Maybe RoleType) -> (ContextInstance -> MonadPerspectivesTransaction Unit) -> MonadPerspectives Unit
     withNewContext authoringRole mroleType effect = case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
-      (Right (ContextSerialization cd@{ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
+      (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
         void $ runMonadPerspectivesTransaction authoringRole do
           g <- liftEffect guid
           ctxt <- runExceptT $ constructContext mroleType (ContextSerialization cd {id = "model:User$c" <> (show g)})

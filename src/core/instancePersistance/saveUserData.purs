@@ -294,6 +294,9 @@ setBinding_ roleId (newBindingId :: RoleInstance) msignedDelta = (lift2 $ try $ 
     \(originalRole :: PerspectRol) -> (lift2 $ try $ getPerspectEntiteit newBindingId) >>=
       handlePerspectRolError' "setBinding_, new binding" []
       \newBinding@(PerspectRol{isMe, pspType}) -> do
+        -- NOTE. If the role is a user role, we have to give it its new binding *before* we compute the users
+        -- that should receive the delta.
+
         cacheAndSave roleId (changeRol_binding newBindingId originalRole)
 
         (lift2 $ findBinderRequests newBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
@@ -405,6 +408,8 @@ removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId)
     \(originalRole :: PerspectRol) -> case rol_binding originalRole of
       Nothing -> pure []
       Just bindingId -> do
+        -- NOTE. because the role can be a user role with a perspective on itself, we have to compute the users
+        -- for this delta *before* we actually delete the binding!
         (lift2 $ findBinderRequests bindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
         subject <- getSubject
         delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
