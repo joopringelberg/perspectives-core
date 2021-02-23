@@ -123,6 +123,7 @@ addUserToLocalUsers = (gets _.userInfo) >>= \u@(CouchdbUser{userName}) -> saveEn
 -- CREATEFIRSTADMIN
 -- Notice: no authentication. Requires Couchdb to be in party mode.
 -- Assumes Couchdb to run on http://127.0.0.1:5984.
+-- This function is no longer used in Perspectives.
 -----------------------------------------------------------
 createFirstAdmin :: forall f. User -> Password -> MonadCouchdb f Unit
 createFirstAdmin user password = do
@@ -135,6 +136,7 @@ createFirstAdmin user password = do
 -----------------------------------------------------------
 -- CREATEANOTHERADMIN
 -- Notice: requires authentication!
+-- This function is no longer used in Perspectives.
 -----------------------------------------------------------
 createAnotherAdmin :: User -> Password -> MonadPerspectives Unit
 createAnotherAdmin user password = ensureAuthentication do

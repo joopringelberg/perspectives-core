@@ -31,6 +31,9 @@ import Control.Monad.Reader (ReaderT, lift)
 import Control.Promise (Promise, toAff)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.String.Regex (Regex, test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect (Effect)
 import Effect.AVar (AVar)
 import Effect.Aff (Aff, Error, catchError, error, message, throwError)
@@ -76,7 +79,7 @@ type MonadPouchdb f = ReaderT (AVar (PouchdbState f)) Aff
 -- POUCHERROR
 -----------------------------------------------------------
 type PouchError =
-  { status :: Int
+  { status :: Maybe Int
   , name :: String
   , message :: String
   , error :: Either Boolean String
@@ -109,17 +112,28 @@ foreign import createRemoteDatabaseImpl :: EffectFn2
 -- TODO: this function is ready to replace CDB.createDatabase.
 -- | Creates a new Pouchdb db object and adds it to PouchdbState with the given name as key.
 -- | If PouchdbState contains a couchdbUrl, creates a database on that endpoint.
+-- | If dbname is a full url, creates a database on that endpoint.
 -- | Ensures authentication.
 createDatabase' :: forall f. DatabaseName -> MonadPouchdb f Unit
-createDatabase' dbname = do
-  mprefix <- gets _.couchdbUrl
-  case mprefix of
-    Nothing -> do
-      pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
-      modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
-    Just prefix -> do
-      pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn2 createRemoteDatabaseImpl dbname prefix)
-      modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
+createDatabase' dbname = if startsWithDatabaseEndpoint dbname
+  then do
+    pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
+    modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
+  else do
+    mprefix <- gets _.couchdbUrl
+    case mprefix of
+      Nothing -> do
+        pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
+        modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
+      Just prefix -> do
+        pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn2 createRemoteDatabaseImpl dbname prefix)
+        modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
+  where
+    endpointRegex :: Regex
+    endpointRegex = unsafeRegex "^https?" noFlags
+
+    startsWithDatabaseEndpoint :: DatabaseName -> Boolean
+    startsWithDatabaseEndpoint = test endpointRegex
 
 -----------------------------------------------------------
 -- ENSUREDATABASE
@@ -156,8 +170,10 @@ withDatabase dbName fun = CDB.ensureAuthentication $ do
 handlePouchError :: forall m a. MonadError Error m => CDB.DocumentName -> Error -> m a
 handlePouchError docName e = case readPouchError (message e) of
   -- Generate messages as we did before, using handleError.
-  Right ({status} :: PouchError) -> handleError status mempty ("addDocument for " <> docName)
-  Left parseErrors -> throwError $ error ("addDocument: cannot parse error thrown by Pouchdb: " <> (show parseErrors))
+  Right ({status} :: PouchError) -> case status of
+    Nothing -> throwError e
+    Just s -> handleError s mempty ("addDocument for " <> docName)
+  Left parseErrors -> throwError $ error ("addDocument: cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (message e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
 
 -----------------------------------------------------------
 -- ADD DOCUMENT

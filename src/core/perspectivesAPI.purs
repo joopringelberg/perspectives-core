@@ -42,6 +42,7 @@ import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (empty)
+import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
@@ -105,7 +106,7 @@ setupApi = runProcess $ (requestProducer $~ (forever (transform decodeRequest)))
       (Left e) -> Request
         { request: Api.WrongRequest
         , subject: ("Perspectives could not decode this request: '" <> show e <> "'")
-        , predicate: ""
+        , predicate: (unsafeStringify f)
         , object: ""
         , corrId: -1
         , reactStateSetter: Just $ unsafeToForeign (\x -> pure unit :: Aff Unit)

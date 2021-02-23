@@ -3,7 +3,7 @@ var PouchDB = require('pouchdb-browser').default;
 
 exports.createDatabaseImpl = function( databaseName )
 {
-  return new Pouchdb( databaseName );
+  return new PouchDB( databaseName );
 }
 
 exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
@@ -33,13 +33,27 @@ exports.addNameAndVersionHack = function( doc, name, rev)
   return doc;
 }
 
-function convertPouchError( obj )
+function convertPouchError( e )
 {
   // Pouchdb returns an object in case of promise rejection.
+  // But sometimes it returns a TypeError. We convert that to the same form.
+  // We then stringify the objects and make a Javascript Error out of it.
   // By throwing a Javascript error, we make toAff catch it
   // and coerce it to an error in MonadError.
   // This is caught by catchError in Purescript, e.g. in addDocument.
-  throw new Error( JSON.stringify(obj))
+
+  if ( e instanceof TypeError )
+  {
+    throw new Error( JSON.stringify(
+      { name: e.name
+      , message: e.message
+      , error: e.stack})
+    );
+  }
+  else
+  {
+    throw new Error( JSON.stringify( e ) );
+  }
 }
 
 exports.getDocumentImpl = function( database, docName )
