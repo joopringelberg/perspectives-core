@@ -21,19 +21,14 @@
 
 module Perspectives.Deltas where
 
-import Affjax (Request, request)
-import Affjax.RequestBody as RequestBody
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
 import Data.Array (elemIndex, insertAt, length, nub, snoc, union)
 import Data.DateTime.Instant (toDateTime)
-import Data.Either (Either(..))
-import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (over)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Foreign.Generic (encodeJSON)
@@ -42,8 +37,6 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.Stomp (sendToTopic)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##=))
-import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
-import Perspectives.Couchdb.Databases (addDocument, defaultPerspectRequest)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
@@ -51,6 +44,7 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (bottom, getProperty, roleType_)
 import Perspectives.Names (getMySystem)
+import Perspectives.Persistence.API (addDocument)
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
@@ -90,11 +84,8 @@ sendTransactieToUserUsingCouchdb userId t = do
     Nothing -> pure unit
     Just (Value channel) -> do
       cdbUrl <- getCouchdbBaseURL
-      (rq :: (Request String)) <- defaultPerspectRequest
       transactionNumber <- nextTransactionNumber
-      res <- liftAff $ request $ rq {method = Left PUT, url = (cdbUrl <> channel <> "/" <> transactieID t <> "_" <> show transactionNumber), content = Just $ RequestBody.string (encodeJSON t)}
-      void $ onAccepted res.status [200, 201] "sendTransactieToUserUsingCouchdb"
-        (onCorrectCallAndResponse "sendTransactieToUserUsingCouchdb" res.body (\(a :: PutCouchdbDocument) -> pure unit))
+      void $ addDocument (cdbUrl <> channel) t (transactieID t <> "_" <> show transactionNumber)
 
 sendTransactieToUserUsingAMQP :: String -> TransactionForPeer -> MonadPerspectives Unit
 sendTransactieToUserUsingAMQP userId t = do
@@ -122,7 +113,7 @@ sendTransactieToUserUsingAMQP userId t = do
 saveTransactionInOutgoingPost :: String -> String -> TransactionForPeer -> MonadPerspectives Unit
 saveTransactionInOutgoingPost userId messageId t = do
   postDB <- postDatabaseName
-  addDocument postDB (OutgoingTransaction{ receiver: userId, transaction: t}) messageId
+  void $ addDocument postDB (OutgoingTransaction{ receiver: userId, transaction: t}) messageId
 
 type TransactionPerUser = Object TransactionForPeer
 

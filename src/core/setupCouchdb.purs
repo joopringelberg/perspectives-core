@@ -21,7 +21,7 @@
 
 module Perspectives.SetupCouchdb where
 
-import Affjax (request, put, Request)
+import Affjax (put, Request)
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Control.Monad.AvarMonadAsk (gets)
@@ -29,7 +29,6 @@ import Control.Monad.Trans.Class (lift)
 import Data.Argonaut (fromString)
 import Data.Array (null)
 import Data.Either (Either(..))
-import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff, try)
 import Effect.Aff.Class (liftAff)
@@ -141,7 +140,7 @@ createAnotherAdmin :: User -> Password -> MonadPerspectives Unit
 createAnotherAdmin user password = ensureAuthentication do
   base <- getCouchdbBaseURL
   (rq :: (Request String)) <- defaultPerspectRequest
-  res <- liftAff $ request $ rq {method = Left PUT, url = (base <> "_node/couchdb@localhost/_config/admins/" <> user), content = Just $ RequestBody.json (fromString password)}
+  res <- liftAff $ put ResponseFormat.string (base <> "_node/couchdb@localhost/_config/admins/" <> user) (RequestBody.json (fromString password))
   liftAff $ onAccepted res.status [200] "createAnotherAdmin" $ pure unit
 
 -----------------------------------------------------------

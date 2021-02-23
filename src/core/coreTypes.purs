@@ -47,6 +47,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
+import Perspectives.Persistence.API (PouchdbState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType)
 import Perspectives.Sync.Transaction (Transaction)
@@ -61,7 +62,7 @@ type DomeinCache = GLStrMap (AVar DomeinFile)
 
 type BrokerService = ConnectAndSubscriptionParameters ( url :: String )
 
-type PerspectivesState = CouchdbState PerspectivesExtraState
+type PerspectivesState = PouchdbState PerspectivesExtraState
 
 type PerspectivesExtraState =
   -- Caching instances

@@ -31,7 +31,7 @@ import Perspectives.CouchdbState (CouchdbUser)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
-import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void, (+))
+import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void, (+), (<>), show)
 
 newPerspectivesState :: CouchdbUser -> String -> Int -> String -> String -> AVar String -> PerspectivesState
 newPerspectivesState uinfo host port password publicRepo av =
@@ -44,7 +44,7 @@ newPerspectivesState uinfo host port password publicRepo av =
   -- , publicRepository: "http://127.0.0.1:5984/repository/"
   -- CouchdbState
   , userInfo: uinfo
-  , couchdbHost: host
+  , couchdbHost: host -- For synchronising via a Couchdb Channel database
   , couchdbPort: port
   , couchdbPassword: password
   , couchdbSessionStarted: false
@@ -55,6 +55,9 @@ newPerspectivesState uinfo host port password publicRepo av =
   , transactionNumber: 0
   , brokerService: Nothing
   , stompClient: Nothing
+  , databases: empty
+  -- , couchdbUrl: Nothing -- For using Couchdb as backend for Pouchdb.
+  , couchdbUrl: Just $ host <> ":" <> (show port)
   }
 
 -----------------------------------------------------------

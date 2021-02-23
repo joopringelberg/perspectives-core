@@ -32,6 +32,7 @@ import Foreign (MultipleErrors)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesExtraState)
 import Perspectives.Couchdb.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
 import Perspectives.Couchdb.Databases (deleteDocument_)
+import Perspectives.Persistence.API (PouchdbExtraState)
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
@@ -50,7 +51,7 @@ incomingPost = do
   -- Save in state, so we can close it.
   void $ modify \s -> s {post = Just es}
   -- Produce new Transaction documents
-  (transactionProducer :: DocProducer PerspectivesExtraState TransactionForPeer) <- pure $ docProducer es
+  (transactionProducer :: DocProducer (PouchdbExtraState PerspectivesExtraState) TransactionForPeer) <- pure $ docProducer es
   -- Handle them.
   void $ runProcess $ transactionProducer $$ transactionConsumer post
   where

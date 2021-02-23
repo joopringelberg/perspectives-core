@@ -45,6 +45,7 @@ module Perspectives.Persistent
 , tryGetPerspectEntiteit
 , class Persistent
 , database
+, dbLocalName
 , entitiesDatabaseName
 , postDatabaseName
 , updateRevision
@@ -56,56 +57,64 @@ where
 
 import Prelude
 
-import Affjax (Request, request)
-import Affjax.RequestBody as RequestBody
-import Control.Monad.Except (catchError, throwError)
-import Data.Either (Either(..))
+import Control.Monad.Except (catchError, lift, throwError)
 import Data.Generic.Rep (class Generic)
-import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (AVar, kill, put, read)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
-import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse, version)
-import Perspectives.Couchdb.Databases (defaultPerspectRequest, documentExists, ensureAuthentication, getDocumentFromUrl, retrieveDocumentVersion)
+import Perspectives.Couchdb.Databases (documentExists, ensureAuthentication, getDocumentFromUrl, retrieveDocumentVersion)
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
+import Perspectives.Persistence.API (addDocument, deleteDocument, getDocument)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   database :: i -> MP String
+  dbLocalName :: i -> MP String
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
   database _ = do
     sysId <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> sysId <> "_entities/"
+  dbLocalName _ = do
+    sysId <- getSystemIdentifier
+    pure $ sysId <> "_entities"
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
   database _ = do
     sysId <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> sysId <> "_entities/"
+  dbLocalName _ = do
+    sysId <- getSystemIdentifier
+    pure $ sysId <> "_entities"
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
   database _ = do
     sysId <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> sysId <> "_models/"
+  dbLocalName _ = do
+    sysId <- getSystemIdentifier
+    pure $ sysId <> "_models"
 
 instance persistentCouchdbUser :: Persistent CouchdbUser UserName where
   database _ = do
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> "localusers/"
+  dbLocalName _ = do
+    sysId <- getSystemIdentifier
+    pure $ sysId <> "localusers"
 
 getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
@@ -165,10 +174,9 @@ removeEntiteit_ entId entiteit =
       Nothing -> pure entiteit
       (Just rev) -> do
         void $ removeInternally entId
-        ebase <- database entId
-        (rq :: (Request String)) <- defaultPerspectRequest
-        res <- liftAff $ request $ rq {method = Left DELETE, url = (ebase <> unwrap entId <> "?rev=" <> rev)}
-        onAccepted res.status [200, 202] ("removeEntiteit(" <> unwrap entId <> ")") $ pure entiteit
+        dbName <- dbLocalName entId
+        void $ deleteDocument dbName (unwrap entId) (Just rev)
+        pure entiteit
 
 tryRemoveEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives Unit
 tryRemoveEntiteit entId = do
@@ -182,13 +190,11 @@ fetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 fetchEntiteit id = ensureAuthentication $ catchError
   do
     v <- representInternally id
-    -- _ <- forkAff do
-    ebase <- database id
-    (rq :: (Request String)) <- defaultPerspectRequest
-    res <- liftAff $ request $ rq {url = ebase <> unwrap id}
-    void $ liftAff $ onAccepted res.status [200, 304] "fetchEntiteit"
-      (onCorrectCallAndResponse "fetchEntiteit" res.body \a -> put a v)
-    liftAff $ read v
+    dbName <- dbLocalName id
+    doc <- getDocument dbName (unwrap id)
+    lift $ put doc v
+    pure doc
+
   \e -> do
     (mav :: Maybe (AVar a)) <- removeInternally id
     case mav of
@@ -230,15 +236,11 @@ saveEntiteit' entId mentiteit = ensureAuthentication $ do
     Just e -> case rev e of
       Nothing -> ""
       Just rev -> "?rev=" <> rev
-
-  ebase <- database entId
-  (rq :: (Request String)) <- defaultPerspectRequest
-  res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> revParam), content = Just $ RequestBody.string  (encodeJSON entiteit)}
-  void $ onAccepted res.status [200, 201] ("saveEntiteit_ for " <> (unwrap entId))
-    (onCorrectCallAndResponse ("saveEntiteit_ for " <> (unwrap entId)) res.body (\(a :: PutCouchdbDocument) -> do
-      v <- version res.headers
-      void $ cacheEntity entId (changeRevision v entiteit)))
-  pure entiteit
+  dbName <- dbLocalName entId
+  (rev :: Revision_) <- addDocument dbName entiteit (unwrap entId)
+  entiteit' <- pure (changeRevision rev entiteit)
+  void $ cacheEntity entId entiteit'
+  pure entiteit'
 
 updateRevision :: forall a i. Persistent a i => i -> MonadPerspectives Unit
 updateRevision entId = do

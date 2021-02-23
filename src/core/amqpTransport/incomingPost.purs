@@ -48,13 +48,10 @@ import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
-import Perspectives.User (getCouchdbBaseURLWithCredentials)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (>=>), (>>=), discard, (*>), (<>))
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
-  -- get host and port
-  base <- getCouchdbBaseURLWithCredentials
   -- get the post database
   post <- postDbName
   mbrokerService <- brokerService

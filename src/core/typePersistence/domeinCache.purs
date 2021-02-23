@@ -24,12 +24,8 @@ module Perspectives.DomeinCache
 
 where
 
-import Affjax (Request) as AX
-import Affjax.ResponseFormat as ResponseFormat
 import Control.Monad.Except (catchError, throwError)
-import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
@@ -47,7 +43,7 @@ import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
-import Perspectives.User (getCouchdbPassword, getSystemIdentifier, getUser)
+import Perspectives.User (getSystemIdentifier)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (<$>))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
@@ -138,20 +134,6 @@ getDomeinFileScreens (DomeinFile {_id}) = do
 -- | Remove the file from couchb. Removes the model from cache.
 removeDomeinFileFromCouchdb :: Namespace -> MonadPerspectives Unit
 removeDomeinFileFromCouchdb ns = removeEntiteit (DomeinFileId ns) *> pure unit
-
-domeinRequest :: MonadPerspectives (AX.Request String)
-domeinRequest = do
-  username <- getUser
-  password <- getCouchdbPassword
-  pure { method: Left GET
-  , url: "http://localhost:5984/models2model_SysteemDomein_"
-  , headers: []
-  , content: Nothing
-  , username: Just username
-  , password: Just password
-  , withCredentials: true
-  , responseFormat: ResponseFormat.string
-  }
 
 -----------------------------------------------------------
 -- CASCADING DELETION OF A DOMAINFILE
