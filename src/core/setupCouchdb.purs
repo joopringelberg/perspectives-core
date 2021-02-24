@@ -21,39 +21,14 @@
 
 module Perspectives.SetupCouchdb where
 
-import Affjax (put, Request)
-import Affjax.RequestBody as RequestBody
-import Affjax.ResponseFormat as ResponseFormat
-import Control.Monad.AvarMonadAsk (gets)
-import Control.Monad.Trans.Class (lift)
-import Data.Argonaut (fromString)
-import Data.Array (null)
-import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Effect.Aff (Aff, try)
-import Effect.Aff.Class (liftAff)
-import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (Password, SecurityDocument(..), User, View(..), onAccepted)
-import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, databaseExists, defaultPerspectRequest, ensureAuthentication, setSecurityDocument)
-import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb)
-import Perspectives.Persistent (entitiesDatabaseName, saveEntiteit_)
-import Perspectives.RunPerspectives (runPerspectives)
-import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
-import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (<>), (>>=))
-
------------------------------------------------------------
--- SETUPCOUCHDBFORFIRSTUSER
--- Notice: Requires Couchdb to be in partymode.
------------------------------------------------------------
-setupCouchdbForFirstUser :: String -> String -> String -> Int -> String -> Aff Unit
-setupCouchdbForFirstUser usr pwd host port publicRepo = do
-  -- TODO: genereer hier de systeemIdentifier als een guid.
-  runMonadCouchdb usr pwd usr host port (createFirstAdmin usr pwd)
-  setupPerspectivesInCouchdb usr pwd host port
-  runPerspectives usr pwd usr host port publicRepo do
-    getSystemIdentifier >>= createUserDatabases
-    void addUserToLocalUsers
-    entitiesDatabaseName >>= setRoleView
+import Effect.Aff (Aff)
+import Perspectives.Couchdb (SecurityDocument(..), User, View(..))
+import Perspectives.Couchdb.Databases (addViewToDatabase, databaseExists, ensureAuthentication, setSecurityDocument)
+import Perspectives.Persistence.API (MonadPouchdb, createDatabase, runMonadPouchdb, UserName, Password, Url, getSystemIdentifier)
+import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.User (getCouchdbBaseURL)
+import Prelude (Unit, bind, discard, not, pure, unit, ($), (<>), (>>=))
 
 -----------------------------------------------------------
 -- SETUPPERSPECTIVESINCOUCHDB
@@ -63,8 +38,8 @@ setupCouchdbForFirstUser usr pwd host port publicRepo = do
 -- |  * create system databases
 -- |  * initialize the local repository
 -- |  * create the database `localusers` and set its security document.
-setupPerspectivesInCouchdb :: String -> String -> String -> Int -> Aff Unit
-setupPerspectivesInCouchdb usr pwd host port = runMonadCouchdb usr pwd usr host port
+setupPerspectivesInCouchdb :: UserName -> Password -> Maybe Url -> Aff Unit
+setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couchdbUrl
   do
     isFirstUser <- databaseExists_ "localusers"
     if not isFirstUser
@@ -76,80 +51,38 @@ setupPerspectivesInCouchdb usr pwd host port = runMonadCouchdb usr pwd usr host 
         setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
       else pure unit
 
-databaseExists_ :: forall f. String -> MonadCouchdb f Boolean
+databaseExists_ :: forall f. String -> MonadPouchdb f Boolean
 databaseExists_ dbname = do
   base <- getCouchdbBaseURL
   databaseExists (base <> dbname)
 
 -----------------------------------------------------------
--- SETUPCOUCHDBFORANOTHERUSER
+-- CREATEPERSPECTIVESUSER
 -- Notice: Requires authentication.
 -----------------------------------------------------------
-setupCouchdbForAnotherUser :: String -> String -> String -> MonadPerspectives Unit
-setupCouchdbForAnotherUser usr pwd publicRepo = do
-  createAnotherAdmin usr pwd
-  host <- getHost
-  port <- getPort
-  void $ lift $ createAnotherPerspectivesUser usr pwd host port publicRepo
-
-createAnotherPerspectivesUser :: String -> String -> String -> Int -> String ->Aff CouchdbUser
-createAnotherPerspectivesUser usr pwd host port publicRepo =
+createPerspectivesUser :: UserName -> Password -> Maybe Url -> Aff Unit
+createPerspectivesUser usr pwd couchdbUrl =
   -- TODO: genereer hier de systeemIdentifier als een guid.
-  runPerspectives usr pwd usr host port publicRepo do
+  runMonadPouchdb usr pwd usr couchdbUrl do
     getSystemIdentifier >>= createUserDatabases
-    u <- addUserToLocalUsers
     entitiesDatabaseName >>= setRoleView
-    pure u
 
 -----------------------------------------------------------
 -- INITREPOSITORY
 -----------------------------------------------------------
 -- | Create a database "repository" and add a view to it to retrive the external roles of the ModelDescription instances.
-initRepository :: forall f. MonadCouchdb f Unit
+initRepository :: forall f. MonadPouchdb f Unit
 initRepository = do
   createDatabase "repository"
   setModelDescriptionsView
   setSecurityDocument "repository"
     (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
 
-
------------------------------------------------------------
--- ADDUSERTOLOCALUSERS
------------------------------------------------------------
-addUserToLocalUsers :: MonadPerspectives CouchdbUser
-addUserToLocalUsers = (gets _.userInfo) >>= \u@(CouchdbUser{userName}) -> saveEntiteit_ userName u
-
------------------------------------------------------------
--- CREATEFIRSTADMIN
--- Notice: no authentication. Requires Couchdb to be in party mode.
--- Assumes Couchdb to run on http://127.0.0.1:5984.
--- This function is no longer used in Perspectives.
------------------------------------------------------------
-createFirstAdmin :: forall f. User -> Password -> MonadCouchdb f Unit
-createFirstAdmin user password = do
-  base <- getCouchdbBaseURL
-  -- See http://docs.couchdb.org/en/2.1.1/api/server/configuration.html#api-config
-  res <- liftAff $ put ResponseFormat.string (base <> "_node/couchdb@localhost/_config/admins/" <> user) (RequestBody.json (fromString password))
-  onAccepted res.status [200] "createFirstAdmin"
-    $ pure unit
-
------------------------------------------------------------
--- CREATEANOTHERADMIN
--- Notice: requires authentication!
--- This function is no longer used in Perspectives.
------------------------------------------------------------
-createAnotherAdmin :: User -> Password -> MonadPerspectives Unit
-createAnotherAdmin user password = ensureAuthentication do
-  base <- getCouchdbBaseURL
-  (rq :: (Request String)) <- defaultPerspectRequest
-  res <- liftAff $ put ResponseFormat.string (base <> "_node/couchdb@localhost/_config/admins/" <> user) (RequestBody.json (fromString password))
-  liftAff $ onAccepted res.status [200] "createAnotherAdmin" $ pure unit
-
 -----------------------------------------------------------
 -- CREATESYSTEMDATABASES
 -- Notice: authentication required!
 -----------------------------------------------------------
-createSystemDatabases :: forall f. MonadCouchdb f Unit
+createSystemDatabases :: forall f. MonadPouchdb f Unit
 createSystemDatabases = do
   databaseExists_ "_users" >>= \exists -> if not exists then createDatabase "_users" else pure unit
   databaseExists_ "_replicator" >>= \exists -> if not exists then createDatabase "_replicator" else pure unit
@@ -159,7 +92,7 @@ createSystemDatabases = do
 -- CREATEUSERDATABASES
 -- Notice: authentication required!
 -----------------------------------------------------------
-createUserDatabases :: forall f. User -> MonadCouchdb f Unit
+createUserDatabases :: forall f. User -> MonadPouchdb f Unit
 createUserDatabases user = do
   createDatabase $ user <> "_entities"
   createDatabase $ user <> "_post"
@@ -169,22 +102,10 @@ createUserDatabases user = do
     (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
 
 -----------------------------------------------------------
--- PARTYMODE
------------------------------------------------------------
--- | PartyMode operationalized as Couchdb having no databases, or failing.
-partyMode :: String -> Int -> Aff Boolean
-partyMode host port = runMonadCouchdb "authenticator" "secret" "authenticator" host port
-  do
-    r <- try $ allDbs
-    case r of
-      Left _ -> pure false
-      Right dbs -> pure $ null dbs
-
------------------------------------------------------------
 -- THE VIEW 'MODELDESCRIPTIONS'
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
-setModelDescriptionsView :: forall f. MonadCouchdb f Unit
+setModelDescriptionsView :: forall f. MonadPouchdb f Unit
 setModelDescriptionsView = do
   addViewToDatabase "repository" "defaultViews" "modeldescriptions" (View {map: modelDescriptions, reduce: Nothing})
 
@@ -196,7 +117,7 @@ foreign import modelDescriptions :: String
 -- This view collects instances of a particular role type.
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
-setRoleView :: forall f. String -> MonadCouchdb f Unit
+setRoleView :: forall f. String -> MonadPouchdb f Unit
 setRoleView dbname = do
   addViewToDatabase dbname "defaultViews" "roleView" (View {map: roleView, reduce: Nothing})
 
@@ -207,7 +128,7 @@ foreign import roleView :: String
 -- This view collects instances of a particular role type, **from a particular context instance**.
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
-setRoleFromContextView :: forall f. String -> MonadCouchdb f Unit
+setRoleFromContextView :: forall f. String -> MonadPouchdb f Unit
 setRoleFromContextView dbname = do
   addViewToDatabase dbname "defaultViews" "roleFromContext" (View {map: roleFromContextView, reduce: Nothing})
 
@@ -219,7 +140,7 @@ foreign import roleFromContextView :: String
 -- This view collects instances model:System$Invitation$External.
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
-setPendingInvitationView :: forall f. String -> MonadCouchdb f Unit
+setPendingInvitationView :: forall f. String -> MonadPouchdb f Unit
 setPendingInvitationView dbname = do
   addViewToDatabase dbname "defaultViews" "pendingInvitations" (View {map: pendingInvitations, reduce: Nothing})
 
@@ -231,7 +152,7 @@ foreign import pendingInvitations :: String
 -- This view collects instances of a particular context type.
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
-setContextView :: forall f. String -> MonadCouchdb f Unit
+setContextView :: forall f. String -> MonadPouchdb f Unit
 setContextView dbname = do
   addViewToDatabase dbname "defaultViews" "contextView" (View {map: contextView, reduce: Nothing})
 

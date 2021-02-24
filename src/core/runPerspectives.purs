@@ -27,26 +27,27 @@ import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar, new)
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
-import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
+import Perspectives.CouchdbState (UserName(..))
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Prelude (bind, ($), (<>))
+import Prelude (bind, show, ($), (<>))
 
 -- | Run an action in MonadPerspectives, given a username and password.
 runPerspectives :: forall a. String -> String -> String -> String -> Int -> String -> MonadPerspectives a
   -> Aff a
 runPerspectives userName password systemId host port publicRepo mp = do
-  (av :: AVar String) <- new "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- new $
-    ((newPerspectivesState (CouchdbUser
-        { userName: UserName userName
+    ((newPerspectivesState
+        { _rev: Nothing
         , systemIdentifier: systemId
-        , _rev: Nothing})
+        , password
+        , couchdbUrl: Just (host <> ":" <> show port <> "/")
+        , userName: UserName userName
+        }
       host
       port
       password
-      publicRepo
-      av) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
+      publicRepo) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
   runReaderT mp rf
 
 runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a

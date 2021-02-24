@@ -34,24 +34,23 @@ import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
 import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
-import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase, setSecurityDocument)
-import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
+import Perspectives.Couchdb.Databases (deleteDatabase, setSecurityDocument)
+import Perspectives.CouchdbState (UserName(..)) as CDBstate
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
-import Perspectives.LocalAuthentication (AuthenticationResult(..))
-import Perspectives.LocalAuthentication (authenticate) as LA
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.API (PouchdbUser, createDatabase, UserName, Password, Url)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithState)
-import Perspectives.SetupCouchdb (createAnotherPerspectivesUser, setupPerspectivesInCouchdb)
+import Perspectives.SetupCouchdb (createPerspectivesUser, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=))
@@ -61,12 +60,12 @@ main :: Effect Unit
 main = runPDR
   "cor"
   "geheim"
-  (CouchdbUser
-    { userName: UserName "cor"
+  ( { _rev: Nothing
     , systemIdentifier: "cor"
-    , _rev: Nothing})
-  "http://127.0.0.1"
-  5984
+    , password: "geheim"
+    , couchdbUrl: Just "http://127.0.0.1:6984/"
+    ,userName: CDBstate.UserName "cor"
+    })
   "http://joopringelberg.nl/cbd/repository"
 -- main = parseFromCommandLine
 
@@ -74,17 +73,17 @@ main = runPDR
 -- While this is available, it is webpacked for usage in the browser and will not run from the command line
 -- (The PDR is not meant for command line usage).
 
+-- | To be called from the client.
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
-  -- TODO. Bewaar de fiber in state en kill om uit te loggen?
-runPDR :: String -> String -> CouchdbUser -> String -> Int -> String -> Effect Unit
-runPDR usr pwd couchdbUser host port publicRepo = void $ runAff handleError do
-  (av :: AVar String) <- new "This value will be removed on first authentication!"
-  state <- new $ newPerspectivesState couchdbUser
-    host
-    port
+-- | Implementation note: the PouchdbUser should have a couchdbUrl that terminates on a forward slash.
+runPDR :: UserName -> Password -> PouchdbUser -> Url -> Effect Unit
+runPDR usr pwd pouchdbUser publicRepo = void $ runAff handleError do
+  state <- new $ newPerspectivesState pouchdbUser
+    -- TODO. Deze twee waarden kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen.
+    "https://127.0.0.1"
+    6984
     pwd
     publicRepo
-    av
   runPerspectivesWithState (do
     void $ setupUser
     addAllExternalFunctions
@@ -105,33 +104,21 @@ handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)
 handleError (Right a) = pure unit
 
--- | The main entrance to the PDR for client programs. Runs the PDR on succesful login.
--- | When Couchdb is in Party Mode, initialises the first admin.
-authenticate :: String -> String -> String -> Int -> String -> (Int -> Effect Unit) -> Effect Unit
-authenticate usr pwd host port publicRepo callback = void $ runAff handler (LA.authenticate usr pwd host port)
-  where
-    handler :: Either Error AuthenticationResult -> Effect Unit
-    handler (Left e) = do
-      logPerspectivesError $ Custom $ "An error condition: " <> (show e)
-      callback 1
-    handler (Right r) = case r of
-      -- Not a valid system administrator for Couchdb.
-      WrongCredentials -> callback 0
-      -- System administrator, but not a Perspectives User. We'll make him one.
-      UnknownUser -> void $ runAff runWithUser do
-        -- There may not yet be another Perspectives user. If so, we need to set up
-        -- system databases etc.
-        setupPerspectivesInCouchdb usr pwd host port
-        createAnotherPerspectivesUser usr pwd host port publicRepo
-      -- System administrator and a Perspectives User.
-      OK couchdbUser -> runWithUser $ Right couchdbUser
-    runWithUser :: Either Error CouchdbUser -> Effect Unit
-    runWithUser (Left e) = do
-      logPerspectivesError $ Custom $ "Could not create another Perspectives user, because: " <> (show e)
-      callback 1
-    runWithUser (Right couchdbUser) = do
-      runPDR usr pwd couchdbUser host port publicRepo
-      callback 2
+-- | Call this function from the client to initialise the Persistence of Perspectives.
+-- | Implementation notes:
+-- |  1. we need credentials if Couchdb is the database backend.
+-- |  2. couchdbUrl should terminate on a forward slash.
+initialisePersistence :: UserName -> Password -> Maybe Url -> Effect Unit
+initialisePersistence userName password couchdbUrl = void $ runAff
+  handleError
+  (setupPerspectivesInCouchdb userName password couchdbUrl)
+
+-- | Implementation notes:
+-- |  1. couchdbUrl should terminate on a forward slash.
+createUser :: UserName -> Password -> Maybe Url -> Effect Unit
+createUser userName password couchdbUrl = void $ runAff
+  handleError
+  (createPerspectivesUser userName password couchdbUrl)
 
 -- | This is for development only! Assumes the user identifier equals the user name.
 resetAccount :: String -> String -> String -> Int -> String -> (Boolean -> Effect Unit) -> Effect Unit

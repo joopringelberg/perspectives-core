@@ -41,7 +41,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, rev)
-import Perspectives.CouchdbState (CouchdbUser, UserName)
+import Perspectives.CouchdbState (UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
@@ -156,14 +156,6 @@ instance cacheablePerspectRol :: Cacheable PerspectRol RoleInstance where
 
 instance cacheableDomeinFile :: Cacheable DomeinFile DomeinFileId where
   theCache = gets _.domeinCache
-  representInternally c = do
-    av <- liftAff empty
-    insert theCache (unwrap c) av
-  retrieveInternally i = lookup theCache (unwrap i)
-  removeInternally i = remove theCache (unwrap i)
-
-instance cacheableCouchdbUser :: Cacheable CouchdbUser UserName where
-  theCache = pure $ new unit
   representInternally c = do
     av <- liftAff empty
     insert theCache (unwrap c) av

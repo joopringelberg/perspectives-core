@@ -61,6 +61,7 @@ import Perspectives.Instances.Builders (createAndAddRoleInstance, constructConte
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getMyType, getRoleBinders, roleType, roleType_, siblings)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.API (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getRoleFunction, getRoleInstances)
@@ -76,7 +77,6 @@ import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, remo
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
-import Perspectives.User (getSystemIdentifier)
 import Prelude (Unit, bind, discard, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 -----------------------------------------------------------

@@ -44,11 +44,12 @@ import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstan
 import Perspectives.Instances.Combinators (filter, disjunction)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.Names (getUserIdentifier)
+import Perspectives.Persistence.API (getSystemIdentifier)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNA
-import Perspectives.User (getCouchdbBaseURL, getHost, getPort, getSystemIdentifier)
+import Perspectives.User (getCouchdbBaseURL, getHost, getPort)
 import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>), (>>=))
 
 -- | Create a new database for the communication between `me` and another user.

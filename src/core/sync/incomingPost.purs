@@ -46,7 +46,6 @@ incomingPost = do
   -- get the post database
   post <- postDbName
   -- Create an EventSource
-  -- TODO: Geef credentials mee.
   (es :: EventSource) <- liftEffect $ createEventSource (base <> post) Nothing true
   -- Save in state, so we can close it.
   void $ modify \s -> s {post = Just es}

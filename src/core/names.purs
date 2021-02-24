@@ -29,7 +29,7 @@ import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isQualifiedWithDomein)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.User (getSystemIdentifier)
+import Perspectives.Persistence.API (getSystemIdentifier)
 import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------

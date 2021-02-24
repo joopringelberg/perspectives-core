@@ -29,10 +29,10 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff, message)
 import Perspectives.Couchdb.Databases (getDocument)
-import Perspectives.CouchdbState (CouchdbUser, runMonadCouchdb)
+import Perspectives.CouchdbState (UserInfo, runMonadCouchdb)
 import Prelude (pure, bind, ($), (==), class Eq, class Show, (<$>))
 
-data AuthenticationResult = UnknownUser | WrongCredentials | OK CouchdbUser
+data AuthenticationResult = UnknownUser | WrongCredentials | OK UserInfo
 
 derive instance genericRepAuthenticationResult :: Generic AuthenticationResult _
 
@@ -43,14 +43,14 @@ instance eqAuthenticationResult :: Eq AuthenticationResult where
   eq = genericEq
 
 -- | We authenticate by retrieving the Perspectives CouchdbUser document with the given user name.
-authenticate :: String -> String -> String -> Int -> Aff AuthenticationResult
-authenticate usr pwd host port = do
-  result <- catchJust
-    (\e -> if message e ==  "UNAUTHORIZED" then Just "UNAUTHORIZED" else Nothing)
-    (Right <$> runMonadCouchdb usr pwd "" host port (getDocument "localusers" usr))
-    (\_ -> pure $ Left WrongCredentials)
-  case result of
-    Left _ -> pure WrongCredentials
-    Right muser -> case muser of
-      Nothing -> pure UnknownUser
-      Just cdbu -> pure $ OK cdbu
+-- authenticate :: String -> String -> String -> Int -> Aff AuthenticationResult
+-- authenticate usr pwd host port = do
+--   result <- catchJust
+--     (\e -> if message e ==  "UNAUTHORIZED" then Just "UNAUTHORIZED" else Nothing)
+--     (Right <$> runMonadCouchdb usr pwd "" host port (getDocument "localusers" usr))
+--     (\_ -> pure $ Left WrongCredentials)
+--   case result of
+--     Left _ -> pure WrongCredentials
+--     Right muser -> case muser of
+--       Nothing -> pure UnknownUser
+--       Just cdbu -> pure $ OK cdbu

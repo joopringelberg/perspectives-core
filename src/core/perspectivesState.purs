@@ -27,14 +27,14 @@ import Effect.Aff.AVar (AVar)
 import Foreign.Object (empty)
 import Perspectives.AMQP.Stomp (StompClient)
 import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState, BrokerService)
-import Perspectives.CouchdbState (CouchdbUser)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
-import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void, (+), (<>), show)
+import Perspectives.Persistence.API (PouchdbUser)
+import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void, (+))
 
-newPerspectivesState :: CouchdbUser -> String -> Int -> String -> String -> AVar String -> PerspectivesState
-newPerspectivesState uinfo host port password publicRepo av =
+newPerspectivesState :: PouchdbUser -> String -> Int -> String -> String -> PerspectivesState
+newPerspectivesState uinfo host port password publicRepo =
   { rolInstances: new unit
   , contextInstances: new unit
   , domeinCache: new unit
@@ -47,7 +47,6 @@ newPerspectivesState uinfo host port password publicRepo av =
   , couchdbHost: host -- For synchronising via a Couchdb Channel database
   , couchdbPort: port
   , couchdbPassword: password
-  , couchdbSessionStarted: false
   , indexedRoles: empty
   , indexedContexts: empty
   , post: Nothing
@@ -57,18 +56,11 @@ newPerspectivesState uinfo host port password publicRepo av =
   , stompClient: Nothing
   , databases: empty
   -- , couchdbUrl: Nothing -- For using Couchdb as backend for Pouchdb.
-  , couchdbUrl: Just $ host <> ":" <> (show port)
   }
 
 -----------------------------------------------------------
 -- FUNCTIONS THAT GET OR MODIFY PARTS OF PERSPECTIVESSTATE
 -----------------------------------------------------------
-couchdbSessionStarted :: MonadPerspectives Boolean
-couchdbSessionStarted = gets _.couchdbSessionStarted
-
-setCouchdbSessionStarted :: Boolean -> MonadPerspectives Unit
-setCouchdbSessionStarted b = modify \ps -> ps {couchdbSessionStarted = b}
-
 domeinCache :: MonadPerspectives DomeinCache
 domeinCache = gets _.domeinCache
 

@@ -27,7 +27,7 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (class MonadError, runExcept)
-import Control.Monad.Reader (ReaderT, lift)
+import Control.Monad.Reader (ReaderT, lift, runReaderT)
 import Control.Promise (Promise, toAff)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -37,17 +37,17 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect (Effect)
 import Effect.AVar (AVar)
 import Effect.Aff (Aff, Error, catchError, error, message, throwError)
+import Effect.Aff.AVar (new)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, runEffectFn1, runEffectFn2, runEffectFn3)
 import Foreign (Foreign, MultipleErrors)
 import Foreign.Class (class Decode, class Encode, decode, encode)
-import Foreign.Object (Object, insert, lookup)
+import Foreign.Object (Object, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), PutCouchdbDocument(..), handleError)
 import Perspectives.Couchdb.Databases as CDB
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev, rev)
-import Perspectives.CouchdbState (CouchdbState)
-import Perspectives.User (getCouchdbBaseURL)
+import Perspectives.CouchdbState (UserName(..)) as CDBstate
 import Simple.JSON (read, readImpl, readJSON')
 
 -----------------------------------------------------------
@@ -56,16 +56,39 @@ import Simple.JSON (read, readImpl, readJSON')
 foreign import data PouchdbDatabase :: Type
 
 -----------------------------------------------------------
+-- ALIASES
+-----------------------------------------------------------
+type UserName = String
+type Password = String
+type SystemIdentifier = String
+type Url = String
+
+-----------------------------------------------------------
 -- POUCHDBSTATE
 -----------------------------------------------------------
-type PouchdbState f = CouchdbState
-  ( databases :: Object PouchdbDatabase
-  , couchdbUrl :: Maybe CouchdbUrl
-  | f)
+type PouchdbState f =
+  { userInfo :: PouchdbUser
+  , databases :: Object PouchdbDatabase
+
+	-- TODO. De volgende drie kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen:
+  , couchdbPassword :: String
+  , couchdbHost :: String
+  , couchdbPort :: Int
+  | f}
+
+type PouchdbUser =
+  { _rev :: Maybe String
+  , systemIdentifier :: String
+  , password :: String
+  , couchdbUrl :: Maybe String
+
+  -- TODO. Te verwijderen zodra Perspectives.Persistence.API alles heeft overgenomen.
+  -- We do not need the UserName value in the core, as long as we have the systemIdentifier.
+  , userName :: CDBstate.UserName
+  }
 
 type PouchdbExtraState f =
   ( databases :: Object PouchdbDatabase
-  , couchdbUrl :: Maybe CouchdbUrl
   | f)
 
 type CouchdbUrl = String
@@ -74,6 +97,31 @@ type CouchdbUrl = String
 -- MONADPOUCHDB
 -----------------------------------------------------------
 type MonadPouchdb f = ReaderT (AVar (PouchdbState f)) Aff
+
+-----------------------------------------------------------
+-- RUNMONADPOUCHDB
+-----------------------------------------------------------
+-- | Run an action in MonadCouchdb, given a username and password etc.
+-- | Its primary use is in addAttachment_ (to add an attachment using the default "admin" account).
+runMonadPouchdb :: forall a. UserName -> Password -> SystemIdentifier -> Maybe Url -> MonadPouchdb () a
+  -> Aff a
+runMonadPouchdb userName password systemId couchdbUrl mp = do
+  (rf :: AVar (PouchdbState ())) <- new $
+    { userInfo:
+      { systemIdentifier: systemId
+      , password
+      , couchdbUrl
+      -- compat:
+      , _rev: Nothing
+      , userName: CDBstate.UserName userName
+    }
+    , databases: empty
+    -- compat
+    , couchdbPassword: password
+    , couchdbHost: "https://127.0.0.1"
+    , couchdbPort: 6984
+  }
+  runReaderT mp rf
 
 -----------------------------------------------------------
 -- POUCHERROR
@@ -92,6 +140,16 @@ readPouchError s = runExcept do
   inter <- readJSON' s
   error <- Left <$> readImpl inter.error <|> Right <$> readImpl inter.error
   pure inter {error = error}
+
+-----------------------------------------------------------
+-- STATE UTILITIES
+-----------------------------------------------------------
+getSystemIdentifier :: forall f. MonadPouchdb f String
+getSystemIdentifier = gets $ _.userInfo >>> _.systemIdentifier
+
+-- | Url terminated with a forward slash.
+getCouchdbBaseURL :: forall f. MonadPouchdb f (Maybe Url)
+getCouchdbBaseURL = gets $ _.userInfo >>> _.couchdbUrl
 
 -----------------------------------------------------------
 -- CREATE DATABASE
@@ -120,7 +178,7 @@ createDatabase' dbname = if startsWithDatabaseEndpoint dbname
     pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
     modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
   else do
-    mprefix <- gets _.couchdbUrl
+    mprefix <- gets (_.userInfo >>> _.couchdbUrl)
     case mprefix of
       Nothing -> do
         pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)

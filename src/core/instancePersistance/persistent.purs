@@ -69,13 +69,12 @@ import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb.Databases (documentExists, ensureAuthentication, getDocumentFromUrl, retrieveDocumentVersion)
-import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Persistence.API (addDocument, deleteDocument, getDocument)
+import Perspectives.Persistence.API (MonadPouchdb, addDocument, deleteDocument, getDocument, getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
+import Perspectives.User (getCouchdbBaseURL)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   database :: i -> MP String
@@ -108,14 +107,6 @@ instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId wher
     sysId <- getSystemIdentifier
     pure $ sysId <> "_models"
 
-instance persistentCouchdbUser :: Persistent CouchdbUser UserName where
-  database _ = do
-    cdbUrl <- getCouchdbBaseURL
-    pure $ cdbUrl <> "localusers/"
-  dbLocalName _ = do
-    sysId <- getSystemIdentifier
-    pure $ sysId <> "localusers"
-
 getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
   do
@@ -126,10 +117,10 @@ getPerspectEntiteit id =
         pure pe
       Nothing -> fetchEntiteit id
 
-entitiesDatabaseName :: MonadPerspectives String
+entitiesDatabaseName :: forall f. MonadPouchdb f String
 entitiesDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_entities/")
 
-postDatabaseName :: MonadPerspectives String
+postDatabaseName :: forall f. MonadPouchdb f String
 postDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_post/")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
