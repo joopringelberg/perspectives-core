@@ -33,6 +33,12 @@ module.exports = {
       commonjs2: "url",
       amd: "url",
       root: "url"
+    },
+    "pouchdb-browser": {
+      commonjs: "pouchdb-browser",
+      commonjs2: "pouchdb-browser",
+      amd: "pouchdb-browser",
+      root: "pouchdb-browser"
     }
   }
 };

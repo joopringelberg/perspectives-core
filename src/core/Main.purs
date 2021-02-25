@@ -28,8 +28,9 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (fst)
 import Effect (Effect)
-import Effect.Aff (Error, catchError, forkAff, joinFiber, runAff, try)
-import Effect.Aff.AVar (AVar, new)
+import Effect.Aff (Error, catchError, error, forkAff, joinFiber, runAff, throwError, try)
+import Effect.Aff.AVar (new)
+import Foreign (Foreign)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
@@ -44,7 +45,7 @@ import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (PouchdbUser, createDatabase, UserName, Password, Url)
+import Perspectives.Persistence.API (Password, PouchdbUser, PouchdbUser', Url, UserName, createDatabase, decodePouchdbUser', encodePouchdbUser')
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
@@ -55,18 +56,24 @@ import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=))
 
--- | Runs the PDR with default credentials. Used for testing clients without authentication.
+-- | Don't do anything. runPDR will actually start the core.
 main :: Effect Unit
-main = runPDR
-  "cor"
-  "geheim"
-  ( { _rev: Nothing
-    , systemIdentifier: "cor"
-    , password: "geheim"
-    , couchdbUrl: Just "http://127.0.0.1:6984/"
-    ,userName: CDBstate.UserName "cor"
-    })
-  "http://joopringelberg.nl/cbd/repository"
+main = pure unit
+
+-- | For testing, uncomment this version of main.
+-- | Runs the PDR with default credentials.
+-- main :: Effect Unit
+-- main = runPDR
+--   "cor"
+--   "geheim"
+--   (encodePouchdbUser'
+--     { _rev: Nothing
+--       , systemIdentifier: "cor"
+--       , password: "geheim"
+--       , couchdbUrl: Just "http://127.0.0.1:6984/"
+--       -- ,userName: CDBstate.UserName "cor"
+--       })
+  -- "http://joopringelberg.nl/cbd/repository"
 -- main = parseFromCommandLine
 
 -- NOTE: For release v0.1.0, I've commented out the original main function because it requires the perspectivesproxy
@@ -76,29 +83,38 @@ main = runPDR
 -- | To be called from the client.
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
 -- | Implementation note: the PouchdbUser should have a couchdbUrl that terminates on a forward slash.
-runPDR :: UserName -> Password -> PouchdbUser -> Url -> Effect Unit
-runPDR usr pwd pouchdbUser publicRepo = void $ runAff handleError do
-  state <- new $ newPerspectivesState pouchdbUser
-    -- TODO. Deze twee waarden kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen.
-    "https://127.0.0.1"
-    6984
-    pwd
-    publicRepo
-  runPerspectivesWithState (do
-    void $ setupUser
-    addAllExternalFunctions
-    addIndexedNames
-    retrieveBrokerService)
-    state
-  void $ forkAff $ forever do
-    apiFiber <- forkAff $ runPerspectivesWithState setupApi state
-    catchError (joinFiber apiFiber)
-      \e -> do
-        logPerspectivesError $ Custom $ "API stopped and restarted because of: " <> show e
-  postFiber <- forkAff $ runPerspectivesWithState incomingPost state
-  catchError (joinFiber postFiber)
-    \e -> do
-      logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
+runPDR :: UserName -> Password -> Foreign -> Url -> Effect Unit
+runPDR usr pwd rawPouchdbUser publicRepo = void $ runAff handleError do
+  case decodePouchdbUser' rawPouchdbUser of
+    Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
+    Right (pdbu :: PouchdbUser'()) -> do
+      (pouchdbUser :: PouchdbUser) <- pure
+        { _rev: pdbu._rev
+        , systemIdentifier: pdbu.systemIdentifier
+        , password: pdbu.password
+        , couchdbUrl: pdbu.couchdbUrl
+        , userName: CDBstate.UserName usr}
+      state <- new $ newPerspectivesState pouchdbUser
+        -- TODO. Deze twee waarden kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen.
+        "https://localhost"
+        6984
+        pwd
+        publicRepo
+      runPerspectivesWithState (do
+        void $ setupUser
+        addAllExternalFunctions
+        addIndexedNames
+        retrieveBrokerService)
+        state
+      void $ forkAff $ forever do
+        apiFiber <- forkAff $ runPerspectivesWithState setupApi state
+        catchError (joinFiber apiFiber)
+          \e -> do
+            logPerspectivesError $ Custom $ "API stopped and restarted because of: " <> show e
+      postFiber <- forkAff $ runPerspectivesWithState incomingPost state
+      catchError (joinFiber postFiber)
+        \e -> do
+          logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)

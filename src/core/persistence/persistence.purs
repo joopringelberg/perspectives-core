@@ -48,7 +48,7 @@ import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), PutCouchdb
 import Perspectives.Couchdb.Databases as CDB
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev, rev)
 import Perspectives.CouchdbState (UserName(..)) as CDBstate
-import Simple.JSON (read, readImpl, readJSON')
+import Simple.JSON (read, readImpl, readJSON', write, E)
 
 -----------------------------------------------------------
 -- POUCHDBDATABASE
@@ -76,15 +76,16 @@ type PouchdbState f =
   , couchdbPort :: Int
   | f}
 
-type PouchdbUser =
+
+-- TODO. Te verwijderen zodra Perspectives.Persistence.API alles heeft overgenomen.
+-- We do not need the UserName value in the core, as long as we have the systemIdentifier.
+type PouchdbUser = PouchdbUser' (userName :: CDBstate.UserName)
+type PouchdbUser' f =
   { _rev :: Maybe String
   , systemIdentifier :: String
   , password :: String
   , couchdbUrl :: Maybe String
-
-  -- TODO. Te verwijderen zodra Perspectives.Persistence.API alles heeft overgenomen.
-  -- We do not need the UserName value in the core, as long as we have the systemIdentifier.
-  , userName :: CDBstate.UserName
+  | f
   }
 
 type PouchdbExtraState f =
@@ -93,6 +94,11 @@ type PouchdbExtraState f =
 
 type CouchdbUrl = String
 
+decodePouchdbUser' :: Foreign -> E (PouchdbUser'())
+decodePouchdbUser' = read
+
+encodePouchdbUser' :: PouchdbUser'() -> Foreign
+encodePouchdbUser' = write
 -----------------------------------------------------------
 -- MONADPOUCHDB
 -----------------------------------------------------------
@@ -278,12 +284,6 @@ addNameAndVersion = runEffectFn3 addNameAndVersionHack
 -----------------------------------------------------------
 -- DELETE DOCUMENT
 -----------------------------------------------------------
--- OBSOLETE. CDB.deleteDocument is not used anywhere in the core anymore.
-deleteDocument_old :: forall f. DatabaseName -> CDB.DocumentName -> Revision_ -> MonadPouchdb f Boolean
-deleteDocument_old dbName docName rev = do
-  base <- getCouchdbBaseURL
-  CDB.deleteDocument (base <> dbName <> "/" <> docName) rev
-
 foreign import deleteDocumentImpl :: EffectFn3
   PouchdbDatabase
   CDB.DocumentName
