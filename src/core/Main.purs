@@ -137,6 +137,7 @@ createUser userName password couchdbUrl = void $ runAff
   (createPerspectivesUser userName password couchdbUrl)
 
 -- | This is for development only! Assumes the user identifier equals the user name.
+-- TODO. Als Perspectives.Persistence.API alles heeft overgenomen, kunnen we hier een PouchdbUser meegeven.
 resetAccount :: String -> String -> String -> Int -> String -> (Boolean -> Effect Unit) -> Effect Unit
 resetAccount usr pwd host port publicRepo callback = void $ runAff handler (runPerspectives usr pwd usr host port publicRepo do
   -- Get all Channels

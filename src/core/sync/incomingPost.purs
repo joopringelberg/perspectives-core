@@ -31,8 +31,7 @@ import Effect.Class (liftEffect)
 import Foreign (MultipleErrors)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesExtraState)
 import Perspectives.Couchdb.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
-import Perspectives.Couchdb.Databases (deleteDocument_)
-import Perspectives.Persistence.API (PouchdbExtraState)
+import Perspectives.Persistence.API (PouchdbExtraState, deleteDocument)
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
@@ -63,5 +62,5 @@ incomingPost = do
         Right (Tuple _ Nothing) -> pure unit
         Right (Tuple id (Just t)) -> do
           -- Delete the document
-          _ <- lift $ deleteDocument_ database id
+          _ <- lift $ deleteDocument database id Nothing
           lift $ executeTransaction t

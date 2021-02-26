@@ -83,7 +83,7 @@ type PouchdbUser = PouchdbUser' (userName :: CDBstate.UserName)
 type PouchdbUser' f =
   { _rev :: Maybe String
   , systemIdentifier :: String
-  , password :: String
+  , password :: String -- Maybe String om met IndexedDB rekening te houden?
   , couchdbUrl :: Maybe String
   | f
   }
@@ -158,11 +158,16 @@ getCouchdbBaseURL :: forall f. MonadPouchdb f (Maybe Url)
 getCouchdbBaseURL = gets $ _.userInfo >>> _.couchdbUrl
 
 -----------------------------------------------------------
+-- DOCUMENTWITHREVISION
+-----------------------------------------------------------
+type DocumentWithRevision = {_rev :: Maybe String}
+
+-----------------------------------------------------------
 -- CREATE DATABASE
 -----------------------------------------------------------
 -- Database names must comply to rules given in https://docs.couchdb.org/en/stable/api/database/common.html#db
-createDatabase :: forall f. DatabaseName -> MonadPouchdb f Unit
-createDatabase = CDB.createDatabase
+createDatabase_old :: forall f. DatabaseName -> MonadPouchdb f Unit
+createDatabase_old = CDB.createDatabase
 
 foreign import createDatabaseImpl :: EffectFn1
   String
@@ -178,8 +183,8 @@ foreign import createRemoteDatabaseImpl :: EffectFn2
 -- | If PouchdbState contains a couchdbUrl, creates a database on that endpoint.
 -- | If dbname is a full url, creates a database on that endpoint.
 -- | Ensures authentication.
-createDatabase' :: forall f. DatabaseName -> MonadPouchdb f Unit
-createDatabase' dbname = if startsWithDatabaseEndpoint dbname
+createDatabase :: forall f. DatabaseName -> MonadPouchdb f Unit
+createDatabase dbname = if startsWithDatabaseEndpoint dbname
   then do
     pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
     modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
@@ -209,7 +214,7 @@ ensureDatabase dbName = do
   mdb <- gets \{databases} -> lookup dbName databases
   case mdb of
     Nothing -> do
-      createDatabase' dbName
+      createDatabase dbName
       gets \{databases} -> unsafePartial $ fromJust $ lookup dbName databases
     Just db -> pure db
 
@@ -309,7 +314,7 @@ deleteDocument dbName docName mrev = case mrev of
               Nothing -> pure false
         -- Promise rejected. Convert the incoming message to a PouchError type.
         (handlePouchError "deleteDocument")
-  Nothing -> pure true
+  Nothing -> retrieveDocumentVersion dbName docName >>= deleteDocument dbName docName
 
 -----------------------------------------------------------
 -- GET DOCUMENT
@@ -318,6 +323,7 @@ deleteDocument dbName docName mrev = case mrev of
 -- | Authentication ensured.
 -- TODO. Zolang we de generic encode gebruiken die een tagged versie oplevert zonder _id en _rev members,
 -- moeten we de _rev van de entiteit overschrijven met die van de envelope.
+-- Zodra dat niet meer nodig is, kunnen we getDocument vervangen door getDocument_
 getDocument :: forall d f. Revision d => Decode d => DatabaseName -> CDB.DocumentName -> MonadPouchdb f d
 getDocument dbName docName = withDatabase dbName
   \db -> do
@@ -335,7 +341,35 @@ getDocument dbName docName = withDatabase dbName
           Right result -> pure result
       (handlePouchError "getDocument")
 
+-- | Similar to getDocument_ but without the requirement that the resulting document is an instance of Revision.
+getDocument_ :: forall d f. Decode d => DatabaseName -> CDB.DocumentName -> MonadPouchdb f d
+getDocument_ dbName docName = withDatabase dbName
+  \db -> do
+    prom <- liftEffect $ runEffectFn2 getDocumentImpl db docName
+    catchError
+      do
+        f <- lift $ toAff prom
+        case runExcept $ decode f of
+          Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
+          Right result -> pure result
+      (handlePouchError "getDocument")
+
 foreign import getDocumentImpl :: EffectFn2
   PouchdbDatabase
   CDB.DocumentName
   (Promise Foreign)
+
+-----------------------------------------------------------
+-- DOCUMENT VERSION
+-----------------------------------------------------------
+retrieveDocumentVersion :: forall f. DatabaseName -> CDB.DocumentName -> MonadPouchdb f (Maybe String)
+retrieveDocumentVersion dbName docName = withDatabase dbName
+  \db -> do
+    prom <- liftEffect $ runEffectFn2 getDocumentImpl db docName
+    catchError
+      do
+        f <- lift $ toAff prom
+        case read f of
+          Left e -> throwError $ error ("retrieveDocumentVersion : error in decoding result: " <> show e)
+          Right (a :: DocumentWithRevision) -> pure a._rev
+      (handlePouchError "getDocument")

@@ -38,13 +38,13 @@ import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, MPT, (##=), (##>), (##>>), type (~~>))
 import Perspectives.Couchdb (selectOnFieldEqual, selectOnFieldNotEqual)
-import Perspectives.Couchdb.Databases (createDatabase, deleteDocument_, endReplication, ensureAuthentication, replicateContinuously)
+import Perspectives.Couchdb.Databases (endReplication, ensureAuthentication, replicateContinuously)
 import Perspectives.Guid (guid)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, disjunction)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.Names (getUserIdentifier)
-import Perspectives.Persistence.API (getSystemIdentifier)
+import Perspectives.Persistence.API (createDatabase, deleteDocument, getSystemIdentifier)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
@@ -284,7 +284,7 @@ endChannelReplication channel = do
     Just (Value channelId) -> do
       r <- try do
         void $ endReplication channelId post
-        void $ deleteDocument_ "_replicator" channelId
+        void $ deleteDocument "_replicator" channelId Nothing
       case r of
         Left e -> log $ show e
         Right _ -> pure unit

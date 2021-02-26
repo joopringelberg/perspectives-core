@@ -43,7 +43,6 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
 import Perspectives.CollectAffectedContexts (lift2)
@@ -51,7 +50,7 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, chan
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (DocWithAttachmentInfo(..))
-import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, addDocument, getAttachmentFromUrl, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, getViewOnDatabase_, retrieveDocumentVersion)
+import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, getAttachmentFromUrl, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, getViewOnDatabase_, retrieveDocumentVersion)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
@@ -66,7 +65,7 @@ import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (getDocument, getSystemIdentifier)
+import Perspectives.Persistence.API (addDocument, getDocument, getSystemIdentifier)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
@@ -360,7 +359,7 @@ uploadToRepository_ dfId url df = lift $ lift $ do
     Just (DocWithAttachmentInfo {_attachments}) -> traverseWithIndex (\attName {content_type} -> Tuple (MediaType content_type) <$> getDocumentAsStringFromUrl (docUrl <> "/" <> attName)) _attachments
   -- Get the revision (if any) from the local database, so we can overwrite.
   mVersion <- retrieveDocumentVersion docUrl
-  res <- addDocument url (encodeJSON (changeRevision mVersion df)) (show dfId)
+  res <- addDocument url (changeRevision mVersion df) (show dfId)
   -- Now add the attachments.
   forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
     Nothing -> pure unit

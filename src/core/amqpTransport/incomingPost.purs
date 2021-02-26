@@ -35,10 +35,11 @@ import Foreign.Generic (encodeJSON)
 import Perspectives.AMQP.Stomp (StructuredMessage, acknowledge, createStompClient, messageProducer, sendToTopic)
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, BrokerService, (##>))
-import Perspectives.Couchdb.Databases (deleteDocument_, documentNamesInDatabase, getDocument)
+import Perspectives.Couchdb.Databases (documentNamesInDatabase)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty, getRoleBinders)
 import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Persistence.API (deleteDocument, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (brokerService, setBrokerService, setStompClient, stompClient)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
@@ -82,7 +83,7 @@ incomingPost = do
           Left me -> case head me of
             ForeignError "noConnection" -> lift $ setConnectionState false
             ForeignError "connection" -> lift $ setConnectionState true *> sendOutgoingPost
-            TypeMismatch "receipt" docId -> void $ lift $ deleteDocument_ postDB docId
+            TypeMismatch "receipt" docId -> void $ lift $ deleteDocument postDB docId Nothing
             otherwise -> log ("Perspectives.AMQP.IncomingPost.transactionConsumer: " <> show me)
           Right {body, ack} -> do
             lift $ executeTransaction body
@@ -102,7 +103,7 @@ incomingPost = do
       mstompClient <- stompClient
       case mstompClient of
         Just stompClient -> for_ waitingTransactions \tname -> do
-          mdoc <- getDocument postDB tname
+          mdoc <- getDocument_ postDB tname
           case mdoc of
             Just (OutgoingTransaction{receiver, transaction}) -> do
               liftEffect $ sendToTopic stompClient receiver tname (encodeJSON transaction)
