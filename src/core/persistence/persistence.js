@@ -60,3 +60,9 @@ exports.getDocumentImpl = function( database, docName )
 {
   return database.get( docName ).catch( convertPouchError );
 }
+
+// db.putAttachment(docId, attachmentId, [rev], attachment, type, [callback]);
+exports.addAttachmentImpl = function( database, docName, attachmentId, mrev, attachment, type)
+{
+  return database.putAttachment(docName, attachmentId, mrev, btoa(attachment), type).catch( convertPouchError );
+}

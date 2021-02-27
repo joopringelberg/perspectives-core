@@ -50,8 +50,8 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, chan
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (DocWithAttachmentInfo(..))
-import Perspectives.Couchdb.Databases (addAttachment, addAttachmentToUrl, getAttachmentFromUrl, getAttachmentsFromUrl, getDocumentAsStringFromUrl, getViewOnDatabase, getViewOnDatabase_, retrieveDocumentVersion)
-import Perspectives.Couchdb.Revision (changeRevision)
+import Perspectives.Couchdb.Databases (addAttachmentToUrl, getAttachment, getAttachmentFromUrl, getAttachmentsFromUrl, getViewOnDatabase, getViewOnDatabase_)
+import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, SeparateInvertedQuery(..))
@@ -65,7 +65,7 @@ import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addDocument, getDocument, getSystemIdentifier)
+import Perspectives.Persistence.API (addAttachment, addDocument, getDocument, getSystemIdentifier, retrieveDocumentVersion)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
@@ -103,7 +103,7 @@ models _ = ArrayT do
         pure _id
 
 modelsDatabaseName :: MonadPerspectives String
-modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models/")
+modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models")
 
 -- | Retrieves all instances of a particular role type from Couchdb.
 -- | For example: `user: Users = callExternal cdb:RoleInstances("model:System$PerspectivesSystem$User") returns: model:System$PerspectivesSystem$User`
@@ -161,7 +161,7 @@ addModelToLocalStore' url = do
           -- Store the model in Couchdb, if none exists in cache or in the database.
           -- Remove the revision before saving: it belongs to the repository,
           -- not the local perspect_models.
-          save (identifier df :: DomeinFileId) (changeRevision Nothing df)
+          revision <- save (identifier df :: DomeinFileId) (changeRevision Nothing df)
 
           -- Add replacements to PerspectivesState for the new indexed names introduced in this model,
           -- unless we find existing ones left over from a previous installation of the model.
@@ -253,7 +253,7 @@ addModelToLocalStore' url = do
                   lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
 
           -- Copy the attachment
-          lift $ lift $ addA url _id
+          lift $ lift $ addA url _id revision
   where
 
     addInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
@@ -305,25 +305,26 @@ addModelToLocalStore' url = do
         else void $ lift $ saveEntiteit_ (RoleInstance i) a
 
     -- Safes the entity, unless a version exists in cache or in the database.
-    save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
+    save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Revision_
     save i a = lift $ lift do
       mexistingContext <- tryGetPerspectEntiteit i
       case mexistingContext of
         Nothing -> do
           void $ cacheEntity i a
           -- updateRevision i
-          void $ saveEntiteit i
-        otherwise -> pure unit
+          e <- saveEntiteit i
+          pure $ rev e
+        Just e -> pure $ rev e
 
     -- url is the path to the document in the repository.
-    addA :: String -> String -> MP Unit
-    addA url' modelName = do
+    addA :: String -> String -> Revision_ -> MP Unit
+    addA url' modelName rev = do
       mAttachment <- getAttachmentFromUrl url' "screens.js"
       case mAttachment of
         Nothing -> pure unit
         Just attachment -> do
           perspect_models <- modelsDatabaseName
-          void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
+          void $ addAttachment perspect_models modelName rev "screens.js" attachment (MediaType "text/ecmascript")
           updateRevision (DomeinFileId modelName)
 
     repository :: String -> MonadPerspectivesTransaction String
@@ -356,9 +357,11 @@ uploadToRepository_ dfId url df = lift $ lift $ do
   (atts :: Maybe DocWithAttachmentInfo) <- getAttachmentsFromUrl docUrl
   attachments <- case atts of
     Nothing -> pure empty
-    Just (DocWithAttachmentInfo {_attachments}) -> traverseWithIndex (\attName {content_type} -> Tuple (MediaType content_type) <$> getDocumentAsStringFromUrl (docUrl <> "/" <> attName)) _attachments
+    Just (DocWithAttachmentInfo {_attachments}) -> traverseWithIndex
+      (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment docUrl attName)
+      _attachments
   -- Get the revision (if any) from the local database, so we can overwrite.
-  mVersion <- retrieveDocumentVersion docUrl
+  (mVersion :: Maybe String) <- retrieveDocumentVersion url (show dfId)
   res <- addDocument url (changeRevision mVersion df) (show dfId)
   -- Now add the attachments.
   forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of

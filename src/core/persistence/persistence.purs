@@ -31,6 +31,8 @@ import Control.Monad.Reader (ReaderT, lift, runReaderT)
 import Control.Promise (Promise, toAff)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.MediaType (MediaType)
+import Data.Nullable (Nullable, toNullable)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -39,7 +41,7 @@ import Effect.AVar (AVar)
 import Effect.Aff (Aff, Error, catchError, error, message, throwError)
 import Effect.Aff.AVar (new)
 import Effect.Class (liftEffect)
-import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, runEffectFn1, runEffectFn2, runEffectFn3)
+import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn6, runEffectFn1, runEffectFn2, runEffectFn3, runEffectFn6)
 import Foreign (Foreign, MultipleErrors)
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Foreign.Object (Object, empty, insert, lookup)
@@ -62,6 +64,8 @@ type UserName = String
 type Password = String
 type SystemIdentifier = String
 type Url = String
+type DocumentName = String
+type AttachmentName = String
 
 -----------------------------------------------------------
 -- POUCHDBSTATE
@@ -178,7 +182,6 @@ foreign import createRemoteDatabaseImpl :: EffectFn2
   CouchdbUrl
   PouchdbDatabase
 
--- TODO: this function is ready to replace CDB.createDatabase.
 -- | Creates a new Pouchdb db object and adds it to PouchdbState with the given name as key.
 -- | If PouchdbState contains a couchdbUrl, creates a database on that endpoint.
 -- | If dbname is a full url, creates a database on that endpoint.
@@ -236,26 +239,26 @@ withDatabase dbName fun = CDB.ensureAuthentication $ do
 -----------------------------------------------------------
 -- | Handle Htpp status codes in case of low level errors in interaction with Couchdb by Pouchdb.
 -- | Guarantees to give the same messages as perspectives-couchdb.
-handlePouchError :: forall m a. MonadError Error m => CDB.DocumentName -> Error -> m a
-handlePouchError docName e = case readPouchError (message e) of
+handlePouchError :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m a
+handlePouchError funcName docName e = case readPouchError (message e) of
   -- Generate messages as we did before, using handleError.
-  Right ({status} :: PouchError) -> case status of
+  Right ({status, message} :: PouchError) -> case status of
     Nothing -> throwError e
-    Just s -> handleError s mempty ("addDocument for " <> docName)
-  Left parseErrors -> throwError $ error ("addDocument: cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (message e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
+    Just s -> handleError s mempty (funcName <> " for " <> docName <> " (" <> message <> ")")
+  Left parseErrors -> throwError $ error (funcName <> ": cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (message e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
 
 -----------------------------------------------------------
 -- ADD DOCUMENT
 -----------------------------------------------------------
 -- OBSOLETE. CDB.addDocument is not used anywhere in the core anymore.
 -- | Add a document with a GenericEncode instance to a database.
-addDocument_old :: forall d f. Encode d => DatabaseName -> d -> CDB.DocumentName -> MonadPouchdb f Unit
+addDocument_old :: forall d f. Encode d => DatabaseName -> d -> DocumentName -> MonadPouchdb f Unit
 addDocument_old = CDB.addDocument
 
 foreign import addDocumentImpl :: EffectFn3
   PouchdbDatabase
   Foreign
-  CDB.DocumentName
+  DocumentName
   (Promise Foreign)
 
 -- | Creates the database if it does not exist.
@@ -264,7 +267,7 @@ foreign import addDocumentImpl :: EffectFn3
 -- | Authentication ensured.
 -- TODO. Zolang we de generic encode gebruiken die een tagged versie oplevert zonder _id en _rev members,
 -- hebben we docName als parameter nodig en moeten we de hack addNameAndVersion toepassen.
-addDocument :: forall d f. Encode d => Revision d => DatabaseName -> d -> CDB.DocumentName -> MonadPouchdb f Revision_
+addDocument :: forall d f. Encode d => Revision d => DatabaseName -> d -> DocumentName -> MonadPouchdb f Revision_
 addDocument dbName doc docName = withDatabase dbName
   \db -> do
     -- TODO. Omdat encoding een json doc oplevert zonder _id en _rev, moeten we die hier toevoegen.
@@ -278,12 +281,12 @@ addDocument dbName doc docName = withDatabase dbName
           Left e -> throwError $ error ("addDocument: error in decoding result: " <> show e)
           Right (PutCouchdbDocument {rev}) -> pure rev
       -- Promise rejected. Convert the incoming message to a PouchError type.
-      (handlePouchError "addDocment")
+      (handlePouchError "addDocment" docName)
 
-foreign import addNameAndVersionHack :: EffectFn3 Foreign CDB.DocumentName String Foreign
+foreign import addNameAndVersionHack :: EffectFn3 Foreign DocumentName String Foreign
 
 -- TODO. Zodra we een encoding toepassen waarbij _rev en _id bewaard blijven, is deze functie overbodig.
-addNameAndVersion :: Foreign -> CDB.DocumentName -> String -> Effect Foreign
+addNameAndVersion :: Foreign -> DocumentName -> String -> Effect Foreign
 addNameAndVersion = runEffectFn3 addNameAndVersionHack
 
 -----------------------------------------------------------
@@ -291,7 +294,7 @@ addNameAndVersion = runEffectFn3 addNameAndVersionHack
 -----------------------------------------------------------
 foreign import deleteDocumentImpl :: EffectFn3
   PouchdbDatabase
-  CDB.DocumentName
+  DocumentName
   String
   (Promise Foreign)
 
@@ -299,7 +302,7 @@ foreign import deleteDocumentImpl :: EffectFn3
 -- | Returns true if no revision is supplied, or if the document is deleted correctly.
 -- | Note: if the database did not exist, it will exist after calling this function!
 -- | Authentication ensured.
-deleteDocument :: forall f. DatabaseName -> CDB.DocumentName -> Revision_ -> MonadPouchdb f Boolean
+deleteDocument :: forall f. DatabaseName -> DocumentName -> Revision_ -> MonadPouchdb f Boolean
 deleteDocument dbName docName mrev = case mrev of
   Just rev -> withDatabase dbName
     \db -> do
@@ -313,7 +316,7 @@ deleteDocument dbName docName mrev = case mrev of
               Just b -> pure b
               Nothing -> pure false
         -- Promise rejected. Convert the incoming message to a PouchError type.
-        (handlePouchError "deleteDocument")
+        (handlePouchError "deleteDocument" docName)
   Nothing -> retrieveDocumentVersion dbName docName >>= deleteDocument dbName docName
 
 -----------------------------------------------------------
@@ -324,7 +327,7 @@ deleteDocument dbName docName mrev = case mrev of
 -- TODO. Zolang we de generic encode gebruiken die een tagged versie oplevert zonder _id en _rev members,
 -- moeten we de _rev van de entiteit overschrijven met die van de envelope.
 -- Zodra dat niet meer nodig is, kunnen we getDocument vervangen door getDocument_
-getDocument :: forall d f. Revision d => Decode d => DatabaseName -> CDB.DocumentName -> MonadPouchdb f d
+getDocument :: forall d f. Revision d => Decode d => DatabaseName -> DocumentName -> MonadPouchdb f d
 getDocument dbName docName = withDatabase dbName
   \db -> do
     prom <- liftEffect $ runEffectFn2 getDocumentImpl db docName
@@ -339,10 +342,10 @@ getDocument dbName docName = withDatabase dbName
           pure ((changeRevision rev) a)) of
           Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
           Right result -> pure result
-      (handlePouchError "getDocument")
+      (handlePouchError "getDocument" docName)
 
 -- | Similar to getDocument_ but without the requirement that the resulting document is an instance of Revision.
-getDocument_ :: forall d f. Decode d => DatabaseName -> CDB.DocumentName -> MonadPouchdb f d
+getDocument_ :: forall d f. Decode d => DatabaseName -> DocumentName -> MonadPouchdb f d
 getDocument_ dbName docName = withDatabase dbName
   \db -> do
     prom <- liftEffect $ runEffectFn2 getDocumentImpl db docName
@@ -352,17 +355,17 @@ getDocument_ dbName docName = withDatabase dbName
         case runExcept $ decode f of
           Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
           Right result -> pure result
-      (handlePouchError "getDocument")
+      (handlePouchError "getDocument_" docName)
 
 foreign import getDocumentImpl :: EffectFn2
   PouchdbDatabase
-  CDB.DocumentName
+  DocumentName
   (Promise Foreign)
 
 -----------------------------------------------------------
 -- DOCUMENT VERSION
 -----------------------------------------------------------
-retrieveDocumentVersion :: forall f. DatabaseName -> CDB.DocumentName -> MonadPouchdb f (Maybe String)
+retrieveDocumentVersion :: forall f. DatabaseName -> DocumentName -> MonadPouchdb f (Maybe String)
 retrieveDocumentVersion dbName docName = withDatabase dbName
   \db -> do
     prom <- liftEffect $ runEffectFn2 getDocumentImpl db docName
@@ -372,4 +375,31 @@ retrieveDocumentVersion dbName docName = withDatabase dbName
         case read f of
           Left e -> throwError $ error ("retrieveDocumentVersion : error in decoding result: " <> show e)
           Right (a :: DocumentWithRevision) -> pure a._rev
-      (handlePouchError "getDocument")
+      (handlePouchError "retrieveDocumentVersion" docName)
+
+-----------------------------------------------------------
+-- ADDATTACHMENT
+-----------------------------------------------------------
+-- | Just handles attachments whose representation is a String.
+-- | Requires a revision if the document exists prior to adding the attachment.
+-- | Notice that the revision of the document changes if an attachment is added succesfully!
+addAttachment :: forall f. DatabaseName -> DocumentName -> Revision_ -> AttachmentName -> String -> MediaType -> MonadPouchdb f DeleteCouchdbDocument
+addAttachment dbName docName rev attachmentName attachment mimetype = withDatabase dbName
+  \db -> do
+    prom <- liftEffect $ runEffectFn6 addAttachmentImpl db docName attachmentName (toNullable rev) attachment mimetype
+    catchError
+      do
+        f <- lift $ toAff prom
+        case runExcept $ decode f of
+          Left e -> throwError $ error ("addAttachment : error in decoding result: " <> show e)
+          Right d -> pure d
+      (handlePouchError "addAttachment" docName)
+
+foreign import addAttachmentImpl :: EffectFn6
+  PouchdbDatabase
+  DocumentName
+  AttachmentName
+  (Nullable String)
+  String
+  MediaType
+  (Promise Foreign)
