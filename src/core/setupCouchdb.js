@@ -1,5 +1,7 @@
 // TODO. The views below emit `doc` while Couchdb documentation warns against it:
 // http://127.0.0.1:5984/_utils/docs/ddocs/views/intro.html
+// SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 exports.modelDescriptions = (function (doc)
 {

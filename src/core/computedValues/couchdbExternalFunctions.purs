@@ -1,6 +1,7 @@
   -- BEGIN LICENSE
 -- Perspectives Distributed Runtime
--- Copyright (C) 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
+-- SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
+-- SPDX-License-Identifier: GPL-3.0-or-later
 --
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -15,7 +16,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <https://www.gnu.org/licenses/>.
 --
--- Full text of this license can be found in the LICENSE file in the projects root.
+-- Full text of this license can be found in the LICENSE directory in the projects root.
 
 -- END LICENSE
 

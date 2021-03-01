@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 'use strict';
 /*
  Generate a guid (taken from http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript)
