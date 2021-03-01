@@ -19,7 +19,7 @@
 -- END LICENSE
 
 module Main where
-import Control.Monad.AvarMonadAsk (modify)
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
 import Data.Either (Either(..))
@@ -35,7 +35,7 @@ import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
 import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
-import Perspectives.Couchdb.Databases (deleteDatabase, setSecurityDocument)
+import Perspectives.Couchdb.Databases (setSecurityDocument)
 import Perspectives.CouchdbState (UserName(..)) as CDBstate
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -45,7 +45,7 @@ import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (Password, PouchdbUser, PouchdbUser', Url, UserName, createDatabase, decodePouchdbUser', encodePouchdbUser')
+import Perspectives.Persistence.API (Password, PouchdbUser, PouchdbUser', Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
@@ -54,7 +54,7 @@ import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>))
 
 -- | Don't do anything. runPDR will actually start the core.
 main :: Effect Unit
@@ -166,9 +166,19 @@ resetAccount usr pwd host port publicRepo callback = void $ runAff handler (runP
       catchError (deleteDatabase dbname)
         \_ -> createDatabase dbname
       createDatabase dbname
-      -- Now set the security document such that there is no role restriction for members.
-      setSecurityDocument dbname
-        (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+      -- If this is a remote (Couchdb) database, set a security policy:
+      mcouchdbUrl <- gets (_.userInfo >>> _.couchdbUrl)
+      case mcouchdbUrl of
+        Nothing -> pure unit
+        otherwise -> do
+          -- We need to do this because we use the Pouchdb adapter.
+          -- Pouchdb actually creates the database only with the first action on it.
+          -- As setSecurityDocument is implemented using Affjax, it bypasses Pouchdb
+          -- and tries to set a security policy on a database that does not yet exist.
+          void $ databaseInfo dbname
+          -- Now set the security document such that there is no role restriction for members.
+          setSecurityDocument dbname
+            (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
 
     clearPostDatabase :: MonadPerspectives Unit
     clearPostDatabase = do

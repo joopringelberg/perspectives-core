@@ -1,26 +1,39 @@
 
 var PouchDB = require('pouchdb-browser').default;
 
-exports.createDatabaseImpl = function( databaseName )
-{
-  return new PouchDB( databaseName );
-}
+exports.runEffectFnAff2 = function runEffectFnAff2(fn) {
+  return function(a) {
+    return function(b) {
+        return fn(a, b);
+      };
+  };
+};
 
-exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
-{
-  var P = PouchDB.defaults({ prefix: couchdbUrl });
-  return new P(databaseName);
-}
+exports.runEffectFnAff3 = function runEffectFnAff3(fn) {
+  return function(a) {
+    return function(b) {
+      return function(c){
+        return fn(a, b, c);
+      };
+    };
+  };
+};
 
-exports.addDocumentImpl = function( database, doc, docName )
-{
-  return database.put(doc).catch( convertPouchError );
-}
-
-exports.deleteDocumentImpl = function( database, docName, rev )
-{
-  return database.remove(docName, rev).catch( convertPouchError );
-}
+exports.runEffectFnAff6 = function runEffectFnAff6(fn) {
+  return function(a) {
+    return function(b) {
+      return function(c){
+        return function(d){
+          return function(e){
+            return function(f){
+              return fn(a, b, c, d, e, f);
+            }
+          }
+        };
+      };
+    };
+  };
+};
 
 // TODO. Zodra we een encoding toepassen waarbij _rev en _id bewaard blijven, is deze functie overbodig.
 exports.addNameAndVersionHack = function( doc, name, rev)
@@ -44,7 +57,7 @@ function convertPouchError( e )
 
   if ( e instanceof TypeError )
   {
-    throw new Error( JSON.stringify(
+    return new Error( JSON.stringify(
       { name: e.name
       , message: e.message
       , error: e.stack})
@@ -52,17 +65,150 @@ function convertPouchError( e )
   }
   else
   {
-    throw new Error( JSON.stringify( e ) );
+    return new Error( JSON.stringify( e ) );
   }
 }
 
-exports.getDocumentImpl = function( database, docName )
+exports.createDatabaseImpl = function( databaseName )
 {
-  return database.get( docName ).catch( convertPouchError );
+  return new PouchDB( databaseName );
 }
 
-// db.putAttachment(docId, attachmentId, [rev], attachment, type, [callback]);
-exports.addAttachmentImpl = function( database, docName, attachmentId, mrev, attachment, type)
+exports.deleteDatabaseImpl = function ( database ) {
+  return function (onError, onSuccess) {
+    database.destroy( function(err, response)
+      {
+        if (err != null)
+        {
+          onError( convertPouchError(err) ); // invoke the error callback in case of an error
+        }
+        else
+        {
+          onSuccess(response); // invoke the success callback with the reponse
+        }
+      });
+
+    // Return a canceler, which is just another Aff effect.
+    return function (cancelError, cancelerError, cancelerSuccess) {
+      // No way to cancel the request.
+      cancelerSuccess(); // invoke the success callback for the canceler
+    };
+  };
+};
+
+exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
 {
-  return database.putAttachment(docName, attachmentId, mrev, btoa(attachment), type).catch( convertPouchError );
+  var P = PouchDB.defaults({ prefix: couchdbUrl });
+  return new P(databaseName);
 }
+
+exports.databaseInfoImpl = function ( database ) {
+  return function (onError, onSuccess) {
+    database.info( function(err, response)
+      {
+        if (err != null)
+        {
+          onError( convertPouchError(err) ); // invoke the error callback in case of an error
+        }
+        else
+        {
+          onSuccess(response); // invoke the success callback with the reponse
+        }
+      });
+
+    // Return a canceler, which is just another Aff effect.
+    return function (cancelError, cancelerError, cancelerSuccess) {
+      // No way to cancel the request.
+      cancelerSuccess(); // invoke the success callback for the canceler
+    };
+  };
+};
+
+exports.addDocumentImpl = function ( database, doc ) {
+  return function (onError, onSuccess) {
+    database.put(doc, function(err, response)
+      {
+        if (err != null)
+        {
+          onError( convertPouchError(err) ); // invoke the error callback in case of an error
+        }
+        else
+        {
+          onSuccess(response); // invoke the success callback with the reponse
+        }
+      });
+
+    // Return a canceler, which is just another Aff effect.
+    return function (cancelError, cancelerError, cancelerSuccess) {
+      // No way to cancel the request.
+      cancelerSuccess(); // invoke the success callback for the canceler
+    };
+  };
+};
+
+exports.deleteDocumentImpl = function ( database, docName, rev ) {
+  return function (onError, onSuccess) {
+    database.remove(docName, rev, function(err, response)
+      {
+        if (err != null)
+        {
+          onError( convertPouchError(err) ); // invoke the error callback in case of an error
+        }
+        else
+        {
+          onSuccess(response); // invoke the success callback with the reponse
+        }
+      });
+
+    // Return a canceler, which is just another Aff effect.
+    return function (cancelError, cancelerError, cancelerSuccess) {
+      // No way to cancel the request.
+      cancelerSuccess(); // invoke the success callback for the canceler
+    };
+  };
+};
+
+exports.getDocumentImpl = function ( database, docName ) {
+  return function (onError, onSuccess) {
+    database.get( docName, function(err, response)
+      {
+        if (err != null)
+        {
+          onError( convertPouchError(err) ); // invoke the error callback in case of an error
+        }
+        else
+        {
+          onSuccess(response); // invoke the success callback with the reponse
+        }
+      });
+
+    // Return a canceler, which is just another Aff effect.
+    return function (cancelError, cancelerError, cancelerSuccess) {
+      // No way to cancel the request.
+      cancelerSuccess(); // invoke the success callback for the canceler
+    };
+  };
+};
+
+// db.putAttachment(docId, attachmentId, [rev], attachment, type, [callback]);
+exports.addAttachmentImpl = function ( database, docName, attachmentId, mrev, attachment, type) {
+  return function (onError, onSuccess) {
+    database.putAttachment(docName, attachmentId, mrev, btoa(attachment), type, function(err, response)
+      {
+        if (err != null)
+        {
+          onError( convertPouchError(err) ); // invoke the error callback in case of an error
+        }
+        else
+        {
+          onSuccess(response); // invoke the success callback with the reponse
+        }
+      });
+
+    // Return a canceler, which is just another Aff effect.
+    return function (cancelError, cancelerError, cancelerSuccess) {
+      // No way to cancel the request.
+      cancelerSuccess(); // invoke the success callback for the canceler
+    };
+  };
+};

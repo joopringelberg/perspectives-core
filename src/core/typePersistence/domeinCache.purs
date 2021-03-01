@@ -34,10 +34,11 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb.Databases (addAttachment, getAttachment)
+import Perspectives.Couchdb.Databases (getAttachment)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
+import Perspectives.Extern.Couchdb (modelsDatabaseName)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.Persistence.API (getSystemIdentifier)
+import Perspectives.Persistence.API (addAttachment, getSystemIdentifier)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.Action (Action(..))
@@ -114,15 +115,15 @@ storeDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) = do
   saveCachedDomeinFile (DomeinFileId _id)
 
 storeDomeinFileInCouchdbPreservingAttachments :: DomeinFile -> MonadPerspectives Unit
-storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{_id}) = do
+storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{_id, _rev}) = do
   mattachment <- getDomeinFileScreens df
   void $ storeDomeinFileInCache _id df
   saveCachedDomeinFile (DomeinFileId _id)
   case mattachment of
     Nothing -> pure unit
     Just attachment -> do
-      user <- getSystemIdentifier
-      void $ addAttachment (user <> "_models/" <> _id) "screens.js" attachment (MediaType "text/ecmascript")
+      db <- modelsDatabaseName
+      void $ addAttachment db _id _rev "screens.js" attachment (MediaType "text/ecmascript")
       updateRevision (DomeinFileId _id)
 
 

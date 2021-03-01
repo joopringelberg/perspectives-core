@@ -117,10 +117,10 @@ getPerspectEntiteit id =
       Nothing -> fetchEntiteit id
 
 entitiesDatabaseName :: forall f. MonadPouchdb f String
-entitiesDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_entities/")
+entitiesDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_entities")
 
 postDatabaseName :: forall f. MonadPouchdb f String
-postDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_post/")
+postDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_post")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit
