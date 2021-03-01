@@ -50,7 +50,7 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, chan
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (DocWithAttachmentInfo(..))
-import Perspectives.Couchdb.Databases (addAttachmentToUrl, getAttachment, getAttachmentFromUrl, getAttachmentsFromUrl, getViewOnDatabase, getViewOnDatabase_)
+import Perspectives.Couchdb.Databases (getAttachmentsFromUrl, getViewOnDatabase, getViewOnDatabase_)
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
@@ -65,7 +65,7 @@ import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, addDocument, getDocument, getSystemIdentifier, retrieveDocumentVersion)
+import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getSystemIdentifier, retrieveDocumentVersion, tryGetDocument)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
@@ -253,7 +253,7 @@ addModelToLocalStore' url = do
                   lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
 
           -- Copy the attachment
-          lift $ lift $ addA url _id revision
+          lift $ lift $ addA repositoryUrl docName revision
   where
 
     addInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
@@ -318,8 +318,8 @@ addModelToLocalStore' url = do
 
     -- url is the path to the document in the repository.
     addA :: String -> String -> Revision_ -> MP Unit
-    addA url' modelName rev = do
-      mAttachment <- getAttachmentFromUrl url' "screens.js"
+    addA repoName modelName rev = do
+      mAttachment <- getAttachment repoName modelName "screens.js"
       case mAttachment of
         Nothing -> pure unit
         Just attachment -> do
@@ -352,21 +352,20 @@ uploadToRepository dfId url = do
 -- | As uploadToRepository, but provide the DomeinFile as argument.
 uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit
 uploadToRepository_ dfId url df = lift $ lift $ do
-  docUrl <- pure (url <> "/" <> (show dfId))
   -- Get the attachment info
-  (atts :: Maybe DocWithAttachmentInfo) <- getAttachmentsFromUrl docUrl
+  (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument url (show dfId)
   attachments <- case atts of
     Nothing -> pure empty
     Just (DocWithAttachmentInfo {_attachments}) -> traverseWithIndex
-      (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment docUrl attName)
+      (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment url (show dfId) attName)
       _attachments
-  -- Get the revision (if any) from the local database, so we can overwrite.
+  -- Get the revision (if any) from the remote database, so we can overwrite.
   (mVersion :: Maybe String) <- retrieveDocumentVersion url (show dfId)
   res <- addDocument url (changeRevision mVersion df) (show dfId)
   -- Now add the attachments.
   forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
     Nothing -> pure unit
-    Just attachment -> void $ addAttachmentToUrl docUrl attName attachment mimetype
+    Just attachment -> void $ addAttachment url (show dfId) mVersion attName attachment mimetype
 
 type URL = String
 

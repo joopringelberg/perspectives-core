@@ -54,6 +54,7 @@ function convertPouchError( e )
   // By throwing a Javascript error, we make toAff catch it
   // and coerce it to an error in MonadError.
   // This is caught by catchError in Purescript, e.g. in addDocument.
+  // It even sometimes (e.g. in addAttachment) returns a Response type object.
 
   if ( e instanceof TypeError )
   {
@@ -62,6 +63,17 @@ function convertPouchError( e )
       , message: e.message
       , error: e.stack})
     );
+  }
+  else if (e instanceof Response)
+  {
+    return new Error( JSON.stringify(
+      { status: e.status
+      , name: "response"
+      , message: e.statusText
+      , error: true
+      , docId: e.url
+      }
+    ));
   }
   else
   {
@@ -72,6 +84,12 @@ function convertPouchError( e )
 exports.createDatabaseImpl = function( databaseName )
 {
   return new PouchDB( databaseName );
+}
+
+exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
+{
+  var P = PouchDB.defaults({ prefix: couchdbUrl });
+  return new P(databaseName);
 }
 
 exports.deleteDatabaseImpl = function ( database ) {
@@ -95,12 +113,6 @@ exports.deleteDatabaseImpl = function ( database ) {
     };
   };
 };
-
-exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
-{
-  var P = PouchDB.defaults({ prefix: couchdbUrl });
-  return new P(databaseName);
-}
 
 exports.databaseInfoImpl = function ( database ) {
   return function (onError, onSuccess) {
@@ -212,3 +224,29 @@ exports.addAttachmentImpl = function ( database, docName, attachmentId, mrev, at
     };
   };
 };
+
+exports.getAttachmentImpl = function( database, docName, attachmentId )
+{
+  return function (onError, onSucces)
+  {
+    database.getAttachment(docName, attachmentId, function( err, blob )
+      {
+        if (err != null)
+        {
+          onError( convertPouchError( err ))
+        }
+        else
+        {
+          blob.text().then( function(t)
+          {
+            onSucces(t);
+          });
+        }
+      });
+    // Return a canceler, which is just another Aff effect.
+    return function (cancelError, cancelerError, cancelerSuccess) {
+      // No way to cancel the request.
+      cancelerSuccess(); // invoke the success callback for the canceler
+    };
+  };
+}

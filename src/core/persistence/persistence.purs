@@ -291,11 +291,22 @@ withDatabase dbName fun = CDB.ensureAuthentication $ do
 -- | Handle Htpp status codes in case of low level errors in interaction with Couchdb by Pouchdb.
 -- | Guarantees to give the same messages as perspectives-couchdb.
 handlePouchError :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m a
-handlePouchError funcName docName e = case readPouchError (message e) of
-  -- Generate messages as we did before, using handleError.
-  Right ({status, message} :: PouchError) -> case status of
+handlePouchError funcName docName e = parsePouchError funcName docName e >>=
+  \({status, message} :: PouchError) -> case status of
     Nothing -> throwError e
     Just s -> handleError s mempty (funcName <> " for " <> docName <> " (" <> message <> ")")
+
+handleNotFound :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m (Maybe a)
+handleNotFound funcName docName e = parsePouchError funcName docName e >>=
+  \err -> case err.status of
+    Just 404 -> pure Nothing
+    Just s -> handleError s mempty ("getAttachment for " <> docName <> " (" <> err.message <> ")")
+    Nothing -> throwError e
+
+parsePouchError :: forall m. MonadError Error m => String -> DocumentName -> Error -> m PouchError
+parsePouchError funcName docName e = case readPouchError (message e) of
+  -- Generate messages as we did before, using handleError.
+  Right err -> pure err
   Left parseErrors -> throwError $ error (funcName <> ": cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (message e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
 
 -----------------------------------------------------------
@@ -406,6 +417,22 @@ getDocument dbName docName = withDatabase dbName
           Right result -> pure result
       (handlePouchError "getDocument" docName)
 
+tryGetDocument :: forall d f. Revision d => Decode d => DatabaseName -> DocumentName -> MonadPouchdb f (Maybe d)
+tryGetDocument dbName docName = withDatabase dbName
+  \db -> do
+    catchError
+      do
+        f <- lift $ fromEffectFnAff $ runEffectFnAff2 getDocumentImpl db docName
+        case (runExcept do
+          -- Get the _rev from the envelope.
+          rev <- getRev f
+          (a :: d) <- decode f
+          -- Set the obtained rev in the inner value, the entity.
+          pure ((changeRevision rev) a)) of
+          Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
+          Right result -> pure $ Just result
+      (handleNotFound "getDocument" docName)
+
 -- | Similar to getDocument_ but without the requirement that the resulting document is an instance of Revision.
 getDocument_ :: forall d f. Decode d => DatabaseName -> DocumentName -> MonadPouchdb f d
 getDocument_ dbName docName = withDatabase dbName
@@ -461,4 +488,25 @@ foreign import addAttachmentImpl :: EffectFn6
   (Nullable String)
   String
   MediaType
+  Foreign
+
+-----------------------------------------------------------
+-- GETATTACHMENT
+-----------------------------------------------------------
+-- | Just handles attachments whose representation is a String.
+getAttachment :: forall f. DatabaseName -> DocumentName -> AttachmentName -> MonadPouchdb f (Maybe String)
+getAttachment dbName docName attachmentName = withDatabase dbName
+  \db -> do
+    catchError
+      do
+        f <- lift $ fromEffectFnAff $ runEffectFnAff3 getAttachmentImpl db docName attachmentName
+        case runExcept $ decode f of
+          Left e -> throwError $ error ("addAttachment : error in decoding result: " <> show e)
+          Right d -> pure $ Just d
+      (handleNotFound "getAttachment" docName)
+
+foreign import getAttachmentImpl :: EffectFn3
+  PouchdbDatabase
+  DocumentName
+  AttachmentName
   Foreign

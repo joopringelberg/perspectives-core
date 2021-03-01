@@ -34,18 +34,16 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb.Databases (getAttachment)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
-import Perspectives.Extern.Couchdb (modelsDatabaseName)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.Persistence.API (addAttachment, getSystemIdentifier)
+import Perspectives.Persistence.API (addAttachment, getAttachment, getSystemIdentifier)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (<$>))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (<$>), (>>=))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
 storeDomeinFileInCache ns df= cacheEntity (DomeinFileId ns) df
@@ -122,7 +120,7 @@ storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{_id, _rev}) = 
   case mattachment of
     Nothing -> pure unit
     Just attachment -> do
-      db <- modelsDatabaseName
+      db <- getSystemIdentifier >>= pure <<< (_ <> "_models")
       void $ addAttachment db _id _rev "screens.js" attachment (MediaType "text/ecmascript")
       updateRevision (DomeinFileId _id)
 
@@ -130,7 +128,7 @@ storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{_id, _rev}) = 
 getDomeinFileScreens :: DomeinFile -> MonadPerspectives (Maybe String)
 getDomeinFileScreens (DomeinFile {_id}) = do
   user <- getSystemIdentifier
-  getAttachment (user <> "_models/" <> _id) "screens.js"
+  getAttachment (user <> "_models") _id "screens.js"
 
 -- | Remove the file from couchb. Removes the model from cache.
 removeDomeinFileFromCouchdb :: Namespace -> MonadPerspectives Unit
