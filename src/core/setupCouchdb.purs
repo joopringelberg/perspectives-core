@@ -24,11 +24,10 @@ module Perspectives.SetupCouchdb where
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Perspectives.Couchdb (SecurityDocument(..), User)
-import Perspectives.Couchdb.Databases (databaseExists, ensureAuthentication, setSecurityDocument)
-import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, getSystemIdentifier, runMonadPouchdb)
+import Perspectives.Couchdb.Databases (ensureAuthentication, setSecurityDocument)
+import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, getSystemIdentifier, runMonadPouchdb)
 import Perspectives.Persistent (entitiesDatabaseName)
-import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (<>), (>>=))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (>>=), (==))
 
 -----------------------------------------------------------
 -- SETUPPERSPECTIVESINCOUCHDB
@@ -41,8 +40,9 @@ import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (<>), (>>=))
 setupPerspectivesInCouchdb :: UserName -> Password -> Maybe Url -> Aff Unit
 setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couchdbUrl
   do
-    isFirstUser <- databaseExists_ "localusers"
-    if not isFirstUser
+    {doc_count} <- databaseInfo "localusers"
+    -- isFirstUser <- databaseExists_ "localusers"
+    if doc_count == 0
       then (ensureAuthentication do
         createSystemDatabases
         -- For now, we initialise the repository, too.
@@ -50,11 +50,6 @@ setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couc
         createDatabase "localusers"
         setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
       else pure unit
-
-databaseExists_ :: forall f. String -> MonadPouchdb f Boolean
-databaseExists_ dbname = do
-  base <- getCouchdbBaseURL
-  databaseExists (base <> dbname)
 
 -----------------------------------------------------------
 -- CREATEPERSPECTIVESUSER
@@ -84,9 +79,10 @@ initRepository = do
 -----------------------------------------------------------
 createSystemDatabases :: forall f. MonadPouchdb f Unit
 createSystemDatabases = do
-  databaseExists_ "_users" >>= \exists -> if not exists then createDatabase "_users" else pure unit
-  databaseExists_ "_replicator" >>= \exists -> if not exists then createDatabase "_replicator" else pure unit
-  databaseExists_ "_global_changes" >>= \exists -> if not exists then createDatabase "_global_changes" else pure unit
+  -- If these databases exist, nothing new is created.
+  createDatabase "_users"
+  createDatabase "_replicator"
+  createDatabase "_global_changes"
 
 -----------------------------------------------------------
 -- CREATEUSERDATABASES

@@ -39,7 +39,6 @@ import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasForUserType)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MPQ, MPT, MonadPerspectives, (###>>), (##>>), (##>))
-import Perspectives.Couchdb.Databases (databaseExists, ensureAuthentication)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol)
@@ -53,8 +52,8 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, setChannelReplication)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Perspectives.User (getCouchdbBaseURL, getHost, getPort)
-import Prelude (class Monad, Unit, bind, discard, eq, map, not, pure, unit, ($), (&&), (<$>), (<>), (>>=), (>>>), (>=>))
+import Perspectives.User (getHost, getPort)
+import Prelude (class Monad, Unit, bind, discard, eq, map, not, pure, unit, ($), (&&), (<$>), (>>=), (>>>), (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A function for the External Core Module `model:Serialise`. The first argument should be a singleton holding
@@ -167,9 +166,8 @@ addChannel invitation = createChannel >>= \channel -> do
 createCopyOfChannelDatabase :: Array String -> ContextInstance -> MPT Unit
 createCopyOfChannelDatabase arrWithChannelName invitation = case ARR.head arrWithChannelName of
   Just channelName -> lift2 $ do
-    base <- getCouchdbBaseURL
-    exsts <- databaseExists (base <> channelName)
-    if not exsts then ensureAuthentication (createDatabase channelName) else pure unit
+    -- If the database existed prior to this line, nothing is created.
+    void $ createDatabase channelName
     mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Invitation$PrivateChannel") >=> binding >=> context)
     case mchannelContext of
       Just channelContext -> setChannelReplication channelContext

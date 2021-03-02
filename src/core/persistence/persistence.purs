@@ -628,3 +628,7 @@ foreign import getViewOnDatabaseImpl ::
     ViewName
     (Nullable String)
     Foreign
+
+-----------------------------------------------------------
+-- DATABASEEXISTS
+-----------------------------------------------------------
