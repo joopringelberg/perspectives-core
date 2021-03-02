@@ -1,6 +1,3 @@
-// TODO. The views below emit `doc` while Couchdb documentation warns against it:
-// http://127.0.0.1:5984/_utils/docs/ddocs/views/intro.html
-
 exports.modelDescriptions = (function (doc)
 {
   emit(doc._id, doc.contents.modelDescription);

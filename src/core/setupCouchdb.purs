@@ -23,12 +23,12 @@ module Perspectives.SetupCouchdb where
 
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
-import Perspectives.Couchdb (SecurityDocument(..), User, View(..))
-import Perspectives.Couchdb.Databases (addViewToDatabase, databaseExists, ensureAuthentication, setSecurityDocument)
-import Perspectives.Persistence.API (MonadPouchdb, createDatabase, runMonadPouchdb, UserName, Password, Url, getSystemIdentifier)
+import Perspectives.Couchdb (SecurityDocument(..), User)
+import Perspectives.Couchdb.Databases (databaseExists, ensureAuthentication, setSecurityDocument)
+import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, getSystemIdentifier, runMonadPouchdb)
 import Perspectives.Persistent (entitiesDatabaseName)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, not, pure, unit, ($), (<>), (>>=))
+import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (<>), (>>=))
 
 -----------------------------------------------------------
 -- SETUPPERSPECTIVESINCOUCHDB
@@ -107,7 +107,7 @@ createUserDatabases user = do
 -- | Add a view to the couchdb installation in the 'repository' db.
 setModelDescriptionsView :: forall f. MonadPouchdb f Unit
 setModelDescriptionsView = do
-  addViewToDatabase "repository" "defaultViews" "modeldescriptions" (View {map: modelDescriptions, reduce: Nothing})
+  void $ addViewToDatabase "repository" "defaultViews" "modeldescriptions" ({map: modelDescriptions, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import modelDescriptions :: String
@@ -119,7 +119,7 @@ foreign import modelDescriptions :: String
 -- | Add a view to the couchdb installation in the 'repository' db.
 setRoleView :: forall f. String -> MonadPouchdb f Unit
 setRoleView dbname = do
-  addViewToDatabase dbname "defaultViews" "roleView" (View {map: roleView, reduce: Nothing})
+  void $ addViewToDatabase dbname "defaultViews" "roleView" ({map: roleView, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import roleView :: String
@@ -130,7 +130,7 @@ foreign import roleView :: String
 -- | Add a view to the couchdb installation in the 'repository' db.
 setRoleFromContextView :: forall f. String -> MonadPouchdb f Unit
 setRoleFromContextView dbname = do
-  addViewToDatabase dbname "defaultViews" "roleFromContext" (View {map: roleFromContextView, reduce: Nothing})
+  void $ addViewToDatabase dbname "defaultViews" "roleFromContext" ({map: roleFromContextView, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import roleFromContextView :: String
@@ -142,7 +142,7 @@ foreign import roleFromContextView :: String
 -- | Add a view to the couchdb installation in the 'repository' db.
 setPendingInvitationView :: forall f. String -> MonadPouchdb f Unit
 setPendingInvitationView dbname = do
-  addViewToDatabase dbname "defaultViews" "pendingInvitations" (View {map: pendingInvitations, reduce: Nothing})
+  void $ addViewToDatabase dbname "defaultViews" "pendingInvitations" ({map: pendingInvitations, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import pendingInvitations :: String
@@ -154,7 +154,7 @@ foreign import pendingInvitations :: String
 -- | Add a view to the couchdb installation in the 'repository' db.
 setContextView :: forall f. String -> MonadPouchdb f Unit
 setContextView dbname = do
-  addViewToDatabase dbname "defaultViews" "contextView" (View {map: contextView, reduce: Nothing})
+  void $ addViewToDatabase dbname "defaultViews" "contextView" ({map: contextView, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import contextView :: String

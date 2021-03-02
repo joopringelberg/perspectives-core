@@ -35,11 +35,10 @@ import Foreign.Generic (encodeJSON)
 import Perspectives.AMQP.Stomp (StructuredMessage, acknowledge, createStompClient, messageProducer, sendToTopic)
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, BrokerService, (##>))
-import Perspectives.Couchdb.Databases (documentNamesInDatabase)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty, getRoleBinders)
 import Perspectives.Names (getMySystem, getUserIdentifier)
-import Perspectives.Persistence.API (deleteDocument, getDocument_)
+import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (brokerService, setBrokerService, setStompClient, stompClient)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
@@ -49,7 +48,7 @@ import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
-import Prelude (Unit, bind, pure, show, unit, void, ($), (>=>), (>>=), discard, (*>), (<>))
+import Prelude (Unit, bind, pure, show, unit, void, ($), (>=>), (>>=), discard, (*>), (<>), (>>>), map)
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
@@ -99,7 +98,7 @@ incomingPost = do
     sendOutgoingPost :: MonadPerspectives Unit
     sendOutgoingPost = do
       postDB <- postDatabaseName
-      (waitingTransactions :: Array String) <- documentNamesInDatabase postDB
+      (waitingTransactions :: Array String) <- documentsInDatabase postDB >>= _.rows >>> map _.id >>> pure
       mstompClient <- stompClient
       case mstompClient of
         Just stompClient -> for_ waitingTransactions \tname -> do

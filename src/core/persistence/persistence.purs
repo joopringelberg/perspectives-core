@@ -31,6 +31,7 @@ import Control.Monad.Reader (ReaderT, lift, runReaderT)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.MediaType (MediaType)
+import Data.Traversable (traverse)
 import Data.Nullable (Nullable, toNullable)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
@@ -42,11 +43,11 @@ import Effect.Aff.AVar (new)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn6, runEffectFn1, runEffectFn2, runEffectFn3)
-import Foreign (Foreign, MultipleErrors)
+import Foreign (Foreign, MultipleErrors, unsafeFromForeign, F)
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Foreign.Object (Object, delete, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), PutCouchdbDocument(..), handleError)
+import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), PutCouchdbDocument(..), ViewResult(..), ViewResultRow(..), handleError)
 import Perspectives.Couchdb.Databases as CDB
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev, rev)
 import Perspectives.CouchdbState (UserName(..)) as CDBstate
@@ -66,6 +67,7 @@ type SystemIdentifier = String
 type Url = String
 type DocumentName = String
 type AttachmentName = String
+type ViewName = String
 
 -----------------------------------------------------------
 -- POUCHDBSTATE
@@ -199,6 +201,30 @@ foreign import runEffectFnAff6 :: forall a b c d e f r.
   EffectFn6 a b c d e f r -> a -> b -> c -> d -> e -> f -> EffectFnAff r
 
 -----------------------------------------------------------
+-- HANDLEPOUCHERROR
+-----------------------------------------------------------
+-- | Handle Htpp status codes in case of low level errors in interaction with Couchdb by Pouchdb.
+-- | Guarantees to give the same messages as perspectives-couchdb.
+handlePouchError :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m a
+handlePouchError funcName docName e = parsePouchError funcName docName e >>=
+  \({status, message} :: PouchError) -> case status of
+    Nothing -> throwError e
+    Just s -> handleError s mempty (funcName <> " for " <> docName <> " (" <> message <> ")")
+
+handleNotFound :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m (Maybe a)
+handleNotFound funcName docName e = parsePouchError funcName docName e >>=
+  \err -> case err.status of
+    Just 404 -> pure Nothing
+    Just s -> handleError s mempty ("getAttachment for " <> docName <> " (" <> err.message <> ")")
+    Nothing -> throwError e
+
+parsePouchError :: forall m. MonadError Error m => String -> DocumentName -> Error -> m PouchError
+parsePouchError funcName docName e = case readPouchError (message e) of
+  -- Generate messages as we did before, using handleError.
+  Right err -> pure err
+  Left parseErrors -> throwError $ error (funcName <> ": cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (show e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
+
+-----------------------------------------------------------
 -- CREATE DATABASE
 -----------------------------------------------------------
 -- | Creates a new Pouchdb db object and adds it to PouchdbState with the given name as key.
@@ -286,30 +312,6 @@ withDatabase dbName fun = CDB.ensureAuthentication $ do
   fun db
 
 -----------------------------------------------------------
--- HANDLEPOUCHERROR
------------------------------------------------------------
--- | Handle Htpp status codes in case of low level errors in interaction with Couchdb by Pouchdb.
--- | Guarantees to give the same messages as perspectives-couchdb.
-handlePouchError :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m a
-handlePouchError funcName docName e = parsePouchError funcName docName e >>=
-  \({status, message} :: PouchError) -> case status of
-    Nothing -> throwError e
-    Just s -> handleError s mempty (funcName <> " for " <> docName <> " (" <> message <> ")")
-
-handleNotFound :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m (Maybe a)
-handleNotFound funcName docName e = parsePouchError funcName docName e >>=
-  \err -> case err.status of
-    Just 404 -> pure Nothing
-    Just s -> handleError s mempty ("getAttachment for " <> docName <> " (" <> err.message <> ")")
-    Nothing -> throwError e
-
-parsePouchError :: forall m. MonadError Error m => String -> DocumentName -> Error -> m PouchError
-parsePouchError funcName docName e = case readPouchError (message e) of
-  -- Generate messages as we did before, using handleError.
-  Right err -> pure err
-  Left parseErrors -> throwError $ error (funcName <> ": cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (message e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
-
------------------------------------------------------------
 -- DATABASEINFO
 -----------------------------------------------------------
 type DatabaseInfo =
@@ -333,6 +335,30 @@ databaseInfo dbName = withDatabase dbName
 foreign import databaseInfoImpl :: PouchdbDatabase -> EffectFnAff Foreign
 
 -----------------------------------------------------------
+-- DOCUMENTSINDATABASE
+-----------------------------------------------------------
+documentsInDatabase :: forall f. DatabaseName -> MonadPouchdb f PouchdbAllDocs
+documentsInDatabase dbName = withDatabase dbName
+  \db -> catchError
+    do
+      f <- lift $ fromEffectFnAff $ documentsInDatabaseImpl db
+      case (read f) of
+        Left e -> throwError $ error ("documentsInDatabase: error in decoding result: " <> show e)
+        Right r -> pure r
+    -- Convert the incoming message to a PouchError type.
+    (handlePouchError "documentsInDatabase" dbName)
+
+foreign import documentsInDatabaseImpl :: PouchdbDatabase -> EffectFnAff Foreign
+
+type Rev = String
+type PouchdbAllDocs =
+  { offset :: Int
+  , rows :: Array { id :: String, value :: Rev}
+  , total_rows :: Int
+  , update_seq :: Maybe Int
+  }
+
+-----------------------------------------------------------
 -- ADD DOCUMENT
 -----------------------------------------------------------
 -- | Creates the database if it does not exist.
@@ -354,7 +380,20 @@ addDocument dbName doc docName = withDatabase dbName
           Left e -> throwError $ error ("addDocument: error in decoding result: " <> show e)
           Right (PutCouchdbDocument {rev}) -> pure rev
       -- Promise rejected. Convert the incoming message to a PouchError type.
-      (handlePouchError "addDocment" docName)
+      (handlePouchError "addDocument" docName)
+
+-- | Similar to addDocument but without the requirement that d is an instance of Revision.
+addDocument_ :: forall d f. Encode d => DatabaseName -> d -> DocumentName -> MonadPouchdb f Revision_
+addDocument_ dbName doc docName = withDatabase dbName
+  \db -> catchError
+    do
+      f <- lift $ fromEffectFnAff $ runEffectFnAff2 addDocumentImpl db (encode doc)
+      -- NOTE we do not use the Decode class instance based on genericDecode here anymore.
+      case PutCouchdbDocument <$> (read f) of
+        Left e -> throwError $ error ("addDocument: error in decoding result: " <> show e)
+        Right (PutCouchdbDocument {rev}) -> pure rev
+    -- Promise rejected. Convert the incoming message to a PouchError type.
+    (handlePouchError "addDocument" docName)
 
 foreign import addDocumentImpl :: EffectFn2 PouchdbDatabase Foreign Foreign
 
@@ -404,18 +443,17 @@ deleteDocument dbName docName mrev = case mrev of
 getDocument :: forall d f. Revision d => Decode d => DatabaseName -> DocumentName -> MonadPouchdb f d
 getDocument dbName docName = withDatabase dbName
   \db -> do
-    catchError
-      do
-        f <- lift $ fromEffectFnAff $ runEffectFnAff2 getDocumentImpl db docName
-        case (runExcept do
-          -- Get the _rev from the envelope.
-          rev <- getRev f
-          a <- decode f
-          -- Set the obtained rev in the inner value, the entity.
-          pure ((changeRevision rev) a)) of
-          Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
-          Right result -> pure result
+    f <- catchError
+      (lift $ fromEffectFnAff $ runEffectFnAff2 getDocumentImpl db docName)
       (handlePouchError "getDocument" docName)
+    case (runExcept do
+      -- Get the _rev from the envelope.
+      rev <- getRev f
+      a <- decode f
+      -- Set the obtained rev in the inner value, the entity.
+      pure ((changeRevision rev) a)) of
+      Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
+      Right result -> pure result
 
 tryGetDocument :: forall d f. Revision d => Decode d => DatabaseName -> DocumentName -> MonadPouchdb f (Maybe d)
 tryGetDocument dbName docName = withDatabase dbName
@@ -429,11 +467,12 @@ tryGetDocument dbName docName = withDatabase dbName
           (a :: d) <- decode f
           -- Set the obtained rev in the inner value, the entity.
           pure ((changeRevision rev) a)) of
-          Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
+          Left e -> throwError $ error ("tryGetDocument : error in decoding result: " <> show e)
           Right result -> pure $ Just result
-      (handleNotFound "getDocument" docName)
+      (handleNotFound "tryGetDocument" docName)
 
--- | Similar to getDocument_ but without the requirement that the resulting document is an instance of Revision.
+-- | Similar to getDocument but without the requirement that the resulting document is an instance of Revision.
+-- NOTE: this function replaces getDocument as soon as we have an encoding that preserves _rev.
 getDocument_ :: forall d f. Decode d => DatabaseName -> DocumentName -> MonadPouchdb f d
 getDocument_ dbName docName = withDatabase dbName
   \db -> do
@@ -441,9 +480,21 @@ getDocument_ dbName docName = withDatabase dbName
       do
         f <- lift $ fromEffectFnAff $ runEffectFnAff2 getDocumentImpl db docName
         case runExcept $ decode f of
-          Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
+          Left e -> throwError $ error ("getDocument_ : error in decoding result: " <> show e)
           Right result -> pure result
       (handlePouchError "getDocument_" docName)
+
+-- | Similar to tryGetDocument but without the requirement that the resulting document is an instance of Revision.
+-- NOTE: this function replaces tryGetDocument as soon as we have an encoding that preserves _rev.
+tryGetDocument_ :: forall d f. Decode d => DatabaseName -> DocumentName -> MonadPouchdb f (Maybe d)
+tryGetDocument_ dbName docName = withDatabase dbName
+  \db -> catchError
+    do
+      f <- lift $ fromEffectFnAff $ runEffectFnAff2 getDocumentImpl db docName
+      case runExcept $ decode f of
+        Left e -> throwError $ error ("tryGetDocument_ : error in decoding result: " <> show e)
+        Right result -> pure result
+    (handleNotFound "tryGetDocument_" docName)
 
 foreign import getDocumentImpl :: EffectFn2
   PouchdbDatabase
@@ -496,17 +547,84 @@ foreign import addAttachmentImpl :: EffectFn6
 -- | Just handles attachments whose representation is a String.
 getAttachment :: forall f. DatabaseName -> DocumentName -> AttachmentName -> MonadPouchdb f (Maybe String)
 getAttachment dbName docName attachmentName = withDatabase dbName
-  \db -> do
-    catchError
-      do
-        f <- lift $ fromEffectFnAff $ runEffectFnAff3 getAttachmentImpl db docName attachmentName
-        case runExcept $ decode f of
-          Left e -> throwError $ error ("addAttachment : error in decoding result: " <> show e)
-          Right d -> pure $ Just d
-      (handleNotFound "getAttachment" docName)
+  \db -> catchError
+    do
+      f <- lift $ fromEffectFnAff $ runEffectFnAff3 getAttachmentImpl db docName attachmentName
+      case runExcept $ decode f of
+        Left e -> throwError $ error ("addAttachment : error in decoding result: " <> show e)
+        Right d -> pure $ Just d
+    (handleNotFound "getAttachment" docName)
 
 foreign import getAttachmentImpl :: EffectFn3
   PouchdbDatabase
   DocumentName
   AttachmentName
   Foreign
+
+-----------------------------------------------------------
+-- ADDVIEWTODATABASE
+-----------------------------------------------------------
+addViewToDatabase :: forall f. DatabaseName -> DocumentName -> ViewName -> View -> MonadPouchdb f Revision_
+addViewToDatabase dbName docname viewname view = do
+  (mddoc :: Maybe DesignDocument) <- tryGetDocument_ dbName ("_design/" <> docname)
+  case mddoc of
+    Nothing -> addDocument_ dbName (addView (defaultDesignDocumentWithViewsSection docname) viewname view) ("_design/" <> docname)
+    Just ddoc -> addDocument_ dbName (addView ddoc viewname view) ("_design/" <> docname)
+
+type View =
+  { map :: String
+  , reduce :: Maybe String
+}
+
+newtype DesignDocument = DesignDocument
+  { _id :: String
+  , _rev :: Maybe String
+  , views :: Object View
+}
+
+instance decodeDesignDocument :: Decode DesignDocument where
+  decode = (map DesignDocument) <<< readImpl <<< unsafeFromForeign
+instance encodeDesignDocument :: Encode DesignDocument where
+  encode (DesignDocument d) = write d
+
+defaultDesignDocumentWithViewsSection :: String -> DesignDocument
+defaultDesignDocumentWithViewsSection n = DesignDocument
+  { _id: "_design/" <> n
+  , _rev: Nothing
+  , views: empty
+}
+
+addView :: DesignDocument -> ViewName -> View -> DesignDocument
+addView (DesignDocument r@{views}) name view = DesignDocument r {views = insert name view views}
+
+-----------------------------------------------------------
+-- GETVIEWONDATABASE
+-----------------------------------------------------------
+-- | Get the view on the database. Notice that the type of the value in the result
+-- | is parameterised and must be an instance of Decode.
+getViewOnDatabase :: forall f value key.
+  Show key =>
+  Decode key =>
+  Decode value =>
+  DatabaseName -> ViewName -> Maybe key -> MonadPouchdb f (Array value)
+getViewOnDatabase dbName viewname mkey = withDatabase dbName
+  \db -> catchError
+    do
+      f <- lift $ fromEffectFnAff $ runEffectFnAff3 getViewOnDatabaseImpl db viewname (toNullable $ show <$> mkey)
+      case runExcept $ decode f of
+        Left e -> throwError $ error ("getViewOnDatabase : error in decoding result: " <> show e)
+        Right ((ViewResult{rows}) :: (ViewResult Foreign key)) -> do
+          (r :: F (Array value)) <- pure $ traverse
+            (\(ViewResultRow{value}) -> decode value)
+            rows
+          case runExcept r of
+            Left e -> throwError (error ("getViewOnDatabase: multiple errors: " <> show e))
+            Right results -> pure results
+    (handlePouchError "getViewOnDatabase" viewname)
+
+foreign import getViewOnDatabaseImpl ::
+  EffectFn3
+    PouchdbDatabase
+    ViewName
+    (Nullable String)
+    Foreign

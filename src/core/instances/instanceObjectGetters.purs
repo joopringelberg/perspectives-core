@@ -38,11 +38,11 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
-import Perspectives.Couchdb.Databases (getViewOnDatabase)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole) as IP
+import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
@@ -66,7 +66,7 @@ getEnumeratedRoleInstances rn c = ArrayT $ (lift $ try $ getContextMember (flip 
     \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
 
 getUnlinkedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
-getUnlinkedRoleInstances rn c = ArrayT $ try ((lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews" "roleFromContext" (Just $ [unwrap rn, unwrap c])) >>=
+getUnlinkedRoleInstances rn c = ArrayT $ try ((lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/roleFromContext" (Just $ [unwrap rn, unwrap c])) >>=
   handlePerspectRolError' "getUnlinkedRoleInstances" []
     \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure roles
 
