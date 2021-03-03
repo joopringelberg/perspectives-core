@@ -39,3 +39,6 @@ The PDR is being intensively developed by the core team. We appreciate feedback 
 * perspectives-documentation
 * perspectives-screens
 * screenuploader
+
+### License information
+This project is available as open source under the terms of the GPL-3.0-or-later license. For accurate information, please check individual files.
