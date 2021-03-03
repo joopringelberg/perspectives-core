@@ -48,7 +48,7 @@ setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couc
         -- For now, we initialise the repository, too.
         initRepository
         createDatabase "localusers"
-        setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
+        void $ setSecurityDocument "localusers" (SecurityDocument {_id: "_security", admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
       else pure unit
 
 -----------------------------------------------------------
@@ -70,8 +70,8 @@ initRepository :: forall f. MonadPouchdb f Unit
 initRepository = do
   createDatabase "repository"
   setModelDescriptionsView
-  setSecurityDocument "repository"
-    (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+  void $ setSecurityDocument "repository"
+    (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
 
 -----------------------------------------------------------
 -- CREATESYSTEMDATABASES
@@ -94,8 +94,8 @@ createUserDatabases user = do
   createDatabase $ user <> "_post"
   createDatabase $ user <> "_models/"
   -- Now set the security document such that there is no role restriction for members.
-  setSecurityDocument (user <> "_models/")
-    (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+  void $ setSecurityDocument (user <> "_models/")
+    (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
 
 -----------------------------------------------------------
 -- THE VIEW 'MODELDESCRIPTIONS'

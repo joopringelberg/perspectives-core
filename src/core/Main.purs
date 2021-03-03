@@ -177,8 +177,8 @@ resetAccount usr pwd host port publicRepo callback = void $ runAff handler (runP
           -- and tries to set a security policy on a database that does not yet exist.
           void $ databaseInfo dbname
           -- Now set the security document such that there is no role restriction for members.
-          setSecurityDocument dbname
-            (SecurityDocument {admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+          void $ setSecurityDocument dbname
+            (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
 
     clearPostDatabase :: MonadPerspectives Unit
     clearPostDatabase = do

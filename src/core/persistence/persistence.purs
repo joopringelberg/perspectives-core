@@ -31,11 +31,11 @@ import Control.Monad.Reader (ReaderT, lift, runReaderT)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.MediaType (MediaType)
-import Data.Traversable (traverse)
 import Data.Nullable (Nullable, toNullable)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Data.Traversable (traverse)
 import Effect (Effect)
 import Effect.AVar (AVar)
 import Effect.Aff (Aff, Error, catchError, error, message, throwError)
@@ -47,7 +47,7 @@ import Foreign (Foreign, MultipleErrors, unsafeFromForeign, F)
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Foreign.Object (Object, delete, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), PutCouchdbDocument(..), ViewResult(..), ViewResultRow(..), handleError)
+import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), PutCouchdbDocument(..), SecurityDocument(..), ViewResult(..), ViewResultRow(..), handleError)
 import Perspectives.Couchdb.Databases as CDB
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev, rev)
 import Perspectives.CouchdbState (UserName(..)) as CDBstate
@@ -605,12 +605,13 @@ addView (DesignDocument r@{views}) name view = DesignDocument r {views = insert 
 getViewOnDatabase :: forall f value key.
   Show key =>
   Decode key =>
+  Encode key =>
   Decode value =>
   DatabaseName -> ViewName -> Maybe key -> MonadPouchdb f (Array value)
 getViewOnDatabase dbName viewname mkey = withDatabase dbName
   \db -> catchError
     do
-      f <- lift $ fromEffectFnAff $ runEffectFnAff3 getViewOnDatabaseImpl db viewname (toNullable $ show <$> mkey)
+      f <- lift $ fromEffectFnAff $ runEffectFnAff3 getViewOnDatabaseImpl db viewname (toNullable (encode <$> mkey))
       case runExcept $ decode f of
         Left e -> throwError $ error ("getViewOnDatabase : error in decoding result: " <> show e)
         Right ((ViewResult{rows}) :: (ViewResult Foreign key)) -> do
@@ -626,9 +627,5 @@ foreign import getViewOnDatabaseImpl ::
   EffectFn3
     PouchdbDatabase
     ViewName
-    (Nullable String)
+    (Nullable Foreign)
     Foreign
-
------------------------------------------------------------
--- DATABASEEXISTS
------------------------------------------------------------
