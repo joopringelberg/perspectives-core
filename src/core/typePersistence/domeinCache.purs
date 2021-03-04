@@ -100,24 +100,24 @@ tryRetrieveDomeinFile id = catchError (Just <$> (getPerspectEntiteit (DomeinFile
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String
 
-saveCachedDomeinFile :: DomeinFileId -> MonadPerspectives Unit
+saveCachedDomeinFile :: DomeinFileId -> MonadPerspectives DomeinFile
 saveCachedDomeinFile ns = do
   updateRevision ns
-  saveEntiteit ns *> pure unit
+  saveEntiteit ns
 
 -- | Either create or modify the DomeinFile in couchdb. Caches.
 -- | Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
 -- | If the model is not found in the cache, assumes it is not in the database either.
-storeDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
+storeDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives DomeinFile
 storeDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) = do
   void $ storeDomeinFileInCache _id df
   saveCachedDomeinFile (DomeinFileId _id)
 
 storeDomeinFileInCouchdbPreservingAttachments :: DomeinFile -> MonadPerspectives Unit
-storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{_id, _rev}) = do
+storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{_id}) = do
   mattachment <- getDomeinFileScreens df
   void $ storeDomeinFileInCache _id df
-  saveCachedDomeinFile (DomeinFileId _id)
+  (DomeinFile {_rev}) <- saveCachedDomeinFile (DomeinFileId _id)
   case mattachment of
     Nothing -> pure unit
     Just attachment -> do
