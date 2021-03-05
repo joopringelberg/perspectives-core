@@ -48,7 +48,7 @@ import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (Password, PouchdbUser, PouchdbUser', Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
-import Perspectives.PerspectivesState (newPerspectivesState)
+import Perspectives.PerspectivesState (backendIsCouchdb, newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithState)
@@ -84,8 +84,8 @@ main = pure unit
 -- | To be called from the client.
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
 -- | Implementation note: the PouchdbUser should have a couchdbUrl that terminates on a forward slash.
-runPDR :: UserName -> Password -> Foreign -> Url -> Effect Unit
-runPDR usr pwd rawPouchdbUser publicRepo = void $ runAff handleError do
+runPDR :: UserName -> Password -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
+runPDR usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler do
   case decodePouchdbUser' rawPouchdbUser of
     Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
     Right (pdbu :: PouchdbUser'()) -> do
@@ -118,6 +118,14 @@ runPDR usr pwd rawPouchdbUser publicRepo = void $ runAff handleError do
       catchError (joinFiber postFiber)
         \e -> do
           logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
+  where
+      handler :: Either Error Unit -> Effect Unit
+      handler (Left e) = do
+        logPerspectivesError $ Custom $ "An error condition in runPDR: " <> (show e)
+        callback false
+      handler (Right e) = do
+        logPerspectivesError $ Custom $ "Started the PDR for: " <> usr
+        callback true
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)
@@ -180,8 +188,10 @@ resetAccount usr pwd host port publicRepo callback = void $ runAff handler (runP
           -- and tries to set a security policy on a database that does not yet exist.
           void $ databaseInfo dbname
           -- Now set the security document such that there is no role restriction for members.
-          void $ setSecurityDocument dbname
-            (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+          backendIsCouchdb >>= if _
+            then void $ setSecurityDocument dbname
+              (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+            else pure unit
 
     clearPostDatabase :: MonadPerspectives Unit
     clearPostDatabase = do

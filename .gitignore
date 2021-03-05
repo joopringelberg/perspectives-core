@@ -25,7 +25,7 @@ yarn-error.log*
 /.idea/**
 /output.js
 /testOutput.txt
-#/dist/**
+/dist/**
 #/output/
 /test.json
 test.js

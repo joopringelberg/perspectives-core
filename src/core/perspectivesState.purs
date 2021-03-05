@@ -23,7 +23,7 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff.AVar (AVar)
 import Foreign.Object (empty)
 import Perspectives.AMQP.Stomp (StompClient)
@@ -31,7 +31,7 @@ import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspective
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
-import Perspectives.Persistence.API (PouchdbUser)
+import Perspectives.Persistence.API (PouchdbUser, MonadPouchdb)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void, (+))
 
 newPerspectivesState :: PouchdbUser -> String -> Int -> String -> String -> PerspectivesState
@@ -106,6 +106,9 @@ stompClient = gets _.stompClient
 
 setStompClient :: StompClient -> MonadPerspectives Unit
 setStompClient bs = modify \s -> s {stompClient = Just bs}
+
+backendIsCouchdb :: forall f. MonadPouchdb f Boolean
+backendIsCouchdb = gets (isJust <<< _.couchdbUrl <<< _.userInfo)
 
 -----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS

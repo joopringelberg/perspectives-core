@@ -28,6 +28,7 @@ import Perspectives.Couchdb (SecurityDocument(..), User)
 import Perspectives.Couchdb.Databases (ensureAuthentication, setSecurityDocument)
 import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, getSystemIdentifier, runMonadPouchdb)
 import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.PerspectivesState (backendIsCouchdb)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (>>=), (==))
 
 -----------------------------------------------------------
@@ -49,7 +50,9 @@ setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couc
         -- For now, we initialise the repository, too.
         initRepository
         createDatabase "localusers"
-        void $ setSecurityDocument "localusers" (SecurityDocument {_id: "_security", admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
+        backendIsCouchdb >>= if _
+          then void $ setSecurityDocument "localusers" (SecurityDocument {_id: "_security", admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}})
+          else pure unit)
       else pure unit
 
 -----------------------------------------------------------
@@ -71,8 +74,10 @@ initRepository :: forall f. MonadPouchdb f Unit
 initRepository = do
   createDatabase "repository"
   setModelDescriptionsView
-  void $ setSecurityDocument "repository"
-    (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+  backendIsCouchdb >>= if _
+    then void $ setSecurityDocument "repository"
+      (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+    else pure unit
 
 -----------------------------------------------------------
 -- CREATESYSTEMDATABASES
@@ -95,8 +100,10 @@ createUserDatabases user = do
   createDatabase $ user <> "_post"
   createDatabase $ user <> "_models/"
   -- Now set the security document such that there is no role restriction for members.
-  void $ setSecurityDocument (user <> "_models/")
-    (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+  backendIsCouchdb >>= if _
+    then void $ setSecurityDocument (user <> "_models/")
+      (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+    else pure unit
 
 -----------------------------------------------------------
 -- THE VIEW 'MODELDESCRIPTIONS'
