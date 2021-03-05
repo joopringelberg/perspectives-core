@@ -16,9 +16,9 @@ ln -s ../../../../purescript-affjax pv9.1.0
 
 cd ../perpectives-apitypes
 
-rm -Rf v2.9.0
+rm -Rf v2.10.0
 
-ln -s ../../../../perspectives-apitypes v2.9.0
+ln -s ../../../../perspectives-apitypes v2.10.0
 
 cd ../avar-monadask/
 
@@ -28,9 +28,9 @@ ln -s ../../../../purescript-avar-monadask v2.1.0
 
 cd ../perspectives-couchdb/
 
-rm -Rf v2.8.2
+rm -Rf v2.8.3
 
-ln -s ../../../../perspectives-couchdb v2.8.2
+ln -s ../../../../perspectives-couchdb v2.8.3
 
 cd ../../..
 
