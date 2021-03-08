@@ -21,14 +21,19 @@
 -- END LICENSE
 
 
-module Perspectives.Persistence.API where
+module Perspectives.Persistence.API
 
+( module Perspectives.Persistence.Types
+, module Perspectives.Persistence.Authentication)
+
+where
+
+import Perspectives.Persistence.Types
 import Prelude
 
-import Control.Alt ((<|>))
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Control.Monad.Except (class MonadError, runExcept)
-import Control.Monad.Reader (ReaderT, lift, runReaderT)
+import Control.Monad.Except (runExcept)
+import Control.Monad.Reader (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.MediaType (MediaType)
@@ -38,192 +43,20 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Effect (Effect)
-import Effect.AVar (AVar)
-import Effect.Aff (Aff, Error, catchError, error, message, throwError)
-import Effect.Aff.AVar (new)
+import Effect.Aff (catchError, error, throwError)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn6, runEffectFn1, runEffectFn2, runEffectFn3)
-import Foreign (Foreign, MultipleErrors, unsafeFromForeign, F)
+import Foreign (Foreign, unsafeFromForeign, F)
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Foreign.Object (Object, delete, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), PutCouchdbDocument(..), SecurityDocument(..), ViewResult(..), ViewResultRow(..), handleError)
-import Perspectives.Couchdb.Databases as CDB
+import Perspectives.Couchdb (DeleteCouchdbDocument(..), PutCouchdbDocument(..), ViewResult(..), ViewResultRow(..))
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev, rev)
-import Perspectives.CouchdbState (UserName(..)) as CDBstate
-import Simple.JSON (read, readImpl, readJSON', write, E)
-
------------------------------------------------------------
--- POUCHDBDATABASE
------------------------------------------------------------
-foreign import data PouchdbDatabase :: Type
-
------------------------------------------------------------
--- ALIASES
------------------------------------------------------------
-type UserName = String
-type Password = String
-type SystemIdentifier = String
-type Url = String
-type DocumentName = String
-type AttachmentName = String
-type ViewName = String
-
------------------------------------------------------------
--- POUCHDBSTATE
------------------------------------------------------------
-type PouchdbState f =
-  { userInfo :: PouchdbUser
-  , databases :: Object PouchdbDatabase
-
-	-- TODO. De volgende drie kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen:
-  , couchdbPassword :: String
-  , couchdbHost :: String
-  , couchdbPort :: Int
-  | f}
-
-
--- TODO. Te verwijderen zodra Perspectives.Persistence.API alles heeft overgenomen.
--- We do not need the UserName value in the core, as long as we have the systemIdentifier.
-type PouchdbUser = PouchdbUser' (userName :: CDBstate.UserName)
-type PouchdbUser' f =
-  { _rev :: Maybe String
-  , systemIdentifier :: String
-  , password :: String -- Maybe String om met IndexedDB rekening te houden?
-  , couchdbUrl :: Maybe String
-  | f
-  }
-
-type PouchdbExtraState f =
-  ( databases :: Object PouchdbDatabase
-  | f)
-
-type CouchdbUrl = String
-
-decodePouchdbUser' :: Foreign -> E (PouchdbUser'())
-decodePouchdbUser' = read
-
-encodePouchdbUser' :: PouchdbUser'() -> Foreign
-encodePouchdbUser' = write
------------------------------------------------------------
--- MONADPOUCHDB
------------------------------------------------------------
-type MonadPouchdb f = ReaderT (AVar (PouchdbState f)) Aff
-
------------------------------------------------------------
--- RUNMONADPOUCHDB
------------------------------------------------------------
--- | Run an action in MonadCouchdb, given a username and password etc.
--- | Its primary use is in addAttachment_ (to add an attachment using the default "admin" account).
-runMonadPouchdb :: forall a. UserName -> Password -> SystemIdentifier -> Maybe Url -> MonadPouchdb () a
-  -> Aff a
-runMonadPouchdb userName password systemId couchdbUrl mp = do
-  (rf :: AVar (PouchdbState ())) <- new $
-    { userInfo:
-      { systemIdentifier: systemId
-      , password
-      , couchdbUrl
-      -- compat:
-      , _rev: Nothing
-      , userName: CDBstate.UserName userName
-    }
-    , databases: empty
-    -- compat
-    , couchdbPassword: password
-    , couchdbHost: "https://127.0.0.1"
-    , couchdbPort: 6984
-  }
-  runReaderT mp rf
-
------------------------------------------------------------
--- POUCHERROR
------------------------------------------------------------
-type PouchError =
-  { status :: Maybe Int
-  , name :: String
-  , message :: String
-  , error :: Either Boolean String
-  -- , reason :: String -- Skip; at most a duplicate of message.
-  , docId :: Maybe String
-}
-
-readPouchError :: String -> Either MultipleErrors PouchError
-readPouchError s = runExcept do
-  inter <- readJSON' s
-  error <- Left <$> readImpl inter.error <|> Right <$> readImpl inter.error
-  pure inter {error = error}
-
------------------------------------------------------------
--- STATE UTILITIES
------------------------------------------------------------
-getSystemIdentifier :: forall f. MonadPouchdb f String
-getSystemIdentifier = gets $ _.userInfo >>> _.systemIdentifier
-
--- | Url terminated with a forward slash.
-getCouchdbBaseURL :: forall f. MonadPouchdb f (Maybe Url)
-getCouchdbBaseURL = gets $ _.userInfo >>> _.couchdbUrl
-
------------------------------------------------------------
--- DOCUMENTWITHREVISION
------------------------------------------------------------
-type DocumentWithRevision = {_rev :: Maybe String}
-
------------------------------------------------------------
--- RUNEFFECTFNAFF2
------------------------------------------------------------
--- | With `fromEffectFnAff`, we apply Effect functions of a single argument to Aff.
--- | Such functions must return a `EffectFnAff`. As an example:
--- |  `foreign import deleteDatabaseImpl :: PouchdbDatabase -> EffectFnAff Foreign`
--- | And then:
--- |  `fromEffectFnAff $ deleteDatabaseImpl db`
--- | However, in this module we have various foreign functions that have more than one
--- | parameter. `addDocumentImpl` is an example:
--- |  `foreign import addDocumentImpl :: EffectFn2 PouchdbDatabase Foreign Foreign`
--- | We cannot apply `fromEffectFnAff` directly to functions of this type.
--- | `runEffectFnAff2` comes to the rescue, allowing you to write:
--- |  addDocumentImpl' :: PouchdbDatabase -> Foreign -> EffectFnAff Foreign
--- |  addDocumentImpl' = `runEffectFnAff2 addDocumentImpl`
--- | And then:
--- |  `fromEffectFnAff $ addDocumentImpl' db doc`
-foreign import runEffectFnAff2 :: forall a b r.
-  EffectFn2 a b r -> a -> b -> EffectFnAff r
-
------------------------------------------------------------
--- RUNEFFECTFNAFF3
------------------------------------------------------------
-foreign import runEffectFnAff3 :: forall a b c r.
-  EffectFn3 a b c r -> a -> b -> c -> EffectFnAff r
-
------------------------------------------------------------
--- RUNEFFECTFNAFF6
------------------------------------------------------------
-foreign import runEffectFnAff6 :: forall a b c d e f r.
-  EffectFn6 a b c d e f r -> a -> b -> c -> d -> e -> f -> EffectFnAff r
-
------------------------------------------------------------
--- HANDLEPOUCHERROR
------------------------------------------------------------
--- | Handle Htpp status codes in case of low level errors in interaction with Couchdb by Pouchdb.
--- | Guarantees to give the same messages as perspectives-couchdb.
-handlePouchError :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m a
-handlePouchError funcName docName e = parsePouchError funcName docName e >>=
-  \({status, message} :: PouchError) -> case status of
-    Nothing -> throwError e
-    Just s -> handleError s mempty (funcName <> " for " <> docName <> " (" <> message <> ")")
-
-handleNotFound :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m (Maybe a)
-handleNotFound funcName docName e = parsePouchError funcName docName e >>=
-  \err -> case err.status of
-    Just 404 -> pure Nothing
-    Just s -> handleError s mempty ("getAttachment for " <> docName <> " (" <> err.message <> ")")
-    Nothing -> throwError e
-
-parsePouchError :: forall m. MonadError Error m => String -> DocumentName -> Error -> m PouchError
-parsePouchError funcName docName e = case readPouchError (message e) of
-  -- Generate messages as we did before, using handleError.
-  Right err -> pure err
-  Left parseErrors -> throwError $ error (funcName <> ": cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (show e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
+import Perspectives.Persistence.Authentication (ensureAuthentication, getCouchdbBaseURL)
+import Perspectives.Persistence.Errors (handlePouchError, handleNotFound)
+import Perspectives.Persistence.RunEffectAff (runEffectFnAff2, runEffectFnAff3, runEffectFnAff6)
+import Simple.JSON (read, readImpl, write)
 
 -----------------------------------------------------------
 -- CREATE DATABASE
@@ -236,16 +69,16 @@ parsePouchError funcName docName e = case readPouchError (message e) of
 createDatabase :: forall f. DatabaseName -> MonadPouchdb f Unit
 createDatabase dbname = if startsWithDatabaseEndpoint dbname
   then do
-    pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
+    pdb <- ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
     modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
   else do
-    mprefix <- gets (_.userInfo >>> _.couchdbUrl)
+    mprefix <- getCouchdbBaseURL
     case mprefix of
       Nothing -> do
-        pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
+        pdb <- ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
         modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
       Just prefix -> do
-        pdb <- CDB.ensureAuthentication (liftEffect $ runEffectFn2 createRemoteDatabaseImpl dbname prefix)
+        pdb <- ensureAuthentication (liftEffect $ runEffectFn2 createRemoteDatabaseImpl dbname prefix)
         modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
   where
     endpointRegex :: Regex
@@ -308,7 +141,7 @@ withDatabase :: forall f a.
   DatabaseName ->
   (PouchdbDatabase -> MonadPouchdb f a) ->
   MonadPouchdb f a
-withDatabase dbName fun = CDB.ensureAuthentication $ do
+withDatabase dbName fun = ensureAuthentication $ do
   (db :: PouchdbDatabase) <- ensureDatabase dbName
   fun db
 
