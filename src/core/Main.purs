@@ -148,71 +148,89 @@ createUser userName password couchdbUrl = void $ runAff
   (createPerspectivesUser userName password couchdbUrl)
 
 -- | This is for development only! Assumes the user identifier equals the user name.
--- TODO. Als Perspectives.Persistence.API alles heeft overgenomen, kunnen we hier een PouchdbUser meegeven.
-resetAccount :: String -> String -> String -> Int -> String -> (Boolean -> Effect Unit) -> Effect Unit
-resetAccount usr pwd host port publicRepo callback = void $ runAff handler (runPerspectives usr pwd usr host port publicRepo do
-  -- Get all Channels
-  getChannels <- getRoleFunction "sys:PerspectivesSystem$Channels"
-  system <- getMySystem
-  (channels :: Array ContextInstance) <- (ContextInstance system) ##= getChannels >=> context
-  -- End their replication
-  for_ channels endChannelReplication
-  -- remove the databases
-  getChannelDbId <- getPropertyFunction "sys:Channel$External$ChannelDatabaseName"
-  for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDb <<< unwrap
-  clearUserDatabase
-  clearModelDatabase
-  clearPostDatabase)
-  where
+resetAccount :: UserName -> Password -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
+resetAccount usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler
+  do
+    case decodePouchdbUser' rawPouchdbUser of
+      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
+      Right (pdbu :: PouchdbUser'()) -> do
+        (pouchdbUser :: PouchdbUser) <- pure
+          { _rev: pdbu._rev
+          , systemIdentifier: pdbu.systemIdentifier
+          , password: pdbu.password
+          , couchdbUrl: pdbu.couchdbUrl
+          , userName: CDBstate.UserName usr}
+        state <- new $ newPerspectivesState pouchdbUser
+          -- TODO. Deze twee waarden kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen.
+          "https://localhost"
+          6984
+          pwd
+          publicRepo
+        runPerspectivesWithState
+          (do
+            -- Get all Channels
+            getChannels <- getRoleFunction "sys:PerspectivesSystem$Channels"
+            system <- getMySystem
+            (channels :: Array ContextInstance) <- (ContextInstance system) ##= getChannels >=> context
+            -- End their replication
+            for_ channels endChannelReplication
+            -- remove the databases
+            getChannelDbId <- getPropertyFunction "sys:Channel$External$ChannelDatabaseName"
+            for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDb <<< unwrap
+            clearUserDatabase
+            clearModelDatabase
+            clearPostDatabase)
+          state
+    where
 
-    clearUserDatabase :: MonadPerspectives Unit
-    clearUserDatabase = do
-      userDatabaseName <- entitiesDatabaseName
-      catchError (deleteDatabase userDatabaseName)
-        \_ -> createDatabase userDatabaseName
-      createDatabase userDatabaseName
-    clearModelDatabase :: MonadPerspectives Unit
-    clearModelDatabase = do
-      dbname <- modelsDatabaseName
-      catchError (deleteDatabase dbname)
-        \_ -> createDatabase dbname
-      createDatabase dbname
-      -- If this is a remote (Couchdb) database, set a security policy:
-      mcouchdbUrl <- gets (_.userInfo >>> _.couchdbUrl)
-      case mcouchdbUrl of
-        Nothing -> pure unit
-        otherwise -> do
-          -- We need to do this because we use the Pouchdb adapter.
-          -- Pouchdb actually creates the database only with the first action on it.
-          -- As setSecurityDocument is implemented using Affjax, it bypasses Pouchdb
-          -- and tries to set a security policy on a database that does not yet exist.
-          void $ databaseInfo dbname
-          -- Now set the security document such that there is no role restriction for members.
-          backendIsCouchdb >>= if _
-            then void $ setSecurityDocument dbname
-              (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
-            else pure unit
+      clearUserDatabase :: MonadPerspectives Unit
+      clearUserDatabase = do
+        userDatabaseName <- entitiesDatabaseName
+        catchError (deleteDatabase userDatabaseName)
+          \_ -> createDatabase userDatabaseName
+        createDatabase userDatabaseName
+      clearModelDatabase :: MonadPerspectives Unit
+      clearModelDatabase = do
+        dbname <- modelsDatabaseName
+        catchError (deleteDatabase dbname)
+          \_ -> createDatabase dbname
+        createDatabase dbname
+        -- If this is a remote (Couchdb) database, set a security policy:
+        mcouchdbUrl <- gets (_.userInfo >>> _.couchdbUrl)
+        case mcouchdbUrl of
+          Nothing -> pure unit
+          otherwise -> do
+            -- We need to do this because we use the Pouchdb adapter.
+            -- Pouchdb actually creates the database only with the first action on it.
+            -- As setSecurityDocument is implemented using Affjax, it bypasses Pouchdb
+            -- and tries to set a security policy on a database that does not yet exist.
+            void $ databaseInfo dbname
+            -- Now set the security document such that there is no role restriction for members.
+            backendIsCouchdb >>= if _
+              then void $ setSecurityDocument dbname
+                (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+              else pure unit
 
-    clearPostDatabase :: MonadPerspectives Unit
-    clearPostDatabase = do
-      dbname <- postDatabaseName
-      catchError (deleteDatabase dbname)
-        \_ -> createDatabase dbname
-      createDatabase dbname
-    handler :: Either Error Unit -> Effect Unit
-    handler (Left e) = do
-      logPerspectivesError $ Custom $ "An error condition in resetAccount: " <> (show e)
-      callback false
-    handler (Right e) = do
-      logPerspectivesError $ Custom $ "Cleared the account " <> usr
-      callback true
+      clearPostDatabase :: MonadPerspectives Unit
+      clearPostDatabase = do
+        dbname <- postDatabaseName
+        catchError (deleteDatabase dbname)
+          \_ -> createDatabase dbname
+        createDatabase dbname
+      handler :: Either Error Unit -> Effect Unit
+      handler (Left e) = do
+        logPerspectivesError $ Custom $ "An error condition in resetAccount: " <> (show e)
+        callback false
+      handler (Right e) = do
+        logPerspectivesError $ Custom $ "Cleared the account " <> usr
+        callback true
 
-    deleteDb :: DatabaseName -> MonadPerspectives Unit
-    deleteDb dbname = do
-      r <- try (deleteDatabase dbname)
-      case r of
-        Left e -> logPerspectivesError $ Custom (show e)
-        Right _ -> pure unit
+      deleteDb :: DatabaseName -> MonadPerspectives Unit
+      deleteDb dbname = do
+        r <- try (deleteDatabase dbname)
+        case r of
+          Left e -> logPerspectivesError $ Custom (show e)
+          Right _ -> pure unit
 
 
 -- | Retrieve all instances of sys:Model$IndexedRole and sys:Model$IndexedContext and create a table of
