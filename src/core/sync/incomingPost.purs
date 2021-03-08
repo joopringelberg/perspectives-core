@@ -36,13 +36,14 @@ import Perspectives.Persistence.API (PouchdbExtraState, deleteDocument)
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
-import Perspectives.User (getCouchdbBaseURLWithCredentials)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>))
 
-incomingPost :: MonadPerspectives Unit
-incomingPost = do
+type URL = String
+
+incomingPost :: URL -> MonadPerspectives Unit
+incomingPost url = do
   -- get host and port
-  base <- getCouchdbBaseURLWithCredentials
+  base <- getCouchdbBaseURLWithCredentials url
   -- get the post database
   post <- postDbName
   -- Create an EventSource
@@ -65,3 +66,21 @@ incomingPost = do
           -- Delete the document
           _ <- lift $ deleteDocument database id Nothing
           lift $ executeTransaction t
+
+-----------------------------------------------------------
+-- GETCOUCHDBBASEURLWITHCREDENTIALS
+-----------------------------------------------------------
+-- | Returns a Url in the format http://user:password@{domain}:{port}/
+getCouchdbBaseURLWithCredentials :: forall f . String -> MonadPouchdb f String
+getCouchdbBaseURLWithCredentials url = do
+  user <- getSystemIdentifier
+  password <- getCouchdbPassword
+  case match domainRegex url of
+    Nothing -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
+    Just matches | length matches < 3 -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
+    Just matches -> case (unsafePartial (fromJust (index matches 1))), (unsafePartial (fromJust (index matches 2))) of
+      Just scheme, Just domain -> pure $ scheme <> user <> ":" <> password <> "@" <> url <> "/"
+      _, _ -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
+  where
+    domainRegex :: Regex
+    domainRegex = unsafeRegex "^(https?\\:\\/\\/)(.*)$" noFlags
