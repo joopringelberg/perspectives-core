@@ -24,7 +24,8 @@
 module Perspectives.Persistence.API
 
 ( module Perspectives.Persistence.Types
-, module Perspectives.Persistence.Authentication)
+, module Perspectives.Persistence.Authentication
+, module Perspectives.Persistence.API)
 
 where
 
@@ -38,6 +39,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.MediaType (MediaType)
 import Data.Nullable (Nullable, toNullable)
+import Data.String.Base64 (btoa)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -49,13 +51,14 @@ import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn6, runEffectFn1, runEffectFn2, runEffectFn3)
 import Foreign (Foreign, unsafeFromForeign, F)
 import Foreign.Class (class Decode, class Encode, decode, encode)
-import Foreign.Object (Object, delete, empty, insert, lookup)
+import Foreign.Object (Object, delete, empty, insert, lookup, singleton)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Couchdb (DeleteCouchdbDocument(..), PutCouchdbDocument(..), ViewResult(..), ViewResultRow(..))
+import Perspectives.Couchdb (DeleteCouchdbDocument(..), PutCouchdbDocument(..), ReplicationDocument(..), ReplicationEndpoint(..), SelectorObject, ViewResult(..), ViewResultRow(..))
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev, rev)
-import Perspectives.Persistence.Authentication (ensureAuthentication, getCouchdbBaseURL)
+import Perspectives.Persistence.Authentication (ensureAuthentication)
 import Perspectives.Persistence.Errors (handlePouchError, handleNotFound)
 import Perspectives.Persistence.RunEffectAff (runEffectFnAff2, runEffectFnAff3, runEffectFnAff6)
+import Perspectives.Persistence.State (getCouchdbBaseURL, getCouchdbPassword, getSystemIdentifier)
 import Simple.JSON (read, readImpl, write)
 
 -----------------------------------------------------------

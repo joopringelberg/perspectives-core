@@ -35,9 +35,8 @@ import Foreign (Foreign)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
-import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
-import Perspectives.Couchdb.Databases (setSecurityDocument)
-import Perspectives.CouchdbState (UserName(..)) as CDBstate
+import Perspectives.Couchdb (SecurityDocument(..))
+import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
@@ -46,9 +45,10 @@ import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (Password, PouchdbUser, PouchdbUser', Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase)
+import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase)
+import Perspectives.Persistence.State (withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
-import Perspectives.PerspectivesState (backendIsCouchdb, newPerspectivesState)
+import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
@@ -88,19 +88,13 @@ runPDR :: UserName -> Password -> Foreign -> Url -> (Boolean -> Effect Unit) -> 
 runPDR usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler do
   case decodePouchdbUser' rawPouchdbUser of
     Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
-    Right (pdbu :: PouchdbUser'()) -> do
+    Right (pdbu :: PouchdbUser) -> do
       (pouchdbUser :: PouchdbUser) <- pure
-        { _rev: pdbu._rev
-        , systemIdentifier: pdbu.systemIdentifier
+        { systemIdentifier: pdbu.systemIdentifier
         , password: pdbu.password
         , couchdbUrl: pdbu.couchdbUrl
-        , userName: CDBstate.UserName usr}
-      state <- new $ newPerspectivesState pouchdbUser
-        -- TODO. Deze twee waarden kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen.
-        "https://localhost"
-        6984
-        pwd
-        publicRepo
+      }
+      state <- new $ newPerspectivesState pouchdbUser publicRepo
       runPerspectivesWithState (do
         void $ setupUser
         addAllExternalFunctions
@@ -153,19 +147,13 @@ resetAccount usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
       Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
-      Right (pdbu :: PouchdbUser'()) -> do
+      Right (pdbu :: PouchdbUser) -> do
         (pouchdbUser :: PouchdbUser) <- pure
-          { _rev: pdbu._rev
-          , systemIdentifier: pdbu.systemIdentifier
+          { systemIdentifier: pdbu.systemIdentifier
           , password: pdbu.password
           , couchdbUrl: pdbu.couchdbUrl
-          , userName: CDBstate.UserName usr}
-        state <- new $ newPerspectivesState pouchdbUser
-          -- TODO. Deze twee waarden kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen.
-          "https://localhost"
-          6984
-          pwd
-          publicRepo
+          }
+        state <- new $ newPerspectivesState pouchdbUser publicRepo
         runPerspectivesWithState
           (do
             -- Get all Channels
@@ -173,7 +161,7 @@ resetAccount usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler
             system <- getMySystem
             (channels :: Array ContextInstance) <- (ContextInstance system) ##= getChannels >=> context
             -- End their replication
-            for_ channels endChannelReplication
+            void $ withCouchdbUrl \url -> for_ channels (endChannelReplication url)
             -- remove the databases
             getChannelDbId <- getPropertyFunction "sys:Channel$External$ChannelDatabaseName"
             for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDb <<< unwrap
@@ -206,10 +194,9 @@ resetAccount usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler
             -- and tries to set a security policy on a database that does not yet exist.
             void $ databaseInfo dbname
             -- Now set the security document such that there is no role restriction for members.
-            backendIsCouchdb >>= if _
-              then void $ setSecurityDocument dbname
+            -- (only applies to Couchdb backends).
+            void $ withCouchdbUrl \url -> setSecurityDocument url dbname
                 (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
-              else pure unit
 
       clearPostDatabase :: MonadPerspectives Unit
       clearPostDatabase = do

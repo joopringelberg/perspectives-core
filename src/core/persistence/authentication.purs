@@ -46,6 +46,7 @@ import Effect.Aff (error, throwError)
 import Effect.Aff.Class (liftAff)
 import Foreign.Object (fromFoldable)
 import Perspectives.Persistence.Types
+import Perspectives.Persistence.State
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -87,16 +88,3 @@ defaultPerspectRequest = pure
   , withCredentials: true
   , responseFormat: ResponseFormat.string
 }
-
------------------------------------------------------------
--- STATE UTILITIES
------------------------------------------------------------
-getSystemIdentifier :: forall f. MonadPouchdb f String
-getSystemIdentifier = gets $ _.userInfo >>> _.systemIdentifier
-
--- | Url terminated with a forward slash.
-getCouchdbBaseURL :: forall f. MonadPouchdb f (Maybe Url)
-getCouchdbBaseURL = gets $ _.userInfo >>> _.couchdbUrl
-
-getCouchdbPassword :: forall f. MonadPouchdb f String
-getCouchdbPassword = gets $ _.userInfo >>> _.password

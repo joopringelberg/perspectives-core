@@ -29,8 +29,8 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isQualifiedWithDomein)
+import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Persistence.API (getSystemIdentifier)
 import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------

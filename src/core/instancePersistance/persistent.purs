@@ -45,7 +45,6 @@ module Perspectives.Persistent
 , getDomeinFile
 , tryGetPerspectEntiteit
 , class Persistent
-, database
 , dbLocalName
 , entitiesDatabaseName
 , postDatabaseName
@@ -68,41 +67,40 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
-import Perspectives.Couchdb.Databases (ensureAuthentication)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Persistence.API (MonadPouchdb, addDocument, deleteDocument, getDocument, getSystemIdentifier, retrieveDocumentVersion)
+import Perspectives.Persistence.API (MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
+import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.User (getCouchdbBaseURL)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
-  database :: i -> MP String
+  -- database :: i -> MP String
   dbLocalName :: i -> MP String
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
-  database _ = do
-    sysId <- getSystemIdentifier
-    cdbUrl <- getCouchdbBaseURL
-    pure $ cdbUrl <> sysId <> "_entities/"
+  -- database _ = do
+  --   sysId <- getSystemIdentifier
+  --   cdbUrl <- getCouchdbBaseURL
+  --   pure $ cdbUrl <> sysId <> "_entities/"
   dbLocalName _ = do
     sysId <- getSystemIdentifier
     pure $ sysId <> "_entities"
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
-  database _ = do
-    sysId <- getSystemIdentifier
-    cdbUrl <- getCouchdbBaseURL
-    pure $ cdbUrl <> sysId <> "_entities/"
+  -- database _ = do
+  --   sysId <- getSystemIdentifier
+  --   cdbUrl <- getCouchdbBaseURL
+  --   pure $ cdbUrl <> sysId <> "_entities/"
   dbLocalName _ = do
     sysId <- getSystemIdentifier
     pure $ sysId <> "_entities"
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
-  database _ = do
-    sysId <- getSystemIdentifier
-    cdbUrl <- getCouchdbBaseURL
-    pure $ cdbUrl <> sysId <> "_models/"
+  -- database _ = do
+  --   sysId <- getSystemIdentifier
+  --   cdbUrl <- getCouchdbBaseURL
+  --   pure $ cdbUrl <> sysId <> "_models/"
   dbLocalName _ = do
     sysId <- getSystemIdentifier
     pure $ sysId <> "_models"

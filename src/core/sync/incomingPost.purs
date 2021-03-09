@@ -23,20 +23,28 @@ module Perspectives.Sync.IncomingPost where
 
 import Control.Coroutine (Consumer, await, runProcess, ($$))
 import Control.Monad.AvarMonadAsk (modify)
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
+import Data.Array.NonEmpty (index, length)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
+import Data.String.Regex (Regex, match)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Effect.Exception (error)
 import Foreign (MultipleErrors)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesExtraState)
-import Perspectives.Couchdb.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
-import Perspectives.Persistence.API (PouchdbExtraState, deleteDocument)
+import Perspectives.Persistent.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
+import Perspectives.Persistence.API (MonadPouchdb, deleteDocument)
+import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (<))
 
 type URL = String
 
@@ -51,7 +59,7 @@ incomingPost url = do
   -- Save in state, so we can close it.
   void $ modify \s -> s {post = Just es}
   -- Produce new Transaction documents
-  (transactionProducer :: DocProducer (PouchdbExtraState PerspectivesExtraState) TransactionForPeer) <- pure $ docProducer es
+  (transactionProducer :: DocProducer (PerspectivesExtraState) TransactionForPeer) <- pure $ docProducer es
   -- Handle them.
   void $ runProcess $ transactionProducer $$ transactionConsumer post
   where

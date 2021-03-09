@@ -25,10 +25,10 @@ module Perspectives.SetupCouchdb where
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Perspectives.Couchdb (SecurityDocument(..), User)
-import Perspectives.Couchdb.Databases (ensureAuthentication, setSecurityDocument)
-import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, getSystemIdentifier, runMonadPouchdb)
+import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, ensureAuthentication, runMonadPouchdb)
+import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
+import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName)
-import Perspectives.PerspectivesState (backendIsCouchdb)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (>>=), (==))
 
 -----------------------------------------------------------
@@ -45,14 +45,15 @@ setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couc
     {doc_count} <- databaseInfo "localusers"
     -- isFirstUser <- databaseExists_ "localusers"
     if doc_count == 0
-      then (ensureAuthentication do
-        createSystemDatabases
-        -- For now, we initialise the repository, too.
-        initRepository
-        createDatabase "localusers"
-        backendIsCouchdb >>= if _
-          then void $ setSecurityDocument "localusers" (SecurityDocument {_id: "_security", admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}})
-          else pure unit)
+      then (ensureAuthentication
+        do
+          createSystemDatabases
+          -- For now, we initialise the repository, too.
+          initRepository
+          createDatabase "localusers"
+          void $ withCouchdbUrl
+            \url -> setSecurityDocument url "localusers"
+              (SecurityDocument {_id: "_security", admins: {names: [], roles: []}, members: {names: [], roles: ["NotExistingRole"]}}))
       else pure unit
 
 -----------------------------------------------------------
@@ -74,10 +75,8 @@ initRepository :: forall f. MonadPouchdb f Unit
 initRepository = do
   createDatabase "repository"
   setModelDescriptionsView
-  backendIsCouchdb >>= if _
-    then void $ setSecurityDocument "repository"
+  void $ withCouchdbUrl \url -> setSecurityDocument url "repository"
       (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
-    else pure unit
 
 -----------------------------------------------------------
 -- CREATESYSTEMDATABASES
@@ -100,10 +99,8 @@ createUserDatabases user = do
   createDatabase $ user <> "_post"
   createDatabase $ user <> "_models/"
   -- Now set the security document such that there is no role restriction for members.
-  backendIsCouchdb >>= if _
-    then void $ setSecurityDocument (user <> "_models/")
+  void $ withCouchdbUrl \url -> setSecurityDocument url (user <> "_models/")
       (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
-    else pure unit
 
 -----------------------------------------------------------
 -- THE VIEW 'MODELDESCRIPTIONS'

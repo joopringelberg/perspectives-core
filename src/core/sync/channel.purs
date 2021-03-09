@@ -29,6 +29,9 @@ import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
+import Data.String.Regex (Regex)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
@@ -39,66 +42,72 @@ import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, MPT, (##=), (##>), (##>>), type (~~>))
 import Perspectives.Couchdb (selectOnFieldEqual, selectOnFieldNotEqual)
-import Perspectives.Couchdb.Databases (endReplication, ensureAuthentication, replicateContinuously)
 import Perspectives.Guid (guid)
+import Perspectives.Identifiers (getFirstMatch, getSecondMatch)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, disjunction)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.Names (getUserIdentifier)
-import Perspectives.Persistence.API (createDatabase, deleteDocument, getSystemIdentifier)
+import Perspectives.Persistence.API (Url, createDatabase, ensureAuthentication)
+import Perspectives.Persistence.CouchdbFunctions (endReplication, replicateContinuously)
+import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNA
-import Perspectives.User (getCouchdbBaseURL, getHost, getPort)
-import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>), (>>=), (<$>))
 
 -- | Create a new database for the communication between `me` and another user.
 -- | Create an instance of sys:Channel. Bind `me` in the role Initiator. Set the value of ChannelDatabaseName to
 -- | that of the new database.
-createChannel :: MonadPerspectivesTransaction ContextInstance
-createChannel = do
+createChannel :: Url -> MonadPerspectivesTransaction ContextInstance
+createChannel couchdbUrl = do
   g <- liftEffect guid
   channelName <- pure ("channel_" <> (show g))
-  channel <- createChannelContext channelName
+  channel <- createChannelContext couchdbUrl channelName
   lift2 $ ensureAuthentication (createDatabase channelName)
   pure channel
 
-createChannelContext :: String -> MonadPerspectivesTransaction ContextInstance
-createChannelContext channelName = do
-  host <- lift2 getHost
-  port <- lift2 getPort
-  eChannel <- runExceptT $ constructContext (Just $ ENR $ EnumeratedRoleType "model:System$Invitation$PrivateChannel") $ ContextSerialization
-    { id: "model:User$" <> channelName
-    , prototype: Nothing
-    , ctype: "sys:Channel"
-    , rollen: fromFoldable [(Tuple "model:System$Channel$Initiator" $
-      SNA.singleton (RolSerialization
-        { id: Nothing
-        , properties: PropertySerialization $ fromFoldable
-          [
-            Tuple "model:System$PhysicalContext$UserWithAddress$Host" [host]
-          , Tuple "model:System$PhysicalContext$UserWithAddress$Port" [(show port)]
-          ]
-        , binding: Just "usr:Me" })
-       )]
-    , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
-    }
-  case eChannel of
-    Left e -> throwError (error ("createChannel could not create channel: " <> show e))
-    Right (channel :: ContextInstance) -> pure channel
+createChannelContext :: Url -> String -> MonadPerspectivesTransaction ContextInstance
+createChannelContext couchdbUrl channelName = case splitCouchdbUrl couchdbUrl of
+  Nothing -> throwError $ error ("createChannelContext received couchdbUrl that is not well-formed: " <> couchdbUrl)
+  Just (Tuple host port) -> do
+    eChannel <- runExceptT $ constructContext (Just $ ENR $ EnumeratedRoleType "model:System$Invitation$PrivateChannel") $ ContextSerialization
+      { id: "model:User$" <> channelName
+      , prototype: Nothing
+      , ctype: "sys:Channel"
+      , rollen: fromFoldable [(Tuple "model:System$Channel$Initiator" $
+        SNA.singleton (RolSerialization
+          { id: Nothing
+          , properties: PropertySerialization $ fromFoldable
+            [
+              Tuple "model:System$PhysicalContext$UserWithAddress$Host" [host]
+            , Tuple "model:System$PhysicalContext$UserWithAddress$Port" [(show port)]
+            ]
+          , binding: Just "usr:Me" })
+         )]
+      , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
+      }
+    case eChannel of
+      Left e -> throwError (error ("createChannel could not create channel: " <> show e))
+      Right (channel :: ContextInstance) -> pure channel
 
 -- | Add the second user to the channel: not the Initiator, but the ConnectedPartner.
-addPartnerToChannel :: RoleInstance -> ContextInstance -> Host -> Port -> MonadPerspectivesTransaction Unit
-addPartnerToChannel (RoleInstance usr) (ContextInstance channel) host port = void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
-  channel
-  (RolSerialization
-    { id: Nothing
-    , properties: PropertySerialization $ fromFoldable
-      [ Tuple "model:System$PhysicalContext$UserWithAddress$Host" [host]
-      , Tuple "model:System$PhysicalContext$UserWithAddress$Port" [show port]
-      ],
-    binding: Just usr})
+addPartnerToChannel :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
+addPartnerToChannel (RoleInstance usr) (ContextInstance channel) = do
+  couchdbUrl <- lift2 $ getCouchdbBaseURL
+  case splitCouchdbUrl <$> couchdbUrl of
+    Just (Just (Tuple host port)) -> do
+       void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
+        channel
+        (RolSerialization
+          { id: Nothing
+          , properties: PropertySerialization $ fromFoldable
+            [ Tuple "model:System$PhysicalContext$UserWithAddress$Host" [host]
+            , Tuple "model:System$PhysicalContext$UserWithAddress$Port" [show port]
+            ],
+          binding: Just usr})
+    _ -> throwError $ error ("addPartnerToChannel received not a well-formed couchdbUrl: " <> (show couchdbUrl))
 
 type Host = String
 type Port = Int
@@ -159,70 +168,81 @@ setYourRelayAddress host port channel = do
 -- | Also set replication for the channel to the post database. This replication filters out just transactions
 -- | whose author is the ConnectedPartner (so I do not have to deal with transactions I've created myself).
 -- TODO. Zodra MonadPerspectives gestapeld is op ExceptT, gebruik dan throwError in plaats van pure unit.
-setChannelReplication :: ContextInstance -> MonadPerspectives Unit
-setChannelReplication channel = do
-  getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
-  mchannel <- channel ##> externalRole >=> getChannelId
-  post <- postDbName
-  case mchannel of
+setChannelReplication :: Url -> ContextInstance -> MonadPerspectives Unit
+setChannelReplication couchdbUrl channel = do
+  case splitCouchdbUrl couchdbUrl of
+    -- Fails silently
     Nothing -> pure unit
-    Just (Value channelId) -> do
-      getYou <- getRoleFunction "sys:Channel$You"
-      myou <- channel ##> getYou
-      case myou of
-        Nothing ->
-          -- REPLICATE CHANNEL TO POST, ALL TRANSACTIONS.
-          -- TODO: repliceer alleen transacties die niet van mijzelf zijn.
-          localReplication channelId post Nothing
-        Just you -> do
-          -- OTHER KNOWN
-          -- yourIdentifier
-          (RoleInstance userBehindYou) <- you ##>> bottom
-          -- REPLICATE CHANNEL TO POST, JUST TRANSACTIONS AUTHORED BY OTHER.
-          localReplication channelId post (Just userBehindYou)
+    Just (Tuple myHost port) -> do
+      getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+      mchannel <- channel ##> externalRole >=> getChannelId
+      post <- postDbName
+      case mchannel of
+        Nothing -> pure unit
+        Just (Value channelId) -> do
+          getYou <- getRoleFunction "sys:Channel$You"
+          myou <- channel ##> getYou
+          case myou of
+            Nothing ->
+              -- REPLICATE CHANNEL TO POST, ALL TRANSACTIONS.
+              -- TODO: repliceer alleen transacties die niet van mijzelf zijn.
+              localReplication couchdbUrl channelId post Nothing
+            Just you -> do
+              -- OTHER KNOWN
+              -- yourIdentifier
+              (RoleInstance userBehindYou) <- you ##>> bottom
+              -- REPLICATE CHANNEL TO POST, JUST TRANSACTIONS AUTHORED BY OTHER.
+              localReplication couchdbUrl channelId post (Just userBehindYou)
 
-          -- REPLICATING CHANNEL TO COPY OF OTHER:
-          host <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Host"
-          hostValue <- you ##> host
-          case hostValue of
-            -- NO HOST
-            Nothing -> do
-              relayHost <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayHost"
-              relayHostValue <- you ##> relayHost
-              case relayHostValue of
-                Nothing -> pure unit
-                -- RELAYHOST
-                Just (Value h) -> do
+              -- REPLICATING CHANNEL TO COPY OF OTHER:
+              host <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Host"
+              hostValue <- you ##> host
+              case hostValue of
+                -- NO HOST
+                Nothing -> do
+                  relayHost <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayHost"
+                  relayHostValue <- you ##> relayHost
+                  case relayHostValue of
+                    Nothing -> pure unit
+                    -- RELAYHOST
+                    Just (Value h) -> do
+                      -- if h equals the host of this PDR, just stop.
+                      if myHost == h
+                        then pure unit
+                        else do
+                          relayPort <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayPort"
+                          portValue <- you ##> relayPort
+                          case portValue of
+                            Nothing -> pure unit
+                            -- REPLICATE LOCAL CHANNEL TO RELAYHOST, JUST TRANSACTIONS AUTHORED BY ME.
+                            -- Push local copy of channel to RelayHost. Author = me
+                            Just (Value p) -> do
+                              me <- getUserIdentifier
+                              setPushAndPullReplication couchdbUrl channelId h p me
+                Just (Value yourHost) -> do
+                  -- HOST
                   -- if h equals the host of this PDR, just stop.
-                  myHost <- getHost
-                  if myHost == h
+                  if myHost == yourHost
                     then pure unit
                     else do
-                      relayPort <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$RelayPort"
-                      portValue <- you ##> relayPort
+                      port <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Port"
+                      portValue <- you ##> port
                       case portValue of
                         Nothing -> pure unit
-                        -- REPLICATE LOCAL CHANNEL TO RELAYHOST, JUST TRANSACTIONS AUTHORED BY ME.
-                        -- Push local copy of channel to RelayHost. Author = me
-                        Just (Value p) -> do
+                        -- REPLICATE LOCAL CHANNEL TO HOST, JUST TRANSACTIONS AUTHORED BY ME.
+                        -- Push local copy of channel to PeerHost. Author = me
+                        Just (Value yourPort) -> do
                           me <- getUserIdentifier
-                          setPushAndPullReplication channelId h p me
-            Just (Value yourHost) -> do
-              -- HOST
-              -- if h equals the host of this PDR, just stop.
-              myHost <- getHost
-              if myHost == yourHost
-                then pure unit
-                else do
-                  port <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Port"
-                  portValue <- you ##> port
-                  case portValue of
-                    Nothing -> pure unit
-                    -- REPLICATE LOCAL CHANNEL TO HOST, JUST TRANSACTIONS AUTHORED BY ME.
-                    -- Push local copy of channel to PeerHost. Author = me
-                    Just (Value yourPort) -> do
-                      me <- getUserIdentifier
-                      setPushReplication channelId yourHost yourPort me
+                          setPushReplication couchdbUrl channelId yourHost yourPort me
+
+-- | Split an url of the form host:port into its two constituents.
+splitCouchdbUrl :: String -> Maybe (Tuple String String)
+splitCouchdbUrl s = case (getFirstMatch couchdbUrlRegex s), (getSecondMatch couchdbUrlRegex s) of
+  Just source, Just target -> Just $ Tuple source target
+  _, _ -> Nothing
+  where
+    couchdbUrlRegex :: Regex
+    couchdbUrlRegex = unsafeRegex "^(.*):(.*)$" noFlags
 
 postDbName :: MonadPerspectives String
 postDbName = do
@@ -230,28 +250,29 @@ postDbName = do
   pure $ systemIdentifier <> "_post/"
 
 -- | Push local channel to remote.
-setPushReplication :: String -> String -> String -> String -> MonadPerspectives Unit
-setPushReplication channelDatabaseName host port author = do
-  base <- getCouchdbBaseURL
+setPushReplication :: Url -> String -> String -> String -> String -> MonadPerspectives Unit
+setPushReplication base channelDatabaseName host port author = do
   replicateContinuously
+    base
     channelDatabaseName
     (base <> channelDatabaseName)
     (host <> ":" <> port <> "/" <> channelDatabaseName)
     (Just $ selectOnFieldEqual "author" author)
 
 -- | Push local channel to remote, pull remote channel on the RelayHost to local.
-setPushAndPullReplication :: String -> String -> String -> String -> MonadPerspectives Unit
-setPushAndPullReplication channelDatabaseName host port author = do
-  base <- getCouchdbBaseURL
+setPushAndPullReplication :: Url -> String -> String -> String -> String -> MonadPerspectives Unit
+setPushAndPullReplication base channelDatabaseName host port author = do
   -- Push my Transactions outwards;
   me <- getUserIdentifier
   replicateContinuously
+    base
     channelDatabaseName
     (base <> channelDatabaseName)
     (host <> ":" <> port <> "/" <> channelDatabaseName)
     (Just $ selectOnFieldEqual "author" me)
   -- Pull in all Transactions from the partner inwards.
   replicateContinuously
+    base
     channelDatabaseName
     (host <> ":" <> port <> "/" <> channelDatabaseName)
     (base <> channelDatabaseName)
@@ -260,11 +281,11 @@ setPushAndPullReplication channelDatabaseName host port author = do
 -- | Replicate source to target. Both databases are supposed to be local, so push or pull is unimportant.
 -- | If the author is not given, the criterium will be that the "author" field in the transaction must be
 -- | *different* from the own user id.
-localReplication :: String -> String -> Maybe String -> MonadPerspectives Unit
-localReplication source target author = do
-  base <- getCouchdbBaseURL
+localReplication :: Url -> String -> String -> Maybe String -> MonadPerspectives Unit
+localReplication base source target author = do
   me <- getUserIdentifier
   replicateContinuously
+    base
     (source <> "_" <> target)
     (base <> source)
     (base <> target)
@@ -275,8 +296,8 @@ localReplication source target author = do
 
 -- | Stop replicating the channel to the post database.
 -- | Stop replicating the channel database to the remote version.
-endChannelReplication :: ContextInstance -> MonadPerspectives Unit
-endChannelReplication channel = do
+endChannelReplication :: Url -> ContextInstance -> MonadPerspectives Unit
+endChannelReplication couchdbUrl channel = do
   getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
   mchannel <- channel ##> externalRole >=> getChannelId
   post <- postDbName
@@ -284,11 +305,23 @@ endChannelReplication channel = do
     Nothing -> pure unit
     Just (Value channelId) -> do
       r <- try do
-        void $ endReplication channelId post
-        void $ deleteDocument "_replicator" channelId Nothing
+        case splitChannelId channelId of
+          Just (Tuple source target) -> do
+            void $ endReplication couchdbUrl channelId post
+            void $ endReplication couchdbUrl source target
+          Nothing -> pure unit
       case r of
         Left e -> log $ show e
         Right _ -> pure unit
+  where
+    splitChannelId :: String -> Maybe (Tuple String String)
+    splitChannelId s = case (getFirstMatch channelRegEx s), (getSecondMatch channelRegEx s) of
+      Just source, Just target -> Just $ Tuple source target
+      _, _ -> Nothing
+
+    channelRegEx :: Regex
+    channelRegEx = unsafeRegex "^(.*)_(.*)$" noFlags
+
 
 -- Not used.
 getYourHostAndPort :: ContextInstance -> MonadPerspectives (Maybe (Tuple Host Port_))

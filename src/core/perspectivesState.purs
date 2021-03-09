@@ -23,7 +23,7 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (AVar)
 import Foreign.Object (empty)
 import Perspectives.AMQP.Stomp (StompClient)
@@ -31,23 +31,18 @@ import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspective
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
-import Perspectives.Persistence.API (PouchdbUser, MonadPouchdb)
+import Perspectives.Persistence.API (PouchdbUser, Url)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void, (+))
 
-newPerspectivesState :: PouchdbUser -> String -> Int -> String -> String -> PerspectivesState
-newPerspectivesState uinfo host port password publicRepo =
+newPerspectivesState :: PouchdbUser -> Url -> PerspectivesState
+newPerspectivesState uinfo publicRepo =
   { rolInstances: new unit
   , contextInstances: new unit
   , domeinCache: new unit
   , queryAssumptionRegister: empty
   , variableBindings: ENV.empty
   , publicRepository: publicRepo
-  -- , publicRepository: "http://127.0.0.1:5984/repository/"
-  -- CouchdbState
   , userInfo: uinfo
-  , couchdbHost: host -- For synchronising via a Couchdb Channel database
-  , couchdbPort: port
-  , couchdbPassword: password
   , indexedRoles: empty
   , indexedContexts: empty
   , post: Nothing
@@ -106,9 +101,6 @@ stompClient = gets _.stompClient
 
 setStompClient :: StompClient -> MonadPerspectives Unit
 setStompClient bs = modify \s -> s {stompClient = Just bs}
-
-backendIsCouchdb :: forall f. MonadPouchdb f Boolean
-backendIsCouchdb = gets (isJust <<< _.couchdbUrl <<< _.userInfo)
 
 -----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS

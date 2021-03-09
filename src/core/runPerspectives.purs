@@ -28,7 +28,6 @@ import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar, new)
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
-import Perspectives.CouchdbState (UserName(..))
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Prelude (bind, show, ($), (<>))
@@ -39,15 +38,11 @@ runPerspectives :: forall a. String -> String -> String -> String -> Int -> Stri
 runPerspectives userName password systemId host port publicRepo mp = do
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState
-        { _rev: Nothing
-        , systemIdentifier: systemId
+        { systemIdentifier: systemId
         , password
         , couchdbUrl: Just (host <> ":" <> show port <> "/")
-        , userName: UserName userName
+        -- , userName: UserName userName
         }
-      host
-      port
-      password
       publicRepo) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
   runReaderT mp rf
 

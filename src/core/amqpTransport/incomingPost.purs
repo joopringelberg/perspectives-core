@@ -45,7 +45,6 @@ import Perspectives.PerspectivesState (brokerService, setBrokerService, setStomp
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
-import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
@@ -54,7 +53,7 @@ import Prelude (Unit, bind, pure, show, unit, void, ($), (>=>), (>>=), discard, 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
   -- get the post database
-  post <- postDbName
+  post <- postDatabaseName
   mbrokerService <- brokerService
   case mbrokerService of
     Just {topic, queueId, login, passcode, vhost, url} -> do

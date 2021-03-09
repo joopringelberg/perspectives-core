@@ -41,7 +41,7 @@ import Foreign.Object (Object)
 import Foreign.Object as F
 import Perspectives.AMQP.Stomp (ConnectAndSubscriptionParameters, StompClient)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.Couchdb.ChangesFeed (EventSource)
+import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)

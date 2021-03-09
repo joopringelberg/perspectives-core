@@ -96,7 +96,7 @@ type MonadPouchdb f = ReaderT (AVar (PouchdbState f)) Aff
 -----------------------------------------------------------
 -- RUNMONADPOUCHDB
 -----------------------------------------------------------
--- | Run an action in MonadCouchdb, given a username and password etc.
+-- | Run an action in MonadPouchdb, given a username and password etc.
 -- | Its primary use is in addAttachment_ (to add an attachment using the default "admin" account).
 runMonadPouchdb :: forall a. UserName -> Password -> SystemIdentifier -> Maybe Url -> MonadPouchdb () a
   -> Aff a

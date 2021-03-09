@@ -45,7 +45,7 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (bottom, getProperty, roleType_)
 import Perspectives.Names (getMySystem)
-import Perspectives.Persistence.API (addDocument)
+import Perspectives.Persistence.API (Url, addDocument)
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
@@ -58,7 +58,6 @@ import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
-import Perspectives.User (getCouchdbBaseURL)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (>=>), (>>>), not, eq, (==))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
@@ -75,8 +74,8 @@ distributeTransactie' t = do
   pure unit
 
 -- | Send a transaction using the Couchdb Channel.
-sendTransactieToUserUsingCouchdb :: String -> TransactionForPeer -> MonadPerspectives Unit
-sendTransactieToUserUsingCouchdb userId t = do
+sendTransactieToUserUsingCouchdb :: Url -> String -> TransactionForPeer -> MonadPerspectives Unit
+sendTransactieToUserUsingCouchdb cdbUrl userId t = do
   -- TODO controleer of hier authentication nodig is!
   userType <- roleType_ (RoleInstance userId)
   getChannel <- getDynamicPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ST $ userType)
@@ -84,7 +83,6 @@ sendTransactieToUserUsingCouchdb userId t = do
   case mchannel of
     Nothing -> pure unit
     Just (Value channel) -> do
-      cdbUrl <- getCouchdbBaseURL
       transactionNumber <- nextTransactionNumber
       void $ addDocument (cdbUrl <> channel) t (transactieID t <> "_" <> show transactionNumber)
 

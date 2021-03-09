@@ -47,13 +47,13 @@ import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (binding, bottom, context, getEnumeratedRoleInstances, roleType, roleType_)
 import Perspectives.Persistence.API (createDatabase)
+import Perspectives.Persistence.State (getCouchdbBaseURL, withCouchdbUrl)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value, externalRole)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, setChannelReplication)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
-import Perspectives.User (getHost, getPort)
 import Prelude (class Monad, Unit, bind, discard, eq, map, not, pure, unit, ($), (&&), (<$>), (>>=), (>>>), (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -154,24 +154,28 @@ serialiseAsJsonFor_ userType cid = do
 -- | This function expects an instance of type sys:Invitation, creates a channel and binds it to the Invitation
 -- | in the role PrivateChannel.
 addChannel :: ContextInstance -> MPT Unit
-addChannel invitation = createChannel >>= \channel -> do
-  void $ createAndAddRoleInstance
-    (EnumeratedRoleType "model:System$Invitation$PrivateChannel")
-    (unwrap invitation)
-    (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
-  lift2 $ setChannelReplication channel
+addChannel invitation = do
+  mCouchdburl <- lift2 $ getCouchdbBaseURL
+  case mCouchdburl of
+    Nothing -> throwError $ (error "addChannel expects a couchdbUrl.")
+    Just url -> createChannel url >>= \channel -> do
+      void $ createAndAddRoleInstance
+        (EnumeratedRoleType "model:System$Invitation$PrivateChannel")
+        (unwrap invitation)
+        (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
+      lift2 $ setChannelReplication url channel
 
 -- | Create a database with the given name, if it does not yet exist (it may exist if the Initiator uses the same
 -- | Couchdb installation as the ConnectedPartner).
 -- | Also set up sync with the post database.
 createCopyOfChannelDatabase :: Array String -> ContextInstance -> MPT Unit
-createCopyOfChannelDatabase arrWithChannelName invitation = case ARR.head arrWithChannelName of
-  Just channelName -> lift2 $ do
+createCopyOfChannelDatabase arrWithChannelName invitation =case ARR.head arrWithChannelName of
+  Just channelName -> void $ lift2 $ withCouchdbUrl \url -> do
     -- If the database existed prior to this line, nothing is created.
     void $ createDatabase channelName
     mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Invitation$PrivateChannel") >=> binding >=> context)
     case mchannelContext of
-      Just channelContext -> setChannelReplication channelContext
+      Just channelContext -> setChannelReplication url channelContext
       Nothing -> pure unit
   Nothing -> pure unit
 
@@ -188,9 +192,7 @@ addConnectedPartnerToChannel userArr channelArr cid = do
           Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the second argument.")
           Just channelId -> do
             -- log $ "addConnectedPartnerToChannel " <> show usr <> " en " <> show channelId
-            host <- lift2 getHost
-            port <- lift2 getPort
-            addPartnerToChannel usr (ContextInstance channelId) host port
+            addPartnerToChannel usr (ContextInstance channelId)
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.

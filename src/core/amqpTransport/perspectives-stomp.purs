@@ -64,8 +64,8 @@ import Foreign (ForeignError(..), MultipleErrors)
 import Foreign.Class (class Decode)
 import Foreign.Generic (decodeJSON)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CouchdbState (MonadCouchdb)
 import Perspectives.Identifiers (getFirstMatch)
+import Perspectives.Persistence.Types (MonadPouchdb)
 
 -----------------------------------------------------------
 -- STOMPURL
@@ -133,14 +133,14 @@ connectAndSubscribe stompClient params = runEffectFn5 connectAndSubscribeImpl
 -- MESSAGEPRODUCER
 -----------------------------------------------------------
 -- | A Producer of Messages.
-messageProducer' :: forall f p. StompClient -> ConnectAndSubscriptionParameters p -> Producer Message (MonadCouchdb f) Unit
+messageProducer' :: forall f p. StompClient -> ConnectAndSubscriptionParameters p -> Producer Message (MonadPouchdb f) Unit
 messageProducer' stompClient params = produce' (connectAndSubscribe stompClient params)
 
 type StructuredMessage f =
   { body :: f
   , ack :: AcknowledgeFunction}
 
-messageProducer :: forall t f p. Decode t => StompClient -> ConnectAndSubscriptionParameters p -> Producer (Either MultipleErrors (StructuredMessage t)) (MonadCouchdb f) Unit
+messageProducer :: forall t f p. Decode t => StompClient -> ConnectAndSubscriptionParameters p -> Producer (Either MultipleErrors (StructuredMessage t)) (MonadPouchdb f) Unit
 messageProducer stompClient params = (messageProducer' stompClient params) $~ (forever (transform decodeMessage))
   where
     decodeMessage :: Message -> Either MultipleErrors (StructuredMessage t)
@@ -163,7 +163,7 @@ messageProducer stompClient params = (messageProducer' stompClient params) $~ (f
 -- ACKNOWLEDGE
 -----------------------------------------------------------
 
-acknowledge :: forall f. AcknowledgeFunction -> MonadCouchdb f Unit
+acknowledge :: forall f. AcknowledgeFunction -> MonadPouchdb f Unit
 acknowledge ack = liftEffect $ runEffectFn1 ack {}
 
 -----------------------------------------------------------

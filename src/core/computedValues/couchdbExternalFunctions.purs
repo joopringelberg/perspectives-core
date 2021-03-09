@@ -51,7 +51,6 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, chan
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (DocWithAttachmentInfo(..))
-import Perspectives.Couchdb.Databases (getAttachmentsFromUrl, getViewOnDatabase_)
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
@@ -66,7 +65,8 @@ import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getSystemIdentifier, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
+import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
+import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
@@ -91,7 +91,7 @@ models _ = ArrayT do
     getExternalRoles :: MP (Array RoleInstance)
     getExternalRoles = do
       repo <- publicRepository
-      (roles :: Array PerspectRol) <- catchError (getViewOnDatabase_ repo "" "defaultViews" "modeldescriptions" (Nothing :: Maybe Unit))
+      (roles :: Array PerspectRol) <- catchError (getViewOnDatabase repo "defaultViews/modeldescriptions" (Nothing :: Maybe Unit))
         \_ -> do
           logPerspectivesError $ Custom "getExternalRoles failed"
           pure []
