@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars 2019, 2020
+-- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021
 domain: System
   use: sys for model:System
   use: cdb for model:Couchdb
@@ -68,6 +68,11 @@ domain: System
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
 
     context: PendingInvitations = callExternal cdb:PendingInvitations() returns: sys:Invitation$External
+
+    thing: Databases (mandatory, not functional)
+      -- Name is one of: post, data, models.
+      property: Name (mandatory, functional, String)
+      property: Identifier (mandatory, functional, String)
 
   case: PhysicalContext
     user: UserWithAddress
