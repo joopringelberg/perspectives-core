@@ -31,12 +31,12 @@ import Data.Tuple (fst)
 import Effect (Effect)
 import Effect.Aff (Error, catchError, error, forkAff, joinFiber, runAff, throwError, try)
 import Effect.Aff.AVar (new)
+import Effect.Aff.Class (liftAff)
 import Foreign (Foreign)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
-import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
@@ -46,13 +46,14 @@ import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase)
-import Perspectives.Persistence.State (withCouchdbUrl)
+import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
+import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
-import Perspectives.SetupCouchdb (createPerspectivesUser, setupPerspectivesInCouchdb)
+import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setRoleView, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>))
@@ -84,8 +85,8 @@ main = pure unit
 -- | To be called from the client.
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
 -- | Implementation note: the PouchdbUser should have a couchdbUrl that terminates on a forward slash.
-runPDR :: UserName -> Password -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-runPDR usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler do
+runPDR :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
+runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
   case decodePouchdbUser' rawPouchdbUser of
     Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
     Right (pdbu :: PouchdbUser) -> do
@@ -96,7 +97,6 @@ runPDR usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler do
       }
       state <- new $ newPerspectivesState pouchdbUser publicRepo
       runPerspectivesWithState (do
-        void $ setupUser
         addAllExternalFunctions
         addIndexedNames
         retrieveBrokerService)
@@ -141,9 +141,37 @@ createUser userName password couchdbUrl = void $ runAff
   handleError
   (createPerspectivesUser userName password couchdbUrl)
 
+createAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
+createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
+  case decodePouchdbUser' rawPouchdbUser of
+    Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
+    Right (pdbu :: PouchdbUser) -> do
+      (pouchdbUser :: PouchdbUser) <- pure
+        { systemIdentifier: pdbu.systemIdentifier
+        , password: pdbu.password
+        , couchdbUrl: pdbu.couchdbUrl
+        }
+      state <- new $ newPerspectivesState pouchdbUser publicRepo
+      runPerspectivesWithState
+        (do
+          -- TODO. Vermoedelijk is dit overbodig voor Pouchdb.
+          getSystemIdentifier >>= createUserDatabases
+          setupUser
+          )
+        state
+  where
+    handler :: Either Error Unit -> Effect Unit
+    handler (Left e) = do
+      logPerspectivesError $ Custom $ "An error condition in createAccount: " <> (show e)
+      callback false
+    handler (Right e) = do
+      logPerspectivesError $ Custom $ "Created an account " <> usr
+      callback true
+
+
 -- | This is for development only! Assumes the user identifier equals the user name.
-resetAccount :: UserName -> Password -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-resetAccount usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler
+resetAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
+resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
       Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
@@ -167,7 +195,8 @@ resetAccount usr pwd rawPouchdbUser publicRepo callback = void $ runAff handler
             for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDb <<< unwrap
             clearUserDatabase
             clearModelDatabase
-            clearPostDatabase)
+            clearPostDatabase
+            setupUser)
           state
     where
 

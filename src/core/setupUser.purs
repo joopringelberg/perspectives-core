@@ -42,16 +42,10 @@ modelDirectory = "./src/model"
 -- | Note that the repository should have model:Couchdb, model:Serialise and model:System.
 setupUser :: MonadPerspectives Unit
 setupUser = do
-  sysId <- getMySystem
-  (mu :: Maybe PerspectContext) <- tryGetPerspectEntiteit (ContextInstance sysId)
-  case mu of
-    Nothing -> do
-      -- First, upload model:System to perspect_models.
-      repo <- publicRepository
-      void $ runSterileTransaction (addModelToLocalStore [repo <> "model:System"] (RoleInstance ""))
-      entitiesDatabaseName >>= setRoleView
-      entitiesDatabaseName >>= setRoleFromContextView
-      entitiesDatabaseName >>= setPendingInvitationView
-      entitiesDatabaseName >>= setContextView
-
-    otherwise -> pure unit
+  -- First, upload model:System to perspect_models.
+  repo <- publicRepository
+  void $ runSterileTransaction (addModelToLocalStore [repo <> "model:System"] (RoleInstance ""))
+  entitiesDatabaseName >>= setRoleView
+  entitiesDatabaseName >>= setRoleFromContextView
+  entitiesDatabaseName >>= setPendingInvitationView
+  entitiesDatabaseName >>= setContextView
