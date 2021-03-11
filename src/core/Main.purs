@@ -108,10 +108,11 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
             logPerspectivesError $ Custom $ "API stopped and restarted because of: " <> show e
       -- Trial and error shows us that if we apply the pattern used for setupApi to incomingPost,
       -- The application will not run well.
-      postFiber <- forkAff $ runPerspectivesWithState incomingPost state
-      catchError (joinFiber postFiber)
-        \e -> do
-          logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
+      void $ forkAff $ do
+        postFiber <- forkAff $ runPerspectivesWithState incomingPost state
+        catchError (joinFiber postFiber)
+          \e -> do
+            logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
   where
       handler :: Either Error Unit -> Effect Unit
       handler (Left e) = do
