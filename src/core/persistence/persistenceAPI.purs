@@ -153,7 +153,6 @@ withDatabase dbName fun = ensureAuthentication $ do
 type DatabaseInfo =
   { db_name :: DatabaseName
   , doc_count :: Int
-  , update_seq :: Int
   }
 
 databaseInfo :: forall f. DatabaseName -> MonadPouchdb f DatabaseInfo
