@@ -100,10 +100,10 @@ createUserDatabases user = do
   void $ databaseInfo $ user <> "_entities"
   createDatabase $ user <> "_post"
   void $ databaseInfo $ user <> "_post"
-  createDatabase $ user <> "_models/"
+  createDatabase $ user <> "_models"
   void $ databaseInfo $ user <> "_models"
   -- Now set the security document such that there is no role restriction for members.
-  void $ withCouchdbUrl \url -> setSecurityDocument url (user <> "_models/")
+  void $ withCouchdbUrl \url -> setSecurityDocument url (user <> "_models")
       (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
 
 -----------------------------------------------------------
