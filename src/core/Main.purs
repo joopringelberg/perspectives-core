@@ -31,7 +31,6 @@ import Data.Tuple (fst)
 import Effect (Effect)
 import Effect.Aff (Error, catchError, error, forkAff, joinFiber, runAff, throwError, try)
 import Effect.Aff.AVar (new)
-import Effect.Aff.Class (liftAff)
 import Foreign (Foreign)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
@@ -49,11 +48,11 @@ import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, U
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
-import Perspectives.PerspectivesState (newPerspectivesState)
+import Perspectives.PerspectivesState (newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
-import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setRoleView, setupPerspectivesInCouchdb)
+import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>))
@@ -197,6 +196,8 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
             clearUserDatabase
             clearModelDatabase
             clearPostDatabase
+            -- clear the caches, otherwise nothing happens.
+            resetCaches
             setupUser)
           state
     where

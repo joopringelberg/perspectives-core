@@ -103,6 +103,23 @@ setStompClient :: StompClient -> MonadPerspectives Unit
 setStompClient bs = modify \s -> s {stompClient = Just bs}
 
 -----------------------------------------------------------
+-- RESETTING CACHES
+-----------------------------------------------------------
+resetDomeinCache :: MonadPerspectives Unit
+resetDomeinCache = modify \s -> s {domeinCache = new unit}
+
+resetRoleInstances :: MonadPerspectives Unit
+resetRoleInstances = modify \s -> s {rolInstances = new unit}
+
+resetContextInstances :: MonadPerspectives Unit
+resetContextInstances = modify \s -> s {contextInstances = new unit}
+
+resetCaches :: MonadPerspectives Unit
+resetCaches = do
+  resetDomeinCache
+  resetRoleInstances
+  resetContextInstances
+-----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS
 -----------------------------------------------------------
 getVariableBindings :: MonadPerspectives (ENV.Environment (Array String))
