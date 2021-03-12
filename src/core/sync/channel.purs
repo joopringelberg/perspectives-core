@@ -225,8 +225,8 @@ setChannelReplication couchdbUrl channel = do
                   if myHost == yourHost
                     then pure unit
                     else do
-                      port <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Port"
-                      portValue <- you ##> port
+                      getPort <- getPropertyFunction "sys:PhysicalContext$UserWithAddress$Port"
+                      portValue <- you ##> getPort
                       case portValue of
                         Nothing -> pure unit
                         -- REPLICATE LOCAL CHANNEL TO HOST, JUST TRANSACTIONS AUTHORED BY ME.

@@ -185,7 +185,7 @@ documentsInDatabase dbName = withDatabase dbName
 
 foreign import documentsInDatabaseImpl :: PouchdbDatabase -> EffectFnAff Foreign
 
-type Rev = String
+type Rev = {rev :: String}
 type PouchdbAllDocs =
   { offset :: Int
   , rows :: Array { id :: String, value :: Rev}

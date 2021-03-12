@@ -22,17 +22,14 @@
 
 module Perspectives.SetupUser where
 
-import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.InstanceRepresentation (PerspectContext)
-import Perspectives.Names (getMySystem)
-import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName)
 import Perspectives.PerspectivesState (publicRepository)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setContextView, setPendingInvitationView, setRoleFromContextView, setRoleView)
-import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>), (>>=))
+import Prelude (Unit, bind, void, ($), discard, (<>), (>>=))
 
 modelDirectory :: String
 modelDirectory = "./src/model"

@@ -22,6 +22,7 @@
 
 module Perspectives.Sync.HandleTransaction where
 
+import Control.Monad.Error.Class (catchError)
 import Control.Monad.Except (runExcept)
 import Data.Array.NonEmpty (NonEmptyArray, head)
 import Data.Either (Either(..))
@@ -238,14 +239,16 @@ executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectives
         executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
         -- For now, we fail silently on deltas that cannot be authenticated.
         executeDelta Nothing = pure unit
-        executeDelta (Just stringifiedDelta) = case runExcept $ decodeJSON stringifiedDelta of
-          Right d1 -> executeRolePropertyDelta d1 s
-          Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-            Right d2 -> executeRoleBindingDelta d2 s
+        executeDelta (Just stringifiedDelta) = catchError
+          (case runExcept $ decodeJSON stringifiedDelta of
+            Right d1 -> executeRolePropertyDelta d1 s
             Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-              Right d3 -> executeContextDelta d3 s
+              Right d2 -> executeRoleBindingDelta d2 s
               Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                Right d4 -> executeUniverseRoleDelta d4 s
+                Right d3 -> executeContextDelta d3 s
                 Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                  Right d5 -> executeUniverseContextDelta d5 s
-                  Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta)
+                  Right d4 -> executeUniverseRoleDelta d4 s
+                  Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                    Right d5 -> executeUniverseContextDelta d5 s
+                    Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
+          (\e -> liftEffect $ log (show e))

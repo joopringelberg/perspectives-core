@@ -33,7 +33,6 @@ module Perspectives.Parsing.Arc.InvertQueriesForBindings where
 
 import Prelude
 
-import Control.Plus (empty)
 import Data.Array (elemIndex, filterA, foldMap, null)
 import Data.Foldable (for_)
 import Data.Map (singleton)
@@ -43,8 +42,7 @@ import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala, unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (lookup, insert, empty) as OBJ
-import Perspectives.CoreTypes (type (~~~>), MP, (###=))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.CoreTypes (MP)
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
 import Perspectives.InvertedQuery (InvertedQuery(..), PropsAndVerbs, QueryWithAKink(..), RelevantProperties(..), addInvertedQuery, allProps, restrictToProperty)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep)
@@ -52,16 +50,14 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
 import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Action(..))
-import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole, getView)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, functional, mandatory)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (aspectsClosure)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType)
 
 -- | For a User RoleType, and an ADT EnumeratedRoleType that represents the Object of a Perspective,
 -- | construct and distribute InvertedQueries that ensure that this User is notified of changes to the role,

@@ -144,7 +144,7 @@ createUser userName password couchdbUrl = void $ runAff
 createAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
 createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
-    Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
+    Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
     Right (pdbu :: PouchdbUser) -> do
       (pouchdbUser :: PouchdbUser) <- pure
         { systemIdentifier: pdbu.systemIdentifier
@@ -174,7 +174,7 @@ resetAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect
 resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
-      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
+      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pdbu :: PouchdbUser) -> do
         (pouchdbUser :: PouchdbUser) <- pure
           { systemIdentifier: pdbu.systemIdentifier
@@ -240,16 +240,52 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
         logPerspectivesError $ Custom $ "An error condition in resetAccount: " <> (show e)
         callback false
       handler (Right e) = do
-        logPerspectivesError $ Custom $ "Cleared the account " <> usr
+        logPerspectivesError $ Custom $ "Reset the account " <> usr
         callback true
 
-      deleteDb :: DatabaseName -> MonadPerspectives Unit
-      deleteDb dbname = do
-        r <- try (deleteDatabase dbname)
-        case r of
-          Left e -> logPerspectivesError $ Custom (show e)
-          Right _ -> pure unit
+deleteDb :: DatabaseName -> MonadPerspectives Unit
+deleteDb dbname = do
+  r <- try (deleteDatabase dbname)
+  case r of
+    Left e -> logPerspectivesError $ Custom (show e)
+    Right _ -> pure unit
 
+removeAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
+removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
+  do
+    case decodePouchdbUser' rawPouchdbUser of
+      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in removeAccount")
+      Right (pdbu :: PouchdbUser) -> do
+        (pouchdbUser :: PouchdbUser) <- pure
+          { systemIdentifier: pdbu.systemIdentifier
+          , password: pdbu.password
+          , couchdbUrl: pdbu.couchdbUrl
+          }
+        state <- new $ newPerspectivesState pouchdbUser publicRepo
+        runPerspectivesWithState
+          do
+            -- Get all Channels
+            getChannels <- getRoleFunction "sys:PerspectivesSystem$Channels"
+            -- End their replication
+            system <- getMySystem
+            (channels :: Array ContextInstance) <- (ContextInstance system) ##= getChannels >=> context
+            void $ withCouchdbUrl \url -> for_ channels (endChannelReplication url)
+            -- remove the channels
+            getChannelDbId <- getPropertyFunction "sys:Channel$External$ChannelDatabaseName"
+            for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDb <<< unwrap
+            -- remove the databases
+            entitiesDatabaseName >>= deleteDb
+            modelsDatabaseName >>= deleteDb
+            postDatabaseName >>= deleteDb
+          state
+  where
+    handler :: Either Error Unit -> Effect Unit
+    handler (Left e) = do
+      logPerspectivesError $ Custom $ "An error condition in removeAccount: " <> (show e)
+      callback false
+    handler (Right e) = do
+      logPerspectivesError $ Custom $ "removeAccount an account " <> usr
+      callback true
 
 -- | Retrieve all instances of sys:Model$IndexedRole and sys:Model$IndexedContext and create a table of
 -- | all known indexed names and their private replacements in PerspectivesState.
