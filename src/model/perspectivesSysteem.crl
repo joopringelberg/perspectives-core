@@ -14,6 +14,12 @@ sys:PerspectivesSystem sys:MySystem
 			$ClusterGenoot -> sys:Me
 				$Url = "http://localhost"
 	$IndexedContexts => sys:MySystem
+	$Databases => ()
+		$Name = "post"
+	$Databases => ()
+		$Name = "data"
+	$Databases => ()
+		$Name = "models"
 	$ModelsInUse =>
 		sys:Model usr:PerspectivesSystemModel
 			extern sys:RootContext$External$Name = "Perspectives System"
@@ -24,9 +30,3 @@ sys:PerspectivesSystem sys:MySystem
 				$Name = "System$MySystem"
 			$IndexedRole -> sys:Me
 				$Name = "System$Me"
-  $Databases(0) => ()
-		$Name = "post"
-	$Databases(1) => ()
-		$Name = "data"
-	$Databases(2) => ()
-		$Name = "models"

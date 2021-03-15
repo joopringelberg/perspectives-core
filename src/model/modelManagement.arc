@@ -57,14 +57,17 @@ domain: ModelManagement
 
     bot: for Author
       perspective on: extern
-        if extern >> ((exists ArcSource) and not exists ArcFeedback) then
-          ArcFeedback = extern >> callExternal p:ParseAndCompileArc( ArcSource ) returns: String
+        rule ProcessArc:
+          if extern >> ((exists ArcSource) and not exists ArcFeedback) then
+            ArcFeedback = extern >> callExternal p:ParseAndCompileArc( ArcSource ) returns: String
     bot: for Author
       perspective on: extern
-        if extern >> ((exists CrlSource) and not exists CrlFeedback) then
-          CrlFeedback = extern >> callExternal p:ParseAndCompileCrl( CrlSource ) returns: String
+        rule ProcessCrl:
+          if extern >> ((exists CrlSource) and not exists CrlFeedback) then
+            CrlFeedback = extern >> callExternal p:ParseAndCompileCrl( CrlSource ) returns: String
     bot: for Author
       perspective on: extern
-        if extern >> (ArcOK and CrlOK) then
-          -- TODO. Add a reload time property and set it after uploading.
-          callEffect p:UploadToRepository( extern >> ArcSource, extern >> CrlSource, Repository >> Url )
+        rule UploadToRepository:
+          if extern >> (ArcOK and CrlOK) then
+            -- TODO. Add a reload time property and set it after uploading.
+            callEffect p:UploadToRepository( extern >> ArcSource, extern >> CrlSource, Repository >> Url )

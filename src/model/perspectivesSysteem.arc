@@ -51,18 +51,20 @@ domain: System
     bot: for User
       -- This rule creates an entry in IndexedContexts if its model has been taken in use.
       perspective on: ModelsInUse
+        rule BindModelInIndexedContext:
         if exists (object >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts) then
           bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
 
       -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
       perspective on: DanglingIndexedContext
-        if exists DanglingIndexedContext then
-          -- After removing the object, we can no longer find the name, so bind it first.
-          let* model <- object >> binding >> context >> contextType >> modelname
-          in
-            remove object
-            -- Until we've got sound and complete cascade delete, do not remove the model.
-            -- callEffect cdb:RemoveModelFromLocalStore (model)
+        rule RemoveDanglingIndexedContext:
+          if exists DanglingIndexedContext then
+            -- After removing the object, we can no longer find the name, so bind it first.
+            let* model <- object >> binding >> context >> contextType >> modelname
+            in
+              remove object
+              -- Until we've got sound and complete cascade delete, do not remove the model.
+              -- callEffect cdb:RemoveModelFromLocalStore (model)
 
     -- An entry in IndexedContexts is dangling if its model is not in use.
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
@@ -140,8 +142,9 @@ domain: System
 
     bot: for Inviter
       perspective on: extern
-        if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then
-          SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
+        rule SerialiseInviation:
+          if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then
+            SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user: Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
