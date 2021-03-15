@@ -129,3 +129,4 @@ instance revisionEnumeratedRole :: Revision EnumeratedRole where
 
 instance identifiableEnumeratedRole :: Identifiable EnumeratedRole EnumeratedRoleType where
   identifier (EnumeratedRole{_id}) = _id
+  displayName (EnumeratedRole{displayName:d}) = d

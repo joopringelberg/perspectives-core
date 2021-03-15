@@ -107,6 +107,7 @@ instance revisionContext :: Revision Context where
 
 instance identifiableContext :: Identifiable Context ContextType where
   identifier (Context{_id}) = _id
+  displayName (Context{displayName:d}) = d
 
 derive instance genericContextKind :: Generic ContextKind _
 instance showContextKind :: Show ContextKind where show = genericShow

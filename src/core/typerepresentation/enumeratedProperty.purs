@@ -91,3 +91,4 @@ instance revisionEnumeratedProperty :: Revision EnumeratedProperty where
 
 instance identifiableEnumeratedProperty :: Identifiable EnumeratedProperty EnumeratedPropertyType where
   identifier (EnumeratedProperty{_id}) = _id
+  displayName (EnumeratedProperty{displayName:d}) = d

@@ -84,3 +84,4 @@ instance revisionCalculatedProperty :: Revision CalculatedProperty where
 
 instance identifiableCalculatedProperty :: Identifiable CalculatedProperty CalculatedPropertyType where
   identifier (CalculatedProperty{_id}) = _id
+  displayName (CalculatedProperty{displayName:d}) = d

@@ -93,6 +93,7 @@ instance eqDomeinFile :: Eq DomeinFile where
 
 instance identifiableDomeinFile :: Identifiable DomeinFile DomeinFileId where
   identifier (DomeinFile{_id}) = DomeinFileId _id
+  displayName (DomeinFile{_id}) = _id
 
 instance revisionDomeinFile :: Revision DomeinFile where
   rev = _._rev <<< unwrap

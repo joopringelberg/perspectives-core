@@ -26,6 +26,7 @@ import Data.Newtype (class Newtype, unwrap)
 
 class Newtype i String <= Identifiable e i | e -> i where
   identifier :: e -> i
+  displayName :: e -> String
 
 identifier_ :: forall e i. Identifiable e i => e -> String
 identifier_ x = unwrap (identifier x :: i)

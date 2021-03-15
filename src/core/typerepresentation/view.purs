@@ -81,6 +81,7 @@ instance revisionView :: Revision View where
 
 instance identifiableView :: Identifiable View ViewType where
   identifier (View{_id}) = _id
+  displayName (View{displayName:d}) = d
 
 instance ordView :: Ord View where
   compare (View{_id:id1}) (View{_id:id2}) = compare id1 id2

@@ -88,6 +88,7 @@ derive instance newtypePerspectContext :: Newtype PerspectContext _
 
 instance identifiablePerspectContext :: Identifiable PerspectContext ContextInstance where
   identifier (PerspectContext{_id}) = _id
+  displayName (PerspectContext{displayName:d}) = d
 
 instance revisionPerspectContext :: Revision PerspectContext where
   rev = _._rev <<< unwrap
@@ -144,6 +145,7 @@ instance revisionPerspectRol :: Revision PerspectRol where
 
 instance identifiablePerspectRol :: Identifiable PerspectRol RoleInstance where
   identifier (PerspectRol{_id}) = _id
+  displayName (PerspectRol{_id}) = unwrap _id
 
 -----------------------------------------------------------
 -- REVISION, BINDING

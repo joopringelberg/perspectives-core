@@ -93,3 +93,4 @@ instance revisionCalculatedRole :: Revision CalculatedRole where
 
 instance identifiableCalculatedRole :: Identifiable CalculatedRole CalculatedRoleType where
   identifier (CalculatedRole{_id}) = _id
+  displayName (CalculatedRole{displayName:d}) = d
