@@ -97,7 +97,7 @@ newtype PerspectiveE = PerspectiveE
 data PerspectivePart = Object Step | DefaultView String | Act ActionE | Rule RuleE
 
 newtype ActionE = ActionE
-  { id :: String
+  { id :: Maybe String
   , verb :: Verb
   , actionParts :: List ActionPart
   , pos :: ArcPosition

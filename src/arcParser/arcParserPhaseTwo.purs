@@ -30,7 +30,7 @@ import Data.Foldable (foldl)
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head, null, sort, (:))
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
@@ -60,7 +60,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Prelude (bind, discard, map, not, pure, show, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (<*))
+import Prelude (bind, discard, identity, map, not, pure, show, ($), (&&), (<$>), (<*), (<<<), (<>), (==), (>>=))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
@@ -497,7 +497,7 @@ traverseActionE objectCalculation defaultObjectView rolename actions (Act (Actio
   action <- pure $ Action
     { _id: ActionType actionId
     , _rev: Nothing
-    , displayName: id
+    , displayName: maybe "" identity id
     , subject: rolename
     , verb: verb
     , object: objectCalculation

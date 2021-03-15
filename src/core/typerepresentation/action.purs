@@ -82,6 +82,7 @@ instance revisionAction :: Revision Action where
 
 instance identifiableAction :: Identifiable Action ActionType where
   identifier (Action{_id}) = _id
+  displayName (Action{displayName:d}) = d
 
 -----------------------------------------------------------
 -- VERB

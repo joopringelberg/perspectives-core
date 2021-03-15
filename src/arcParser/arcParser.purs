@@ -312,7 +312,7 @@ perspectiveE = try do
     minimalAction' = mkActionFromVerb <$> getPosition <*> token.identifier
 
 mkActionFromVerb :: ArcPosition -> String -> PerspectivePart
-mkActionFromVerb pos v = Act $ ActionE {id: "", verb: constructVerb v, actionParts: Nil, pos}
+mkActionFromVerb pos v = Act $ ActionE {id: Nothing, verb: constructVerb v, actionParts: Nil, pos}
 
 constructVerb :: String -> Verb
 constructVerb v = case v of
@@ -336,7 +336,7 @@ constructVerb v = case v of
 -- |    if Prop1 < 10
 actionE :: IP PerspectivePart
 actionE = try $ withEntireBlock
-  (\{pos, verb, mview} parts -> Act $ ActionE {id: "", verb, actionParts: case mview of
+  (\{pos, verb, mview} parts -> Act $ ActionE {id: Nothing, verb, actionParts: case mview of
     Nothing -> join parts
     (Just view) ->  Cons view (join parts), pos})
   actionE_
@@ -375,8 +375,9 @@ actionE = try $ withEntireBlock
 
 ruleE :: IP PerspectivePart
 ruleE = withPos (do
+  (ruleName :: Maybe String) <- reserved "rule" *> optionMaybe arcIdentifier <* colon
   lhs <- ruleE_
-  (letWithAssignment lhs <|> assignmentList lhs) <?> "one or more assignment expressions")
+  (letWithAssignment lhs ruleName <|> assignmentList lhs ruleName) <?> "one or more assignment expressions")
   -- TODO. IK SNAP niet waarom dit faalt. De positie in het resultaat van de LetStep (bijvoorbeeld) is rechts
   -- van die van de if. Waarom dan niet indented?
   -- indented *> (letWithAssignment lhs <|> assignmentList lhs)
@@ -391,10 +392,10 @@ ruleE_ = do
 -- |   if Wens >> Bedrag > 10 then
 -- |     SomeProp = false
 -- |     SomeOtherProp =+ "aap"
-assignmentList :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
-assignmentList {pos, condition} = try do
+assignmentList :: {pos :: ArcPosition, condition :: Step} -> Maybe String -> IP PerspectivePart
+assignmentList {pos, condition} ruleName = try do
   assignments <- entireBlock assignment
-  pure $ Act $ ActionE {id: "", verb: Change, actionParts: Cons (Condition condition) (map AssignmentPart assignments), pos}
+  pure $ Act $ ActionE {id: ruleName, verb: Change, actionParts: Cons (Condition condition) (map AssignmentPart assignments), pos}
 
 -- | A rule may also have a let* expression for its right hand side:
 -- |  if Wens >> Bedrag > 10 then
@@ -402,11 +403,11 @@ assignmentList {pos, condition} = try do
 -- |      a <- <expression>
 -- |    in
 -- |      SomeProp = a
-letWithAssignment :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
-letWithAssignment {pos, condition} = try do
+letWithAssignment :: {pos :: ArcPosition, condition :: Step} -> Maybe String -> IP PerspectivePart
+letWithAssignment {pos, condition} ruleName = try do
   ltst <- letStep
   case ltst of
-    (Let lt) -> pure $ Act $ ActionE {id: "", verb: Change, actionParts: ((Condition condition) : (LetPart lt) : Nil), pos}
+    (Let lt) -> pure $ Act $ ActionE {id: ruleName, verb: Change, actionParts: ((Condition condition) : (LetPart lt) : Nil), pos}
     (PureLet (PureLetStep{body})) -> failWithPosition "assignment expression" (arcPosition2Position (startOf body))
     otherwise -> fail "let* expression"
 

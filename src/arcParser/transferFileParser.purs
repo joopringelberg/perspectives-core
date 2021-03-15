@@ -175,12 +175,12 @@ actionE = withBlock
   actionE_
   (indirectObjectView <|> indirectObject <|> objectView <|> subjectView)
   where
-    actionE_ :: IP (Record (uname :: String, verb :: String, pos :: ArcPosition))
+    actionE_ :: IP (Record (uname :: Maybe String, verb :: String, pos :: ArcPosition))
     actionE_ = do
       verb <- reserved "Action" *> colon *> arcIdentifier
       pos <- getPosition <* colon
       uname <- arcIdentifier
-      pure {uname, verb, pos}
+      pure {uname: Just uname, verb, pos}
 
     indirectObject :: IP ActionPart
     indirectObject = reserved "IndirectObjectRef" *> colon *> arcIdentifier >>= pure <<< IndirectObject
