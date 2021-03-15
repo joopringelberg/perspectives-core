@@ -26,6 +26,7 @@ module Perspectives.Extern.Parsing where
 
 import Prelude
 
+import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (runWriterT)
 import Data.Array (head)
@@ -49,21 +50,25 @@ import Unsafe.Coerce (unsafeCoerce)
 parseAndCompileArc :: Array ArcSource -> (ContextInstance ~~> Value)
 parseAndCompileArc arcSource_ _ = case head arcSource_ of
   Nothing -> pure $ Value "No arc source given!"
-  Just arcSource -> do
-    r <- lift $ lift $ loadAndCompileArcFile_ arcSource
-    case r of
-      Left errs -> ArrayT $ pure (Value <<< show <$> errs)
-      Right _ -> pure $ Value "OK"
+  Just arcSource -> catchError
+    do
+      r <- lift $ lift $ loadAndCompileArcFile_ arcSource
+      case r of
+        Left errs -> ArrayT $ pure (Value <<< show <$> errs)
+        Right _ -> pure $ Value "OK"
+    \e -> ArrayT $ pure [Value (show e)]
 
 -- | Read the .crl file, parse it and try to compile it.
 parseAndCompileCrl :: Array CrlSource -> (ContextInstance ~~> Value)
 parseAndCompileCrl crlSource_ _ = case head crlSource_ of
   Nothing -> pure $ Value "No crl source given!"
-  Just crlSource -> do
-    r <- lift $ lift $ loadAndCacheCrlFile' crlSource
-    case r of
-      Left errs -> ArrayT $ pure (Value <<< show <$> errs)
-      Right _ -> pure $ Value "OK"
+  Just crlSource -> catchError
+    do
+      r <- lift $ lift $ loadAndCacheCrlFile' crlSource
+      case r of
+        Left errs -> ArrayT $ pure (Value <<< show <$> errs)
+        Right _ -> pure $ Value "OK"
+    \e -> ArrayT $ pure [(Value $ show e)]
 
 type ArcSource = String
 type CrlSource = String
