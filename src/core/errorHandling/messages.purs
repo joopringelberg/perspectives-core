@@ -104,6 +104,7 @@ data PerspectivesError
     | ContextErrorBoundary String String
     | DomeinFileErrorBoundary String String
     | ApiErrorBoundary String
+    | RuleErrorBoundary String String
     | ParserError String ArcPosition
     | Custom String
 
@@ -164,6 +165,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (ContextErrorBoundary boundaryName err) = "(ContextErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"
   show (DomeinFileErrorBoundary boundaryName err) = "(DomeinFileErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for DomeinFile (" <> err <> ")"
   show (ApiErrorBoundary m) = "(ApiErrorBoundary) An error occurred while processing an API request: " <> show m
+  show (RuleErrorBoundary ruleName m) = "(RuleErrorBoundary) An error occurred while running rule " <> ruleName <> ": " <> show m
+
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
 type MultipleErrors = NonEmptyList PerspectivesError

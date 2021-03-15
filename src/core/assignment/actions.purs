@@ -27,7 +27,7 @@ module Perspectives.Actions where
 import Prelude
 
 import Control.Monad.AvarMonadAsk (modify, gets)
-import Control.Monad.Error.Class (throwError, try)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, null, uncons, unsafeIndex)
@@ -49,6 +49,7 @@ import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInst
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.Error.Boundaries (handlePerspectRolError)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -58,13 +59,15 @@ import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstan
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Instances.ObjectGetters (getConditionState, roleType_, setConditionState)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, roleFunctionFromQfd)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect, objectQfd, subject)
-import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
+import Perspectives.Representation.Class.Identifiable (displayName)
+import Perspectives.Representation.Class.PersistentType (ActionType, getAction, getPerspectType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
@@ -83,21 +86,23 @@ compileBotAction actionType = do
       (action :: Action) <- getPerspectType actionType
       eff <- effect action
       subj <- pure $ subject action
+      dname <- getAction actionType >>= pure <<< displayName
       (objectCalculation :: QueryFunctionDescription) <- objectQfd action
       (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff >>= pure <<< withAuthoringRole subj
       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
-      updater <- pure $ ruleRunner lhs effectFullFunction objectCalculation
+      updater <- pure $ ruleRunner dname lhs effectFullFunction objectCalculation
       void $ pure $ cacheAction actionType updater
       pure updater
 
   where
     -- | Actual effectful function for which we track dependencies. If one of them changes,
     -- | the function is executed again.
-    ruleRunner :: (ContextInstance ~~> Value) ->
+    ruleRunner :: String ->
+      (ContextInstance ~~> Value) ->
       (Updater ContextInstance) ->
       QueryFunctionDescription ->
       (Updater ContextInstance)
-    ruleRunner lhs effectFullFunction objectQfd (contextId :: ContextInstance) = do
+    ruleRunner displayName lhs effectFullFunction objectQfd (contextId :: ContextInstance) = do
       oldEnvironment <- lift2 pushFrame
       lift2 $ addBinding "currentcontext" [unwrap contextId]
       getter <- lift2 $ roleFunctionFromQfd objectQfd
@@ -111,7 +116,7 @@ compileBotAction actionType = do
           run :: Maybe RoleInstance -> MonadPerspectivesTransaction Unit
           run Nothing = do
             (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
-            log $ "Running " <> show actionType
+            log $ "Running " <> show displayName
             if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
               then log "Condition satisfied, will run right hand side without object" *> effectFullFunction contextId
               else log "Condition not satisfied, will not run right hand side without ojbect"
@@ -119,14 +124,16 @@ compileBotAction actionType = do
             handlePerspectRolError "ruleRunner"
               \conditionWasTrue -> do
                 (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
-                log $ "Running " <> show actionType
+                log $ "Running " <> show displayName
                 if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
                   then if conditionWasTrue
                     then log ("Condition satisfied, but rule fired before on " <> show object <> ".") *> pure unit
                     else do
                       log $ "Condition satisfied, will run right hand side on " <> show object <> "."
                       lift2 $ setConditionState actionType object true
-                      effectFullFunction contextId
+                      catchError (effectFullFunction contextId)
+                        \e -> logPerspectivesError (RuleErrorBoundary displayName (show e))
+
                   else if conditionWasTrue
                     then (log $ "Condition not satisfied, rule fired before on " <> show object <> ".") *> (lift2 $ setConditionState actionType object false)
                     else log ("Condition not satisfied, rule did not fire before on " <> show object <> ".") *> pure unit
