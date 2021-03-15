@@ -26,7 +26,7 @@ module Perspectives.Extern.Couchdb where
 
 import Control.Monad.AvarMonadAsk (modify) as AMA
 import Control.Monad.Error.Class (catchError, throwError, try)
-import Control.Monad.State (State, StateT, execState, execStateT, modify)
+import Control.Monad.State (State, StateT, execState, execStateT, get, modify, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
 import Data.Array (cons, head)
@@ -50,7 +50,7 @@ import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction)
-import Perspectives.Couchdb (DocWithAttachmentInfo(..))
+import Perspectives.Couchdb (DeleteCouchdbDocument(..), DocWithAttachmentInfo(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
@@ -362,11 +362,20 @@ uploadToRepository_ dfId url df = lift $ lift $ do
       _attachments
   -- Get the revision (if any) from the remote database, so we can overwrite.
   (mVersion :: Maybe String) <- retrieveDocumentVersion url (show dfId)
-  res <- addDocument url (changeRevision mVersion df) (show dfId)
+  (newRev :: Revision_) <- addDocument url (changeRevision mVersion df) (show dfId)
   -- Now add the attachments.
-  forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
-    Nothing -> pure unit
-    Just attachment -> void $ addAttachment url (show dfId) mVersion attName attachment mimetype
+  void $ execStateT (go attachments) newRev
+
+  where
+    -- As each attachment that we add will bump the document version, we have to catch it and use it on the
+    -- next attachment.
+    go :: Object (Tuple MediaType (Maybe String)) -> StateT Revision_ MonadPerspectives Unit
+    go attachments = forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
+      Nothing -> pure unit
+      Just attachment -> do
+        newRev <- get
+        DeleteCouchdbDocument {rev} <- lift $ addAttachment url (show dfId) newRev attName attachment mimetype
+        put rev
 
 type URL = String
 
