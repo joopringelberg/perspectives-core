@@ -35,7 +35,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.DateTime (SerializableDateTime)
 import Perspectives.Sync.SignedDelta (SignedDelta)
-import Prelude (class Show, (<>), show, ($))
+import Prelude (class Ord, class Show, class Eq, compare, show, ($), (<>), (&&), eq)
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -72,3 +72,9 @@ transactieID (TransactionForPeer{author, timeStamp}) = author <> "_" <> show tim
 instance revisionTransactionForPeer :: Revision TransactionForPeer where
   rev t = Nothing
   changeRevision _ t = t
+
+instance eqTransactionForPeer :: Eq TransactionForPeer where
+  eq (TransactionForPeer{timeStamp: t1, author: a1}) (TransactionForPeer{timeStamp: t2, author: a2}) = eq t1 t2 && eq a1 a2
+
+instance ordTransactionForPeer :: Ord TransactionForPeer where
+  compare (TransactionForPeer{timeStamp: t1}) (TransactionForPeer{timeStamp: t2}) = compare t1 t2

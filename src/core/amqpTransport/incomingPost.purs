@@ -24,11 +24,13 @@ module Perspectives.AMQP.IncomingPost where
 import Control.Coroutine (Consumer, Producer, await, runProcess, ($$))
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
+import Data.Array (nub, sort)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.List.NonEmpty (head)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign (ForeignError(..), MultipleErrors)
@@ -48,7 +50,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransac
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
-import Prelude (Unit, bind, pure, show, unit, void, ($), (>=>), (>>=), discard, (*>), (<>), (>>>), map)
+import Prelude (Unit, bind, pure, show, unit, void, ($), (>=>), (>>=), discard, (*>), (<>), (>>>), map, (<$>), (<<<))
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
@@ -101,13 +103,11 @@ incomingPost = do
       (waitingTransactions :: Array String) <- documentsInDatabase postDB >>= _.rows >>> map _.id >>> pure
       mstompClient <- stompClient
       case mstompClient of
-        Just stompClient -> for_ waitingTransactions \tname -> do
-          mdoc <- getDocument_ postDB tname
-          case mdoc of
-            Just (OutgoingTransaction{receiver, transaction}) -> do
-              liftEffect $ sendToTopic stompClient receiver tname (encodeJSON transaction)
-              -- We do not delete here; only when we receive the receipt.
-            otherwise -> pure unit
+        -- TODO. Order transactions to increasing timestamps (TransactionForPeer, timeStamp)
+        Just stompClient -> do
+          (transactions :: Array OutgoingTransaction) <- sort <<< nub <$> traverse (getDocument_ postDB) waitingTransactions
+          -- We do not delete here; only when we receive the receipt.
+          for_ transactions \(t@OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient receiver _id (encodeJSON t)
         otherwise -> pure unit
 
 -- | Construct the BrokerService from the database, if possible, and set it in PerspectivesState.

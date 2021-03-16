@@ -33,13 +33,14 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
-import Prelude (class Show)
+import Prelude (class Eq, class Ord, class Show, compare, eq)
 
 -----------------------------------------------------------
 -- OUTGOINGTRANSACTION
 -----------------------------------------------------------
 newtype OutgoingTransaction = OutgoingTransaction
-  { receiver :: String
+  { _id :: String
+  , receiver :: String
   , transaction :: TransactionForPeer
   }
 
@@ -60,3 +61,9 @@ instance decodeTransactie :: Decode OutgoingTransaction where
 instance revisionOutgoingTransaction :: Revision OutgoingTransaction where
   rev t = Nothing
   changeRevision _ t = t
+
+instance eqOutgoingTransaction :: Eq OutgoingTransaction where
+  eq (OutgoingTransaction t1) (OutgoingTransaction t2) = eq t1 t2
+
+instance ordOutgoingTransaction :: Ord OutgoingTransaction where
+  compare (OutgoingTransaction {transaction: t1}) (OutgoingTransaction {transaction: t2}) = compare t1 t2

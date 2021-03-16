@@ -112,7 +112,7 @@ sendTransactieToUserUsingAMQP userId t = do
 saveTransactionInOutgoingPost :: String -> String -> TransactionForPeer -> MonadPerspectives Unit
 saveTransactionInOutgoingPost userId messageId t = do
   postDB <- postDatabaseName
-  void $ addDocument postDB (OutgoingTransaction{ receiver: userId, transaction: t}) messageId
+  void $ addDocument postDB (OutgoingTransaction{_id: messageId, receiver: userId, transaction: t}) messageId
 
 type TransactionPerUser = Object TransactionForPeer
 
