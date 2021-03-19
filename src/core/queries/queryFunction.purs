@@ -26,15 +26,23 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
+import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Kishimen (genericSumToVariant, variantToGenericSum)
+import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
-import Prelude (class Eq, class Show)
+import Prelude (class Eq, class Show, map, show, (<<<))
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 type VariableName = String
+
+---------------------------------------------------------------------------------------
+---- FUNCTIONNAME
+---------------------------------------------------------------------------------------
 
 data FunctionName =
   ContextF
@@ -76,6 +84,61 @@ data FunctionName =
   | RoleTypesF
   | SpecialisesRoleTypeF
 
+
+derive instance genericFunctionName :: Generic FunctionName _
+instance encodeFunctionName :: Encode FunctionName where
+  encode = genericEncode defaultOptions
+instance decodeFunctionName :: Decode FunctionName where
+  decode = genericDecode defaultOptions
+
+instance eqFunctionName :: Eq FunctionName where eq = genericEq
+
+-- | The show function produces the very same string that the parser parses.
+instance showFunctionName :: Show FunctionName where
+    show ContextF = "context"
+    show BindingF = "binding"
+    show ExternalRoleF = "external" -- TODO klopt dit met de parser?
+    show IdentityF = "identity"
+    show ModelNameF = "Namespace"
+    show SequenceF = "sequence"
+    show NotF = "not"
+    show ExistsF = "exists"
+    show BindsF = "binds"
+    show BoundByF = "boundBy"
+    show FilterF = "filter"
+    show ComposeF = "compose"
+    show UnionF = "either"
+    show IntersectionF = "both"
+    show CreateContextF = "createContext"
+    show CreateRoleF = "createRole"
+    show GetRoleBindersF = "binder" -- TODO en dit?
+    show GetRoleInstancesForContextFromDatabaseF = "GetRoleInstancesForContextFromDatabaseF"
+    show EqualsF = "="
+    show NotEqualsF = "/="
+    show LessThanF = "<"
+    show LessThanEqualF = "<="
+    show GreaterThanF = ">"
+    show GreaterThanEqualF = ">="
+    show AddF = "+"
+    show SubtractF = "-"
+    show DivideF = "/"
+    show MultiplyF = "*"
+    show AndF = "and"
+    show OrF = "or"
+    show CountF = "count"
+    show MinimumF = "minimum"
+    show MaximumF = "maximum"
+    show AvailableF = "available"
+    show TypeOfContextF = "TypeOfContextF"
+    show RoleTypesF = "RoleTypesF"
+    show SpecialisesRoleTypeF = "SpecialisesRoleTypeF"
+
+instance writeForeignFunctionName :: WriteForeign FunctionName where
+  writeImpl = writeImpl <<< genericSumToVariant
+
+instance readForeignFunctionName :: ReadForeign FunctionName where
+  readImpl = map variantToGenericSum <<< readImpl
+
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
   ContextF -> True
@@ -116,7 +179,9 @@ isFunctionalFunction fn = case fn of
   RoleTypesF -> False
   SpecialisesRoleTypeF -> True
 
-
+---------------------------------------------------------------------------------------
+---- QUERYFUNCTION
+---------------------------------------------------------------------------------------
 data QueryFunction
   = DataTypeGetter FunctionName
   | DataTypeGetterWithParameter FunctionName String
@@ -171,54 +236,14 @@ instance eqQueryFunction :: Eq QueryFunction where
 
 instance encodeQueryFunction :: Encode QueryFunction where
   encode q = genericEncode defaultOptions q
+  -- encode = writeImpl
 
 instance decodeQueryFunction :: Decode QueryFunction where
   decode = genericDecode defaultOptions
+  -- decode = readImpl
 
-derive instance genericFunctionName :: Generic FunctionName _
-instance encodeFunctionName :: Encode FunctionName where
-  encode = genericEncode defaultOptions
-instance decodeFunctionName :: Decode FunctionName where
-  decode = genericDecode defaultOptions
+instance writeForeignQueryFunction :: WriteForeign QueryFunction where
+  writeImpl = writeImpl <<< genericSumToVariant
 
--- | The show function produces the very same string that the parser parses.
-instance showFunctionName :: Show FunctionName where
-    show ContextF = "context"
-    show BindingF = "binding"
-    show ExternalRoleF = "external" -- TODO klopt dit met de parser?
-    show IdentityF = "identity"
-    show ModelNameF = "Namespace"
-    show SequenceF = "sequence"
-    show NotF = "not"
-    show ExistsF = "exists"
-    show BindsF = "binds"
-    show BoundByF = "boundBy"
-    show FilterF = "filter"
-    show ComposeF = "compose"
-    show UnionF = "either"
-    show IntersectionF = "both"
-    show CreateContextF = "createContext"
-    show CreateRoleF = "createRole"
-    show GetRoleBindersF = "binder" -- TODO en dit?
-    show GetRoleInstancesForContextFromDatabaseF = "GetRoleInstancesForContextFromDatabaseF"
-    show EqualsF = "="
-    show NotEqualsF = "/="
-    show LessThanF = "<"
-    show LessThanEqualF = "<="
-    show GreaterThanF = ">"
-    show GreaterThanEqualF = ">="
-    show AddF = "+"
-    show SubtractF = "-"
-    show DivideF = "/"
-    show MultiplyF = "*"
-    show AndF = "and"
-    show OrF = "or"
-    show CountF = "count"
-    show MinimumF = "minimum"
-    show MaximumF = "maximum"
-    show AvailableF = "available"
-    show TypeOfContextF = "TypeOfContextF"
-    show RoleTypesF = "RoleTypesF"
-    show SpecialisesRoleTypeF = "SpecialisesRoleTypeF"
-
-instance eqFunctionName :: Eq FunctionName where eq = genericEq
+instance readForeightQueryFunction :: ReadForeign QueryFunction where
+  readImpl = map variantToGenericSum <<< readImpl

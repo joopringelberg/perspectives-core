@@ -25,9 +25,12 @@ module Perspectives.Representation.Range where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Prelude (class Eq, class Show)
+import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
+import Prelude (class Eq, class Show, show, (<<<))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- RANGE
@@ -42,8 +45,14 @@ instance eqRange :: Eq Range where eq = genericEq
 instance encodeRange :: Encode Range where
   encode = genericEncode defaultOptions
 
+instance writeForeignRange :: WriteForeign Range where
+  writeImpl = unsafeToForeign <<< show
+
 instance decodeRange :: Decode Range where
   decode = genericDecode defaultOptions
+
+instance readForeignRange :: ReadForeign Range where
+  readImpl = enumReadForeign
 
 instance rangeShow :: Show Range where
   show = genericShow

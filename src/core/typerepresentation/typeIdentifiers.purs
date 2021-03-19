@@ -45,9 +45,13 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, unwrap)
+import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Kishimen (genericSumToVariant, variantToGenericSum)
+import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Utilities (class PrettyPrint)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 newtype ContextType = ContextType String
 derive instance newtypeContextType :: Newtype ContextType _
@@ -60,6 +64,8 @@ instance eqContextType :: Eq ContextType where
   eq (ContextType id1) (ContextType id2) = id1 == id2
 instance prettyPrintContextType :: PrettyPrint ContextType where
   prettyPrint' t = show
+derive newtype instance writeForeignContextType :: WriteForeign ContextType
+derive newtype instance readForeignContextType :: ReadForeign ContextType
 
 newtype EnumeratedRoleType = EnumeratedRoleType String
 derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRoleType _
@@ -67,13 +73,16 @@ derive instance genericRepEnumeratedRolType :: Generic EnumeratedRoleType _
 derive newtype instance encodeEnumeratedRolType :: Encode EnumeratedRoleType
 derive newtype instance decodeEnumeratedRolType :: Decode EnumeratedRoleType
 instance showEnumeratedRolType :: Show EnumeratedRoleType where
-  show i = "EnumeratedRoleType " <> (unwrap i)
+  -- show i = "EnumeratedRoleType " <> (unwrap i)
+  show = genericShow
 instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
   eq (EnumeratedRoleType id1) (EnumeratedRoleType id2) = id1 == id2
 instance ordEnumeratedRoleType :: Ord EnumeratedRoleType where
   compare (EnumeratedRoleType p1) (EnumeratedRoleType p2) = compare p1 p2
 instance prettyPrintEnumeratedRoleType :: PrettyPrint EnumeratedRoleType where
   prettyPrint' t = show
+derive newtype instance writeForeignEnumeratedRoleType :: WriteForeign EnumeratedRoleType
+derive newtype instance readForeignEnumeratedRoleType :: ReadForeign EnumeratedRoleType
 
 newtype CalculatedRoleType = CalculatedRoleType String
 derive instance newtypeComputedRolType :: Newtype CalculatedRoleType _
@@ -88,6 +97,8 @@ instance ordCalculatedRoleType :: Ord CalculatedRoleType where
   compare (CalculatedRoleType p1) (CalculatedRoleType p2) = compare p1 p2
 instance prettyPrintCalculatedRoleType :: PrettyPrint CalculatedRoleType where
   prettyPrint' t = show
+derive newtype instance writeForeignCalculatedRoleType :: WriteForeign CalculatedRoleType
+derive newtype instance readForeignCalculatedRoleType :: ReadForeign CalculatedRoleType
 
 data RoleType = ENR EnumeratedRoleType | CR CalculatedRoleType
 derive instance genericRepRoleType :: Generic RoleType _
@@ -107,6 +118,11 @@ instance ordRoleType :: Ord RoleType where
   compare = genericCompare
 instance prettyPrintRoleType :: PrettyPrint RoleType where
   prettyPrint' t = show
+instance writeForeignRoleType :: WriteForeign RoleType where
+  writeImpl = writeImpl <<< genericSumToVariant
+instance readForeightRoleType :: ReadForeign RoleType where
+  readImpl = map variantToGenericSum <<< readImpl
+
 
 -- | We have rare occasions where we want to lose the difference between
 -- | CalculatedRoletype and EnumeratedRoleType.
@@ -142,6 +158,11 @@ instance showRoleKind :: Show RoleKind where
   show = genericShow
 instance eqRoleKind :: Eq RoleKind where
   eq = genericEq
+instance writeForeignRoleKind :: WriteForeign RoleKind where
+  writeImpl = unsafeToForeign <<< show
+instance readForeignRoleKind :: ReadForeign RoleKind where
+  readImpl = enumReadForeign
+
 
 newtype EnumeratedPropertyType = EnumeratedPropertyType String
 derive instance newtypeEnumeratedPropertyType :: Newtype EnumeratedPropertyType _
@@ -156,6 +177,9 @@ instance ordEnumeratedPropertyType :: Ord EnumeratedPropertyType where
   compare (EnumeratedPropertyType p1) (EnumeratedPropertyType p2) = compare p1 p2
 instance prettyPrintEnumeratedPropertyType :: PrettyPrint EnumeratedPropertyType where
   prettyPrint' t = show
+derive newtype instance writeForeignEnumeratedPropertyType :: WriteForeign EnumeratedPropertyType
+derive newtype instance readForeignEnumeratedPropertyType :: ReadForeign EnumeratedPropertyType
+
 
 newtype CalculatedPropertyType = CalculatedPropertyType String
 derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
@@ -170,6 +194,8 @@ instance ordCalculatedPropertyType :: Ord CalculatedPropertyType where
   compare (CalculatedPropertyType p1) (CalculatedPropertyType p2) = compare p1 p2
 instance prettyPrintCalculatedPropertyType :: PrettyPrint CalculatedPropertyType where
   prettyPrint' t = show
+derive newtype instance writeForeignCalculatedPropertyType :: WriteForeign CalculatedPropertyType
+derive newtype instance readForeignCalculatedPropertyType :: ReadForeign CalculatedPropertyType
 
 data PropertyType = ENP EnumeratedPropertyType | CP CalculatedPropertyType
 
@@ -195,6 +221,10 @@ instance eqPropertyType :: Eq PropertyType where
   eq (ENP r1) (ENP r2) = r1 == r2
 instance prettyPrintPropertyType :: PrettyPrint PropertyType where
   prettyPrint' t = show
+instance writeForeignPropertyType :: WriteForeign PropertyType where
+  writeImpl = writeImpl <<< genericSumToVariant
+instance readForeightPropertyType :: ReadForeign PropertyType where
+  readImpl = map variantToGenericSum <<< readImpl
 
 newtype ViewType = ViewType String
 derive instance newtypeViewType :: Newtype ViewType _
@@ -209,6 +239,8 @@ instance ordViewType :: Ord ViewType where
   compare (ViewType p1) (ViewType p2) = compare p1 p2
 instance prettyPrintViewType :: PrettyPrint ViewType where
   prettyPrint' t = show
+derive newtype instance writeForeignViewType :: WriteForeign ViewType
+derive newtype instance readForeignViewType :: ReadForeign ViewType
 
 newtype ActionType = ActionType String
 derive instance newtypeActionType :: Newtype ActionType _
@@ -223,6 +255,8 @@ instance ordActionType :: Ord ActionType where
   compare (ActionType a1) (ActionType a2) = compare a1 a2
 instance prettyPrintActionType :: PrettyPrint ActionType where
   prettyPrint' t = show
+derive newtype instance writeForeignActionType :: WriteForeign ActionType
+derive newtype instance readForeignActionType :: ReadForeign ActionType
 
 externalRoleType :: ContextType -> EnumeratedRoleType
 externalRoleType (ContextType ct) = EnumeratedRoleType (ct <> "$External")

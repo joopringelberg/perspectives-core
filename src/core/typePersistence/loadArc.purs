@@ -123,7 +123,7 @@ loadArcAndCrl' arcSource crlSource = do
               collectIndexedNames (identifier m)
           pure $ Right (df
             { modelDescription = modelDescription
-            , crl = foldl (replacePrefix prefixes) arcSource (keys prefixes)
+            , crl = foldl (replacePrefix prefixes) crlSource (keys prefixes)
             , indexedRoles = indexedRoles
             , indexedContexts = indexedContexts})
 

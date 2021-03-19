@@ -27,10 +27,19 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 data ThreeValuedLogic = True | Unknown | False
+
+instance writeForeignThreeValuedLogic :: WriteForeign ThreeValuedLogic where
+  writeImpl = unsafeToForeign <<< show
+
+instance readForeignThreeValuedLogic :: ReadForeign ThreeValuedLogic where
+  readImpl = enumReadForeign
 
 derive instance genericRepThreeValuedLogic :: Generic ThreeValuedLogic _
 
@@ -42,9 +51,11 @@ instance eqThreeValuedLogic :: Eq ThreeValuedLogic where
 
 instance encodeThreeValuedLogic :: Encode ThreeValuedLogic where
   encode = genericEncode defaultOptions
+  -- encode = write
 
 instance decodeThreeValuedLogic :: Decode ThreeValuedLogic where
   decode = genericDecode defaultOptions
+  -- decode = readImpl
 
 bool2threeValued :: Boolean -> ThreeValuedLogic
 bool2threeValued true = True

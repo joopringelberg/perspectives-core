@@ -45,13 +45,15 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, map, pure, show, ($), (<>), (==), (>>>))
+import Prelude (class Eq, class Monad, class Show, bind, map, pure, show, (<>), (==), (>>>), (<<<), ($))
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
 
-derive instance genericRepBinding :: Generic (ADT a) _
+derive instance genericRepADT :: Generic (ADT a) _
 
 instance showADT :: (Show a) => Show (ADT a) where
   show (ST a) = "(" <> "ST" <> " " <> show a <> ")"
@@ -62,6 +64,12 @@ instance showADT :: (Show a) => Show (ADT a) where
 
 instance eqADT :: (Eq a) => Eq (ADT a) where
   eq b1 b2 = genericEq b1 b2
+
+instance writeForeignADT :: WriteForeign a => WriteForeign (ADT a) where
+  writeImpl = writeImpl <<< genericSumToVariant
+
+instance readForeightADT :: ReadForeign a => ReadForeign (ADT a) where
+  readImpl = map variantToGenericSum <<< readImpl
 
 instance encodeADT :: (Encode a) => Encode (ADT a) where
   encode q = genericEncode defaultOptions q

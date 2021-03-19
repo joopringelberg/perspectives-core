@@ -95,6 +95,7 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
         , couchdbUrl: pdbu.couchdbUrl
       }
       state <- new $ newPerspectivesState pouchdbUser publicRepo
+
       runPerspectivesWithState (do
         addAllExternalFunctions
         addIndexedNames

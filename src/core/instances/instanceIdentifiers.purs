@@ -27,34 +27,38 @@ import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Perspectives.Utilities (class PrettyPrint)
 import Prelude (class Eq, class Ord, class Show, compare, show, (<<<), (==), (<>))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 newtype ContextInstance = ContextInstance String
 derive instance newtypeContextInstance :: Newtype ContextInstance _
 derive instance genericRepContextInstance :: Generic ContextInstance _
 derive newtype instance encodeContextInstance :: Encode ContextInstance
 derive newtype instance decodeContextInstance :: Decode ContextInstance
+derive newtype instance writeForeignContextInstance :: WriteForeign ContextInstance
+derive newtype instance readForeignContextInstance :: ReadForeign ContextInstance
 instance showContextInstance :: Show ContextInstance where
   show = show <<< unwrap
 instance eqContextInstance :: Eq ContextInstance where
   eq (ContextInstance id1) (ContextInstance id2) = id1 == id2
 instance ordContextInstance :: Ord ContextInstance where
   compare (ContextInstance a) (ContextInstance b) = compare a b
-
 instance prettyPrintContextInstance :: PrettyPrint ContextInstance where
   prettyPrint' t = show
+
 
 newtype RoleInstance = RoleInstance String
 derive instance newtypeRoleInstance :: Newtype RoleInstance _
 derive instance genericRepRoleInstance :: Generic RoleInstance _
 derive newtype instance encodeRoleInstance :: Encode RoleInstance
 derive newtype instance decodeRoleInstance :: Decode RoleInstance
+derive newtype instance writeForeignRoleInstance :: WriteForeign RoleInstance
+derive newtype instance readForeignRoleInstance :: ReadForeign RoleInstance
 instance showRoleInstance :: Show RoleInstance where
   show = show <<< unwrap
 instance eqRoleInstance :: Eq RoleInstance where
   eq (RoleInstance id1) (RoleInstance id2) = id1 == id2
 instance ordRoleInstance :: Ord RoleInstance where
   compare (RoleInstance a) (RoleInstance b) = compare a b
-
 instance prettyPrintRoleInstance :: PrettyPrint RoleInstance where
   prettyPrint' t = show
 
