@@ -2,30 +2,25 @@ module Test.SerialisedAsDeltas where
 
 import Prelude
 
-import Control.Monad.AvarMonadAsk (get)
 import Control.Monad.Free (Free)
-import Control.Monad.Trans.Class (lift)
-import Data.Array (find, head, length, null)
+import Data.Array (head, null)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Perspectives.CoreTypes ((##>>))
-import Perspectives.Couchdb.Databases (deleteDatabase)
+import Perspectives.Persistence.API (deleteDatabase)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.LoadCRL.FS (loadAndSaveCrlFile)
+import Perspectives.Persistence.State (withCouchdbUrl)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter, getRoleFunction)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SaveUserData (handleNewPeer, setBinding)
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel)
-import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile)
-import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
 import Perspectives.User (getHost, getPort)
-import Perspectives.Utilities (prettyPrint)
-import Test.Perspectives.Utils (clearUserDatabase, runP, withModel', withSystem, runMonadPerspectivesTransaction)
+import Test.Perspectives.Utils (clearUserDatabase, runP, withSystem, runMonadPerspectivesTransaction)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -47,15 +42,15 @@ theSuite = suite "SerialisedAsDeltas" do
         logShow modelErrors
         liftAff $ assert "There are modelErrors" false
       else pure unit
-    achannel <- runMonadPerspectivesTransaction createChannel
-    case head achannel of
+    machannel <- withCouchdbUrl \url -> runMonadPerspectivesTransaction (createChannel url)
+    case machannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
-      Just channel -> do
-        -- load a second user
-        void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        host <- getHost
-        port <- getPort
-        void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
+      Just achannel -> case head achannel of
+        Nothing -> liftAff $ assert "Failed to create a channel" false
+        Just channel -> do
+          -- load a second user
+          void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+          void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
 
     getter <- getRoleFunction "model:Test$TestCase$Other"
     unboundOtherRole <- (ContextInstance "model:User$MyTestCase") ##>> getter

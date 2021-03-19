@@ -15,11 +15,13 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console (log, logShow)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (PerspectivesState, (##=), (##>), (##>>))
-import Perspectives.Couchdb.ChangesFeed (EventSource, closeEventSource)
-import Perspectives.Couchdb.Databases (deleteDatabase, documentNamesInDatabase, endReplication, getDocument)
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getEnumeratedRoleInstances, getRoleBinders)
 import Perspectives.LoadCRL.FS (loadAndSaveCrlFile)
 import Perspectives.Names (getMySystem)
+import Perspectives.Persistence.API (deleteDatabase, documentsInDatabase, tryGetDocument)
+import Perspectives.Persistence.CouchdbFunctions (endReplication)
+import Perspectives.Persistence.State (withCouchdbUrl)
+import Perspectives.Persistent.ChangesFeed (EventSource, closeEventSource)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
@@ -27,8 +29,6 @@ import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, localReplication)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.IncomingPost (incomingPost)
-import Perspectives.User (getHost, getPort)
-import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (clearPostDatabase, runP, runPCor, runPJoop, withSystem, runMonadPerspectivesTransaction)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -43,8 +43,8 @@ theSuite :: Free TestF Unit
 theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
 
   test "create channel, add user, check for channel on the other side" do
-    mdbName <- (runP $ withSystem do
-      achannel <- runMonadPerspectivesTransaction createChannel
+    mdbName <- (runP $ withSystem $ withCouchdbUrl \url -> do
+      achannel <- runMonadPerspectivesTransaction (createChannel url)
       case head achannel of
         Nothing -> liftAff $ assert "Failed to create a channel" false
         Just channel -> do
@@ -52,24 +52,21 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
           -- logShow channelContext
           -- load a second user
           void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-          host <- getHost
-          port <- getPort
-          void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
+          void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
       getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
       RoleInstance "model:User$joop$User" ##> getter
       )
     (runPJoop $ withSystem do
       case mdbName of
-        Nothing -> liftAff $ assert "There should be a channel" false
-        Just (Value dbName) -> do
+        Just (Just (Value dbName)) -> do
           -- get the document name
-          transactionDocNames <- documentNamesInDatabase dbName
+          transactionDocNames <- (map _.id) <<< _.rows <$> documentsInDatabase dbName
           case head transactionDocNames of
             Nothing -> liftAff $ assert "There should be a transaction document" false
             Just docName -> do
               -- NOTE. If this test fails, research getDocument. It has been refactored to throw errors when
               -- the database is approached without proper credentials, where previously it just yielded Nothing.
-              mt <- getDocument dbName docName
+              mt <- tryGetDocument dbName docName
               case mt of
                 Nothing -> liftAff $ assert "There should be a transaction document" false
                 Just t -> do
@@ -90,16 +87,16 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
                       logShow connectedPartners
                       liftAff $ assert "The user of model:System$test and of model:System$joop should be the binding of the ConnectedPartners" ((length $ difference connectedPartners (RoleInstance <$> ["model:User$test$User","model:User$joop$User"])) == 0)
           deleteDatabase dbName
+        otherwise -> liftAff $ assert "There should be a channel" false
+
     )
 
   test "create channel between two users, add user on one side, check for channel context on the other side" do
-    channelId <- runPCor $ withSystem do
+    (channelId :: Maybe (Maybe String)) <- runPCor $ withSystem $ withCouchdbUrl \url -> do
       (channelA :: Array ContextInstance) <- runMonadPerspectivesTransaction do
-        channel <- createChannel
+        channel <- createChannel url
         void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        host <- lift2 getHost
-        port <- lift2 getPort
-        addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
+        addPartnerToChannel (RoleInstance "model:User$joop$User") channel
         -- setYourAddress "http://127.0.0.1" 5984 channel
         -- We now have a channel with two partners.
         pure channel
@@ -113,14 +110,14 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
             Just (Value channelId) -> do
               -- We have to artificially replicate the channel to the post of Joop,
               -- replicating just transactions coming from Cor.
-              localReplication channelId "joop_post" (Just "model:User$cor$User")
+              localReplication url channelId "joop_post" (Just "model:User$cor$User")
               pure $ Just channelId
-    runPJoop $ withSystem do
+    void $ runPJoop $ withSystem $ withCouchdbUrl \url -> do
       (pstate :: AVar PerspectivesState) <- ask
       -- Handle post in parallel
       -- TODO. Dit proces stopt niet, ondanks killFiber
       log "1"
-      postFiber <- lift $ forkAff (runPerspectivesWithState incomingPost pstate)
+      postFiber <- lift $ forkAff (runPerspectivesWithState (incomingPost url) pstate)
       log "2"
       -- Wait a little
       liftAff $ delay (Milliseconds 8000.0)
@@ -148,7 +145,7 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
       clearPostDatabase
 
       case channelId of
-        Nothing -> pure unit
-        Just c -> do
+        Just (Just c) -> do
           deleteDatabase c
-          void $ endReplication c "joop_post"
+          void $ endReplication url c "joop_post"
+        otherwise -> pure unit

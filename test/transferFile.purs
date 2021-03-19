@@ -171,7 +171,7 @@ theSuite = suite "Perspectives.Parsing.TransferFile" do
             otherwise -> false) perspectiveParts)))
         (assert "The Perspective should have an action 'MyAction'"
           (isJust (findIndex (case _ of
-            (Act (ActionE {id: id1})) -> id1 == "MyAction"
+            (Act (ActionE {id: id1})) -> id1 == Just "MyAction"
             otherwise -> false) perspectiveParts)))
       otherwise -> assert "Parsed an unexpected type" false
 
@@ -181,7 +181,7 @@ theSuite = suite "Perspectives.Parsing.TransferFile" do
       (Left e) -> assert (show e) false
       (Right ctxt@(Act (ActionE{id, verb}))) -> do
         -- logShow ctxt
-        assert "The Action should have the id 'MyAction'" (id == "MyAction")
+        assert "The Action should have the id 'MyAction'" (id == Just "MyAction")
         assert "The Action should have the verb 'Consults''" (verb == Consult)
       otherwise -> assert "Parsed an unexpected type" false
 

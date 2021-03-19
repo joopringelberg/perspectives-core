@@ -25,11 +25,8 @@ import Test.Extern.Couchdb as CDB
 import Test.Model.System as TMS
 import Test.Types.ObjectGetters as TTO
 import Test.Queries as QR
-import Test.SetupCouchdb as SCDB
-import Test.LocalAuthentication as LA
 import Test.SerialisedAsDeltas as SAD
 import Test.Sync.Channel as CHA
-import Test.PrepareTestUser as PTU
 import Test.ArrayT as ARRT
 import Test.Sync.HandleTransaction as HTA
 import Test.Assignment.SerialiseAsJson as SAJ
@@ -62,11 +59,8 @@ main = runTest do
   COMB.theSuite
   TMS.theSuite
   TTO.theSuite
-  SCDB.theSuite
-  LA.theSuite
   SAD.theSuite
   CHA.theSuite
-  PTU.theSuite
   ARRT.theSuite
   HTA.theSuite
   SAJ.theSuite

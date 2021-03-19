@@ -6,7 +6,7 @@ import Control.Monad.Free (Free)
 import Control.Monad.Writer (runWriterT)
 import Data.Array (catMaybes, head, length, null)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (empty)
@@ -14,19 +14,18 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextAndRole (addRol_gevuldeRollen)
 import Perspectives.CoreTypes ((##=))
-import Perspectives.Couchdb.Databases (deleteDocument, documentExists)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId(..))
 import Perspectives.Extern.Couchdb (uploadToRepository_)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
+import Perspectives.Persistence.API (deleteDocument, tryGetDocument)
 import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.Class.Cacheable (cacheEntity, removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadArcAndCrl, loadCompileAndSaveArcFile')
-import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (clearUserDatabase, runP, runMonadPerspectivesTransaction)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -59,8 +58,7 @@ theSuite = suiteSkip  "Model:System" do
         liftAff $ assert "There are modelerrors" false
       Right df -> do
         -- Send the model to the repository.
-        cdburl <- getCouchdbBaseURL
-        void $ runWriterT $ runArrayT (uploadToRepository_ (DomeinFileId "model:TestBotActie") (cdburl <> "repository") df)
+        void $ runWriterT $ runArrayT (uploadToRepository_ (DomeinFileId "model:TestBotActie") "repository" df)
         -- Now remove the model instances from cache!
         void $ removeInternally (RoleInstance "model:User$TestBotActieModel_External")
         void $ removeInternally (ContextInstance "model:User$TestBotActieModel")
@@ -84,8 +82,8 @@ theSuite = suiteSkip  "Model:System" do
         void $ saveEntiteit (RoleInstance descriptionId)
 
         -- Check if model:TestBotActie is in perspect_models
-        succes <- documentExists (cdburl <> "perspect_models/model:TestBotActie")
-        liftAff $ assert "model:TestBotActie should be in perspect_models" succes
+        (succes :: Maybe DomeinFile) <- tryGetDocument "perspect_models" "model:TestBotActie"
+        liftAff $ assert "model:TestBotActie should be in perspect_models" (isJust succes)
 
         -- Check if ModelsInUse has two instances.
         getIndexedContexts <- getRoleFunction "model:System$PerspectivesSystem$IndexedContexts"
@@ -95,7 +93,7 @@ theSuite = suiteSkip  "Model:System" do
 
         -- remove model:TestBotActie from the repository and from perspect_models
         (_ :: DomeinFile) <- removeEntiteit (DomeinFileId "model:TestBotActie")
-        void $ deleteDocument (cdburl <> "repository/model:TestBotActie") Nothing
+        void $ deleteDocument "repository" "model:TestBotActie" Nothing
 
         -- remove all user instances
         clearUserDatabase

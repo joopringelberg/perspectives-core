@@ -13,13 +13,13 @@ import Effect.Exception (error)
 import Foreign.Object (lookup)
 import Perspectives.CoreTypes (evalMonadPerspectivesQuery, (##=))
 import Perspectives.Couchdb (designDocumentViews)
-import Perspectives.Couchdb.Databases (getDesignDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore, models, uploadToRepository)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, removeEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistence.API (tryGetDocument)
+import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (developmentRepository)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -166,7 +166,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     assertEqual "The retrieved document should equal the sent document"
       (do
         setModelDescriptionsView
-        mddoc <- getDesignDocument "repository" "defaultViews"
+        mddoc <- tryGetDocument "repository" "_design/defaultViews"
         case mddoc of
           Nothing -> throwError (error "No design doc, impossible!")
           Just ddoc -> do
@@ -178,7 +178,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     assertEqual "The retrieved document should equal the sent document"
       (do
         entitiesDatabaseName >>= setRoleView
-        mddoc <- entitiesDatabaseName >>= \db -> getDesignDocument db "defaultViews"
+        mddoc <- entitiesDatabaseName >>= \db -> tryGetDocument db "defaultViews"
         case mddoc of
           Nothing -> throwError (error "No design doc, impossible!")
           Just ddoc -> do

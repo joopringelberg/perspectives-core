@@ -3,19 +3,19 @@ module Test.Perspectives.Utils where
 import Prelude
 
 import Data.Either (Either(..))
-import Effect.Aff (Aff, throwError, try)
+import Data.Maybe (Maybe(..))
+import Effect.Aff (Aff, error, throwError, try)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
-import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
+import Perspectives.Persistence.API (createDatabase, deleteDatabase)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.Persistence.State (getCouchdbBaseURL)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectives)
-import Perspectives.SetupCouchdb (setupCouchdbForAnotherUser)
-import Perspectives.User (getCouchdbBaseURL)
 import Test.Unit.Assert as Assert
 
 couchdbHost :: String
@@ -76,9 +76,6 @@ clearPostDatabase = do
   deleteDatabase db
   createDatabase db
 
-setupCouchdbForTestUser :: MonadPerspectives Unit
-setupCouchdbForTestUser = setupCouchdbForAnotherUser "test" "geheim" "http://joopringelberg.nl/cbd/repository"
-
 -- | Load the model, compute the value in MonadPerspectives, unload the model and remove the instances.
 -- | Notice: dependencies of the model are not automatically removed!
 withModel :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
@@ -98,13 +95,16 @@ withModel_ m@(DomeinFileId id) clear a = do
 -- | Leaves instances from the computation in the database.
 withModel' :: forall a. DomeinFileId -> MonadPerspectives a -> MonadPerspectives a
 withModel' m@(DomeinFileId id) a = do
-  cdbUrl <- getCouchdbBaseURL
-  void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "repository/" <> id] (RoleInstance ""))
-  result <- try a
-  void $ cascadeDeleteDomeinFile m
-  case result of
-    Left e -> throwError e
-    Right r -> pure r
+  mcdbUrl <- getCouchdbBaseURL
+  case mcdbUrl of
+    Just cdbUrl -> do
+      void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "repository/" <> id] (RoleInstance ""))
+      result <- try a
+      void $ cascadeDeleteDomeinFile m
+      case result of
+        Left e -> throwError e
+        Right r -> pure r
+    Nothing -> throwError $ error "Expected a couchdb url"
 
 withSystem :: forall a. MonadPerspectives a -> MonadPerspectives a
 withSystem = withModel (DomeinFileId "model:System")

@@ -19,6 +19,7 @@ import Perspectives.CoreTypes ((##=))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Instances.SerialiseAsJson (serialiseAsJsonFor)
 import Perspectives.LoadCRL.FS (loadAndCacheCrlFile)
+import Perspectives.Persistence.State (withCouchdbUrl)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
@@ -38,16 +39,14 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Instances.SerialiseAsJson" do
 
-  test "serialiseAsJsonFor" (runP $ withSystem $ do
-    achannel <- runSterileTransaction $ createChannelContext "MyTestChannel"
+  test "serialiseAsJsonFor" (runP $ withSystem $ void $ withCouchdbUrl \url -> do
+    achannel <- runSterileTransaction $ createChannelContext url "MyTestChannel"
     case head achannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
       Just channel -> do
         -- load a second user
         void $ loadAndCacheCrlFile "userJoop.crl" testDirectory
-        host <- getHost
-        port <- getPort
-        void $ runSterileTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel host port
+        void $ runSterileTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
         -- Serialise as JSON
         partners <- channel ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
         case head partners of
