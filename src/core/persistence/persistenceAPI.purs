@@ -348,7 +348,7 @@ retrieveDocumentVersion dbName docName = withDatabase dbName
         case read f of
           Left e -> throwError $ error ("retrieveDocumentVersion : error in decoding result: " <> show e)
           Right (a :: DocumentWithRevision) -> pure a._rev
-      (handlePouchError "retrieveDocumentVersion" docName)
+      (handleNotFound "retrieveDocumentVersion" docName)
 
 -----------------------------------------------------------
 -- ADDATTACHMENT

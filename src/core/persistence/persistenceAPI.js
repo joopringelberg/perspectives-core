@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-var PouchDB = require('pouchdb-browser').default;
+// TODO. Webpack switch voor pouchdb-browser?
+// var PouchDB = require('pouchdb-browser').default;
+var PouchDB = require('pouchdb');
 
 // TODO. Zodra we een encoding toepassen waarbij _rev en _id bewaard blijven, is deze functie overbodig.
 exports.addNameAndVersionHack = function( doc, name, rev)
@@ -36,18 +38,26 @@ function convertPouchError( e )
       , error: e.stack})
     );
   }
-  else if (e instanceof Response)
+  else try
   {
-    return new Error( JSON.stringify(
-      { status: e.status
-      , name: "response"
-      , message: e.statusText
-      , error: true
-      , docId: e.url
-      }
-    ));
+    // Apparently, 'Response' is unknown in the Node distribution...
+    if (e instanceof Response)
+    {
+      return new Error( JSON.stringify(
+        { status: e.status
+        , name: "response"
+        , message: e.statusText
+        , error: true
+        , docId: e.url
+        }
+      ));
+    }
+    else
+    {
+      return new Error( JSON.stringify( e ) );
+    }
   }
-  else
+  catch(ignore)
   {
     return new Error( JSON.stringify( e ) );
   }
@@ -196,10 +206,25 @@ exports.getDocumentImpl = function ( database, docName ) {
   };
 };
 
+var b2a;
+try
+{
+  // Browser environment.
+  b2a = btoa;
+}
+catch (e)
+{
+  // Node environment.
+  b2a = function (b)
+    {
+      return Buffer.from(b).toString('base64');
+    };
+}
+
 // db.putAttachment(docId, attachmentId, [rev], attachment, type, [callback]);
 exports.addAttachmentImpl = function ( database, docName, attachmentId, mrev, attachment, type) {
   return function (onError, onSuccess) {
-    database.putAttachment(docName, attachmentId, mrev, btoa(attachment), type, function(err, response)
+    database.putAttachment(docName, attachmentId, mrev, b2a(attachment), type, function(err, response)
       {
         if (err != null)
         {
@@ -231,10 +256,18 @@ exports.getAttachmentImpl = function( database, docName, attachmentId )
         }
         else
         {
-          blob.text().then( function(t)
+          // blob is a Buffer on node. Then use toString().
+          if (blob.text)
           {
-            onSucces(t);
-          });
+            blob.text().then( function(t)
+            {
+              onSucces(t);
+            });
+          }
+          else
+          {
+            onSucces( blob.toString() );
+          }
         }
       });
     // Return a canceler, which is just another Aff effect.

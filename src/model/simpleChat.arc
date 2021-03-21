@@ -45,8 +45,9 @@ domain: SimpleChat
 
     bot: for Partner
       perspective on: extern
-        if not exists object >> binder Chats then
-				    bind object to Chats in cht:MyChats
+        rule BindChat:
+          if not exists object >> binder Chats then
+  				    bind object to Chats in cht:MyChats
 
     thing: PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns: sys:PerspectivesSystem$User) with not binds sys:Me
 

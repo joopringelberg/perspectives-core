@@ -48,8 +48,9 @@ domain: BrokerServices
 
     bot: for Guest
       perspective on: Administrator
-        if not exists object then
-          bind sys:Me to Administrator
+        rule FillBrokerServiceAdministrator:
+          if not exists object then
+            bind sys:Me to Administrator
 
     context: Accounts filledBy: BrokerContract
 
@@ -94,10 +95,12 @@ domain: BrokerServices
 
     bot: for Guest
       perspective on: Administrator
-        if not exists object then
-          bind extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
+        rule FillBrokerContractAdministrator:
+          if not exists object then
+            bind extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
 
     bot: for Guest
       perspective on: AccountHolder
-        if not exists object then
-          createRole AccountHolder
+        rule CreateAccountHolder:
+          if not exists object then
+            createRole AccountHolder
