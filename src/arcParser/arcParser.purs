@@ -375,7 +375,7 @@ actionE = try $ withEntireBlock
 
 ruleE :: IP PerspectivePart
 ruleE = withPos (do
-  (ruleName :: Maybe String) <- reserved "rule" *> optionMaybe arcIdentifier <* colon
+  (ruleName :: Maybe String) <- optionMaybe (reserved "rule" *> arcIdentifier <* colon)
   lhs <- ruleE_
   (letWithAssignment lhs ruleName <|> assignmentList lhs ruleName) <?> "one or more assignment expressions")
   -- TODO. IK SNAP niet waarom dit faalt. De positie in het resultaat van de LetStep (bijvoorbeeld) is rechts
