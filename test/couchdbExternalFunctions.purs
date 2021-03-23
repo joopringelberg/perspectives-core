@@ -37,7 +37,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
+theSuite = suite "Perspectives.Extern.Couchdb" do
 
   test "models" $ runP $ withSystem do
 
@@ -67,7 +67,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       clearUserDatabase
       void $ cascadeDeleteDomeinFile (DomeinFileId "model:System")
 
-  testOnly "upload model:Serialise to repository from files" $ runP do
+  test "upload model:Serialise to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile "serialise" modelDirectory
     if null errs
       then do
