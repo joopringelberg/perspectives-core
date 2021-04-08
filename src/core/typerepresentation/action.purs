@@ -30,7 +30,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Query.QueryTypes (Calculation)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.SideEffect (SideEffect)
@@ -88,7 +88,7 @@ instance identifiableAction :: Identifiable Action ActionType where
 -- VERB
 -----------------------------------------------------------
 
-data Verb = Create | Consult | Change | Delete | Bind | CreateAndBindContext | Become | Custom String
+data Verb = Consult | Change | Delete | Bind | CreateAndBindContext | Become | Custom String
 
 derive instance genericRepVerb :: Generic Verb _
 instance encodeVerb :: Encode Verb where

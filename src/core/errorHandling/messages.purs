@@ -33,12 +33,13 @@ import Data.List.Lazy.Types (NonEmptyList)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.Expression.AST (LetStep(..), PureLetStep(..), Step)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
-import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Range (Range) as RAN
+import Perspectives.Representation.State (StateIdentifier)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType)
+import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
 
 -- | A Perspectives sourcefile (text or diagram) will be parsed in two passes.
@@ -55,7 +56,7 @@ data PerspectivesError
   = DefaultPrototype ContextType ContextType
     | CyclicAspects ArcPosition ContextType
     | WrongRoleKind RoleType RoleKind RoleKind
-    | MissingForUser ArcPosition String
+    -- | MissingForUser ArcPosition String
     | MissingObject ArcPosition String
     | NotWellFormedName ArcPosition String
     | RoleMissingInContext ArcPosition String String
@@ -96,9 +97,12 @@ data PerspectivesError
     | CannotFindContextType ArcPosition ArcPosition String
     | NoPropertyTypeWithValue ArcPosition ArcPosition
 
-    | UnauthorizedForProperty String RoleType EnumeratedRoleType EnumeratedPropertyType Verb
-    | UnauthorizedForRole String RoleType RoleType (Array Verb)
+    | UnauthorizedForProperty String RoleType EnumeratedRoleType EnumeratedPropertyType PropertyVerb
+    | UnauthorizedForRole String RoleType RoleType (Array RoleVerb)
     | UnauthorizedForContext String RoleType ContextType
+
+    | MissingPerspective
+    | StateDoesNotExist StateIdentifier ArcPosition ArcPosition
 
     | RolErrorBoundary String String
     | ContextErrorBoundary String String
@@ -114,7 +118,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (DefaultPrototype expected given) = "Invalid type for DefaultPrototype. Expected: '" <> unwrap expected <> "' but found '" <> unwrap given <> "'."
   show (CyclicAspects pos c) = "Context '" <> unwrap c <> "' has cyclic aspects: " <> show pos
   show (WrongRoleKind roletype expected found) = "Role '" <> show roletype <> "' has kind '" <> show found <> "' but should have kind '" <> show expected<> "'."
-  show (MissingForUser pos localBotName) = "(MissingForUser) The BotRole '" <> localBotName <> "' should have a 'ForUser' clause: " <> show pos
+  -- show (MissingForUser pos localBotName) = "(MissingForUser) The BotRole '" <> localBotName <> "' should have a 'ForUser' clause: " <> show pos
   show (MissingObject pos localPerspectiveName) = "(MissingObject) The perspective '" <> localPerspectiveName <> "' should have an 'ObjectRef' clause: " <> show pos
   show (NotWellFormedName pos name) = "(NotWellFormedName) The name '" <> name <> "' is not well-formed (it cannot be expanded to a fully qualified name): " <> show pos
   show (RoleMissingInContext pos localRoleName ctxt) = "(RoleMissingInContext) The local role name '" <> localRoleName <> "' cannot be found in the context: '" <> ctxt <> "', at: " <> show pos
@@ -160,6 +164,10 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnauthorizedForProperty author userRole role property verb) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> "."
   show (UnauthorizedForRole author userRole role verbs) = "(UnauthorizedForRole) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes at least one of " <> show verbs
   show (UnauthorizedForContext author userRole contextType) = "(UnauthorizedForContext) User " <> author <> " in role " <> show userRole <> " has no perspective on context " <> show contextType
+
+
+  show MissingPerspective = "(MissingPerspective) This should be inside a perspective expression."
+  show (StateDoesNotExist stateId start end) = "(StateDoesNotExist) The state '" <> show stateId <> "' is not modelled (between " <> show start <> " and " <> show end <> ")."
 
   show (RolErrorBoundary boundaryName err) = "(RolErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"
   show (ContextErrorBoundary boundaryName err) = "(ContextErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"

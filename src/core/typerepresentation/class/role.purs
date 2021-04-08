@@ -41,11 +41,12 @@ import Perspectives.Representation.Class.Context (contextAspects, externalRole, 
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.ExplicitSet (ExplicitSet(..), intersectionOfArrays, intersectionPset, subsetPSet, unionOfArrays, unionPset)
+import Perspectives.Representation.ExplicitSet (intersectionOfArrays, unionOfArrays)
+import Perspectives.Representation.Perspective (Perspective)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
-import Prelude (class Show, class Eq, bind, flip, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>), (&&))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
+import Prelude (class Show, class Eq, bind, flip, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -70,7 +71,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   -- | Includes: the type of the Role, its own binding (not the bindings transitive closure!) and its own aspects (not their transitive closure!).
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsBindingADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
-  perspectives :: r -> Array ActionType
+  perspectives :: r -> Array Perspective
 
 rangeOfRoleCalculation' :: String -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> rangeOfRoleCalculation'_ (CalculatedRoleType r)
@@ -203,17 +204,6 @@ directProperties = reduce magic
 --------------------------------------------------------------------------------------------------
 ---- ROLESET
 --------------------------------------------------------------------------------------------------
-type RoleSet = ExplicitSet RoleType
-
--- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
--- | Computes all roles, but does not descend into Aspects in the ST case.
-roleSet :: ADT ContextType -> MP RoleSet
-roleSet (ST r) = getContext r >>= pure <<< PSet <<< roles
-roleSet (SUM terms) = traverse roleSet terms >>= pure <<< intersectionPset
-roleSet (PROD terms) = traverse roleSet terms >>= pure <<< unionPset
-roleSet UNIVERSAL = pure Universal
-roleSet EMPTY = pure Empty
-
 -- | The roles of this context and its aspects, recursively.
 allRoles :: ADT ContextType -> MP (Array RoleType)
 allRoles = reduce magic
@@ -228,19 +218,6 @@ allRoles = reduce magic
           pure (roles c <> rs)
 
 --------------------------------------------------------------------------------------------------
----- ACTIONSET
---------------------------------------------------------------------------------------------------
-type ActionSet = ExplicitSet ActionType
-
--- | The ADT must be normalised in the sense that no set of terms contains EMPTY or UNIVERSAL.
-actionSet :: ADT EnumeratedRoleType -> MP ActionSet
-actionSet (ST r) = getEnumeratedRole r >>= pure <<< PSet <<< _.perspectives <<< unwrap
-actionSet (SUM terms) = traverse actionSet terms >>= pure <<< intersectionPset
-actionSet (PROD terms) = traverse actionSet terms >>= pure <<< unionPset
-actionSet UNIVERSAL = pure Universal
-actionSet EMPTY = pure Empty
-
---------------------------------------------------------------------------------------------------
 ---- ENUMERATEDTYPESINADT
 --------------------------------------------------------------------------------------------------
 leavesInADT :: forall a. Eq a => ADT a -> Array a
@@ -251,8 +228,10 @@ leavesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Array a)
 -----------------------------------------------------------
 -- | `p lessThanOrEqualTo q` means: p is less specific than q, or equal to q.
 -- | `p lessThanOrEqualTo q` equals: `q greaterThanOrEqualTo p`
+-- TODO. Oorspronkelijk betrok ik ook de Actions in de vergelijking.
 lessThanOrEqualTo :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-lessThanOrEqualTo p q = (&&) <$> (p `hasNotMorePropertiesThan` q) <*> (subsetPSet <$> actionSet p <*> actionSet q)
+lessThanOrEqualTo p q = p `hasNotMorePropertiesThan` q
+-- lessThanOrEqualTo p q = (&&) <$> (p `hasNotMorePropertiesThan` q) <*> (subsetPSet <$> actionSet p <*> actionSet q)
 
 hasNotMorePropertiesThan :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 hasNotMorePropertiesThan p q = subset <$> (allProperties >=> pure <<< fromFoldable) p <*> (allProperties >=> pure <<< fromFoldable) q
@@ -429,7 +408,7 @@ contextOfRepresentationOfRole :: RoleType -> MonadPerspectives (ADT ContextType)
 contextOfRepresentationOfRole (ENR e) = getPerspectType e >>= pure <<< ST <<< contextOfRepresentation
 contextOfRepresentationOfRole (CR c) = getPerspectType c >>= pure <<< ST <<< contextOfRepresentation
 
-perspectivesOfRoleType :: RoleType -> MonadPerspectives (Array ActionType)
+perspectivesOfRoleType :: RoleType -> MonadPerspectives (Array Perspective)
 perspectivesOfRoleType (ENR e) = getPerspectType e >>= pure <<< perspectives
 perspectivesOfRoleType (CR c) = getPerspectType c >>= pure <<< perspectives
 -----------------------------------------------------------

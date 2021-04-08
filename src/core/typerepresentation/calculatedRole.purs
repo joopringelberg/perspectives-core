@@ -30,10 +30,11 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..))
+import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), RoleKind)
+import Perspectives.Representation.Perspective (Perspective)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleKind)
 import Prelude (class Eq, class Show, (<<<), (==), ($))
 
 -----------------------------------------------------------
@@ -50,8 +51,7 @@ type CalculatedRoleRecord =
   , calculation :: Calculation
   , context :: ContextType
 
-  -- An array of ActionTypes
-  , perspectives :: Array ActionType
+  , perspectives :: Array Perspective
 
   , pos :: ArcPosition
   }

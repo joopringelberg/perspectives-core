@@ -26,16 +26,14 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
-import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
-import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
-import Prelude (class Eq, class Show, map, show, (<<<))
+import Prelude (class Eq, class Ord, class Show, map, (<<<))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 type VariableName = String
@@ -92,6 +90,7 @@ instance decodeFunctionName :: Decode FunctionName where
   decode = genericDecode defaultOptions
 
 instance eqFunctionName :: Eq FunctionName where eq = genericEq
+derive instance ordFunctionName :: Ord FunctionName
 
 -- | The show function produces the very same string that the parser parses.
 instance showFunctionName :: Show FunctionName where

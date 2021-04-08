@@ -30,11 +30,12 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.InvertedQuery (InvertedQuery)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
+import Perspectives.Representation.Perspective (Perspective)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 
 -----------------------------------------------------------
@@ -56,8 +57,7 @@ type EnumeratedRoleRecord =
 
   , views :: Array ViewType
 
-  -- An array of ActionTypes
-  , perspectives :: Array ActionType
+  , perspectives :: Array Perspective
 
   , functional :: Boolean
   , mandatory :: Boolean

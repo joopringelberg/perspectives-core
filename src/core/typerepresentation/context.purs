@@ -29,9 +29,10 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
+import Perspectives.Representation.State (StateIdentifier)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), RoleType)
 import Prelude (class Eq, class Show, map, (<<<), (==))
 
@@ -53,6 +54,7 @@ type ContextRecord =
   , contextRol :: Array RoleType
   , gebruikerRol :: Array RoleType
 
+  , states :: Array StateIdentifier
   , nestedContexts :: Array ContextType
   , actions :: Array ActionType
   , context :: Maybe ContextType
@@ -62,6 +64,7 @@ type ContextRecord =
   , pos :: ArcPosition
   }
 
+-- TODO: verwijder State. Het is geen ContextKind.
 data ContextKind = Domain | Case | Party | Activity | State
 
 -- | We assume the id is a qualified name.
@@ -77,6 +80,7 @@ defaultContext id dname kind context pos = Context { _id: (ContextType id)
   , contextRol: []
   , gebruikerRol: []
 
+  , states: []
   , nestedContexts: []
   , actions: []
   , context: map ContextType context

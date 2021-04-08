@@ -23,32 +23,42 @@
 module Perspectives.Parsing.Arc where
 
 import Control.Alt (map, void, (<|>))
-import Data.Array (elemIndex)
-import Data.List (List(..), singleton, (:))
+import Control.Lazy (fix)
+import Data.Array (elemIndex, fromFoldable)
+import Data.Either (Either(..))
+import Data.List (List(..), many, singleton, (:), concat)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Identifiers (isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression (assignment, letStep, startOf, step)
-import Perspectives.Parsing.Arc.Expression.AST (PureLetStep(..), Step(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), ContextE(..), ContextPart(..), AutomaticEffectE(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateQualifiedPart(..), ViewE(..), StateE(..))
+import Perspectives.Parsing.Arc.Expression (assignment, letWithAssignment, step)
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, arcPosition2Position, entireBlock, getPosition, nextLine, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getArcParserState, getPosition, isIndented, nextLine, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Token (token)
-import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.State (NotificationLevel(..), StateIdentifier(..), unwrapStateIdentifier)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=), (<$>), (<*>))
-import Text.Parsing.Indent (withPos)
-import Text.Parsing.Parser (fail, failWithPosition)
+import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
+import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=))
+import Text.Parsing.Indent (block, indented, sameOrIndented, withPos)
+import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
 
 contextE :: IP ContextPart
-contextE = try $ withEntireBlock
-  (\{uname, knd, pos} elements -> CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos})
-  context_
-  contextPart
+contextE = try $ withPos do
+  {uname, knd, pos} <- context_
+  elements <- isIndented >>= if _
+    then withArcParserState (AllStates $ qname knd uname) (entireBlock contextPart)
+    else pure Nil
+  pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos}
+
   where
+    qname :: ContextKind -> String -> String
+    qname knd cname = if knd == Domain then "model:" <> cname else cname
+
     context_ :: IP (Record (uname :: String, knd :: ContextKind, pos :: ArcPosition))
     context_ = do
       knd <- contextKind <* colon
@@ -64,7 +74,7 @@ contextE = try $ withEntireBlock
       <|> reserved "state" *> pure State
 
     isContextKind :: String -> Boolean
-    isContextKind s = isJust (elemIndex s ["domain", "case", "party", "activity", "state"])
+    isContextKind s = isJust (elemIndex s ["domain", "case", "party", "activity"])
 
     contextPart :: IP ContextPart
     contextPart = do
@@ -74,6 +84,7 @@ contextE = try $ withEntireBlock
         "aspect" -> aspectE
         "indexed" -> indexedE
         ctxt | isContextKind ctxt -> contextE
+        ctxt | ctxt == "state" -> stateE
         role | isRoleKind role -> roleE
         otherwise -> fail "unknown keyword for a context."
 
@@ -106,7 +117,7 @@ useE = do
   modelName <- arcIdentifier
   if isQualifiedWithDomein modelName
     then pure $ PREFIX prefix modelName
-    else failWithPosition ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)") (arcPosition2Position pos)
+    else fail ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)")
 
 roleE :: IP ContextPart
 roleE = try $ withEntireBlock
@@ -119,7 +130,6 @@ roleE = try $ withEntireBlock
       pos <- getPosition
       knd <- (roleKind <* colon) <?> "'thing', 'external', 'context', 'user' or 'bot'"
       case knd of
-        BotRole -> botRole_ pos
         ExternalRole -> externalRole_ pos
         otherwise -> do
           uname <- arcIdentifier
@@ -130,12 +140,16 @@ roleE = try $ withEntireBlock
 
     rolePart :: IP RolePart
     rolePart = do
-      typeOfPart <- lookAhead (reserved' "property" <|> reserved' "perspective" <|> reserved' "view" <|> reserved' "aspect" <|> reserved' "indexed")
+      typeOfPart <- lookAhead (reserved' "property" <|> perspectiveOnKeywords <|> perspectiveOfKeywords <|> reserved' "view" <|> reserved' "aspect" <|> reserved' "indexed" <|> inStateKeywords <|> onEntryKeywords <|> onExitKeywords)
       case typeOfPart of
         "property" -> propertyE
-        "perspective" -> perspectiveE
+        "perspectiveOn" -> SQP <$> perspectiveOn
+        "perspectiveOf" -> SQP <$> perspectiveOf
         "aspect" -> aspectE
         "indexed" -> indexedE
+        "inState" -> SQP <$> inState
+        "onEntry" -> SQP <$> onEntryE
+        "onExit" -> SQP <$> onExitE
         _ -> viewE
 
     aspectE :: IP RolePart
@@ -154,21 +168,26 @@ roleE = try $ withEntireBlock
 
     otherRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     otherRole_ pos knd uname = try do
+      -- Add either subject or object to state.
+      {object, state} <- getArcParserState
+      void $ case knd of
+        UserRole -> setSubject (unwrapStateIdentifier state <> uname)
+        otherwise -> setObject (Simple $ ArcIdentifier pos uname)
       attributes <- roleAttributes <?> "([not] mandatory, [not] functional)"
       -- parse filledBy
       filledBy' <- filledBy
       pure {uname, knd, pos, parts: filledBy' <> attributes}
-
-    botRole_ :: ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
-    botRole_ pos = try do
-      forUser <- reserved "for" *> arcIdentifier
-      pure {uname: "", knd: BotRole, pos, parts: Cons (ForUser forUser) Nil}
 
     externalRole_ :: ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     externalRole_ pos = pure {uname: "External", knd: ExternalRole, pos, parts: Nil}
 
     calculatedRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     calculatedRole_ pos knd uname = try do
+      -- Add either subject or object to state.
+      {object, state} <- getArcParserState
+      void $ case knd of
+        UserRole -> setSubject (unwrapStateIdentifier state <> uname)
+        otherwise -> setObject (Simple $ ArcIdentifier pos uname)
       -- calculation <- reserved "=" *> stringUntilNewline >>= pure <<< Calculation
       calculation <- reserved "=" *> step >>= pure <<< Calculation
       pure {uname, knd, pos, parts: Cons calculation Nil }
@@ -197,8 +216,6 @@ roleE = try $ withEntireBlock
             case maybeNegated of
               Nothing -> pure $ FunctionalAttribute true
               otherwise -> pure $ FunctionalAttribute false
-
-
 
     filledBy :: IP (List RolePart)
     filledBy = (option Nil (reserved "filledBy" *> colon *> token.commaSep arcIdentifier >>= pure <<< map FilledByAttribute)) <* (nextLine <?> "valid filledBy clause")
@@ -282,134 +299,225 @@ viewE = try do
   refs <- token.parens (token.commaSep1 arcIdentifier)
   pure $ VE $ ViewE {id: uname, viewParts: refs, pos: pos}
 
--- | Parses four forms, because both the default view on the Object and the actions involved are optional:
--- |  `perspective on: Guest`
--- |  `perspective on: Guest (ViewOnGuest)`
--- |  `perspective on: Guest: Consult, Change`
--- |  `perspective on: Guest (ViewOnGuest): Consult, Change`
--- | Each of the forms above can be combined with specialised actions:
--- |      Consult with ViewOnGuest
--- |      Change with AnotherView`
-perspectiveE :: IP RolePart
-perspectiveE = try do
+stateE :: IP ContextPart
+stateE = do
+  id <- reserved "state" *> colon *> token.identifier
+  condition <- sameOrIndented *> step
+  stateParts <- indented *> (concat <$> block (onEntryE <|> onExitE <|> perspectiveOn <|> perspectiveOf))
+  pure $ STATE $ StateE {id, condition, stateParts}
+
+
+perspectiveOn :: IP (List StateQualifiedPart)
+perspectiveOn = try $ withPos do
   pos <- getPosition
-  withEntireBlock
-    (\parts otherActions -> PRE $ PerspectiveE {id: "", perspectiveParts: parts <> otherActions, pos: pos})
-    perspective_
-    (actionE <|> ruleE)
-  where
-    perspective_ :: IP (List PerspectivePart)
-    perspective_ = do
-      (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> step >>= pure <<< Object
-      (mdefaultView :: Maybe PerspectivePart) <- optionMaybe (token.parens $ arcIdentifier >>= pure <<< DefaultView)
-      pos <- getPosition
-      (actions :: List PerspectivePart) <- option Nil (colon *> token.commaSep minimalAction')
-      case mdefaultView of
-        Nothing -> pure $ Cons object actions
-        (Just defaultView) -> pure $ Cons defaultView (Cons object actions)
+  (stp :: Step) <- perspectiveOnKeywords *> step
+  setObject stp
+  isIndented >>= if _
+    then concat <$> entireBlock perspectivePart
+    else pure Nil
 
-    minimalAction' :: IP PerspectivePart
-    minimalAction' = mkActionFromVerb <$> getPosition <*> token.identifier
-
-mkActionFromVerb :: ArcPosition -> String -> PerspectivePart
-mkActionFromVerb pos v = Act $ ActionE {id: Nothing, verb: constructVerb v, actionParts: Nil, pos}
-
-constructVerb :: String -> Verb
-constructVerb v = case v of
-  "Consult" -> Consult
-  "Create" -> Create
-  "Change" -> Change
-  "Delete" -> Delete
-  "CreateAndBindContext" -> CreateAndBindContext
-  "Bind" -> Bind
-  s -> Custom s
-
--- | Parses the following forms:
--- |  Consult with ViewOnGuest
--- |  Consult with ViewOnGuest
--- |    subjectView: AnotherView
--- |  Bind with AnotherView
--- |    indirectObject: AnotherRole (ViewOnAnotherRole)
--- |  Consult
--- |    indirectObject: AnotherRole
--- |  Consult
--- |    if Prop1 < 10
-actionE :: IP PerspectivePart
-actionE = try $ withEntireBlock
-  (\{pos, verb, mview} parts -> Act $ ActionE {id: Nothing, verb, actionParts: case mview of
-    Nothing -> join parts
-    (Just view) ->  Cons view (join parts), pos})
-  actionE_
-  actionParts
-  where
-    actionE_ :: IP {pos :: ArcPosition, verb :: Verb, mview :: Maybe ActionPart}
-    actionE_ = try do
-      pos <- getPosition
-      verb <- (arcIdentifier <?> "Consult, Change, Create, Delete, Bind, CreateAndBindContext or a valid identifier") >>= pure <<< constructVerb
-      mview <- optionMaybe (reserved "with" *> arcIdentifier >>= pure <<< ObjectView)
-      pure {pos, verb, mview}
-
-    actionParts :: IP (List ActionPart)
-    actionParts = do
-      lookAhead (reserved "subjectView" <|> reserved "indirectObject" <|> reserved "if") <?> "if, subjectView or indirectObject"
-      subjectView <|> indirectObject <|> condition
-
-    subjectView :: IP (List ActionPart)
-    subjectView = do
-      pos <- getPosition
-      viewName <- reserved "subjectView" *> colon *> arcIdentifier
-      pure $ Cons (SubjectView viewName) Nil
-
-    indirectObject :: IP (List ActionPart)
-    indirectObject = do
-      pos <- getPosition
-      indirectObjectName <- reserved "indirectObject" *> colon *> token.identifier
-      indirectObjectView <- option Nil (token.parens (arcIdentifier >>= pure <<< singleton <<< IndirectObjectView))
-      pure $ Cons (IndirectObject indirectObjectName) indirectObjectView
-
-    condition :: IP (List ActionPart)
-    condition = do
-      pos <- getPosition
-      expr <- reserved "if" *> step
-      pure $ Cons (Condition expr) Nil
-
-ruleE :: IP PerspectivePart
-ruleE = withPos (do
-  (ruleName :: Maybe String) <- optionMaybe (reserved "rule" *> arcIdentifier <* colon)
-  lhs <- ruleE_
-  (letWithAssignment lhs ruleName <|> assignmentList lhs ruleName) <?> "one or more assignment expressions")
-  -- TODO. IK SNAP niet waarom dit faalt. De positie in het resultaat van de LetStep (bijvoorbeeld) is rechts
-  -- van die van de if. Waarom dan niet indented?
-  -- indented *> (letWithAssignment lhs <|> assignmentList lhs)
-
-ruleE_ :: IP {pos :: ArcPosition, condition :: Step}
-ruleE_ = do
+perspectiveOf :: IP (List StateQualifiedPart)
+perspectiveOf = try $ withPos do
   pos <- getPosition
-  cond <- reserved "if" *> step <* reserved "then"
-  pure {pos: pos, condition: cond}
+  (subject :: String) <- perspectiveOnKeywords *> arcIdentifier
+  setSubject subject
+  isIndented >>= if _
+    then concat <$> entireBlock perspectivePart
+    else pure Nil
 
--- | A rule is a special format for a Bot action:
--- |   if Wens >> Bedrag > 10 then
--- |     SomeProp = false
--- |     SomeOtherProp =+ "aap"
-assignmentList :: {pos :: ArcPosition, condition :: Step} -> Maybe String -> IP PerspectivePart
-assignmentList {pos, condition} ruleName = try do
-  assignments <- entireBlock assignment
-  pure $ Act $ ActionE {id: ruleName, verb: Change, actionParts: Cons (Condition condition) (map AssignmentPart assignments), pos}
+perspectivePart :: IP (List StateQualifiedPart)
+perspectivePart = fix \p ->
+      (singleton <<< R <$> roleVerbs )
+  <|> (singleton <<< P <$> propertyVerbs )
+  <|> inState
+  <|> onEntryE
+  <|> onExitE
+  <|> actionE
 
--- | A rule may also have a let* expression for its right hand side:
--- |  if Wens >> Bedrag > 10 then
--- |    let*
--- |      a <- <expression>
--- |    in
--- |      SomeProp = a
-letWithAssignment :: {pos :: ArcPosition, condition :: Step} -> Maybe String -> IP PerspectivePart
-letWithAssignment {pos, condition} ruleName = try do
-  ltst <- letStep
-  case ltst of
-    (Let lt) -> pure $ Act $ ActionE {id: ruleName, verb: Change, actionParts: ((Condition condition) : (LetPart lt) : Nil), pos}
-    (PureLet (PureLetStep{body})) -> failWithPosition "assignment expression" (arcPosition2Position (startOf body))
-    otherwise -> fail "let* expression"
+inState :: IP (List StateQualifiedPart)
+inState = do
+  stateId <- State_ <$> (inStateKeywords *> arcIdentifier)
+  -- We can use withArcParserState here. It will concatenate the local
+  -- state identifier to the state identifier provided by the surrounding context.
+  -- The assumption being that we do not refer to states out of the context that the
+  -- user or role is defined in.
+  withArcParserState stateId
+    (isIndented >>= if _
+      then concat <$> entireBlock (
+           (singleton <<< R <$> roleVerbs)
+        <|> (singleton <<< P <$> propertyVerbs)
+        <|> perspectiveOn
+        <|> perspectiveOf
+        <|> actionE
+        )
+      else pure Nil)
+
+inStateKeywords :: IP String
+inStateKeywords = reserved "in" *> reserved "state" *> colon *> pure "inState"
+
+onExitKeywords :: IP String
+onExitKeywords = reserved "on" *> reserved "exit" *> colon *> pure "inState"
+
+onEntryKeywords :: IP String
+onEntryKeywords = reserved "on" *> reserved "entry" *> colon *> pure "inState"
+
+perspectiveOfKeywords :: IP String
+perspectiveOfKeywords = reserved "perspective" *> reserved "of" *> colon *> pure "perspectiveOf"
+
+perspectiveOnKeywords :: IP String
+perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> colon *> pure "perspectiveOn"
+
+onEntryE :: IP (List StateQualifiedPart)
+onEntryE = do
+  stateTrans <- onEntryKeywords *> arcIdentifier
+  -- The transition will be fully qualified.
+  setOnEntry stateTrans
+  isIndented >>= if _
+    then concat <$> entireBlock (notificationE <|> automaticEffectE)
+    else pure Nil
+
+onExitE :: IP (List StateQualifiedPart)
+onExitE = do
+  stateTrans <- onExitKeywords *> arcIdentifier
+  -- The transition will be fully qualified.
+  setOnExit stateTrans
+  isIndented >>= if _
+    then concat <$> entireBlock (notificationE <|> automaticEffectE)
+    else pure Nil
+
+automaticEffectE :: IP (List StateQualifiedPart)
+automaticEffectE = do
+  start <- getPosition
+  reserved "do"
+  isIndented >>= if _
+    then do
+      effect <- Left <$> entireBlock assignment <|> Right <$> letWithAssignment
+      end <- getPosition
+      {subject, object, onEntry, onExit} <- getArcParserState
+      case subject, onEntry, onExit of
+        Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+        Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+        _, Nothing, Nothing -> fail "A state transition is required"
+        _, _, _ -> fail "State transition inside state transition is not allowed"
+    else pure Nil
+
+notificationE :: IP (List StateQualifiedPart)
+notificationE = do
+  start <- getPosition
+  reserved "notify"
+  -- User role either specified here or taken from state.
+  usr <- optionMaybe arcIdentifier
+  level <- notificationLevel
+  end <- getPosition
+  {subject, onEntry, onExit} <- getArcParserState
+  case usr of
+    Just user -> case onEntry, onExit of
+      Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user, transition, level, start, end}
+      Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user, transition, level, start, end}
+      Nothing, Nothing -> fail "A state transition is required"
+      _, _ -> fail "State transition inside state transition is not allowed"
+    Nothing -> case subject, onEntry, onExit of
+      Just u, Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: u, transition, level, start, end}
+      Just u, Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: u, transition, level, start, end}
+      Nothing, _, _ -> fail "User role is not specified"
+      _, _, _ -> fail "State transition inside state transition is not allowed"
+
+  where
+    notificationLevel :: IP NotificationLevel
+    notificationLevel = do
+      v <- token.identifier
+      case v of
+        "Alert" -> pure Alert
+        _ -> fail "Not a notification level"
+
+-- only Consult
+-- only Consult
+-- only Consult, Create
+-- only Consult,
+--    Create
+-- all except Delete, Remove
+-- etc.
+roleVerbs :: IP RoleVerbE
+roleVerbs = do
+  -- subject and object must be present.
+  {subject, object, state} <- getArcParserState
+  case subject, object of
+    Just s, Just o -> do
+      start <- getPosition
+      (rv :: RoleVerbList) <- option All roleVerbList
+      end <- getPosition
+      pure $ RoleVerbE {subject: s, object: o, state, roleVerbs: rv, start, end}
+    _, _ -> fail "User role and object of perspective must be given"
+
+propertyVerbs :: IP PropertyVerbE
+propertyVerbs = do
+  -- subject and object must be present.
+  {subject, object, state} <- getArcParserState
+  case subject, object of
+    Just s, Just o -> do
+      -- <PropertyVerb>+: (view <View> | <Property>+)
+      start <- getPosition
+      (pv :: List PropertyVerb) <- option allPropertyVerbs lotsOfVerbs
+      (propsOrView :: PropsOrView) <- option AllProperties
+        (colon *> reserved "view" *> (View <$> arcIdentifier)) <|>
+        (colon *> (Properties <$> lotsOfProperties))
+      end <- getPosition
+      pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView, start, end}
+    _, _ -> fail "User role and object of perspective must be given"
+  where
+    lotsOfVerbs :: IP (List PropertyVerb)
+    lotsOfVerbs = Cons <$> propertyVerb <*> (many (sameOrIndented *> token.comma *> propertyVerb))
+
+    allPropertyVerbs :: List PropertyVerb
+    allPropertyVerbs = (RemovePropertyValue : (DeleteProperty : (AddPropertyValue : (SetPropertyValue : Nil))))
+
+    lotsOfProperties :: IP (List String)
+    lotsOfProperties = Cons <$> arcIdentifier <*> (many (sameOrIndented *> token.comma *> arcIdentifier))
+
+roleVerbList :: IP RoleVerbList
+roleVerbList
+ =  (reserved "only" *> (Including <<< fromFoldable <$> lotsOfVerbs)) <|>
+    (reserved "except" *> (Excluding <<< fromFoldable <$> lotsOfVerbs))
+  where
+    lotsOfVerbs :: IP (List RoleVerb)
+    lotsOfVerbs = Cons <$> roleVerb <*> (many (sameOrIndented *> token.comma *> roleVerb))
+
+roleVerb :: IP RoleVerb
+roleVerb = do
+  v <- token.identifier
+  case v of
+    "Remove" -> pure Remove
+    "Delete" -> pure Delete
+    "Create" -> pure Create
+    "CreateAndFill" -> pure CreateAndFill
+    "Fill" -> pure Fill
+    "Unbind" -> pure Unbind
+    "RemoveFiller" -> pure RemoveFiller
+    "Move" -> pure Move
+    _ -> fail "Not a role verb"
+
+propertyVerb :: IP PropertyVerb
+propertyVerb = do
+  v <- token.identifier
+  case v of
+    "RemovePropertyValue" -> pure RemovePropertyValue
+    "DeleteProperty" -> pure DeleteProperty
+    "AddPropertyValue" -> pure AddPropertyValue
+    "SetPropertyValue" -> pure SetPropertyValue
+    _ -> fail "Not a property verb"
+
+actionE :: IP (List StateQualifiedPart)
+actionE = do
+  start <- getPosition
+  id <- reserved "action" *> token.identifier <* colon
+  {subject, state, object} <- getArcParserState
+  case subject, object of
+    Nothing, _ -> fail "User role is not specified"
+    _, Nothing -> fail "object of perspective must be given"
+    Just s, Just o -> do
+      effect <- Left <$> entireBlock assignment <|> Right <$> letWithAssignment
+      end <- getPosition
+      pure $ singleton $ AC $ ActionE {id, subject: s, object: o, state, effect, start, end}
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name

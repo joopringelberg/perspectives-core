@@ -46,9 +46,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, keys, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Parsing.Arc (constructVerb)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
@@ -110,9 +108,6 @@ addInvertedQuery q@(InvertedQuery{userTypes}) qs = case findIndex (equalDescript
 
 allProps :: PropsAndVerbs -> RelevantProperties
 allProps o = fold $ values o
-
-allVerbs :: PropsAndVerbs -> Array Verb
-allVerbs o = constructVerb <$> keys o
 
 -- | Remove each verb-properties pair that does not include the PropertyType
 -- | and restrict the properties to the singleton with that property.

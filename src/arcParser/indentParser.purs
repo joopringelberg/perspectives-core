@@ -22,17 +22,18 @@
 
 module Perspectives.Parsing.Arc.IndentParser where
 
-import Control.Alt ((<|>))
-import Control.Monad.State (gets, lift)
+import Control.Alt (void, (<|>))
+import Control.Monad.State (StateT, evalStateT, gets, lift, modify)
 import Control.Monad.State.Trans (get, put)
 import Data.Either (Either)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Identity (Identity)
 import Data.List (List(..), many, singleton)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, ($), (*>), (<), (>), (<*), (<<<), (<=), (>>=), unit)
+import Data.Maybe (Maybe(..), isNothing)
+import Perspectives.Parsing.Arc.AST (StateTransitionE(..))
+import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.Position (ArcPosition(..))
+import Perspectives.Representation.State (StateIdentifier(..))
+import Prelude (class Monad, Unit, bind, discard, flip, pure, unit, ($), (*>), (<), (<*), (<<<), (<=), (>), (>>=), (<>))
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
 import Text.Parsing.Parser.Pos (Position)
@@ -41,11 +42,70 @@ import Unsafe.Coerce (unsafeCoerce)
 
 -- | This is the type that is produced by Perspectives.Parsing.TransferFile.
 -- type IndentParser m s a = ParserT s (StateT Position m) a
-type IP a = IndentParser Identity String a
+-- type IP a = IndentParser Identity String a
+
+-- | The StateIdentifier holds a fully qualified context name directly after parsing the
+-- | context declaration.
+-- | Directly after parsing the state declaration, the StateIdentifier holds a fully qualified name
+-- | consisting of the surrounding context name and the state identifier given in the declaration.
+-- | (if we allow States to be nested, their names will be nested, too, providing a kind of scope).
+-- | Subject may be a qualified name (from the role declaration). However, it may also be unqualified or partly
+-- | qualified (from the "perspective of" expression).
+type ArcParserState =
+  { subject :: Maybe String
+  , object :: Maybe Step
+  , state :: StateIdentifier
+  , onEntry :: Maybe StateTransitionE
+  , onExit :: Maybe StateTransitionE
+  }
+
+type ArcParser = StateT ArcParserState Identity
+type IP a = IndentParser ArcParser String a
+
+initialArcParserState :: ArcParserState
+initialArcParserState = {subject: Nothing, object: Nothing, state: AllStates "", onEntry: Nothing, onExit: Nothing}
+
+getArcParserState :: IP ArcParserState
+getArcParserState = lift $ lift $ get
+
+modifyArcParserState :: (ArcParserState -> ArcParserState) -> IP ArcParserState
+modifyArcParserState f = lift $ lift $ modify f
+
+withArcParserState :: forall a. StateIdentifier -> IP a -> IP a
+withArcParserState stateId a = do
+  oldState@{state} <- getArcParserState
+  lift $ lift $ put initialArcParserState {state = state <> stateId}
+  result <- a
+  lift $ lift $ put oldState
+  pure result
+
+setSubject :: String -> IP Unit
+setSubject name = do
+  {subject} <- getArcParserState
+  if isNothing subject then void $ modifyArcParserState \s -> s {subject = Just name} else fail "User role is already specified"
+
+setObject :: Step -> IP Unit
+setObject stp = do
+  {object} <- getArcParserState
+  if isNothing object then void $ modifyArcParserState \s -> s {object = Just stp} else fail "Object of perspective is already specified"
+
+-- | Given a local state name, create and store in state a Transition with ado
+--  fully qualified state identifier.
+setOnEntry :: String -> IP Unit
+setOnEntry localStateName = do
+  {onEntry, state} <- getArcParserState
+  if isNothing onEntry then void $ modifyArcParserState \s -> s {onEntry = Just (Entry (state <> (State_ localStateName)))} else fail "on entry is already specified"
+
+-- | Given a local state name, create and store in state a Transition with ado
+--  fully qualified state identifier.
+setOnExit :: String -> IP Unit
+setOnExit localStateName = do
+  {onExit, state} <- getArcParserState
+  if isNothing onExit then void $ modifyArcParserState \s -> s {onExit = Just (Exit (state <> (State_ localStateName)))} else fail "on exit is already specified"
 
 -- | Apply a parser, keeping only the parsed result.
 runIndentParser :: forall a. String -> IP a -> Identity (Either ParseError a)
-runIndentParser s p = runIndent (runParserT s p)
+runIndentParser s p = flip evalStateT initialArcParserState (runIndent (runParserT s p))
 
 onSameLine :: forall m s a. Monad m => IndentParser m s a -> IndentParser m s a
 onSameLine p = withPos (p <* sameLine)
@@ -63,23 +123,6 @@ get' = do
 -- | Records the position with the IndentParser.
 put' :: ArcPosition -> IP Unit
 put' p = lift (put $ arcPosition2Position p)
-
-derive instance genericArcPosition :: Generic ArcPosition _
-instance showArcPosition :: Show ArcPosition where show = genericShow
-derive instance eqArcPosition :: Eq ArcPosition
-instance decodeArcPosition :: Decode ArcPosition where
-  decode = genericDecode defaultOptions
-instance encodeArcPosition :: Encode ArcPosition where
-  encode = genericEncode defaultOptions
-
--- | `Position` represents the position of the parser in the input.
--- |
--- | - `line` is the current line in the input
--- | - `column` is the column of the next character in the current line that will be parsed
-newtype ArcPosition = ArcPosition
-  { line :: Int
-  , column :: Int
-  }
 
 upperLeft :: ArcPosition
 upperLeft = ArcPosition{line: 0, column: 0}

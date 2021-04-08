@@ -242,6 +242,22 @@ instance prettyPrintViewType :: PrettyPrint ViewType where
 derive newtype instance writeForeignViewType :: WriteForeign ViewType
 derive newtype instance readForeignViewType :: ReadForeign ViewType
 
+newtype PerspectiveType = PerspectiveType String
+derive instance newtypePerspectiveType :: Newtype PerspectiveType _
+derive instance genericRepPerspectiveType :: Generic PerspectiveType _
+derive newtype instance encodePerspectiveType :: Encode PerspectiveType
+derive newtype instance decodePerspectiveType :: Decode PerspectiveType
+instance showPerspectiveType :: Show PerspectiveType where
+  show i = "PerspectiveType " <> (unwrap i)
+instance eqPerspectiveType :: Eq PerspectiveType where
+  eq (PerspectiveType id1) (PerspectiveType id2) = id1 == id2
+instance ordPerspectiveType :: Ord PerspectiveType where
+  compare (PerspectiveType a1) (PerspectiveType a2) = compare a1 a2
+instance prettyPrintPerspectiveType :: PrettyPrint PerspectiveType where
+  prettyPrint' t = show
+derive newtype instance writeForeignPerspectiveType :: WriteForeign PerspectiveType
+derive newtype instance readForeignPerspectiveType :: ReadForeign PerspectiveType
+
 newtype ActionType = ActionType String
 derive instance newtypeActionType :: Newtype ActionType _
 derive instance genericRepActionType :: Generic ActionType _

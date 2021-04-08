@@ -88,7 +88,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.QueryFunction (FunctionName) as QF
 import Perspectives.Representation.Range (Range)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
@@ -177,6 +177,7 @@ data Assignment =
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
 instance eqStep :: Eq Step where eq = genericEq
+derive instance ordStep :: Ord Step
 instance encodeStep :: Encode Step where
   encode = genericEncode defaultOptions
 instance decodeStep :: Decode Step where
@@ -192,6 +193,7 @@ instance prettyPrintStep :: PrettyPrint Step where
 derive instance genericSimpleStep :: Generic SimpleStep _
 instance showSimpleStep :: Show SimpleStep where show = genericShow
 instance eqSimpleStep :: Eq SimpleStep where eq = genericEq
+derive instance ordSimpleStep :: Ord SimpleStep
 instance encodeSimpleStep :: Encode SimpleStep where
   encode = genericEncode defaultOptions
 instance decodeSimpleStep :: Decode SimpleStep where
@@ -215,6 +217,7 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
 derive instance genericBinaryStep :: Generic BinaryStep _
 instance showBinaryStep :: Show BinaryStep where show = genericShow
 instance eqBinaryStep :: Eq BinaryStep where eq s1 s2 = genericEq s1 s2
+derive instance ordBinaryStap :: Ord BinaryStep
 instance encodeBinaryStep :: Encode BinaryStep where
   encode q = genericEncode defaultOptions q
 instance decodeBinaryStep :: Decode BinaryStep where
@@ -225,6 +228,7 @@ instance prettyPrintBinaryStep :: PrettyPrint BinaryStep where
 derive instance genericUnaryStep :: Generic UnaryStep _
 instance showUnaryStep :: Show UnaryStep where show = genericShow
 instance eqUnaryStep :: Eq UnaryStep where eq u1 u2 = genericEq u1 u2
+derive instance ordUnaryStap :: Ord UnaryStep
 instance encodeUnaryStep :: Encode UnaryStep where
   encode q = genericEncode defaultOptions q
 instance decodeUnaryStep :: Decode UnaryStep where
@@ -239,6 +243,7 @@ instance prettyPrintUnaryStep :: PrettyPrint UnaryStep where
 derive instance genericLetStep :: Generic LetStep _
 instance showLetStep :: Show LetStep where show = genericShow
 instance eqLetStep :: Eq LetStep where eq u1 u2 = genericEq u1 u2
+derive instance ordLetStap :: Ord LetStep
 instance encodeLetStep :: Encode LetStep where
   encode q = genericEncode defaultOptions q
 instance decodeLetStep :: Decode LetStep where
@@ -249,6 +254,7 @@ instance prettyPrintLetStep :: PrettyPrint LetStep where
 derive instance genericPureLetStep :: Generic PureLetStep _
 instance showPureLetStep :: Show PureLetStep where show = genericShow
 instance eqPureLetStep :: Eq PureLetStep where eq u1 u2 = genericEq u1 u2
+derive instance ordPureLetStep :: Ord PureLetStep
 instance encodePureLetStep :: Encode PureLetStep where
   encode q = genericEncode defaultOptions q
 instance decodePureLetStep :: Decode PureLetStep where
@@ -259,6 +265,7 @@ instance prettyPrintPureLetStep :: PrettyPrint PureLetStep where
 derive instance genericVarBinding :: Generic VarBinding _
 instance showVarBinding :: Show VarBinding where show = genericShow
 instance eqVarBinding :: Eq VarBinding where eq = genericEq
+derive instance ordVarBinding :: Ord VarBinding
 instance encodeVarBinding :: Encode VarBinding where
   encode q = genericEncode defaultOptions q
 instance decodeVarBinding :: Decode VarBinding where
@@ -269,6 +276,7 @@ instance prettyPrintVarBinding :: PrettyPrint VarBinding where
 derive instance genericOperator :: Generic Operator _
 instance showOperator :: Show Operator where show = genericShow
 instance eqOperator :: Eq Operator where eq = genericEq
+derive instance ordOperator :: Ord Operator
 instance encodeOperator :: Encode Operator where
   encode = genericEncode defaultOptions
 instance decodeOperator :: Decode Operator where
@@ -295,6 +303,7 @@ instance prettyPrintOperator :: PrettyPrint Operator where
 derive instance genericAssignment :: Generic Assignment _
 instance showAssignment :: Show Assignment where show = genericShow
 instance eqAssignment :: Eq Assignment where eq = genericEq
+derive instance ordAssignment :: Ord Assignment
 instance encodeAssignment :: Encode Assignment where
   encode q = genericEncode defaultOptions q
 instance decodeAssignment :: Decode Assignment where
@@ -320,6 +329,7 @@ instance prettyPrintAssignment :: PrettyPrint Assignment where
 derive instance genericAssignmentOperator :: Generic AssignmentOperator _
 instance showAssignmentOperator :: Show AssignmentOperator where show = genericShow
 instance eqAssignmentOperator :: Eq AssignmentOperator where eq = genericEq
+derive instance ordAssignmentOperator :: Ord AssignmentOperator
 instance encodeAssignmentOperator :: Encode AssignmentOperator where
   encode = genericEncode defaultOptions
 instance decodeAssignmentOperator :: Decode AssignmentOperator where
@@ -334,6 +344,7 @@ instance prettyPrintAssignmentOperator :: PrettyPrint AssignmentOperator where
 derive instance genericComputationStep :: Generic ComputationStep _
 instance showComputationStep :: Show ComputationStep where show s = genericShow s
 instance eqComputationStep :: Eq ComputationStep where eq c1 c2 = genericEq c1 c2
+derive instance ordComputationStep :: Ord ComputationStep
 instance encodeComputationStep :: Encode ComputationStep where
   encode q = genericEncode defaultOptions q
 instance decodeComputationStep :: Decode ComputationStep where

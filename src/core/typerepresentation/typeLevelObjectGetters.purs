@@ -52,8 +52,8 @@ import Perspectives.Representation.Class.Action (object, providesPerspectiveOnPr
 import Perspectives.Representation.Class.Context (allContextTypes)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (getAction, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView)
-import Perspectives.Representation.Class.Role (actionSet, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, leavesInADT, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
+import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView)
+import Perspectives.Representation.Class.Role (adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, leavesInADT, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.ExplicitSet (hasElementM)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))

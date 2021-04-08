@@ -24,48 +24,86 @@ module Perspectives.Parsing.Arc.PhaseTwo where
 
 import Perspectives.Parsing.Arc.PhaseTwoDefs
 
-import Control.Monad.Except (throwError)
-import Data.Array (cons, elemIndex, fromFoldable, length)
-import Data.Foldable (foldl)
+import Control.Monad.Except (lift, throwError)
+import Control.Monad.State (gets, modify)
+import Data.Array (cons, elemIndex, length, group)
+import Data.Array (filter, fromFoldable) as ARR
+import Data.Array.NonEmpty (NonEmptyArray, head) as ARNE
+import Data.Array.NonEmpty (toArray)
+import Data.Array.Partial (head) as ARRP
+import Data.Either (Either(..))
+import Data.Foldable (foldl, for_)
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
-import Data.List (List(..), filter, findIndex, foldM, head, null, sort, (:))
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.List (List(..), filter, findIndex, foldM, head, sort)
+import Data.Map (insert, lookup, empty) as MAP
+import Data.Map (toUnfoldable)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Foreign.Object (insert, keys, lookup)
+import Data.Tuple (Tuple(..), fst, snd)
+import Foreign.Object (Object, insert, keys, lookup, singleton)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc (mkActionFromVerb)
-import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf, isQualifiedWithDomein)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateTransitionE(..), ViewE(..))
+import Perspectives.Parsing.Arc.Expression.AST (Step) as Expr
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
-import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
 import Perspectives.Representation.Class.Role (Role(..))
-import Perspectives.Representation.Context (Context(..), defaultContext)
+import Perspectives.Representation.Context (Context(..), defaultContext, ContextRecord)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), externalRoleType_, roletype2string)
-import Perspectives.Representation.View (View(..))
-import Prelude (bind, discard, identity, map, not, pure, show, ($), (&&), (<$>), (<*), (<<<), (<>), (==), (>>=))
+import Perspectives.Representation.State (State(..), StateIdentifier(..), StateRecord, constructState)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), externalRoleType_, roletype2string)
+import Perspectives.Representation.View (View(..)) as VIEW
+import Prelude (Unit, bind, discard, pure, void, ($), (<$>), (<<<), (<>), (==), (>>=))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
+  -- Traverse the model parse tree and construct a DomeinFileRecord in PhaseTwoState.
   (Context {_id}) <- traverseContextE c ns
+
+  -- Add perspectives to PhaseTwoState.
+  handlePostponedStateQualifiedParts
+
+  -- Modify the DomeinFileRecord in PhaseTwoState so that all perspectives
+  -- are stored in their subject roles.
+  perspectives <- lift $ gets _.perspectives
+  (perRole :: Array (ARNE.NonEmptyArray (Tuple (Tuple RoleType Expr.Step) Perspective))) <- pure $ group (toUnfoldable perspectives)
+  modifyDF \domeinFileRecord -> foldl
+    (\dfr@{enumeratedRoles, calculatedRoles} perspectivesForOneRole -> let
+      (rname :: String) = roletype2string $ fst $ fst $ ARNE.head perspectivesForOneRole
+      -- modify the role in the domeinfile
+      in case lookup rname enumeratedRoles of
+        Nothing -> case lookup rname calculatedRoles of
+          Nothing -> dfr
+          Just (CalculatedRole cr) -> dfr { calculatedRoles =
+            insert
+              rname
+              (CalculatedRole cr { perspectives = toArray (snd <$> perspectivesForOneRole)})
+              calculatedRoles
+          }
+        Just (EnumeratedRole er) -> dfr { enumeratedRoles =
+          insert
+            rname
+            (EnumeratedRole er { perspectives = toArray (snd <$> perspectivesForOneRole)})
+            enumeratedRoles})
+    domeinFileRecord
+    perRole
   domeinFileRecord <- getDF
   pure $ DomeinFile (domeinFileRecord {_id = unwrap _id})
 
@@ -118,6 +156,13 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       qualifiedIndexedName <- expandNamespace indexedName
       pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
 
+    handleParts (Context contextUnderConstruction) (STATE s@(StateE{id:stateId})) = do
+      state@(State{id:ident}) <- traverseStateE s (AllStates $ addNamespace ns stateId)
+      pure (ident `insertStateInto` contextUnderConstruction)
+      where
+        insertStateInto :: StateIdentifier -> ContextRecord -> Context
+        insertStateInto stateIdentifier cr@{states} = if isJust $ elemIndex stateIdentifier states then Context cr else Context $ cr {states = cons stateIdentifier states}
+
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = LN.over
       (prop (SProxy :: SProxy "contexts"))
@@ -156,43 +201,18 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
 traverseRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseRoleE r ns = if isCalculatedRole r
   then traverseCalculatedRoleE r ns
-  else if isBotRole r
-    then traverseBotRole r ns
-    else traverseEnumeratedRoleE r ns
+  else traverseEnumeratedRoleE r ns
+  -- else if isBotRole r
+  --   then traverseBotRole r ns
+  --   else traverseEnumeratedRoleE r ns
   where
     isCalculatedRole :: RoleE -> Boolean
     -- isCalculatedRole _ = true
     isCalculatedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
       (Calculation _) -> true
       otherwise -> false) roleParts))
-    isBotRole :: RoleE -> Boolean
-    isBotRole (RoleE{kindOfRole}) = kindOfRole == BotRole
-
--- | The User, Enumerated or Calculated, must be present by now because we handle BotRoles last.
-traverseBotRole :: RoleE -> Namespace -> PhaseTwo Role
-traverseBotRole r@(RoleE {id, roleParts, pos}) ns = do
-  subjectIsBot
-  servedUserLocalName <- userServedByBot pos id roleParts
-  servedUserId <- pure (ns <> "$" <> servedUserLocalName)
-  df@{enumeratedRoles, calculatedRoles} <- getDF
-  case lookup servedUserId enumeratedRoles of
-    Just user -> traverseEnumeratedRoleE_ user roleParts <* subjectIsNotABot
-    -- Nothing -> throwError $ UnknownRole pos servedUserLocalName
-    Nothing -> case lookup servedUserId calculatedRoles of
-      Just user -> traverseCalculatedRoleE_ user roleParts <* subjectIsNotABot
-      Nothing -> traverseEnumeratedRoleE_ (defaultEnumeratedRole servedUserId servedUserLocalName UserRole ns pos) roleParts <* subjectIsNotABot
-  where
-    userServedByBot :: ArcPosition -> String -> List RolePart -> PhaseTwo String
-    userServedByBot pos' localBotName parts = let
-      f = foldl
-        (\found next -> if isJust found then found else case next of
-          (ForUser user) -> Just user
-          otherwise -> Nothing)
-        Nothing
-        parts
-      in case f of
-        (Just user) -> pure user
-        otherwise -> throwError (MissingForUser pos' localBotName)
+    -- isBotRole :: RoleE -> Boolean
+    -- isBotRole (RoleE{kindOfRole}) = kindOfRole == BotRole
 
 traverseEnumeratedRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
@@ -217,11 +237,14 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       property <- traversePropertyE pe roleName
       pure (property `insertPropertyInto` roleUnderConstruction)
 
-    -- PERSPECTIVE
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
-      actions <- traversePerspectiveE pe (ENR rn)
-      -- As all actions are generated with a guid as identity, we can safely concatenate the new actions.
-      pure (EnumeratedRole roleUnderConstruction {perspectives = actions <> perspectives})
+    -- PERSPECTIVE AS STATEQUALIFIEDPARTS
+    -- Here we encounter forward references to roles that may be calculated or enumerated;
+    -- we can't tell, here. Yet we need to know in order to construct
+    -- perspectives and states. Hence we postpone them to the very last.
+    -- Notice that no perspectives are created!
+    handleParts roleName erole (SQP stateQualifiedParts) = do
+      lift $ void $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateQualifiedParts}
+      pure erole
 
     -- VIEW
     handleParts roleName (EnumeratedRole roleUnderConstruction@{views}) (VE pe) = do
@@ -250,9 +273,6 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
           -- By default, comma separated types form a SUM wrt binding.
           pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding expandedBnd})
 
-    -- FORUSER
-    handleParts roleName (EnumeratedRole roleUnderConstruction) (ForUser _) = pure (EnumeratedRole $ roleUnderConstruction)
-
     -- ROLEASPECT
     handleParts roleName (EnumeratedRole roleUnderConstruction@{roleAspects}) (RoleAspect a pos') = do
       expandedAspect <- expandNamespace a
@@ -260,21 +280,10 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
         then pure (EnumeratedRole $ roleUnderConstruction {roleAspects = cons (EnumeratedRoleType expandedAspect) roleAspects})
         else throwError $ NotWellFormedName pos' a
 
+    -- INDEXEDROLE
     handleParts roleName (EnumeratedRole roleUnderConstruction) (IndexedRole indexedName pos') = do
       expandedIndexedName <- expandNamespace indexedName
       pure (EnumeratedRole $ roleUnderConstruction {indexedRole = Just (RoleInstance expandedIndexedName)})
-
-    userServedByBot :: ArcPosition -> String -> List RolePart -> PhaseTwo String
-    userServedByBot pos' localBotName parts = let
-      f = foldl
-        (\found next -> if isJust found then found else case next of
-          (ForUser user) -> Just user
-          otherwise -> Nothing)
-        Nothing
-        parts
-      in case f of
-        (Just user) -> pure user
-        otherwise -> throwError (MissingForUser pos' localBotName)
 
     -- We we add roleName as another disjunct of a sum type.
     -- `roleName` should be qualified.
@@ -302,13 +311,26 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     insertPropertyInto (Property.E (EnumeratedProperty {_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (ENP _id) properties}
     insertPropertyInto (Property.C (CalculatedProperty{_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (CP _id) properties}
 
+traverseStateE :: StateE -> StateIdentifier -> PhaseTwo State
+traverseStateE (StateE {id, condition, stateParts}) ns = do
+  state <- pure $ constructState ns condition
+  -- Postpone all stateParts because there may be forward references to user and subject.
+  void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateParts}
+  pure state
+
+addStateToDomeinFile :: State -> DomeinFileRecord -> DomeinFileRecord
+addStateToDomeinFile state@(State{id}) dfr@{states} = dfr {states = EncodableMap (MAP.insert id state (unwrap states))}
+
+getState :: StateIdentifier -> PhaseTwo (Maybe State)
+getState id = gets _.dfr >>= \{states: (EncodableMap states)} -> pure $ MAP.lookup id states
+
 -- Traverse the members of ViewE to construct a new View type and insert it into the
 -- DomeinFileRecord.
 traverseViewE :: ViewE -> Namespace -> PhaseTwo ViewType
 traverseViewE (ViewE {id, viewParts, pos}) ns = do
   viewName <- pure (ns <> "$" <> id)
-  (expandedPropertyReferences :: Array PropertyType) <- traverse qualifyProperty (fromFoldable viewParts)
-  view <- pure $ View
+  (expandedPropertyReferences :: Array PropertyType) <- traverse qualifyProperty (ARR.fromFoldable viewParts)
+  view <- pure $ VIEW.View
     { _id: ViewType viewName
     , _rev: Nothing
     , displayName: id
@@ -347,13 +369,6 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   modifyDF (\domeinFile -> addRoleToDomeinFile role' domeinFile)
   pure role'
 
-  where
-    handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
-    -- Parse the query expression.
-    handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) = do
-      expandedCalc <- expandPrefix calc
-      pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc})
-
 traverseCalculatedRoleE_ :: CalculatedRole -> List RolePart -> PhaseTwo Role
 traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) roleParts = do
   role' <- foldM (unsafePartial $ handleParts) role roleParts
@@ -370,13 +385,12 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
       pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc})
 
     -- PERSPECTIVE
-    handleParts (CalculatedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
-      actions <- traversePerspectiveE pe (CR roleName)
-      -- As all actions are generated with a guid as identity, we can safely concatenate the new actions.
-      pure (CalculatedRole roleUnderConstruction {perspectives = actions <> perspectives})
+    handleParts crole (SQP stateQualifiedParts) = do
+      void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateQualifiedParts}
+      pure crole
 
-    -- FORUSER
-    handleParts (CalculatedRole roleUnderConstruction) (ForUser _) = pure (CalculatedRole $ roleUnderConstruction)
+    -- -- FORUSER
+    -- handleParts (CalculatedRole roleUnderConstruction) (ForUser _) = pure (CalculatedRole $ roleUnderConstruction)
 
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
@@ -426,119 +440,126 @@ addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties}
   (Property.E r@(EnumeratedProperty{_id})) -> df {enumeratedProperties = insert (unwrap _id) r enumeratedProperties}
   (Property.C r@(CalculatedProperty{_id})) -> df {calculatedProperties = insert (unwrap _id) r calculatedProperties}
 
--- | Traverse a PerspectiveE. Add each Action seperately to the DomeinFile.
--- | Returns the fully qualified string that identifies the Object of the Action and the qualified identifiers of the Actions
--- | (we need not know what kind of Role that Object is, to be able to store the
--- | Perspective in the Role itself).
-traversePerspectiveE :: PerspectiveE -> RoleType -> PhaseTwo (Array ActionType)
-traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
-
-  -- First identify the Object of the Perspective. We need to hand it down to treatment
-  -- of each separate Action.
-  (object :: Calculation) <- case head $ filter (case _ of
-    (Object _) -> true
-    otherwise -> false) perspectiveParts of
-      -- Object **must** be an expression that selects a role.
-
-      -- Object **must** be a local role name. We do not expand it.
-      -- Even though the object should be a role in the context,
-      -- we cannot be sure at this point that it will actually be so.
-      -- We pass the unqualified name and have PhaseThree look it up.
-      (Just (Object objectExpression)) -> S <$> expandPrefix objectExpression
-      otherwise -> throwError (MissingObject pos id)
-
-  -- Similarly, find and use the DefaultObjectView, if the Action has not provided its own View.
-  -- We do not (yet) allow a View with a CalculatedRole, so the View is taken from the EnumeratedRole's that
-  -- underly the calculation of such a role. However, that still allows the View to be defined in another
-  -- namespace than the Role itself.
-  -- In other words, the namespace of the View is unknown.
-  -- However, it may be fully qualified or be a prefixed name (we expand the latter).
-  (defaultObjectView :: Maybe ViewType) <- pure $ map (unsafePartial \(DefaultView v) -> ViewType v)
-    (head $ filter (case _ of
-      (DefaultView _) -> true
-      otherwise -> false) perspectiveParts)
-
-  expandedDefaultObjectView <- case defaultObjectView of
-    Nothing -> pure Nothing
-    Just (ViewType v) -> Just <<< ViewType <$> expandNamespace v
-  -- Now construct all Actions. If there are no Actions and this is not a bot, fill in the defaults for Users.
-  (actions :: Array ActionType) <- do
-    (acts :: List PerspectivePart) <- pure $ (filter (case _ of
-        (Act _) -> true
-        otherwise -> false) perspectiveParts)
-    isabot <- isSubjectBot
-    if null acts && not isabot
-      then foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) []
-        (map (mkActionFromVerb pos) ("Consult" : "Change" : "Delete" : "Create" : "Bind" : "CreateAndBindContext" : Nil))
-      else foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) [] acts
-
-  pure actions
-
--- | Constructs an Action, using the provided Object and maybe the View on that Object,
--- | from the ActionE. Returns the fully qualified name of the Action in the ActionType.
--- | Adds each Action to the DomeinFileRecord.
-traverseActionE :: Partial =>                     -- The function is partial because we just handle ActionE.
-  Calculation ->                                  -- The parse tree of the Object expression, or the QueryFunctionDescription
-  Maybe ViewType ->                               -- The unqualified identifier of the Default View on the Object.
-  RoleType ->                                     -- The namespace, i.e. the qualified identifier of the Role.
-  (Array ActionType) ->                           -- Accumulator: an array of Actions.
-  PerspectivePart ->                              -- The ActionE element.
-  PhaseTwo (Array ActionType)
-traverseActionE objectCalculation defaultObjectView rolename actions (Act (ActionE{id, verb, actionParts, pos})) = do
-  isabot <- isSubjectBot
-  -- Each action in the domeinFile has a unique index.
-  (n :: Int) <- getsDF \df -> length $ keys df.actions
-  actionId <- if isabot
-    -- Different names for the same verb and object for the bot and its master, otherwise they will overwrite.
-    then pure (roletype2string rolename <> "_bot$" <> show verb <> (show n))
-    else pure (roletype2string rolename <> "$" <> show verb <> (show n))
-
-  executedByBot <- isSubjectBot
-  action <- pure $ Action
-    { _id: ActionType actionId
-    , _rev: Nothing
-    , displayName: maybe "" identity id
-    , subject: rolename
-    , verb: verb
-    , object: objectCalculation
-    , requiredObjectProperties: defaultObjectView
-    , requiredSubjectProperties: Nothing
-    , requiredIndirectObjectProperties: Nothing
-    , indirectObject: Nothing
-    , condition: S (Expr.Simple (Expr.Value pos PBool "true"))
-    , effect: Nothing
-    , executedByBot: executedByBot
-    , pos
-  }
-  action' <- foldM (handleParts $ deconstructNamespace_ (roletype2string rolename)) action actionParts
-  modifyDF (\df -> df {actions = (insert actionId action' df.actions)})
-  pure (cons (identifier action') actions)
-
+handlePostponedStateQualifiedParts  :: PhaseTwo Unit
+handlePostponedStateQualifiedParts = do
+  postponedStateQualifiedParts <- lift $ gets _.postponedStateQualifiedParts
+  for_ postponedStateQualifiedParts handlePart
   where
 
-    handleParts :: Namespace -> Action -> ActionPart -> PhaseTwo Action
+    handlePart :: StateQualifiedPart -> PhaseTwo Unit
+    handlePart (N (NotificationE{user, transition, level, start, end})) = do
+      qualifiedUser <- findRole user start
+      modifyPartOfState transition start end
+        \(sr@{notifyOnEntry, notifyOnExit}) -> case transition of
+          Entry _ -> sr {notifyOnEntry = EncodableMap $ MAP.insert qualifiedUser level (unwrap notifyOnEntry)}
+          Exit _ -> sr {notifyOnExit = EncodableMap $ MAP.insert qualifiedUser level (unwrap notifyOnExit)}
 
-    -- INDIRECTOBJECT
-    -- TODO: weliswaar hoort het object in de namespace van de context te zitten,
-    -- maar we weten natuurlijk niet of het er ook werkelijk is!
-    handleParts contextName (Action ar) (IndirectObject ido) = pure $ Action ar {indirectObject = Just (ENR $ EnumeratedRoleType (contextName <> "$" <> ido))}
+    handlePart (AE (AutomaticEffectE{subject, object, transition, effect, start, end})) = do
+      qualifiedSubject <- findRole subject start
+      -- TODO. If there is an object, the compilation of the effect can have an 'object' variable.
+      modifyPartOfState transition start end
+        \(sr@{automaticOnEntry, automaticOnExit}) -> let
+          sideEffect = case effect of
+            Left assignments -> A (ARR.fromFoldable assignments)
+            Right letstep -> L letstep
+          in case transition of
+            Entry _ -> sr {automaticOnEntry = EncodableMap $ MAP.insert qualifiedSubject sideEffect (unwrap automaticOnEntry)}
+            Exit _ -> sr {automaticOnExit = EncodableMap $ MAP.insert qualifiedSubject sideEffect (unwrap automaticOnExit)}
 
-    -- SUBJECTVIEW
-    handleParts _ (Action ar) (SubjectView sv) = expandNamespace sv >>= \sview -> pure $ Action (ar {requiredSubjectProperties = Just $ ViewType sview})
+    handlePart (R (RoleVerbE{subject, object, state, roleVerbs:rv, start})) =
+      modifyPerspective subject object start
+        \(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ MAP.insert state rv (unwrap roleVerbs)}
 
-    -- OBJECTVIEW
-    handleParts _ (Action ar) (ObjectView ov) = expandNamespace ov >>= \oview -> pure $ Action (ar {requiredObjectProperties = Just $ ViewType oview})
+    handlePart (P (PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start})) = do
+      -- Construct the map of property types and property verbs.
+      porv <- f propsOrView
+      (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs porv (ARR.fromFoldable propertyVerbs)
+      modifyPerspective subject object start
+        \(Perspective pr@{propertyVerbs:pverbs}) -> Perspective $ pr {propertyVerbs =
+          EncodableMap $ MAP.insert
+            state
+            case MAP.lookup state (unwrap pverbs) of
+              Nothing -> [propertyVerbs']
+              Just pv -> cons propertyVerbs' pv
+            (unwrap pverbs)}
+      where
+        f :: PropsOrView -> PhaseTwo (ExplicitSet PropertyType)
+        f AllProperties = pure Universal
+        f (Properties ps) =
+          -- The (partial) names for properties used here may be defined outside
+          -- of the model (due to role filling). Hence we postpone looking up their
+          -- real referents to phase three. Here we assume an Enumerated PropertyType.
+          pure $ PSet (ENP <<< EnumeratedPropertyType <$> (ARR.fromFoldable ps))
+        f (View view) = do
+          (views :: Object VIEW.View) <- getsDF _.views
+          case lookup view views of
+            Nothing -> throwError $ UnknownView start view
+            Just (VIEW.View {propertyReferences}) -> pure $ PSet propertyReferences
 
-    -- INDIRECTOBJECTVIEW
-    handleParts _ (Action ar) (IndirectObjectView iov) = expandNamespace iov >>= \ioview -> pure $ Action (ar {requiredIndirectObjectProperties = Just $ ViewType ioview})
+    handlePart (AC (ActionE{id, subject, object, state, effect, start})) = modifyPerspective subject object start
+      \(Perspective pr@{actions}) -> let
+        sideEffect = case effect of
+          Left assignments -> A (ARR.fromFoldable assignments)
+          Right letstep -> L letstep
+        in case MAP.lookup state (unwrap actions) of
+          Nothing -> Perspective $ pr { actions = EncodableMap $ MAP.insert
+            state
+            (singleton id sideEffect)
+            (unwrap actions)}
+          Just effects -> Perspective $ pr { actions = EncodableMap $ MAP.insert
+            state
+            (insert id sideEffect effects)
+            (unwrap actions) }
 
-    -- CONDITION
-    handleParts _ (Action ar) (Condition s) = expandPrefix s >>= \es -> pure $ Action (ar {condition = S es})
+    modifyPerspective :: String -> Expr.Step -> ArcPosition -> (Perspective -> Perspective) -> PhaseTwo Unit
+    modifyPerspective subject object start modifier = do
+      qualifiedSubject <- findRole subject start
+      -- Find the perspective by subject and object in PhaseTwoState.
+      mperspective <- findPerspective qualifiedSubject object
+      (perspective :: Perspective) <- case mperspective of
+        Nothing -> pure $ Perspective
+          { object: S object
+          , roleVerbs: EncodableMap MAP.empty
+          , propertyVerbs: EncodableMap MAP.empty
+          , actions: EncodableMap MAP.empty
+          }
+        Just p -> pure p
+      -- Save in state
+      void $ modify \s@{perspectives} -> s {perspectives = MAP.insert
+        (Tuple qualifiedSubject object)
+        -- Modify it
+        (modifier perspective)
+        perspectives}
 
-    -- ASSIGNMENT
-    handleParts _ (Action ar@{effect}) (AssignmentPart a) = expandPrefix a >>= \ea -> case effect of
-      Nothing -> pure $ Action (ar {effect = Just $ A [ea]})
-      Just (A as) -> pure $ Action (ar {effect = Just $ A (cons ea as)})
+    modifyPartOfState :: StateTransitionE -> ArcPosition -> ArcPosition -> (StateRecord -> StateRecord) -> PhaseTwo Unit
+    modifyPartOfState transition start end modifyState = do
+      stateId <- case transition of
+        Entry s -> pure s
+        Exit s -> pure s
+      -- The state is a fully qualified StateIdentifier.
+      mstate <- getState stateId
+      case mstate of
+        Nothing -> throwError $ StateDoesNotExist stateId start end
+        Just (State sr) -> do
+          -- modify the state
+          state' <- pure $ State (modifyState sr)
+          modifyDF (\domeinFile -> addStateToDomeinFile state' domeinFile)
 
-    -- LETPART
-    handleParts _ (Action ar) (LetPart lstep) = expandPrefix lstep >>= \elstep -> pure $ Action (ar {effect = Just $ L elstep})
+    -- Look up the role in the DomainFile, because it must be defined locally.
+    -- This is because we can only specify perspectives for roles that are locally defined.
+    -- In the same vein, we only define notifications and automatic effects for locally
+    -- defined user roles.
+    -- It may be both qualified and unqualified, where insufficient qualification is an error.
+    findRole :: String -> ArcPosition -> PhaseTwo RoleType
+    findRole partialRoleName start = do
+      {enumeratedRoles, calculatedRoles} <- gets _.dfr
+      ecandidates <- pure $ ARR.filter (areLastSegmentsOf partialRoleName) (keys enumeratedRoles)
+      case length ecandidates of
+        0 -> do
+          ccandidates <- pure $ ARR.filter (areLastSegmentsOf partialRoleName) (keys calculatedRoles)
+          case length ccandidates of
+            0 -> throwError $ UnknownRole start partialRoleName
+            1 -> pure $ CR $ CalculatedRoleType (unsafePartial $ ARRP.head ccandidates)
+            _ -> throwError $ NotUniquelyIdentifying start partialRoleName ccandidates
+        1 -> pure $ ENR $ EnumeratedRoleType (unsafePartial $ ARRP.head ecandidates)
+        _ -> throwError $ NotUniquelyIdentifying start partialRoleName ecandidates

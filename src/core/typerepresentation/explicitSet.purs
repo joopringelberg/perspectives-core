@@ -25,14 +25,36 @@ module Perspectives.Representation.ExplicitSet where
 import Prelude
 
 import Data.Array (delete, elemIndex, find, foldM, foldl, intersect, nub, uncons)
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Set (subset, fromFoldable)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Partial.Unsafe (unsafePartial)
 
+-----------------------------------------------------------
+-- EXPLICITSET
+-----------------------------------------------------------
 -- | An ExplicitSet represents a set of elements, where we have an explicit representation of the
 -- | Empty set and the Universal set.
 data ExplicitSet a = Universal | Empty | PSet (Array a)
 
+derive instance genericExplicitSet :: Generic (ExplicitSet a) _
+instance eqExplicitSet :: Eq a => Eq (ExplicitSet a) where
+  eq (PSet s1) (PSet s2) = eq s1 s2
+  eq Universal Universal = true
+  eq Empty Empty = true
+  eq _ _ = false
+instance showExplicitSet :: Show a => Show (ExplicitSet a) where
+  show Universal = "Universal"
+  show Empty = "Empty"
+  show (PSet s) = "PSet " <> show s
+instance encodeExplicitSet :: Encode a => Encode (ExplicitSet a) where encode = genericEncode defaultOptions
+instance decodeExplicitSet :: Decode a => Decode (ExplicitSet a) where decode = genericDecode defaultOptions
+
+-----------------------------------------------------------
+-- FUNCTIONS ON EXPLICITSET
+-----------------------------------------------------------
 -- | Construct a PSet out of an array of PropertySets, handling Universal and Empty.
 unionPset :: forall a. Eq a => Ord a => Array (ExplicitSet a) -> (ExplicitSet a)
 unionPset terms = if isJust (elemIndex Universal terms)
@@ -84,14 +106,3 @@ subsetPSet p q = case p, q of
 
 elements :: forall a. Partial => ExplicitSet a -> Array a
 elements (PSet s) = s
-
-instance eqExplicitSet :: Eq a => Eq (ExplicitSet a) where
-  eq (PSet s1) (PSet s2) = eq s1 s2
-  eq Universal Universal = true
-  eq Empty Empty = true
-  eq _ _ = false
-
-instance showExplicitSet :: Show a => Show (ExplicitSet a) where
-  show Universal = "Universal"
-  show Empty = "Empty"
-  show (PSet s) = "PSet " <> show s

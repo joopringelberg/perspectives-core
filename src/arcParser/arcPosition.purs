@@ -20,40 +20,33 @@
 
 -- END LICENSE
 
-module Perspectives.Representation.Range where
+module Perspectives.Parsing.Arc.Position where
+
+import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
-import Prelude (class Eq, class Ord, class Show, show, (<<<))
-import Simple.JSON (class ReadForeign, class WriteForeign)
 
------------------------------------------------------------
--- RANGE
------------------------------------------------------------
--- | PDate is represented as SerializableDateTime.
-data Range = PString | PBool | PNumber | PDate
+derive instance genericArcPosition :: Generic ArcPosition _
+instance showArcPosition :: Show ArcPosition where show = genericShow
 
-derive instance genericRange :: Generic Range _
+-- | Because we want two expressions to be equal regardless of where in the text they
+-- | occur, we make all instances of ArcPosition equal to each other.
+instance eqArcPosition :: Eq ArcPosition where eq a b = true
+instance ordArcPosition :: Ord ArcPosition where compare a b = EQ
 
-instance eqRange :: Eq Range where eq = genericEq
-derive instance ordRange :: Ord Range
-
-instance encodeRange :: Encode Range where
+instance decodeArcPosition :: Decode ArcPosition where
+  decode = genericDecode defaultOptions
+instance encodeArcPosition :: Encode ArcPosition where
   encode = genericEncode defaultOptions
 
-instance writeForeignRange :: WriteForeign Range where
-  writeImpl = unsafeToForeign <<< show
-
-instance decodeRange :: Decode Range where
-  decode = genericDecode defaultOptions
-
-instance readForeignRange :: ReadForeign Range where
-  readImpl = enumReadForeign
-
-instance rangeShow :: Show Range where
-  show = genericShow
+-- | `Position` represents the position of the parser in the input.
+-- |
+-- | - `line` is the current line in the input
+-- | - `column` is the column of the next character in the current line that will be parsed
+newtype ArcPosition = ArcPosition
+  { line :: Int
+  , column :: Int
+  }

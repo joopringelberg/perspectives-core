@@ -37,7 +37,6 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (deconstructModelName)
-import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, retrieveInternally)
@@ -45,7 +44,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable, ident
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, PerspectiveType(..), ViewType)
 import Perspectives.Representation.View (View)
 import Prelude (class Eq, class Show, Unit, bind, const, pure, show, unit, ($), (<<<), (<>), (>>=))
 
@@ -78,9 +77,6 @@ getCalculatedProperty = getPerspectType
 
 getContext :: ContextType -> MP Context
 getContext = getPerspectType
-
-getAction :: ActionType -> MP Action
-getAction = getPerspectType
 
 getView :: ViewType -> MP View
 getView = getPerspectType
@@ -155,9 +151,3 @@ instance persistentView :: PersistentType View ViewType where
     (\(DomeinFile dff@{views}) -> DomeinFile dff {views = FO.insert (unwrap i) v views})
   retrieveFromDomein i = retrieveFromDomein_ i
     (\(DomeinFile{views}) -> FO.lookup (unwrap i) views)
-
-instance persistentAction :: PersistentType Action ActionType where
-  cacheInDomeinFile i v = ifNamespace i
-    (\(DomeinFile dff@{actions}) -> DomeinFile dff {actions = FO.insert (unwrap i) v actions})
-  retrieveFromDomein i = retrieveFromDomein_ i
-    (\(DomeinFile{actions}) -> FO.lookup (unwrap i) actions)

@@ -99,8 +99,8 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- log "==========RUNNING EFFECTS============"
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
       lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do
-        me <- pure $ lookupActiveSupportedEffect corrId
-        case me of
+        mEffect <- pure $ lookupActiveSupportedEffect corrId
+        case mEffect of
           Nothing -> pure unit
           (Just {runner}) -> do
             -- logShow corrId
@@ -158,6 +158,9 @@ runActions t = do
         Left e -> logPerspectivesError $ Custom ("Cannot compile rule, because " <> show e)
         Right updater -> updater ctxt
 
+-- REFACTOR door eerst states te berekenen. De deltas (toegevoegde en verwijderde states) gebruik je om
+-- in Context- en Roltypen de automatische acties bij entry en exit op te zoeken.
+-- Bovendien bepaal je aan de hand van die deltas wat de notifications zijn en of de current user genotificeerd moet worden.
 getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
 getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = join <$> for (toArray contextInstances) \contextInstance -> do
   (mmyType :: Maybe RoleType) <- lift2 (contextInstance ##> getMyType)

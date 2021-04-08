@@ -33,13 +33,14 @@ import Data.String.CodeUnits as SCU
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), ComputationStep(..), LetStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, colon, lowerCaseName, reserved)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Range(..))
 import Prelude (bind, discard, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=))
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (between, lookAhead, optionMaybe, try, (<?>))
+import Text.Parsing.Parser.Combinators (between, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char)
 import Text.Parsing.Parser.Token (alphaNum)
 
@@ -70,7 +71,7 @@ step_ parenthesised = do
         otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}
   where
     leftSide :: IP Step
-    leftSide = defer \_ -> reserved "filter" *> step <|> letStep <|> computationStep <|> unaryStep <|> simpleStep
+    leftSide = defer \_ -> reserved "filter" *> step <|> pureLetStep <|> (Let <$> letWithAssignment) <|> computationStep <|> unaryStep <|> simpleStep
 
 simpleStep :: IP Step
 simpleStep = try
@@ -421,25 +422,41 @@ dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
     dateChar :: IP Char
     dateChar = alphaNum <|> char ':' <|> char '+' <|> char '-' <|> char ' ' <|> char '.'
 
-letStep :: IP Step
-letStep = do
-  lookAhead (reserved "let*")
+-- letStep = do
+--   lookAhead (reserved "let*")
+--   start <- getPosition
+--   bindings <- withEntireBlock (\_ bs -> bs) (reserved "let*") binding
+--   massignments <- optionMaybe $ try $ withEntireBlock (\_ bs -> bs) (reserved "in") assignment
+--   case massignments of
+--     (Just assignments) -> do
+--       end <- getPosition
+--       pure $ Let $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
+--     Nothing -> do
+--       body <- reserved "in" *> step
+--       end <- getPosition
+--       pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
+
+
+binding :: IP VarBinding
+binding = VarBinding <$> (lowerCaseName <* token.reservedOp "<-") <*> defer \_ -> step
+
+-- | A pure let: let* <binding>+ in <step>).
+pureLetStep :: IP Step
+pureLetStep = do
   start <- getPosition
-  bindings <- withEntireBlock (\_ bs -> bs) (reserved "let*") binding
-  massignments <- optionMaybe $ try $ withEntireBlock (\_ bs -> bs) (reserved "in") assignment
-  case massignments of
-    (Just assignments) -> do
-      end <- getPosition
-      pure $ Let $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
-    Nothing -> do
-      body <- reserved "in" *> step
-      end <- getPosition
-      pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
+  bindings <- reserved "let*" *> entireBlock binding
+  body <- reserved "in" *> step
+  end <- getPosition
+  pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
 
-  where
-
-    binding :: IP VarBinding
-    binding = VarBinding <$> (lowerCaseName <* token.reservedOp "<-") <*> defer \_ -> step
+-- | A let with assignments: let* <binding>+ in <assignment>+.
+letWithAssignment :: IP LetStep
+letWithAssignment = do
+  start <- getPosition
+  bindings <- reserved "let*" *> entireBlock binding
+  assignments <- reserved "in" *> entireBlock assignment
+  end <- getPosition
+  pure $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
 
 computationStep :: IP Step
 computationStep = do

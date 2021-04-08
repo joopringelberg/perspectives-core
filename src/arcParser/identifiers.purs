@@ -28,7 +28,7 @@ import Data.Char.Unicode (isLower)
 import Data.String.CodeUnits (fromCharArray)
 import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Parsing.Arc.Token (token)
-import Prelude (Unit, bind, discard, pure, ($), (/=), (<>), (>>=), (<<<), (<*), (*>))
+import Prelude (Unit, bind, discard, pure, ($), (/=), (<>), (*>))
 import Text.Parsing.Parser.Combinators (try, (<?>))
 import Text.Parsing.Parser.String (string, satisfy, whiteSpace)
 

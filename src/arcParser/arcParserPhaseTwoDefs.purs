@@ -27,7 +27,8 @@ import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, 
 import Data.Array (union)
 import Data.Either (Either)
 import Data.Identity (Identity)
-import Data.List (List)
+import Data.List (List(..))
+import Data.Map (Map, empty, lookup) as MAP
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, values)
@@ -37,10 +38,12 @@ import Perspectives.DomeinFile (DomeinFileId(..), DomeinFileRecord, defaultDomei
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
 import Perspectives.Names (defaultNamespaces, expandNamespaces)
-import Perspectives.Parsing.Arc.AST (ContextPart(..))
+import Perspectives.Parsing.Arc.AST (ContextPart(..), StateQualifiedPart)
+import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
+import Perspectives.Representation.Perspective (Perspective)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType)
 import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=), (<$>))
 
 -- TODO
@@ -58,6 +61,8 @@ type PhaseTwoState =
   -- In PhaseTwoState, variables are bound to QueryFunctionDescriptions.
   -- In PerspectivesState, variables are bound to Strings.
   , variableBindings :: Environment QueryFunctionDescription
+  , postponedStateQualifiedParts :: List StateQualifiedPart
+  , perspectives :: MAP.Map (Tuple RoleType Step) Perspective
 }
 
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot,
@@ -82,7 +87,9 @@ runPhaseTwo_' computation dfr indexedContexts indexedRoles = runStateT (runExcep
   , referredModels: []
   , indexedContexts
   , indexedRoles
-  , variableBindings: ENV.empty}
+  , variableBindings: ENV.empty
+  , postponedStateQualifiedParts: Nil
+  , perspectives: MAP.empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
@@ -96,7 +103,10 @@ evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExc
   , referredModels: []
   , indexedContexts
   , indexedRoles
-  , variableBindings: ENV.empty}
+  , variableBindings: ENV.empty
+  , postponedStateQualifiedParts: Nil
+  , perspectives: MAP.empty
+  }
 
 type PhaseTwo a = PhaseTwo' a Identity
 
@@ -122,6 +132,7 @@ modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
 getDF :: PhaseTwo DomeinFileRecord
 getDF = lift $ gets _.dfr
 
+-- | Get a part of the DomeinFileRecord from PhaseTwoState.
 getsDF :: forall m n. MonadState PhaseTwoState m => (DomeinFileRecord -> n) -> m n
 getsDF f = gets (f <<< _.dfr)
 
@@ -176,5 +187,11 @@ isIndexedRole n = do
   indexedRoles <- lift $ gets _.indexedRoles
   pure $ OBJ.lookup n indexedRoles
 
--- addIndexedContextsOf :: forall m. Monad m => DomeinFileId -> PhaseTwo' Unit m
--- addIndexedContextsOf domeinFileId =
+-- | Find a perspective in PhaseTwoState.
+findPerspective :: forall m. Monad m => RoleType -> Step -> PhaseTwo' (Maybe Perspective ) m
+findPerspective subject object = do
+  perspectives <- lift $ gets _.perspectives
+  pure $ MAP.lookup (Tuple subject object) perspectives
+
+-- insertPerspective :: forall m. Monad m => Perspective -> PhaseTwo' Unit m
+-- insertPerspective perspective@(Perspective{subject, object}) = void $ lift $ modify \r@{perspectives} -> r {perspectives = MAP.insert (Tuple (roletype2string subject) object) perspective perspectives}

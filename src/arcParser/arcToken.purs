@@ -25,18 +25,18 @@ module Perspectives.Parsing.Arc.Token where
 import Control.Alt ((<|>))
 import Control.Monad (class Monad)
 import Control.Monad.State (StateT)
-import Data.Identity (Identity)
+import Perspectives.Parsing.Arc.IndentParser (ArcParser)
 import Text.Parsing.Parser (ParserT)
 import Text.Parsing.Parser.Pos (Position)
 import Text.Parsing.Parser.String (oneOf)
 import Text.Parsing.Parser.Token (GenLanguageDef(..), GenTokenParser, alphaNum, makeTokenParser, upper)
 
-type IndentTokenParser = GenTokenParser String (StateT Position Identity)
+type IndentTokenParser = GenTokenParser String (StateT Position ArcParser)
 
 token :: IndentTokenParser
 token = makeTokenParser perspectDef
 
-type IndentLanguageDef = GenLanguageDef String (StateT Position Identity)
+type IndentLanguageDef = GenLanguageDef String (StateT Position ArcParser)
 
 perspectDef :: IndentLanguageDef
 -- perspectDef = LanguageDef (unGenLanguageDef haskellStyle)

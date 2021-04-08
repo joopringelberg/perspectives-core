@@ -24,17 +24,22 @@ module Perspectives.Parsing.Arc.AST where
 
 import Prelude
 
+import Data.Either (Either)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep, Step)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Representation.Action (Verb)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
+import Perspectives.Representation.State (NotificationLevel, StateIdentifier)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
+import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 
+--------------------------------------------------------------------------------
+---- CONTEXT
+--------------------------------------------------------------------------------
 newtype ContextE = ContextE
   { id :: String
   , kindOfContext :: ContextKind
@@ -44,8 +49,135 @@ newtype ContextE = ContextE
 type Prefix = String
 type ModelName = String
 
-data ContextPart = RE RoleE | CE ContextE | PREFIX Prefix ModelName | ContextAspect String ArcPosition | IndexedContext String ArcPosition
+data ContextPart =
+  RE RoleE |
+  -- User RoleE |
+  STATE StateE |
+  CE ContextE |
+  PREFIX Prefix ModelName |
+  ContextAspect String ArcPosition |
+  IndexedContext String ArcPosition
 
+--------------------------------------------------------------------------------
+---- ROLE
+--------------------------------------------------------------------------------
+newtype RoleE = RoleE
+  { id :: String
+  , kindOfRole :: RoleKind
+  , roleParts :: List RolePart
+  , pos :: ArcPosition}
+
+-- TODO: het verschil tussen conjunctie en disjunctie bij FilledByAttribute.
+data RolePart =
+  PE PropertyE |
+  SQP (List StateQualifiedPart) |
+  VE ViewE |
+  FunctionalAttribute Boolean |
+  MandatoryAttribute Boolean |
+  UnlinkedAttribute |
+  FilledByAttribute String |
+  Calculation Step |
+  RoleAspect String ArcPosition |
+  IndexedRole String ArcPosition
+
+--------------------------------------------------------------------------------
+---- STATE
+--------------------------------------------------------------------------------
+newtype StateE = StateE
+  { id :: String
+  , condition :: Step
+  , stateParts :: List StateQualifiedPart
+  }
+--------------------------------------------------------------------------------
+---- PROPERTY
+--------------------------------------------------------------------------------
+newtype PropertyE = PropertyE
+  { id :: String
+  , range :: Maybe Range
+  , propertyParts :: List PropertyPart
+  , pos :: ArcPosition
+  }
+
+data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean | Calculation' Step
+
+--------------------------------------------------------------------------------
+---- STATEQUALIFIEDPART
+--------------------------------------------------------------------------------
+-- | In all these types, "subject" (and "user" in NotificationE) may be both qualified and unqualified (this happens when used as a reference).
+-- | However, it is an error for subject to be insufficiently qualified for it to be unique in the model.
+data StateQualifiedPart =
+  R RoleVerbE |
+  P PropertyVerbE |
+  AC ActionE |
+  N NotificationE |
+  AE AutomaticEffectE
+
+-- Ends up in Perspective, identified by subject and object.
+newtype RoleVerbE = RoleVerbE
+  { subject :: String
+  , object :: Step
+  , state :: StateIdentifier
+  , roleVerbs :: RoleVerbList
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
+
+-- Ends up in Perspective, identified by subject and object.
+newtype PropertyVerbE = PropertyVerbE
+  { subject :: String
+  , object :: Step
+  , state :: StateIdentifier
+  , propertyVerbs :: List PropertyVerb
+  , propsOrView :: PropsOrView
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
+
+-- Ends up in Perspective, identified by subject and object.
+newtype ActionE = ActionE
+  { id :: String
+  , subject :: String
+  , object :: Step
+  , state :: StateIdentifier
+  , effect :: Either (List Assignment) LetStep
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
+
+-- Ends up in State, identified by the fully qualified name in StateTransitionE.
+newtype NotificationE = NotificationE
+  { user :: String
+  , transition :: StateTransitionE
+  , level :: NotificationLevel
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
+
+-- Ends up in State, identified by the fully qualified name in StateTransitionE.
+newtype AutomaticEffectE = AutomaticEffectE
+  { subject :: String
+  , object :: Maybe Step
+  , transition :: StateTransitionE
+  , effect :: Either (List Assignment) LetStep
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
+
+data StateTransitionE = Entry StateIdentifier | Exit StateIdentifier
+
+data PropsOrView = AllProperties | Properties (List String) | View String
+
+--------------------------------------------------------------------------------
+---- VIEW
+--------------------------------------------------------------------------------
+newtype ViewE = ViewE
+  { id :: String
+  , viewParts :: List String
+  , pos :: ArcPosition}
+
+--------------------------------------------------------------------------------
+---- INSTANCES
+--------------------------------------------------------------------------------
 -- We are only interested in ordering RE dataconstructors.
 instance eqContextPart :: Eq ContextPart where
   eq (RE r1) (RE r2) = eq r1 r1
@@ -54,12 +186,6 @@ instance eqContextPart :: Eq ContextPart where
 instance ordContextPart :: Ord ContextPart where
   compare (RE r1) (RE r2) = compare r1 r2
   compare _ _ = EQ
-
-newtype RoleE = RoleE
-  { id :: String
-  , kindOfRole :: RoleKind
-  , roleParts :: List RolePart
-  , pos :: ArcPosition}
 
 instance eqRoleE :: Eq RoleE where
   eq (RoleE{id:id1}) (RoleE{id:id2}) = id1 == id2
@@ -73,46 +199,6 @@ instance ordRoleE :: Ord RoleE where
       then EQ
       else LT
 
-type FunctionName = String
-type ComputedType = String
-
--- TODO: het verschil tussen conjunctie en disjunctie bij FilledByAttribute.
-data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | UnlinkedAttribute | FilledByAttribute String | Calculation Step | ForUser String | RoleAspect String ArcPosition | IndexedRole String ArcPosition
-
-newtype PropertyE = PropertyE
-  { id :: String
-  , range :: Maybe Range
-  , propertyParts :: List PropertyPart
-  , pos :: ArcPosition
-  }
-
-data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean | Calculation' Step
-
-newtype PerspectiveE = PerspectiveE
-  { id :: String
-  , perspectiveParts :: List PerspectivePart
-  , pos :: ArcPosition}
-
--- Rule is an obsolete constructor.
-data PerspectivePart = Object Step | DefaultView String | Act ActionE | Rule RuleE
-
-newtype ActionE = ActionE
-  { id :: Maybe String
-  , verb :: Verb
-  , actionParts :: List ActionPart
-  , pos :: ArcPosition
-  }
-
-data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String | Condition Step | AssignmentPart Assignment | LetPart LetStep
-
--- Obsolete.
-data RuleE = RuleE Step Assignment
-
-newtype ViewE = ViewE
-  { id :: String
-  , viewParts :: List String
-  , pos :: ArcPosition}
-
 derive instance genericContextE :: Generic ContextE _
 instance showContextE :: Show ContextE where show = genericShow
 
@@ -125,26 +211,38 @@ instance showRoleE :: Show RoleE where show = genericShow
 derive instance genericRoleElement :: Generic RolePart _
 instance showRoleElement :: Show RolePart where show = genericShow
 
+derive instance genericStateE :: Generic StateE _
+instance showStateE :: Show StateE where show = genericShow
+
+derive instance genericStateQualifiedPart :: Generic StateQualifiedPart _
+instance showStateQualifiedPart :: Show StateQualifiedPart where show = genericShow
+
+derive instance genericNotificationE :: Generic NotificationE _
+instance showNotificationE :: Show NotificationE where show = genericShow
+
+derive instance genericStateTransitionE :: Generic StateTransitionE _
+instance showStateTransitionE :: Show StateTransitionE where show = genericShow
+
+derive instance genericAutomaticEffectE :: Generic AutomaticEffectE _
+instance showAutomaticEffectE :: Show AutomaticEffectE where show = genericShow
+
+derive instance genericRoleVerbE :: Generic RoleVerbE _
+instance showRoleVerbE :: Show RoleVerbE where show = genericShow
+
+derive instance genericPropertyVerbE :: Generic PropertyVerbE _
+instance showPropertyVerbE :: Show PropertyVerbE where show = genericShow
+
 derive instance genericPropertyE :: Generic PropertyE _
 instance showPropertyE :: Show PropertyE where show = genericShow
 
 derive instance genericPropertyElement :: Generic PropertyPart _
 instance showPropertyElement :: Show PropertyPart where show = genericShow
 
-derive instance genericPerspectiveElement :: Generic PerspectiveE _
-instance showPerspectiveElement :: Show PerspectiveE where show = genericShow
-
-derive instance genericPerspectivePart :: Generic PerspectivePart _
-instance showPerspectivePart :: Show PerspectivePart where show = genericShow
-
-derive instance genericRuleElement :: Generic RuleE _
-instance showRuleElement :: Show RuleE where show = genericShow
+derive instance genericPropOrView :: Generic PropsOrView _
+instance showPropOrView :: Show PropsOrView where show = genericShow
 
 derive instance genericActionElement :: Generic ActionE _
 instance showActionElement :: Show ActionE where show = genericShow
-
-derive instance genericActionPart :: Generic ActionPart _
-instance showActionPart :: Show ActionPart where show = genericShow
 
 derive instance genericViewElement :: Generic ViewE _
 instance showViewElement :: Show ViewE where show = genericShow

@@ -57,7 +57,7 @@ import Perspectives.InvertedQuery (PropsAndVerbs, QueryWithAKink(..), RelevantPr
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AE
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -343,7 +343,7 @@ invertedQueriesForLocalRolesAndProperties = do
             -- Now add those verbs to the inverted query.
             setInvertedQueriesForUserAndRole userType (ST _id) pv true qwk
 
--- | The calculation of a CalculatedRole, of a CalculatedProperty and of the objec of an Action are all expressions.
+-- | The calculation of a CalculatedRole, of a CalculatedProperty and of the object of an Action are all expressions.
 -- | This function compiles the parser AST output that represents these expressions to QueryFunctionDescriptions.
 -- | All names are qualified in the process.
 compileExpressions :: PhaseThree Unit

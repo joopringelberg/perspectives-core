@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.List (filter, findIndex, head, length)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log, logShow)
@@ -13,7 +13,7 @@ import Node.Encoding (Encoding(..)) as ENC
 import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE, ruleE, viewE)
-import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), RuleE(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), RuleE(..), VerbList(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), ComputationStep(..), Operator(..), SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
@@ -260,17 +260,28 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc" do
     (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "if IWantToInviteAnUnconnectedUser then\n  SerialisedInvitation = callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns: String" ruleE
     case r of
       (Left e) -> assert (show e) false
-      Right (Act (ActionE{actionParts})) -> case (head (filter (case _ of
-          (AssignmentPart _) -> true
-          otherwise -> false) actionParts)) of
-        Nothing -> assert "There should be an AssignmentPart" false
-        Just (AssignmentPart (PropertyAssignment{propertyIdentifier, valueExpression})) -> do
-          assert "propertyIdentifier should be SerialisedInvitation" (propertyIdentifier == "SerialisedInvitation")
-          case valueExpression of
-            (Computation (ComputationStep{functionName})) -> assert "functionName should be ser:SerialiseFor" (functionName == "ser:SerialiseFor")
-            otherwise -> assert "There should be a Computation" false
-        otherwise -> assert "There should be an AssignmentPart" false
-      otherwise -> assert "There should be an ActionE" false
+      Right (RuleP (RuleE{effect})) -> case effect of
+        Left assignments -> case head assignments of
+          Just (PropertyAssignment{propertyIdentifier, valueExpression}) -> do
+            assert "propertyIdentifier should be SerialisedInvitation" (propertyIdentifier == "SerialisedInvitation")
+            case valueExpression of
+              (Computation (ComputationStep{functionName})) -> assert "functionName should be ser:SerialiseFor" (functionName == "ser:SerialiseFor")
+              otherwise -> assert "There should be a Computation" false
+          _ -> assert "There should be a PropertyAssignment" false
+        otherwise -> assert "There should be a list of assignments" false
+      _ -> assert "There should be a rule" false
+
+      -- Right (RuleP (RuleE{actionParts})) -> case (head (filter (case _ of
+      --     (AssignmentPart _) -> true
+      --     otherwise -> false) actionParts)) of
+      --   Nothing -> assert "There should be an AssignmentPart" false
+      --   Just (AssignmentPart (PropertyAssignment{propertyIdentifier, valueExpression})) -> do
+      --     assert "propertyIdentifier should be SerialisedInvitation" (propertyIdentifier == "SerialisedInvitation")
+      --     case valueExpression of
+      --       (Computation (ComputationStep{functionName})) -> assert "functionName should be ser:SerialiseFor" (functionName == "ser:SerialiseFor")
+      --       otherwise -> assert "There should be a Computation" false
+      --   otherwise -> assert "There should be an AssignmentPart" false
+      -- otherwise -> assert "There should be an ActionE" false
 
   test "Property with functional and mandatory attributes" do
     (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "property: MyProperty (mandatory, not functional, Number)" propertyE
@@ -328,287 +339,281 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc" do
   test "Perspective with ObjectRef, DefaultObjectView and two Actions" do
     (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject (MyView): Consult, Change" perspectiveE
     case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        -- logShow pre
-        (assert "The Perspective should have the object 'MyObject'"
-          (isJust (findIndex (case _ of
-            (Object _) -> true
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have the default object view 'MyView'"
-          (isJust (findIndex (case _ of
-            (DefaultView _) -> true
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have an action with Verb 'Consult'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Consult
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have an action with Verb 'Change'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Change
-            otherwise -> false) perspectiveParts)))
-      otherwise -> assert "Parsed an unexpected type" false
+      Left e -> assert (show e) false
+      Right pre@(PRE (PerspectiveE{id, object, view, verbList, perspectiveParts})) -> do
+        assert "The Perspective should have the default object view 'MyView'"
+          (maybe false (eq "MyView") view)
+        case verbList of
+          Including verbs -> do
+            assert
+              "The Perspective should have an action with Verb 'Consult'"
+              (isJust (findIndex (eq Consult) verbs))
+            assert
+              "The Perspective should have an action with Verb 'Change'"
+              (isJust (findIndex (eq Change) verbs))
+          _ -> assert "The Perspective should have an action with Verb 'Consult'" false
+      _ -> assert "There should be a Perspective" false
 
-  test "Perspective on External" do
-    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: External" perspectiveE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        -- logShow pre
-        (assert "The Perspective should have the object 'External'"
-          (isJust (findIndex (case _ of
-            (Object (Simple (ArcIdentifier _ "External"))) -> true
-            otherwise -> false) perspectiveParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Perspective with just an ObjectRef and a defaultView" do
-    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject (MyView)" perspectiveE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        -- logShow pre
-        (assert "The Perspective should have the object 'MyObject'"
-          (isJust (findIndex (case _ of
-            (Object _) -> true
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have the default object view 'MyView'"
-          (isJust (findIndex (case _ of
-            (DefaultView _) -> true
-            otherwise -> false) perspectiveParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Perspective with just an ObjectRef and some otherwise unspecified Actions" do
-    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject: Consult, Change" perspectiveE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        -- logShow pre
-        (assert "The Perspective should have the object 'MyObject'"
-          (isJust (findIndex (case _ of
-            (Object _) -> true
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have an action with Verb 'Consult'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Consult
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have an action with Verb 'Change'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Change
-            otherwise -> false) perspectiveParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Action with its own View" do
-    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest" actionE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(Act (ActionE{verb, actionParts}))) -> do
-        -- logShow pre
-        assert "The Action should have the Verb 'Consult'" (verb == Consult)
-        (assert "The Action should have a view with name 'ViewOnGuest'"
-          (isJust (findIndex (case _ of
-            (ObjectView v) -> v == "ViewOnGuest"
-            otherwise -> false) actionParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Action with its own View and with a subjectView" do
-    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest\n  subjectView: AnotherView" actionE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(Act (ActionE{verb, actionParts}))) -> do
-        -- logShow pre
-        assert "The Action should have the Verb 'Consult'" (verb == Consult)
-        (assert "The Action should have a view with name 'ViewOnGuest'"
-          (isJust (findIndex (case _ of
-            (ObjectView v) -> v == "ViewOnGuest"
-            otherwise -> false) actionParts)))
-        (assert "The Action should have a subjectView with name 'AnotherView'"
-          (isJust (findIndex (case _ of
-            (SubjectView v) -> v == "AnotherView"
-            otherwise -> false) actionParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Action with a condition" do
-    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest\n  subjectView: AnotherView\n  if Prop1 > 10" actionE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(Act (ActionE{verb, actionParts}))) -> do
-        -- logShow pre
-        assert "The Action should have the Verb 'Consult'" (verb == Consult)
-        (assert "The Action should have a view with name 'ViewOnGuest'"
-          (isJust (findIndex (case _ of
-            (ObjectView v) -> v == "ViewOnGuest"
-            otherwise -> false) actionParts)))
-        (assert "The Action should have a subjectView with name 'AnotherView'"
-          (isJust (findIndex (case _ of
-            (SubjectView v) -> v == "AnotherView"
-            otherwise -> false) actionParts)))
-        (assert "The Action should have a Condition"
-          (isJust (findIndex (case _ of
-            (Condition (Binary (BinaryStep {operator}))) -> case operator of
-              GreaterThan _ -> true
-              otherwise -> false
-            otherwise -> false) actionParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Action with its own View, with a subjectView and an indirectObject with a view." do
-    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest\n  subjectView: AnotherView\n  indirectObject: AnotherRole (ViewOnAnotherRole)" actionE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(Act (ActionE{verb, actionParts}))) -> do
-        -- logShow pre
-        assert "The Action should have the Verb 'Consult'" (verb == Consult)
-        (assert "The Action should have a view with name 'ViewOnGuest'"
-          (isJust (findIndex (case _ of
-            (ObjectView v) -> v == "ViewOnGuest"
-            otherwise -> false) actionParts)))
-        (assert "The Action should have a subjectView with name 'AnotherView'"
-          (isJust (findIndex (case _ of
-            (SubjectView v) -> v == "AnotherView"
-            otherwise -> false) actionParts)))
-        (assert "The Action should have an indirectObject with name 'AnotherRole'"
-          (isJust (findIndex (case _ of
-            (IndirectObject v) -> v == "AnotherRole"
-            otherwise -> false) actionParts)))
-        (assert "The Action should have an IndirectObjectView with name 'ViewOnAnotherRole'"
-          (isJust (findIndex (case _ of
-            (IndirectObjectView v) -> v == "ViewOnAnotherRole"
-            otherwise -> false) actionParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Action without a view and an indirectObject" do
-    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult\n  indirectObject: AnotherRole" actionE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(Act (ActionE{verb, actionParts}))) -> do
-        assert "The Action should have the Verb 'Consult'" (verb == Consult)
-        (assert "The Action should have an indirectObject with name 'AnotherRole'"
-          (isJust (findIndex (case _ of
-            (IndirectObject v) -> v == "AnotherRole"
-            otherwise -> false) actionParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Perspective with an ObjectRef, some otherwise unspecified Actions and a Delete with a subjectView and an indirect object with view" do
-    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject: Consult, Change\n  Delete with SomeView\n    subjectView: AnotherView\n    indirectObject: AnotherRole (ViewOnAnotherRole)" perspectiveE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        -- logShow pre
-        (assert "The Perspective should have the object 'MyObject'"
-          (isJust (findIndex (case _ of
-            (Object _) -> true
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have an action with Verb 'Consult'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Consult
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have an action with Verb 'Change'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Change
-            otherwise -> false) perspectiveParts)))
-        (assert "The Perspective should have an action with Verb 'Delete'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Delete
-            otherwise -> false) perspectiveParts)))
-        (assert "The action with Verb 'Delete' should have ObjectView 'SomeView'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb, actionParts})) -> verb == Delete && (isJust (findIndex (case _ of
-              (ObjectView "SomeView") -> true
-              otherwise -> false) actionParts))
-            otherwise -> false) perspectiveParts)))
-        (assert "The action with Verb 'Delete' should have IndirectObject 'AnotherRole'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb, actionParts})) -> verb == Delete && (isJust (findIndex (case _ of
-              (IndirectObject "AnotherRole") -> true
-              otherwise -> false) actionParts))
-            otherwise -> false) perspectiveParts)))
-        (assert "The action with Verb 'Delete' should have IndirectObjectView 'ViewOnAnotherRole'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb, actionParts})) -> verb == Delete && (isJust (findIndex (case _ of
-              (IndirectObjectView "ViewOnAnotherRole") -> true
-              otherwise -> false) actionParts))
-            otherwise -> false) perspectiveParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Parse a file" do
-    fileName <- pure "arcsyntax.arc"
-    text <- liftEffect (readTextFile ENC.UTF8 (Path.concat [testDirectory, fileName]))
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
-    case r of
-      (Left e) -> assert (show e) false
-      (Right dom) -> do
-        -- logShow dom
-        assert ("The file '" <> fileName <> "' does not parse") true
-
-  test "Context with an aspect" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  aspect : pre:MyAspectRole" domain
-    case r of
-      (Left e) -> assert (show e) false
-      (Right ctxt@(ContextE{contextParts})) -> do
-        case head contextParts of
-          Nothing -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
-          (Just (ContextAspect "pre:MyAspectRole" _)) -> pure unit
-          otherwise -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
-
-  test "Role with an aspect" do
-    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing : MyRole (mandatory, functional)\n  aspect: pre:MyAspectRole" roleE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right rl@(RE (RoleE{roleParts}))) -> case (head (filter (case _ of
-            (RoleAspect _ _) -> true
-            otherwise -> false) roleParts)) of
-          Nothing -> assert "Role should have a RoleAspect part." false
-          Just (RoleAspect u _) -> assert "Role should have a RoleAspect part with value 'pre:MyAspectRole'" (u == "pre:MyAspectRole")
-          otherwise -> assert "Role should have a RoleAspect part" false
-      otherwise -> assert "Role should have a RoleAspect part" false
-
-  test "Context with a use clause" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:System$System" domain
-    case r of
-      (Left e) -> assert (show e) false
-      (Right ctxt@(ContextE{contextParts})) -> do
-        case head contextParts of
-          Nothing -> assert "The Context should have a user clause." false
-          (Just (PREFIX "sys" "model:System$System")) -> pure unit
-          otherwise -> assert "The Context should have a use clause: 'use: sys model:System$System'." false
-
-  test "Well-formedness of a use clause" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for System$System" domain
-    case r of
-      (Left (ParseError _ pos)) -> assert "The error should be situated at (2, 16)" (unsafeCoerce pos == ArcPosition {line: 2, column: 16})
-      otherwise -> assert "The modelname is not well-formed and that should be detected" false
-
-  test "Perspective with a rule" do
-    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject\n  if Prop1 > 10 then\n    AnotherProp = 20\n    YetAnotherProp =+ \"aap\"" perspectiveE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        -- logShow pre
-        (assert "The Perspective should have an action with Verb 'Change'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Change
-            otherwise -> false) perspectiveParts)))
-        (assert "The action with Verb 'Change' should have a Condition"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb, actionParts})) -> verb == Change && (isJust (findIndex (case _ of
-              (Condition _) -> true
-              otherwise -> false) actionParts))
-            otherwise -> false) perspectiveParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Perspective with a rule with a let* on the rhs." do
-    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject\n  if Prop1 > 10 then\n    let*\n      a <- 20\n    in\n      AnotherProp = a\n" perspectiveE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        -- logShow pre
-        (assert "The Perspective should have an action with Verb 'Change'"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb: v})) -> v == Change
-            otherwise -> false) perspectiveParts)))
-        (assert "The action with Verb 'Change' should have a Condition"
-          (isJust (findIndex (case _ of
-            (Act (ActionE {verb, actionParts})) -> verb == Change && (isJust (findIndex (case _ of
-              (Condition _) -> true
-              otherwise -> false) actionParts))
-            otherwise -> false) perspectiveParts)))
-      otherwise -> assert "Parsed an unexpected type" false
+  -- test "Perspective on External" do
+  --   (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: External" perspectiveE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+  --       -- logShow pre
+  --       (assert "The Perspective should have the object 'External'"
+  --         (isJust (findIndex (case _ of
+  --           (Object (Simple (ArcIdentifier _ "External"))) -> true
+  --           otherwise -> false) perspectiveParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Perspective with just an ObjectRef and a defaultView" do
+  --   (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject (MyView)" perspectiveE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+  --       -- logShow pre
+  --       (assert "The Perspective should have the object 'MyObject'"
+  --         (isJust (findIndex (case _ of
+  --           (Object _) -> true
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The Perspective should have the default object view 'MyView'"
+  --         (isJust (findIndex (case _ of
+  --           (DefaultView _) -> true
+  --           otherwise -> false) perspectiveParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Perspective with just an ObjectRef and some otherwise unspecified Actions" do
+  --   (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject: Consult, Change" perspectiveE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+  --       -- logShow pre
+  --       (assert "The Perspective should have the object 'MyObject'"
+  --         (isJust (findIndex (case _ of
+  --           (Object _) -> true
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The Perspective should have an action with Verb 'Consult'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb: v})) -> v == Consult
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The Perspective should have an action with Verb 'Change'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb: v})) -> v == Change
+  --           otherwise -> false) perspectiveParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Action with its own View" do
+  --   (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest" actionE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(Act (ActionE{verb, actionParts}))) -> do
+  --       -- logShow pre
+  --       assert "The Action should have the Verb 'Consult'" (verb == Consult)
+  --       (assert "The Action should have a view with name 'ViewOnGuest'"
+  --         (isJust (findIndex (case _ of
+  --           (ObjectView v) -> v == "ViewOnGuest"
+  --           otherwise -> false) actionParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Action with its own View and with a subjectView" do
+  --   (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest\n  subjectView: AnotherView" actionE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(Act (ActionE{verb, actionParts}))) -> do
+  --       -- logShow pre
+  --       assert "The Action should have the Verb 'Consult'" (verb == Consult)
+  --       (assert "The Action should have a view with name 'ViewOnGuest'"
+  --         (isJust (findIndex (case _ of
+  --           (ObjectView v) -> v == "ViewOnGuest"
+  --           otherwise -> false) actionParts)))
+  --       (assert "The Action should have a subjectView with name 'AnotherView'"
+  --         (isJust (findIndex (case _ of
+  --           (SubjectView v) -> v == "AnotherView"
+  --           otherwise -> false) actionParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Action with a condition" do
+  --   (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest\n  subjectView: AnotherView\n  if Prop1 > 10" actionE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(Act (ActionE{verb, actionParts}))) -> do
+  --       -- logShow pre
+  --       assert "The Action should have the Verb 'Consult'" (verb == Consult)
+  --       (assert "The Action should have a view with name 'ViewOnGuest'"
+  --         (isJust (findIndex (case _ of
+  --           (ObjectView v) -> v == "ViewOnGuest"
+  --           otherwise -> false) actionParts)))
+  --       (assert "The Action should have a subjectView with name 'AnotherView'"
+  --         (isJust (findIndex (case _ of
+  --           (SubjectView v) -> v == "AnotherView"
+  --           otherwise -> false) actionParts)))
+  --       (assert "The Action should have a Condition"
+  --         (isJust (findIndex (case _ of
+  --           (Condition (Binary (BinaryStep {operator}))) -> case operator of
+  --             GreaterThan _ -> true
+  --             otherwise -> false
+  --           otherwise -> false) actionParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Action with its own View, with a subjectView and an indirectObject with a view." do
+  --   (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest\n  subjectView: AnotherView\n  indirectObject: AnotherRole (ViewOnAnotherRole)" actionE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(Act (ActionE{verb, actionParts}))) -> do
+  --       -- logShow pre
+  --       assert "The Action should have the Verb 'Consult'" (verb == Consult)
+  --       (assert "The Action should have a view with name 'ViewOnGuest'"
+  --         (isJust (findIndex (case _ of
+  --           (ObjectView v) -> v == "ViewOnGuest"
+  --           otherwise -> false) actionParts)))
+  --       (assert "The Action should have a subjectView with name 'AnotherView'"
+  --         (isJust (findIndex (case _ of
+  --           (SubjectView v) -> v == "AnotherView"
+  --           otherwise -> false) actionParts)))
+  --       (assert "The Action should have an indirectObject with name 'AnotherRole'"
+  --         (isJust (findIndex (case _ of
+  --           (IndirectObject v) -> v == "AnotherRole"
+  --           otherwise -> false) actionParts)))
+  --       (assert "The Action should have an IndirectObjectView with name 'ViewOnAnotherRole'"
+  --         (isJust (findIndex (case _ of
+  --           (IndirectObjectView v) -> v == "ViewOnAnotherRole"
+  --           otherwise -> false) actionParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Action without a view and an indirectObject" do
+  --   (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult\n  indirectObject: AnotherRole" actionE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(Act (ActionE{verb, actionParts}))) -> do
+  --       assert "The Action should have the Verb 'Consult'" (verb == Consult)
+  --       (assert "The Action should have an indirectObject with name 'AnotherRole'"
+  --         (isJust (findIndex (case _ of
+  --           (IndirectObject v) -> v == "AnotherRole"
+  --           otherwise -> false) actionParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Perspective with an ObjectRef, some otherwise unspecified Actions and a Delete with a subjectView and an indirect object with view" do
+  --   (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject: Consult, Change\n  Delete with SomeView\n    subjectView: AnotherView\n    indirectObject: AnotherRole (ViewOnAnotherRole)" perspectiveE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+  --       -- logShow pre
+  --       (assert "The Perspective should have the object 'MyObject'"
+  --         (isJust (findIndex (case _ of
+  --           (Object _) -> true
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The Perspective should have an action with Verb 'Consult'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb: v})) -> v == Consult
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The Perspective should have an action with Verb 'Change'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb: v})) -> v == Change
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The Perspective should have an action with Verb 'Delete'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb: v})) -> v == Delete
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The action with Verb 'Delete' should have ObjectView 'SomeView'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb, actionParts})) -> verb == Delete && (isJust (findIndex (case _ of
+  --             (ObjectView "SomeView") -> true
+  --             otherwise -> false) actionParts))
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The action with Verb 'Delete' should have IndirectObject 'AnotherRole'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb, actionParts})) -> verb == Delete && (isJust (findIndex (case _ of
+  --             (IndirectObject "AnotherRole") -> true
+  --             otherwise -> false) actionParts))
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The action with Verb 'Delete' should have IndirectObjectView 'ViewOnAnotherRole'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb, actionParts})) -> verb == Delete && (isJust (findIndex (case _ of
+  --             (IndirectObjectView "ViewOnAnotherRole") -> true
+  --             otherwise -> false) actionParts))
+  --           otherwise -> false) perspectiveParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Parse a file" do
+  --   fileName <- pure "arcsyntax.arc"
+  --   text <- liftEffect (readTextFile ENC.UTF8 (Path.concat [testDirectory, fileName]))
+  --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right dom) -> do
+  --       -- logShow dom
+  --       assert ("The file '" <> fileName <> "' does not parse") true
+  --
+  -- test "Context with an aspect" do
+  --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  aspect : pre:MyAspectRole" domain
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right ctxt@(ContextE{contextParts})) -> do
+  --       case head contextParts of
+  --         Nothing -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
+  --         (Just (ContextAspect "pre:MyAspectRole" _)) -> pure unit
+  --         otherwise -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
+  --
+  -- test "Role with an aspect" do
+  --   (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing : MyRole (mandatory, functional)\n  aspect: pre:MyAspectRole" roleE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right rl@(RE (RoleE{roleParts}))) -> case (head (filter (case _ of
+  --           (RoleAspect _ _) -> true
+  --           otherwise -> false) roleParts)) of
+  --         Nothing -> assert "Role should have a RoleAspect part." false
+  --         Just (RoleAspect u _) -> assert "Role should have a RoleAspect part with value 'pre:MyAspectRole'" (u == "pre:MyAspectRole")
+  --         otherwise -> assert "Role should have a RoleAspect part" false
+  --     otherwise -> assert "Role should have a RoleAspect part" false
+  --
+  -- test "Context with a use clause" do
+  --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:System$System" domain
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right ctxt@(ContextE{contextParts})) -> do
+  --       case head contextParts of
+  --         Nothing -> assert "The Context should have a user clause." false
+  --         (Just (PREFIX "sys" "model:System$System")) -> pure unit
+  --         otherwise -> assert "The Context should have a use clause: 'use: sys model:System$System'." false
+  --
+  -- test "Well-formedness of a use clause" do
+  --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for System$System" domain
+  --   case r of
+  --     (Left (ParseError _ pos)) -> assert "The error should be situated at (2, 16)" (unsafeCoerce pos == ArcPosition {line: 2, column: 16})
+  --     otherwise -> assert "The modelname is not well-formed and that should be detected" false
+  --
+  -- test "Perspective with a rule" do
+  --   (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject\n  if Prop1 > 10 then\n    AnotherProp = 20\n    YetAnotherProp =+ \"aap\"" perspectiveE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+  --       -- logShow pre
+  --       (assert "The Perspective should have an action with Verb 'Change'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb: v})) -> v == Change
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The action with Verb 'Change' should have a Condition"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb, actionParts})) -> verb == Change && (isJust (findIndex (case _ of
+  --             (Condition _) -> true
+  --             otherwise -> false) actionParts))
+  --           otherwise -> false) perspectiveParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
+  --
+  -- test "Perspective with a rule with a let* on the rhs." do
+  --   (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject\n  if Prop1 > 10 then\n    let*\n      a <- 20\n    in\n      AnotherProp = a\n" perspectiveE
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+  --       -- logShow pre
+  --       (assert "The Perspective should have an action with Verb 'Change'"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb: v})) -> v == Change
+  --           otherwise -> false) perspectiveParts)))
+  --       (assert "The action with Verb 'Change' should have a Condition"
+  --         (isJust (findIndex (case _ of
+  --           (Act (ActionE {verb, actionParts})) -> verb == Change && (isJust (findIndex (case _ of
+  --             (Condition _) -> true
+  --             otherwise -> false) actionParts))
+  --           otherwise -> false) perspectiveParts)))
+  --     otherwise -> assert "Parsed an unexpected type" false
