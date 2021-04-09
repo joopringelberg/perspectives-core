@@ -33,11 +33,12 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (intersect, length, uncons, union)
+import Data.Array (intersect, length, singleton, uncons, union)
 import Data.Array.Partial (head) as AP
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
+import Data.Identity (Identity)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
@@ -208,3 +209,9 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f (PROD adts) = map product (traverse (reduce f) adts)
   reduce f EMPTY = pure EMPTY
   reduce f UNIVERSAL = pure UNIVERSAL
+
+--------------------------------------------------------------------------------------------------
+---- ENUMERATEDTYPESINADT
+--------------------------------------------------------------------------------------------------
+leavesInADT :: forall a. Eq a => ADT a -> Array a
+leavesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Array a))

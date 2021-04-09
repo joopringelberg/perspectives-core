@@ -35,12 +35,13 @@ import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.SideEffect (SideEffect)
-import Perspectives.Representation.TypeIdentifiers (RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
 
 newtype State = State StateRecord
 
 type StateRecord =
 	{ id :: StateIdentifier
+	, context :: ContextType
 	, query :: Calculation
 	, notifyOnEntry :: EncodableMap RoleType NotificationLevel
 	, notifyOnExit :: EncodableMap RoleType NotificationLevel
@@ -48,9 +49,10 @@ type StateRecord =
 	, automaticOnExit :: EncodableMap RoleType SideEffect
 	}
 
-constructState :: StateIdentifier -> Step -> State
-constructState id condition = State
+constructState :: StateIdentifier -> Step -> ContextType -> State
+constructState id condition context = State
 	{id: id
+	, context
 	, query: S condition
 	, notifyOnEntry: EncodableMap empty
 	, notifyOnExit: EncodableMap empty

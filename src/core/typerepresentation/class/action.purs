@@ -30,11 +30,11 @@ import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, domain2roleType, range)
-import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.ADT (ADT, leavesInADT)
 import Perspectives.Representation.Action (Action(..), Verb)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getView)
-import Perspectives.Representation.Class.Role (adtOfRoleAndBinding, getRole, leavesInADT)
+import Perspectives.Representation.Class.Role (adtOfRoleAndBinding, getRole)
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, PropertyType, RoleType, ViewType)
 import Perspectives.Representation.View (propertyReferences)
@@ -84,7 +84,10 @@ instance actionActionClass :: ActionClass Action where
     (Just (EF ar)) -> pure ar
     otherwise -> throwError (error ("Attempt to access the Effect of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
   isExecutedByBot r = (unwrap r).executedByBot
-  providesPerspectiveOnRole rt r = null <$> (difference <$> (leavesInADT <$> objectType r) <*> (leavesInADT <$> (getRole rt >>= adtOfRoleAndBinding)))
+  providesPerspectiveOnRole rt r = null <$>
+    (difference <$>
+      (leavesInADT <$> objectType r) <*>
+      (leavesInADT <$> (getRole rt >>= adtOfRoleAndBinding)))
   providesPerspectiveOnProperty pt r = (||) <$> maybe (pure true) isInView (requiredObjectProperties r) <*> ((||) <$> maybe (pure true) isInView (requiredIndirectObjectProperties r) <*> maybe (pure true) isInView (requiredSubjectProperties r))
     where
       isInView :: ViewType -> MonadPerspectives Boolean

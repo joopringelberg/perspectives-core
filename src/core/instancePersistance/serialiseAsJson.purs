@@ -36,6 +36,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Foreign.Object (Object, singleton, empty, toUnfoldable, fromFoldable) as OBJ
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasForUserType)
 import Perspectives.CollectAffectedContexts (lift2)
@@ -121,7 +122,7 @@ serialiseAsJsonFor_ userType cid = do
     serialiseRoleInstances :: Tuple String (Array RoleInstance) -> Collecting (Maybe (Tuple String (SerializableNonEmptyArray RolSerialization)))
     serialiseRoleInstances (Tuple roleTypeId roleInstances) = do
       -- Now for each role, decide if the user may see it.
-      allowed <- lift $ (userType ###>> roleIsInPerspectiveOf (EnumeratedRoleType roleTypeId))
+      allowed <- lift $ (userType ###>> unsafePartial roleIsInPerspectiveOf (EnumeratedRoleType roleTypeId))
       if allowed
         then case fromArray roleInstances of
           Nothing -> pure Nothing
@@ -140,7 +141,7 @@ serialiseAsJsonFor_ userType cid = do
           c <- lift (b ##>> context)
           doneBefore <- hasContextBeenDone c
           typeOfBinding <- lift (b ##>> roleType)
-          allowed <- lift (userType ###>> roleIsInPerspectiveOf typeOfBinding)
+          allowed <- lift (userType ###>> unsafePartial roleIsInPerspectiveOf typeOfBinding)
           -- TODO. Serialiseer de context niet als de ander er al een rol bij speelt!
           if allowed && not doneBefore then serialiseAsJsonFor_ userType c else pure unit
           pure $ RolSerialization {id: Just (unwrap roleInstance), properties: (PropertySerialization properties'), binding: if allowed then map unwrap binding else Nothing}

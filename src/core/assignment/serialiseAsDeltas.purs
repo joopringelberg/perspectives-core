@@ -57,7 +57,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), Prop
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..), createTransactie)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (actionObjectQfd, actionsClosure_)
+import Perspectives.Types.ObjectGetters (perspectiveObjectQfd, perspectivesClosure_)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -110,7 +110,7 @@ liftToMPT = lift <<< lift
 serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> RoleType -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor_ cid userId userType = do
   -- All Roletypes the user may see in this context, expressed as Calculations.
-  (roleQfds :: Array QueryFunctionDescription) <- liftToMPT (userType ###= (actionsClosure_ >=> actionObjectQfd))
+  (roleQfds :: Array QueryFunctionDescription) <- liftToMPT (userType ###= (perspectivesClosure_ >=> pure <<< unsafePartial perspectiveObjectQfd))
   for_ roleQfds
     \roleQfd -> do
       -- All instances of this RoleType the user may see in this context.

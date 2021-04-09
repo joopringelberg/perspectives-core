@@ -27,6 +27,7 @@ where
 
 import Control.Monad.Except (catchError, throwError)
 import Data.Foldable (for_)
+import Data.Map (insert) as MAP
 import Data.Maybe (Maybe(..))
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
@@ -35,6 +36,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Persistence.API (addAttachment, getAttachment)
@@ -44,6 +46,7 @@ import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
+import Perspectives.Representation.State (State(..))
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (<$>), (>>=))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
@@ -80,6 +83,12 @@ modifyCalculatedPropertyInDomeinFile ns cr@(CalculatedProperty {_id}) = modifyDo
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{calculatedProperties}) = DomeinFile dff {calculatedProperties = insert (unwrap _id) cr calculatedProperties}
+
+modifyStateInDomeinFile :: Namespace -> State -> MonadPerspectives State
+modifyStateInDomeinFile ns sr@(State {id}) = modifyDomeinFileInCache modifier ns *> pure sr
+  where
+    modifier :: DomeinFile -> DomeinFile
+    modifier (DomeinFile dff@{states}) = DomeinFile dff {states = EncodableMap $ MAP.insert id sr (unwrap states)}
 
 -----------------------------------------------------------
 -- RETRIEVE A DOMAINFILE

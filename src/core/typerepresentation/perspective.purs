@@ -22,20 +22,26 @@
 
 module Perspectives.Representation.Perspective where
 
+import Data.Array (difference, elemIndex, findIndex, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Newtype (class Newtype)
+import Data.List (List)
+import Data.List (findIndex) as LST
+import Data.Map (values)
+import Data.Maybe (isJust)
+import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object)
 import Perspectives.Data.EncodableMap (EncodableMap)
-import Perspectives.Query.QueryTypes (Calculation)
-import Perspectives.Representation.ExplicitSet (ExplicitSet)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), range)
+import Perspectives.Representation.ADT (ADT, leavesInADT)
+import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
 import Perspectives.Representation.SideEffect (SideEffect)
 import Perspectives.Representation.State (StateIdentifier)
-import Perspectives.Representation.TypeIdentifiers (PropertyType)
-import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
-import Prelude (class Eq, class Show)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType)
+import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb, RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
+import Prelude (class Eq, class Show, ($), (&&))
 
 -----------------------------------------------------------
 -- PERSPECTIVE
@@ -66,8 +72,64 @@ instance decodePerspective :: Decode Perspective where
   decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
+-- ACCESSORS
+-----------------------------------------------------------
+-- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+objectOfPerspective :: Partial => Perspective -> ADT EnumeratedRoleType
+objectOfPerspective (Perspective {object}) = case object of
+  Q qfd -> case range qfd of
+    RDOM adt -> adt
+
+-- | Disregarding state, returns true iff the perspective lets the user apply the
+-- | verb to the property.
+perspectiveSupportsPropertyForVerb :: Perspective -> PropertyType -> PropertyVerb -> Boolean
+perspectiveSupportsPropertyForVerb (Perspective {propertyVerbs}) property verb = find $ values $ unwrap propertyVerbs
+  where
+    find :: List (Array PropertyVerbs) -> Boolean
+    find pvs = isJust $ LST.findIndex
+      (\(pva :: Array PropertyVerbs) -> isJust $ findIndex
+        (\(PropertyVerbs pset pverbs) -> isElementOf property pset && (isJust $ elemIndex verb pverbs))
+        pva)
+      pvs
+
+-- | Disregarding state, returns true iff the perspective lets the user apply *some*
+-- | verb to the property.
+perspectiveSupportsProperty :: Perspective -> PropertyType -> Boolean
+perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ values $ unwrap propertyVerbs
+  where
+    find :: List (Array PropertyVerbs) -> Boolean
+    find pvs = isJust $ LST.findIndex
+      (\(pva :: Array PropertyVerbs) -> isJust $ findIndex
+        (\(PropertyVerbs pset pverbs) -> isElementOf property pset)
+        pva)
+      pvs
+
+-- | The object of the perspective must cover the given ADT in the sense that its
+-- | EnumeratedRoleTypes form a superset of those of the ADT.
+-- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+isPerspectiveOnADT :: Partial => Perspective -> ADT EnumeratedRoleType -> Boolean
+isPerspectiveOnADT p adt = null (leavesInADT adt `difference` (leavesInADT $ objectOfPerspective p))
+
+-- | Regardless of state, does the perspective allow for the RoleVerb?
+perspectiveSupportsRoleVerb :: Perspective -> RoleVerb -> Boolean
+perspectiveSupportsRoleVerb (Perspective{roleVerbs}) verb = isJust $ LST.findIndex
+  (\rvs -> hasVerb verb rvs)
+  (values $ unwrap roleVerbs)
+
+perspectiveSupportsRoleVerbs :: Perspective -> Array RoleVerb -> Boolean
+perspectiveSupportsRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.findIndex
+  (\rvs -> hasAllVerbs verbs rvs)
+  (values $ unwrap roleVerbs)
+
+perspectiveSupportsOneOfRoleVerbs :: Perspective -> Array RoleVerb -> Boolean
+perspectiveSupportsOneOfRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.findIndex
+  (\rvs -> hasOneOfTheVerbs verbs rvs)
+  (values $ unwrap roleVerbs)
+
+-----------------------------------------------------------
 -- PROPERTYVERBS
 -----------------------------------------------------------
+-- NOTE: we might replace (ExplicitSet PropertyType) with RelevantProperties.
 data PropertyVerbs = PropertyVerbs (ExplicitSet PropertyType) (Array PropertyVerb)
 derive instance genericPropertyVerbs :: Generic PropertyVerbs _
 instance showPropertyVerbs :: Show PropertyVerbs where show = genericShow

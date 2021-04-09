@@ -22,12 +22,14 @@
 
 module Perspectives.Representation.Verbs where
 
+import Data.Array (difference, elemIndex, intersect, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (isJust, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Prelude (class Show, class Eq)
+import Prelude (class Eq, class Show, not, ($))
 
 -----------------------------------------------------------
 -- ROLEVERB
@@ -58,7 +60,8 @@ instance eqRoleVerb :: Eq RoleVerb where
 -----------------------------------------------------------
 
 data PropertyVerb =
-    RemovePropertyValue   -- Remove a single value.
+    Consult
+  | RemovePropertyValue   -- Remove a single value.
   | DeleteProperty        -- Remove all values.
   | AddPropertyValue      -- Add a single value.
   | SetPropertyValue      -- Replace all values.
@@ -78,8 +81,23 @@ instance eqPropertyVerb :: Eq PropertyVerb where
 -----------------------------------------------------------
 data RoleVerbList = All | Including (Array RoleVerb) | Excluding (Array RoleVerb)
 
-derive instance genericRoleVerbList :: Generic RoleVerbList _ 
+derive instance genericRoleVerbList :: Generic RoleVerbList _
 instance encodeRoleVerbList :: Encode RoleVerbList where encode = genericEncode defaultOptions
 instance decodeRoleVerbList :: Decode RoleVerbList where decode = genericDecode defaultOptions
 instance showRoleVerbList :: Show RoleVerbList where show = genericShow
 derive instance eqRoleVerbList :: Eq RoleVerbList
+
+hasVerb :: RoleVerb -> RoleVerbList -> Boolean
+hasVerb v All = true
+hasVerb v (Including vl) = isJust $ elemIndex v vl
+hasVerb v (Excluding vl) = isNothing $ elemIndex v vl
+
+hasAllVerbs :: Array RoleVerb -> RoleVerbList -> Boolean
+hasAllVerbs vs All = true
+hasAllVerbs vs (Including vl) = null $ difference vs vl
+hasAllVerbs vs (Excluding vl) = null $ intersect vs vl
+
+hasOneOfTheVerbs :: Array RoleVerb -> RoleVerbList -> Boolean
+hasOneOfTheVerbs vs All = true
+hasOneOfTheVerbs vs (Including vl) = not $ null $ intersect vs vl
+hasOneOfTheVerbs vs (Excluding vl) = not $ null $ difference vs vl

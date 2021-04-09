@@ -217,11 +217,6 @@ allRoles = reduce magic
           rs <- reduce magic (PROD (ST <$> contextAspects c))
           pure (roles c <> rs)
 
---------------------------------------------------------------------------------------------------
----- ENUMERATEDTYPESINADT
---------------------------------------------------------------------------------------------------
-leavesInADT :: forall a. Eq a => ADT a -> Array a
-leavesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Array a))
 
 -----------------------------------------------------------
 -- LESSTHANOREQUALTO
@@ -368,8 +363,8 @@ rangeOfRoleCalculation = getRole >=> getCalculation >=> case _ of
     BQD _ _ _ _ (RDOM p) _ _ -> pure p
     otherwise -> empty -- NB: The Alt instance of Aff throws an error on empty!
 
-typeExcludingBinding_ :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
-typeExcludingBinding_ = getRole >=> (case _ of
+typeExcludingBinding :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
+typeExcludingBinding = getRole >=> (case _ of
   E r -> roleADT r
   C r -> roleADT r)
 

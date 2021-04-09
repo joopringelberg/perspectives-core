@@ -53,7 +53,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
-import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
+import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
@@ -76,7 +76,7 @@ type FD = PhaseThree QueryFunctionDescription
 makeConjunction :: Domain -> QueryFunctionDescription -> RoleType -> FD
 makeConjunction currentDomain left rt2 = do
   right <- makeRoleGetter currentDomain rt2
-  (rightADT :: ADT EnumeratedRoleType) <- lift2 $ typeExcludingBinding_ rt2
+  (rightADT :: ADT EnumeratedRoleType) <- lift2 $ typeExcludingBinding rt2
   pure $ BQD currentDomain (QF.BinaryCombinator UnionF) left right (RDOM (sum [unsafePartial roleRange left, rightADT])) THREE.False (THREE.or (mandatory left) (mandatory right))
 
 -- | Constructs a QueryFunctionDescription that describes getting a role of the given type.

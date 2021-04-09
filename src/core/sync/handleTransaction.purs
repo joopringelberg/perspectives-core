@@ -53,6 +53,7 @@ import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
+import Perspectives.Representation.Verbs (RoleVerb(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, setBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
@@ -168,7 +169,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- be created by any user and usually will be created by parsing a CRL file.
       lift2 (roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$External")) >>= if _
         then constructExternalRole
-        else (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole CreateAndBindContext) >>= case _ of
+        else (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole CreateAndFill) >>= case _ of
           Left e -> handleError e
           Right _ -> constructExternalRole
     RemoveRoleInstance -> do

@@ -43,7 +43,7 @@ import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Foreign.Object (Object, keys, values)
+import Foreign.Object (Object, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
@@ -140,6 +140,7 @@ instance decodeUserProps :: Decode UserPropsAndVerbs where
 -----------------------------------------------------------
 -- RELEVANTPROPERTIES
 -----------------------------------------------------------
+-- NOTE: We might replace this with ExplicitSet PropertyType.
 data RelevantProperties = All | Properties (Array PropertyType)
 
 derive instance genericRelevantProperties :: Generic RelevantProperties _

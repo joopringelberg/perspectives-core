@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.Parsing.Arc.AST where
+module Perspectives.Parsing.Arc.AST where 
 
 import Prelude
 

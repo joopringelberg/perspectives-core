@@ -48,7 +48,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (empty, insert, keys, lookup, unions, values, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
-import Perspectives.DomeinCache (modifyActionInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
+import Perspectives.DomeinCache (modifyStateInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
@@ -57,9 +57,9 @@ import Perspectives.InvertedQuery (PropsAndVerbs, QueryWithAKink(..), RelevantPr
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AE
-import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.DescriptionCompiler (compileAndSaveProperty, compileAndSaveRole, compileStep, compileVarBinding, makeSequence, qualifyLocalEnumeratedRoleName, qualifyReturnsClause)
@@ -78,6 +78,7 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
+import Perspectives.Representation.State (State(..), StateIdentifier)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
@@ -356,28 +357,29 @@ compileExpressions = do
     (compileExpressions' df _id)
   where
     compileExpressions' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
-    compileExpressions' {_id,calculatedRoles, calculatedProperties, actions} ns = do
+    compileExpressions' {_id,calculatedRoles, calculatedProperties, states} ns = do
       traverse_ compileRolExpr (identifier <$> calculatedRoles)
       traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
-      traverseWithIndex_ compileActionObject actions
+      traverseWithIndex_ compileStateQuery states
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
       -- We will not have errors on trying to retrieve the DomeinFile here.
       DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId ns)
       modifyDF \dfr -> modifiedDomeinFile
 
       where
-        compileActionObject :: String -> Action -> PhaseThree Unit
-        compileActionObject actionName (Action a@{subject, object, verb, requiredObjectProperties}) = case object of
+        compileStateQuery :: StateIdentifier -> State -> PhaseThree Unit
+        compileStateQuery stateId (State s@{query, context}) = case query of
           Q _ -> pure unit
           S stp -> do
-            dom <- lift2 $ CDOM <$> contextOfRoleType subject
+            -- The domain is the Context Type the State belongs to.
+            dom <- pure $ CDOM $ ST context
             descr <- withFrame do
               varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
               compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
               pure $ makeSequence varb compiledCalculation
-            -- Save the Action in the DomeinCache. Notice that the cache temporarily contains
+            -- Save the State in the DomeinCache. Notice that the cache temporarily contains
             -- the version of the model we're compiling.
-            lift2 $ void $ modifyActionInDomeinFile ns (Action (a {object = Q descr}))
+            lift2 $ void modifyStateInDomeinFile ns (State s {query = Q descr})
 
         compileRolExpr :: CalculatedRoleType -> PhaseThree Unit
         compileRolExpr roleType = do

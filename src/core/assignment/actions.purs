@@ -67,7 +67,7 @@ import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, cont
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect, objectQfd, subject)
 import Perspectives.Representation.Class.Identifiable (displayName)
-import Perspectives.Representation.Class.PersistentType (ActionType, getAction, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF

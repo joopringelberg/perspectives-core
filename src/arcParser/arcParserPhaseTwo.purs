@@ -156,8 +156,8 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       qualifiedIndexedName <- expandNamespace indexedName
       pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
 
-    handleParts (Context contextUnderConstruction) (STATE s@(StateE{id:stateId})) = do
-      state@(State{id:ident}) <- traverseStateE s (AllStates $ addNamespace ns stateId)
+    handleParts (Context contextUnderConstruction@({_id})) (STATE s@(StateE{id:stateId})) = do
+      state@(State{id:ident}) <- traverseStateE s (State_ $ addNamespace (unwrap _id) stateId) _id
       pure (ident `insertStateInto` contextUnderConstruction)
       where
         insertStateInto :: StateIdentifier -> ContextRecord -> Context
@@ -311,9 +311,9 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     insertPropertyInto (Property.E (EnumeratedProperty {_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (ENP _id) properties}
     insertPropertyInto (Property.C (CalculatedProperty{_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (CP _id) properties}
 
-traverseStateE :: StateE -> StateIdentifier -> PhaseTwo State
-traverseStateE (StateE {id, condition, stateParts}) ns = do
-  state <- pure $ constructState ns condition
+traverseStateE :: StateE -> StateIdentifier -> ContextType -> PhaseTwo State
+traverseStateE (StateE {id, condition, stateParts}) qualifiedStateId contextId = do
+  state <- pure $ constructState qualifiedStateId condition contextId
   -- Postpone all stateParts because there may be forward references to user and subject.
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateParts}
   pure state
