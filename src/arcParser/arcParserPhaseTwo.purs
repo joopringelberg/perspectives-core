@@ -47,7 +47,7 @@ import Foreign.Object (Object, insert, keys, lookup, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, areLastSegmentsOf, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateTransitionE(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (Step) as Expr
 import Perspectives.Parsing.Arc.Position (ArcPosition)
@@ -492,9 +492,14 @@ handlePostponedStateQualifiedParts = do
           pure $ PSet (ENP <<< EnumeratedPropertyType <$> (ARR.fromFoldable ps))
         f (View view) = do
           (views :: Object VIEW.View) <- getsDF _.views
-          case lookup view views of
-            Nothing -> throwError $ UnknownView start view
-            Just (VIEW.View {propertyReferences}) -> pure $ PSet propertyReferences
+          -- As we have postponed handling these parse tree fragments after
+          -- handling all others, there can be no forward references.
+          candidates <- pure $ ARR.filter (endsWithSegments view) (keys views)
+          case length candidates of
+            0 -> throwError $ UnknownView start view
+            1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
+              Just (VIEW.View {propertyReferences}) -> pure $ PSet propertyReferences
+            _ -> throwError $ NotUniquelyIdentifying start view candidates
 
     handlePart (AC (ActionE{id, subject, object, state, effect, start})) = modifyPerspective subject object start
       \(Perspective pr@{actions}) -> let
