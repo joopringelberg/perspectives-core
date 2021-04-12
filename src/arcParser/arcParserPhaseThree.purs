@@ -49,7 +49,7 @@ import Foreign.Object (empty, insert, keys, lookup, unions, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
-import Perspectives.DomeinCache (modifyStateInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
+import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
@@ -79,7 +79,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.State (State(..), StateIdentifier, unwrapStateIdentifier)
+import Perspectives.Representation.State (State(..), StateIdentifier)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Representation.Verbs (PropertyVerb)
@@ -257,7 +257,6 @@ compileExpressions = do
     compileExpressions' {_id,calculatedRoles, calculatedProperties, states, enumeratedRoles} ns = do
       traverse_ compileRolExpr (identifier <$> calculatedRoles)
       traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
-      traverseWithIndex_ compileStateExpressions (unwrap states)
       enumeratedRoles' <- traverse compilePerspectiveObjects enumeratedRoles
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
       -- We will not have errors on trying to retrieve the DomeinFile here.
@@ -281,32 +280,6 @@ compileExpressions = do
                   pure $ makeSequence varb compiledCalculation
                 pure $ Perspective pr {object = Q descr}
               Q _ -> pure $ Perspective pr
-
-        compileStateExpressions :: StateIdentifier -> State -> PhaseThree Unit
-        compileStateExpressions stateId (State s@{query, context, object}) = do
-          queryDescr <- case query of
-            Q d -> pure d
-            S stp -> do
-              -- The domain is the Context Type the State belongs to.
-              dom <- pure $ CDOM $ ST context
-              withFrame do
-                varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
-                compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
-                pure $ makeSequence varb compiledCalculation
-
-          objectDescr <- case object of
-            Just (Q d) -> pure $ Just d
-            Just (S stp) -> do
-              -- The domain is the Context Type the State belongs to.
-              dom <- pure $ CDOM $ ST context
-              withFrame do
-                varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
-                compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
-                pure $ Just $ makeSequence varb compiledCalculation
-            Nothing -> pure Nothing
-          -- Save the State in the DomeinCache. Notice that the cache temporarily contains
-          -- the version of the model we're compiling.
-          void $ lift2 $ modifyStateInDomeinFile ns (State s {query = Q queryDescr, object = Q <$> objectDescr})
 
         compileRolExpr :: CalculatedRoleType -> PhaseThree Unit
         compileRolExpr roleType = do
@@ -337,8 +310,6 @@ addInvertedQueries = do
     addInvertedQueries' {enumeratedRoles, calculatedRoles, calculatedProperties, states} ns = do
       traverseWithIndex_ addInvertedQueriesForPerspectives enumeratedRoles
       -- TODO. Moeten we niet ook inverted queries toevoegen voor de perspectives van CalculatedRoles?
-      -- NOTE. De expressies in de state assignments zijn hier nog niet gecompileerd!
-      traverseWithIndex_ addInvertedQueriesForState $ unwrap states
       traverseWithIndex_ addInvertedQueriesForRole calculatedRoles
       traverseWithIndex_ addInvertedQueriesForProperty calculatedProperties
 
@@ -367,9 +338,6 @@ addInvertedQueries = do
           explicitSet2RelevantProperties Universal = All
           explicitSet2RelevantProperties Empty = Properties []
           explicitSet2RelevantProperties (PSet ps) = Properties ps
-
-        addInvertedQueriesForState :: StateIdentifier -> State -> PhaseThree Unit
-        addInvertedQueriesForState stateId state = pure unit
 
         addInvertedQueriesForRole :: String -> CalculatedRole -> PhaseThree Unit
         addInvertedQueriesForRole roleName (CalculatedRole cr@{_id, calculation, context}) = case calculation of
@@ -408,8 +376,8 @@ addInvertedQueries = do
 -- | It also has a side effect on the DomeinFileRecord that is kept in [PhaseTwoState](Perspectives.Parsing.Arc.PhaseTwoDefs.html#t:PhaseTwoState): it
 -- |  * changes EnumeratedRoles
 -- |  * changes EnumeratedProperties
--- | We only call `compileAndDistributeStep` in the functions `compileExpressions` and `compileStates`. These functions
--- | also modify the DomeinFileRecord, but just the CalculatedRole, CalculatedProperty and Action definitions in it.
+-- | We only call `compileAndDistributeStep` in the function `compileStates`. This function
+-- | also modifies the DomeinFileRecord, but just the CalculatedRole, CalculatedProperty and Action definitions in it.
 -- | Hence we do not risk to modify a definition that will be overwritten soon after without including that modification.
 compileAndDistributeStep :: Map.Map RoleType PropsAndVerbs -> Domain -> Step -> PhaseThree QueryFunctionDescription
 compileAndDistributeStep userProps dom stp = do
@@ -420,7 +388,7 @@ compileAndDistributeStep userProps dom stp = do
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process. Notice that all other names are qualified, by now:
--- |  * object and indirect object
+-- |  * object
 -- |  * binding of role definitions
 -- |  * references of properties (in views)
 -- |  * references to views
@@ -428,6 +396,7 @@ compileAndDistributeStep userProps dom stp = do
 -- | This means we can look for the qualified version of a local name using the functions in
 -- | Perspectives.Types.ObjectGetters, as long as we make sure the model under construction is in the DomainCache.
 -- | Compile the action to an Updater. Cache for later use.
+-- | Each expression (in statements) is handled with compileAndDistributeStep, hence the inverted queries are set as well.
 -- TODO: Controleer of het type argument van de assignment operatoren wel hetzelfde zijn als het type van het object van de Actie.
 compileStates :: PhaseThree Unit
 compileStates = do
@@ -451,23 +420,37 @@ compileStates = do
               -- lookup in the runtime environment.
               addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True False)
               -- Add an object variable if we have an object.
+              queryDescription <- case query of
+                Q d -> pure d
+                -- We have to do this for all user role types in the notifyOnEntry, notifyOnExit, automaticOnEntry
+                -- and automaticOnExit members.
+                S stp -> do
+                  varb <- compileVarBinding currentDomain (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
+                  compiledCalculation <- compileAndDistributeStep allUserRoles (CDOM $ ST context) stp
+                  pure $ makeSequence varb compiledCalculation
               mobjectCalculation <-  case object of
                 Nothing -> pure Nothing
                 Just object' -> do
                   objectCalculation' <- case object' of
-                    S _ -> throwError (Custom ("compileRules: Attempt to acces Object of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrapStateIdentifier $ id)))
+                    S stp -> do
+                      -- The domain is the Context Type the State belongs to.
+                      dom <- pure $ CDOM $ ST context
+                      withFrame do
+                        varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
+                        compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
+                        pure $ makeSequence varb compiledCalculation
                     Q calc -> pure calc
                   addBinding "object" (SQD currentDomain (QF.VariableLookup "object") (range objectCalculation') (functional objectCalculation') (mandatory objectCalculation'))
                   pure $ Just objectCalculation'
-              queryDescription <- case query of
-                Q d -> pure d
-                -- We have to do this for all user role type sin the notifyOnEntry, notifyOnExit, automaticOnEntry
-                -- and automaticOnExit members.
-                S stp -> compileAndDistributeStep allUserRoles (CDOM $ ST context) stp
               -- Now for the entries in automaticOnEntry and automaticOnExit, compile the SideEffects.
               automaticOnEntry' <- traverseWithIndex (compileSideEffect mobjectCalculation) (unwrap automaticOnEntry)
               automaticOnExit' <- traverseWithIndex (compileSideEffect mobjectCalculation) (unwrap automaticOnExit)
-              pure $ State ar {query = Q queryDescription, automaticOnEntry = EncodableMap automaticOnEntry', automaticOnExit = EncodableMap automaticOnExit'}
+              pure $ State ar
+                { query = Q queryDescription
+                , object = Q <$> mobjectCalculation
+                , automaticOnEntry = EncodableMap automaticOnEntry'
+                , automaticOnExit = EncodableMap automaticOnExit'
+                }
           where
 
             allUserRoles :: Map.Map RoleType PropsAndVerbs
