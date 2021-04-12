@@ -240,7 +240,8 @@ invertedQueriesForLocalRolesAndProperties = do
             -- Now add those verbs to the inverted query.
             setInvertedQueriesForUserAndRole userType (ST _id) pv true qwk
 
--- | The calculation of a CalculatedRole, of a CalculatedProperty and of the object of a Perspective are all expressions.
+-- | The calculation of a CalculatedRole, of a CalculatedProperty, the object of a Perspective
+-- | and the object and query of a state are all expressions.
 -- | This function compiles the parser AST output that represents these expressions to QueryFunctionDescriptions.
 -- | All names are qualified in the process.
 compileExpressions :: PhaseThree Unit
@@ -334,14 +335,16 @@ addInvertedQueries = do
   where
     addInvertedQueries' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
     addInvertedQueries' {enumeratedRoles, calculatedRoles, calculatedProperties, states} ns = do
-      traverseWithIndex_ addInvertedQueriesForEnumeratedRoles enumeratedRoles
+      traverseWithIndex_ addInvertedQueriesForPerspectives enumeratedRoles
+      -- TODO. Moeten we niet ook inverted queries toevoegen voor de perspectives van CalculatedRoles?
+      -- NOTE. De expressies in de state assignments zijn hier nog niet gecompileerd!
       traverseWithIndex_ addInvertedQueriesForState $ unwrap states
       traverseWithIndex_ addInvertedQueriesForRole calculatedRoles
       traverseWithIndex_ addInvertedQueriesForProperty calculatedProperties
 
       where
-        addInvertedQueriesForEnumeratedRoles :: String -> EnumeratedRole -> PhaseThree Unit
-        addInvertedQueriesForEnumeratedRoles eroleName (EnumeratedRole{_id, perspectives, context}) =
+        addInvertedQueriesForPerspectives :: String -> EnumeratedRole -> PhaseThree Unit
+        addInvertedQueriesForPerspectives eroleName (EnumeratedRole{_id, perspectives, context}) =
           for_ perspectives addInvertedQueriesForPerspectiveObject
           where
           addInvertedQueriesForPerspectiveObject :: Perspective -> PhaseThree Unit
