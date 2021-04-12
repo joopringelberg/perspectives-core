@@ -46,6 +46,7 @@ import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.State (State(..))
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (<$>), (>>=))
 
@@ -77,6 +78,12 @@ modifyCalculatedRoleInDomeinFile ns cr@(CalculatedRole {_id}) = modifyDomeinFile
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{calculatedRoles}) = DomeinFile dff {calculatedRoles = insert (unwrap _id) cr calculatedRoles}
+
+modifyEnumeratedRoleInDomeinFile :: Namespace -> EnumeratedRole -> MonadPerspectives EnumeratedRole
+modifyEnumeratedRoleInDomeinFile ns er@(EnumeratedRole {_id}) = modifyDomeinFileInCache modifier ns *> pure er
+  where
+    modifier :: DomeinFile -> DomeinFile
+    modifier (DomeinFile dff@{enumeratedRoles}) = DomeinFile dff {enumeratedRoles = insert (unwrap _id) er enumeratedRoles}
 
 modifyCalculatedPropertyInDomeinFile :: Namespace -> CalculatedProperty -> MonadPerspectives CalculatedProperty
 modifyCalculatedPropertyInDomeinFile ns cr@(CalculatedProperty {_id}) = modifyDomeinFileInCache modifier ns *> pure cr

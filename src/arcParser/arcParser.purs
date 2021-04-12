@@ -225,7 +225,6 @@ roleE = try $ withEntireBlock
       <|> reserved "external" *> pure ExternalRole
       <|> reserved "context" *> pure ContextRole
       <|> reserved "user" *> pure UserRole
-      <|> reserved "bot" *> pure BotRole
       <|> fail "Unknown kind of role"
 
 isRoleKind :: String -> Boolean

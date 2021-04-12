@@ -148,7 +148,7 @@ roletype2string (ENR s) = unwrap s
 roletype2string (CR s) = unwrap s
 
 -- | RoleKind codes the 'role' of the role in the context. Is it an external rol, a bot role, etc.
-data RoleKind = RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
+data RoleKind = RoleInContext | ContextRole | ExternalRole | UserRole
 derive instance genericRepRoleKind :: Generic RoleKind _
 instance encodeRoleKind :: Encode RoleKind where
   encode = genericEncode defaultOptions

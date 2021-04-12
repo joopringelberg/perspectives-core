@@ -74,7 +74,7 @@ instance decodePerspective :: Decode Perspective where
 -----------------------------------------------------------
 -- ACCESSORS
 -----------------------------------------------------------
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 objectOfPerspective :: Partial => Perspective -> ADT EnumeratedRoleType
 objectOfPerspective (Perspective {object}) = case object of
   Q qfd -> case range qfd of
@@ -106,7 +106,7 @@ perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ valu
 
 -- | The object of the perspective must cover the given ADT in the sense that its
 -- | EnumeratedRoleTypes form a superset of those of the ADT.
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 isPerspectiveOnADT :: Partial => Perspective -> ADT EnumeratedRoleType -> Boolean
 isPerspectiveOnADT p adt = null (leavesInADT adt `difference` (leavesInADT $ objectOfPerspective p))
 

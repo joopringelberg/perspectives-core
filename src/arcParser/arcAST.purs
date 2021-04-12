@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.Parsing.Arc.AST where 
+module Perspectives.Parsing.Arc.AST where
 
 import Prelude
 
@@ -34,7 +34,7 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.State (NotificationLevel, StateIdentifier)
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
+import Perspectives.Representation.TypeIdentifiers (RoleKind)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 
 --------------------------------------------------------------------------------
@@ -183,21 +183,8 @@ instance eqContextPart :: Eq ContextPart where
   eq (RE r1) (RE r2) = eq r1 r1
   eq _ _ = false
 
-instance ordContextPart :: Ord ContextPart where
-  compare (RE r1) (RE r2) = compare r1 r2
-  compare _ _ = EQ
-
 instance eqRoleE :: Eq RoleE where
   eq (RoleE{id:id1}) (RoleE{id:id2}) = id1 == id2
-
-instance ordRoleE :: Ord RoleE where
-  compare (RoleE{kindOfRole:kor1}) (RoleE{kindOfRole:kor2}) = if kor1 == BotRole
-    then if kor2 == BotRole
-      then EQ
-      else GT
-    else if kor2 == BotRole
-      then EQ
-      else LT
 
 derive instance genericContextE :: Generic ContextE _
 instance showContextE :: Show ContextE where show = genericShow

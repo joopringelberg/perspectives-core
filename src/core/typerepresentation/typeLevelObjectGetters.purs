@@ -256,7 +256,7 @@ perspectivesOfRole rt = ArrayT (getEnumeratedRole rt >>= unwrap >>> _.perspectiv
 
 -- | <UserRole> `perspectiveOnADT` <ADT> gives the perspectives (at most one) of the
 -- | UserRole on the role represented by the ADT.
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 perspectiveOnADT :: Partial => RoleType -> (ADT EnumeratedRoleType) ~~~> Perspective
 perspectiveOnADT userRoleType adt = ArrayT do
   (ps :: Array Perspective) <- perspectivesOfRoleType userRoleType
@@ -264,7 +264,7 @@ perspectiveOnADT userRoleType adt = ArrayT do
 
 -- | <UserRole> `perspectiveOnRoleType` <ObjectRole> gives the perspectives (at most one)
 -- | of the UserRole on the ObjectRole.
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 perspectiveOnRoleType :: Partial => RoleType -> RoleType ~~~> Perspective
 perspectiveOnRoleType userRoleType objectRoleType = (lift $ getRole objectRoleType) >>= lift <<< adtOfRole >>= (perspectiveOnADT userRoleType)
 
@@ -285,6 +285,7 @@ perspectiveOnRoleType userRoleType objectRoleType = (lift $ getRole objectRoleTy
 -- | Results are computed for the user role and its Aspects.
 -- | Notice that only RelevantProperties are returned. In case of All, this symbolically
 -- | also represents properties of Aspects and the binding hierarchy, but does not make them explicit.
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 propsAndVerbsForObjectRole :: Partial => RoleType -> RoleType -> MonadPerspectives PropsAndVerbs
 propsAndVerbsForObjectRole objectRole userRole' = do
   (perspectives :: Array Perspective) <- objectRole ###= perspectiveOnRoleType userRole'
@@ -392,24 +393,24 @@ qualifyContextInDomain localName namespace = ArrayT do
 ----------------------------------------------------------------------------------------
 -- | <user RoleType> `hasPerspectiveOnRole` <RoleType>
 -- | True, iff the user RoleType or one of its aspects has a perspective on the role type.
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 hasPerspectiveOnRole :: Partial => RoleType -> EnumeratedRoleType ~~~> Boolean
 -- hasPerspectiveOnRole ur rt =
 hasPerspectiveOnRole ur rt = ArrayT ((hasPerspectiveWithVerb ur rt []) >>= pure <<< singleton)
 
 -- | <RoleType> `roleIsInPerspectiveOf` <userRole>
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 roleIsInPerspectiveOf :: Partial => EnumeratedRoleType -> RoleType ~~~> Boolean
 roleIsInPerspectiveOf = flip hasPerspectiveOnRole
 
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 hasPerspectiveOnRoleWithVerbs :: Partial => Array RoleVerb -> RoleType -> EnumeratedRoleType ~~~> Boolean
 hasPerspectiveOnRoleWithVerbs verbs ur rt = ArrayT ((hasPerspectiveWithVerb ur rt verbs) >>= pure <<< singleton)
 
 -- | True if the user role (subjectType (first) argument) has a perspective
 -- | on the object (roleType (second) argument) that includes one of the given RoleVerbs,
 -- | OR if the role type has the aspect "sys:RootContext$RootUser"
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 hasPerspectiveWithVerb :: Partial => RoleType -> EnumeratedRoleType -> Array RoleVerb -> MonadPerspectives Boolean
 hasPerspectiveWithVerb subjectType roleType verbs = do
   objectIsRootUser <- roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$RootUser")
@@ -424,6 +425,7 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
         (\perspective@(Perspective{roleVerbs}) -> (not $ null $ intersect allObjects (leavesInADT $ objectOfPerspective perspective)) && (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs))
 
 -- | In a Context type, find all enumerated local user roles that have a perspective on a given RoleType.
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 localEnumeratedRolesWithPerspectiveOnRole :: Partial => RoleType -> ContextType ~~~> RoleType
 localEnumeratedRolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole
   (\ur -> do
@@ -477,7 +479,7 @@ findPerspective subjectType criterium = execStateT f Nothing
 -- | True iff the subject type has a perspective that includes the property,
 -- | qualified with the given PropertyVerb.
 
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 hasPerspectiveOnPropertyWithVerb :: Partial => RoleType -> EnumeratedRoleType -> EnumeratedPropertyType -> PropertyVerb -> MonadPerspectives Boolean
 hasPerspectiveOnPropertyWithVerb subjectType roleType property verb = do
   adt <- getEnumeratedRole roleType >>= roleADT
@@ -498,14 +500,14 @@ rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiv
 -- | The object of the perspective (first argument) must cover the RoleType in the sense
 -- | that its EnumeratedRoleTypes form a superset of those of the role type
 -- | (second argument), *not including* its binding or aspects.
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 isPerspectiveOnRole :: Partial => Perspective -> RoleType -> MonadPerspectives Boolean
 isPerspectiveOnRole p t = typeExcludingBinding t >>= pure <<< isPerspectiveOnADT p
 
 -- | The object of the perspective (first argument) must cover the RoleType in the sense
 -- | that its EnumeratedRoleTypes form a superset of those of the role type
 -- | (second argument), *including* its binding or aspects.
--- | PARTIAL: cannot be used during model file parsing (only after PhaseThree).
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 isPerspectiveOnRoleAndAspects :: Partial => Perspective -> RoleType -> MonadPerspectives Boolean
 isPerspectiveOnRoleAndAspects p t = typeIncludingAspectsBinding t >>= pure <<< isPerspectiveOnADT p
 ----------------------------------------------------------------------------------------

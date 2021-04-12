@@ -27,6 +27,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Foreign (unsafeFromForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -43,6 +44,8 @@ type StateRecord =
 	{ id :: StateIdentifier
 	, context :: ContextType
 	, query :: Calculation
+	, object :: Maybe Calculation
+	-- the key in these maps is the subject the effect or notification is for.
 	, notifyOnEntry :: EncodableMap RoleType NotificationLevel
 	, notifyOnExit :: EncodableMap RoleType NotificationLevel
 	, automaticOnEntry :: EncodableMap RoleType SideEffect
@@ -54,6 +57,7 @@ constructState id condition context = State
 	{id: id
 	, context
 	, query: S condition
+	, object: Nothing
 	, notifyOnEntry: EncodableMap empty
 	, notifyOnExit: EncodableMap empty
 	, automaticOnEntry: EncodableMap empty

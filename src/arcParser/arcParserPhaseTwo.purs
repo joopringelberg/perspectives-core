@@ -35,7 +35,7 @@ import Data.Either (Either(..))
 import Data.Foldable (foldl, for_)
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
-import Data.List (List(..), filter, findIndex, foldM, head, sort)
+import Data.List (List(..), filter, findIndex, foldM, head)
 import Data.Map (insert, lookup, empty) as MAP
 import Data.Map (toUnfoldable)
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -122,8 +122,7 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
         otherwise -> false) contextParts)) of
           Nothing -> pure $ Cons (RE (RoleE{id: "External", kindOfRole: ExternalRole, roleParts: Nil, pos})) contextParts
           otherwise -> pure contextParts
-      -- RoleE elements that are BotRoles are handled last, so we can lookup their users.
-      context' <- foldM handleParts context (sort contextParts')
+      context' <- foldM handleParts context contextParts'
       -- context' <- foldM handleParts context contextParts'
       modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
       pure context'
@@ -173,9 +172,8 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     insertInto :: Context -> Context -> Context
     insertInto (Context{_id}) (Context cr@{nestedContexts}) = Context $ cr {nestedContexts = cons _id nestedContexts}
 
-    -- Insert a Role type into a Context type. This function is partial, because we ignore
-    -- BotRole (a BotRole is represented with the UserRole that it serves).
-    insertRoleInto :: Partial => Role -> Context -> Context
+    -- Insert a Role type into a Context type.
+    insertRoleInto :: Role -> Context -> Context
     insertRoleInto (E (EnumeratedRole {_id, kindOfRole})) c = case kindOfRole, c of
       RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (ENR _id) rolInContext}
       ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR _id) contextRol}
@@ -189,8 +187,7 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR _id) rolInContext}
       ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR _id) contextRol}
       UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR _id) gebruikerRol}
-      -- A catchall case that just returns the context. Calculated roles for ExternalRole,
-      -- UserRole and BotRole should be ignored.
+      -- A catchall case that just returns the context. Calculated roles for ExternalRole and UserRole should be ignored.
       _, _ -> c
 
     addNamespace :: String -> String -> String
@@ -202,17 +199,11 @@ traverseRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseRoleE r ns = if isCalculatedRole r
   then traverseCalculatedRoleE r ns
   else traverseEnumeratedRoleE r ns
-  -- else if isBotRole r
-  --   then traverseBotRole r ns
-  --   else traverseEnumeratedRoleE r ns
   where
     isCalculatedRole :: RoleE -> Boolean
-    -- isCalculatedRole _ = true
     isCalculatedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
       (Calculation _) -> true
       otherwise -> false) roleParts))
-    -- isBotRole :: RoleE -> Boolean
-    -- isBotRole (RoleE{kindOfRole}) = kindOfRole == BotRole
 
 traverseEnumeratedRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
@@ -357,9 +348,6 @@ addRoleToDomeinFile (C r@(CalculatedRole{_id})) domeinFile = LN.over
   (prop (SProxy :: SProxy "calculatedRoles"))
   (insert (unwrap _id) r)
   domeinFile
--- addRoleToDomeinFile role df@{enumeratedRoles, calculatedRoles} = case role of
---   (E r@(EnumeratedRole{_id})) -> df {enumeratedRoles = insert (unwrap _id) r enumeratedRoles}
---   (C r@(CalculatedRole{_id})) -> df {calculatedRoles = insert (unwrap _id) r calculatedRoles}
 
 -- | Traverse a RoleE that results in an CalculatedRole.
 traverseCalculatedRoleE :: RoleE -> Namespace -> PhaseTwo Role
@@ -388,10 +376,6 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
     handleParts crole (SQP stateQualifiedParts) = do
       void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateQualifiedParts}
       pure crole
-
-    -- -- FORUSER
-    -- handleParts (CalculatedRole roleUnderConstruction) (ForUser _) = pure (CalculatedRole $ roleUnderConstruction)
-
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
 -- | and insert it into a DomeinFileRecord.
@@ -456,15 +440,14 @@ handlePostponedStateQualifiedParts = do
 
     handlePart (AE (AutomaticEffectE{subject, object, transition, effect, start, end})) = do
       qualifiedSubject <- findRole subject start
-      -- TODO. If there is an object, the compilation of the effect can have an 'object' variable.
       modifyPartOfState transition start end
         \(sr@{automaticOnEntry, automaticOnExit}) -> let
           sideEffect = case effect of
             Left assignments -> A (ARR.fromFoldable assignments)
             Right letstep -> L letstep
           in case transition of
-            Entry _ -> sr {automaticOnEntry = EncodableMap $ MAP.insert qualifiedSubject sideEffect (unwrap automaticOnEntry)}
-            Exit _ -> sr {automaticOnExit = EncodableMap $ MAP.insert qualifiedSubject sideEffect (unwrap automaticOnExit)}
+            Entry _ -> sr {automaticOnEntry = EncodableMap $ MAP.insert qualifiedSubject sideEffect (unwrap automaticOnEntry), object = S <$> object}
+            Exit _ -> sr {automaticOnExit = EncodableMap $ MAP.insert qualifiedSubject sideEffect (unwrap automaticOnExit), object = S <$> object}
 
     handlePart (R (RoleVerbE{subject, object, state, roleVerbs:rv, start})) =
       modifyPerspective subject object start
@@ -494,6 +477,7 @@ handlePostponedStateQualifiedParts = do
           (views :: Object VIEW.View) <- getsDF _.views
           -- As we have postponed handling these parse tree fragments after
           -- handling all others, there can be no forward references.
+          -- Notice that the property references may not be fully qualified!
           candidates <- pure $ ARR.filter (endsWithSegments view) (keys views)
           case length candidates of
             0 -> throwError $ UnknownView start view
