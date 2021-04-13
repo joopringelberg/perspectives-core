@@ -32,7 +32,7 @@ import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.State (StateIdentifier)
+import Perspectives.Representation.State (StateIdentifier(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), RoleType)
 import Prelude (class Eq, class Show, map, (<<<), (==))
 
@@ -54,7 +54,7 @@ type ContextRecord =
   , contextRol :: Array RoleType
   , gebruikerRol :: Array RoleType
 
-  , states :: Array StateIdentifier
+  , rootState :: StateIdentifier
   , nestedContexts :: Array ContextType
   , actions :: Array ActionType
   , context :: Maybe ContextType
@@ -80,7 +80,7 @@ defaultContext id dname kind context pos = Context { _id: (ContextType id)
   , contextRol: []
   , gebruikerRol: []
 
-  , states: []
+  , rootState: State_ id
   , nestedContexts: []
   , actions: []
   , context: map ContextType context

@@ -87,6 +87,7 @@ newtype StateE = StateE
   { id :: String
   , condition :: Step
   , stateParts :: List StateQualifiedPart
+  , subStates :: List StateE
   }
 --------------------------------------------------------------------------------
 ---- PROPERTY
@@ -199,7 +200,7 @@ derive instance genericRoleElement :: Generic RolePart _
 instance showRoleElement :: Show RolePart where show = genericShow
 
 derive instance genericStateE :: Generic StateE _
-instance showStateE :: Show StateE where show = genericShow
+instance showStateE :: Show StateE where show s = genericShow s
 
 derive instance genericStateQualifiedPart :: Generic StateQualifiedPart _
 instance showStateQualifiedPart :: Show StateQualifiedPart where show = genericShow

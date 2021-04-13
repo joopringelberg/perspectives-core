@@ -27,6 +27,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.List (List)
 import Data.Maybe (Maybe(..))
 import Foreign (unsafeFromForeign)
 import Foreign.Class (class Decode, class Encode)
@@ -50,10 +51,11 @@ type StateRecord =
 	, notifyOnExit :: EncodableMap RoleType NotificationLevel
 	, automaticOnEntry :: EncodableMap RoleType SideEffect
 	, automaticOnExit :: EncodableMap RoleType SideEffect
+	, subStates :: Array StateIdentifier
 	}
 
-constructState :: StateIdentifier -> Step -> ContextType -> State
-constructState id condition context = State
+constructState :: StateIdentifier -> Step -> ContextType -> List State -> State
+constructState id condition context subStates = State
 	{id: id
 	, context
 	, query: S condition
@@ -62,6 +64,7 @@ constructState id condition context = State
 	, notifyOnExit: EncodableMap empty
 	, automaticOnEntry: EncodableMap empty
 	, automaticOnExit: EncodableMap empty
+	, subStates: []
 	}
 
 derive instance genericState :: Generic State _

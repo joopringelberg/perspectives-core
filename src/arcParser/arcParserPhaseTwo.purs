@@ -59,7 +59,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), d
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
 import Perspectives.Representation.Class.Role (Role(..))
-import Perspectives.Representation.Context (Context(..), defaultContext, ContextRecord)
+import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -156,11 +156,9 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
 
     handleParts (Context contextUnderConstruction@({_id})) (STATE s@(StateE{id:stateId})) = do
-      state@(State{id:ident}) <- traverseStateE s (State_ $ addNamespace (unwrap _id) stateId) _id
-      pure (ident `insertStateInto` contextUnderConstruction)
-      where
-        insertStateInto :: StateIdentifier -> ContextRecord -> Context
-        insertStateInto stateIdentifier cr@{states} = if isJust $ elemIndex stateIdentifier states then Context cr else Context $ cr {states = cons stateIdentifier states}
+      state@(State{id:ident}) <- traverseStateE _id (unwrap _id) s
+      modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
+      pure $ Context contextUnderConstruction {rootState = ident}
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = LN.over
@@ -190,8 +188,8 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       -- A catchall case that just returns the context. Calculated roles for ExternalRole and UserRole should be ignored.
       _, _ -> c
 
-    addNamespace :: String -> String -> String
-    addNamespace ns' ln = if ns == "model:" then (ns' <> ln) else (ns' <> "$" <> ln)
+addNamespace :: String -> String -> String
+addNamespace ns' ln = if ns' == "model:" then (ns' <> ln) else (ns' <> "$" <> ln)
 
 -- | Traverse the members of the RoleE AST type to construct a new Role type
 -- | and insert it into a DomeinFileRecord.
@@ -302,9 +300,10 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     insertPropertyInto (Property.E (EnumeratedProperty {_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (ENP _id) properties}
     insertPropertyInto (Property.C (CalculatedProperty{_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (CP _id) properties}
 
-traverseStateE :: StateE -> StateIdentifier -> ContextType -> PhaseTwo State
-traverseStateE (StateE {id, condition, stateParts}) qualifiedStateId contextId = do
-  state <- pure $ constructState qualifiedStateId condition contextId
+traverseStateE :: ContextType -> String -> StateE -> PhaseTwo State
+traverseStateE contextId parentStateName (StateE {id, condition, stateParts, subStates}) = do
+  subStates' <- traverse (traverseStateE contextId (parentStateName <> "$" <> id)) subStates
+  state <- pure $ constructState (State_ $ parentStateName <> "$" <> id) condition contextId subStates'
   -- Postpone all stateParts because there may be forward references to user and subject.
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateParts}
   pure state

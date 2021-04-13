@@ -43,7 +43,7 @@ import Perspectives.Representation.State (NotificationLevel(..), StateIdentifier
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=))
-import Text.Parsing.Indent (block, indented, sameOrIndented, withPos)
+import Text.Parsing.Indent (block, checkIndent, indented, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
 
@@ -51,11 +51,36 @@ contextE :: IP ContextPart
 contextE = try $ withPos do
   {uname, knd, pos} <- context_
   elements <- isIndented >>= if _
-    then withArcParserState (AllStates $ qname knd uname) (entireBlock contextPart)
+    then withArcParserState (AllStates $ qname knd uname)
+      (withPos do
+        uses <- many $ checkIndent *> useE
+        ind <- checkIndent *> indexedE
+        aspects <- many $ checkIndent *> aspectE
+        states <- nestedStates
+        rolesAndContexts <- many $ checkIndent *> (contextE <|> roleE)
+        pure $ (ind : (states : (uses <> aspects <> rolesAndContexts))))
     else pure Nil
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos}
 
   where
+    nestedStates :: IP ContextPart
+    nestedStates = do
+      start <- getPosition
+      void $ reserved "states" *> colon
+      entryNotifications <- onEntryKeywords *> isIndented >>= if _
+        then concat <$> entireBlock notificationE
+        else pure Nil
+      exitNotifications <- onExitKeywords *> isIndented >>= if _
+        then concat <$> entireBlock notificationE
+        else pure Nil
+      states <- many $ checkIndent *> stateE
+      pure $ STATE $ StateE
+        { id: ""
+        , condition: Simple $ Value start PBool "true"
+        , stateParts: entryNotifications <> exitNotifications
+        , subStates: states
+        }
+
     qname :: ContextKind -> String -> String
     qname knd cname = if knd == Domain then "model:" <> cname else cname
 
@@ -75,18 +100,6 @@ contextE = try $ withPos do
 
     isContextKind :: String -> Boolean
     isContextKind s = isJust (elemIndex s ["domain", "case", "party", "activity"])
-
-    contextPart :: IP ContextPart
-    contextPart = do
-      keyword <- lookAhead $ lowerCaseName <* colon
-      case keyword of
-        "use" -> useE
-        "aspect" -> aspectE
-        "indexed" -> indexedE
-        ctxt | isContextKind ctxt -> contextE
-        ctxt | ctxt == "state" -> stateE
-        role | isRoleKind role -> roleE
-        otherwise -> fail "unknown keyword for a context."
 
     aspectE :: IP ContextPart
     aspectE = do
@@ -308,13 +321,15 @@ viewE = try do
   refs <- token.parens (token.commaSep1 arcIdentifier)
   pure $ VE $ ViewE {id: uname, viewParts: refs, pos: pos}
 
-stateE :: IP ContextPart
+stateE :: IP StateE
 stateE = do
   id <- reserved "state" *> colon *> token.identifier
-  condition <- sameOrIndented *> step
-  stateParts <- indented *> (concat <$> block (onEntryE <|> onExitE <|> perspectiveOn <|> perspectiveOf))
-  pure $ STATE $ StateE {id, condition, stateParts}
-
+  withArcParserState (State_ id)
+    do
+      condition <- sameOrIndented *> step
+      stateParts <- indented *> (concat <$> block (onEntryE <|> onExitE <|> perspectiveOn <|> perspectiveOf))
+      subStates <- indented *> many stateE
+      pure $ StateE {id, condition, stateParts, subStates}
 
 perspectiveOn :: IP (List StateQualifiedPart)
 perspectiveOn = try $ withPos do
