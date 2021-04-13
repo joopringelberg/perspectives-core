@@ -22,6 +22,8 @@
 
 module Perspectives.Parsing.Arc.IndentParser where
 
+import Prim.Row
+
 import Control.Alt (void, (<|>))
 import Control.Monad.State (StateT, evalStateT, gets, lift, modify)
 import Control.Monad.State.Trans (get, put)
@@ -29,11 +31,13 @@ import Data.Either (Either)
 import Data.Identity (Identity)
 import Data.List (List(..), many, singleton)
 import Data.Maybe (Maybe(..), isNothing)
+import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Perspectives.Parsing.Arc.AST (StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Representation.State (StateIdentifier(..))
 import Prelude (class Monad, Unit, bind, discard, flip, pure, unit, ($), (*>), (<), (<*), (<<<), (<=), (>), (>>=), (<>))
+import Record (get, set) as Record
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
 import Text.Parsing.Parser.Pos (Position)
@@ -79,17 +83,54 @@ withArcParserState stateId a = do
   lift $ lift $ put oldState
   pure result
 
+setLabel :: forall a l r'. IsSymbol l =>
+  Cons l (Maybe a) r' (subject :: Maybe String
+  , object :: Maybe Step
+  , state :: StateIdentifier
+  , onEntry :: Maybe StateTransitionE
+  , onExit :: Maybe StateTransitionE
+  ) =>
+  SProxy l -> a -> IP Unit
+setLabel l newValue = do
+  (oldValue :: Maybe a) <- getArcParserState >>= pure <<< Record.get l
+  if isNothing oldValue
+    then void $ modifyArcParserState \s -> Record.set l (Just newValue) s
+    else fail (reflectSymbol l <> " is already specified in the context")
+
 setSubject :: String -> IP Unit
-setSubject name = do
-  {subject} <- getArcParserState
-  if isNothing subject then void $ modifyArcParserState \s -> s {subject = Just name} else fail "User role is already specified"
+setSubject = setLabel (SProxy :: SProxy "subject")
 
 setObject :: Step -> IP Unit
-setObject stp = do
-  {object} <- getArcParserState
-  if isNothing object then void $ modifyArcParserState \s -> s {object = Just stp} else fail "Object of perspective is already specified"
+setObject = setLabel (SProxy :: SProxy "object")
 
--- | Given a local state name, create and store in state a Transition with ado
+protectLabel :: forall a l r' b. IsSymbol l =>
+  Cons l (Maybe a) r' (subject :: Maybe String
+  , object :: Maybe Step
+  , state :: StateIdentifier
+  , onEntry :: Maybe StateTransitionE
+  , onExit :: Maybe StateTransitionE
+  ) =>
+  SProxy l -> IP b -> IP b
+protectLabel l f = do
+  (oldValue :: Maybe a) <- getArcParserState >>= pure <<< Record.get l
+  void $ lift $ lift $ (modify \s -> Record.set l Nothing s)
+  result <- f
+  void $ lift $ lift $ modify \s -> Record.set l oldValue s
+  pure result
+
+protectSubject :: forall a. IP a -> IP a
+protectSubject = protectLabel (SProxy :: SProxy "subject")
+
+protectObject :: forall a. IP a -> IP a
+protectObject = protectLabel (SProxy :: SProxy "object")
+
+protectOnEntry :: forall a. IP a -> IP a
+protectOnEntry = protectLabel (SProxy :: SProxy "onEntry")
+
+protectOnExit :: forall a. IP a -> IP a
+protectOnExit = protectLabel (SProxy :: SProxy "onExit")
+
+-- | Given a local state name, create and store in state a Transition with a
 --  fully qualified state identifier.
 setOnEntry :: String -> IP Unit
 setOnEntry localStateName = do

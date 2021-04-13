@@ -34,7 +34,7 @@ import Perspectives.Parsing.Arc.AST (ActionE(..), ContextE(..), ContextPart(..),
 import Perspectives.Parsing.Arc.Expression (assignment, letWithAssignment, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getArcParserState, getPosition, isIndented, nextLine, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getArcParserState, getPosition, isIndented, nextLine, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Context (ContextKind(..))
@@ -107,7 +107,7 @@ domain = do
   r <- token.whiteSpace *> contextE
   case r of
     (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
-    otherwise -> fail "Domain cannot be a role"
+    otherwise -> fail "Domain must be a context"
 
 useE :: IP ContextPart
 useE = do
@@ -120,15 +120,25 @@ useE = do
     else fail ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)")
 
 roleE :: IP ContextPart
-roleE = try $ withEntireBlock
-  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
-  role_
-  rolePart
+roleE =
+  lookAhead (reserved "user") *> protectSubject roleE'
+  <|>
+  lookAhead (reserved "thing") *> protectObject roleE'
+  <|>
+  lookAhead (reserved "context") *> protectObject roleE'
+  <|>
+  roleE'
   where
+    roleE' :: IP ContextPart
+    roleE' = try $ withEntireBlock
+      (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
+      role_
+      rolePart
+
     role_ :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     role_ = do
       pos <- getPosition
-      knd <- (roleKind <* colon) <?> "'thing', 'external', 'context', 'user' or 'bot'"
+      knd <- (roleKind <* colon) <?> "'thing', 'external', 'context' or 'user'"
       case knd of
         ExternalRole -> externalRole_ pos
         otherwise -> do
@@ -310,19 +320,21 @@ perspectiveOn :: IP (List StateQualifiedPart)
 perspectiveOn = try $ withPos do
   pos <- getPosition
   (stp :: Step) <- perspectiveOnKeywords *> step
-  setObject stp
-  isIndented >>= if _
-    then concat <$> entireBlock perspectivePart
-    else pure Nil
+  protectObject do
+    setObject stp
+    isIndented >>= if _
+      then concat <$> entireBlock perspectivePart
+      else pure Nil
 
 perspectiveOf :: IP (List StateQualifiedPart)
 perspectiveOf = try $ withPos do
   pos <- getPosition
   (subject :: String) <- perspectiveOnKeywords *> arcIdentifier
-  setSubject subject
-  isIndented >>= if _
-    then concat <$> entireBlock perspectivePart
-    else pure Nil
+  protectSubject do
+    setSubject subject
+    isIndented >>= if _
+      then concat <$> entireBlock perspectivePart
+      else pure Nil
 
 perspectivePart :: IP (List StateQualifiedPart)
 perspectivePart = fix \p ->
@@ -370,19 +382,21 @@ onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do
   stateTrans <- onEntryKeywords *> arcIdentifier
   -- The transition will be fully qualified.
-  setOnEntry stateTrans
-  isIndented >>= if _
-    then concat <$> entireBlock (notificationE <|> automaticEffectE)
-    else pure Nil
+  protectOnEntry do
+    setOnEntry stateTrans
+    isIndented >>= if _
+      then concat <$> entireBlock (notificationE <|> automaticEffectE)
+      else pure Nil
 
 onExitE :: IP (List StateQualifiedPart)
 onExitE = do
   stateTrans <- onExitKeywords *> arcIdentifier
   -- The transition will be fully qualified.
-  setOnExit stateTrans
-  isIndented >>= if _
-    then concat <$> entireBlock (notificationE <|> automaticEffectE)
-    else pure Nil
+  protectOnExit do
+    setOnExit stateTrans
+    isIndented >>= if _
+      then concat <$> entireBlock (notificationE <|> automaticEffectE)
+      else pure Nil
 
 automaticEffectE :: IP (List StateQualifiedPart)
 automaticEffectE = do
@@ -396,8 +410,9 @@ automaticEffectE = do
       case subject, onEntry, onExit of
         Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
         Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+        Nothing, _, _ -> fail "A subject is required"
         _, Nothing, Nothing -> fail "A state transition is required"
-        _, _, _ -> fail "State transition inside state transition is not allowed"
+        _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
     else pure Nil
 
 notificationE :: IP (List StateQualifiedPart)
@@ -418,8 +433,9 @@ notificationE = do
     Nothing -> case subject, onEntry, onExit of
       Just u, Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: u, transition, level, start, end}
       Just u, Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: u, transition, level, start, end}
-      Nothing, _, _ -> fail "User role is not specified"
-      _, _, _ -> fail "State transition inside state transition is not allowed"
+      Nothing, _, _ -> fail "A subject is required"
+      _, Nothing, Nothing -> fail "A state transition is required"
+      _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
 
   where
     notificationLevel :: IP NotificationLevel
