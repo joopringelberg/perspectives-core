@@ -14,13 +14,14 @@ domain: System
       perspective on: ClusterGenoot (Adressering) Consult
 
   case: PerspectivesSystem
+    indexed: sys:MySystem
+    aspect: sys:RootContext
+
     external:
       aspect: sys:RootContext$External
       property: ModelOphaalTeller (mandatory, functional, Number)
       property: ConnectedToAMQPBroker (not mandatory, functional, Boolean)
       property: CardClipBoard (not mandatory, functional, String)
-    aspect: sys:RootContext
-    indexed: sys:MySystem
 
     context: TheTrustedCluster (not mandatory, functional) filledBy: TrustedCluster
 

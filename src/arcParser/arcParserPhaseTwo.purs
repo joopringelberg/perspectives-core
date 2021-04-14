@@ -66,8 +66,8 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.State (State(..), StateIdentifier(..), StateRecord, constructState)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), externalRoleType_, roletype2string)
+import Perspectives.Representation.State (State(..), StateRecord, constructState)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.View (View(..)) as VIEW
 import Prelude (Unit, bind, discard, pure, void, ($), (<$>), (<<<), (<>), (==), (>>=))
 
@@ -303,16 +303,16 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 traverseStateE :: ContextType -> String -> StateE -> PhaseTwo State
 traverseStateE contextId parentStateName (StateE {id, condition, stateParts, subStates}) = do
   subStates' <- traverse (traverseStateE contextId (parentStateName <> "$" <> id)) subStates
-  state <- pure $ constructState (State_ $ parentStateName <> "$" <> id) condition contextId subStates'
+  state <- pure $ constructState (StateIdentifier $ parentStateName <> "$" <> id) condition contextId subStates'
   -- Postpone all stateParts because there may be forward references to user and subject.
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateParts}
   pure state
 
 addStateToDomeinFile :: State -> DomeinFileRecord -> DomeinFileRecord
-addStateToDomeinFile state@(State{id}) dfr@{states} = dfr {states = EncodableMap (MAP.insert id state (unwrap states))}
+addStateToDomeinFile state@(State{id}) dfr@{states} = dfr {states = insert (unwrap id) state states}
 
 getState :: StateIdentifier -> PhaseTwo (Maybe State)
-getState id = gets _.dfr >>= \{states: (EncodableMap states)} -> pure $ MAP.lookup id states
+getState id = gets _.dfr >>= \{states} -> pure $ lookup (unwrap id) states
 
 -- Traverse the members of ViewE to construct a new View type and insert it into the
 -- DomeinFileRecord.

@@ -34,10 +34,9 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for, traverse)
 import Effect.Aff.AVar (new)
 import Foreign.Object (empty)
-import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (retrieveAction)
-import Perspectives.CoreTypes (ActionInstance(..), MonadPerspectives, MonadPerspectivesTransaction, (###=), (##>))
+import Perspectives.CoreTypes (ActionInstance(..), MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), (###=), (##>), (##>>))
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
@@ -50,18 +49,18 @@ import Perspectives.Identifiers (hasLocalName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
-import Perspectives.Instances.ObjectGetters (getMyType)
+import Perspectives.Instances.ObjectGetters (contextType, getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
-import Perspectives.Types.ObjectGetters (actionsClosure_, isAutomatic, specialisesRoleType_)
-import Prelude (Unit, bind, discard, join, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=))
+import Perspectives.Types.ObjectGetters (rootState, specialisesRoleType_)
+import Prelude (Unit, bind, discard, join, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=), (>=>))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -86,7 +85,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
       -- 2. Now run actions, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
-      (ft@(Transaction{correlationIdentifiers, contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved}) :: Transaction) <- lift AA.get >>= runActions
+      (ft@(Transaction{correlationIdentifiers, contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved}) :: Transaction) <- lift AA.get >>= runStates
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then lift $ lift $ distributeTransaction ft else pure unit
       -- Definitively remove instances
@@ -115,83 +114,140 @@ runSterileTransaction a =
   >>= lift <<< new
   >>= runReaderT (runArrayT a)
 
--- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
--- | Also execute ActionInstances for created contexts.
--- | We need not trigger actions on a context instance that is deleted.
--- | Repeat this recursively, accumulating Deltas in a single Transaction that is the final result of the process.
-runActions :: Transaction -> MonadPerspectivesTransaction Transaction
-runActions t = do
-  -- Collect all combinations of context instances and user types.
-  -- Check if the type of 'me' is among them.
-  -- If so, execute the automatic actions for 'me'.
-  -- log "==========RUNNING ACTIONS============"
-  (as :: Array ActionInstance) <- (lift $ AA.gets (_.affectedContexts <<< unwrap)) >>= traverse getAllAutomaticActions >>= pure <<< join
+runStates :: Transaction -> MonadPerspectivesTransaction Transaction
+runStates t = do
+  -- log "==========RUNNING STATES============"
+  (stateEvaluations :: Array StateEvaluation) <- (lift $ AA.gets (_.affectedContexts <<< unwrap)) >>= traverse computeStateEvaluations
   -- Collect all contexts that are created
   (ccs :: Array ContextInstance) <- lift $ AA.gets (_.createdContexts <<< unwrap)
   -- Only now install a fresh transaction.
   lift $ void $ AA.modify cloneEmptyTransaction
-  -- Run the actions on all combinations of an actiontype and context instance that were in the original transaction.
-  for_ as \(ActionInstance ctxt atype) -> run ctxt atype
-  -- Run all the automatic actions defined for the Me in each new context.
+  -- Evaluate all collected stateEvaluations.
+  for_ stateEvaluations evaluateState
+  -- Enter the rootState of new contexts.
   for_ ccs
     \ctxt -> do
       (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure_ isAutomatic)
-          for_ automaticActions (run ctxt)
-
+          state <- contextInstance ##= contextType >=> rootState
+          enteringState (StateEvaluation state ctxt myType)
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure t
-    else pure <<< (<>) t =<< runActions nt
-
+    else pure <<< (<>) t =<< runStates nt
   where
+    computeStateEvaluations :: AffectedContext -> MonadPerspectivesTransaction (Array StateEvaluation)
+    computeStateEvaluations (AffectedContext {contextInstances, userTypes}) = join <$> for (toArray contextInstances) \contextInstance -> do
+      (mmyType :: Maybe RoleType) <- lift2 (contextInstance ##> getMyType)
+      case mmyType of
+        Nothing -> pure []
+        Just (CR myType) -> if isGuestRole myType
+          then do
+            (mmguest :: RoleInstance) <- lift2 (contextInstance ##> getCalculatedRoleInstances myType)
+            case mmguest of
+              -- If the Guest role is not filled, don't execute bots on its behalf!
+              Nothing -> pure []
+              otherwise -> do
+                state <- contextInstance ##>> contextType >=> rootState
+                pure $ StateEvaluation state contextInstance (CR myType)
+          else do
+            r <- lift2 $ filterA (\userType -> (CR myType) `specialisesRoleType_` userType) userTypes
+            if not $ null r
+              then do
+                state <- contextInstance ##>> contextType >=> rootState
+                pure $ StateEvaluation state contextInstance (CR myType)
+              else pure []
+        Just (ENR myType) -> do
+          r <- lift2 $ filterA (\userType -> (ENR myType) `specialisesRoleType_` userType) userTypes
+          if not $ null r
+            then do
+              state <- contextInstance ##>> contextType >=> rootState
+              pure $ StateEvaluation state contextInstance (ENR myType)
+            else pure []
+      where
+        isGuestRole :: CalculatedRoleType -> Boolean
+        isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
 
-    run :: ContextInstance -> ActionType -> MonadPerspectivesTransaction Unit
-    run ctxt atype = case retrieveAction atype of
-      (Just updater) -> do
-        -- log ("Evaluating " <> unwrap atype)
-        updater ctxt
-      Nothing -> (try $ lift2 $ compileBotAction atype) >>= case _ of
-        Left e -> logPerspectivesError $ Custom ("Cannot compile rule, because " <> show e)
-        Right updater -> updater ctxt
+-- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
+-- | Also execute ActionInstances for created contexts.
+-- | We need not trigger actions on a context instance that is deleted.
+-- | Repeat this recursively, accumulating Deltas in a single Transaction that is the final result of the process.
+-- runActions :: Transaction -> MonadPerspectivesTransaction Transaction
+-- runActions t = do
+--   -- Collect all combinations of context instances and user types.
+--   -- Check if the type of 'me' is among them.
+--   -- If so, execute the automatic actions for 'me'.
+--   -- log "==========RUNNING ACTIONS============"
+--   (as :: Array ActionInstance) <- (lift $ AA.gets (_.affectedContexts <<< unwrap)) >>= traverse getAllAutomaticActions >>= pure <<< join
+--   -- Collect all contexts that are created
+--   (ccs :: Array ContextInstance) <- lift $ AA.gets (_.createdContexts <<< unwrap)
+--   -- Only now install a fresh transaction.
+--   lift $ void $ AA.modify cloneEmptyTransaction
+--   -- Run the actions on all combinations of an actiontype and context instance that were in the original transaction.
+--   for_ as \(ActionInstance ctxt atype) -> run ctxt atype
+--   -- Run all the automatic actions defined for the Me in each new context.
+--   for_ ccs
+--     \ctxt -> do
+--       (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
+--       case mmyType of
+--         Nothing -> pure unit
+--         Just myType -> do
+--           (automaticActions :: Array ActionType) <- lift2 (myType ###= filter actionsClosure_ isAutomatic)
+--           for_ automaticActions (run ctxt)
+--
+--   nt <- lift AA.get
+--   if isEmptyTransaction nt
+--     then pure t
+--     else pure <<< (<>) t =<< runActions nt
+--
+--   where
+--
+--     run :: ContextInstance -> ActionType -> MonadPerspectivesTransaction Unit
+--     run ctxt atype = case retrieveAction atype of
+--       (Just updater) -> do
+--         -- log ("Evaluating " <> unwrap atype)
+--         updater ctxt
+--       Nothing -> (try $ lift2 $ compileBotAction atype) >>= case _ of
+--         Left e -> logPerspectivesError $ Custom ("Cannot compile rule, because " <> show e)
+--         Right updater -> updater ctxt
 
 -- REFACTOR door eerst states te berekenen. De deltas (toegevoegde en verwijderde states) gebruik je om
 -- in Context- en Roltypen de automatische acties bij entry en exit op te zoeken.
 -- Bovendien bepaal je aan de hand van die deltas wat de notifications zijn en of de current user genotificeerd moet worden.
-getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
-getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = join <$> for (toArray contextInstances) \contextInstance -> do
-  (mmyType :: Maybe RoleType) <- lift2 (contextInstance ##> getMyType)
-  case mmyType of
-    Nothing -> pure []
-    Just (CR myType) -> if isGuestRole myType
-      then do
-        mmguest <- lift2 (contextInstance ##> getCalculatedRoleInstances myType)
-        case mmguest of
-          -- If the Guest role is not filled, don't execute bots on its behalf!
-          Nothing -> pure []
-          otherwise -> do
-            (automaticActions :: Array ActionType) <- lift2 (CR myType ###= filter actionsClosure_ isAutomatic)
-            pure $ (ActionInstance contextInstance) <$> automaticActions
-      else do
-        r <- lift2 $ filterA (\userType -> (CR myType) `specialisesRoleType_` userType) userTypes
-        if not $ null r
-          then do
-            (automaticActions :: Array ActionType) <- lift2 (CR myType ###= filter actionsClosure_ isAutomatic)
-            pure $ (ActionInstance contextInstance) <$> automaticActions
-          else pure []
-    Just (ENR myType) -> do
-      r <- lift2 $ filterA (\userType -> (ENR myType) `specialisesRoleType_` userType) userTypes
-      if not $ null r
-        then do
-          (automaticActions :: Array ActionType) <- lift2 (ENR myType ###= filter actionsClosure_ isAutomatic)
-          pure $ (ActionInstance contextInstance) <$> automaticActions
-        else pure []
-  where
-    isGuestRole :: CalculatedRoleType -> Boolean
-    isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
+-- getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
+-- getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = join <$> for (toArray contextInstances) \contextInstance -> do
+--   (mmyType :: Maybe RoleType) <- lift2 (contextInstance ##> getMyType)
+--   case mmyType of
+--     Nothing -> pure []
+--     Just (CR myType) -> if isGuestRole myType
+--       then do
+--         (mmguest :: RoleInstance) <- lift2 (contextInstance ##> getCalculatedRoleInstances myType)
+--         case mmguest of
+--           -- If the Guest role is not filled, don't execute bots on its behalf!
+--           Nothing -> pure []
+--           otherwise -> do
+--             -- Pas de state runner toe op de root state (van het type), de context instance, en de guest user.
+--             (automaticActions :: Array ActionType) <- lift2 (CR myType ###= filter actionsClosure_ isAutomatic)
+--             pure $ (ActionInstance contextInstance) <$> automaticActions
+--       else do
+--         r <- lift2 $ filterA (\userType -> (CR myType) `specialisesRoleType_` userType) userTypes
+--         if not $ null r
+--           then do
+--             (automaticActions :: Array ActionType) <- lift2 (CR myType ###= filter actionsClosure_ isAutomatic)
+--             pure $ (ActionInstance contextInstance) <$> automaticActions
+--           else pure []
+--     Just (ENR myType) -> do
+--       r <- lift2 $ filterA (\userType -> (ENR myType) `specialisesRoleType_` userType) userTypes
+--       if not $ null r
+--         then do
+--           (automaticActions :: Array ActionType) <- lift2 (ENR myType ###= filter actionsClosure_ isAutomatic)
+--           pure $ (ActionInstance contextInstance) <$> automaticActions
+--         else pure []
+--   where
+--     isGuestRole :: CalculatedRoleType -> Boolean
+--     isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift

@@ -109,6 +109,7 @@ compileBotAction actionType = do
       objects <- lift2 (contextId ##= getter)
       if null objects
         then (lift2 $ addBinding "object" []) *> run Nothing
+        -- Run the rule for each object.
         else for_ objects (\object -> (lift2 $ addBinding "object" [unwrap object]) *> run (Just object))
       lift2 $ restoreFrame oldEnvironment
 
@@ -119,7 +120,7 @@ compileBotAction actionType = do
             log $ "Running " <> show displayName
             if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
               then log "Condition satisfied, will run right hand side without object" *> effectFullFunction contextId
-              else log "Condition not satisfied, will not run right hand side without ojbect"
+              else log "Condition not satisfied, will not run right hand side without object"
           run (Just object) = (lift2 $ try $ getConditionState actionType object) >>=
             handlePerspectRolError "ruleRunner"
               \conditionWasTrue -> do

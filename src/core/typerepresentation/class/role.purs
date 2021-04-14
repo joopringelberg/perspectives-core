@@ -24,8 +24,7 @@ module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, (<|>))
-import Data.Array (cons, null, singleton, (:))
-import Data.Identity (Identity)
+import Data.Array (cons, null, (:))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
 import Data.Traversable (traverse)
@@ -46,7 +45,7 @@ import Perspectives.Representation.Perspective (Perspective)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
-import Prelude (class Show, class Eq, bind, flip, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>))
+import Prelude (class Show, bind, flip, pure, show, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS

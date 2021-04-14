@@ -29,15 +29,17 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Foreign (unsafeFromForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
-import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.SideEffect (SideEffect)
-import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType, StateIdentifier)
 
 newtype State = State StateRecord
 
@@ -80,33 +82,10 @@ instance eqNotificationLevel :: Eq NotificationLevel where eq = genericEq
 instance encodeNotificationLevel :: Encode NotificationLevel where encode = genericEncode defaultOptions
 instance decodeNotificationLevel :: Decode NotificationLevel where decode = genericDecode defaultOptions
 
--- | To identify all states of, say sys:PerspectivesSystem, use AllStates model:Perspectives$PerspectivesSystem.
--- | This distinguishes those states from those of, for example, model:SimpleChat$Chat.
--- | AllStates is only ever meant as: all states of a context. In theory we could use a Role identifier; however,
--- | we have no use for that.
--- | All other state definitions have names scoped to their lexically enclosing context or role.
-type ArcIdentifier = String
+instance identifiableState :: Identifiable State StateIdentifier where
+  identifier (State{id}) = id
+  displayName (State{id}) = (unwrap id)
 
-data StateIdentifier = AllStates ArcIdentifier | State_ ArcIdentifier
-
-unwrapStateIdentifier :: StateIdentifier -> String
-unwrapStateIdentifier (AllStates s) = s
-unwrapStateIdentifier (State_ s) = s
-
-instance semigroupStateIdentifier :: Semigroup StateIdentifier where
-	append (AllStates ctxt1) (AllStates ctxt2) = AllStates (ctxt1 <> ctxt2)
-	append (AllStates ctxt1) (State_ s) = State_ (ctxt1 <> s)
-	append (State_ s) (AllStates ctxt2) = AllStates (s <> ctxt2)
-	append (State_ s1) (State_ s2) = State_ (s1 <> s2)
-
-derive instance genericStateIdentifier :: Generic StateIdentifier _
-instance showStateIdentifier :: Show StateIdentifier where show = genericShow
-instance eqStateIdentifier :: Eq StateIdentifier where eq = genericEq
-instance encodeStateIdentifier :: Encode StateIdentifier where encode = genericEncode defaultOptions
-instance decodeStateIdentifier :: Decode StateIdentifier where decode = genericDecode defaultOptions
-instance ordStateIdentifier :: Ord StateIdentifier where
-  compare (AllStates s1) (State_ s2) = if s1 `isContainingNamespace` s2 then LT else EQ -- If s1 is a prefix of s2, (AllStates s1) is LE and otherwise EQ
-  compare (State_ x) (State_ y) = compare x y
-  compare (State_ s2) (AllStates s1) = if s1 `isContainingNamespace` s2 then GT else EQ
-  compare (AllStates s1) (AllStates s2) = if s1 `isContainingNamespace` s2 then LT
-    else if s2 `isContainingNamespace` s1 then GT else EQ
+instance revisionState :: Revision State where
+  rev _ = Nothing
+  changeRevision _ s = s

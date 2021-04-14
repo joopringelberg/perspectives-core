@@ -33,8 +33,8 @@ import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep, Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
-import Perspectives.Representation.State (NotificationLevel, StateIdentifier)
-import Perspectives.Representation.TypeIdentifiers (RoleKind)
+import Perspectives.Representation.State (NotificationLevel)
+import Perspectives.Representation.TypeIdentifiers (RoleKind, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 
 --------------------------------------------------------------------------------

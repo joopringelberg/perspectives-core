@@ -35,7 +35,7 @@ import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Perspectives.Parsing.Arc.AST (StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
-import Perspectives.Representation.State (StateIdentifier(..))
+import Perspectives.Representation.TypeIdentifiers (StateIdentifier(..))
 import Prelude (class Monad, Unit, bind, discard, flip, pure, unit, ($), (*>), (<), (<*), (<<<), (<=), (>), (>>=), (<>))
 import Record (get, set) as Record
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
@@ -67,7 +67,7 @@ type ArcParser = StateT ArcParserState Identity
 type IP a = IndentParser ArcParser String a
 
 initialArcParserState :: ArcParserState
-initialArcParserState = {subject: Nothing, object: Nothing, state: AllStates "", onEntry: Nothing, onExit: Nothing}
+initialArcParserState = {subject: Nothing, object: Nothing, state: StateIdentifier "", onEntry: Nothing, onExit: Nothing}
 
 getArcParserState :: IP ArcParserState
 getArcParserState = lift $ lift $ get
@@ -135,14 +135,14 @@ protectOnExit = protectLabel (SProxy :: SProxy "onExit")
 setOnEntry :: String -> IP Unit
 setOnEntry localStateName = do
   {onEntry, state} <- getArcParserState
-  if isNothing onEntry then void $ modifyArcParserState \s -> s {onEntry = Just (Entry (state <> (State_ localStateName)))} else fail "on entry is already specified"
+  if isNothing onEntry then void $ modifyArcParserState \s -> s {onEntry = Just (Entry (state <> (StateIdentifier localStateName)))} else fail "on entry is already specified"
 
 -- | Given a local state name, create and store in state a Transition with ado
 --  fully qualified state identifier.
 setOnExit :: String -> IP Unit
 setOnExit localStateName = do
   {onExit, state} <- getArcParserState
-  if isNothing onExit then void $ modifyArcParserState \s -> s {onExit = Just (Exit (state <> (State_ localStateName)))} else fail "on exit is already specified"
+  if isNothing onExit then void $ modifyArcParserState \s -> s {onExit = Just (Exit (state <> (StateIdentifier localStateName)))} else fail "on exit is already specified"
 
 -- | Apply a parser, keeping only the parsed result.
 runIndentParser :: forall a. String -> IP a -> Identity (Either ParseError a)

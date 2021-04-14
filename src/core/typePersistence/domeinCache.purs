@@ -27,7 +27,6 @@ where
 
 import Control.Monad.Except (catchError, throwError)
 import Data.Foldable (for_)
-import Data.Map (insert) as MAP
 import Data.Maybe (Maybe(..))
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
@@ -36,7 +35,6 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Persistence.API (addAttachment, getAttachment)
@@ -95,7 +93,7 @@ modifyStateInDomeinFile :: Namespace -> State -> MonadPerspectives State
 modifyStateInDomeinFile ns sr@(State {id}) = modifyDomeinFileInCache modifier ns *> pure sr
   where
     modifier :: DomeinFile -> DomeinFile
-    modifier (DomeinFile dff@{states}) = DomeinFile dff {states = EncodableMap $ MAP.insert id sr (unwrap states)}
+    modifier (DomeinFile dff@{states}) = DomeinFile dff {states = insert (unwrap id) sr states}
 
 -----------------------------------------------------------
 -- RETRIEVE A DOMAINFILE

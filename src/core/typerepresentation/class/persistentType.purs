@@ -44,7 +44,8 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable, ident
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, PerspectiveType(..), ViewType)
+import Perspectives.Representation.State (State)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, PerspectiveType(..), StateIdentifier(..), ViewType)
 import Perspectives.Representation.View (View)
 import Prelude (class Eq, class Show, Unit, bind, const, pure, show, unit, ($), (<<<), (<>), (>>=))
 
@@ -80,6 +81,9 @@ getContext = getPerspectType
 
 getView :: ViewType -> MP View
 getView = getPerspectType
+
+getState :: StateIdentifier -> MP State
+getState = getPerspectType
 
 typeExists :: forall v i. PersistentType v i => i -> MP Boolean
 typeExists id = catchError (((getPerspectType id) :: MP v) >>= pure <<< const true) \e -> pure false
@@ -151,3 +155,9 @@ instance persistentView :: PersistentType View ViewType where
     (\(DomeinFile dff@{views}) -> DomeinFile dff {views = FO.insert (unwrap i) v views})
   retrieveFromDomein i = retrieveFromDomein_ i
     (\(DomeinFile{views}) -> FO.lookup (unwrap i) views)
+
+instance persistentState :: PersistentType State StateIdentifier where
+  cacheInDomeinFile i v = ifNamespace i
+    (\(DomeinFile dff@{states}) -> DomeinFile dff {states = FO.insert (unwrap i) v states})
+  retrieveFromDomein i = retrieveFromDomein_ i
+    (\(DomeinFile{states}) -> FO.lookup (unwrap i) states)

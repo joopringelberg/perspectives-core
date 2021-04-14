@@ -28,6 +28,7 @@ import Data.Array (elemIndex, fromFoldable)
 import Data.Either (Either(..))
 import Data.List (List(..), many, singleton, (:), concat)
 import Data.Maybe (Maybe(..), isJust)
+import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ContextE(..), ContextPart(..), AutomaticEffectE(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateQualifiedPart(..), ViewE(..), StateE(..))
@@ -39,8 +40,8 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.State (NotificationLevel(..), StateIdentifier(..), unwrapStateIdentifier)
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
+import Perspectives.Representation.State (NotificationLevel(..))
+import Perspectives.Representation.TypeIdentifiers (StateIdentifier(..), RoleKind(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameOrIndented, withPos)
@@ -51,7 +52,7 @@ contextE :: IP ContextPart
 contextE = try $ withPos do
   {uname, knd, pos} <- context_
   elements <- isIndented >>= if _
-    then withArcParserState (AllStates $ qname knd uname)
+    then withArcParserState (StateIdentifier $ qname knd uname)
       (withPos do
         uses <- many $ checkIndent *> useE
         ind <- checkIndent *> indexedE
@@ -194,7 +195,7 @@ roleE =
       -- Add either subject or object to state.
       {object, state} <- getArcParserState
       void $ case knd of
-        UserRole -> setSubject (unwrapStateIdentifier state <> uname)
+        UserRole -> setSubject (unwrap state <> uname)
         otherwise -> setObject (Simple $ ArcIdentifier pos uname)
       attributes <- roleAttributes <?> "([not] mandatory, [not] functional)"
       -- parse filledBy
@@ -209,7 +210,7 @@ roleE =
       -- Add either subject or object to state.
       {object, state} <- getArcParserState
       void $ case knd of
-        UserRole -> setSubject (unwrapStateIdentifier state <> uname)
+        UserRole -> setSubject (unwrap state <> uname)
         otherwise -> setObject (Simple $ ArcIdentifier pos uname)
       -- calculation <- reserved "=" *> stringUntilNewline >>= pure <<< Calculation
       calculation <- reserved "=" *> step >>= pure <<< Calculation
@@ -324,7 +325,7 @@ viewE = try do
 stateE :: IP StateE
 stateE = do
   id <- reserved "state" *> colon *> token.identifier
-  withArcParserState (State_ id)
+  withArcParserState (StateIdentifier id)
     do
       condition <- sameOrIndented *> step
       stateParts <- indented *> (concat <$> block (onEntryE <|> onExitE <|> perspectiveOn <|> perspectiveOf))
@@ -362,7 +363,7 @@ perspectivePart = fix \p ->
 
 inState :: IP (List StateQualifiedPart)
 inState = do
-  stateId <- State_ <$> (inStateKeywords *> arcIdentifier)
+  stateId <- StateIdentifier <$> (inStateKeywords *> arcIdentifier)
   -- We can use withArcParserState here. It will concatenate the local
   -- state identifier to the state identifier provided by the surrounding context.
   -- The assumption being that we do not refer to states out of the context that the

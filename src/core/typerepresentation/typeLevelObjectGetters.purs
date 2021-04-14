@@ -61,7 +61,7 @@ import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), hasElementM)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
 import Prelude (Unit, bind, eq, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||), (<*>), (<#>))
@@ -146,6 +146,9 @@ contextTypeModelName (ContextType rid) = maybe empty (pure <<< Value) (deconstru
 
 contextTypeModelName' :: ContextType ~~> Value
 contextTypeModelName' (ContextType rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
+
+rootState :: ContextType ~~~> StateIdentifier
+rootState = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< singleton <<< _.rootState <<< unwrap)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S

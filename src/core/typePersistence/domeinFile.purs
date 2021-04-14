@@ -35,7 +35,6 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert, lookup)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
-import Perspectives.Data.EncodableMap (EncodableMap(..), empty) as EM
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InvertedQuery (InvertedQuery)
@@ -46,7 +45,7 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.State (StateIdentifier, State) as PEState
+import Perspectives.Representation.State (State) as PEState
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Perspectives.Representation.View (View)
 import Perspectives.Utilities (class PrettyPrint)
@@ -63,7 +62,7 @@ type DomeinFileRecord =
   , enumeratedProperties :: Object EnumeratedProperty
   , calculatedProperties :: Object CalculatedProperty
   , views :: Object View
-  , states :: EM.EncodableMap PEState.StateIdentifier PEState.State
+  , states :: Object PEState.State
   , crl :: String
   -- These are instances of types in this model that have been declared 'indexed'.
   , indexedRoles :: Array RoleInstance
@@ -160,7 +159,7 @@ defaultDomeinFileRecord =
   , enumeratedProperties: empty
   , calculatedProperties: empty
   , views: empty
-  , states: EM.EncodableMap EM.empty
+  , states: empty
   , crl: ""
   , indexedRoles: []
   , indexedContexts: []

@@ -41,15 +41,15 @@ import Foreign.Object (Object)
 import Foreign.Object as F
 import Perspectives.AMQP.Stomp (ConnectAndSubscriptionParameters, StompClient)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
 import Perspectives.Persistence.API (PouchdbState)
+import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType, RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction)
 import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
 
@@ -153,6 +153,21 @@ instance ordActionInstance :: Ord ActionInstance where
 -- | Actions should be re-run as the Assumptions underlying their computation change.
 -- | We register the dependency of Actions for ContextInstances with a double registration that allows us to
 -- | travel from Assumptions to ActionInstances and vice versa by simple lookup.
+
+-----------------------------------------------------------
+-- STATE EXECUTION
+-----------------------------------------------------------
+-- | A StateEvaluation is a combination of an instance of a Context, the user role type
+-- | played in it by the current (own) user and a State type (its root state).
+data StateEvaluation = StateEvaluation StateIdentifier ContextInstance RoleType
+
+derive instance genericStateEvaluation :: Generic StateEvaluation _
+
+instance eqStateEvaluation :: Eq StateEvaluation where
+  eq = genericEq
+
+instance showStateEvaluation :: Show StateEvaluation where
+  show = genericShow
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVES

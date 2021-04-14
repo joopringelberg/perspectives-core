@@ -49,6 +49,7 @@ import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
+import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Utilities (class PrettyPrint)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
@@ -273,6 +274,26 @@ instance prettyPrintActionType :: PrettyPrint ActionType where
   prettyPrint' t = show
 derive newtype instance writeForeignActionType :: WriteForeign ActionType
 derive newtype instance readForeignActionType :: ReadForeign ActionType
+
+newtype StateIdentifier = StateIdentifier String
+derive instance newtypeStateIdentifier :: Newtype StateIdentifier _
+derive instance genericRepStateIdentifier :: Generic StateIdentifier _
+derive newtype instance encodeStateIdentifier :: Encode StateIdentifier
+derive newtype instance decodeStateIdentifier :: Decode StateIdentifier
+instance showStateIdentifier :: Show StateIdentifier where
+  show i = "StateIdentifier " <> (unwrap i)
+instance eqStateIdentifier :: Eq StateIdentifier where
+  eq (StateIdentifier id1) (StateIdentifier id2) = id1 == id2
+instance ordStateIdentifier :: Ord StateIdentifier where
+  compare (StateIdentifier s1) (StateIdentifier s2) = if s1 `isContainingNamespace` s2 then LT
+    else if s2 `isContainingNamespace` s1 then GT else EQ
+instance prettyPrintStateIdentifier :: PrettyPrint StateIdentifier where
+  prettyPrint' t = show
+derive newtype instance writeForeignStateIdentifier :: WriteForeign StateIdentifier
+derive newtype instance readForeignStateIdentifier :: ReadForeign StateIdentifier
+instance semiGroupStateIdentifier :: Semigroup StateIdentifier where
+  append (StateIdentifier s1) (StateIdentifier s2) = StateIdentifier (s1 <> s2)
+
 
 externalRoleType :: ContextType -> EnumeratedRoleType
 externalRoleType (ContextType ct) = EnumeratedRoleType (ct <> "$External")

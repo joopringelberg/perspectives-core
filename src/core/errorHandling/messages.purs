@@ -37,8 +37,7 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.State (StateIdentifier)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
 

@@ -408,8 +408,8 @@ compileStates = do
   where
     compileStates' :: DomeinFileRecord -> PhaseThree Unit
     compileStates' {states, enumeratedRoles} = do
-      compStates <- traverse compileState (unwrap states)
-      modifyDF \dfr -> dfr {states = EncodableMap compStates}
+      compStates <- traverse compileState states
+      modifyDF \dfr -> dfr {states = compStates}
       where
         compileState :: State -> PhaseThree State
         compileState (State ar@{id, context, query, object, notifyOnEntry, notifyOnExit, automaticOnEntry, automaticOnExit}) =
