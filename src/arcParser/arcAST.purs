@@ -113,6 +113,9 @@ data StateQualifiedPart =
   N NotificationE |
   AE AutomaticEffectE
 
+--------------------------------------------------------------------------------
+---- ROLEVERB
+--------------------------------------------------------------------------------
 -- Ends up in Perspective, identified by subject and object.
 newtype RoleVerbE = RoleVerbE
   { subject :: String
@@ -123,6 +126,9 @@ newtype RoleVerbE = RoleVerbE
   , end :: ArcPosition
   }
 
+--------------------------------------------------------------------------------
+---- PROPERTYVERB
+--------------------------------------------------------------------------------
 -- Ends up in Perspective, identified by subject and object.
 newtype PropertyVerbE = PropertyVerbE
   { subject :: String
@@ -134,6 +140,9 @@ newtype PropertyVerbE = PropertyVerbE
   , end :: ArcPosition
   }
 
+--------------------------------------------------------------------------------
+---- ACTION
+--------------------------------------------------------------------------------
 -- Ends up in Perspective, identified by subject and object.
 newtype ActionE = ActionE
   { id :: String
@@ -145,6 +154,9 @@ newtype ActionE = ActionE
   , end :: ArcPosition
   }
 
+--------------------------------------------------------------------------------
+---- NOTIFICATION
+--------------------------------------------------------------------------------
 -- Ends up in State, identified by the fully qualified name in StateTransitionE.
 newtype NotificationE = NotificationE
   { user :: String
@@ -154,6 +166,9 @@ newtype NotificationE = NotificationE
   , end :: ArcPosition
   }
 
+--------------------------------------------------------------------------------
+---- AUTOMATICEFFECT
+--------------------------------------------------------------------------------
 -- Ends up in State, identified by the fully qualified name in StateTransitionE.
 newtype AutomaticEffectE = AutomaticEffectE
   { subject :: String

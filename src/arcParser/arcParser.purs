@@ -539,7 +539,7 @@ propertyVerb = do
 actionE :: IP (List StateQualifiedPart)
 actionE = do
   start <- getPosition
-  id <- reserved "action" *> token.identifier <* colon
+  id <- reserved "action" *> colon *> token.identifier
   {subject, state, object} <- getArcParserState
   case subject, object of
     Nothing, _ -> fail "User role is not specified"
