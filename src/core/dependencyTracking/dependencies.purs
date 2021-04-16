@@ -179,6 +179,13 @@ findStateRequests (ContextInstance contextId) = do
     Nothing -> pure []
     Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Context$State" typesForResource)
 
+findRoleStateRequests :: RoleInstance -> MP (Array CorrelationIdentifier)
+findRoleStateRequests (RoleInstance roleId) = do
+  r <- queryAssumptionRegister
+  case lookup roleId r of
+    Nothing -> pure []
+    Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Role$State" typesForResource)
+
 isRegistered :: CorrelationIdentifier -> Assumption -> MP Boolean
 isRegistered corrId assumption = findDependencies assumption >>= pure <<<
   (maybe false (maybe false (const true) <<< (elemIndex corrId)) )
@@ -208,6 +215,7 @@ toAssumption (Property ri pt) = assumption (unwrap ri) (unwrap pt)
 toAssumption (Context ri) = assumption (unwrap ri) "model:System$Role$context"
 toAssumption (External ci) = assumption (unwrap ci) "model:System$Context$external"
 toAssumption (State ci) = assumption (unwrap ci) "model:System$Context$State"
+toAssumption (RoleState ri) = assumption (unwrap ri) "model:System$Role$State"
 
 canBeUntypedAssumption :: InformedAssumption -> Boolean
 canBeUntypedAssumption (RoleAssumption _ _) = true
@@ -219,3 +227,4 @@ canBeUntypedAssumption (Context _) = false
 canBeUntypedAssumption (External _) = false
 -- TODO. Ik ben hier niet zeker van.
 canBeUntypedAssumption (State _) = true
+canBeUntypedAssumption (RoleState _) = true

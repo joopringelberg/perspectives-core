@@ -309,6 +309,15 @@ siblings rid = ArrayT $ (lift $ try $ getPerspectRol rid) >>=
   handlePerspectRolError' "siblings" []
     \(IP.PerspectRol{pspType, context:ctxt}) -> runArrayT $ getEnumeratedRoleInstances pspType ctxt
 
+getActiveRoleStates :: RoleInstance ~~> StateIdentifier
+getActiveRoleStates ri = ArrayT $ (try $ lift $ getRolMember (_.states <<< unwrap) ri) >>=
+  handlePerspectContextError' "states" []
+    \states -> (tell $ ArrayWithoutDoubles [RoleState ri]) *> pure states
+
+getActiveRoleStates_ :: RoleInstance -> MonadPerspectives (Array StateIdentifier)
+getActiveRoleStates_ ci = (try $ getRolMember (_.states <<< unwrap) ci) >>=
+  handlePerspectContextError' "states" [] pure <<< identity
+
 -- | Returns the name of the model that defines the role type as a String Value.
 roleModelName :: RoleInstance ~~> Value
 roleModelName (RoleInstance rid) = maybe empty (pure <<< Value) (deconstructModelName rid)

@@ -124,6 +124,7 @@ data InformedAssumption =
 	| Context RoleInstance
 	| External ContextInstance
   | State ContextInstance
+  | RoleState RoleInstance
 
 derive instance genericInformedAssumption :: Generic InformedAssumption _
 

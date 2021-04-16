@@ -119,6 +119,7 @@ type RolRecord =
   , bindingDelta :: Maybe SignedDelta
   -- The first index is the propertytype; the second is the value.
   , propertyDeltas :: F.Object (F.Object SignedDelta)
+  , states :: Array StateIdentifier
   }
 
 derive instance genericRepPerspectRol :: Generic PerspectRol _

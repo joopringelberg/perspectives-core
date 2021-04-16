@@ -35,7 +35,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.Perspective (Perspective)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, StateIdentifier, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 
 -----------------------------------------------------------
@@ -57,6 +57,7 @@ type EnumeratedRoleRecord =
 
   , views :: Array ViewType
 
+  , rootState :: Maybe StateIdentifier
   , perspectives :: Array Perspective
 
   , functional :: Boolean
@@ -91,6 +92,7 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
 
   , views: []
 
+  , rootState: Nothing
   , perspectives: []
 
   , functional: true

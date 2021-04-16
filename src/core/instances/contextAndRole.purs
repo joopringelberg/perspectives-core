@@ -196,6 +196,7 @@ defaultRolRecord =
   , contextDelta: SignedDelta {author: "", encryptedDelta: "ContextDelta from defaultRolRecord"}
   , bindingDelta: Nothing
   , propertyDeltas: empty
+  , states: []
   }
 
 isDefaultContextDelta :: SignedDelta -> Boolean
@@ -315,6 +316,22 @@ removeRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
             if null roles'
               then PerspectRol cr {gevuldeRollen = delete (unwrap rolName) gevuldeRollen}
               else PerspectRol cr {gevuldeRollen = insert (unwrap rolName) roles' gevuldeRollen}
+
+rol_states :: PerspectRol -> Array StateIdentifier
+rol_states (PerspectRol{states}) = states
+
+-- | Add the state identifier as the last one in the Array (the Array represents the path from the rootstate).
+pushRol_state :: PerspectRol -> StateIdentifier -> PerspectRol
+pushRol_state (PerspectRol cr) stateId = PerspectRol cr {states = Arr.snoc cr.states stateId}
+
+-- | Remove the last state but only if it equals the given state.
+popRol_state :: PerspectRol -> StateIdentifier -> PerspectRol
+popRol_state (PerspectRol cr) stateId = case Arr.unsnoc cr.states of
+  Nothing -> PerspectRol cr
+  Just {init, last} -> if eq stateId last
+    then PerspectRol cr {states = init}
+    else PerspectRol cr
+
 
 compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
 compareOccurrences a b = compare (rol_occurrence a) (rol_occurrence b)
