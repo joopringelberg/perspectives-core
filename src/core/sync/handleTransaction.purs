@@ -53,7 +53,7 @@ import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
-import Perspectives.Representation.Verbs (RoleVerb(..))
+import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, setBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
@@ -76,10 +76,10 @@ executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstan
   log (show deltaType <> " to/from " <> show contextId <> " and " <> show roleInstances)
   case deltaType of
     -- The subject must be allowed to change the role: they must have a perspective on it that includes the verb Change.
-    AddRoleInstancesToContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Change]) >>= case _ of
+    AddRoleInstancesToContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create]) >>= case _ of
       Left e -> handleError e
       Right _ -> addRoleInstancesToContext contextId roleType ((flip Tuple (Just signedDelta)) <$> (unwrap roleInstances))
-    MoveRoleInstancesToAnotherContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Delete, Change]) >>= case _ of
+    MoveRoleInstancesToAnotherContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Delete, Verbs.Create]) >>= case _ of
       Left e -> handleError e
       Right _ -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
 
@@ -87,7 +87,7 @@ executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesT
 executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved, subject}) signedDelta = do
   log (show deltaType <> " of " <> show roleId <> " (to) " <> show binding)
   roleType' <- lift2 (roleId ##>> roleType)
-  (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Bind]) >>= case _ of
+  (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Verbs.Fill]) >>= case _ of
     Left e -> handleError e
     Right _ -> case deltaType of
       SetBinding -> void $ setBinding roleId (unsafePartial $ fromJust binding) (Just signedDelta)
@@ -100,13 +100,13 @@ executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, sub
     AddProperty -> do
       -- we need not check whether the model is known if we assume valid transactions:
       -- a role instance creation delta must have preceded the property delta.
-      (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Create) >>= case _ of
+      (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.AddPropertyValue) >>= case _ of
         Left e -> handleError e
         Right _ -> addProperty [id] property (flip Tuple (Just signedDelta) <$> values)
-    RemoveProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Change) >>= case _ of
+    RemoveProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.RemovePropertyValue) >>= case _ of
       Left e -> handleError e
       Right _ -> removeProperty [id] property values
-    DeleteProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Delete) >>= case _ of
+    DeleteProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.DeleteProperty) >>= case _ of
       Left e -> handleError e
       Right _ -> deleteProperty [id] property
 
@@ -158,8 +158,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         else do
           -- Check if the author has a perspective on the role to be created that includes
           -- the verb Create.
-          -- TODO. Ik heb 'Change' toegevoegd om het bot perspectief mee te laten tellen.
-          (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Create, Become, Change]) >>= case _ of
+          (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create]) >>= case _ of
             Left e -> handleError e
             Right _ -> constructAnotherRole_
     ConstructExternalRole -> do
@@ -169,20 +168,20 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- be created by any user and usually will be created by parsing a CRL file.
       lift2 (roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$External")) >>= if _
         then constructExternalRole
-        else (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole CreateAndFill) >>= case _ of
+        else (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.CreateAndFill) >>= case _ of
           Left e -> handleError e
           Right _ -> constructExternalRole
     RemoveRoleInstance -> do
-      (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Delete]) >>= case _ of
+      (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove]) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
 
     RemoveUnboundExternalRoleInstance -> do
-      (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Delete) >>= case _ of
+      (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
     RemoveExternalRoleInstance -> do
-      (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Delete) >>= case _ of
+      (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
     where

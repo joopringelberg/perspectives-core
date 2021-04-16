@@ -50,7 +50,7 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.InvertedQuery (PropsAndVerbs, RelevantProperties(..))
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
-import Perspectives.Representation.Action (Action(..), Verb)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.Action (object, providesPerspectiveOnProperty, providesPerspectiveOnRole, requiredObjectProperties, verb, objectType)
 import Perspectives.Representation.Class.Context (allContextTypes)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
