@@ -22,24 +22,21 @@
 
 module Perspectives.Types.ObjectGetters where
 
-import Control.Monad.Error.Class (throwError, try)
+import Control.Monad.Error.Class (try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (concat, cons, elemIndex, filter, filterA, findIndex, fold, foldl, head, intersect, null, singleton, fromFoldable)
-import Data.List (List)
+import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, intersect, null, singleton, fromFoldable)
 import Data.Map (values)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Data.Traversable (for, for_, traverse)
+import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
 import Foreign.Object (fromFoldable, keys) as OBJ
-import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>), (###>>), (###>))
+import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>), (###>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -50,21 +47,18 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.InvertedQuery (PropsAndVerbs, RelevantProperties(..))
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
-import Perspectives.Representation.Action (Action(..))
-import Perspectives.Representation.Class.Action (object, providesPerspectiveOnProperty, providesPerspectiveOnRole, requiredObjectProperties, verb, objectType)
 import Perspectives.Representation.Class.Context (allContextTypes)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
-import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView)
 import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeExcludingBinding, typeIncludingAspects, typeIncludingAspectsBinding)
 import Perspectives.Representation.Context (Context)
-import Perspectives.Representation.ExplicitSet (ExplicitSet(..), hasElementM)
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier, propertytype2string, roletype2string)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, perspectiveSupportsPropertyForVerb)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (Unit, bind, eq, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||), (<*>), (<#>))
+import Prelude (Unit, bind, eq, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -218,44 +212,6 @@ hasAspectWithLocalName :: String -> (EnumeratedRoleType ~~~> Boolean)
 hasAspectWithLocalName localAspectName roleType = ArrayT do
   aspects <- roleType ###= aspectsClosure
   pure [isJust $ findIndex (test (unsafeRegex (localAspectName <> "$") noFlags)) (unwrap <$> aspects)]
-----------------------------------------------------------------------------------------
-------- FUNCTIONS FOR ACTIONS
-----------------------------------------------------------------------------------------
--- actionsOfRole :: EnumeratedRoleType ~~~> ActionType
--- actionsOfRole rt = ArrayT (getEnumeratedRole rt >>= unwrap >>> _.perspectives >>> pure)
---
--- actionsClosure :: EnumeratedRoleType ~~~> ActionType
--- actionsClosure = aspectsClosure >=> actionsOfRole
---
--- isAutomatic :: ActionType ~~~> Boolean
--- isAutomatic at = ArrayT (getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
---
--- -- | Get all Actions that are defined for a RoleType or its Aspects.
--- -- | A CalculatedRole has no aspects, hence all Actions returned are defined directly on it.
--- actionsClosure_ :: RoleType ~~~> ActionType
--- actionsClosure_ (ENR t) = actionsClosure t
--- actionsClosure_ t = actionsOfRole_ t
---
--- -- | For a user RoleType, get all Actions defined directly in perspectives of that RoleType
--- actionsOfRole_ :: RoleType ~~~> ActionType
--- actionsOfRole_ (ENR erole) = ArrayT (getEnumeratedRole erole >>= pure <<< perspectives)
---
--- actionsOfRole_ (CR crole) = ArrayT (getCalculatedRole crole >>= pure <<< perspectives)
---
--- actionObjectQfd :: ActionType ~~~> QueryFunctionDescription
--- actionObjectQfd at = ArrayT do
---   action <- getAction at
---   case object action of
---     S _ -> throwError (error "bla")
---     Q calc -> pure [calc]
---
--- -- | From an ActionType, get the view on its object
--- objectView :: ActionType ~~~> ViewType
--- objectView = ArrayT <<< (getAction >=> requiredObjectProperties >>> maybe [] singleton >>> pure)
--- -- objectView at = ArrayT (getAction at >>= requiredObjectProperties >>> maybe [] singleton >>> pure)
---
--- hasVerb :: Verb -> ActionType ~~~> Boolean
--- hasVerb v = (lift <<< getAction) >=> pure <<< eq v <<< verb
 
 ----------------------------------------------------------------------------------------
 ------- GET A PERSPECTIVE
@@ -276,17 +232,6 @@ perspectiveOnADT userRoleType adt = ArrayT do
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 perspectiveOnRoleType :: Partial => RoleType -> RoleType ~~~> Perspective
 perspectiveOnRoleType userRoleType objectRoleType = (lift $ getRole objectRoleType) >>= lift <<< adtOfRole >>= (perspectiveOnADT userRoleType)
-
--- | Return all Actions defined with (the first) RoleType as their object, taken
--- | from the transitive Aspect closure of the second RoleType.
--- getPerspectiveOnObject :: RoleType -> RoleType ~~~> ActionType
--- getPerspectiveOnObject objectType ur =
---   (roleTypeAspectsClosure >=> getPerspective objectType) ur
-
--- | For the ADT EnumeratedRoleType that identifies a type of object (first argument), return
--- | the ActionTypes available in the perspective of the user role (second argument).
--- getPerspective :: RoleType -> RoleType ~~~> ActionType
--- getPerspective objectRoleType userRoleType = ArrayT $ (perspectivesOfRoleType userRoleType) >>= traverse getAction >>= filterA (providesPerspectiveOnRole objectRoleType) >>= pure <<< (map identifier)
 
 -- | For the user role (second argument), and the object role (first argument), compute
 -- | for each verb in the perspective the former has on the latter, the properties,

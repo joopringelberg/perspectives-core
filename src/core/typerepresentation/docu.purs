@@ -27,7 +27,6 @@
 -- | * [CalculatedRole](Perspectives.Representation.CalculatedRole.html#t:CalculatedRole)
 -- | * [EnumeratedProperty](Perspectives.Representation.EnumeratedProperty.html#t:EnumeratedProperty)
 -- | * [CalculatedProperty](Perspectives.Representation.CalculatedProperty.html#t:CalculatedProperty)
--- | * [Action](Perspectives.Representation.Action.html#t:Action)
 -- | * [View](Perspectives.Representation.View.html#t:View)
 -- |
 -- | Types can be combined in [Abstract Data types](Perspectives.Representation.ADT.html#t:ADT)
