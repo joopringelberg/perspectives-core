@@ -22,8 +22,8 @@
 
 module Perspectives.RunMonadPerspectivesTransaction where
 
-import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
-import Control.Monad.Error.Class (try)
+import Control.Monad.AvarMonadAsk (get, modify) as AA
+import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Reader (lift, runReaderT)
 import Data.Array (filterA, null, sort)
 import Data.Array.NonEmpty (toArray)
@@ -41,22 +41,24 @@ import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (contextType, getMyType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
-import Perspectives.PerspectivesState (publicRepository)
+import Perspectives.PerspectivesState (addBinding, publicRepository, pushFrame, restoreFrame)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
-import Perspectives.StateCompiler (enteringState, evaluateState)
+import Perspectives.StateCompiler (enteringState, evaluateState, exitingState)
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (rootState, specialisesRoleType_)
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=), (>=>))
+import Prelude (Unit, bind, discard, join, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -81,12 +83,12 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
       -- 2. Now run states, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
-      -- TODO 1. Om state change beschikbaar te maken voor queries: sla het resultaat van AA.get op in MonadPerspectives.
       (ft@(Transaction{correlationIdentifiers, contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved}) :: Transaction) <- lift AA.get >>= runStates
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then lift $ lift $ distributeTransaction ft else pure unit
       -- Definitively remove instances
       -- log ("Will remove these contexts: " <> show contextsToBeRemoved)
+      -- TODO. Moeten hier niet de onExits worden uitgevoerd?
       lift2 $ for_ contextsToBeRemoved tryRemoveEntiteit
       -- log ("Will remove these roles: " <> show rolesToBeRemoved)
       lift2 $ for_ rolesToBeRemoved tryRemoveEntiteit
@@ -111,31 +113,57 @@ runSterileTransaction a =
   >>= lift <<< new
   >>= runReaderT (runArrayT a)
 
--- TODO. Invariant (na uitvoering van TODO's 1 en 2): transactie t is beschikbaar in MonadPerspectives.
 runStates :: Transaction -> MonadPerspectivesTransaction Transaction
 runStates t = do
   -- log "==========RUNNING STATES============"
-  (affectedContexts :: Array AffectedContext) <- lift $ AA.gets (_.affectedContexts <<< unwrap)
+  Transaction{affectedContexts, createdContexts, {-createdRoles,-} contextsToBeRemoved, rolesToBeRemoved} <- lift $ AA.get
   (stateEvaluations :: Array StateEvaluation) <- join <$> traverse computeStateEvaluations affectedContexts
-  -- Collect all contexts that are created
-  (ccs :: Array ContextInstance) <- lift $ AA.gets (_.createdContexts <<< unwrap)
   -- Only now install a fresh transaction.
   lift $ void $ AA.modify cloneEmptyTransaction
   -- Evaluate all collected stateEvaluations.
-  for_ stateEvaluations \(StateEvaluation stateId contextId roleType) -> evaluateState contextId roleType stateId
+  for_ stateEvaluations \(StateEvaluation stateId contextId roleType) -> do
+    -- Provide a new frame for the current context variable binding.
+    oldFrame <- lift2 pushFrame
+    lift2 $ addBinding "currentcontext" [unwrap contextId]
+    -- Error boundary.
+    catchError (evaluateState contextId roleType stateId)
+      \e -> logPerspectivesError $ Custom ("Cannot evaluate state, because " <> show e)
+    lift2 $ restoreFrame oldFrame
   -- Enter the rootState of new contexts.
-  for_ ccs
+  for_ createdContexts
     \ctxt -> do
       (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
           state <- lift2 (ctxt ##>> contextType >=> liftToInstanceLevel rootState)
-          enteringState ctxt myType state
+          -- Provide a new frame for the current context variable binding.
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          -- Error boundary.
+          catchError (enteringState ctxt myType state)
+            \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
+  -- Exit the rootState of contexts that are deleted.
+  for_ contextsToBeRemoved
+    \ctxt -> do
+      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
+      case mmyType of
+        Nothing -> pure unit
+        Just myType -> do
+          state <- lift2 (ctxt ##>> contextType >=> liftToInstanceLevel rootState)
+          -- Provide a new frame for the current context variable binding.
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          -- Error boundary.
+          catchError (exitingState ctxt myType state)
+            \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
+  -- Enter the rootState of new roles.
+  -- Exit the rootState of roles that are deleted.
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure t
-    -- TODO 2. Om state change beschikbaar te maken voor queries: sla t <> nt op in MonadPerspectives.
     else pure <<< (<>) t =<< runStates nt
   where
     computeStateEvaluations :: AffectedContext -> MonadPerspectivesTransaction (Array StateEvaluation)

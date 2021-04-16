@@ -30,14 +30,15 @@ module Perspectives.StateCompiler where
 
 import Prelude
 
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, foldMap, index, null)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (alaF, unwrap)
-import Data.Traversable (traverse)
+import Data.Newtype (alaF, over, unwrap)
+import Data.Traversable (for_, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (singleton)
@@ -47,12 +48,12 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (CompiledState, cacheCompiledState, retrieveCompiledState)
 import Perspectives.Assignment.Update (setActive, setInActive)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery)
+import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=))
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (getActiveStates_)
 import Perspectives.Names (getMySystem)
-import Perspectives.PerspectivesState (addBinding, pushFrame)
+import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, roleFunctionFromQfd)
 import Perspectives.Representation.Class.PersistentType (getState)
@@ -60,10 +61,10 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
+import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (specialisesRoleType_, subStates_)
 import Perspectives.Utilities (findM)
 
--- Put an error boundary around this function.
 compileState :: StateIdentifier -> MP CompiledState
 compileState stateId = do
     State {context, query, object, automaticOnEntry, automaticOnExit} <- getState stateId
@@ -72,14 +73,14 @@ compileState stateId = do
       (unsafePartial case _ of
         Q calc -> roleFunctionFromQfd calc) object
     (automaticOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\_ (effect :: SideEffect) ->
+      (\subject (effect :: SideEffect) ->
         unsafePartial case effect of
-          EF qfd -> compileAssignment qfd)
+          EF qfd -> compileAssignment qfd >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnEntry)
     (automaticOnExit' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\_ (effect :: SideEffect) ->
+      (\subject (effect :: SideEffect) ->
         unsafePartial case effect of
-          EF qfd -> compileAssignment qfd)
+          EF qfd -> compileAssignment qfd >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnExit)
     -- TODO notifyOnEntry, notifyOnExit.
 
@@ -87,19 +88,20 @@ compileState stateId = do
     (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ unsafePartial case query of Q qfd -> qfd
     pure $ cacheCompiledState stateId
       { query: lhs
+      , objectGetter: mobjectGetter
       , automaticOnEntry: automaticOnEntry'
       , automaticOnExit: automaticOnExit'
       }
   where
-    stateRunner ::
-      (ContextInstance ~~> Value) ->
-      (Map RoleType (Updater ContextInstance)) ->
-      (Maybe (ContextInstance ~~> RoleInstance)) ->
-      (Updater ContextInstance)
-    stateRunner lhs aOnEntry mobjectGetter contextId = do
-      oldEnvironment <- lift2 pushFrame
-      lift2 $ addBinding "currentcontext" [unwrap contextId]
+    withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
+    withAuthoringRole aRole updater a = do
+      originalRole <- lift $ gets (_.authoringRole <<< unwrap)
+      lift $ modify (over Transaction \t -> t {authoringRole = aRole})
+      updater a
+      lift $ modify (over Transaction \t -> t {authoringRole = originalRole})
 
+-- | Ensure that the current context is available in the environment before applying this function!
+-- | Put an error boundary around this function.
 evaluateState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 evaluateState contextId userRoleType stateId = do
   mactive <- getActiveSubstate stateId contextId
@@ -116,15 +118,31 @@ evaluateState contextId userRoleType stateId = do
 -- | On entering a state, we register that state with the context instance and trigger client query updates.
 -- | We run all automatic actions and create notifications.
 -- | Finally, we look for the substate whose query returns true and apply `enteringState` to it.
+-- | Invariant: the state is not registered as active but its query evaluates to true.
+-- |
+-- | Put an error boundary around this function.
+-- | Ensure that the current context is available in the environment before applying this function!
 enteringState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 enteringState contextId userRoleType stateId = do
   -- Add the state identifier to the path of states in the context instance, triggering query updates
-  -- when the current Transaction is run.
+  -- just before running the current Transaction is finished.
   setActive stateId contextId
-  {automaticOnEntry} <- getCompiledState stateId
+  {automaticOnEntry, objectGetter} <- getCompiledState stateId
+  objects <- case objectGetter of
+    Nothing -> pure []
+    Just getter -> lift2 (contextId ##= getter)
   -- Run automatic actions in the current Transaction.
   forWithIndex_ automaticOnEntry \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    then updater contextId
+    -- Run for each object.
+    then if isJust objectGetter
+      then for_ objects \object -> do
+        oldFrame <- lift2 pushFrame
+        lift2 $ addBinding "object" [unwrap object]
+        updater contextId
+        lift2 $ restoreFrame oldFrame
+      -- Note we do not push an empty set of values for object, like we did for rules.
+      -- The modeller should not use the 'object' variable.
+      else updater contextId
     else pure unit
   State {notifyOnEntry} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnEntry) of
@@ -145,17 +163,31 @@ enteringState contextId userRoleType stateId = do
 -- | On exiting a state, we de-register that state with the context instance and trigger client query updates.
 -- | We run all automatic actions and create notifications.
 -- | Finally, we find the substate that is still active (if any) and apply `exitingState` to it.
+-- | Invariant: the state is registered as active and its query evaluates to false.
+-- |
+-- | Put an error boundary around this function.
+-- | Ensure that the current context is available in the environment before applying this function!
 exitingState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 exitingState contextId userRoleType stateId = do
   -- Recur. We do this first, because we have to exit the deepest nested substate first.
   getActiveSubstate stateId contextId >>= void <<< traverse (exitingState contextId userRoleType)
   -- Add the state identifier to the path of states in the context instance, triggering query updates
-  -- when the current Transaction is run.
+  -- just before running the current Transaction is finished.
   setInActive stateId contextId
-  {automaticOnExit} <- getCompiledState stateId
+  {automaticOnExit, objectGetter} <- getCompiledState stateId
+  objects <- case objectGetter of
+    Nothing -> pure []
+    Just getter -> lift2 (contextId ##= getter)
   -- Run automatic actions in the current Transaction.
   forWithIndex_ automaticOnExit \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    then updater contextId
+    -- Run for each object.
+    then if isJust objectGetter
+      then for_ objects \object -> do
+        oldFrame <- lift2 pushFrame
+        lift2 $ addBinding "object" [unwrap object]
+        updater contextId
+        lift2 $ restoreFrame oldFrame
+      else updater contextId
     else pure unit
   State {notifyOnExit} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnExit) of

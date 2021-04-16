@@ -296,6 +296,9 @@ createDeltasFromAssumption users (Context roleInstance) = do
 -- its external role.
 createDeltasFromAssumption users (External contextInstance) = pure unit
 
+-- State is private, hence no deltas should be generated.
+createDeltasFromAssumption users (State contextInstance) = pure unit
+
 -- | Add a UniverseContextDelta, UniverseRoleDelta and a ContextDelta.
 magic :: ContextInstance -> SerializableNonEmptyArray RoleInstance -> EnumeratedRoleType ->  Array RoleInstance -> MonadPerspectivesTransaction Unit
 magic ctxt roleInstances rtype users =  do

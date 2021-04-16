@@ -42,7 +42,7 @@ import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), StateIdentifier(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Prelude (flip, identity, pure, show, ($), (+), (/), (<<<), (<>), bind, not, eq)
@@ -196,7 +196,6 @@ defaultRolRecord =
   , contextDelta: SignedDelta {author: "", encryptedDelta: "ContextDelta from defaultRolRecord"}
   , bindingDelta: Nothing
   , propertyDeltas: empty
-  , actionConditionState: empty
   }
 
 isDefaultContextDelta :: SignedDelta -> Boolean

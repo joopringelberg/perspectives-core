@@ -34,22 +34,22 @@ import Data.Newtype (unwrap, ala)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Foreign.Object (insert, keys, lookup, values)
+import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
-import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError, handlePerspectRolError')
+import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
 import Perspectives.Persistence.API (getViewOnDatabase)
-import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
+import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
-import Prelude (Unit, bind, discard, flip, identity, join, map, not, pure, show, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -77,15 +77,6 @@ contextType :: ContextInstance ~~> ContextType
 contextType cid  = ArrayT $ (lift $ try $ getContextMember (\c -> [context_pspType c]) cid) >>=
   handlePerspectRolError' "contextType" [] (pure <<< identity)
 
--- | Note that this function has no error boundary: the caller has to handle errors.
-getConditionState :: ActionType -> RoleInstance -> MonadPerspectives Boolean
-getConditionState a c = getPerspectRol c >>= \(IP.PerspectRol{actionConditionState}) -> pure $ maybe false identity (lookup (unwrap a) actionConditionState)
-
-setConditionState :: ActionType -> RoleInstance -> Boolean -> MonadPerspectives Unit
-setConditionState a c b = (try $ getPerspectRol c) >>=
-  handlePerspectRolError "setConditionState"
-    \(IP.PerspectRol r@{actionConditionState}) -> void $ saveEntiteit_ c (IP.PerspectRol r {actionConditionState = insert (unwrap a) b actionConditionState})
-
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
   handlePerspectContextError' "getMe" []
@@ -102,7 +93,7 @@ getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
 getActiveStates :: ContextInstance ~~> StateIdentifier
 getActiveStates ci = ArrayT $ (try $ lift $ getContextMember IP.states ci) >>=
   handlePerspectContextError' "states" []
-    \states -> (tell $ ArrayWithoutDoubles [States ci states]) *> pure states
+    \states -> (tell $ ArrayWithoutDoubles [State ci]) *> pure states
 
 getActiveStates_ :: ContextInstance -> MonadPerspectives (Array StateIdentifier)
 getActiveStates_ ci = (try $ getContextMember IP.states ci) >>=

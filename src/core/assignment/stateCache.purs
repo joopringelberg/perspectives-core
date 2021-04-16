@@ -27,7 +27,7 @@ import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (Updater, type (~~>))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
 import Prelude (const, unit)
 
@@ -46,6 +46,7 @@ retrieveCompiledState a = peek stateCache (unwrap a)
 
 type CompiledState =
   { query :: (ContextInstance ~~> Value)
+  , objectGetter :: Maybe (ContextInstance ~~> RoleInstance)
   , automaticOnEntry :: Map RoleType (Updater ContextInstance)
   , automaticOnExit :: Map RoleType (Updater ContextInstance)
   }
