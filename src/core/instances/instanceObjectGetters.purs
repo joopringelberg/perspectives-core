@@ -42,11 +42,11 @@ import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssu
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
-import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole) as IP
+import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
 import Prelude (Unit, bind, discard, flip, identity, join, map, not, pure, show, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
@@ -98,6 +98,15 @@ getMyType :: ContextInstance ~~> RoleType
 getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
   <|>
   (contextType >=> liftToInstanceLevel (lookForUnqualifiedRoleType "Guest")) ctxt
+
+getActiveStates :: ContextInstance ~~> StateIdentifier
+getActiveStates ci = ArrayT $ (try $ lift $ getContextMember IP.states ci) >>=
+  handlePerspectContextError' "states" []
+    \states -> (tell $ ArrayWithoutDoubles [States ci states]) *> pure states
+
+getActiveStates_ :: ContextInstance -> MonadPerspectives (Array StateIdentifier)
+getActiveStates_ ci = (try $ getContextMember IP.states ci) >>=
+  handlePerspectContextError' "states" [] pure <<< identity
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE

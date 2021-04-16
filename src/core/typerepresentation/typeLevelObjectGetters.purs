@@ -55,7 +55,7 @@ import Perspectives.Representation.Class.Action (object, providesPerspectiveOnPr
 import Perspectives.Representation.Class.Context (allContextTypes)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView)
+import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView)
 import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeExcludingBinding, typeIncludingAspects, typeIncludingAspectsBinding)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), hasElementM)
@@ -149,6 +149,12 @@ contextTypeModelName' (ContextType rid) = maybe empty (pure <<< Value) (deconstr
 
 rootState :: ContextType ~~~> StateIdentifier
 rootState = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< singleton <<< _.rootState <<< unwrap)
+
+----------------------------------------------------------------------------------------
+------- FUNCTIONS OPERATING DIRECTLY ON STATE
+----------------------------------------------------------------------------------------
+subStates_ :: StateIdentifier -> MonadPerspectives (Array StateIdentifier)
+subStates_ = getState >=> pure <<< _.subStates <<< unwrap
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S

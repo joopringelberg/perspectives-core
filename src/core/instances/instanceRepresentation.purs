@@ -33,7 +33,7 @@ import Foreign.Object (Object) as F
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Prelude (class Show, class Eq, (==), (<<<), eq, bind, pure)
 
@@ -44,11 +44,13 @@ class PerspectContextClass c where
   pspType :: c -> ContextType
   externalRole :: c -> RoleInstance
   roles :: c -> F.Object (Array RoleInstance)
+  states :: c -> Array StateIdentifier
 
 instance perspectContextPerspectContextClass :: PerspectContextClass PerspectContext where
   pspType c = (unwrap c).pspType
   externalRole c = (unwrap c).buitenRol
   roles c = (unwrap c).rolInContext
+  states c = (unwrap c).states
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT
@@ -65,6 +67,7 @@ type ContextRecord =
   , aliases :: F.Object String
   , me :: Maybe RoleInstance
   , universeContextDelta :: SignedDelta
+  , states :: Array StateIdentifier
   }
 
 derive instance genericRepPerspectContext :: Generic PerspectContext _

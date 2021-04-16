@@ -23,7 +23,7 @@
 module Perspectives.Utilities where
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
-import Data.Array (cons)
+import Data.Array (cons, uncons)
 import Data.Foldable (intercalate)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
@@ -48,6 +48,19 @@ maybeM default fromJust monadicValue = do
 
 ifNothing :: forall a b m. Monad m => m (Maybe b) -> m a -> (b -> m a) -> m a
 ifNothing monadicValue default fromJust = maybeM default fromJust monadicValue
+
+----------------------------------------------------------------------------------------
+---- FINDM
+----------------------------------------------------------------------------------------
+-- | Find a value in an Array using a monadic criterium.
+findM :: forall a f. Monad f => (a -> f Boolean) -> Array a -> f (Maybe a)
+findM criterium arr = case uncons arr of
+  Just {head, tail} -> do
+    allowed <- criterium head
+    if allowed
+      then pure (Just head)
+      else findM criterium tail
+  Nothing -> pure Nothing
 
 ----------------------------------------------------------------------------------------
 ---- PRETTYPRINT

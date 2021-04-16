@@ -228,10 +228,11 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
 
 -- | Construct a Role instance for an existing Context instance.
 -- | This function is complete w.r.t. the five responsibilities.
--- | Notice that roleType must be a well-formed identifier!
+-- | Notice that roleType must be a well-formed (and expanded) identifier!
+-- | The contextId may be prefixed with a default namespace: it will be expanded.
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction (Maybe RoleInstance)
-createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerialization{id: mRoleId, properties, binding}) = case binding of
+createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSerialization{id: mRoleId, properties, binding}) = case binding of
   Nothing -> go false
   Just b -> (lift2 $ try $ getPerspectEntiteit (RoleInstance b)) >>=
     handlePerspectRolError' "createAndAddRoleInstance" Nothing
@@ -240,7 +241,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) id (RolSerializatio
   where
     go :: Boolean -> MonadPerspectivesTransaction (Maybe RoleInstance)
     go isMe = do
-      contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces id)
+      contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces contextId)
       rolInstances <- lift2 (contextInstanceId ##= getRoleInstances (ENR roleType))
       (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole roleType
       (PerspectRol r@{_id:roleInstance}) <- case mRoleId of

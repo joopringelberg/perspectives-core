@@ -22,23 +22,30 @@
 
 module Perspectives.Assignment.StateCache where
 
+import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (Updater)
+import Perspectives.CoreTypes (Updater, type (~~>))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (StateIdentifier)
-import Prelude (unit)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, Value)
+import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
+import Prelude (const, unit)
 
-type StateCache = GLStrMap (Updater ContextInstance)
+type StateCache = GLStrMap CompiledState
 
 -- | A global store of SupportedEffect-s
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 stateCache :: StateCache
 stateCache = new unit
 
-cacheState :: StateIdentifier -> (Updater ContextInstance) -> StateCache
-cacheState a u = poke stateCache (unwrap a) u
+cacheCompiledState :: StateIdentifier -> CompiledState -> CompiledState
+cacheCompiledState a u = const u (poke stateCache (unwrap a) u)
 
-retrieveState :: StateIdentifier -> (Maybe (Updater ContextInstance))
-retrieveState a = peek stateCache (unwrap a)
+retrieveCompiledState :: StateIdentifier -> (Maybe CompiledState)
+retrieveCompiledState a = peek stateCache (unwrap a)
+
+type CompiledState =
+  { query :: (ContextInstance ~~> Value)
+  , automaticOnEntry :: Map RoleType (Updater ContextInstance)
+  , automaticOnExit :: Map RoleType (Updater ContextInstance)
+  }

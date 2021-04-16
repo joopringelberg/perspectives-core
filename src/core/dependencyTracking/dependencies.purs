@@ -39,7 +39,7 @@ import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, Info
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.Persistent (class Persistent, entityExists)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..))
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
@@ -172,6 +172,13 @@ findBinderRequests (RoleInstance roleId) (EnumeratedRoleType typeId) = do
     Nothing -> pure []
     Just typesForResource -> pure $ maybe [] identity (lookup typeId typesForResource)
 
+findStateRequests :: ContextInstance -> MP (Array CorrelationIdentifier)
+findStateRequests (ContextInstance contextId) = do
+  r <- queryAssumptionRegister
+  case lookup contextId r of
+    Nothing -> pure []
+    Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Context$State" typesForResource)
+
 isRegistered :: CorrelationIdentifier -> Assumption -> MP Boolean
 isRegistered corrId assumption = findDependencies assumption >>= pure <<<
   (maybe false (maybe false (const true) <<< (elemIndex corrId)) )
@@ -200,6 +207,7 @@ toAssumption (Binder ri rt) = assumption (unwrap ri) (unwrap rt)
 toAssumption (Property ri pt) = assumption (unwrap ri) (unwrap pt)
 toAssumption (Context ri) = assumption (unwrap ri) "model:System$Role$context"
 toAssumption (External ci) = assumption (unwrap ci) "model:System$Context$external"
+toAssumption (State ci) = assumption (unwrap ci) "model:System$Context$State"
 
 canBeUntypedAssumption :: InformedAssumption -> Boolean
 canBeUntypedAssumption (RoleAssumption _ _) = true
@@ -209,3 +217,5 @@ canBeUntypedAssumption (Binder _ _) = true
 canBeUntypedAssumption (Property _ _) = true
 canBeUntypedAssumption (Context _) = false
 canBeUntypedAssumption (External _) = false
+-- TODO. Ik ben hier niet zeker van.
+canBeUntypedAssumption (State _) = true

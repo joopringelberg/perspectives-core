@@ -123,6 +123,7 @@ data InformedAssumption =
 	| Property RoleInstance EnumeratedPropertyType
 	| Context RoleInstance
 	| External ContextInstance
+  | State ContextInstance
 
 derive instance genericInformedAssumption :: Generic InformedAssumption _
 

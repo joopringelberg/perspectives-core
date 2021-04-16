@@ -29,7 +29,7 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Foreign (unsafeFromForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -68,6 +68,7 @@ constructState id condition context subStates = State
 	, automaticOnExit: EncodableMap empty
 	, subStates: []
 	}
+derive instance newtypeState :: Newtype State _
 
 derive instance genericState :: Generic State _
 instance showState :: Show State where show = genericShow

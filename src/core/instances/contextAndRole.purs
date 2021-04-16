@@ -23,7 +23,7 @@
 module Perspectives.ContextAndRole where
 
 import Data.Array (cons, foldl, null)
-import Data.Array (delete, difference, elemIndex, last, snoc, union) as Arr
+import Data.Array (delete, difference, elemIndex, last, snoc, union, unsnoc) as Arr
 import Data.Int (floor, fromString, toNumber)
 import Data.Lens (Lens', Traversal', _Just, over, set, view)
 import Data.Lens.At (at)
@@ -42,7 +42,7 @@ import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), EnumeratedPropertyType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), StateIdentifier(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (aspectsClosure)
 import Prelude (flip, identity, pure, show, ($), (+), (/), (<<<), (<>), bind, not, eq)
@@ -152,6 +152,21 @@ modifyContext_rolInContext ct@(PerspectContext cr@{rolInContext, aliases}) r@(En
       }
   Just roles -> pure $ set (_roleInstances' r) (Just (f roles)) ct
 
+context_states :: PerspectContext -> Array StateIdentifier
+context_states (PerspectContext{states}) = states
+
+-- | Add the state identifier as the last one in the Array (the Array represents the path from the rootstate).
+pushContext_state :: PerspectContext -> StateIdentifier -> PerspectContext
+pushContext_state (PerspectContext cr) stateId = PerspectContext cr {states = Arr.snoc cr.states stateId}
+
+-- | Remove the last state but only if it equals the given state.
+popContext_state :: PerspectContext -> StateIdentifier -> PerspectContext
+popContext_state (PerspectContext cr) stateId = case Arr.unsnoc cr.states of
+  Nothing -> PerspectContext cr
+  Just {init, last} -> if eq stateId last
+    then PerspectContext cr {states = init}
+    else PerspectContext cr
+
 defaultContextRecord :: ContextRecord
 defaultContextRecord =
   { _id: ContextInstance ""
@@ -163,6 +178,7 @@ defaultContextRecord =
   , aliases: empty
   , me: Nothing
   , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord"}
+  , states: []
   }
 
 defaultRolRecord :: RolRecord
