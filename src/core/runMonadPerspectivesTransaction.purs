@@ -159,8 +159,8 @@ runStates t = do
           catchError (exitingState ctxt myType state)
             \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
           lift2 $ restoreFrame oldFrame
-  -- Enter the rootState of new roles.
-  -- Exit the rootState of roles that are deleted.
+  -- TODO Enter the rootState of new roles.
+  -- TODO Exit the rootState of roles that are deleted.
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure t

@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.Actions where
+module Perspectives.CompileAssignment where
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect.
@@ -56,20 +56,15 @@ import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
-import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
+import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
-import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, roleFunctionFromQfd)
-import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Action (condition, effect, objectQfd, subject)
-import Perspectives.Representation.Class.Identifiable (displayName)
-import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
+import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (removeAllRoleInstances, handleNewPeer, removeRoleInstance, setBinding, removeBinding)
-import Perspectives.Sync.Transaction (Transaction(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Put an error boundary around this function.
