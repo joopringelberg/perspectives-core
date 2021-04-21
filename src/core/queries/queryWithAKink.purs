@@ -32,7 +32,7 @@ import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.InvertedQuery (QueryWithAKink(..), PropsAndVerbs)
+import Perspectives.InvertedQuery (QueryWithAKink(..), RelevantProperties)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setPathForStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
@@ -164,7 +164,7 @@ invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q
 --------------------------------------------------------------------------------------------------------------
 ---- SET INVERTED QUERIES
 --------------------------------------------------------------------------------------------------------------
-setInvertedQueries :: Map RoleType PropsAndVerbs -> QueryFunctionDescription -> PhaseThree Unit
+setInvertedQueries :: Map RoleType RelevantProperties -> QueryFunctionDescription -> PhaseThree Unit
 setInvertedQueries userTypes qfd = do
   (zqs :: (Array QueryWithAKink)) <- ensureContextDomain qfd >>= invert
   for_ zqs \qwk@(ZQ backward forward) -> do

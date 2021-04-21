@@ -30,9 +30,9 @@ module Perspectives.Parsing.Arc.PhaseThree where
 
 import Control.Monad.Error.Class (try)
 import Control.Monad.Except (throwError)
-import Control.Monad.State (State, execState, gets, modify) as State
+import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, filterA, foldM, head, length, null, reverse, uncons, fromFoldable, concat)
+import Data.Array (concat, filter, filterA, fold, foldM, fromFoldable, head, length, null, reverse, uncons)
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
@@ -45,7 +45,7 @@ import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (empty, insert, keys, lookup, unions, values)
+import Foreign.Object (insert, keys, lookup, unions, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
@@ -54,7 +54,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileReco
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
-import Perspectives.InvertedQuery (PropsAndVerbs, QueryWithAKink(..), RelevantProperties(..))
+import Perspectives.InvertedQuery (QueryWithAKink(..), RelevantProperties(..))
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AE
@@ -82,9 +82,8 @@ import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
-import Perspectives.Representation.Verbs (PropertyVerb)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (localEnumeratedRolesWithPerspectiveOnRole, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleTypeOfADT, propsAndVerbsForObjectRole, rolesWithPerspectiveOnProperty)
+import Perspectives.Types.ObjectGetters (localEnumeratedRolesWithPerspectiveOnRole, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleTypeOfADT, relevantPropertiesForObjectRole, rolesWithPerspectiveOnProperty)
 import Prelude (Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
@@ -236,7 +235,7 @@ invertedQueriesForLocalRolesAndProperties = do
             (Just (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory)))
             Nothing
           for_ userTypes \userType -> do
-            pv <- lift2 $ unsafePartial propsAndVerbsForObjectRole (ENR _id) userType
+            pv <- lift2 $ unsafePartial relevantPropertiesForObjectRole (ENR _id) userType
             -- Now add those verbs to the inverted query.
             setInvertedQueriesForUserAndRole userType (ST _id) pv true qwk
 
@@ -322,17 +321,10 @@ addInvertedQueries = do
           addInvertedQueriesForPerspectiveObject (Perspective {object, propertyVerbs}) = case object of
             S stp -> throwError $ Custom $ "addInvertedQueriesForPerspectiveObject: perspective object not compiled for " <> (show _id)
             Q descr -> do
-              (pAndV :: PropsAndVerbs) <- pure $ State.execState (for_ (concat $ fromFoldable $ Map.values (unwrap propertyVerbs)) propertyVerbs2PropsAndVerbs) empty
+              (pAndV :: RelevantProperties) <- pure $ fold ((\(PropertyVerbs props _) -> explicitSet2RelevantProperties props) <$> (concat $ fromFoldable $ Map.values (unwrap propertyVerbs)))
               -- Sets the inverted queries directly in the EnumeratedRoles and Properties in the
               -- DomeinFile we keep in PhaseTwoState.
               setInvertedQueries (Map.singleton (ENR _id) pAndV) descr
-
-          propertyVerbs2PropsAndVerbs :: PropertyVerbs -> State.State PropsAndVerbs Unit
-          propertyVerbs2PropsAndVerbs (PropertyVerbs v propertyVerbs) = for_ propertyVerbs
-            \(pv :: PropertyVerb) -> State.modify \pAndVs ->
-              case lookup (show pv) pAndVs of
-                Nothing -> insert (show pv) (explicitSet2RelevantProperties v) pAndVs
-                Just pvs -> insert (show pv) (pvs <> (explicitSet2RelevantProperties v))  pAndVs
 
           explicitSet2RelevantProperties :: ExplicitSet PropertyType -> RelevantProperties
           explicitSet2RelevantProperties Universal = All
@@ -344,9 +336,9 @@ addInvertedQueries = do
           S stp -> throwError $ Custom $ "addInvertedQueriesForRole: role expression not compiled for " <> roleName
           Q descr -> do
             userTypes <- lift $ lift (context ###= unsafePartial localEnumeratedRolesWithPerspectiveOnRole (CR _id))
-            -- For each userType get the PropsAndVerbs for the calculated role:
-            (pAndV :: Map.Map RoleType PropsAndVerbs) <- Map.fromFoldable <$> for userTypes (\userType -> do
-              pv <- lift2 $ unsafePartial propsAndVerbsForObjectRole (CR _id) userType
+            -- For each userType get the RelevantProperties for the calculated role:
+            (pAndV :: Map.Map RoleType RelevantProperties) <- Map.fromFoldable <$> for userTypes (\userType -> do
+              pv <- lift2 $ unsafePartial relevantPropertiesForObjectRole (CR _id) userType
               pure $ Tuple userType pv
               )
             setInvertedQueries pAndV descr
@@ -358,9 +350,9 @@ addInvertedQueries = do
             (EnumeratedRole{context}) <- lift $ lift $ getEnumeratedRole role
             userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnProperty (CP _id))
 
-            -- For each userType get the PropsAndVerbs for the calculated role:
-            (pAndV :: Map.Map RoleType PropsAndVerbs) <- Map.fromFoldable <$> for userTypes (\userType -> do
-              pure $ Tuple userType empty
+            -- For each userType get the RelevantProperties for the calculated role:
+            (pAndV :: Map.Map RoleType RelevantProperties) <- Map.fromFoldable <$> for userTypes (\userType -> do
+              pure $ Tuple userType (Properties [])
               )
             setInvertedQueries pAndV descr
 
@@ -379,7 +371,7 @@ addInvertedQueries = do
 -- | We only call `compileAndDistributeStep` in the function `compileStates`. This function
 -- | also modifies the DomeinFileRecord, but just the CalculatedRole, CalculatedProperty and Action definitions in it.
 -- | Hence we do not risk to modify a definition that will be overwritten soon after without including that modification.
-compileAndDistributeStep :: Map.Map RoleType PropsAndVerbs -> Domain -> Step -> PhaseThree QueryFunctionDescription
+compileAndDistributeStep :: Map.Map RoleType RelevantProperties -> Domain -> Step -> PhaseThree QueryFunctionDescription
 compileAndDistributeStep userProps dom stp = do
   descr' <- compileStep dom stp
   descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
@@ -453,8 +445,8 @@ compileStates = do
                 }
           where
 
-            allUserRoles :: Map.Map RoleType PropsAndVerbs
-            allUserRoles = Map.fromFoldable ((\rt -> Tuple rt empty) <$> (fromFoldable (Map.keys (unwrap notifyOnEntry) <> Map.keys (unwrap notifyOnExit) <> Map.keys (unwrap automaticOnEntry) <> Map.keys (unwrap automaticOnExit))))
+            allUserRoles :: Map.Map RoleType RelevantProperties
+            allUserRoles = Map.fromFoldable ((\rt -> Tuple rt (Properties [])) <$> (fromFoldable (Map.keys (unwrap notifyOnEntry) <> Map.keys (unwrap notifyOnExit) <> Map.keys (unwrap automaticOnEntry) <> Map.keys (unwrap automaticOnExit))))
 
             compileSideEffect :: Maybe QueryFunctionDescription -> RoleType -> SideEffect -> PhaseThree SideEffect
             compileSideEffect mobjectCalculation userRoleType effect =
@@ -592,7 +584,7 @@ compileStates = do
                   Just e -> ensureRole subject  currentDomain e
                 (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
                 -- Compile the value expression to a QueryFunctionDescription. Its range must comply with the range of the qualifiedProperty. It is compiled relative to the current context; not relative to the object!
-                valueQfd <- compileAndDistributeStep (Map.singleton subject empty) currentDomain valueExpression
+                valueQfd <- compileAndDistributeStep (Map.singleton subject (Properties [])) currentDomain valueExpression
                 rangeOfProperty <- lift $ lift $ getEnumeratedProperty qualifiedProperty >>= PT.range
                 fname <- case operator of
                   Set _ -> pure $ QF.SetPropertyValue qualifiedProperty
@@ -613,7 +605,7 @@ compileStates = do
                         Nothing -> throwError (UnknownExternalFunction start end effectName)
                         Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
                           then do
-                            compiledArguments <- traverse (\s -> compileAndDistributeStep (Map.singleton subject empty) currentDomain s) arguments
+                            compiledArguments <- traverse (\s -> compileAndDistributeStep (Map.singleton subject (Properties [])) currentDomain s) arguments
                             pure $ MQD currentDomain (QF.ExternalEffectFullFunction effectName) compiledArguments currentDomain Unknown Unknown
                           else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
                     -- TODO: behandel hier Foreign functions.
@@ -677,14 +669,14 @@ compileStates = do
 
 ensureContext :: RoleType -> Domain -> Step -> PhaseThree QueryFunctionDescription
 ensureContext userType currentDomain stp = do
-  qfd <- compileAndDistributeStep (Map.singleton userType empty) currentDomain stp
+  qfd <- compileAndDistributeStep (Map.singleton userType (Properties [])) currentDomain stp
   case range qfd of
     (CDOM _) -> pure qfd
     otherwise -> throwError $ NotAContextDomain (range qfd) (startOf stp) (endOf stp)
 
 ensureRole :: RoleType -> Domain -> Step -> PhaseThree QueryFunctionDescription
 ensureRole userType currentDomain stp = do
-  qfd <- compileAndDistributeStep (Map.singleton userType empty) currentDomain stp
+  qfd <- compileAndDistributeStep (Map.singleton userType (Properties [])) currentDomain stp
   case range qfd of
     (RDOM _) -> pure qfd
     otherwise -> throwError $ NotARoleDomain (range qfd) (startOf stp) (endOf stp)

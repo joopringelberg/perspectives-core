@@ -26,7 +26,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, intersect, null, singleton, fromFoldable)
+import Data.Array (concat, cons, elemIndex, filter, findIndex, fold, foldl, fromFoldable, intersect, null, singleton)
 import Data.Map (values)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
@@ -34,8 +34,7 @@ import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for_)
-import Data.Tuple (Tuple(..))
-import Foreign.Object (fromFoldable, keys) as OBJ
+import Foreign.Object (keys) as OBJ
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>), (###>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -44,7 +43,7 @@ import Perspectives.Error.Boundaries (handleDomeinFileError')
 import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments)
 import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
-import Perspectives.InvertedQuery (PropsAndVerbs, RelevantProperties(..))
+import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.Class.Context (allContextTypes)
@@ -234,29 +233,28 @@ perspectiveOnRoleType :: Partial => RoleType -> RoleType ~~~> Perspective
 perspectiveOnRoleType userRoleType objectRoleType = (lift $ getRole objectRoleType) >>= lift <<< adtOfRole >>= (perspectiveOnADT userRoleType)
 
 -- | For the user role (second argument), and the object role (first argument), compute
--- | for each verb in the perspective the former has on the latter, the properties,
--- | indexed with the Action Verb (PropsAndVerbs).
+-- | for each verb in the perspective the former has on the latter, the properties.
 -- | Results are computed for the user role and its Aspects.
 -- | Notice that only RelevantProperties are returned. In case of All, this symbolically
 -- | also represents properties of Aspects and the binding hierarchy, but does not make them explicit.
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-propsAndVerbsForObjectRole :: Partial => RoleType -> RoleType -> MonadPerspectives PropsAndVerbs
-propsAndVerbsForObjectRole objectRole userRole' = do
+relevantPropertiesForObjectRole :: Partial => RoleType -> RoleType -> MonadPerspectives RelevantProperties
+relevantPropertiesForObjectRole objectRole userRole' = do
   (perspectives :: Array Perspective) <- objectRole ###= perspectiveOnRoleType userRole'
-  pure $ OBJ.fromFoldable (concat (e <$> perspectives))
+  pure $ fold (concat (e <$> perspectives))
     where
-      e :: Perspective -> Array (Tuple String RelevantProperties)
+      e :: Perspective -> Array RelevantProperties
       e (Perspective{propertyVerbs}) = let
         (lpvs :: Array PropertyVerbs) = concat $ fromFoldable (values (unwrap propertyVerbs))
         in concat (map f lpvs)
-      f :: PropertyVerbs -> Array (Tuple String RelevantProperties)
+      f :: PropertyVerbs -> Array RelevantProperties
       f (PropertyVerbs pset verbs) = map
         (\verb -> let
           (props :: RelevantProperties) = case pset of
             Universal -> All
             Empty -> Properties []
             PSet ps -> Properties ps
-          in (Tuple (show verb) props))
+          in props)
         (verbs :: Array PropertyVerb)
 
 ----------------------------------------------------------------------------------------

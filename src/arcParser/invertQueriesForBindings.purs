@@ -41,10 +41,10 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala, unwrap)
 import Data.Traversable (traverse)
-import Foreign.Object (lookup, insert, empty) as OBJ
+import Foreign.Object (lookup, insert) as OBJ
 import Perspectives.CoreTypes (MP)
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), PropsAndVerbs, QueryWithAKink(..), RelevantProperties(..), addInvertedQuery, allProps, restrictToProperty)
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
 import Perspectives.Query.DescriptionCompiler (makeComposition)
@@ -67,13 +67,13 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 -- | provided as third argument, store an InvertedQuery for each of them on the
 -- | PropertyType.
 -- | If the binding adds properties, store an InvertedQuery in onRoleDelta_binder of the role.
-setInvertedQueriesForUserAndRole :: RoleType -> ADT EnumeratedRoleType -> PropsAndVerbs -> Boolean -> QueryWithAKink -> PhaseThree Boolean
+setInvertedQueriesForUserAndRole :: RoleType -> ADT EnumeratedRoleType -> RelevantProperties -> Boolean -> QueryWithAKink -> PhaseThree Boolean
 setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWithAkink = do
   if perspectiveOnThisRole
     -- Add qWithAkink in onContextDelta_context of role.
     then addToOnContextDelta qWithAkink role
     else pure unit
-  roleHasRequestedProperties <- case allProps props of
+  roleHasRequestedProperties <- case props of
     All -> do
       -- for each property of role, store (Value2Role >> invertedQ) in onPropertyDelta of that property
       (propsOfRole :: Array PropertyType) <- lift2 $ allLocallyRepresentedProperties (ST role)
@@ -102,11 +102,11 @@ setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWit
     addToOnContextDelta qwk@(ZQ backwards _) (EnumeratedRoleType roleId) = modifyDF \df@{enumeratedRoles:roles} ->
         case OBJ.lookup roleId roles of
           Nothing -> addInvertedQueryForDomain roleId
-            (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user OBJ.empty})
+            (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])})
             OnContextDelta_context
             df
           Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery
-            (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user OBJ.empty
+            (InvertedQuery {description: qwk, backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [])
               -- add verbs here.
               })
             onContextDelta_context }) roles}
@@ -131,10 +131,10 @@ setInvertedQueriesForUserAndRole user (ST role) props perspectiveOnThisRole qWit
         modifyDF \df@{enumeratedProperties} -> do
           case OBJ.lookup p enumeratedProperties of
             Nothing -> addInvertedQueryForDomain p
-              (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (restrictToProperty prop props)})
+              (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [prop])})
               OnPropertyDelta
               df
-            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = OBJ.insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (restrictToProperty prop props)}) onPropertyDelta}) enumeratedProperties}
+            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = OBJ.insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery (InvertedQuery {description: ZQ backwards' forwards', backwardsCompiled: Nothing, forwardsCompiled: Nothing, userTypes: singleton user (Properties [prop])}) onPropertyDelta}) enumeratedProperties}
         pure unit
       _ -> pure unit
 

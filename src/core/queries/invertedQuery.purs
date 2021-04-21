@@ -32,7 +32,7 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, findIndex, fold, modifyAt, null)
+import Data.Array (cons, findIndex, modifyAt, null)
 import Data.Array (union) as ARR
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -43,7 +43,6 @@ import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Foreign.Object (Object, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
@@ -57,10 +56,7 @@ newtype InvertedQuery = InvertedQuery
   { description :: QueryWithAKink
   , backwardsCompiled :: (Maybe HiddenFunction)
   , forwardsCompiled :: (Maybe HiddenFunction)
-  , userTypes :: Map RoleType PropsAndVerbs}
-
--- | The keys of PropsAndVerbs are the show values of Verbs.
-type PropsAndVerbs = Object RelevantProperties
+  , userTypes :: Map RoleType RelevantProperties}
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _
 derive instance newtypeInvertedQuery :: Newtype InvertedQuery _
@@ -76,7 +72,7 @@ instance encodeInvertedQuery :: Encode InvertedQuery where
     { description
     , userTypes: g userTypes})
     where
-      g :: Map RoleType PropsAndVerbs -> Array UserPropsAndVerbs
+      g :: Map RoleType RelevantProperties -> Array UserPropsAndVerbs
       g m = (\(Tuple u props) -> UserPropsAndVerbs {user: u, properties: props}) <$> toUnfoldable m
 
 instance decodeInvertedQuery :: Decode InvertedQuery where
@@ -89,7 +85,7 @@ instance decodeInvertedQuery :: Decode InvertedQuery where
       , userTypes: f r.userTypes
       }
     where
-      f :: Array UserPropsAndVerbs -> Map RoleType PropsAndVerbs
+      f :: Array UserPropsAndVerbs -> Map RoleType RelevantProperties
       f a = fromFoldable ((\(UserPropsAndVerbs{user, properties}) -> Tuple user properties) <$> a)
 
 instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
@@ -98,7 +94,7 @@ instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
 equalDescriptions :: InvertedQuery -> InvertedQuery -> Boolean
 equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}) = d1 == d2
 
-addUserTypes :: Map RoleType PropsAndVerbs -> InvertedQuery -> InvertedQuery
+addUserTypes :: Map RoleType RelevantProperties -> InvertedQuery -> InvertedQuery
 addUserTypes t (InvertedQuery r@{userTypes}) = InvertedQuery r {userTypes = union userTypes t}
 
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
@@ -106,14 +102,6 @@ addInvertedQuery q@(InvertedQuery{userTypes}) qs = case findIndex (equalDescript
   Nothing -> cons q qs
   Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes userTypes) qs
 
-allProps :: PropsAndVerbs -> RelevantProperties
-allProps o = fold $ values o
-
--- | Remove each verb-properties pair that does not include the PropertyType
--- | and restrict the properties to the singleton with that property.
--- TODO. Implementeer!
-restrictToProperty :: PropertyType -> PropsAndVerbs -> PropsAndVerbs
-restrictToProperty pt pAndV = pAndV
 -----------------------------------------------------------
 -- INVERTEDQUERY'
 -- As we cannot serialise a Map, we've to convert it to a serialisable form first.
@@ -128,7 +116,7 @@ derive instance genericInvertedQuery' :: Generic InvertedQuery' _
 -----------------------------------------------------------
 -- UserPropsAndVerbs
 -----------------------------------------------------------
-newtype UserPropsAndVerbs = UserPropsAndVerbs {user :: RoleType, properties :: PropsAndVerbs}
+newtype UserPropsAndVerbs = UserPropsAndVerbs {user :: RoleType, properties :: RelevantProperties}
 
 derive instance genericUserProps :: Generic UserPropsAndVerbs _
 
