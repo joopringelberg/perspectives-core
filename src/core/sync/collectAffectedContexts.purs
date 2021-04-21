@@ -83,7 +83,11 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
   users1 <- do
     contextCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_context))
     (for contextCalculations \iq@(InvertedQuery{backwardsCompiled, userTypes}) -> do
-      -- Find all affected contexts, starting from the role instance of the Delta.
+      -- Find all affected contexts, starting from the role instance of the Delta (provided as third argument to this function).
+      -- Each context is the start of a path through instance space that corresponds to a query expression in type space.
+      -- The path passes through the roleInstance of the Delta.
+      -- This means that the query, when re-run from the context, might yield a different result then before the
+      -- mutation described by the Delta.
       (affectedContexts :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
       handleAffectedContexts affectedContexts userTypes >>= runForwardsComputation roleInstance iq) >>= pure <<< join
   users2 <- do
@@ -99,7 +103,7 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
   pure $ nub $ union users1 users2
 
 -- Adds an AffectedContext to the transaction and returns user instances.
---
+-- These are the instances of the user roles in the affected contexts.
 handleAffectedContexts :: Array ContextInstance -> Map RoleType PropsAndVerbs -> MonadPerspectivesTransaction (Array RoleInstance)
 handleAffectedContexts affectedContexts userProps = case ANE.fromArray affectedContexts of
   Nothing -> pure []

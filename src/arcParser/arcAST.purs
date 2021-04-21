@@ -78,7 +78,8 @@ data RolePart =
   FilledByAttribute String |
   Calculation Step |
   RoleAspect String ArcPosition |
-  IndexedRole String ArcPosition
+  IndexedRole String ArcPosition |
+  ROLESTATE StateE
 
 --------------------------------------------------------------------------------
 ---- STATE

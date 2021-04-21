@@ -274,6 +274,12 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       expandedIndexedName <- expandNamespace indexedName
       pure (EnumeratedRole $ roleUnderConstruction {indexedRole = Just (RoleInstance expandedIndexedName)})
 
+    -- ROLESTATE
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{context}) (ROLESTATE s@(StateE{id:stateId})) = do
+      state@(State{id:ident}) <- traverseStateE context (unwrap context <> "$" <> stateId) s
+      modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
+      pure (EnumeratedRole $ roleUnderConstruction {rootState = Just ident})
+
     -- We we add roleName as another disjunct of a sum type.
     -- `roleName` should be qualified.
     -- Notice that we treat roles as units here; not as collections of properties!

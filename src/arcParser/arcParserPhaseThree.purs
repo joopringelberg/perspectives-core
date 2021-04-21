@@ -386,7 +386,7 @@ compileAndDistributeStep userProps dom stp = do
   setInvertedQueries userProps descr
   pure descr
 
--- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
+-- | For each State, compile the query, the object (if any) and the SideEffects.
 -- | All names are qualified in the process. Notice that all other names are qualified, by now:
 -- |  * object
 -- |  * binding of role definitions
@@ -395,7 +395,6 @@ compileAndDistributeStep userProps dom stp = do
 -- |  * the type of value that is returned from a computed role
 -- | This means we can look for the qualified version of a local name using the functions in
 -- | Perspectives.Types.ObjectGetters, as long as we make sure the model under construction is in the DomainCache.
--- | Compile the action to an Updater. Cache for later use.
 -- | Each expression (in statements) is handled with compileAndDistributeStep, hence the inverted queries are set as well.
 -- TODO: Controleer of het type argument van de assignment operatoren wel hetzelfde zijn als het type van het object van de Actie.
 compileStates :: PhaseThree Unit
@@ -428,6 +427,7 @@ compileStates = do
                   varb <- compileVarBinding currentDomain (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
                   compiledCalculation <- compileAndDistributeStep allUserRoles (CDOM $ ST context) stp
                   pure $ makeSequence varb compiledCalculation
+              -- TODO. Hier worden geen inverted queries aangelegd. Dat lijkt me wel nodig.
               mobjectCalculation <-  case object of
                 Nothing -> pure Nothing
                 Just object' -> do
@@ -484,6 +484,7 @@ compileStates = do
             -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
             -- The assignment functions arbitrarily return the currentContext. Hence,
             -- we declare the functions to be both functional and mandatory.
+            -- All inverted queries that need be created are created in this function.
             -- TODO: Controleer of de assignment operators wel corresponderen met de toegekende Verbs.
             describeAssignmentStatement :: Domain -> RoleType -> Assignment -> Maybe QueryFunctionDescription -> PhaseThree QueryFunctionDescription
             describeAssignmentStatement currentDomain subject ass mobjectCalculation = case ass of

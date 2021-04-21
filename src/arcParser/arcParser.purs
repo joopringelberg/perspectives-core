@@ -57,30 +57,13 @@ contextE = try $ withPos do
         uses <- many $ checkIndent *> useE
         ind <- checkIndent *> indexedE
         aspects <- many $ checkIndent *> aspectE
-        states <- nestedStates
+        states <- STATE <$> nestedStates
         rolesAndContexts <- many $ checkIndent *> (contextE <|> roleE)
         pure $ (ind : (states : (uses <> aspects <> rolesAndContexts))))
     else pure Nil
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos}
 
   where
-    nestedStates :: IP ContextPart
-    nestedStates = do
-      start <- getPosition
-      void $ reserved "states" *> colon
-      entryNotifications <- onEntryKeywords *> isIndented >>= if _
-        then concat <$> entireBlock notificationE
-        else pure Nil
-      exitNotifications <- onExitKeywords *> isIndented >>= if _
-        then concat <$> entireBlock notificationE
-        else pure Nil
-      states <- many $ checkIndent *> stateE
-      pure $ STATE $ StateE
-        { id: ""
-        , condition: Simple $ Value start PBool "true"
-        , stateParts: entryNotifications <> exitNotifications
-        , subStates: states
-        }
 
     qname :: ContextKind -> String -> String
     qname knd cname = if knd == Domain then "model:" <> cname else cname
@@ -115,6 +98,24 @@ contextE = try $ withPos do
       pos <- getPosition
       indexedName <- arcIdentifier
       pure $ IndexedContext indexedName pos
+
+nestedStates :: IP StateE
+nestedStates = do
+  start <- getPosition
+  void $ reserved "states" *> colon
+  entryNotifications <- onEntryKeywords *> isIndented >>= if _
+    then concat <$> entireBlock notificationE
+    else pure Nil
+  exitNotifications <- onExitKeywords *> isIndented >>= if _
+    then concat <$> entireBlock notificationE
+    else pure Nil
+  states <- many $ checkIndent *> stateE
+  pure $ StateE
+    { id: ""
+    , condition: Simple $ Value start PBool "true"
+    , stateParts: entryNotifications <> exitNotifications
+    , subStates: states
+    }
 
 domain :: IP ContextE
 domain = do
@@ -162,9 +163,10 @@ roleE =
             Nothing -> otherRole_ pos knd uname
             (Just _) -> calculatedRole_ pos knd uname
 
+    -- TODO. Heroverweeg deze vrije volgorde; houdt een meer vaste volgorde aan zoals bij context.
     rolePart :: IP RolePart
     rolePart = do
-      typeOfPart <- lookAhead (reserved' "property" <|> perspectiveOnKeywords <|> perspectiveOfKeywords <|> reserved' "view" <|> reserved' "aspect" <|> reserved' "indexed" <|> inStateKeywords <|> onEntryKeywords <|> onExitKeywords)
+      typeOfPart <- lookAhead (reserved' "property" <|> perspectiveOnKeywords <|> perspectiveOfKeywords <|> reserved' "view" <|> reserved' "aspect" <|> reserved' "indexed" <|> reserved' "states" <|> inStateKeywords <|> onEntryKeywords <|> onExitKeywords)
       case typeOfPart of
         "property" -> propertyE
         "perspectiveOn" -> SQP <$> perspectiveOn
@@ -174,6 +176,7 @@ roleE =
         "inState" -> SQP <$> inState
         "onEntry" -> SQP <$> onEntryE
         "onExit" -> SQP <$> onExitE
+        "states" -> ROLESTATE <$> nestedStates
         _ -> viewE
 
     aspectE :: IP RolePart

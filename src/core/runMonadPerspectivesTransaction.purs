@@ -191,6 +191,7 @@ runStates t = do
           r <- lift2 $ filterA (\userType -> (ENR myType) `specialisesRoleType_` userType) userTypes
           if not $ null r
             then do
+              -- TODO. Alle context instances zijn van hetzelfde type, dus éénmaal de rootstate bepalen volstaat.
               state <- lift2 (contextInstance ##>> contextType >=> liftToInstanceLevel rootState)
               pure [StateEvaluation state contextInstance (ENR myType)]
             else pure []

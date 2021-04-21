@@ -111,6 +111,7 @@ allProps o = fold $ values o
 
 -- | Remove each verb-properties pair that does not include the PropertyType
 -- | and restrict the properties to the singleton with that property.
+-- TODO. Implementeer!
 restrictToProperty :: PropertyType -> PropsAndVerbs -> PropsAndVerbs
 restrictToProperty pt pAndV = pAndV
 -----------------------------------------------------------
