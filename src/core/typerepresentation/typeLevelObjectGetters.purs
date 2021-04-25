@@ -25,16 +25,18 @@ module Perspectives.Types.ObjectGetters where
 import Control.Monad.Error.Class (try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
-import Control.Plus (empty, map, (<|>))
-import Data.Array (concat, cons, elemIndex, filter, findIndex, fold, foldl, fromFoldable, intersect, null, singleton)
-import Data.Map (values)
+import Control.Plus (map, (<|>), empty)
+import Data.Array (concat, cons, elemIndex, filter, findIndex, fold, foldl, foldr, fromFoldable, intersect, null, singleton)
+import Data.FoldableWithIndex (foldWithIndexM)
+import Data.Map (Map, values, empty, lookup, insert, keys) as Map
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Data.Traversable (for_)
+import Data.Traversable (for_, traverse)
 import Foreign.Object (keys) as OBJ
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>), (###>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -44,7 +46,7 @@ import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWi
 import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.InvertedQuery (RelevantProperties(..))
-import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.Class.Context (allContextTypes)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
@@ -245,7 +247,7 @@ relevantPropertiesForObjectRole objectRole userRole' = do
     where
       e :: Perspective -> Array RelevantProperties
       e (Perspective{propertyVerbs}) = let
-        (lpvs :: Array PropertyVerbs) = concat $ fromFoldable (values (unwrap propertyVerbs))
+        (lpvs :: Array PropertyVerbs) = concat $ fromFoldable (Map.values (unwrap propertyVerbs))
         in concat (map f lpvs)
       f :: PropertyVerbs -> Array RelevantProperties
       f (PropertyVerbs pset verbs) = map
@@ -486,3 +488,28 @@ perspectiveObjectQfd :: Partial => Perspective -> QueryFunctionDescription
 perspectiveObjectQfd (Perspective{object}) = do
   case object of
     Q calc -> calc
+
+statesPerProperty :: Perspective -> MonadPerspectives (Map.Map PropertyType (Array StateIdentifier))
+statesPerProperty (Perspective{propertyVerbs, object}) = foldWithIndexM f Map.empty (unwrap propertyVerbs)
+  where
+    f :: StateIdentifier ->
+      Map.Map PropertyType (Array StateIdentifier) ->
+      Array PropertyVerbs ->
+      MonadPerspectives (Map.Map PropertyType (Array StateIdentifier))
+    f stateId cum pvArr = do
+      (r1 :: Array (Array PropertyType)) <- traverse propertyVerbs2PropertyArray pvArr
+      pure $ foldr (\prop cum' ->
+        case Map.lookup prop cum' of
+          Nothing -> Map.insert prop [stateId] cum'
+          Just states -> Map.insert prop (cons stateId states) cum')
+        cum
+        (concat r1)
+
+    propertyVerbs2PropertyArray :: PropertyVerbs -> MonadPerspectives (Array PropertyType)
+    propertyVerbs2PropertyArray (PropertyVerbs pset _) = case pset of
+      Universal -> allProperties (unsafePartial roleRange (unsafePartial case object of Q qfd -> qfd))
+      Empty -> pure []
+      PSet props -> pure props
+
+roleStates :: Perspective -> Array StateIdentifier
+roleStates (Perspective {roleVerbs}) = fromFoldable $ Map.keys (unwrap roleVerbs)

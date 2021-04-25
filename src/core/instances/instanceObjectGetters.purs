@@ -43,6 +43,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
+import Perspectives.Instances.Combinators (conjunction)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -114,6 +115,11 @@ context rid = ArrayT $ (lift $ try $ getPerspectEntiteit rid) >>= handlePerspect
   -- of that change and consequently is no longer interested in its context.
   tell $ ArrayWithoutDoubles [Context rid]
   pure $ [rol_context r]
+
+context_ :: RoleInstance -> MonadPerspectives (Array ContextInstance)
+context_ rid = (try $ getPerspectEntiteit rid) >>=
+  handlePerspectRolError' "context_" []
+  (pure <<< singleton <<< rol_context)
 
 binding :: RoleInstance ~~> RoleInstance
 binding r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
@@ -317,6 +323,9 @@ getActiveRoleStates ri = ArrayT $ (try $ lift $ getRolMember (_.states <<< unwra
 getActiveRoleStates_ :: RoleInstance -> MonadPerspectives (Array StateIdentifier)
 getActiveRoleStates_ ci = (try $ getRolMember (_.states <<< unwrap) ci) >>=
   handlePerspectContextError' "states" [] pure <<< identity
+
+getActiveRoleAndContextStates :: RoleInstance ~~> StateIdentifier
+getActiveRoleAndContextStates = conjunction getActiveRoleStates (context >=> getActiveStates)
 
 -- | Returns the name of the model that defines the role type as a String Value.
 roleModelName :: RoleInstance ~~> Value

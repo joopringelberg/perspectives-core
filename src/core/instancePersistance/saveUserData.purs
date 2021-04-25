@@ -47,8 +47,8 @@ import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.State (lift)
 import Control.Monad.Writer (WriterT, runWriterT, tell)
-import Data.Array (deleteAt, findIndex, index, modifyAt, nub, cons)
-import Data.Array.NonEmpty (elemIndex, fromArray, head, singleton, filter)
+import Data.Array (head, elemIndex, cons, deleteAt, findIndex, index, modifyAt, nub, null, filter)
+import Data.Array.NonEmpty (fromArray, singleton)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (over, unwrap)
@@ -79,7 +79,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
-import Perspectives.Sync.AffectedContext (AffectedContext(..))
+import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -95,11 +95,11 @@ saveContextInstance :: Updater ContextInstance
 saveContextInstance id = do
   (ctxt :: PerspectContext) <- lift2 $ saveEntiteit id
   subject <- getSubject
-  forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances' ->
-    case fromArray instances' of
+  forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances ->
+    case head instances of
       Nothing -> pure unit
       -- RULE TRIGGERING
-      Just instances -> addRoleObservingContexts id (EnumeratedRoleType roleName) (head instances)
+      Just i -> addRoleObservingContexts id (EnumeratedRoleType roleName) i
   for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> do
     (PerspectRol{_id, binding, pspType, gevuldeRollen}) <- lift2 $ saveEntiteit rol
     case binding of
@@ -175,36 +175,40 @@ removeContextInstance id authorizedRole = do
     -- TODO. Maak hier een set van om dubbele te vermijden.
     remove :: EnumeratedRoleType -> Array RoleInstance -> WriterT (Array RoleInstance) MonadPerspectivesTransaction Unit
     remove roleType instances' =
-      case fromArray instances' of
+      case head instances' of
         Nothing -> pure unit
-        Just instances -> do
+        Just rid -> do
           -- Also adds contexts that 'have a vantage point' on the removed roleInstances
           -- in the context, for RULE TRIGGERING (adds them as AffectedContexts).
-          users <- lift $ usersWithPerspectiveOnRoleInstance id roleType (head instances)
+          users <- lift $ usersWithPerspectiveOnRoleInstance id roleType rid
           tell users
           -- Add correlation identifiers for outstanding Api requests, in order to update
           -- their query results, for QUERY UPDATES.
           lift ((lift2 $ findRoleRequests id roleType) >>= addCorrelationIdentifiersToTransactie)
           -- PERSISTENCE
-          for_ instances removeRoleInstance_
+          for_ instances' removeRoleInstance_
 
+    -- If the Transaction holds an AffectedContext that has the context instance,
+    -- remove it from that AffectedContext. If the AffectedContext then no longer has
+    -- context instances, remove it entirely.
     removeAffectedContext :: ContextInstance -> MonadPerspectivesTransaction Unit
     removeAffectedContext cinst = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = let
       i = findIndex
-        (\(AffectedContext{contextInstances}) -> isJust $ elemIndex cinst contextInstances)
+        (\iqr -> case iqr of
+          ContextStateQuery contextInstances -> isJust $ elemIndex cinst contextInstances
+          otherwise -> false
+        )
         affectedContexts
       in
         case i of
           Nothing -> affectedContexts
-          Just n -> let
-            AffectedContext {contextInstances, userTypes} = unsafePartial $ fromJust $ index affectedContexts n
-            mcontextInstances' = fromArray $ filter (eq cinst) contextInstances
-            in
-              case mcontextInstances' of
-                Nothing -> unsafePartial $ fromJust $ deleteAt n affectedContexts
-                Just contextInstances' -> unsafePartial $ fromJust $ modifyAt n
-                  (\_ -> AffectedContext{contextInstances: contextInstances', userTypes})
-                  affectedContexts
+          Just n -> case unsafePartial $ fromJust $ index affectedContexts n of
+            ContextStateQuery contextInstances -> case filter (eq cinst) contextInstances of
+              instances | null instances -> unsafePartial $ fromJust $ deleteAt n affectedContexts
+              instances -> unsafePartial $ fromJust $ modifyAt n
+                (\_ -> ContextStateQuery instances)
+                affectedContexts
+            otherwise -> affectedContexts
         })
 
 -- | Collects the union of the user role instances that occurr in the bindings.

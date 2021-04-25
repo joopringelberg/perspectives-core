@@ -113,6 +113,8 @@ compileAndSaveRole dom step (CalculatedRole cr@{_id}) = withFrame do
   lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q descr})
   pure $ unsafePartial $ domain2roleType $ range compiledExpression
 
+-- | Ensures that the range of the QueryFunctionDescription is a qualified
+-- | EnumeratedRole.
 qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
 qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = do
   -- Note that it doesn't matter if we take the roles from the cache or from

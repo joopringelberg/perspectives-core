@@ -23,32 +23,28 @@
 module Perspectives.Query.Kinked where
 
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, cons, foldr, intercalate, null, uncons, unsnoc)
-import Data.FoldableWithIndex (forWithIndex_)
+import Data.Array (catMaybes, concat, cons, foldr, fromFoldable, intercalate, null, uncons, union, unsnoc)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Map (Map)
+import Data.Map (Map, values)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.InvertedQuery (QueryWithAKink(..), RelevantProperties)
+import Perspectives.InvertedQuery (QueryWithAKink(..))
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setPathForStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.Inversion (compose, inversionIsFunctional, inversionIsMandatory, invertFunction)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, replaceDomain)
-import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
-import Perspectives.Representation.Class.Role (contextOfADT, getCalculation, getRole)
+import Perspectives.Representation.Class.Role (getCalculation, getRole)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
-import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (==))
+import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
@@ -164,29 +160,25 @@ invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q
 --------------------------------------------------------------------------------------------------------------
 ---- SET INVERTED QUERIES
 --------------------------------------------------------------------------------------------------------------
-setInvertedQueries :: Map RoleType RelevantProperties -> QueryFunctionDescription -> PhaseThree Unit
-setInvertedQueries userTypes qfd = do
-  (zqs :: (Array QueryWithAKink)) <- ensureContextDomain qfd >>= invert
+setInvertedQueries ::
+  Maybe RoleType ->
+  Map PropertyType (Array StateIdentifier) ->
+  Array StateIdentifier ->
+  QueryFunctionDescription ->
+  PhaseThree Unit
+setInvertedQueries user statesPerProperty roleStates qfd = do
+  (zqs :: (Array QueryWithAKink)) <- invert qfd
   for_ zqs \qwk@(ZQ backward forward) -> do
     case backward of
-      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk userTypes
+      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk user (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
       -- Assuming an SQD otherwise
-      -- (Just b) -> unsafePartial $ setPathForStep b b userTypes
-      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk userTypes
+      -- (Just b) -> unsafePartial $ setPathForStep b b usersAndProps
+      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk  user (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
       Nothing -> pure unit
     -- TODO. Voor de rol zetten we nu voor de tweede keer de InvertedQuery.
     case forward, backward, domain <$> backward of
-      Nothing, Just bw, Just (RDOM role) -> (forWithIndex_ userTypes
-        \user props -> setInvertedQueriesForUserAndRole user role props true qwk)
+      Nothing, Just bw, Just (RDOM role) ->
+        void $ setInvertedQueriesForUserAndRole user role statesPerProperty true qwk
       _, _, _ -> pure unit
-  where
-    -- For a query that has a Role domain, we add a step from context to role.
-    -- This guarantees that the inverse query has a context domain.
-    -- Note that this is equivalent to addContextToPropertyQuery in Perspectives.Query.Inversion.
-    ensureContextDomain :: QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-    ensureContextDomain q = case domain q of
-      (RDOM dom@(ST et)) -> (lift $ lift $ contextOfADT dom) >>= \c -> pure $
-        makeComposition (SQD (CDOM c) (RolGetter (ENR et)) (RDOM dom) Unknown Unknown) q
-      otherwise -> pure q

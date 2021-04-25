@@ -36,7 +36,9 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Data.Traversable (traverse)
+import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (unwrap)
+import Data.Traversable (foldMap, traverse)
 import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -47,7 +49,7 @@ import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Simple.JSON (class ReadForeign, class WriteForeign, read, readImpl, write, writeImpl)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write, writeImpl)
 
 -----------------------------------------------------------------------------------------
 ---- QUERYFUNCTIONDESCRIPTION
@@ -136,6 +138,30 @@ traverseQfd f q@(BQD dom qf qfd1 qfd2 ran fun man) = do
   f (BQD dom qf qfd1' qfd2' ran fun man)
 traverseQfd f q@(MQD dom qf qfds ran fun man) = traverse (traverseQfd f) qfds >>= \qfds' -> f (MQD dom qf qfds' ran fun man)
 
+-- | Check whether the expression or one of its subexpressions has the requested QueryFunction.
+hasQueryFunction :: QueryFunction -> QueryFunctionDescription -> Boolean
+hasQueryFunction f q@(SQD _ qf _ _ _) = eq qf f
+hasQueryFunction f q@(UQD _ qf qfd _ _ _) = if eq qf f then true else hasQueryFunction f qfd
+hasQueryFunction f q@(BQD _ qf qfd1 qfd2 _ _ _) = if eq qf f
+  then true
+  else if hasQueryFunction f qfd1
+    then true
+    else hasQueryFunction f qfd1
+hasQueryFunction f q@(MQD _ qf qfds _ _ _) = if eq qf f
+  then true
+  else unwrap $ foldMap (Disj <<< hasQueryFunction f) qfds
+
+-----------------------------------------------------------------------------------------
+---- BOOLEAN FUNCTIONS
+-----------------------------------------------------------------------------------------
+isContextDomain :: Domain -> Boolean
+isContextDomain (CDOM _) = true
+isContextDomain _ = false
+
+isRoleDomain :: Domain -> Boolean
+isRoleDomain (RDOM _) = true
+isRoleDomain _ = false
+
 -----------------------------------------------------------------------------------------
 ---- SELECTING PARTS
 -----------------------------------------------------------------------------------------
@@ -177,6 +203,11 @@ queryFunction (MQD _ f _ _ _ _) = f
 secondOperand :: QueryFunctionDescription -> Maybe QueryFunctionDescription
 secondOperand (BQD _ _ _ s _ _ _) = Just s
 secondOperand _ = Nothing
+
+propertyOfRange :: QueryFunctionDescription -> Maybe PropertyType
+propertyOfRange qfd = case range qfd of
+  (VDOM _ p) -> p
+  otherwise -> Nothing
 
 -----------------------------------------------------------------------------------------
 ---- REPLACE DOMAIN

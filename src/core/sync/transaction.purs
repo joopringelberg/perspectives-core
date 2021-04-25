@@ -41,7 +41,7 @@ import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.DomeinFile (DomeinFileId)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
-import Perspectives.Sync.AffectedContext (AffectedContext)
+import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
@@ -51,7 +51,7 @@ import Prelude (class Semigroup, class Show, bind, ($), (<>), pure)
 -- TRANSACTIE
 -----------------------------------------------------------
 newtype Transaction = Transaction (TransactionRecord
-  ( affectedContexts :: Array AffectedContext
+  ( affectedContexts :: Array InvertedQueryResult
   , correlationIdentifiers :: Array CorrelationIdentifier
   , authoringRole :: RoleType
   , rolesToBeRemoved :: Array RoleInstance

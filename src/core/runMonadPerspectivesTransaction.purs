@@ -55,7 +55,7 @@ import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.StateCompiler (enteringState, evaluateState, exitingState)
-import Perspectives.Sync.AffectedContext (AffectedContext(..))
+import Perspectives.Sync.InvertedQueryResult (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (rootState, specialisesRoleType_)
 import Prelude (Unit, bind, discard, join, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
@@ -181,6 +181,7 @@ runStates t = do
                 state <- lift2 (contextInstance ##>> contextType >=> liftToInstanceLevel rootState)
                 pure [StateEvaluation state contextInstance (CR myType)]
           else do
+            -- TODO. Dit is niet nodig. In de evaluatie controleer ik of myType een specialisatie is van de usertypes bij automaticOnEntry, enzovoort.
             r <- lift2 $ filterA (\userType -> (CR myType) `specialisesRoleType_` userType) userTypes
             if not $ null r
               then do

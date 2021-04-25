@@ -54,7 +54,6 @@ type PerspectiveRecord =
 	, actions :: EncodableMap StateIdentifier (Object SideEffect)
   }
 
-
 derive instance genericRepPerspective :: Generic Perspective _
 
 instance showPerspective :: Show Perspective where

@@ -32,21 +32,19 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, findIndex, modifyAt, null)
+import Data.Array (cons, null)
 import Data.Array (union) as ARR
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Map (Map, fromFoldable, toUnfoldable, union)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe, fromJust, isJust, isNothing)
 import Data.Newtype (class Newtype)
-import Data.Tuple (Tuple(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Partial.Unsafe (unsafePartial)
+import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, isContextDomain, isRoleDomain, range)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -----------------------------------------------------------
@@ -56,7 +54,11 @@ newtype InvertedQuery = InvertedQuery
   { description :: QueryWithAKink
   , backwardsCompiled :: (Maybe HiddenFunction)
   , forwardsCompiled :: (Maybe HiddenFunction)
-  , userTypes :: Map RoleType RelevantProperties}
+  , user :: Maybe RoleType
+  -- Yield PerspectiveObject InvertedQueryResult data only in one of these states:
+  , states :: Array StateIdentifier
+  , statesPerProperty :: EncodableMap PropertyType (Array StateIdentifier)
+}
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _
 derive instance newtypeInvertedQuery :: Newtype InvertedQuery _
@@ -68,50 +70,40 @@ instance eqInvertedQuery :: Eq InvertedQuery where
   eq = genericEq
 
 instance encodeInvertedQuery :: Encode InvertedQuery where
-  encode (InvertedQuery {description, userTypes}) = genericEncode defaultOptions (InvertedQuery'
-    { description
-    , userTypes: g userTypes})
-    where
-      g :: Map RoleType RelevantProperties -> Array UserPropsAndVerbs
-      g m = (\(Tuple u props) -> UserPropsAndVerbs {user: u, properties: props}) <$> toUnfoldable m
+  encode = genericEncode defaultOptions
 
 instance decodeInvertedQuery :: Decode InvertedQuery where
-  decode x = do
-    InvertedQuery' r <- genericDecode defaultOptions x
-    pure $ InvertedQuery
-      { description: r.description
-      , backwardsCompiled: Nothing
-      , forwardsCompiled: Nothing
-      , userTypes: f r.userTypes
-      }
-    where
-      f :: Array UserPropsAndVerbs -> Map RoleType RelevantProperties
-      f a = fromFoldable ((\(UserPropsAndVerbs{user, properties}) -> Tuple user properties) <$> a)
+  decode = genericDecode defaultOptions
 
 instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
-  prettyPrint' t (InvertedQuery{description, userTypes}) = "InvertedQuery " <> prettyPrint' (t <> "  ") description <> show userTypes
+  prettyPrint' t (InvertedQuery{description, user, states}) = "InvertedQuery " <> prettyPrint' (t <> "  ") description <> show user <> show states
 
 equalDescriptions :: InvertedQuery -> InvertedQuery -> Boolean
 equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}) = d1 == d2
 
-addUserTypes :: Map RoleType RelevantProperties -> InvertedQuery -> InvertedQuery
-addUserTypes t (InvertedQuery r@{userTypes}) = InvertedQuery r {userTypes = union userTypes t}
-
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
-addInvertedQuery q@(InvertedQuery{userTypes}) qs = case findIndex (equalDescriptions q) qs of
-  Nothing -> cons q qs
-  Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes userTypes) qs
+addInvertedQuery = cons
+-- addInvertedQuery q@(InvertedQuery{usersAndProps}) qs = case findIndex (equalDescriptions q) qs of
+--   Nothing -> cons q qs
+--   Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes usersAndProps) qs
 
------------------------------------------------------------
--- INVERTEDQUERY'
--- As we cannot serialise a Map, we've to convert it to a serialisable form first.
------------------------------------------------------------
-newtype InvertedQuery' = InvertedQuery'
-  { description :: QueryWithAKink
-  , userTypes :: Array UserPropsAndVerbs
-  }
+isStateQuery :: InvertedQuery -> Boolean
+isStateQuery (InvertedQuery{user}) = isNothing user
 
-derive instance genericInvertedQuery' :: Generic InvertedQuery' _
+-- | This is a Partial function. Do not apply when the description has Nothing for its
+-- | backwards part.
+shouldResultInContextStateQuery :: Partial => InvertedQuery -> Boolean
+shouldResultInContextStateQuery (InvertedQuery{description, user}) = isNothing user &&
+  (isContextDomain $ range $ fromJust $ backwards description)
+
+-- | This is a Partial function. Do not apply when the description has Nothing for its
+-- | backwards part.
+shouldResultInRoleStateQuery :: Partial => InvertedQuery -> Boolean
+shouldResultInRoleStateQuery (InvertedQuery{description, user}) = isNothing user &&
+  (isRoleDomain $ range $ fromJust $ backwards description)
+
+shouldResultInPerspectiveObject :: InvertedQuery -> Boolean
+shouldResultInPerspectiveObject (InvertedQuery{user}) = isJust user
 
 -----------------------------------------------------------
 -- UserPropsAndVerbs
