@@ -53,6 +53,7 @@ import Perspectives.Representation.Class.Context (contextRole, roleInContext, us
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView)
 import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeExcludingBinding, typeIncludingAspects, typeIncludingAspectsBinding)
 import Perspectives.Representation.Context (Context)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, perspectiveSupportsPropertyForVerb)
@@ -66,6 +67,9 @@ import Prelude (Unit, bind, eq, flip, not, pure, show, unit, ($), (&&), (<$>), (
 ----------------------------------------------------------------------------------------
 isUnlinked_ :: EnumeratedRoleType -> MonadPerspectives Boolean
 isUnlinked_ et = getEnumeratedRole et >>= pure <<< _.unlinked <<< unwrap
+
+roleRootState :: EnumeratedRoleType ~~~> StateIdentifier
+roleRootState = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MonadPerspectives EnumeratedRole) >=> pure <<< maybe [] singleton <<< _.rootState <<< unwrap)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S

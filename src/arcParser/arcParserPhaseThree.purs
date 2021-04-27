@@ -36,7 +36,7 @@ import Data.Array (filter, filterA, foldM, fromFoldable, head, length, nub, null
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
-import Data.Map (Map, fromFoldable, keys, empty, singleton, filter) as Map
+import Data.Map (Map, keys, empty, singleton, filter) as Map
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replace)
@@ -77,7 +77,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.State (State(..))
+import Perspectives.Representation.State (State(..), StateFulObject(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Representation.View (View(..))
@@ -381,14 +381,45 @@ compileStates = do
       modifyDF \dfr -> dfr {states = compStates}
       where
         compileState :: State -> PhaseThree State
-        compileState (State ar@{id:stateIdentifier, context, query, object, notifyOnEntry, notifyOnExit, automaticOnEntry, automaticOnExit}) =
+        compileState s@(State{stateFulObject}) = case stateFulObject of
+          Cnt context -> compileContextState context s
+          Rle role -> compileRoleState role s
+
+        compileRoleState :: EnumeratedRoleType -> State -> PhaseThree State
+        compileRoleState roleType (State ar@{id:stateIdentifier, query, notifyOnEntry, notifyOnExit, automaticOnEntry, automaticOnExit}) =
+          withFrame
+            do
+              currentDomain <- pure (RDOM $ ST roleType)
+              -- add declaraton for object. Replace object expr with
+              -- lookup in the runtime environment.
+              addBinding "object" (SQD currentDomain (QF.VariableLookup "object") currentDomain True True)
+              queryDescription <- case query of
+                Q d -> pure d
+                -- We have to do this for all user role types in the notifyOnEntry, notifyOnExit, automaticOnEntry
+                -- and automaticOnExit members.
+                S stp -> do
+                  varb <- compileVarBinding currentDomain (VarBinding "object" (Simple $ AE.Identity (startOf stp)))
+                  -- A State query only has to return the ContextInstance or RoleInstance that the state query is executed on.
+                  compiledCalculation <- compileAndDistributeStep currentDomain stp Nothing stateIdentifier
+                  pure $ makeSequence varb compiledCalculation
+              -- Now for the entries in automaticOnEntry and automaticOnExit, compile the SideEffects.
+              automaticOnEntry' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain Nothing) (unwrap automaticOnEntry)
+              automaticOnExit' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain Nothing) (unwrap automaticOnExit)
+              pure $ State ar
+                { query = Q queryDescription
+                , object = Q <$> Nothing
+                , automaticOnEntry = EncodableMap automaticOnEntry'
+                , automaticOnExit = EncodableMap automaticOnExit'
+                }
+
+        compileContextState :: ContextType -> State -> PhaseThree State
+        compileContextState context (State ar@{id:stateIdentifier, query, object, notifyOnEntry, notifyOnExit, automaticOnEntry, automaticOnExit}) =
           withFrame
             do
               currentDomain <- pure (CDOM $ ST context)
               -- add declaraton for currentcontext. Replace currentcontext expr with
               -- lookup in the runtime environment.
-              addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True False)
-              -- Add an object variable if we have an object.
+              addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True True)
               queryDescription <- case query of
                 Q d -> pure d
                 -- We have to do this for all user role types in the notifyOnEntry, notifyOnExit, automaticOnEntry
@@ -396,8 +427,9 @@ compileStates = do
                 S stp -> do
                   varb <- compileVarBinding currentDomain (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
                   -- A State query only has to return the ContextInstance or RoleInstance that the state query is executed on.
-                  compiledCalculation <- compileAndDistributeStep (CDOM $ ST context) stp Nothing stateIdentifier
+                  compiledCalculation <- compileAndDistributeStep currentDomain stp Nothing stateIdentifier
                   pure $ makeSequence varb compiledCalculation
+              -- Add an object variable if we have an object.
               mobjectCalculation <-  case object of
                 Nothing -> pure Nothing
                 Just object' -> do
@@ -421,51 +453,48 @@ compileStates = do
                   addBinding "object" (SQD currentDomain (QF.VariableLookup "object") (range objectCalculation') (functional objectCalculation') (mandatory objectCalculation'))
                   pure $ Just objectCalculation'
               -- Now for the entries in automaticOnEntry and automaticOnExit, compile the SideEffects.
-              automaticOnEntry' <- traverseWithIndex (compileSideEffect mobjectCalculation) (unwrap automaticOnEntry)
-              automaticOnExit' <- traverseWithIndex (compileSideEffect mobjectCalculation) (unwrap automaticOnExit)
+              automaticOnEntry' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain mobjectCalculation) (unwrap automaticOnEntry)
+              automaticOnExit' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain mobjectCalculation) (unwrap automaticOnExit)
               pure $ State ar
                 { query = Q queryDescription
                 , object = Q <$> mobjectCalculation
                 , automaticOnEntry = EncodableMap automaticOnEntry'
                 , automaticOnExit = EncodableMap automaticOnExit'
                 }
+
+        compileSideEffect :: StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> RoleType -> SideEffect -> PhaseThree SideEffect
+        compileSideEffect stateIdentifier currentDomain mobjectCalculation' userRoleType effect =
+          case effect of
+            -- Compile a series of Assignments into a QueryDescription.
+            A assignments -> EF <$> sequenceOfAssignments userRoleType (reverse assignments) mobjectCalculation'
+              -- Compile the LetStep into a QueryDescription.
+            L (LetStep {bindings, assignments}) -> EF <$> sequenceOfAssignments userRoleType assignments mobjectCalculation'
+            EF qfd -> pure $ EF qfd
           where
 
-            allUserRoles :: Map.Map RoleType RelevantProperties
-            allUserRoles = Map.fromFoldable ((\rt -> Tuple rt (Properties [])) <$> (fromFoldable (Map.keys (unwrap notifyOnEntry) <> Map.keys (unwrap notifyOnExit) <> Map.keys (unwrap automaticOnEntry) <> Map.keys (unwrap automaticOnExit))))
+          -- This will return a QueryFunctionDescription that describes either a single assignment, or
+          -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
+          sequenceOfAssignments :: RoleType -> Array Assignment -> Maybe QueryFunctionDescription -> PhaseThree QueryFunctionDescription
+          sequenceOfAssignments subject assignments' objectCalculation = sequenceOfAssignments_ assignments'
+            where
+              sequenceOfAssignments_ :: Array Assignment -> PhaseThree QueryFunctionDescription
+              sequenceOfAssignments_ assignments = case uncons assignments of
+                Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
+                (Just {head, tail}) -> do
+                  head_ <- describeAssignmentStatement subject head objectCalculation
+                  foldM addAssignmentToSequence head_ tail
 
-            compileSideEffect :: Maybe QueryFunctionDescription -> RoleType -> SideEffect -> PhaseThree SideEffect
-            compileSideEffect mobjectCalculation userRoleType effect =
-              case effect of
-                -- Compile a series of Assignments into a QueryDescription.
-                A assignments -> EF <$> sequenceOfAssignments (CDOM $ ST context) userRoleType (reverse assignments) mobjectCalculation
-                  -- Compile the LetStep into a QueryDescription.
-                L (LetStep {bindings, assignments}) -> EF <$> sequenceOfAssignments (CDOM $ ST context) userRoleType assignments mobjectCalculation
-                EF qfd -> pure $ EF qfd
+              -- Returns a BQD with QueryFunction (BinaryCombinator SequenceF)
+              addAssignmentToSequence :: QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription
+              addAssignmentToSequence seq v = makeSequence <$> pure seq <*> (describeAssignmentStatement subject v objectCalculation)
 
-            -- This will return a QueryFunctionDescription that describes either a single assignment, or
-            -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
-            sequenceOfAssignments :: Domain -> RoleType -> Array Assignment -> Maybe QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-            sequenceOfAssignments currentDomain subject assignments' objectCalculation = sequenceOfAssignments_ assignments'
-              where
-                sequenceOfAssignments_ :: Array Assignment -> PhaseThree QueryFunctionDescription
-                sequenceOfAssignments_ assignments = case uncons assignments of
-                  Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
-                  (Just {head, tail}) -> do
-                    head_ <- describeAssignmentStatement currentDomain subject head objectCalculation
-                    foldM addAssignmentToSequence head_ tail
-
-                -- Returns a BQD with QueryFunction (BinaryCombinator SequenceF)
-                addAssignmentToSequence :: QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription
-                addAssignmentToSequence seq v = makeSequence <$> pure seq <*> (describeAssignmentStatement currentDomain subject v objectCalculation)
-
-            -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
-            -- The assignment functions arbitrarily return the currentContext. Hence,
-            -- we declare the functions to be both functional and mandatory.
-            -- All inverted queries that need be created are created in this function.
-            -- TODO: Controleer of de assignment operators wel corresponderen met de toegekende Verbs.
-            describeAssignmentStatement :: Domain -> RoleType -> Assignment -> Maybe QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-            describeAssignmentStatement currentDomain subject ass mobjectCalculation = case ass of
+          -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
+          -- The assignment functions arbitrarily return the currentContext. Hence,
+          -- we declare the functions to be both functional and mandatory.
+          -- All inverted queries that need be created are created in this function.
+          -- TODO: Controleer of de assignment operators wel corresponderen met de toegekende Verbs.
+          describeAssignmentStatement :: RoleType -> Assignment -> Maybe QueryFunctionDescription -> PhaseThree QueryFunctionDescription
+          describeAssignmentStatement subject ass mobjectCalculation = case ass of
               Remove {roleExpression} -> do
                 rle <- ensureRole subject roleExpression
                 pure $ UQD currentDomain QF.Remove rle currentDomain True True

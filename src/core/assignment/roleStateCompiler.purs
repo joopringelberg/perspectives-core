@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.StateCompiler where
+module Perspectives.RoleStateCompiler where
 
 -- | From the description of a state, compute a function that computes for an instance of its context type
 -- | whether that state is in effect. If entering the state, run all entry effects for the current user.
@@ -38,26 +38,25 @@ import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, over, unwrap)
-import Data.Traversable (for_, traverse)
+import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.StateCache (CompiledState, cacheCompiledState, retrieveCompiledState)
-import Perspectives.Assignment.Update (setActive, setInActive)
+import Perspectives.Assignment.StateCache (CompiledRoleState, cacheCompiledRoleState, retrieveCompiledRoleState)
+import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=))
-import Perspectives.Identifiers (buitenRol)
+import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
+import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.ObjectGetters (getActiveStates_)
+import Perspectives.Instances.ObjectGetters (getActiveRoleStates_)
 import Perspectives.Names (getMySystem)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
-import Perspectives.Query.UnsafeCompiler (context2propertyValue, roleFunctionFromQfd)
+import Perspectives.Query.UnsafeCompiler (role2propertyValue)
 import Perspectives.Representation.Class.PersistentType (getState)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
@@ -65,30 +64,26 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (specialisesRoleType_, subStates_)
 import Perspectives.Utilities (findM)
 
-compileState :: StateIdentifier -> MP CompiledState
+compileState :: StateIdentifier -> MP CompiledRoleState
 compileState stateId = do
-    State {context, query, object, automaticOnEntry, automaticOnExit} <- getState stateId
-    (mobjectGetter :: Maybe (ContextInstance ~~> RoleInstance)) <- traverse
-      -- we know the queryfunction description is there, by now, hence unsafePartial.
-      (unsafePartial case _ of
-        Q calc -> roleFunctionFromQfd calc) object
-    (automaticOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
+    State {query, object, automaticOnEntry, automaticOnExit} <- getState stateId
+    (automaticOnEntry' :: Map RoleType (Updater RoleInstance)) <- traverseWithIndex
       (\subject (effect :: SideEffect) ->
         unsafePartial case effect of
-          EF qfd -> compileAssignment qfd >>= pure <<< withAuthoringRole subject)
+          EF qfd -> compileAssignmentFromRole qfd >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnEntry)
-    (automaticOnExit' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
+    (automaticOnExit' :: Map RoleType (Updater RoleInstance)) <- traverseWithIndex
       (\subject (effect :: SideEffect) ->
         unsafePartial case effect of
-          EF qfd -> compileAssignment qfd >>= pure <<< withAuthoringRole subject)
+          EF qfd -> compileAssignmentFromRole qfd >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnExit)
     -- TODO notifyOnEntry, notifyOnExit.
 
     -- We postpone compiling substates until they're asked for.
-    (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ unsafePartial case query of Q qfd -> qfd
-    pure $ cacheCompiledState stateId
+    (lhs :: (RoleInstance ~~> Value)) <- role2propertyValue $ unsafePartial case query of Q qfd -> qfd
+    pure $ cacheCompiledRoleState stateId
       { query: lhs
-      , objectGetter: mobjectGetter
+      , objectGetter: Nothing
       , automaticOnEntry: automaticOnEntry'
       , automaticOnExit: automaticOnExit'
       }
@@ -100,49 +95,39 @@ compileState stateId = do
       updater a
       lift $ modify (over Transaction \t -> t {authoringRole = originalRole})
 
--- | Ensure that the current context is available in the environment before applying this function!
 -- | Put an error boundary around this function.
-evaluateState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
-evaluateState contextId userRoleType stateId = do
-  mactive <- getActiveSubstate stateId contextId
+evaluateRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
+evaluateRoleState roleId userRoleType stateId = do
+  mactive <- getActiveSubstate stateId roleId
   case mactive of
-    Nothing -> findSatisfiedSubstate stateId contextId >>= case _ of
+    Nothing -> findSatisfiedSubstate stateId roleId >>= case _ of
       Nothing -> pure unit
-      Just sub -> enteringState contextId userRoleType sub
-    Just sub -> conditionSatisfied contextId stateId >>= if _
-      then evaluateState contextId userRoleType sub
+      Just sub -> enteringState roleId userRoleType sub
+    Just sub -> conditionSatisfied roleId stateId >>= if _
+      then evaluateRoleState roleId userRoleType sub
       else do
-        exitingState contextId userRoleType sub
-        findSatisfiedSubstate stateId contextId >>= (void <<< traverse (enteringState contextId userRoleType))
+        exitingState roleId userRoleType sub
+        findSatisfiedSubstate stateId roleId >>= (void <<< traverse (enteringState roleId userRoleType))
 
--- | On entering a state, we register that state with the context instance and trigger client query updates.
+-- | On entering a state, we register that state with the role instance and trigger client query updates.
 -- | We run all automatic actions and create notifications.
 -- | Finally, we look for the substate whose query returns true and apply `enteringState` to it.
 -- | Invariant: the state is not registered as active but its query evaluates to true.
 -- |
 -- | Put an error boundary around this function.
--- | Ensure that the current context is available in the environment before applying this function!
-enteringState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
-enteringState contextId userRoleType stateId = do
-  -- Add the state identifier to the path of states in the context instance, triggering query updates
+enteringState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
+enteringState roleId userRoleType stateId = do
+  -- Add the state identifier to the path of states in the role instance, triggering query updates
   -- just before running the current Transaction is finished.
-  setActive stateId contextId
-  {automaticOnEntry, objectGetter} <- getCompiledState stateId
-  objects <- case objectGetter of
-    Nothing -> pure []
-    Just getter -> lift2 (contextId ##= getter)
+  setActiveRoleState stateId roleId
+  {automaticOnEntry} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction.
   forWithIndex_ automaticOnEntry \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    -- Run for each object.
-    then if isJust objectGetter
-      then for_ objects \object -> do
-        oldFrame <- lift2 pushFrame
-        lift2 $ addBinding "object" [unwrap object]
-        updater contextId
-        lift2 $ restoreFrame oldFrame
-      -- Note we do not push an empty set of values for object, like we did for rules.
-      -- The modeller should not use the 'object' variable.
-      else updater contextId
+    then do
+      oldFrame <- lift2 pushFrame
+      lift2 $ addBinding "object" [unwrap roleId]
+      updater roleId
+      lift2 $ restoreFrame oldFrame
     else pure unit
   State {notifyOnEntry} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnEntry) of
@@ -156,38 +141,32 @@ enteringState contextId userRoleType stateId = do
           { id: Nothing
           , properties: PropertySerialization $ singleton "model:System$PerspectivesSystem$ContextNotification$Level"
             [(show l)]
-          , binding: Just $ buitenRol (unwrap contextId)})
+          -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
+          , binding: Just $ unwrap roleId})
   -- Recur.
-  findSatisfiedSubstate stateId contextId >>= void <<< traverse (enteringState contextId userRoleType)
+  findSatisfiedSubstate stateId roleId >>= void <<< traverse (enteringState roleId userRoleType)
 
--- | On exiting a state, we de-register that state with the context instance and trigger client query updates.
+-- | On exiting a state, we de-register that state with the role instance and trigger client query updates.
 -- | We run all automatic actions and create notifications.
 -- | Finally, we find the substate that is still active (if any) and apply `exitingState` to it.
 -- | Invariant: the state is registered as active and its query evaluates to false.
 -- |
 -- | Put an error boundary around this function.
--- | Ensure that the current context is available in the environment before applying this function!
-exitingState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
-exitingState contextId userRoleType stateId = do
+exitingState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
+exitingState roleId userRoleType stateId = do
   -- Recur. We do this first, because we have to exit the deepest nested substate first.
-  getActiveSubstate stateId contextId >>= void <<< traverse (exitingState contextId userRoleType)
+  getActiveSubstate stateId roleId >>= void <<< traverse (exitingState roleId userRoleType)
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
-  setInActive stateId contextId
-  {automaticOnExit, objectGetter} <- getCompiledState stateId
-  objects <- case objectGetter of
-    Nothing -> pure []
-    Just getter -> lift2 (contextId ##= getter)
+  setInActiveRoleState stateId roleId
+  {automaticOnExit} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction.
   forWithIndex_ automaticOnExit \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    -- Run for each object.
-    then if isJust objectGetter
-      then for_ objects \object -> do
-        oldFrame <- lift2 pushFrame
-        lift2 $ addBinding "object" [unwrap object]
-        updater contextId
-        lift2 $ restoreFrame oldFrame
-      else updater contextId
+    then do
+      oldFrame <- lift2 pushFrame
+      lift2 $ addBinding "object" [unwrap roleId]
+      updater roleId
+      lift2 $ restoreFrame oldFrame
     else pure unit
   State {notifyOnExit} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnExit) of
@@ -201,28 +180,29 @@ exitingState contextId userRoleType stateId = do
           { id: Nothing
           , properties: PropertySerialization $ singleton "model:System$PerspectivesSystem$ContextNotification$Level"
             [(show l)]
-          , binding: Just $ buitenRol (unwrap contextId)})
+          -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
+          , binding: Just $ unwrap roleId})
 
 -- | Check all substates until one of them is found for which conditionSatisfied holds;
-findSatisfiedSubstate :: StateIdentifier -> ContextInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
-findSatisfiedSubstate stateId contextId = (lift2 $ subStates_ stateId) >>= findM (conditionSatisfied contextId)
+findSatisfiedSubstate :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
+findSatisfiedSubstate stateId roleId = (lift2 $ subStates_ stateId) >>= findM (conditionSatisfied roleId)
 
-conditionSatisfied :: ContextInstance -> StateIdentifier -> MonadPerspectivesTransaction Boolean
-conditionSatisfied contextId stateId = do
+conditionSatisfied :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Boolean
+conditionSatisfied roleId stateId = do
   compiledState <- getCompiledState stateId
-  (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId compiledState.query
+  (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery roleId compiledState.query
   pure $ (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
 
-getCompiledState :: StateIdentifier -> MonadPerspectivesTransaction CompiledState
-getCompiledState stateId = case retrieveCompiledState stateId of
+getCompiledState :: StateIdentifier -> MonadPerspectivesTransaction CompiledRoleState
+getCompiledState stateId = case retrieveCompiledRoleState stateId of
   Nothing -> lift2 $ compileState stateId
   Just c -> pure c
 
-isActive :: StateIdentifier -> ContextInstance -> MonadPerspectives Boolean
-isActive stateId contextId = getActiveStates_ contextId >>= pure <<< isJust <<< elemIndex stateId
+isActive :: StateIdentifier -> RoleInstance -> MonadPerspectives Boolean
+isActive stateId roleId = getActiveRoleStates_ roleId >>= pure <<< isJust <<< elemIndex stateId
 
 -- isEntering :: State -> ContextInstance -> Boolean
 -- isExiting :: State -> ContextInstance -> Boolean
 
-getActiveSubstate :: StateIdentifier -> ContextInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
-getActiveSubstate stateId contextId = (lift $ lift $ getActiveStates_ contextId) >>= \states -> pure $ join ((\i -> index states (i + 1)) <$> (elemIndex stateId states))
+getActiveSubstate :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
+getActiveSubstate stateId roleId = (lift $ lift $ getActiveRoleStates_ roleId) >>= \states -> pure $ join ((\i -> index states (i + 1)) <$> (elemIndex stateId states))

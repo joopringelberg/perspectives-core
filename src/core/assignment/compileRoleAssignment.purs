@@ -20,10 +20,11 @@
 
 -- END LICENSE
 
-module Perspectives.CompileAssignment where
+module Perspectives.CompileRoleAssignment where
 
 -- | From the description of an assignment or effectful function, construct a function
--- | that actually assigns a value or sorts an effect.
+-- | that actually assigns a value or sorts an effect, **starting with a Role instance**.
+
 import Prelude
 
 import Control.Monad.AvarMonadAsk (modify)
@@ -58,7 +59,7 @@ import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
-import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string)
+import Perspectives.Query.UnsafeCompiler (compileFunction, role2context, role2propertyValue, role2role, role2string)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
@@ -68,25 +69,25 @@ import Perspectives.SaveUserData (removeAllRoleInstances, handleNewPeer, removeR
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Put an error boundary around this function.
-compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
-compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
-  roleGetter <- context2role rle
-  pure \contextId -> do
-    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+compileAssignmentFromRole :: QueryFunctionDescription -> MP (Updater RoleInstance)
+compileAssignmentFromRole (UQD _ QF.Remove rle _ _ mry) = do
+  roleGetter <- role2role rle
+  pure \roleId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
     for_ roles removeRoleInstance
 
--- Delete all instances of the role. Model
-compileAssignment (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
-  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextsToDeleteFrom
-  pure \contextId -> do
-    ctxts <- lift $ lift (contextId ##= contextGetter)
+-- Delete all instances of the role.
+compileAssignmentFromRole (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
+  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextsToDeleteFrom
+  pure \roleId -> do
+    ctxts <- lift $ lift (roleId ##= contextGetter)
     for_ ctxts \ctxt -> do
       removeAllRoleInstances qualifiedRoleIdentifier ctxt
 
-compileAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
-  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
-  pure \(contextId :: ContextInstance) -> do
-    ctxts <- lift2 (contextId ##= contextGetter)
+compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
+  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
+  pure \(roleId :: RoleInstance) -> do
+    ctxts <- lift2 (roleId ##= contextGetter)
     for_ ctxts \ctxt -> do
       -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
       g <- liftEffect guid
@@ -94,15 +95,15 @@ compileAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualif
         { id = "model:User$c" <> (show g)
         , ctype = unwrap qualifiedContextTypeIdentifier
         })
-      void $ createAndAddRoleInstance qualifiedRoleIdentifier (unwrap contextId) (RolSerialization
+      void $ createAndAddRoleInstance qualifiedRoleIdentifier (unwrap roleId) (RolSerialization
         { id: Nothing
         , properties: PropertySerialization empty
         , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
 
-compileAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) = do
-  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleGetterDescription
-  pure \(contextId :: ContextInstance) -> do
-    roles <- lift2 (contextId ##= roleGetter)
+compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) = do
+  (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleGetterDescription
+  pure \(roleId :: RoleInstance) -> do
+    roles <- lift2 (roleId ##= roleGetter)
     for_ roles \roleInstance -> do
       -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
       rtype <- lift2 $ roleType_ roleInstance
@@ -116,58 +117,58 @@ compileAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) role
       void $ setBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
       handleNewPeer (RoleInstance newContextId)
 
-compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
-  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
-  pure \contextId -> do
-    ctxts <- lift2 (contextId ##= contextGetter)
+compileAssignmentFromRole (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
+  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
+  pure \roleId -> do
+    ctxts <- lift2 (roleId ##= contextGetter)
     for_ ctxts \ctxt -> do
       roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
       -- No need to handle retrieval errors as we've just created the role.
       lift2 $ getPerspectRol roleIdentifier
 
-compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
-  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
-  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleToMove
+compileAssignmentFromRole (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
+  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextToMoveTo
+  (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleToMove
   if (pessimistic mry)
-    then pure \contextId -> do
-      c <- lift $ lift (contextId ##>> contextGetter)
-      (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+    then pure \roleId -> do
+      c <- lift $ lift (roleId ##>> contextGetter)
+      (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
       case fromArray roles of
         Nothing -> pure unit
         Just roles' ->  try (lift $ lift $ getPerspectEntiteit (head roles')) >>=
-          handlePerspectRolError "compileAssignment, Move"
+          handlePerspectRolError "compileAssignmentFromRole, Move"
             (\((PerspectRol{context, pspType}) :: PerspectRol) -> moveRoleInstancesToAnotherContext context c pspType roles')
 
-    else pure \contextId -> do
-      ctxt <- lift $ lift (contextId ##> contextGetter)
+    else pure \roleId -> do
+      ctxt <- lift $ lift (roleId ##> contextGetter)
       case ctxt of
         Nothing -> pure unit
         Just c -> do
-          (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+          (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
           case fromArray roles of
             Nothing -> pure unit
             Just roles' ->  try (lift $ lift $ getPerspectEntiteit (head roles')) >>=
-              handlePerspectRolError "compileAssignment, Move"
+              handlePerspectRolError "compileAssignmentFromRole, Move"
                 (\((PerspectRol{context, pspType}) :: PerspectRol) -> moveRoleInstancesToAnotherContext context c pspType roles')
 
-compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
-  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn
-  (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
-  pure \contextId -> do
-    ctxts <- lift2 (contextId ##= contextGetter)
-    (bindings' :: Array RoleInstance) <- lift2 (contextId ##= bindingsGetter)
+compileAssignmentFromRole (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
+  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextToBindIn
+  (bindingsGetter :: (RoleInstance ~~> RoleInstance)) <- role2role bindings
+  pure \roleId -> do
+    ctxts <- lift2 (roleId ##= contextGetter)
+    (bindings' :: Array RoleInstance) <- lift2 (roleId ##= bindingsGetter)
     for_ ctxts \ctxt -> do
       for_ bindings' \bndg -> createAndAddRoleInstance
         qualifiedRoleIdentifier
         (unwrap ctxt)
         (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just (unwrap bndg)})
 
-compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
-  (bindingGetter :: (ContextInstance ~~> RoleInstance)) <- context2role binding
-  (binderGetter :: (ContextInstance ~~> RoleInstance)) <- context2role binder
-  pure \contextId -> do
-    (binding' :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindingGetter)
-    (binder' :: Maybe RoleInstance) <- lift $ lift (contextId ##> binderGetter)
+compileAssignmentFromRole (BQD _ QF.Bind_ binding binder _ _ _) = do
+  (bindingGetter :: (RoleInstance ~~> RoleInstance)) <- role2role binding
+  (binderGetter :: (RoleInstance ~~> RoleInstance)) <- role2role binder
+  pure \roleId -> do
+    (binding' :: Maybe RoleInstance) <- lift $ lift (roleId ##> bindingGetter)
+    (binder' :: Maybe RoleInstance) <- lift $ lift (roleId ##> binderGetter)
     -- setBinding caches, saves, sets isMe and me.
     void $ case binding' of
       Nothing -> pure []
@@ -176,70 +177,70 @@ compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
         Just binder'' -> do
           setBinding binder'' binding'' Nothing <* handleNewPeer binder''
 
-compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
-  (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
+compileAssignmentFromRole (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
+  (bindingsGetter :: (RoleInstance ~~> RoleInstance)) <- role2role bindings
   case mroleType of
     Nothing -> pure
-      \contextId -> do
-        binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.allRoleBinders)
+      \roleId -> do
+        binders <- lift $ lift (roleId ##= bindingsGetter >=> OG.allRoleBinders)
         for_ binders (removeBinding false)
     Just roleType -> pure
-      \contextId -> do
-        binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getRoleBinders roleType)
+      \roleId -> do
+        binders <- lift $ lift (roleId ##= bindingsGetter >=> OG.getRoleBinders roleType)
         for_ binders (removeBinding false)
 
-compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
-  (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
-  (bindersGetter :: (ContextInstance ~~> RoleInstance)) <- context2role binders
-  pure \contextId -> do
-    (binding :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindingsGetter)
-    (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
+compileAssignmentFromRole (BQD _ QF.Unbind_ bindings binders _ _ _) = do
+  (bindingsGetter :: (RoleInstance ~~> RoleInstance)) <- role2role bindings
+  (bindersGetter :: (RoleInstance ~~> RoleInstance)) <- role2role binders
+  pure \roleId -> do
+    (binding :: Maybe RoleInstance) <- lift $ lift (roleId ##> bindingsGetter)
+    (binder :: Maybe RoleInstance) <- lift $ lift (roleId ##> bindersGetter)
     -- TODO. As soon as we introduce multiple values for a binding, we have to adapt this so the binding argument
     -- is taken into account, too.
     void $ case binder of
       Nothing -> pure []
       Just binder' -> removeBinding false binder'
 
-compileAssignment (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _ _ _) = do
-  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
-  pure \contextId -> do
-    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+compileAssignmentFromRole (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _ _ _) = do
+  (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleQfd
+  pure \roleId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
     deleteProperty roles qualifiedProperty
 
-compileAssignment (BQD _ (QF.RemovePropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
-  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
-  (valueGetter :: (ContextInstance ~~> Value)) <- context2propertyValue valueQfd
-  pure \contextId -> do
-    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
-    (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
+compileAssignmentFromRole (BQD _ (QF.RemovePropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
+  (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleQfd
+  (valueGetter :: (RoleInstance ~~> Value)) <- role2propertyValue valueQfd
+  pure \roleId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
+    (values :: Array Value) <- lift $ lift (roleId ##= valueGetter)
     removeProperty roles qualifiedProperty values
 
-compileAssignment (BQD _ (QF.AddPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
-  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
-  (valueGetter :: (ContextInstance ~~> Value)) <- context2propertyValue valueQfd
-  pure \contextId -> do
-    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
-    (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
+compileAssignmentFromRole (BQD _ (QF.AddPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
+  (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleQfd
+  (valueGetter :: (RoleInstance ~~> Value)) <- role2propertyValue valueQfd
+  pure \roleId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
+    (values :: Array Value) <- lift $ lift (roleId ##= valueGetter)
     addProperty roles qualifiedProperty (flip Tuple Nothing <$> values)
 
-compileAssignment (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
-  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
-  (valueGetter :: (ContextInstance ~~> Value)) <- context2propertyValue valueQfd
-  pure \contextId -> do
-    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
-    (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
+compileAssignmentFromRole (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
+  (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleQfd
+  (valueGetter :: (RoleInstance ~~> Value)) <- role2propertyValue valueQfd
+  pure \roleId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
+    (values :: Array Value) <- lift $ lift (roleId ##= valueGetter)
     setProperty roles qualifiedProperty values
 
 -- Even though SequenceF is compiled in the QueryCompiler, we need to handle it here, too.
 -- In the QueryCompiler, the components will be variable bindings.
 -- Here they will be assignments.
-compileAssignment (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
-  f1' <- compileAssignment f1
-  f2' <- compileAssignment f2
+compileAssignmentFromRole (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
+  f1' <- compileAssignmentFromRole f1
+  f2' <- compileAssignmentFromRole f2
   pure \c -> (f1' c *> f2' c)
 
-compileAssignment (UQD _ WithFrame f1 _ _ _) = do
-  f1' <- compileAssignment f1
+compileAssignmentFromRole (UQD _ WithFrame f1 _ _ _) = do
+  f1' <- compileAssignmentFromRole f1
   pure \c -> do
     old <- lift $ lift $ getVariableBindings
     void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
@@ -247,33 +248,33 @@ compileAssignment (UQD _ WithFrame f1 _ _ _) = do
     void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = old}
     pure unit
 
-compileAssignment (UQD _ (BindVariable varName) f1 _ _ _) = do
-  f1' <- context2string f1
-  pure \contextId -> do
-    v <- lift $ lift (contextId ##= f1')
+compileAssignmentFromRole (UQD _ (BindVariable varName) f1 _ _ _) = do
+  f1' <- role2string f1
+  pure \roleId -> do
+    v <- lift $ lift (roleId ##= f1')
     lift $ lift $ addBinding varName (unsafeCoerce v)
     pure unit
 
-compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
+compileAssignmentFromRole (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
-  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (unsafeCoerce compileFunction) args
+  (argFunctions :: Array (RoleInstance ~~> String)) <- traverse (unsafeCoerce compileFunction) args
   pure (\c -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
-      0 -> (unsafeCoerce f :: ContextInstance -> MPT Unit) c
-      1 -> (unsafeCoerce f :: (Array String -> ContextInstance -> MPT Unit))
+      0 -> (unsafeCoerce f :: RoleInstance -> MPT Unit) c
+      1 -> (unsafeCoerce f :: (Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         c
-      2 -> (unsafeCoerce f :: (Array String -> Array String -> ContextInstance -> MPT Unit))
+      2 -> (unsafeCoerce f :: (Array String -> Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         c
-      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
+      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
         c
-      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
@@ -283,4 +284,4 @@ compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _)
     )
 
 -- Catchall, remove when all cases have been covered.
-compileAssignment otherwise = throwError (error ("Found unknown case for compileAssignment: " <> show otherwise))
+compileAssignmentFromRole otherwise = throwError (error ("Found unknown case for compileAssignmentFromRole: " <> show otherwise))

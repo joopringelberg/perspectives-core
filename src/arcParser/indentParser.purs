@@ -83,6 +83,9 @@ withArcParserState stateId a = do
   lift $ lift $ put oldState
   pure result
 
+getStateIdentifier :: IP StateIdentifier
+getStateIdentifier = getArcParserState >>= pure <<< _.state
+
 setLabel :: forall a l r'. IsSymbol l =>
   Cons l (Maybe a) r' (subject :: Maybe String
   , object :: Maybe Step

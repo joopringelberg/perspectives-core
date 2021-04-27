@@ -66,8 +66,8 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.State (State(..), StateRecord, constructState)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
+import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier, ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.View (View(..)) as VIEW
 import Prelude (Unit, bind, discard, pure, void, ($), (<$>), (<<<), (<>), (==), (>>=))
 
@@ -156,7 +156,7 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
 
     handleParts (Context contextUnderConstruction@({_id})) (STATE s@(StateE{id:stateId})) = do
-      state@(State{id:ident}) <- traverseStateE _id (unwrap _id) s
+      state@(State{id:ident}) <- traverseStateE (Cnt _id) s
       modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
       pure $ Context contextUnderConstruction {rootState = ident}
 
@@ -275,8 +275,8 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       pure (EnumeratedRole $ roleUnderConstruction {indexedRole = Just (RoleInstance expandedIndexedName)})
 
     -- ROLESTATE
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{context}) (ROLESTATE s@(StateE{id:stateId})) = do
-      state@(State{id:ident}) <- traverseStateE context (unwrap context <> "$" <> stateId) s
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{_id, context}) (ROLESTATE s@(StateE{id:stateId})) = do
+      state@(State{id:ident}) <- traverseStateE (Rle _id) s
       modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
       pure (EnumeratedRole $ roleUnderConstruction {rootState = Just ident})
 
@@ -306,10 +306,10 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     insertPropertyInto (Property.E (EnumeratedProperty {_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (ENP _id) properties}
     insertPropertyInto (Property.C (CalculatedProperty{_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (CP _id) properties}
 
-traverseStateE :: ContextType -> String -> StateE -> PhaseTwo State
-traverseStateE contextId parentStateName (StateE {id, condition, stateParts, subStates}) = do
-  subStates' <- traverse (traverseStateE contextId (parentStateName <> "$" <> id)) subStates
-  state <- pure $ constructState (StateIdentifier $ parentStateName <> "$" <> id) condition contextId subStates'
+traverseStateE :: StateFulObject -> StateE -> PhaseTwo State
+traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = do
+  subStates' <- traverse (traverseStateE stateFulObect) subStates
+  state <- pure $ constructState id condition stateFulObect subStates'
   -- Postpone all stateParts because there may be forward references to user and subject.
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateParts}
   pure state

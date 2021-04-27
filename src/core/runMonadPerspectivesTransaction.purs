@@ -25,7 +25,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (filterA, null, sort)
+import Data.Array (filterA, head, null, sort)
 import Data.Array.NonEmpty (toArray)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
@@ -34,6 +34,7 @@ import Data.Traversable (for, traverse)
 import Effect.Aff.AVar (new)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
+import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), liftToInstanceLevel, (##>), (##>>))
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -46,7 +47,7 @@ import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.ObjectGetters (contextType, getMyType)
+import Perspectives.Instances.ObjectGetters (context, contextType, getMyType, roleType)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
@@ -54,10 +55,10 @@ import Perspectives.PerspectivesState (addBinding, publicRepository, pushFrame, 
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
-import Perspectives.StateCompiler (enteringState, evaluateState, exitingState)
-import Perspectives.Sync.InvertedQueryResult (AffectedContext(..))
+import Perspectives.RoleStateCompiler (evaluateRoleState)
+import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
-import Perspectives.Types.ObjectGetters (rootState, specialisesRoleType_)
+import Perspectives.Types.ObjectGetters (roleRootState, rootState, specialisesRoleType_)
 import Prelude (Unit, bind, discard, join, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
 
 -----------------------------------------------------------
@@ -121,14 +122,22 @@ runStates t = do
   -- Only now install a fresh transaction.
   lift $ void $ AA.modify cloneEmptyTransaction
   -- Evaluate all collected stateEvaluations.
-  for_ stateEvaluations \(StateEvaluation stateId contextId roleType) -> do
-    -- Provide a new frame for the current context variable binding.
-    oldFrame <- lift2 pushFrame
-    lift2 $ addBinding "currentcontext" [unwrap contextId]
-    -- Error boundary.
-    catchError (evaluateState contextId roleType stateId)
-      \e -> logPerspectivesError $ Custom ("Cannot evaluate state, because " <> show e)
-    lift2 $ restoreFrame oldFrame
+  for_ stateEvaluations \s -> case s of
+    ContextStateEvaluation stateId contextId roleType -> do
+      -- Provide a new frame for the current context variable binding.
+      oldFrame <- lift2 pushFrame
+      lift2 $ addBinding "currentcontext" [unwrap contextId]
+      -- Error boundary.
+      catchError (evaluateContextState contextId roleType stateId)
+        \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
+      lift2 $ restoreFrame oldFrame
+    RoleStateEvaluation stateId roleId roleType -> do
+      oldFrame <- lift2 pushFrame
+      lift2 $ addBinding "object" [unwrap roleId]
+      catchError (evaluateRoleState roleId roleType stateId)
+        \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
+      lift2 $ restoreFrame oldFrame
+
   -- Enter the rootState of new contexts.
   for_ createdContexts
     \ctxt -> do
@@ -166,39 +175,47 @@ runStates t = do
     then pure t
     else pure <<< (<>) t =<< runStates nt
   where
-    computeStateEvaluations :: AffectedContext -> MonadPerspectivesTransaction (Array StateEvaluation)
-    computeStateEvaluations (AffectedContext {contextInstances, userTypes}) = join <$> for (toArray contextInstances) \contextInstance -> do
-      (mmyType :: Maybe RoleType) <- lift2 (contextInstance ##> getMyType)
-      case mmyType of
+    -- Add to each context instance the user role type and the RootState type.
+    computeStateEvaluations :: InvertedQueryResult -> MonadPerspectivesTransaction (Array StateEvaluation)
+    computeStateEvaluations (ContextStateQuery contextInstances) = join <$> do
+      case head contextInstances of
         Nothing -> pure []
-        Just (CR myType) -> if isGuestRole myType
-          then do
-            (mmguest :: Maybe RoleInstance) <- lift2 (contextInstance ##> getCalculatedRoleInstances myType)
-            case mmguest of
-              -- If the Guest role is not filled, don't execute bots on its behalf!
+        Just contextInstance -> do
+          state <- lift2 (contextInstance ##>> contextType >=> liftToInstanceLevel rootState)
+          for contextInstances \contextInstance -> do
+            -- Note that the user may play different roles in the various context instances.
+            (mmyType :: Maybe RoleType) <- lift2 (contextInstance ##> getMyType)
+            case mmyType of
               Nothing -> pure []
-              otherwise -> do
-                state <- lift2 (contextInstance ##>> contextType >=> liftToInstanceLevel rootState)
-                pure [StateEvaluation state contextInstance (CR myType)]
-          else do
-            -- TODO. Dit is niet nodig. In de evaluatie controleer ik of myType een specialisatie is van de usertypes bij automaticOnEntry, enzovoort.
-            r <- lift2 $ filterA (\userType -> (CR myType) `specialisesRoleType_` userType) userTypes
-            if not $ null r
-              then do
-                state <- lift2 (contextInstance ##>> contextType >=> liftToInstanceLevel rootState)
-                pure [StateEvaluation state contextInstance (CR myType)]
-              else pure []
-        Just (ENR myType) -> do
-          r <- lift2 $ filterA (\userType -> (ENR myType) `specialisesRoleType_` userType) userTypes
-          if not $ null r
-            then do
-              -- TODO. Alle context instances zijn van hetzelfde type, dus éénmaal de rootstate bepalen volstaat.
-              state <- lift2 (contextInstance ##>> contextType >=> liftToInstanceLevel rootState)
-              pure [StateEvaluation state contextInstance (ENR myType)]
-            else pure []
-      where
-        isGuestRole :: CalculatedRoleType -> Boolean
-        isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
+              Just (CR myType) -> if isGuestRole myType
+                then do
+                  (mmguest :: Maybe RoleInstance) <- lift2 (contextInstance ##> getCalculatedRoleInstances myType)
+                  case mmguest of
+                    -- If the Guest role is not filled, don't execute bots on its behalf!
+                    Nothing -> pure []
+                    otherwise -> pure [ContextStateEvaluation state contextInstance (CR myType)]
+                else pure [ContextStateEvaluation state contextInstance (CR myType)]
+              Just (ENR myType) -> pure [ContextStateEvaluation state contextInstance (ENR myType)]
+    computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
+      case head roleInstances of
+        Nothing -> pure []
+        Just roleInstance -> do
+          state <- lift2 (roleInstance ##>> roleType >=> liftToInstanceLevel roleRootState)
+          for roleInstances \roleInstance -> do
+            (mmyType :: Maybe RoleType) <- lift2 (roleInstance ##> context >=> getMyType)
+            case mmyType of
+              Nothing -> pure []
+              Just (CR myType) -> if isGuestRole myType
+                then do
+                  (mmguest :: Maybe RoleInstance) <- lift2 (roleInstance ##> context >=> getCalculatedRoleInstances myType)
+                  case mmguest of
+                    Nothing -> pure []
+                    otherwise -> pure [RoleStateEvaluation state roleInstance (CR myType)]
+                else pure [RoleStateEvaluation state roleInstance (CR myType)]
+              Just (ENR myType) -> pure [RoleStateEvaluation state roleInstance (ENR myType)]
+
+    isGuestRole :: CalculatedRoleType -> Boolean
+    isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
 
 -- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
 -- | Also execute ActionInstances for created contexts.

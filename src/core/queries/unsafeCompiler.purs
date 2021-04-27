@@ -486,9 +486,21 @@ context2string qd = unsafeCoerce $ compileFunction qd
 role2context :: QueryFunctionDescription -> MP (RoleInstance ~~> ContextInstance)
 role2context qd = unsafeCoerce $ compileFunction qd
 
+-- | Construct a function to compute Strings (not further typed) from an instance of a Context.
+role2string :: QueryFunctionDescription -> MP (RoleInstance ~~> String)
+role2string qd = unsafeCoerce $ compileFunction qd
+
+-- | Construct a function to compute instances of a RoleType from an instance of a Context.
+role2role :: QueryFunctionDescription -> MP (RoleInstance ~~> RoleInstance)
+role2role qd = unsafeCoerce $ compileFunction qd
+
 -- | Construct a function to compute values of a Property for some RoleType from an instance of a Context.
 context2propertyValue :: QueryFunctionDescription -> MP (ContextInstance ~~> Value)
 context2propertyValue qd = unsafeCoerce $ compileFunction qd
+
+-- | Construct a function to compute values of a Property for some RoleType from an instance of a Context.
+role2propertyValue :: QueryFunctionDescription -> MP (RoleInstance ~~> Value)
+role2propertyValue qd = unsafeCoerce $ compileFunction qd
 
 -- | From a string that maybe identifies a Property(Enumerated or Calculated), retrieve or construct a function to
 -- | get values for that Property from a Role instance. Notice that this function may fail.

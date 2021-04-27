@@ -172,8 +172,8 @@ findBinderRequests (RoleInstance roleId) (EnumeratedRoleType typeId) = do
     Nothing -> pure []
     Just typesForResource -> pure $ maybe [] identity (lookup typeId typesForResource)
 
-findStateRequests :: ContextInstance -> MP (Array CorrelationIdentifier)
-findStateRequests (ContextInstance contextId) = do
+findContextStateRequests :: ContextInstance -> MP (Array CorrelationIdentifier)
+findContextStateRequests (ContextInstance contextId) = do
   r <- queryAssumptionRegister
   case lookup contextId r of
     Nothing -> pure []

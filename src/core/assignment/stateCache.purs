@@ -31,22 +31,40 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
 import Prelude (const, unit)
 
-type StateCache = GLStrMap CompiledState
+type ContextStateCache = GLStrMap CompiledContextState
 
--- | A global store of SupportedEffect-s
--- | This index cannot be part of the PerspectivesState. The compiler loops on it.
-stateCache :: StateCache
-stateCache = new unit
-
-cacheCompiledState :: StateIdentifier -> CompiledState -> CompiledState
-cacheCompiledState a u = const u (poke stateCache (unwrap a) u)
-
-retrieveCompiledState :: StateIdentifier -> (Maybe CompiledState)
-retrieveCompiledState a = peek stateCache (unwrap a)
-
-type CompiledState =
+type CompiledContextState =
   { query :: (ContextInstance ~~> Value)
   , objectGetter :: Maybe (ContextInstance ~~> RoleInstance)
   , automaticOnEntry :: Map RoleType (Updater ContextInstance)
   , automaticOnExit :: Map RoleType (Updater ContextInstance)
   }
+
+-- | A global store of SupportedEffect-s
+-- | This index cannot be part of the PerspectivesState. The compiler loops on it.
+contextStateCache :: ContextStateCache
+contextStateCache = new unit
+
+cacheCompiledContextState :: StateIdentifier -> CompiledContextState -> CompiledContextState
+cacheCompiledContextState a u = const u (poke contextStateCache (unwrap a) u)
+
+retrieveCompiledContextState :: StateIdentifier -> (Maybe CompiledContextState)
+retrieveCompiledContextState a = peek contextStateCache (unwrap a)
+
+type RoleStateCache = GLStrMap CompiledRoleState
+
+type CompiledRoleState =
+  { query :: (RoleInstance ~~> Value)
+  , objectGetter :: Maybe (RoleInstance ~~> RoleInstance)
+  , automaticOnEntry :: Map RoleType (Updater RoleInstance)
+  , automaticOnExit :: Map RoleType (Updater RoleInstance)
+  }
+
+roleStateCache :: RoleStateCache
+roleStateCache = new unit
+
+cacheCompiledRoleState :: StateIdentifier -> CompiledRoleState -> CompiledRoleState
+cacheCompiledRoleState a u = const u (poke roleStateCache (unwrap a) u)
+
+retrieveCompiledRoleState :: StateIdentifier -> (Maybe CompiledRoleState)
+retrieveCompiledRoleState a = peek roleStateCache (unwrap a)

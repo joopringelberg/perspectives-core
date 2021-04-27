@@ -292,7 +292,7 @@ instance prettyPrintStateIdentifier :: PrettyPrint StateIdentifier where
 derive newtype instance writeForeignStateIdentifier :: WriteForeign StateIdentifier
 derive newtype instance readForeignStateIdentifier :: ReadForeign StateIdentifier
 instance semiGroupStateIdentifier :: Semigroup StateIdentifier where
-  append (StateIdentifier s1) (StateIdentifier s2) = StateIdentifier (s1 <> s2)
+  append (StateIdentifier s1) (StateIdentifier s2) = StateIdentifier (s1 <> "$" <> s2)
 
 
 externalRoleType :: ContextType -> EnumeratedRoleType

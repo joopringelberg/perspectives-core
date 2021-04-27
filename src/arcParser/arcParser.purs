@@ -35,7 +35,7 @@ import Perspectives.Parsing.Arc.AST (ActionE(..), ContextE(..), ContextPart(..),
 import Perspectives.Parsing.Arc.Expression (assignment, letWithAssignment, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getArcParserState, getPosition, isIndented, nextLine, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getArcParserState, getPosition, getStateIdentifier, isIndented, nextLine, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Context (ContextKind(..))
@@ -103,18 +103,13 @@ nestedStates :: IP StateE
 nestedStates = do
   start <- getPosition
   void $ reserved "states" *> colon
-  entryNotifications <- onEntryKeywords *> isIndented >>= if _
-    then concat <$> entireBlock notificationE
-    else pure Nil
-  exitNotifications <- onExitKeywords *> isIndented >>= if _
-    then concat <$> entireBlock notificationE
-    else pure Nil
-  states <- many $ checkIndent *> stateE
+  stateParts <- indented *> (concat <$> block (onEntryE <|> onExitE <|> perspectiveOn <|> perspectiveOf))
+  subStates <- indented *> many stateE
   pure $ StateE
-    { id: ""
+    { id: StateIdentifier ""
     , condition: Simple $ Value start PBool "true"
-    , stateParts: entryNotifications <> exitNotifications
-    , subStates: states
+    , stateParts
+    , subStates
     }
 
 domain :: IP ContextE
@@ -330,10 +325,13 @@ stateE = do
   id <- reserved "state" *> colon *> token.identifier
   withArcParserState (StateIdentifier id)
     do
+      -- In IP, defined as an IntendParser on top of StateT ArcParserState Identity, we now have a
+      -- new ArcParserState object with member 'state' being StateIdentifier "{previousStateIdentifier}$id".
       condition <- sameOrIndented *> step
       stateParts <- indented *> (concat <$> block (onEntryE <|> onExitE <|> perspectiveOn <|> perspectiveOf))
       subStates <- indented *> many stateE
-      pure $ StateE {id, condition, stateParts, subStates}
+      nestedStateId <- getStateIdentifier
+      pure $ StateE {id: nestedStateId, condition, stateParts, subStates}
 
 perspectiveOn :: IP (List StateQualifiedPart)
 perspectiveOn = try $ withPos do

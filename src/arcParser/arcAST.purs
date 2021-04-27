@@ -85,7 +85,7 @@ data RolePart =
 ---- STATE
 --------------------------------------------------------------------------------
 newtype StateE = StateE
-  { id :: String
+  { id :: StateIdentifier
   , condition :: Step
   , stateParts :: List StateQualifiedPart
   , subStates :: List StateE

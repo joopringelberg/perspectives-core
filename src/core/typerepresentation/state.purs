@@ -39,13 +39,13 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.SideEffect (SideEffect)
-import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, StateIdentifier)
 
 newtype State = State StateRecord
 
 type StateRecord =
 	{ id :: StateIdentifier
-	, context :: ContextType
+	, stateFulObject :: StateFulObject
 	, query :: Calculation
 	, object :: Maybe Calculation
 	-- the key in these maps is the subject the effect or notification is for.
@@ -56,10 +56,10 @@ type StateRecord =
 	, subStates :: Array StateIdentifier
 	}
 
-constructState :: StateIdentifier -> Step -> ContextType -> List State -> State
-constructState id condition context subStates = State
+constructState :: StateIdentifier -> Step -> StateFulObject -> List State -> State
+constructState id condition stateFulObject subStates = State
 	{id: id
-	, context
+	, stateFulObject
 	, query: S condition
 	, object: Nothing
 	, notifyOnEntry: EncodableMap empty
@@ -90,3 +90,11 @@ instance identifiableState :: Identifiable State StateIdentifier where
 instance revisionState :: Revision State where
   rev _ = Nothing
   changeRevision _ s = s
+
+
+data StateFulObject = Cnt ContextType | Rle EnumeratedRoleType
+derive instance genericStateFulObject :: Generic StateFulObject _
+instance showStateFulObject :: Show StateFulObject where show = genericShow
+instance eqStateFulObject :: Eq StateFulObject where eq = genericEq
+instance encodeStateFulObject :: Encode StateFulObject where encode = genericEncode defaultOptions
+instance decodeStateFulObject :: Decode StateFulObject where decode = unsafeFromForeign

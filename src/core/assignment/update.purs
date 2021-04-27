@@ -56,10 +56,10 @@ import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, lift2, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, context_rolInContext, context_states, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, pushContext_state, removeRol_property, rol_id, rol_isMe)
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, context_rolInContext, context_states, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_id, rol_isMe, rol_states)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
-import Perspectives.DependencyTracking.Dependency (findPropertyRequests, findRoleRequests, findStateRequests)
+import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, roleType)
@@ -453,7 +453,7 @@ getAuthor :: MonadPerspectivesTransaction String
 getAuthor = lift $ gets (_.author <<< unwrap)
 
 -----------------------------------------------------------
--- SETACTIVE
+-- SETACTIVECONTEXTSTATE
 -----------------------------------------------------------
 -- | Add the state identifier as the last state in the array of state identifiers in the context instance.
 -- | The five responsibilities are adressed as follows:
@@ -465,15 +465,15 @@ getAuthor = lift $ gets (_.author <<< unwrap)
 -- | QUERY UPDATES This is handled by adding correlation identifiers for requests that depend on the State Assumption
 -- |  for the context instance to Transaction State.
 -- | CURRENTUSER is not applicable.
-setActive :: StateIdentifier -> ContextInstance -> MonadPerspectivesTransaction Unit
-setActive stateId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
-    handlePerspectContextError "setActive"
+setActiveContextState :: StateIdentifier -> ContextInstance -> MonadPerspectivesTransaction Unit
+setActiveContextState stateId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
+    handlePerspectContextError "setActiveContextState"
       \(pe :: PerspectContext) -> do
         cacheAndSave contextId $ pushContext_state pe stateId
-        (lift2 $ findStateRequests contextId) >>= addCorrelationIdentifiersToTransactie
+        (lift2 $ findContextStateRequests contextId) >>= addCorrelationIdentifiersToTransactie
 
 -----------------------------------------------------------
--- SETINACTIVE
+-- SETINACTIVECONTEXTSTATE
 -----------------------------------------------------------
 -- | Remove the state identifier from the array of state identifiers in the context instance, iff it is actually
 -- | the last one.
@@ -486,11 +486,54 @@ setActive stateId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
 -- | QUERY UPDATES This is handled by adding correlation identifiers for requests that depend on the State Assumption
 -- |  for the context instance to Transaction State.
 -- | CURRENTUSER is not applicable.
-setInActive :: StateIdentifier -> ContextInstance -> MonadPerspectivesTransaction Unit
-setInActive stateId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
-    handlePerspectContextError "setInActive"
+setInActiveContextState :: StateIdentifier -> ContextInstance -> MonadPerspectivesTransaction Unit
+setInActiveContextState stateId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
+    handlePerspectContextError "setInActiveContextState"
       \(pe :: PerspectContext) -> if isJust $ last (context_states pe)
         then do
           cacheAndSave contextId $ popContext_state pe stateId
-          (lift2 $ findStateRequests contextId) >>= addCorrelationIdentifiersToTransactie
+          (lift2 $ findContextStateRequests contextId) >>= addCorrelationIdentifiersToTransactie
+        else pure unit
+
+-----------------------------------------------------------
+-- SETACTIVEROLESTATE
+-----------------------------------------------------------
+-- | Add the state identifier as the last state in the array of state identifiers in the role instance.
+-- | The five responsibilities are adressed as follows:
+-- | PERSISTENCE of the role instance.
+-- | SYNCHRONISATION is not applicable: state is not synchronised between participants but recomputed by each PDR.
+-- | RULE TRIGGERING is not applicable. State change is a *consequence* of assignment (and therefore of triggered
+-- |  rules) but not a direct cause. The rule triggering mechanism depends on building a list of affected contexts
+-- |  during assignment. Changing state is not affecting contexts; it is a representation of such changes.
+-- | QUERY UPDATES This is handled by adding correlation identifiers for requests that depend on the State Assumption
+-- |  for the role instance to Transaction State.
+-- | CURRENTUSER is not applicable.
+setActiveRoleState :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction Unit
+setActiveRoleState stateId roleId = (lift2 $ try $ getPerspectRol roleId) >>=
+    handlePerspectContextError "setActiveRoleState"
+      \(pe :: PerspectRol) -> do
+        cacheAndSave roleId $ pushRol_state pe stateId
+        (lift2 $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
+
+-----------------------------------------------------------
+-- SETINACTIVEROLESTATE
+-----------------------------------------------------------
+-- | Remove the state identifier from the array of state identifiers in the context instance, iff it is actually
+-- | the last one.
+-- | The five responsibilities are adressed as follows:
+-- | PERSISTENCE of the context instance.
+-- | SYNCHRONISATION is not applicable: state is not synchronised between participants but recomputed by each PDR.
+-- | RULE TRIGGERING is not applicable. State change is a *consequence* of assignment (and therefore of triggered
+-- |  rules) but not a direct cause. The rule triggering mechanism depends on building a list of affected contexts
+-- |  during assignment. Changing state is not affecting contexts; it is a representation of such changes.
+-- | QUERY UPDATES This is handled by adding correlation identifiers for requests that depend on the State Assumption
+-- |  for the context instance to Transaction State.
+-- | CURRENTUSER is not applicable.
+setInActiveRoleState :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction Unit
+setInActiveRoleState stateId roleId = (lift2 $ try $ getPerspectRol roleId) >>=
+    handlePerspectContextError "setInActiveRoleState"
+      \(pe :: PerspectRol) -> if isJust $ last (rol_states pe)
+        then do
+          cacheAndSave roleId $ popRol_state pe stateId
+          (lift2 $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
         else pure unit
