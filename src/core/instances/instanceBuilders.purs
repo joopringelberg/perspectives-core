@@ -58,7 +58,7 @@ import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
-import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, deltaIndex, insertDelta)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.Identifiers (buitenRol, deconstructLocalName)
@@ -214,6 +214,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
               , deltaType: ConstructExternalRole
               , subject } }
       })
+  lift $ addCreatedRoleToTransaction externalRole
   -- QUERY UPDATES
   (lift $ lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType pspType)) >>= lift <<< addCorrelationIdentifiersToTransactie
   -- TODO. Op dit moment van constructie aangekomen is nog niet vastgelegd wie 'me' is in de context.
@@ -305,4 +306,5 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
             , subject } }
     })
   void $ lift2 $ cacheEntity rolInstanceId role
+  addCreatedRoleToTransaction rolInstanceId
   pure role

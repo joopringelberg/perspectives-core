@@ -165,7 +165,7 @@ removeContextInstance id authorizedRole = do
               , subject
               }}}
 
-      -- now remove id from the affectedContexts in the Transaction.
+      -- now remove id from the invertedQueryResults in the Transaction.
       removeAffectedContext id
 
   where
@@ -192,23 +192,23 @@ removeContextInstance id authorizedRole = do
     -- remove it from that AffectedContext. If the AffectedContext then no longer has
     -- context instances, remove it entirely.
     removeAffectedContext :: ContextInstance -> MonadPerspectivesTransaction Unit
-    removeAffectedContext cinst = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = let
+    removeAffectedContext cinst = lift $ AA.modify \(Transaction r@{invertedQueryResults}) -> Transaction (r {invertedQueryResults = let
       i = findIndex
         (\iqr -> case iqr of
           ContextStateQuery contextInstances -> isJust $ elemIndex cinst contextInstances
           otherwise -> false
         )
-        affectedContexts
+        invertedQueryResults
       in
         case i of
-          Nothing -> affectedContexts
-          Just n -> case unsafePartial $ fromJust $ index affectedContexts n of
+          Nothing -> invertedQueryResults
+          Just n -> case unsafePartial $ fromJust $ index invertedQueryResults n of
             ContextStateQuery contextInstances -> case filter (eq cinst) contextInstances of
-              instances | null instances -> unsafePartial $ fromJust $ deleteAt n affectedContexts
+              instances | null instances -> unsafePartial $ fromJust $ deleteAt n invertedQueryResults
               instances -> unsafePartial $ fromJust $ modifyAt n
                 (\_ -> ContextStateQuery instances)
-                affectedContexts
-            otherwise -> affectedContexts
+                invertedQueryResults
+            otherwise -> invertedQueryResults
         })
 
 -- | Collects the union of the user role instances that occurr in the bindings.

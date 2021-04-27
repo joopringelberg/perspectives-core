@@ -172,6 +172,13 @@ addCreatedContextToTransaction cid =
       then createdContexts
       else snoc createdContexts cid})
 
+addCreatedRoleToTransaction :: RoleInstance -> MonadPerspectivesTransaction Unit
+addCreatedRoleToTransaction rid =
+  lift $ AA.modify (over Transaction \t@{createdRoles} -> t {createdRoles =
+    if isJust $ elemIndex rid createdRoles
+      then createdRoles
+      else snoc createdRoles rid})
+
 -- Procedure om Delta's zuinig toe te voegen.
 -- 2. Bepaal of de rol functioneel is.
 -- ZO JA:

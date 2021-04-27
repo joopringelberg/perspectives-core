@@ -101,8 +101,8 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, user, stat
   where
     createContextStateQuery :: MonadPerspectivesTransaction (Array RoleInstance)
     createContextStateQuery = do
-      (affectedContexts :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
-      addInvertedQueryResult $ ContextStateQuery affectedContexts
+      (invertedQueryResults :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
+      addInvertedQueryResult $ ContextStateQuery invertedQueryResults
       pure []
 
     createRoleStateQuery :: MonadPerspectivesTransaction (Array RoleInstance)
@@ -113,18 +113,18 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, user, stat
 
     usersWithAnActivePerspective :: MonadPerspectivesTransaction (Array RoleInstance)
     usersWithAnActivePerspective = do
-      (affectedContexts :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
+      (invertedQueryResults :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
       -- Return users only for those contexts that are in one of the permissable states.
       allowed <- filterA
         (\cid -> (lift2 $ getActiveStates_ cid) >>= pure <<< not <<< null <<< intersect states)
-        affectedContexts
+        invertedQueryResults
       join <$> for allowed \ci -> do
         -- Remove 'me'
         -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
         lift2 ((ci ##= getRoleInstances (unsafePartial $ fromJust user)) >>= filterA notIsMe)
 
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
-addInvertedQueryResult result = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [result] affectedContexts})
+addInvertedQueryResult result = lift $ AA.modify \(Transaction r@{invertedQueryResults}) -> Transaction (r {invertedQueryResults = union [result] invertedQueryResults})
 
 -----------------------------------------------------------
 -- OBSERVINGCONTEXTS

@@ -41,7 +41,7 @@ import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWith
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>), (##>>))
-import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (buitenRol, unsafeDeconstructModelName)
@@ -213,6 +213,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
                   , occurrence = i
                   , universeRoleDelta = s
                   })
+            addCreatedRoleToTransaction rolInstanceId
             void $ lift2 $ cacheEntity rolInstanceId role
             pure true
           else pure false

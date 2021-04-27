@@ -52,7 +52,6 @@ import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Upd
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates_)
 import Perspectives.Names (getMySystem)
-import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (role2propertyValue)
 import Perspectives.Representation.Class.PersistentType (getState)
@@ -102,32 +101,29 @@ evaluateRoleState roleId userRoleType stateId = do
   case mactive of
     Nothing -> findSatisfiedSubstate stateId roleId >>= case _ of
       Nothing -> pure unit
-      Just sub -> enteringState roleId userRoleType sub
+      Just sub -> enteringRoleState roleId userRoleType sub
     Just sub -> conditionSatisfied roleId stateId >>= if _
       then evaluateRoleState roleId userRoleType sub
       else do
-        exitingState roleId userRoleType sub
-        findSatisfiedSubstate stateId roleId >>= (void <<< traverse (enteringState roleId userRoleType))
+        exitingRoleState roleId userRoleType sub
+        findSatisfiedSubstate stateId roleId >>= (void <<< traverse (enteringRoleState roleId userRoleType))
 
 -- | On entering a state, we register that state with the role instance and trigger client query updates.
 -- | We run all automatic actions and create notifications.
--- | Finally, we look for the substate whose query returns true and apply `enteringState` to it.
+-- | Finally, we look for the substate whose query returns true and apply `enteringRoleState` to it.
 -- | Invariant: the state is not registered as active but its query evaluates to true.
 -- |
 -- | Put an error boundary around this function.
-enteringState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
-enteringState roleId userRoleType stateId = do
+-- | Ensure that the current context is available in the environment before applying this function!
+enteringRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
+enteringRoleState roleId userRoleType stateId = do
   -- Add the state identifier to the path of states in the role instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveRoleState stateId roleId
   {automaticOnEntry} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction.
   forWithIndex_ automaticOnEntry \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    then do
-      oldFrame <- lift2 pushFrame
-      lift2 $ addBinding "object" [unwrap roleId]
-      updater roleId
-      lift2 $ restoreFrame oldFrame
+    then updater roleId
     else pure unit
   State {notifyOnEntry} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnEntry) of
@@ -144,29 +140,26 @@ enteringState roleId userRoleType stateId = do
           -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
           , binding: Just $ unwrap roleId})
   -- Recur.
-  findSatisfiedSubstate stateId roleId >>= void <<< traverse (enteringState roleId userRoleType)
+  findSatisfiedSubstate stateId roleId >>= void <<< traverse (enteringRoleState roleId userRoleType)
 
 -- | On exiting a state, we de-register that state with the role instance and trigger client query updates.
 -- | We run all automatic actions and create notifications.
--- | Finally, we find the substate that is still active (if any) and apply `exitingState` to it.
+-- | Finally, we find the substate that is still active (if any) and apply `exitingRoleState` to it.
 -- | Invariant: the state is registered as active and its query evaluates to false.
 -- |
 -- | Put an error boundary around this function.
-exitingState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
-exitingState roleId userRoleType stateId = do
+-- | Ensure that the current context is available in the environment before applying this function!
+exitingRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
+exitingRoleState roleId userRoleType stateId = do
   -- Recur. We do this first, because we have to exit the deepest nested substate first.
-  getActiveSubstate stateId roleId >>= void <<< traverse (exitingState roleId userRoleType)
+  getActiveSubstate stateId roleId >>= void <<< traverse (exitingRoleState roleId userRoleType)
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
   setInActiveRoleState stateId roleId
   {automaticOnExit} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction.
   forWithIndex_ automaticOnExit \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    then do
-      oldFrame <- lift2 pushFrame
-      lift2 $ addBinding "object" [unwrap roleId]
-      updater roleId
-      lift2 $ restoreFrame oldFrame
+    then updater roleId
     else pure unit
   State {notifyOnExit} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnExit) of

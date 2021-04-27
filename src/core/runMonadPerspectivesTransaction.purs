@@ -25,8 +25,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (filterA, head, null, sort)
-import Data.Array.NonEmpty (toArray)
+import Data.Array (head, sort)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
@@ -55,11 +54,11 @@ import Perspectives.PerspectivesState (addBinding, publicRepository, pushFrame, 
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
-import Perspectives.RoleStateCompiler (evaluateRoleState)
+import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
-import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
-import Perspectives.Types.ObjectGetters (roleRootState, rootState, specialisesRoleType_)
-import Prelude (Unit, bind, discard, join, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
+import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
+import Perspectives.Types.ObjectGetters (roleRootState, rootState)
+import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -77,7 +76,7 @@ runMonadPerspectivesTransaction' :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives (Array o))
-runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= lift <<< createTransactie authoringRole >>= lift <<< new >>= runReaderT (runArrayT run)
+runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= lift <<< createTransaction authoringRole >>= lift <<< new >>= runReaderT (runArrayT run)
   where
     run :: MonadPerspectivesTransaction o
     run = do
@@ -110,15 +109,15 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
 runSterileTransaction a =
   getUserIdentifier
-  >>= lift <<< createTransactie (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+  >>= lift <<< createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
   >>= lift <<< new
   >>= runReaderT (runArrayT a)
 
 runStates :: Transaction -> MonadPerspectivesTransaction Transaction
 runStates t = do
   -- log "==========RUNNING STATES============"
-  Transaction{affectedContexts, createdContexts, {-createdRoles,-} contextsToBeRemoved, rolesToBeRemoved} <- lift $ AA.get
-  (stateEvaluations :: Array StateEvaluation) <- join <$> traverse computeStateEvaluations affectedContexts
+  Transaction{invertedQueryResults, createdContexts, createdRoles, contextsToBeRemoved, rolesToBeRemoved} <- lift $ AA.get
+  (stateEvaluations :: Array StateEvaluation) <- join <$> traverse computeStateEvaluations invertedQueryResults
   -- Only now install a fresh transaction.
   lift $ void $ AA.modify cloneEmptyTransaction
   -- Evaluate all collected stateEvaluations.
@@ -132,12 +131,12 @@ runStates t = do
         \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
       lift2 $ restoreFrame oldFrame
     RoleStateEvaluation stateId roleId roleType -> do
+      cid <- lift2 (roleId ##>> context)
       oldFrame <- lift2 pushFrame
-      lift2 $ addBinding "object" [unwrap roleId]
+      lift2 $ addBinding "currentcontext" [unwrap cid]
       catchError (evaluateRoleState roleId roleType stateId)
         \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
       lift2 $ restoreFrame oldFrame
-
   -- Enter the rootState of new contexts.
   for_ createdContexts
     \ctxt -> do
@@ -168,51 +167,79 @@ runStates t = do
           catchError (exitingState ctxt myType state)
             \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
           lift2 $ restoreFrame oldFrame
-  -- TODO Enter the rootState of new roles.
-  -- TODO Exit the rootState of roles that are deleted.
+  -- Enter the rootState of roles that are created.
+  for_ createdRoles
+    \rid -> do
+      ctxt <- lift2 (rid ##>> context)
+      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
+      case mmyType of
+        Nothing -> pure unit
+        Just myType -> do
+          state <- lift2 (rid ##>> roleType >=> liftToInstanceLevel roleRootState)
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          -- Error boundary.
+          catchError (enteringRoleState rid myType state)
+            \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
+  -- Exit the rootState of roles that are removed.
+  for_ rolesToBeRemoved
+    \rid -> do
+      ctxt <- lift2 (rid ##>> context)
+      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
+      case mmyType of
+        Nothing -> pure unit
+        Just myType -> do
+          state <- lift2 (rid ##>> roleType >=> liftToInstanceLevel roleRootState)
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          -- Error boundary.
+          catchError (exitingRoleState rid myType state)
+            \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure t
     else pure <<< (<>) t =<< runStates nt
   where
-    -- Add to each context instance the user role type and the RootState type.
+    -- Add to each context or role instance the user role type and the RootState type.
     computeStateEvaluations :: InvertedQueryResult -> MonadPerspectivesTransaction (Array StateEvaluation)
     computeStateEvaluations (ContextStateQuery contextInstances) = join <$> do
       case head contextInstances of
         Nothing -> pure []
         Just contextInstance -> do
           state <- lift2 (contextInstance ##>> contextType >=> liftToInstanceLevel rootState)
-          for contextInstances \contextInstance -> do
+          for contextInstances \cid -> do
             -- Note that the user may play different roles in the various context instances.
-            (mmyType :: Maybe RoleType) <- lift2 (contextInstance ##> getMyType)
+            (mmyType :: Maybe RoleType) <- lift2 (cid ##> getMyType)
             case mmyType of
               Nothing -> pure []
               Just (CR myType) -> if isGuestRole myType
                 then do
-                  (mmguest :: Maybe RoleInstance) <- lift2 (contextInstance ##> getCalculatedRoleInstances myType)
+                  (mmguest :: Maybe RoleInstance) <- lift2 (cid ##> getCalculatedRoleInstances myType)
                   case mmguest of
                     -- If the Guest role is not filled, don't execute bots on its behalf!
                     Nothing -> pure []
-                    otherwise -> pure [ContextStateEvaluation state contextInstance (CR myType)]
-                else pure [ContextStateEvaluation state contextInstance (CR myType)]
-              Just (ENR myType) -> pure [ContextStateEvaluation state contextInstance (ENR myType)]
+                    otherwise -> pure [ContextStateEvaluation state cid (CR myType)]
+                else pure [ContextStateEvaluation state cid (CR myType)]
+              Just (ENR myType) -> pure [ContextStateEvaluation state cid (ENR myType)]
     computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
       case head roleInstances of
         Nothing -> pure []
         Just roleInstance -> do
           state <- lift2 (roleInstance ##>> roleType >=> liftToInstanceLevel roleRootState)
-          for roleInstances \roleInstance -> do
-            (mmyType :: Maybe RoleType) <- lift2 (roleInstance ##> context >=> getMyType)
+          for roleInstances \rid -> do
+            (mmyType :: Maybe RoleType) <- lift2 (rid ##> context >=> getMyType)
             case mmyType of
               Nothing -> pure []
               Just (CR myType) -> if isGuestRole myType
                 then do
-                  (mmguest :: Maybe RoleInstance) <- lift2 (roleInstance ##> context >=> getCalculatedRoleInstances myType)
+                  (mmguest :: Maybe RoleInstance) <- lift2 (rid ##> context >=> getCalculatedRoleInstances myType)
                   case mmguest of
                     Nothing -> pure []
-                    otherwise -> pure [RoleStateEvaluation state roleInstance (CR myType)]
-                else pure [RoleStateEvaluation state roleInstance (CR myType)]
-              Just (ENR myType) -> pure [RoleStateEvaluation state roleInstance (ENR myType)]
+                    otherwise -> pure [RoleStateEvaluation state rid (CR myType)]
+                else pure [RoleStateEvaluation state rid (CR myType)]
+              Just (ENR myType) -> pure [RoleStateEvaluation state rid (ENR myType)]
 
     isGuestRole :: CalculatedRoleType -> Boolean
     isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
@@ -227,7 +254,7 @@ runStates t = do
 --   -- Check if the type of 'me' is among them.
 --   -- If so, execute the automatic actions for 'me'.
 --   -- log "==========RUNNING ACTIONS============"
---   (as :: Array ActionInstance) <- (lift $ AA.gets (_.affectedContexts <<< unwrap)) >>= traverse getAllAutomaticActions >>= pure <<< join
+--   (as :: Array ActionInstance) <- (lift $ AA.gets (_.invertedQueryResults <<< unwrap)) >>= traverse getAllAutomaticActions >>= pure <<< join
 --   -- Collect all contexts that are created
 --   (ccs :: Array ContextInstance) <- lift $ AA.gets (_.createdContexts <<< unwrap)
 --   -- Only now install a fresh transaction.

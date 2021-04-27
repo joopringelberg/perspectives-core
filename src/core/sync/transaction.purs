@@ -51,13 +51,14 @@ import Prelude (class Semigroup, class Show, bind, ($), (<>), pure)
 -- TRANSACTIE
 -----------------------------------------------------------
 newtype Transaction = Transaction (TransactionRecord
-  ( affectedContexts :: Array InvertedQueryResult
+  ( invertedQueryResults :: Array InvertedQueryResult
   , correlationIdentifiers :: Array CorrelationIdentifier
   , authoringRole :: RoleType
   , rolesToBeRemoved :: Array RoleInstance
   , contextsToBeRemoved :: Array ContextInstance
   , modelsToBeRemoved :: Array DomeinFileId
   , createdContexts :: Array ContextInstance
+  , createdRoles :: Array RoleInstance
   ))
 
 type TransactionRecord f =
@@ -87,25 +88,26 @@ instance encodeTransactie' :: Encode Transaction' where
 instance decodeTransactie :: Decode Transaction where
   decode f = do
     ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- decode f
-    pure $ Transaction{author, timeStamp, deltas, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: [], authoringRole: ENR $ EnumeratedRoleType "model:System$PerspectivesContext$User", rolesToBeRemoved: [], contextsToBeRemoved: [], modelsToBeRemoved: [], createdContexts: []}
+    pure $ Transaction{author, timeStamp, deltas, changedDomeinFiles, invertedQueryResults: [], correlationIdentifiers: [], authoringRole: ENR $ EnumeratedRoleType "model:System$PerspectivesContext$User", rolesToBeRemoved: [], contextsToBeRemoved: [], modelsToBeRemoved: [], createdContexts: [], createdRoles: []}
 
 instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, authoringRole, rolesToBeRemoved, contextsToBeRemoved, modelsToBeRemoved, createdContexts})
-    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, correlationIdentifiers: ci, rolesToBeRemoved: rtbr, contextsToBeRemoved: ctbr, modelsToBeRemoved: mtbr, createdContexts: cc}) = Transaction
+  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, authoringRole, rolesToBeRemoved, contextsToBeRemoved, modelsToBeRemoved, createdContexts, createdRoles})
+    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, correlationIdentifiers: ci, rolesToBeRemoved: rtbr, contextsToBeRemoved: ctbr, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr}) = Transaction
       { author: author
       , timeStamp: timeStamp
       , deltas: deltas `union` ds
       , changedDomeinFiles: union changedDomeinFiles cd
-      , affectedContexts: []
+      , invertedQueryResults: []
       , correlationIdentifiers: union correlationIdentifiers ci
       , authoringRole
       , rolesToBeRemoved: rolesToBeRemoved <> rtbr
       , contextsToBeRemoved: contextsToBeRemoved <> ctbr
       , modelsToBeRemoved: modelsToBeRemoved <> mtbr
       , createdContexts: createdContexts <> cc
+      , createdRoles: createdRoles <> cr
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
@@ -116,8 +118,8 @@ instance revisionTransaction :: Revision Transaction where
 instance prettyPrintTransaction :: PrettyPrint Transaction where
   prettyPrint' t (Transaction r) = "Transaction " <> prettyPrint' (t <> "  ") r
 
-createTransactie :: RoleType -> String -> Aff Transaction
-createTransactie authoringRole author =
+createTransaction :: RoleType -> String -> Aff Transaction
+createTransaction authoringRole author =
   do
     n <- liftEffect $ now
     pure $ Transaction
@@ -125,13 +127,15 @@ createTransactie authoringRole author =
       , timeStamp: SerializableDateTime (toDateTime n)
       , deltas: []
       , changedDomeinFiles: []
-      , affectedContexts: []
+      , invertedQueryResults: []
       , correlationIdentifiers: []
       , authoringRole
       , rolesToBeRemoved: []
       , contextsToBeRemoved: []
       , modelsToBeRemoved: []
-      , createdContexts: []}
+      , createdContexts: []
+      , createdRoles: []
+    }
 
 cloneEmptyTransaction :: Transaction -> Transaction
 cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole}) = Transaction
@@ -139,13 +143,15 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole}) = Transac
   , timeStamp: timeStamp
   , deltas: []
   , changedDomeinFiles: []
-  , affectedContexts: []
+  , invertedQueryResults: []
   , correlationIdentifiers: []
   , authoringRole
   , rolesToBeRemoved: []
   , contextsToBeRemoved: []
   , modelsToBeRemoved: []
-  , createdContexts: []}
+  , createdContexts: []
+  , createdRoles: []
+}
 
 isEmptyTransaction :: Transaction -> Boolean
 isEmptyTransaction (Transaction {deltas}) = null deltas

@@ -55,7 +55,7 @@ import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
-import Perspectives.Sync.Transaction (Transaction(..), createTransactie)
+import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (perspectiveObjectQfd, perspectivesClosure_)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
@@ -93,7 +93,7 @@ serialisedAsDeltasForUserType cid userType = do
       MonadPerspectives Transaction
     execMonadPerspectivesTransaction authoringRole a =
       getUserIdentifier
-      >>= lift <<< createTransactie authoringRole
+      >>= lift <<< createTransaction authoringRole
       >>= lift <<< new
       >>= runReaderT (runArrayT run)
       >>= pure <<< unsafePartial PA.head
