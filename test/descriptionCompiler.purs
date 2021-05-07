@@ -47,7 +47,7 @@ makeTest_ :: (String -> Aff Unit -> Free TestF Unit) ->
   (DomeinFileRecord -> Aff Unit) ->
   Free TestF Unit
 makeTest_ test title source errorHandler theTest = test title do
-  (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser source ARC.domain
+  (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser source ARC.domain
   case r of
     (Left e) -> assert (show e) false
     (Right ctxt@(ContextE{id})) -> do

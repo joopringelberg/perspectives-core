@@ -22,16 +22,24 @@
 
 module Perspectives.Parsing.Arc.Token where
 
+import Prelude
+
 import Control.Alt ((<|>))
-import Control.Monad (class Monad)
 import Control.Monad.State (StateT)
+import Data.Array (uncons, sort, many) as Array
+import Data.Maybe (Maybe(..))
+import Data.String (toLower)
+import Data.String.CodeUnits as SCU
 import Perspectives.Parsing.Arc.IndentParser (ArcParser)
-import Text.Parsing.Parser (ParserT)
+import Text.Parsing.Parser (ParserT, fail)
+import Text.Parsing.Parser.Combinators (try, (<?>))
 import Text.Parsing.Parser.Pos (Position)
 import Text.Parsing.Parser.String (oneOf)
 import Text.Parsing.Parser.Token (GenLanguageDef(..), GenTokenParser, alphaNum, makeTokenParser, upper)
 
 type IndentTokenParser = GenTokenParser String (StateT Position ArcParser)
+
+type StringPositionParser = ParserT String (StateT Position ArcParser) String
 
 token :: IndentTokenParser
 token = makeTokenParser perspectDef
@@ -61,12 +69,14 @@ perspectDef = LanguageDef
                   , "state"
                   , "activity"
                   , "use"
+                  , "indexed"
+                  , "aspect"
 
                   -- Roles
                   , "thing"
                   , "user"
-                  , "bot"
                   , "context"
+                  , "external"
                   , "properties"
                   , "filledBy"
                   , "for"
@@ -78,29 +88,107 @@ perspectDef = LanguageDef
                   , "mandatory"
                   , "functional"
                   , "not"
-                  , "number"
-                  , "string"
-                  , "date"
-                  , "boolean"
+                  , "Number"
+                  , "String"
+                  , "DateTime"
+                  , "Boolean"
 
                   -- Perspectives
                   , "perspective"
                   , "on"
-                  , "consults"
-                  , "changes"
-                  , "deletes"
-                  , "creates"
-                  , "with"
-                  , "indirectObject"
-                  , "objectView"
-                  , "indirectObjectView"
-                  , "subjectView"
+                  , "of"
+                  , "view"
+                  , "props"
+                  , "roleverbs"
+                  , "all"
+                  , "only"
+                  , "except"
+
+                  -- States
+                  , "in"
+                  , "entry"
+                  , "exit"
+                  , "notify"
+                  , "do"
+                  , "action"
 
                   -- Queries
-                  , "Filter"
+                  , "filter"
+
+                  -- Expressions
+                  , "remove"
+                  , "createRole"
+                  , "move"
+                  , "bind"
+                  , "bind_"
+                  , "unbind"
+                  , "unbind_"
+                  , "delete"
+                  , "callEffect"
+                  , "letE"
+                  , "letA"
+                  , "callExternal"
+                  , "exists"
+                  , "binds"
+                  , "boundBy"
+                  , "available"
+
                   ]
                 , caseSensitive:   true
                 }
   where
     op' :: forall m . (Monad m) => ParserT String m Char
     op' = oneOf [':', '!', '%', '&', '*', '+', '.', '<', '=', '>', '?', '@', '\\', '^', '|', '-', '~']
+
+-----------------------------------------------------------
+-- reservedIdentifier
+-----------------------------------------------------------
+-- | Parse one of the reserved identifiers.
+reservedIdentifier :: StringPositionParser
+reservedIdentifier = token.lexeme $ try go
+  where
+    go :: StringPositionParser
+    go = do
+        name <- ident
+        if (isReservedPerspectivesName name)
+           then pure name
+           else fail ("not a reserved word " <> show name <> "(or unexpected end of input)")
+
+    isReservedPerspectivesName :: String -> Boolean
+    isReservedPerspectivesName = isReservedName perspectDef
+
+
+    ident :: StringPositionParser
+    ident = go' perspectDef <?> "identifier"
+      where
+        go' :: IndentLanguageDef -> StringPositionParser
+        go' (LanguageDef languageDef) = do
+            cs <- Array.many languageDef.identLetter
+            pure $ SCU.fromCharArray cs
+
+-----------------------------------------------------------
+-- Identifiers & Reserved words
+-- This section is replicated from Text.Parsing.Parser.Token.
+-- We need isReservedName but it is not exported from Text.Parsing.Parser.Token.
+-----------------------------------------------------------
+
+isReservedName :: forall m . Monad m => GenLanguageDef String m -> String -> Boolean
+isReservedName langDef@(LanguageDef languageDef) name =
+    isReserved (theReservedNames langDef) caseName
+  where
+    caseName | languageDef.caseSensitive  = name
+             | otherwise                  = toLower name
+
+isReserved :: Array String -> String -> Boolean
+isReserved names name =
+    case Array.uncons names of
+        Nothing -> false
+        Just { head: r, tail: rs } -> case (compare r name) of
+                                        LT  -> isReserved rs name
+                                        EQ  -> true
+                                        GT  -> false
+
+theReservedNames :: forall m . Monad m => GenLanguageDef String m -> Array String
+theReservedNames (LanguageDef languageDef)
+    | languageDef.caseSensitive = Array.sort languageDef.reservedNames
+    | otherwise                 = Array.sort $ map toLower languageDef.reservedNames

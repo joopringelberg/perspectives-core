@@ -23,6 +23,7 @@
 module Perspectives.TypePersistence.LoadArc where
 
 import Control.Monad.Error.Class (catchError)
+import Control.Monad.Trans.Class (lift)
 import Data.Array (delete, filterA, findIndex, head)
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
@@ -67,7 +68,7 @@ type Source = String
 loadAndCompileArcFile_ :: Source -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
 loadAndCompileArcFile_ text = catchError
   do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} lift $ runIndentParser text domain
     case r of
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
       (Right ctxt) -> do

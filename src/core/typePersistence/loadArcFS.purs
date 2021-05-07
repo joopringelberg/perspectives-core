@@ -81,7 +81,7 @@ loadAndCompileArcFile_ :: FilePath -> MonadPerspectives (Either (Array Perspecti
 loadAndCompileArcFile_ filePath = catchError
   do
     text <- lift $ readTextFile UTF8 filePath
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} lift $ runIndentParser text domain
     case r of
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
       (Right ctxt) -> do

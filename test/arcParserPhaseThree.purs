@@ -3,15 +3,18 @@ module Test.Parsing.Arc.PhaseThree where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (elemIndex, filter, head, length)
+import Data.Array (elemIndex, filter, find, head, length)
 import Data.Either (Either(..))
 import Data.Lens (_Just, preview, traversed)
 import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Map (Map, lookup, values) as Map
+import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Newtype (unwrap)
+import Data.Set (subset, fromFoldable)
 import Data.Symbol (SProxy(..))
+import Effect.Aff (Aff, throwError, error)
 import Effect.Class.Console (logShow)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
@@ -21,31 +24,32 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
-import Perspectives.Parsing.Arc.Expression.AST (Step(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AST
+import Perspectives.Parsing.Arc.Expression.AST (Step(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.PersistentType (getPerspectType)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getPerspectType)
 import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..), subsetPSet)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), objectOfPerspective)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
+import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb, RoleVerbList(..))
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
 import Test.Perspectives.Utils (runP)
-import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (Test, TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
 
@@ -58,43 +62,44 @@ withDomeinFile ns df mpa = do
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
-  test "TypeLevelObjectGetters" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
-    case r of
-      (Left e) -> assert (show e) false
-      (Right ctxt@(ContextE{id})) -> do
-        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
-          (Left e) -> assert (show e) false
-          (Right df@(DomeinFile dr')) -> do
-            -- logShow dr'
-            (Context {_id}) <- runP $
-              withDomeinFile "model:MyTestDomain" df
-                (getPerspectType (ContextType "model:MyTestDomain"))
-            assert "Should be able to retrieve the context that represents the domain"
-              (_id == ContextType "model:MyTestDomain")
-            (CalculatedRole {_id:crid}) <- runP $
-              withDomeinFile "model:MyTestDomain" df
-                (getPerspectType (CalculatedRoleType "model:MyTestDomain$AnotherRole"))
-            assert "Should be able to retrieve the role AnotherRole"
-              (crid == CalculatedRoleType "model:MyTestDomain$AnotherRole")
-
-            roles <- runP $
-              withDomeinFile "model:MyTestDomain" df
-                ((ContextType "model:MyTestDomain") ###= roleInContext)
-            assert "roleInContext should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
-              case head roles of
-                (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
-                otherwise -> false
-
-            roles'' <- runP $
-              withDomeinFile "model:MyTestDomain" df
-                ((ContextType "model:MyTestDomain") ###= (lookForUnqualifiedRoleType "AnotherRole"))
-            assert "lookForUnqualifiedRoleType should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
-              (isJust (head roles''))
+  -- test "TypeLevelObjectGetters" do
+  --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right ctxt@(ContextE{id})) -> do
+  --       case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+  --         (Left e) -> assert (show e) false
+  --         (Right df@(DomeinFile dr')) -> do
+  --           -- logShow dr'
+  --           (Context {_id}) <- runP $
+  --             withDomeinFile "model:MyTestDomain" df
+  --               (getPerspectType (ContextType "model:MyTestDomain"))
+  --           assert "Should be able to retrieve the context that represents the domain"
+  --             (_id == ContextType "model:MyTestDomain")
+  --           (CalculatedRole {_id:crid}) <- runP $
+  --             withDomeinFile "model:MyTestDomain" df
+  --               (getPerspectType (CalculatedRoleType "model:MyTestDomain$AnotherRole"))
+  --           assert "Should be able to retrieve the role AnotherRole"
+  --             (crid == CalculatedRoleType "model:MyTestDomain$AnotherRole")
+  --
+  --           roles <- runP $
+  --             withDomeinFile "model:MyTestDomain" df
+  --               ((ContextType "model:MyTestDomain") ###= roleInContext)
+  --           assert "roleInContext should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
+  --             case head roles of
+  --               (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
+  --               otherwise -> false
+  --
+  --           roles'' <- runP $
+  --             withDomeinFile "model:MyTestDomain" df
+  --               ((ContextType "model:MyTestDomain") ###= (lookForUnqualifiedRoleType "AnotherRole"))
+  --           assert "lookForUnqualifiedRoleType should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
+  --             (isJust (head roles''))
 
   -- test "Testing qualifyActionRoles." do
   --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
 
+{-
   test "Testing qualifyActionRoles." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  bot: for MySelf\n    perspective on: AnotherRole\n      Consult\n        indirectObject: AnotherRole \n  thing: Role (mandatory, functional) filledBy: YetAnotherRole\n  thing: AnotherRole = Role >> binding\n  thing: YetAnotherRole (mandatory, functional)" ARC.domain
     case r of
@@ -362,9 +367,9 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   (Just (View{propertyReferences})) -> case head (filter (\pref -> propertytype2string pref == "model:MyTestDomain$FeestVoorbereiding$Datum") propertyReferences) of
                     (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))) -> assert "" true
                     otherwise -> assert "There should be a Property 'model:MyTestDomain$FeestVoorbereiding$Datum' in ViewOpFeest" false
-
+-}
   test "Testing qualifyViewReferences: reference to View on Action." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    property: BigParty = context >> Guest >>= count > 10\n    view: ViewOpFeest (Datum, BigParty)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n  user: Guest (mandatory, functional)\n    perspective on: Feest (ViewOpFeest) Consult" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    property: BigParty = context >> Guest >>= count > 10\n    view: ViewOpFeest (Datum, BigParty)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n  user: Guest (mandatory, functional)\n    perspective on: Feest (ViewOpFeest) \n      Consult" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -376,14 +381,83 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
             x' <- runP $ phaseThree dr'
             case x' of
               (Left e) -> assert (show e) false
-              (Right correctedDFR@{actions}) -> do
-                -- logShow correctedDFR
-                case lookup "model:MyTestDomain$Guest$ConsultFeest" actions of
-                  Nothing -> assert "There should be an Action 'model:MyTestDomain$Guest$ConsultFeest'." false
-                  (Just (Action{requiredObjectProperties})) -> case requiredObjectProperties of
-                    (Just (ViewType "model:MyTestDomain$Feest$ViewOpFeest")) -> assert "bla" true
-                    otherwise -> assert "There should be an Object View" false
+              Right dfr ->
+                ensureERole dfr  "model:MyTestDomain$Guest" >>=
+                  ensurePerspectiveOn "model:MyTestDomain$Feest" >>=
+                    ensurePropertyVerbsInState "model:MyTestDomain" >>=
+                      Universal `haveVerbs` [Consult]
 
+failure :: forall a. String -> Aff a
+failure = throwError <<< error
+
+ensureERole :: DomeinFileRecord -> String -> Aff EnumeratedRole
+ensureERole {enumeratedRoles} roleName = case lookup roleName enumeratedRoles of
+  Nothing -> failure  ("There should be a role '" <> roleName <> "'.")
+  Just erole -> pure erole
+
+ensurePerspectiveOn :: String -> EnumeratedRole -> Aff Perspective
+ensurePerspectiveOn roleName (EnumeratedRole{perspectives}) = case head $ filter (unsafePartial objectOfPerspective >>> eq (ST $ EnumeratedRoleType roleName)) perspectives of
+  Nothing -> failure  ("There should be a Perspective on '" <> roleName <> "'.")
+  Just p -> pure p
+
+ensurePropertyVerbsInState  :: String -> Perspective -> Aff (Array PropertyVerbs)
+ensurePropertyVerbsInState stateName (Perspective{propertyVerbs}) = case Map.lookup (StateIdentifier stateName) (unwrap propertyVerbs) of
+  Nothing -> failure ("There should be an entry in propertyVerbs for state '" <> stateName <> "'.")
+  Just pv -> pure pv
+
+ensureRoleVerbsInState :: String -> Perspective -> Aff RoleVerbList
+ensureRoleVerbsInState stateName (Perspective {roleVerbs}) = case Map.lookup (StateIdentifier stateName) (unwrap roleVerbs) of
+  Nothing -> failure ("There should be an entry in roleVerbs for state '" <> stateName <> "'.")
+  Just rv -> pure rv
+
+-- (ExplicitSet PropertyType) haveVerbs (Array PropertyVerb)
+-- eg: Universal `haveVerbs` [Consult]
+haveVerbs :: (ExplicitSet PropertyType) -> (Array PropertyVerb) -> (Array PropertyVerbs) -> Test
+haveVerbs props verbs pvArr = case find (\(PropertyVerbs propset verbarr) -> propset `subsetPSet` props && (fromFoldable verbarr) `subset` (fromFoldable verbs)) pvArr of
+  Nothing -> failure ("Expected '" <> show pvArr <> "' for '" <> show props <> "'.")
+  Just _ -> pure unit
+
+{-
+getERole :: DomeinFileRecord -> String -> Maybe EnumeratedRole
+getERole {enumeratedRoles} roleName = lookup roleName enumeratedRoles
+
+ensurePerspectiveInStateOn :: EnumeratedRole -> String -> Aff Perspective
+ensurePerspectiveInStateOn roleName stateId (EnumeratedRole{perspectives}) = case head $ filter (objectOfPerspective >>> eq (ST $ EnumeratedRole roleName)) of
+  Nothing -> failure ("There should be a Perspective on '" <> roleName <> "' in state '" <> show stateId <> "'.")
+  Just p@(Perspective {roleVerbs}) -> if isJust $ Map.lookup stateId roleVerbs
+    then pure p
+    else failure ("Perspective is not valid for state '" <> show stateId <> "'.")
+
+getPerspectiveOn :: EnumeratedRole -> String -> Maybe Perspective
+getPerspectiveOn (EnumeratedRole{perspectives}) roleName = head $ filter (unsafePartial objectOfPerspective >>> eq (ST $ EnumeratedRoleType roleName)) perspectives
+
+ensureRoleVerb  :: RoleVerb -> RoleVerbList -> Test
+ensureRoleVerb roleVerb p = if perspectiveHasRoleVerb p roleVerb
+  then assert "ok" true
+  else assert ("The Perspective should have role verb '" <> show roleVerb <> "'") false
+
+perspectiveHasRoleVerb :: Perspective -> RoleVerb -> Boolean
+perspectiveHasRoleVerb (Perspective{roleVerbs}) roleVerb = isJust $ find (roleVerbsInclude roleVerb) $ Map.values (unwrap roleVerbs)
+
+perspectiveHasRoleVerbInState :: Perspective -> RoleVerb -> StateIdentifier -> Aff Unit
+perspectiveHasRoleVerbInState (Perspective{roleVerbs}) roleVerb stateId = case Map.lookup stateId (unwrap roleVerbs) of
+  Nothing -> failure ("Perspective is not valid for '" <> show stateId <> "'.")
+  Just roleVerbs -> if roleVerbsInclude roleVerb roleVerbs
+    then pure unit
+    else failure ("Perspective does not have '" <> show roleVerb <> "' in state '" <> show stateId <> "'.")
+
+roleVerbsInclude :: RoleVerb -> RoleVerbList -> Boolean
+roleVerbsInclude _ All = true
+roleVerbsInclude v (Including verbs) = isJust $ elemIndex v verbs
+roleVerbsInclude v (Excluding verbs) = isNothing $ elemIndex v verbs
+
+ensurePropertyVerb  :: PropertyVerb -> Perspective -> Test
+ensurePropertyVerb propertyVerb (Perspective{propertyVerbs}) = case lookup propertyVerb (unwrap propertyVerbs) of
+  Nothing -> assert "The Perspective should have property verb '" <> show propertyVerb <> "'" false
+  otherwise -> assert "ok" true
+-}
+
+{-
   test "Testing qualifyPropertyReferences: reference to a Calculated Property." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    property: NrOfGuests (mandatory, functional, Number)\n    property: BigParty = NrOfGuests > 10\n    view: ViewOpFeest (Datum, BigParty)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n  user: Guest (mandatory, functional)\n    perspective on: Feest (ViewOpFeest) Consult" ARC.domain
     case r of
@@ -1088,3 +1162,4 @@ x :: DomeinFileRecord -> MonadPerspectives (Array RoleType)
 x correctedDFR = withDomeinFile "model:MyTestDomain"
   (DomeinFile correctedDFR)
   ((runTypeLevelToArray (ST (ContextType "model:MyTestDomain")) (lookForUnqualifiedRoleTypeOfADT "Guest")))
+-}

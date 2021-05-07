@@ -22,7 +22,7 @@ import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, localReplication, postDbName, setChannelReplication, setMyAddress, setYourAddress)
-import Perspectives.Sync.Transaction (Transaction, createTransactie)
+import Perspectives.Sync.Transaction (Transaction, createTransaction)
 import Test.Perspectives.Utils (runP, withSystem, runMonadPerspectivesTransaction)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -95,7 +95,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
     createDatabase "post"
     (user :: String) <- getUserIdentifier
     localReplication url "channel" "post" (Just user)
-    t <- liftAff $ createTransactie (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") user
+    t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") user
     void $ addDocument "channel" t "emptyTransaction"
 
     -- Wait a bit
@@ -134,7 +134,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
         case mchannel of
           Nothing -> pure unit
           Just (Value channelId) -> do
-            t <- liftAff $ createTransactie (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") "model:User$joop$User"
+            t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") "model:User$joop$User"
             void $ addDocument channelId t "emptyTransaction"
             -- Wait a bit
             liftAff $ delay (Milliseconds 5000.0)

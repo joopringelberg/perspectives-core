@@ -29,7 +29,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (isJust, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Prelude (class Eq, class Show, not, ($))
+import Prelude (class Eq, class Ord, class Show, compare, not, show, ($))
 
 -----------------------------------------------------------
 -- ROLEVERB
@@ -75,6 +75,8 @@ instance showPropertyVerb :: Show PropertyVerb where
   show = genericShow
 instance eqPropertyVerb :: Eq PropertyVerb where
   eq = genericEq
+instance ordPropertyVerb :: Ord PropertyVerb where
+  compare pv1 pv2 = compare (show pv1) (show pv2)
 
 -----------------------------------------------------------
 -- ROLEVERBLIST

@@ -12,10 +12,9 @@ import Effect.Class.Console (logShow)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 import Node.Path as Path
-import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
-import Perspectives.Parsing.TransferFile (actionE, domain, perspectiveE, propertyE, roleE, viewE)
-import Perspectives.Representation.Action (Verb(..))
+-- import Perspectives.Parsing.TransferFile (actionE, domain, perspectiveE, propertyE, roleE, viewE)
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
@@ -26,6 +25,7 @@ import Text.Parsing.Parser (ParseError)
 testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
+{-
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Parsing.TransferFile" do
   test "Representing the Domain" do
@@ -219,3 +219,4 @@ theSuite = suite "Perspectives.Parsing.TransferFile" do
           (isJust (findIndex (case _ of
             (CE (ContextE {id, kindOfContext})) -> id == "MySubContext" && kindOfContext == Case
             otherwise -> false) contextParts)))
+-}

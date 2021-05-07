@@ -8,9 +8,10 @@ import Data.Either (Either(..))
 import Data.Maybe (isJust, isNothing)
 import Data.Newtype (unwrap)
 import Effect.Class.Console (log, logShow)
-import Perspectives.Parsing.Arc.Expression (assignment, computationStep, letStep, operator, simpleStep, step, unaryStep)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), ComputationStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
+import Perspectives.Parsing.Arc.Expression (assignment, computationStep, operator, roleAssignment, simpleStep, step, unaryStep)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), ComputationStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
+import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Utilities (prettyPrint)
@@ -21,7 +22,7 @@ import Text.Parsing.Parser (ParseError(..))
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyRole" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -31,7 +32,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           otherwise -> false
 
   test "SimpleStep: Binding" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "binding" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "binding" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -41,7 +42,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           otherwise -> false
 
   test "SimpleStep: Variable" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "someName" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "someName" simpleStep
     case r of
       (Left (ParseError m _)) -> assert "A lowercase name should be parsed as a variable" false
       (Right v@(Simple (Variable _ _))) -> do
@@ -52,7 +53,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         assert "A lowercase name should be parsed as a variable" false
 
   test "UnaryStep: LogicalNot" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "not MyProperty" unaryStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "not MyProperty" unaryStep
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -62,7 +63,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           otherwise -> false
 
   test "UnaryStep: create" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "createRole MyRole" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "createRole MyRole" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -72,7 +73,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           otherwise -> false
 
   test "FilterStep" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter MyRole with ItsBooleanProp" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "filter MyRole with ItsBooleanProp" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -85,7 +86,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "CompoundStep on filter with parens" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "(filter MyRole with ItsBooleanProp)" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "(filter MyRole with ItsBooleanProp)" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -98,7 +99,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "BinaryStep with ==" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "Prop1 == Prop2" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "Prop1 == Prop2" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -118,7 +119,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
 
 
   test "BinaryStep with different SimpleSteps" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "AnotherRole >> binding" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "AnotherRole >> binding" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -131,7 +132,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "BinaryStep that fails on operator" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "Prop1 ? Prop2" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "Prop1 ? Prop2" step
     case r of
       (Left (ParseError m _)) -> do
         -- logShow m
@@ -142,7 +143,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         assert "Of 'Prop1 ? Prop2', just the first term should be parsed." (id == (Simple (ArcIdentifier (ArcPosition { column: 1, line: 1 }) "Prop1")))
 
   test "Step on == with nested filter expression left" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter MyRole with ItsBooleanProp == MyOtherRole" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "filter MyRole with ItsBooleanProp == MyOtherRole" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -155,7 +156,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "Filter with compound criterium" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter MyRole with (MyOtherRole >> Criterium)" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "filter MyRole with (MyOtherRole >> Criterium)" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -169,7 +170,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "Step on recursive binaryStep" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> MyProp == MyOtherRole >> MyProp" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyRole >> MyProp == MyOtherRole >> MyProp" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -182,7 +183,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "Step on recursive binaryStep with last subexpression as filter" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> MyProp == filter MyRole with MyProp" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyRole >> MyProp == filter MyRole with MyProp" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -195,7 +196,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "Step on unneccasary parens" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "((MyRole) >> (MyProp))" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "((MyRole) >> (MyProp))" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -208,7 +209,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "Operator precedence on 'MyProp1 + MyProp2 * MyProp3'" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp1 + MyProp2 * MyProp3" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyProp1 + MyProp2 * MyProp3" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -221,7 +222,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "Operator precedence on '(MyProp1 + MyProp2) * MyProp3'" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "(MyProp1 + MyProp2) * MyProp3" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "(MyProp1 + MyProp2) * MyProp3" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -234,7 +235,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "number in equation" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp > 10" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyProp > 10" step
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Binary (BinaryStep{operator, right}))) -> do
@@ -250,7 +251,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert "'MyProp > 10' should be parsed as a a GreaterThen" false
 
   test "boolean" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "false" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "false" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PBool "false"))) -> do
@@ -259,7 +260,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert "'false' should be parsed as a (Value _ PBoolean \"false\")" false
 
   test "string" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "\"aap\"" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "\"aap\"" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PString "aap"))) -> do
@@ -268,7 +269,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert "'\"aap\"' should be parsed as a (Value _ PBoolean \"aap\")" false
 
   test "date" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "'1995-12-17T03:24:00'" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "'1995-12-17T03:24:00'" simpleStep
     -- logShow r -- (Right (Simple (Value (ArcPosition { column: 1, line: 1 }) PNumber "1995")))
     case r of
       (Left e) -> assert (show e) false
@@ -278,7 +279,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert "\"1995-12-17T03:24:00\" should be parsed as a (Date _ PDate ...)" false
 
   test "date" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "'1995-12-17'" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "'1995-12-17'" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PDate _))) -> do
@@ -287,7 +288,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert "'1995-12-17' should be parsed as a (Date _ PDate ...)" false
 
   test "date in comparison" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp > '1995-12-17'" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyProp > '1995-12-17'" step
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Binary (BinaryStep{operator, right}))) -> do
@@ -303,7 +304,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert "'MyProp > '1995-12-17'' should be parsed as a a GreaterThan" false
 
   test "SimpleStep: sum" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "sum" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "sum" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -313,7 +314,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           otherwise -> false
 
   test "Operator: >>=" do
-    (r :: Either ParseError Operator) <- pure $ unwrap $ runIndentParser ">>=" operator
+    (r :: Either ParseError Operator) <- {-pure $ unwrap $-} runIndentParser ">>=" operator
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -323,7 +324,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           otherwise -> false
 
   test "sequenceStep" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp >>= sum" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyProp >>= sum" step
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Binary (BinaryStep {operator}))) -> do
@@ -337,7 +338,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         assert "'MyProp >>= sum' should be parsed as a a SequenceFunction" false
 
   test "sequenceStep with non-existing sequenceFunction" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser " this >>= fantasy" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser " this >>= fantasy" step
     case r of
       (Left (ParseError m _)) -> do
         -- logShow m
@@ -347,7 +348,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         assert "Should fail." false
 
   test "sequenceStep with complex left side" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyRole >> binding >> MyProp >>= sum" step
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Binary (BinaryStep {right}))) -> do
@@ -366,7 +367,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         assert "'MyRole >> binding >> MyProp >>= sum' should be parsed as a a Sequence" false
 
   test "sequenceStep with complex left side" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum + 1" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyRole >> binding >> MyProp >>= sum + 1" step
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Binary (BinaryStep {operator}))) -> do
@@ -379,22 +380,22 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         assert "'MyRole >> binding >> MyProp >>= sum + 1' should be parsed \
         \as a BinaryStep with operator equal to add" false
 
-  test "LetStep" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "let*\n  a <- MyProp\n  b <- SecondProp\nin\n  AnotherProp = a\n  SomeProp = 1" letStep
-    case r of
-      (Left e) -> assert (show e) false
-      (Right a@(Let (LetStep {bindings, assignments}))) -> do
-        -- logShow a
-        assert "There should be two bindings" (length bindings == 2)
-        assert "There should be two statements" (length assignments == 2)
-      x -> do
-        -- logShow x
-        assert "'let*\n  a <- MyProp\n  b <- SecondProp\nin\n  AnotherProp = a' should be parsed as a LetStep" false
+  -- test "LetStep" do
+  --   (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "let*\n  a <- MyProp\n  b <- SecondProp\nin\n  AnotherProp = a\n  SomeProp = 1" letStep
+  --   case r of
+  --     (Left e) -> assert (show e) false
+  --     (Right a@(Let (LetStep {bindings, assignments}))) -> do
+  --       -- logShow a
+  --       assert "There should be two bindings" (length bindings == 2)
+  --       assert "There should be two statements" (length assignments == 2)
+  --     x -> do
+  --       -- logShow x
+  --       assert "'let*\n  a <- MyProp\n  b <- SecondProp\nin\n  AnotherProp = a' should be parsed as a LetStep" false
 -----------------------------------------------------------------------------------
 ---- ASSIGNMENT
 -----------------------------------------------------------------------------------
   test "Assignment: remove" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "remove MyRole" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "remove MyRole" roleAssignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Remove _)) -> do
@@ -403,7 +404,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'remove MyRole' should be parsed as a Remove assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: createRole" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "createRole MyRole" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "createRole MyRole" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(CreateRole {contextExpression})) -> do
@@ -412,7 +413,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'createRole MyRole' should be parsed as a CreateRole assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: createRole in an embedded context" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "createRole MyRole in SomeContextRole >> binding >> context" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "createRole MyRole in SomeContextRole >> binding >> context" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(CreateRole {contextExpression})) -> do
@@ -421,7 +422,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'createRole MyRole in SomeContextRole >> binding >> context' should be parsed as a CreateRole assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: move" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "move MyRole" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "move MyRole" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Move {roleExpression: Simple (ArcIdentifier _ "MyRole"), contextExpression})) -> do
@@ -430,7 +431,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'move MyRole' should be parsed as a Move assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: move to an embedded context" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "move MyRole to SomeContextRole >> binding >> context" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "move MyRole to SomeContextRole >> binding >> context" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Move {contextExpression})) -> do
@@ -439,7 +440,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'move MyRole to SomeContextRole >> binding >> context' should be parsed as a Move assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: bind" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "bind MyRole to AnotherRole" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "bind MyRole to AnotherRole" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Bind {bindingExpression: Simple (ArcIdentifier _ "MyRole"), roleIdentifier})) -> do
@@ -448,7 +449,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'bind MyRole to AnotherRole' should be parsed as a Bind assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: bind in an embedded context" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "bind MyRole to AnotherRole in SomeContextRole >> binding >> context" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "bind MyRole to AnotherRole in SomeContextRole >> binding >> context" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Bind {bindingExpression: Simple (ArcIdentifier _ "MyRole"), roleIdentifier, contextExpression})) -> do
@@ -457,13 +458,13 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'bind MyRole to AnotherRole in SomeContextRole >> binding >> context' should be parsed as a Bind assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: bind with path as second term should fail" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "bind MyRole to (SomeContextRole >> binding >> context >> AnotherRole)" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "bind MyRole to (SomeContextRole >> binding >> context >> AnotherRole)" assignment
     case r of
       (Left e) -> assert "failure expected" true
       otherwise -> assert "'bind MyRole to SomeContextRole >> binding >> context >> AnotherRole' should fail because the second term must be an identifier" false
 
   test "Assignment: propertyAssignment" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyProp = 10" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "MyProp = 10" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression})) -> do
@@ -477,7 +478,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'MyProp = 10' should be parsed as a PropertyAssignment assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: propertyAssignment for another role" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyProp = 10 for AnotherRole" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "MyProp = 10 for AnotherRole" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(PropertyAssignment {roleExpression})) -> do
@@ -485,7 +486,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'MyProp = 10 for AnotherRole' should be parsed as a PropertyAssignment assignment, instead this was returned: " <> show otherwise) false
 
   test "Assignment: callEffect" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "callEffect cdb:LoadModel()" assignment
+    (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "callEffect cdb:LoadModel()" assignment
     case r of
       (Left e) -> assert (show e) false
       (Right a@(ExternalEffect {effectName, arguments})) -> do
@@ -495,7 +496,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert ("'callEffect cdb:LoadModel()' should be parsed as an ExternalEffect assignment, instead this was returned: " <> show otherwise) false
 
   test "callExternal" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns: String" computationStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns String" computationStep
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Computation (ComputationStep {functionName, arguments, computedType}))) -> do
@@ -503,4 +504,4 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         assert "functionName should be 'cbd:LoadModel'" (functionName == "ser:SerialiseFor")
         assert "two arguments" (length arguments == 2)
         assert "ComputedType should be 'String'" (computedType == "String")
-      otherwise -> assert ("'callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns: String' should be parsed as an ComputationStep, instead this was returned: " <> show otherwise) false
+      otherwise -> assert ("'callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns String' should be parsed as an ComputationStep, instead this was returned: " <> show otherwise) false

@@ -23,9 +23,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo', runPhaseTwo_')
 import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Query.Kinked (invert)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, queryFunction)
-import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
-import Perspectives.Representation.Class.PersistentType (getAction)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), PropertyType(..))
@@ -55,33 +53,33 @@ theSuite = suite "Test.Query.Inversion" do
     when (length modelErrors > 0) (logShow modelErrors)
 
 
-  test "Invert a rule condition on a CalculatedProperty" (runP do
-      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
-      if null modelErrors
-        then do
-          (Action{condition}) <- getAction (ActionType "model:Test$TestCase5$Self_bot$ChangeARole")
-          case condition of
-            S _ -> liftAff $ assert "Condition should have been compiled." false
-            Q qfd -> do
-              -- log $ prettyPrint qfd
-              -- the condition is variable-free.
-              (DomeinFile (dfr :: DomeinFileRecord)) <- getPerspectEntiteit (DomeinFileId "model:Test")
-              result <- runPhaseTwo_' (invert qfd) dfr empty empty
-              case fst result of
-                Left e -> liftAff $ assert ("Cannot invert query: " <> show e) false
-                Right (affectedContextQueries :: Array QueryWithAKink) -> do
-                  -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
-                  -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> (catMaybes $ backwards <$> affectedContextQueries))
-                  liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> (catMaybes $ backwards <$> affectedContextQueries)) ==
-                    [ [(DataTypeGetter ContextF)]
-                    , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop6")),(DataTypeGetter ContextF)]
-                    , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop7")),(DataTypeGetter ContextF)]
-                    ])
-        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-        )
+  -- test "Invert a rule condition on a CalculatedProperty" (runP do
+  --     modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
+  --     if null modelErrors
+  --       then do
+  --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase5$Self_bot$ChangeARole")
+  --         case condition of
+  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           Q qfd -> do
+  --             -- log $ prettyPrint qfd
+  --             -- the condition is variable-free.
+  --             (DomeinFile (dfr :: DomeinFileRecord)) <- getPerspectEntiteit (DomeinFileId "model:Test")
+  --             result <- runPhaseTwo_' (invert qfd) dfr empty empty
+  --             case fst result of
+  --               Left e -> liftAff $ assert ("Cannot invert query: " <> show e) false
+  --               Right (affectedContextQueries :: Array QueryWithAKink) -> do
+  --                 -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
+  --                 -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> (catMaybes $ backwards <$> affectedContextQueries))
+  --                 liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> (catMaybes $ backwards <$> affectedContextQueries)) ==
+  --                   [ [(DataTypeGetter ContextF)]
+  --                   , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop6")),(DataTypeGetter ContextF)]
+  --                   , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop7")),(DataTypeGetter ContextF)]
+  --                   ])
+  --       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+  --       )
 
   test "Constant" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = true" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = true" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -104,7 +102,7 @@ theSuite = suite "Test.Query.Inversion" do
                       assert "The inversion of a Constant should be Nothing" (null inv)
 
   test "Property of another role in the same context" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = context >> AnotherRole >> Prop2\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = context >> AnotherRole >> Prop2\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -137,7 +135,7 @@ theSuite = suite "Test.Query.Inversion" do
                           otherwise -> false) paths)
 
   test "Property of another role in the same context" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = context >> NestedContext >> binding >> context >> AnotherRole >> Prop2\n    context: NestedContext filledBy: SubCase\n    case: SubCase\n      thing: AnotherRole\n        property: Prop2 (mandatory, functional, Boolean)" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = context >> NestedContext >> binding >> context >> AnotherRole >> Prop2\n    context: NestedContext filledBy: SubCase\n    case: SubCase\n      thing: AnotherRole\n        property: Prop2 (mandatory, functional, Boolean)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -174,7 +172,7 @@ theSuite = suite "Test.Query.Inversion" do
                           otherwise -> false) paths)
 
   test "A filter expression should yield five inverse queries." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = filter context >> AnotherRole with Prop2 >> Prop3\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)\n      property: Prop3 (mandatory, functional, Boolean)\n" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = filter context >> AnotherRole with Prop2 >> Prop3\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)\n      property: Prop3 (mandatory, functional, Boolean)\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -198,90 +196,90 @@ theSuite = suite "Test.Query.Inversion" do
                       -- log $ intercalate "\n" (prettyPrint <$> paths)
                       assert "The inversion of an expression with a filter should yield two inverse queries" (length paths == 5)
 
-  test "Invert a rule condition" (runP do
-      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
-      if null modelErrors
-        then do
-          (Action{condition}) <- getAction (ActionType "model:Test$TestCase1$Self_bot$ChangeARole")
-          -- logShow condition
-          case condition of
-            S _ -> liftAff $ assert "Condition should have been compiled." false
-            Q qfd -> do
-              affectedContextQueries <- liftAff $ invertFD qfd
-              -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
-              -- logShow $ paths2functions <$> affectedContextQueries
-              liftAff $ assert "There should be four AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
-                [ [(DataTypeGetter ContextF)]
-                , [Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2", (DataTypeGetter ContextF)]
-                , [(DataTypeGetter ContextF)]
-                , [Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop3",(DataTypeGetter ContextF)]
-                ])
-        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-        )
+  -- test "Invert a rule condition" (runP do
+  --     modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
+  --     if null modelErrors
+  --       then do
+  --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase1$Self_bot$ChangeARole")
+  --         -- logShow condition
+  --         case condition of
+  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           Q qfd -> do
+  --             affectedContextQueries <- liftAff $ invertFD qfd
+  --             -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
+  --             -- logShow $ paths2functions <$> affectedContextQueries
+  --             liftAff $ assert "There should be four AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
+  --               [ [(DataTypeGetter ContextF)]
+  --               , [Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2", (DataTypeGetter ContextF)]
+  --               , [(DataTypeGetter ContextF)]
+  --               , [Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop3",(DataTypeGetter ContextF)]
+  --               ])
+  --       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+  --       )
 
-  test "Invert a rule condition that reaches into a subcontext 1" (runP do
-      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
-      if null modelErrors
-        then do
-          (Action{condition}) <- getAction (ActionType "model:Test$TestCase2$Self_bot$ChangeARole")
-          -- logShow condition
-          case condition of
-            S _ -> liftAff $ assert "Condition should have been compiled." false
-            Q qfd -> do
-              affectedContextQueries <- liftAff $ invertFD qfd
-              -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
-              -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
-              liftAff $ assert "There should be seven AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
-                [ [ (DataTypeGetter ContextF)]
-                , [ Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$ARole$Prop1" , (DataTypeGetter ContextF)]
-                , [(DataTypeGetter ContextF)]
-                , [(DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
-                , [(DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
-                , [(DataTypeGetter ContextF), (DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
-                , [(Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$NestedCase1$AnotherRole$Prop3"), (DataTypeGetter ContextF), (DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
-                ])
-        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-        )
+  -- test "Invert a rule condition that reaches into a subcontext 1" (runP do
+  --     modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
+  --     if null modelErrors
+  --       then do
+  --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase2$Self_bot$ChangeARole")
+  --         -- logShow condition
+  --         case condition of
+  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           Q qfd -> do
+  --             affectedContextQueries <- liftAff $ invertFD qfd
+  --             -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
+  --             -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
+  --             liftAff $ assert "There should be seven AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
+  --               [ [ (DataTypeGetter ContextF)]
+  --               , [ Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$ARole$Prop1" , (DataTypeGetter ContextF)]
+  --               , [(DataTypeGetter ContextF)]
+  --               , [(DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
+  --               , [(DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
+  --               , [(DataTypeGetter ContextF), (DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
+  --               , [(Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$NestedCase1$AnotherRole$Prop3"), (DataTypeGetter ContextF), (DataTypeGetter ExternalRoleF), (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole"), (DataTypeGetter ContextF)]
+  --               ])
+  --       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+  --       )
 
-  test "Invert a rule condition that reaches into a subcontext 2" (runP do
-      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
-      if null modelErrors
-        then do
-          (Action{condition}) <- getAction (ActionType "model:Test$TestCase3$Self_bot$ChangeARole")
-          -- logShow condition
-          case condition of
-            S _ -> liftAff $ assert "Condition should have been compiled." false
-            Q qfd -> do
-              affectedContextQueries <- liftAff $ invertFD qfd
-              -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
-              -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
-              -- logShow $ length affectedContextQueries
-              liftAff $ assert "There should be nine AffectedContextQueries." (length affectedContextQueries == 9)
-        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-        )
+  -- test "Invert a rule condition that reaches into a subcontext 2" (runP do
+  --     modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
+  --     if null modelErrors
+  --       then do
+  --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase3$Self_bot$ChangeARole")
+  --         -- logShow condition
+  --         case condition of
+  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           Q qfd -> do
+  --             affectedContextQueries <- liftAff $ invertFD qfd
+  --             -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
+  --             -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
+  --             -- logShow $ length affectedContextQueries
+  --             liftAff $ assert "There should be nine AffectedContextQueries." (length affectedContextQueries == 9)
+  --       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+  --       )
 
-  test "Invert a rule condition with a filter criterium that reaches into a subcontext" (runP do
-      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
-      if null modelErrors
-        then do
-          (Action{condition}) <- getAction (ActionType "model:Test$TestCase4$Self_bot$ChangeARole")
-          -- logShow condition
-          case condition of
-            S _ -> liftAff $ assert "Condition should have been compiled." false
-            Q qfd -> do
-              affectedContextQueries <- liftAff $ invertFD qfd
-              -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
-              -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
-              -- log $ intercalate "\n" (map (show <<< domain) affectedContextQueries)
-              liftAff $ assert "There should be twelve AffectedContextQueries." (length affectedContextQueries == 12)
-              liftAff $ assert "The three AffectedContextQueries should start in the properties Prop3, Prop5 and Prop2"
-                (eq 3
-                  (length $ (map domain affectedContextQueries) `intersect`
-                  [ (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$AnotherRole$Prop3"))
-                  , (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$YetAnotherRole$Prop5"))
-                  , (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$AnotherRole$Prop2"))]))
-        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
-        )
+  -- test "Invert a rule condition with a filter criterium that reaches into a subcontext" (runP do
+  --     modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
+  --     if null modelErrors
+  --       then do
+  --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase4$Self_bot$ChangeARole")
+  --         -- logShow condition
+  --         case condition of
+  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           Q qfd -> do
+  --             affectedContextQueries <- liftAff $ invertFD qfd
+  --             -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
+  --             -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
+  --             -- log $ intercalate "\n" (map (show <<< domain) affectedContextQueries)
+  --             liftAff $ assert "There should be twelve AffectedContextQueries." (length affectedContextQueries == 12)
+  --             liftAff $ assert "The three AffectedContextQueries should start in the properties Prop3, Prop5 and Prop2"
+  --               (eq 3
+  --                 (length $ (map domain affectedContextQueries) `intersect`
+  --                 [ (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$AnotherRole$Prop3"))
+  --                 , (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$YetAnotherRole$Prop5"))
+  --                 , (VDOM PBool (Just $ ENP $ EnumeratedPropertyType "model:Test$TestCase4$NestedCase3$AnotherRole$Prop2"))]))
+  --       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+  --       )
 
 composition2path :: QueryFunctionDescription -> Array QueryFunctionDescription
 composition2path (BQD _ (BinaryCombinator ComposeF) left right _ _ _) = cons left (composition2path right)

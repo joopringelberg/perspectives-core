@@ -432,10 +432,10 @@ addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties}
 handlePostponedStateQualifiedParts  :: PhaseTwo Unit
 handlePostponedStateQualifiedParts = do
   postponedStateQualifiedParts <- lift $ gets _.postponedStateQualifiedParts
-  for_ postponedStateQualifiedParts handlePart
+  for_ postponedStateQualifiedParts (unsafePartial handlePart)
   where
 
-    handlePart :: StateQualifiedPart -> PhaseTwo Unit
+    handlePart :: Partial => StateQualifiedPart -> PhaseTwo Unit
     handlePart (N (NotificationE{user, transition, level, start, end})) = do
       qualifiedUser <- findRole user start
       modifyPartOfState transition start end

@@ -23,94 +23,112 @@
 module Perspectives.Parsing.Arc where
 
 import Control.Alt (map, void, (<|>))
-import Control.Lazy (fix)
-import Data.Array (elemIndex, fromFoldable)
+import Data.Array (find, fromFoldable)
 import Data.Either (Either(..))
-import Data.List (List(..), many, singleton, (:), concat)
-import Data.Maybe (Maybe(..), isJust)
+import Data.List (List(..), concat, filter, many, null, singleton, (:))
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log, logShow)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), ContextE(..), ContextPart(..), AutomaticEffectE(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateQualifiedPart(..), ViewE(..), StateE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (assignment, letWithAssignment, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getArcParserState, getPosition, getStateIdentifier, isIndented, nextLine, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
+import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getPosition, getStateIdentifier, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Parsing.Arc.Token (token)
+import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.State (NotificationLevel(..))
-import Perspectives.Representation.TypeIdentifiers (StateIdentifier(..), RoleKind(..))
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..), StateIdentifier(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=))
-import Text.Parsing.Indent (block, checkIndent, indented, sameOrIndented, withPos)
-import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
+import Prelude (bind, discard, pure, ($), (*>), (<$>), (<<<), (<>), (==), (>>=), (<*>), (&&))
+import Text.Parsing.Indent (block1, checkIndent, sameOrIndented, withPos)
+import Text.Parsing.Parser (fail, failWithPosition)
+import Text.Parsing.Parser.Combinators (option, optionMaybe, sepBy, try, (<?>), lookAhead)
 
 contextE :: IP ContextPart
-contextE = try $ withPos do
-  {uname, knd, pos} <- context_
-  elements <- isIndented >>= if _
+contextE = withPos do
+  -- log "contextE"
+  knd <- contextKind
+  pos <- getPosition
+  uname <- arcIdentifier
+  -- ook hier geldt: als op de volgende regel en geïndenteerd, dan moet de deelparser slagen en het hele blok consumeren.
+  isIndented' <- isIndented
+  isNextLine' <- isNextLine
+  elements <- if isIndented' && isNextLine'
     then withArcParserState (StateIdentifier $ qname knd uname)
-      (withPos do
-        uses <- many $ checkIndent *> useE
-        ind <- checkIndent *> indexedE
-        aspects <- many $ checkIndent *> aspectE
-        states <- STATE <$> nestedStates
-        rolesAndContexts <- many $ checkIndent *> (contextE <|> roleE)
-        pure $ (ind : (states : (uses <> aspects <> rolesAndContexts))))
+          -- The state identifier is fully qualified.
+          -- The parser starts with StateIdentifier ""
+          -- `domain` results in StateIdentifier model:<ModelName>
+          -- Each context results in: StateIdentifier model:ModelName$<ContextName>
+          (withPos do
+            uses <- many $ checkIndent *> useE
+            ind <- option Nil $ checkIndent *> contextIndexedE
+            aspects <- many $ checkIndent *> contextAspectE
+            states <- scanIdentifier >>= case _ of
+              "state" -> singleton <<< STATE <$> stateE
+              _ -> pure Nil
+            -- log "in ContextE, past looking for a state"
+            rolesAndContexts <- if null uses && null ind && null aspects && null states
+              then entireBlock1 contextPart
+              else entireBlock contextPart
+            pure $ ind <> states <> (uses <> aspects <> rolesAndContexts))
     else pure Nil
+  -- Notice: uname is unqualified.
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos}
 
   where
 
+    contextPart :: IP ContextPart
+    contextPart = do
+      keyword <- scanIdentifier
+      case keyword of
+        "domain" -> contextE
+        "case" -> contextE
+        "party" -> contextE
+        "activity" -> contextE
+        "thing" -> thingRoleE
+        "user" -> userRoleE
+        "context" -> contextRoleE
+        "external" -> externalRoleE
+        _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external"
+
     qname :: ContextKind -> String -> String
     qname knd cname = if knd == Domain then "model:" <> cname else cname
 
-    context_ :: IP (Record (uname :: String, knd :: ContextKind, pos :: ArcPosition))
-    context_ = do
-      knd <- contextKind <* colon
-      pos <- getPosition
-      uname <- arcIdentifier
-      pure {uname, knd, pos}
-
     contextKind :: IP ContextKind
-    contextKind = (reserved "domain" *> pure Domain)
-      <|> (reserved "case" *> pure Case)
+    contextKind = (reserved "domain" *> pure Domain
+      <|> reserved "case" *> pure Case
       <|> reserved "party" *> pure Party
-      <|> reserved "activity" *> pure Activity
-      <|> reserved "state" *> pure State
+      <|> reserved "activity" *> pure Activity) <?> "domain, case, party or activity"
 
-    isContextKind :: String -> Boolean
-    isContextKind s = isJust (elemIndex s ["domain", "case", "party", "activity"])
-
-    aspectE :: IP ContextPart
-    aspectE = do
-      void $ reserved "aspect" *> colon
+    contextAspectE :: IP ContextPart
+    contextAspectE = do
+      void $ reserved "aspect"
       pos <-getPosition
       aspect <- arcIdentifier
       pure $ ContextAspect aspect pos
 
-    indexedE :: IP ContextPart
-    indexedE = do
-      void $ reserved "indexed" *> colon
+    contextIndexedE :: IP (List ContextPart)
+    contextIndexedE = do
+      void $ reserved "indexed"
       pos <- getPosition
       indexedName <- arcIdentifier
-      pure $ IndexedContext indexedName pos
+      pure $ singleton $ IndexedContext indexedName pos
 
-nestedStates :: IP StateE
-nestedStates = do
-  start <- getPosition
-  void $ reserved "states" *> colon
-  stateParts <- indented *> (concat <$> block (onEntryE <|> onExitE <|> perspectiveOn <|> perspectiveOf))
-  subStates <- indented *> many stateE
-  pure $ StateE
-    { id: StateIdentifier ""
-    , condition: Simple $ Value start PBool "true"
-    , stateParts
-    , subStates
-    }
+    useE :: IP ContextPart
+    useE = do
+      prefix <- reserved "use" *> lowerCaseName
+      void $ reserved "for"
+      pos <- getPosition
+      modelName <- arcIdentifier
+      if isQualifiedWithDomein modelName
+        then pure $ PREFIX prefix modelName
+        else fail ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)")
+
 
 domain :: IP ContextE
 domain = do
@@ -119,248 +137,266 @@ domain = do
     (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
     otherwise -> fail "Domain must be a context"
 
-useE :: IP ContextPart
-useE = do
-  prefix <- reserved "use" *> colon *> lowerCaseName
-  void $ reserved "for"
-  pos <- getPosition
-  modelName <- arcIdentifier
-  if isQualifiedWithDomein modelName
-    then pure $ PREFIX prefix modelName
-    else fail ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)")
-
-roleE :: IP ContextPart
-roleE =
-  lookAhead (reserved "user") *> protectSubject roleE'
-  <|>
-  lookAhead (reserved "thing") *> protectObject roleE'
-  <|>
-  lookAhead (reserved "context") *> protectObject roleE'
-  <|>
-  roleE'
+-- Either fails with consumed=false if the input stream does not start with "user",
+-- or fails with consumed=true,
+-- or succeeds with consumed=true.
+userRoleE :: IP ContextPart
+userRoleE = protectSubject $ withEntireBlock
+  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
+  user_
+  rolePart
   where
-    roleE' :: IP ContextPart
-    roleE' = try $ withEntireBlock
-      (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
-      role_
-      rolePart
-
-    role_ :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
-    role_ = do
+    user_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    user_ = do
+      -- log "in user_"
       pos <- getPosition
-      knd <- (roleKind <* colon) <?> "'thing', 'external', 'context' or 'user'"
-      case knd of
-        ExternalRole -> externalRole_ pos
-        otherwise -> do
-          uname <- arcIdentifier
-          isCalculated <- (lookAhead $ optionMaybe (reserved "="))
-          case isCalculated of
-            Nothing -> otherRole_ pos knd uname
-            (Just _) -> calculatedRole_ pos knd uname
+      kind <- reserved "user" *> pure UserRole
+      uname <- arcIdentifier
+      {state} <- getArcParserState
+      setSubject (unwrap state <> "$" <> uname)
+      -- userRoleE cannot fail in the last line.
+      ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
-    -- TODO. Heroverweeg deze vrije volgorde; houdt een meer vaste volgorde aan zoals bij context.
-    rolePart :: IP RolePart
-    rolePart = do
-      typeOfPart <- lookAhead (reserved' "property" <|> perspectiveOnKeywords <|> perspectiveOfKeywords <|> reserved' "view" <|> reserved' "aspect" <|> reserved' "indexed" <|> reserved' "states" <|> inStateKeywords <|> onEntryKeywords <|> onExitKeywords)
-      case typeOfPart of
-        "property" -> propertyE
-        "perspectiveOn" -> SQP <$> perspectiveOn
-        "perspectiveOf" -> SQP <$> perspectiveOf
-        "aspect" -> aspectE
-        "indexed" -> indexedE
-        "inState" -> SQP <$> inState
-        "onEntry" -> SQP <$> onEntryE
-        "onExit" -> SQP <$> onExitE
-        "states" -> ROLESTATE <$> nestedStates
-        _ -> viewE
-
-    aspectE :: IP RolePart
-    aspectE = do
-      void $ reserved "aspect" *> colon
+thingRoleE :: IP ContextPart
+thingRoleE = protectObject $ withEntireBlock
+  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
+  thing_
+  rolePart
+  where
+    thing_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    thing_ = do
       pos <- getPosition
-      aspect <- arcIdentifier
-      pure $ RoleAspect aspect pos
+      kind <- reserved "thing" *> pure RoleInContext
+      uname <- arcIdentifier
+      {state} <- getArcParserState
+      setObject (Simple $ ArcIdentifier pos (unwrap state <> "$" <> uname))
+      ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
-    indexedE :: IP RolePart
-    indexedE = do
-      void $ reserved "indexed" *> colon
+contextRoleE :: IP ContextPart
+contextRoleE = protectObject $ withEntireBlock
+  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
+  context_
+  rolePart
+  where
+    context_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    context_ = do
       pos <- getPosition
-      indexedName <- arcIdentifier
-      pure $ IndexedRole indexedName pos
+      kind <- reserved "context" *> pure ContextRole
+      uname <- arcIdentifier
+      {state} <- getArcParserState
+      setObject (Simple $ ArcIdentifier pos (unwrap state <> "$" <> uname))
+      enumeratedRole_ uname kind pos
 
-    otherRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
-    otherRole_ pos knd uname = try do
-      -- Add either subject or object to state.
-      {object, state} <- getArcParserState
-      void $ case knd of
-        UserRole -> setSubject (unwrap state <> uname)
-        otherwise -> setObject (Simple $ ArcIdentifier pos uname)
-      attributes <- roleAttributes <?> "([not] mandatory, [not] functional)"
-      -- parse filledBy
-      filledBy' <- filledBy
-      pure {uname, knd, pos, parts: filledBy' <> attributes}
+externalRoleE :: IP ContextPart
+externalRoleE = protectObject $ withEntireBlock
+  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
+  external_
+  rolePart
+  where
+    external_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    external_ = do
+      pos <- getPosition
+      knd <- reserved "external" *> pure ExternalRole
+      {state} <- getArcParserState
+      setObject (Simple $ ArcIdentifier pos (unwrap state <> "$External"))
+      pure {uname: "External", knd, pos, parts: Nil}
 
-    externalRole_ :: ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
-    externalRole_ pos = pure {uname: "External", knd: ExternalRole, pos, parts: Nil}
+calculatedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+calculatedRole_ uname knd pos = do
+  calculation <- reserved "=" *> step >>= pure <<< Calculation
+  pure {uname, knd, pos, parts: Cons calculation Nil }
 
-    calculatedRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
-    calculatedRole_ pos knd uname = try do
-      -- Add either subject or object to state.
-      {object, state} <- getArcParserState
-      void $ case knd of
-        UserRole -> setSubject (unwrap state <> uname)
-        otherwise -> setObject (Simple $ ArcIdentifier pos uname)
-      -- calculation <- reserved "=" *> stringUntilNewline >>= pure <<< Calculation
-      calculation <- reserved "=" *> step >>= pure <<< Calculation
-      pure {uname, knd, pos, parts: Cons calculation Nil }
-
+enumeratedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+enumeratedRole_ uname knd pos = do
+  attributes <- option Nil roleAttributes
+  filledBy' <- filledBy
+  pure {uname, knd, pos, parts: attributes <> filledBy'}
+  where
+    -- We cannot use token.commaSep or sebBy to separate the role attributes;
+    -- it will cause looping as long as it is used
+    -- both in userRoleE and thingRoleE. I do not understand why.
     roleAttributes :: IP (List RolePart)
-    roleAttributes = option Nil $ token.parens do
-      ma <- mandatory
-      fu <- token.comma *> functional
-      munlinked <- optionMaybe (token.comma *> reserved "unlinked")
-      case munlinked of
-        Nothing -> pure (Cons ma (Cons fu Nil))
-        Just _ -> pure (Cons ma (Cons fu (Cons UnlinkedAttribute Nil)))
-        where
-          mandatory :: IP RolePart
-          mandatory = do
-            maybeNegated <- optionMaybe (reserved "not")
-            reserved "mandatory"
-            case maybeNegated of
-              Nothing -> pure $ MandatoryAttribute true
-              otherwise -> pure $ MandatoryAttribute false
+    roleAttributes = token.parens ((mandatory <|> functional <|> unlinked) `sepBy` token.symbol ",")
 
-          functional :: IP RolePart
-          functional = do
-            maybeNegated <- optionMaybe (reserved "not")
-            reserved "functional"
-            case maybeNegated of
-              Nothing -> pure $ FunctionalAttribute true
-              otherwise -> pure $ FunctionalAttribute false
+    mandatory :: IP RolePart
+    mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute true)))
 
-    filledBy :: IP (List RolePart)
-    filledBy = (option Nil (reserved "filledBy" *> colon *> token.commaSep arcIdentifier >>= pure <<< map FilledByAttribute)) <* (nextLine <?> "valid filledBy clause")
+    functional :: IP RolePart
+    functional = (reserved "functional" *> (pure (FunctionalAttribute true)))
 
-    roleKind :: IP RoleKind
-    roleKind = (reserved "thing" *> pure RoleInContext)
-      <|> reserved "external" *> pure ExternalRole
-      <|> reserved "context" *> pure ContextRole
-      <|> reserved "user" *> pure UserRole
-      <|> fail "Unknown kind of role"
+    unlinked :: IP RolePart
+    unlinked = (reserved "unlinked" *> (pure UnlinkedAttribute))
 
-isRoleKind :: String -> Boolean
-isRoleKind s = isJust (elemIndex s ["thing", "external", "context", "user", "bot"])
+-- | This parser always succeeds.
+-- | If it detects no filledBy clause, it leaves consumed state as it is and returns Nil.
+filledBy :: IP (List RolePart)
+filledBy = (option Nil $
+  (reserved "filledBy" *> token.commaSep arcIdentifier >>= pure <<< map FilledByAttribute)
+  )
+
+rolePart :: IP RolePart
+rolePart = do
+  (Tuple first second) <- twoReservedWords
+  case first, second of
+    "perspective", "on" -> SQP <$> perspectiveOn
+    "perspective", "of" -> SQP <$> perspectiveOf
+    "in", "state" -> SQP <$> inState
+    "on", "entry" -> SQP <$> onEntryE
+    "on", "exit" -> SQP <$> onExitE
+    "state", _ -> ROLESTATE <$> stateE
+    "aspect", _ -> aspectE
+    "indexed", _ -> indexedE
+    "property", _ -> propertyE
+    "view", _ -> viewE
+    _, _ -> fail "Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view"
+
+aspectE :: IP RolePart
+aspectE = do
+  void $ reserved "aspect"
+  pos <- getPosition
+  aspect <- arcIdentifier
+  pure $ RoleAspect aspect pos
+
+indexedE :: IP RolePart
+indexedE = do
+  void $ reserved "indexed"
+  pos <- getPosition
+  indexedName <- arcIdentifier
+  pure $ IndexedRole indexedName pos
 
 propertyE :: IP RolePart
-propertyE = try do
+propertyE = do
   pos <- getPosition
-  uname <- reserved "property" *> colon *> arcIdentifier
-  -- _ <- lookAhead (token.reservedOp "=" <|> (token.reservedOp "(")) <?> "property attributes in parentheses, or '=' followed by a calculation."
-  isCalculated <- optionMaybe (token.reservedOp "=")
-  case isCalculated of
-    Nothing -> enumeratedProperty pos uname
-    otherwise -> calculatedProperty pos uname
-  -- (calculatedProperty pos uname) <|> (enumeratedProperty pos uname)
-
+  uname <- reserved "property" *> arcIdentifier
+  (calculatedProperty pos uname) <|> (enumeratedProperty pos uname)
   where
-
     calculatedProperty :: ArcPosition -> String -> IP RolePart
-    calculatedProperty pos uname = try do
-      -- token.reservedOp "="
+    calculatedProperty pos uname = do
+      token.reservedOp "="
       calc <- step
       pure $ PE $ PropertyE
         { id: uname
         , range: Nothing
         , propertyParts: Cons (Calculation' calc) Nil, pos: pos}
 
-
+    -- This parser always succeeds, either with or without consuming part of the input stream.
     enumeratedProperty :: ArcPosition -> String -> IP RolePart
-    enumeratedProperty pos uname = try do
-      attributes <- option (Tuple PString Nil) propertyAttributes
+    enumeratedProperty pos uname = do
+      attributes <- option Nil propertyAttributes
+      ran <- pure $ (unsafePartial case _ of Ran r -> r) <$> find (case _ of
+        Ran r -> true
+        _ -> false) attributes
       pure $ PE $ PropertyE
         { id: uname
-        , range: Just $ fst attributes
-        , propertyParts: snd attributes
+        , range: ran
+        , propertyParts: filter (case _ of
+            Ran _ -> false
+            _ -> true) attributes
         , pos: pos}
 
-    propertyAttributes :: IP (Tuple Range (List PropertyPart))
-    propertyAttributes = token.parens do
-      ma <- mandatory
-      fu <- token.comma *> functional
-      ran <- token.comma *> range
-      pure $ Tuple ran (Cons ma (Cons fu Nil))
+    -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
+    -- a valid property attribute specification.
+    propertyAttributes :: IP (List PropertyPart)
+    propertyAttributes = token.parens ((mandatory <|> functional <|> range) `sepBy` token.symbol ",")
         where
           mandatory :: IP PropertyPart
-          mandatory = do
-            maybeNegated <- optionMaybe (reserved "not")
-            reserved "mandatory" <?> "[not] mandatory"
-            case maybeNegated of
-              Nothing -> pure $ MandatoryAttribute' true
-              otherwise -> pure $ MandatoryAttribute' false
+          mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
 
           functional :: IP PropertyPart
-          functional = do
-            maybeNegated <- optionMaybe (reserved "not")
-            reserved "functional" <?> "[not] functional"
-            case maybeNegated of
-              Nothing -> pure $ FunctionalAttribute' true
-              otherwise -> pure $ FunctionalAttribute' false
+          functional = (reserved "functional" *> (pure (FunctionalAttribute' true)))
 
-          range :: IP Range
-          range = (reserved "Boolean" *> pure PBool
-            <|> reserved "Number" *> pure PNumber
-            <|> reserved "String" *> pure PString
-            <|> reserved "DateTime" *> pure PDate) <?> "Boolean, Number, String or DateTime"
+          range :: IP PropertyPart
+          range = (reserved "Boolean" *> (pure $ Ran PBool)
+            <|> reserved "Number" *> (pure $ Ran PNumber)
+            <|> reserved "String" *> (pure $ Ran PString)
+            <|> reserved "DateTime" *> (pure $ Ran PDate)) <?> "Boolean, Number, String or DateTime"
 
 viewE :: IP RolePart
-viewE = try do
+viewE = do
   pos <- getPosition
-  uname <- reserved "view" *> colon *> arcIdentifier
-  refs <- token.parens (token.commaSep1 arcIdentifier)
+  uname <- reserved "view" *> arcIdentifier
+  refs <- sameOrIndented *> (token.parens (token.commaSep1 arcIdentifier))
   pure $ VE $ ViewE {id: uname, viewParts: refs, pos: pos}
 
 stateE :: IP StateE
-stateE = do
-  id <- reserved "state" *> colon *> token.identifier
+stateE = withPos do
+  id <- reserved "state" *> token.identifier
+  -- log "stateE"
   withArcParserState (StateIdentifier id)
     do
       -- In IP, defined as an IntendParser on top of StateT ArcParserState Identity, we now have a
       -- new ArcParserState object with member 'state' being StateIdentifier "{previousStateIdentifier}$id".
-      condition <- sameOrIndented *> step
-      stateParts <- indented *> (concat <$> block (onEntryE <|> onExitE <|> perspectiveOn <|> perspectiveOf))
-      subStates <- indented *> many stateE
+      condition <- sameOrIndented *> reserved "=" *> step
+      allParts <- concat <$> nestedBlock statePart
+      stateParts <- pure $ filter (case _ of
+        SUBSTATE _ -> false
+        _ -> true) allParts
+      subStates <- pure $ (unsafePartial case _ of SUBSTATE s -> s) <$> filter (case _ of
+        SUBSTATE _ -> true
+        _ -> false) allParts
       nestedStateId <- getStateIdentifier
       pure $ StateE {id: nestedStateId, condition, stateParts, subStates}
+  where
+    statePart :: IP (List StateQualifiedPart)
+    statePart = do
+      (Tuple first second) <- twoReservedWords
+      -- log ("statePart: " <> first <> ", " <> second)
+      case first, second of
+        "state", _ -> singleton <<< SUBSTATE <$> stateE
+        "on", "entry" -> onEntryE
+        "on", "exit" -> onExitE
+        "perspective", "on" -> perspectiveOn
+        "perspective", "of" -> perspectiveOf
+        _, _ -> fail ("Expected: on (entry/exit), perspective (on/of) (but found '" <> first <> "'.)")
 
+-- We need to use `try` because this parser will consume "perspective" from the
+-- expression "perspective of".
 perspectiveOn :: IP (List StateQualifiedPart)
 perspectiveOn = try $ withPos do
+  -- log "perspectiveOn"
   pos <- getPosition
   (stp :: Step) <- perspectiveOnKeywords *> step
   protectObject do
     setObject stp
-    isIndented >>= if _
-      then concat <$> entireBlock perspectivePart
-      else pure Nil
+    -- If 'perspectivePart' fails, nestedBlock will fail and thus perspectiveOn will fail.
+    concat <$> nestedBlock perspectivePart
+    -- In contrast, with the non-determinate expression outcommented below,
+    -- if perspectivePart fails, perspectiveOn succeeds.
+    -- option Nil (indented' *> (concat <$> entireBlock perspectivePart))
 
+-- We need to use `try` because this parser will consume "perspective" from the
+-- expression "perspective of".
 perspectiveOf :: IP (List StateQualifiedPart)
 perspectiveOf = try $ withPos do
+  -- log "perspectiveOf"
   pos <- getPosition
-  (subject :: String) <- perspectiveOnKeywords *> arcIdentifier
+  (subject :: String) <- perspectiveOfKeywords *> arcIdentifier
   protectSubject do
     setSubject subject
-    isIndented >>= if _
-      then concat <$> entireBlock perspectivePart
-      else pure Nil
+    concat <$> nestedBlock perspectivePart
 
 perspectivePart :: IP (List StateQualifiedPart)
-perspectivePart = fix \p ->
-      (singleton <<< R <$> roleVerbs )
-  <|> (singleton <<< P <$> propertyVerbs )
-  <|> inState
-  <|> onEntryE
-  <|> onExitE
-  <|> actionE
+perspectivePart = do
+  (Tuple first second) <- twoReservedWords
+  case first, second of
+    "view", _ -> singleton <<< P <$> propertyVerbs
+    "props", _ -> singleton <<< P <$> propertyVerbs
+    "only", _ -> singleton <<< R <$> roleVerbs
+    "except", _ -> singleton <<< R <$> roleVerbs
+    "all", "roleverbs" -> singleton <<< R <$> roleVerbs
+    "in", "state" -> inState
+    "on", "entry" -> onEntryE
+    "on", "exit" -> onExitE
+    "action", _ -> actionE
+    "perspective", "on" -> perspectiveOn
+    "perspective", "of" -> perspectiveOf
+    _, _ -> fail "Expected: view, props, only, except, all, in, on, action, perspective"
+
+-- | Looking ahead, find at least one reserved identifier, two if possible.
+-- | If only one is found, returns Tuple <theword> "".
+-- | If none is found, returns Tuple "" "".
+twoReservedWords :: IP (Tuple String String)
+twoReservedWords = option (Tuple "" "") $ lookAhead (Tuple <$> reservedIdentifier <*> (option "" reservedIdentifier))
 
 inState :: IP (List StateQualifiedPart)
 inState = do
@@ -370,66 +406,99 @@ inState = do
   -- The assumption being that we do not refer to states out of the context that the
   -- user or role is defined in.
   withArcParserState stateId
-    (isIndented >>= if _
-      then concat <$> entireBlock (
-           (singleton <<< R <$> roleVerbs)
-        <|> (singleton <<< P <$> propertyVerbs)
-        <|> perspectiveOn
-        <|> perspectiveOf
-        <|> actionE
-        )
-      else pure Nil)
+    (concat <$> nestedBlock statePart)
+  where
+    statePart :: IP (List StateQualifiedPart)
+    statePart = do
+      (Tuple first second) <- twoReservedWords
+      -- log ("statePart: " <> first <> ", " <> second)
+      case first, second of
+        "view", _ -> singleton <<< P <$> propertyVerbs
+        "props", _ -> singleton <<< P <$> propertyVerbs
+        "only", _ -> singleton <<< R <$> roleVerbs
+        "except", _ -> singleton <<< R <$> roleVerbs
+        "all", "roleverbs" -> singleton <<< R <$> roleVerbs
+        "perspective", "on" -> perspectiveOn
+        "perspective", "of" -> perspectiveOf
+        "action", _ -> actionE
+        _, _ -> fail ("Expected: view, props, only, except, all roleverbs, perspective (on/of), action expected (but found '" <> first <> "'.)")
 
 inStateKeywords :: IP String
-inStateKeywords = reserved "in" *> reserved "state" *> colon *> pure "inState"
+inStateKeywords = reserved "in" *> reserved "state" *> pure "inState"
 
 onExitKeywords :: IP String
-onExitKeywords = reserved "on" *> reserved "exit" *> colon *> pure "inState"
+onExitKeywords = reserved "on" *> reserved "exit" *> pure "onExit"
 
 onEntryKeywords :: IP String
-onEntryKeywords = reserved "on" *> reserved "entry" *> colon *> pure "inState"
+onEntryKeywords = reserved "on" *> reserved "entry" *> pure "onEntry"
 
 perspectiveOfKeywords :: IP String
-perspectiveOfKeywords = reserved "perspective" *> reserved "of" *> colon *> pure "perspectiveOf"
+perspectiveOfKeywords = reserved "perspective" *> reserved "of" *> pure "perspectiveOf"
 
 perspectiveOnKeywords :: IP String
-perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> colon *> pure "perspectiveOn"
+perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> pure "perspectiveOn"
 
+-- | Parses
+-- |    on entry
+-- |    on entry: <stateName>
 onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do
-  stateTrans <- onEntryKeywords *> arcIdentifier
+  mstateTrans <- onEntryKeywords *> optionMaybe arcIdentifier
+  stateTrans <- case mstateTrans of
+    Just stateTrans -> pure stateTrans
+    Nothing -> unwrap <$> getStateIdentifier
   -- The transition will be fully qualified.
   protectOnEntry do
     setOnEntry stateTrans
-    isIndented >>= if _
-      then concat <$> entireBlock (notificationE <|> automaticEffectE)
-      else pure Nil
+    concat <$> nestedBlock stateTransitionPart
 
 onExitE :: IP (List StateQualifiedPart)
 onExitE = do
-  stateTrans <- onExitKeywords *> arcIdentifier
+  mstateTrans <- onExitKeywords *> optionMaybe arcIdentifier
+  stateTrans <- case mstateTrans of
+    Just stateTrans -> pure stateTrans
+    Nothing -> unwrap <$> getStateIdentifier
   -- The transition will be fully qualified.
   protectOnExit do
     setOnExit stateTrans
-    isIndented >>= if _
-      then concat <$> entireBlock (notificationE <|> automaticEffectE)
-      else pure Nil
+    concat <$> nestedBlock stateTransitionPart
+
+stateTransitionPart :: IP (List StateQualifiedPart)
+stateTransitionPart = do
+  keyword <- scanIdentifier
+  case keyword of
+    "do" -> automaticEffectE
+    "notify" -> notificationE
+    _ -> fail "Expected: do, notify"
 
 automaticEffectE :: IP (List StateQualifiedPart)
 automaticEffectE = do
   start <- getPosition
   reserved "do"
+  -- User role either specified here or taken from state.
+  usr <- optionMaybe (reserved "for" *> arcIdentifier)
   isIndented >>= if _
     then do
-      effect <- Left <$> entireBlock assignment <|> Right <$> letWithAssignment
+      keyword <- scanIdentifier
+      effect <- case keyword of
+        "letE" -> fail "letE does not allow assignment operators, so this will not have an effect. Did you mean 'letA'?"
+        "letA" -> Right <$> letWithAssignment
+        _ -> Left <$> nestedBlock assignment
       end <- getPosition
       {subject, object, onEntry, onExit} <- getArcParserState
-      case subject, onEntry, onExit of
-        Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
-        Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
-        Nothing, _, _ -> fail "A subject is required"
-        _, Nothing, Nothing -> fail "A state transition is required"
-        _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
+      case usr of
+        Nothing -> case subject, onEntry, onExit of
+          Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+          Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+          Nothing, _, _ -> failWithPosition "A subject is required" (arcPosition2Position start)
+          _, Nothing, Nothing -> fail "A state transition is required"
+          _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
+        Just subject -> case Just subject, onEntry, onExit of
+          Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+          Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+          Nothing, _, _ -> failWithPosition "A subject is required" (arcPosition2Position start)
+          _, Nothing, Nothing -> fail "A state transition is required"
+          _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
     else pure Nil
 
 notificationE :: IP (List StateQualifiedPart)
@@ -462,57 +531,46 @@ notificationE = do
         "Alert" -> pure Alert
         _ -> fail "Not a notification level"
 
--- only Consult
--- only Consult
--- only Consult, Create
--- only Consult,
---    Create
--- all except Delete, Remove
--- etc.
+-- | roleVerbs =
+-- |	only ( <RoleVerb> {, <roleVerb>}+ )
+-- |	|
+-- |	excluding ( <RoleVerb> {, <roleVerb>}+ )
+-- |  |
+-- |  all roleverbs
 roleVerbs :: IP RoleVerbE
 roleVerbs = do
+  -- log "roleVerbs"
   -- subject and object must be present.
   {subject, object, state} <- getArcParserState
   case subject, object of
     Just s, Just o -> do
       start <- getPosition
-      (rv :: RoleVerbList) <- option All roleVerbList
+      (rv :: RoleVerbList) <- roleVerbList
       end <- getPosition
+      -- log "finishing roleVerbs"
       pure $ RoleVerbE {subject: s, object: o, state, roleVerbs: rv, start, end}
-    _, _ -> fail "User role and object of perspective must be given"
-
-propertyVerbs :: IP PropertyVerbE
-propertyVerbs = do
-  -- subject and object must be present.
-  {subject, object, state} <- getArcParserState
-  case subject, object of
-    Just s, Just o -> do
-      -- <PropertyVerb>+: (view <View> | <Property>+)
-      start <- getPosition
-      (pv :: List PropertyVerb) <- option allPropertyVerbs lotsOfVerbs
-      (propsOrView :: PropsOrView) <- option AllProperties
-        (colon *> reserved "view" *> (View <$> arcIdentifier)) <|>
-        (colon *> (Properties <$> lotsOfProperties))
-      end <- getPosition
-      pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView, start, end}
-    _, _ -> fail "User role and object of perspective must be given"
+    Nothing, Nothing -> fail "User role and object of perspective must be given"
+    Nothing, (Just _) -> fail "User role must be given"
+    (Just _), Nothing -> fail "Object of perspective must be given"
   where
-    lotsOfVerbs :: IP (List PropertyVerb)
-    lotsOfVerbs = Cons <$> propertyVerb <*> (many (sameOrIndented *> token.comma *> propertyVerb))
+    roleVerbList :: IP RoleVerbList
+    roleVerbList
+     =  inclusive <|> exclusive <|> (reserved "all" *> reserved "roleverbs" *> pure All) <?> "only, except, all roleverbs"
+      where
+        inclusive :: IP RoleVerbList
+        inclusive = do
+          -- log "inclusive"
+          (reserved "only" *> (Including <<< fromFoldable <$> lotsOfVerbs))
 
-    allPropertyVerbs :: List PropertyVerb
-    allPropertyVerbs = (RemovePropertyValue : (DeleteProperty : (AddPropertyValue : (SetPropertyValue : Nil))))
+        exclusive :: IP RoleVerbList
+        exclusive = do
+          -- log "exclusive"
+          (reserved "except" *> (Excluding <<< fromFoldable <$> lotsOfVerbs))
 
-    lotsOfProperties :: IP (List String)
-    lotsOfProperties = Cons <$> arcIdentifier <*> (many (sameOrIndented *> token.comma *> arcIdentifier))
-
-roleVerbList :: IP RoleVerbList
-roleVerbList
- =  (reserved "only" *> (Including <<< fromFoldable <$> lotsOfVerbs)) <|>
-    (reserved "except" *> (Excluding <<< fromFoldable <$> lotsOfVerbs))
-  where
-    lotsOfVerbs :: IP (List RoleVerb)
-    lotsOfVerbs = Cons <$> roleVerb <*> (many (sameOrIndented *> token.comma *> roleVerb))
+        lotsOfVerbs :: IP (List RoleVerb)
+        lotsOfVerbs = do
+          -- log "lotsOfVerbs"
+          token.parens (roleVerb `sepBy` token.symbol ",") <?> "a list of role verbs between parenthesis."
 
 roleVerb :: IP RoleVerb
 roleVerb = do
@@ -528,6 +586,49 @@ roleVerb = do
     "Move" -> pure Move
     _ -> fail "Not a role verb"
 
+-- view <ArcIdentifier> [: (<PropertyVerb+)]
+-- props (<ArcIdentifier>) [: (<PropertyVerb+)]
+propertyVerbs :: IP PropertyVerbE
+propertyVerbs = basedOnView <|> basedOnProps
+  where
+    basedOnView :: IP PropertyVerbE
+    basedOnView = do
+      -- log "basedOnView"
+      -- subject and object must be present.
+      {subject, object, state} <- getArcParserState
+      case subject, object of
+        Just s, Just o -> do
+          -- view <ArcIdentifier> [: (<PropertyVerb+)]
+          start <- getPosition
+          view <- reserved "view" *> (View <$> arcIdentifier)
+          (pv :: List PropertyVerb) <- option allPropertyVerbs lotsOfVerbs
+          end <- getPosition
+          pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
+        _, _ -> fail "User role and object of perspective must be given"
+    basedOnProps :: IP PropertyVerbE
+    basedOnProps = do
+      -- log "basedOnProps"
+      -- subject and object must be present.
+      {subject, object, state} <- getArcParserState
+      case subject, object of
+        Just s, Just o -> do
+          -- props (<ArcIdentifier>) [: (<PropertyVerb+)]
+          start <- getPosition
+          view <- reserved "props" *> option AllProperties (Properties <$> lotsOfProperties)
+          (pv :: List PropertyVerb) <- option allPropertyVerbs lotsOfVerbs
+          end <- getPosition
+          pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
+        _, _ -> fail "User role and object of perspective must be given"
+
+    lotsOfVerbs :: IP (List PropertyVerb)
+    lotsOfVerbs = token.parens (propertyVerb `sepBy` token.symbol ",")
+
+    allPropertyVerbs :: List PropertyVerb
+    allPropertyVerbs = (RemovePropertyValue : (DeleteProperty : (AddPropertyValue : (SetPropertyValue : Nil))))
+
+    lotsOfProperties :: IP (List String)
+    lotsOfProperties = token.parens (arcIdentifier `sepBy` token.symbol ",")
+
 propertyVerb :: IP PropertyVerb
 propertyVerb = do
   v <- token.identifier
@@ -536,20 +637,26 @@ propertyVerb = do
     "DeleteProperty" -> pure DeleteProperty
     "AddPropertyValue" -> pure AddPropertyValue
     "SetPropertyValue" -> pure SetPropertyValue
+    "Consult" -> pure Consult
     _ -> fail "Not a property verb"
 
 actionE :: IP (List StateQualifiedPart)
 actionE = do
   start <- getPosition
-  id <- reserved "action" *> colon *> token.identifier
+  id <- reserved "action" *> token.identifier
   {subject, state, object} <- getArcParserState
   case subject, object of
     Nothing, _ -> fail "User role is not specified"
     _, Nothing -> fail "object of perspective must be given"
     Just s, Just o -> do
-      effect <- Left <$> entireBlock assignment <|> Right <$> letWithAssignment
+      effect <- Left <$> block1 assignment <|> Right <$> letWithAssignment
       end <- getPosition
       pure $ singleton $ AC $ ActionE {id, subject: s, object: o, state, effect, start, end}
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name
+
+-- | This parser always succeeds with a string.
+-- | If no reserved word is found, restores the parser state (uses try internally).
+scanIdentifier :: IP String
+scanIdentifier = option "" (lookAhead reservedIdentifier)

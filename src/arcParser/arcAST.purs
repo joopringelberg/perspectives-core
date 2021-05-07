@@ -26,6 +26,7 @@ import Prelude
 
 import Data.Either (Either)
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
@@ -100,7 +101,11 @@ newtype PropertyE = PropertyE
   , pos :: ArcPosition
   }
 
-data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean | Calculation' Step
+data PropertyPart =
+    FunctionalAttribute' Boolean
+  | MandatoryAttribute' Boolean
+  | Calculation' Step
+  | Ran Range
 
 --------------------------------------------------------------------------------
 ---- STATEQUALIFIEDPART
@@ -112,7 +117,8 @@ data StateQualifiedPart =
   P PropertyVerbE |
   AC ActionE |
   N NotificationE |
-  AE AutomaticEffectE
+  AE AutomaticEffectE |
+  SUBSTATE StateE
 
 --------------------------------------------------------------------------------
 ---- ROLEVERB
@@ -183,6 +189,8 @@ newtype AutomaticEffectE = AutomaticEffectE
 data StateTransitionE = Entry StateIdentifier | Exit StateIdentifier
 
 data PropsOrView = AllProperties | Properties (List String) | View String
+derive instance genericPropsOrView :: Generic PropsOrView _
+instance eqPropsOrView :: Eq PropsOrView where eq = genericEq
 
 --------------------------------------------------------------------------------
 ---- VIEW

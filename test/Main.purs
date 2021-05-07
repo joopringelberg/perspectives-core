@@ -5,7 +5,7 @@ import Prelude
 import Test.Unit.Main (runTest)
 import Effect (Effect)
 -- import Test.Perspectives.DataTypeObjectGetters (theSuite) as DTO
-import Test.Parsing.Arc.TransferFile (theSuite) as TF
+-- import Test.Parsing.Arc.TransferFile (theSuite) as TF
 import Test.Parsing.Arc as TPA
 import Test.Parsing.Arc.PhaseTwo (theSuite) as TPA2
 import Test.Parsing.Arc.PhaseThree as TPA3
@@ -39,7 +39,7 @@ import Test.Guid as GUID
 
 main :: Effect Unit
 main = runTest do
-  TF.theSuite
+  -- TF.theSuite
   TPA.theSuite
   TPA2.theSuite
   TPA3.theSuite

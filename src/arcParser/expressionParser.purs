@@ -24,23 +24,24 @@ module Perspectives.Parsing.Arc.Expression where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Data.Array (fromFoldable, many)
+import Data.Array (elemIndex, fromFoldable, many)
 import Data.DateTime (DateTime)
 import Data.JSDate (JSDate, parse, toDateTime)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.String (length)
 import Data.String.CodeUnits as SCU
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), ComputationStep(..), LetStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, colon, lowerCaseName, reserved)
-import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
+import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, entireBlock1, getPosition, nestedBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
-import Perspectives.Parsing.Arc.Token (token)
+import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Range(..))
-import Prelude (bind, discard, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=))
+import Prelude (bind, discard, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>))
+import Text.Parsing.Indent (indented', withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (between, optionMaybe, try, (<?>))
+import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char)
 import Text.Parsing.Parser.Token (alphaNum)
 
@@ -71,7 +72,15 @@ step_ parenthesised = do
         otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}
   where
     leftSide :: IP Step
-    leftSide = defer \_ -> reserved "filter" *> step <|> pureLetStep <|> (Let <$> letWithAssignment) <|> computationStep <|> unaryStep <|> simpleStep
+    leftSide = do
+      keyword <- option "" (lookAhead reservedIdentifier)
+      case keyword of
+        "filter" -> reserved "filter" *> step
+        "letE" -> pureLetStep
+        "letA" -> (Let <$> letWithAssignment)
+        "callExternal" -> computationStep
+        u | isUnaryKeyword u -> unaryStep
+        _ -> simpleStep
 
 simpleStep :: IP Step
 simpleStep = try
@@ -121,6 +130,11 @@ sequenceFunction = (token.symbol "sum" *> pure AddF
   ) <?> "sum, product, minimum,\
 \ maximum or count"
 
+propertyRange :: IP String
+propertyRange = (reserved "Boolean" *> (pure "Boolean")
+  <|> reserved "Number" *> (pure "Number")
+  <|> reserved "String" *> (pure "String")
+  <|> reserved "DateTime" *> (pure "DateTime")) <?> "Boolean, Number, String or DateTime"
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
 parseDate :: IP DateTime
@@ -131,18 +145,19 @@ parseDate = try do
     Nothing -> fail "Not a date"
     (Just (dt :: DateTime)) -> pure dt
 
+isUnaryKeyword :: String -> Boolean
+isUnaryKeyword kw = isJust $ elemIndex kw ["not", "exists", "binds", "boundBy", "available"]
+
 unaryStep :: IP Step
-unaryStep = try
-  (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step)))
-  <|>
-  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
-  <|>
-  Unary <$> (Binds <$> getPosition <*> (reserved "binds" *> (defer \_ -> step)))
-  <|>
-  Unary <$> (BoundBy <$> getPosition <*> (reserved "boundBy" *> (defer \_ -> step)))
-  <|>
-  Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step))))
-  <?> "not <expr>, exists <step>, binds <step> or available <step>."
+unaryStep = do
+  keyword <- lookAhead reservedIdentifier <?> "not, exists, binds or available."
+  case keyword of
+    "not" -> (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step))))
+    "exists" -> Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
+    "binds" -> Unary <$> (Binds <$> getPosition <*> (reserved "binds" *> (defer \_ -> step)))
+    "boundBy" -> Unary <$> (BoundBy <$> getPosition <*> (reserved "boundBy" *> (defer \_ -> step)))
+    "available" -> Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step)))
+    s -> fail ("Expected not, exists, binds or available, but found: '" <> s <> "'.")
 
 operator :: IP Operator
 operator =
@@ -272,18 +287,24 @@ endOf stp = case stp of
     line_ (ArcPosition{line}) = line
 
 assignment :: IP Assignment
-assignment = defer \_-> propertyAssignment <|> roleAssignment
+assignment = isPropertyAssignment >>= if _
+  then propertyAssignment
+  else roleAssignment
 
 roleAssignment :: IP Assignment
-roleAssignment = defer \_-> removal
-  <|> roleCreation
-  <|> move
-  <|> bind'
-  <|> bind_
-  <|> unbind
-  <|> unbind_
-  <|> roleDeletion
-  <|> callEffect
+roleAssignment = do
+  keyword <- lookAhead reservedIdentifier <?> "Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, or callEffect"
+  case keyword of
+    "remove" -> removal
+    "createRole" -> roleCreation
+    "move" -> move
+    "bind" -> bind'
+    "bind_" -> bind_
+    "unbind" -> unbind
+    "unbind_" -> unbind_
+    "delete" -> roleDeletion
+    "callEffect" -> callEffect
+    s -> fail ("Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, or callEffect but found '" <> s <> "'.")
 
 removal :: IP Assignment
 removal = do
@@ -360,8 +381,19 @@ unbind_ = do
   end <- getPosition
   pure $ Unbind_ {start, end, bindingExpression, binderExpression}
 
+isPropertyAssignment :: IP Boolean
+isPropertyAssignment = do
+  keyword <- option "" (lookAhead reservedIdentifier)
+  case keyword of
+    "delete" -> pure true
+    otherwise -> isJust <$> optionMaybe (lookAhead (arcIdentifier *> assignmentOperator))
+
 propertyAssignment :: IP Assignment
-propertyAssignment = (propertyDeletion <|> propertyAssignment')
+propertyAssignment = do
+  keyword <- option "" (lookAhead reservedIdentifier)
+  case keyword of
+    "delete" -> propertyDeletion
+    _ -> propertyAssignment'
   where
     propertyAssignment' :: IP Assignment
     propertyAssignment' = try do
@@ -440,29 +472,29 @@ dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
 binding :: IP VarBinding
 binding = VarBinding <$> (lowerCaseName <* token.reservedOp "<-") <*> defer \_ -> step
 
--- | A pure let: let* <binding>+ in <step>).
+-- | A pure let: letE <binding>+ in <step>).
 pureLetStep :: IP Step
 pureLetStep = do
   start <- getPosition
-  bindings <- reserved "let*" *> entireBlock binding
+  bindings <- reserved "letE" *> entireBlock binding
   body <- reserved "in" *> step
   end <- getPosition
   pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
 
--- | A let with assignments: let* <binding>+ in <assignment>+.
+-- | A let with assignments: letA <binding>+ in <assignment>+.
 letWithAssignment :: IP LetStep
-letWithAssignment = do
+letWithAssignment = withPos $ try do
   start <- getPosition
-  bindings <- reserved "let*" *> entireBlock binding
-  assignments <- reserved "in" *> entireBlock assignment
+  bindings <- reserved "letA" *> nestedBlock binding
+  assignments <- reserved "in" *> nestedBlock assignment
   end <- getPosition
   pure $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
 
 computationStep :: IP Step
-computationStep = do
+computationStep = try do
   start <- getPosition
   functionName <- reserved "callExternal" *> arcIdentifier
   arguments <- token.parens (token.commaSep step)
-  computedType <- reserved "returns" *> colon *> arcIdentifier
+  computedType <- reserved "returns" *> (arcIdentifier <|> propertyRange)
   end <- getPosition
   pure $ Computation $ ComputationStep {functionName, arguments: (fromFoldable arguments), computedType, start, end}

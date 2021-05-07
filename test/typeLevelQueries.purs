@@ -3,6 +3,7 @@ module Test.TypeLevelQueries where
 import Prelude
 
 import Control.Monad.Free (Free)
+import Control.Monad.Trans.Class (lift)
 import Data.Array (length)
 import Data.Either (Either(..))
 import Data.Newtype (unwrap)
@@ -34,7 +35,7 @@ theSuite :: Free TestF Unit
 theSuite = suite "TypeLevelQueries" do
 
   test "Retrieve a context type" $ runP $ withSystem do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "contextType" simpleStep
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} lift $ runIndentParser "contextType" simpleStep
     case r of
       (Left e) -> liftAff $ assert (show e) false
       (Right step) -> do
@@ -51,7 +52,7 @@ theSuite = suite "TypeLevelQueries" do
             liftAff $ assert "The type retrieved should be model:System$PerspectivesSystem" (theType == (ContextType "model:System$PerspectivesSystem"))
 
   test "Retrieve the role types of a context type" $ runP $ withSystem do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "roleTypes" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} lift $ runIndentParser "roleTypes" step
     case r of
       (Left e) -> liftAff $ assert (show e) false
       (Right step) -> do
@@ -75,7 +76,7 @@ theSuite = suite "TypeLevelQueries" do
             liftAff $ assert "There should be 9 roletypes " (length theRoles == 9)
 
   test "Retrieve the role types of the type of a context instance" $ runP $ withSystem do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "contextType >> roleTypes" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} lift $ runIndentParser "contextType >> roleTypes" step
     case r of
       (Left e) -> liftAff $ assert (show e) false
       (Right step) -> do
@@ -112,7 +113,7 @@ theSuite = suite "TypeLevelQueries" do
             liftAff $ assert "There should be 9 roletypes " (length theRoles == 9)
 
   test "Filter the role types of the type of a context instance" $ runP $ withSimpleChat do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} lift $ runIndentParser "filter contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee" step
     case r of
       (Left e) -> liftAff $ assert (show e) false
       (Right step) -> do
@@ -161,7 +162,7 @@ theSuite = suite "TypeLevelQueries" do
             liftAff $ assert "There should be 1 roletype " (length theRoles == 1)
 
   test "Filter the role types of the type of a context starting with the external role" $ runP $ withSimpleChat do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee" step
+    (r :: Either ParseError Step) <- {-pure $ unwrap $-} lift $ runIndentParser "filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee" step
     case r of
       (Left e) -> liftAff $ assert (show e) false
       (Right step) -> do
