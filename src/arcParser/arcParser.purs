@@ -25,11 +25,12 @@ module Perspectives.Parsing.Arc where
 import Control.Alt (map, void, (<|>))
 import Data.Array (find, fromFoldable)
 import Data.Either (Either(..))
-import Data.List (List(..), concat, filter, many, null, singleton, (:))
+import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log, logShow)
+-- import Effect.Class.Console (log, logShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), ViewE(..))
@@ -39,15 +40,18 @@ import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseN
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getPosition, getStateIdentifier, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
+import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), StateIdentifier(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, pure, ($), (*>), (<$>), (<<<), (<>), (==), (>>=), (<*>), (&&))
+import Prelude (bind, discard, pure, ($), (*>), (<$>), (<<<), (<>), (==), (>>=), (<*>), (&&), not)
 import Text.Parsing.Indent (block1, checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
-import Text.Parsing.Parser.Combinators (option, optionMaybe, sepBy, try, (<?>), lookAhead)
+import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
+import Text.Parsing.Parser.String (char, satisfy)
 
 contextE :: IP ContextPart
 contextE = withPos do
@@ -507,18 +511,18 @@ notificationE = do
   reserved "notify"
   -- User role either specified here or taken from state.
   usr <- optionMaybe arcIdentifier
-  level <- notificationLevel
+  message <- sentenceE
   end <- getPosition
   {subject, onEntry, onExit} <- getArcParserState
   case usr of
     Just user -> case onEntry, onExit of
-      Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user, transition, level, start, end}
-      Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user, transition, level, start, end}
+      Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user, transition, message, start, end}
+      Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user, transition, message, start, end}
       Nothing, Nothing -> fail "A state transition is required"
       _, _ -> fail "State transition inside state transition is not allowed"
     Nothing -> case subject, onEntry, onExit of
-      Just u, Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: u, transition, level, start, end}
-      Just u, Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: u, transition, level, start, end}
+      Just u, Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: u, transition, message, start, end}
+      Just u, Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: u, transition, message, start, end}
       Nothing, _, _ -> fail "A subject is required"
       _, Nothing, Nothing -> fail "A state transition is required"
       _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
@@ -652,6 +656,21 @@ actionE = do
       effect <- Left <$> block1 assignment <|> Right <$> letWithAssignment
       end <- getPosition
       pure $ singleton $ AC $ ActionE {id, subject: s, object: o, state, effect, start, end}
+
+sentenceE :: IP Sentence
+sentenceE = do
+  start <- getPosition
+  parts <- between (char '"') (char '"') (many (sentencePart <|> exprPart))
+  end <- getPosition
+  pure $ Sentence (fromFoldable parts)
+  where
+    sentencePart :: IP SentencePart
+    sentencePart = do
+      chars <- some (satisfy (\c -> not (c == '{') && not (c == '"')))
+      pure $ HR $ fromCharArray $ fromFoldable chars
+
+    exprPart :: IP SentencePart
+    exprPart = CP <<< S <$> between (token.symbol "{") (token.symbol "}") step
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name

@@ -34,7 +34,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep, Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
-import Perspectives.Representation.State (NotificationLevel)
+import Perspectives.Representation.Sentence (Sentence)
 import Perspectives.Representation.TypeIdentifiers (RoleKind, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 
@@ -168,7 +168,8 @@ newtype ActionE = ActionE
 newtype NotificationE = NotificationE
   { user :: String
   , transition :: StateTransitionE
-  , level :: NotificationLevel
+  , message :: Sentence
+  -- , level :: NotificationLevel
   , start :: ArcPosition
   , end :: ArcPosition
   }

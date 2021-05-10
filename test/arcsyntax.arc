@@ -20,7 +20,7 @@ domain Feest
   thing Wens (mandatory, functional)
     state DureWens = Wens >> Bedrag > 10
       on exit
-        notify Gast Alert
+        notify Gast "Hello {Guest >> FirstName}!"
     property Naam (mandatory, String)
     property  Bedrag (functional, Number)
     aspect pre:MyAspect$MyAspectRole
@@ -29,7 +29,7 @@ domain Feest
     aspect sys:User
     indexed TheGuest
     on exit SomeState
-      notify GoedeGast Alert
+      notify GoedeGast "Goodbye {user >> FirstName}."
     state SomeState = SomeProp > AnotherProp
       on entry
         do

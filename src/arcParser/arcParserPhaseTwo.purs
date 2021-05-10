@@ -436,12 +436,12 @@ handlePostponedStateQualifiedParts = do
   where
 
     handlePart :: Partial => StateQualifiedPart -> PhaseTwo Unit
-    handlePart (N (NotificationE{user, transition, level, start, end})) = do
+    handlePart (N (NotificationE{user, transition, message, start, end})) = do
       qualifiedUser <- findRole user start
       modifyPartOfState transition start end
         \(sr@{notifyOnEntry, notifyOnExit}) -> case transition of
-          Entry _ -> sr {notifyOnEntry = EncodableMap $ MAP.insert qualifiedUser level (unwrap notifyOnEntry)}
-          Exit _ -> sr {notifyOnExit = EncodableMap $ MAP.insert qualifiedUser level (unwrap notifyOnExit)}
+          Entry _ -> sr {notifyOnEntry = EncodableMap $ MAP.insert qualifiedUser message (unwrap notifyOnEntry)}
+          Exit _ -> sr {notifyOnExit = EncodableMap $ MAP.insert qualifiedUser message (unwrap notifyOnExit)}
 
     handlePart (AE (AutomaticEffectE{subject, object, transition, effect, start, end})) = do
       qualifiedSubject <- findRole subject start
