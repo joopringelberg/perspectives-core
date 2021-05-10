@@ -523,11 +523,11 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc" do
           ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
             stateExists
 
-  testOnly "A state with an on entry and notification" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    state SomeState = true\n      on entry\n        notify SomeUser \"Hello {SomeUser >> FirstName}!\"" domain
+  test "A state with an on entry and notification" do
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    state SomeState = true\n      on entry\n        notify SomeUser \"Hello {SomeUser >> FirstName}!\"\n  case AnotherCase" domain
     case r of
       (Left e) -> assert (show e) false
-      Right dom -> 
+      Right dom ->
         ensureContext "MyCase" dom >>=
           ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
             stateParts >>=
@@ -653,7 +653,7 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc" do
             otherwise -> false) viewParts)))
       otherwise -> assert "Property should have parts" false
 
-  test "Parse a file" do
+  testOnly "Parse a file" do
     fileName <- pure "arcsyntax.arc"
     text <- (readTextFile ENC.UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser text domain

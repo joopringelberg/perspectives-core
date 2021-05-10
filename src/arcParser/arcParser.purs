@@ -30,7 +30,6 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
--- import Effect.Class.Console (log, logShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), ViewE(..))
@@ -51,7 +50,7 @@ import Prelude (bind, discard, pure, ($), (*>), (<$>), (<<<), (<>), (==), (>>=),
 import Text.Parsing.Indent (block1, checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
-import Text.Parsing.Parser.String (char, satisfy)
+import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 
 contextE :: IP ContextPart
 contextE = withPos do
@@ -661,6 +660,7 @@ sentenceE :: IP Sentence
 sentenceE = do
   start <- getPosition
   parts <- between (char '"') (char '"') (many (sentencePart <|> exprPart))
+  _ <- whiteSpace
   end <- getPosition
   pure $ Sentence (fromFoldable parts)
   where

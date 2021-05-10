@@ -20,7 +20,7 @@ domain Feest
   thing Wens (mandatory, functional)
     state DureWens = Wens >> Bedrag > 10
       on exit
-        notify Gast "Hello {Guest >> FirstName}!"
+        notify Gast "Hello {Gast >> FirstName}!"
     property Naam (mandatory, String)
     property  Bedrag (functional, Number)
     aspect pre:MyAspect$MyAspectRole
