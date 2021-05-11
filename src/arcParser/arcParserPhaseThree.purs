@@ -70,7 +70,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
+import Perspectives.Representation.Class.Role (bindingOfRole, contextOfADT, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -596,7 +596,21 @@ compileStates = do
                     Nothing -> throwError $ MissingRoleForPropertyAssignment start end
                     Just objectCalculation -> pure objectCalculation
                   -- PropertyType =+ 10 for <roleExpression>
-                  Just e -> ensureRole subject e
+                  -- Note that currentDomain now is a RDOM.
+                  -- currentDomain is used as starting point in ensureRole.
+                  -- Hence this goes wrong.
+                  Just e -> do
+                    -- currentDomain is an RDOM by construction.
+                    -- But we need to compile a querydescription for the roleExpression
+                    -- with respect to its context (so we cannot use ensureRole here).
+                    contextDomain <- case currentDomain of
+                      RDOM adt -> lift2 $ contextOfADT adt
+                      otherwise -> throwError $ NotARoleDomain currentDomain (startOf e) (endOf e)
+                    qfd <- compileAndDistributeStep (CDOM contextDomain) e (Just subject) stateIdentifier
+                    case range qfd of
+                      (RDOM _) -> pure qfd
+                      otherwise -> throwError $ NotARoleDomain (range qfd) (startOf e) (endOf e)
+
                 (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
                 -- Compile the value expression to a QueryFunctionDescription. Its range must comply with the range of the qualifiedProperty. It is compiled relative to the current context; not relative to the object!
                 valueQfd <- compileAndDistributeStep currentDomain valueExpression (Just subject) stateIdentifier
