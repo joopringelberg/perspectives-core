@@ -26,7 +26,7 @@ import Control.Alt (map, void, (<|>))
 import Data.Array (find, fromFoldable)
 import Data.Either (Either(..))
 import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
@@ -46,7 +46,7 @@ import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), StateIdentifier(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, pure, ($), (*>), (<$>), (<<<), (<>), (==), (>>=), (<*>), (&&), not)
+import Prelude (append, bind, discard, not, pure, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (block1, checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
@@ -93,11 +93,16 @@ contextE = withPos do
         "case" -> contextE
         "party" -> contextE
         "activity" -> contextE
-        "thing" -> thingRoleE
-        "user" -> userRoleE
-        "context" -> contextRoleE
-        "external" -> externalRoleE
+        "thing" -> setRoleName thingRoleE
+        "user" -> setRoleName userRoleE
+        "context" -> setRoleName contextRoleE
+        "external" -> withArcParserState (StateIdentifier "External") externalRoleE
         _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external"
+
+    setRoleName :: IP ContextPart -> IP ContextPart
+    setRoleName p = do
+      ident <- lookAhead (reservedIdentifier *> arcIdentifier)
+      withArcParserState (StateIdentifier ident) p
 
     qname :: ContextKind -> String -> String
     qname knd cname = if knd == Domain then "model:" <> cname else cname
@@ -447,23 +452,19 @@ perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> pure "perspec
 onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do
   mstateTrans <- onEntryKeywords *> optionMaybe arcIdentifier
-  stateTrans <- case mstateTrans of
-    Just stateTrans -> pure stateTrans
-    Nothing -> unwrap <$> getStateIdentifier
+  currentStateId <- getStateIdentifier
   -- The transition will be fully qualified.
   protectOnEntry do
-    setOnEntry stateTrans
+    setOnEntry (maybe currentStateId (append currentStateId <<< StateIdentifier) mstateTrans)
     concat <$> nestedBlock stateTransitionPart
 
 onExitE :: IP (List StateQualifiedPart)
 onExitE = do
   mstateTrans <- onExitKeywords *> optionMaybe arcIdentifier
-  stateTrans <- case mstateTrans of
-    Just stateTrans -> pure stateTrans
-    Nothing -> unwrap <$> getStateIdentifier
+  currentStateId <- getStateIdentifier
   -- The transition will be fully qualified.
   protectOnExit do
-    setOnExit stateTrans
+    setOnExit (maybe currentStateId (append currentStateId <<< StateIdentifier) mstateTrans)
     concat <$> nestedBlock stateTransitionPart
 
 stateTransitionPart :: IP (List StateQualifiedPart)
