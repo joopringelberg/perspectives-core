@@ -35,7 +35,6 @@ import Perspectives.Utilities (class PrettyPrint)
 -- | Represents consequtively the query inversion results for
 -- | 	* the State query for context state. These inversions are exclusively used to evaluate the states of a context instance.
 -- | 	* the State query for role state.
--- | 	* the object query of a Perspective. These inversions are exclusively used to distribute deltas.
 data InvertedQueryResult =
 	  ContextStateQuery (Array ContextInstance)
 	| RoleStateQuery (Array RoleInstance)

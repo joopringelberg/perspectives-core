@@ -258,29 +258,14 @@ roleIndexNr s = case match roleIndexNrRegex s of
 escapeCouchdbDocumentName :: String -> String
 escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (replaceAll (Pattern "$") (Replacement "%24") s)
 
--- | To be used for qualified names only!
--- | True iff the first argument contains the second (as its first part). E.g.:
--- | "model:Perspectives$Aangifte$Aangever" `isInNamespace` "model:Perspectives$Aangifte".
--- | "a" `isInNamespace` "a" is true, too.
-isInNamespace :: String -> String -> Boolean
-isInNamespace a b = a == b || (b `isContainingNamespace` a)
-
--- | To be used for qualified names only!
--- | True iff the first argument is the first part of the second. E.g.:
--- | "model:Perspectives$Aangifte" `isContainingNamespace` "model:Perspectives$Aangifte$Aangever".
--- | Hence, a SubNamespace is more specialized, thus longer.
-isContainingNamespace :: String -> String -> Boolean
-isContainingNamespace ns ident = case indexOf (Pattern ns) ident of
-  (Just n) | n == 0 -> true
-  otherwise -> false
-
--- | True iff the second argument is a suffix of the first argument.
+-- | True iff the second argument is a suffix of the first argument, or if they are equal.
 -- | Does not check whether names are well-formed qualified names.
 -- | whole `endsWithSegments` part
 -- | "model:Model$First$Second$Third" `endsWithSegments` "Second$Third" == true
 -- | "model:Model$First$Second$Third" `endsWithSegments` "Second" == false
+-- | "model:Model$First$Second$Third" `endsWithSegments` "model:Model$First$Second$Third" == true
 endsWithSegments :: String -> String -> Boolean
-endsWithSegments whole part = isJust $ stripSuffix (Pattern ("$" <> part)) whole
+endsWithSegments whole part = (whole == part) || (isJust $ stripSuffix (Pattern ("$" <> part)) whole)
 
 -- | "Second$Third" `areLastSegmentsOf` "model:Model$First$Second$Third" == true
 -- | "Second" `areLastSegmentsOf` "model:Model$First$Second$Third" == false

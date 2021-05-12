@@ -41,6 +41,7 @@ domain Feest
     property Unspecified
     property AantalGasten = this >>= sum
     view ViewOpGast (Naam)
+    view AnotherView (Unspecified)
     perspective on Wens
       view ViewOpWens (Consult, SetPropertyValue)
     property WellBehaved = context > Gast > Binding > Naam

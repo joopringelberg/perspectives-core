@@ -38,7 +38,7 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head)
 import Data.Map (insert, lookup, empty) as MAP
 import Data.Map (toUnfoldable)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
@@ -65,11 +65,12 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEn
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier, ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.View (View(..)) as VIEW
-import Prelude (Unit, bind, discard, pure, void, ($), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, flip, pure, show, void, ($), (<$>), (<<<), (<>), (==), (>>=))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
@@ -112,10 +113,8 @@ traverseDomain c ns = do
 traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
 traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
   context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
-  unsafePartial $ withNamespaces
-    (filter (case _ of
-      (PREFIX _ _) -> true
-      otherwise -> false) contextParts)
+  withNamespaces
+    contextParts
     do
       contextParts' <- case (head (filter (case _ of
         RE (RoleE{id:rid}) -> rid == "External"
@@ -140,7 +139,7 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     -- Construct a Role
     handleParts contextUnderConstruction (RE r) = do
       role <- traverseRoleE r (addNamespace ns id)
-      pure (unsafePartial (role `insertRoleInto` contextUnderConstruction))
+      pure (role `insertRoleInto` contextUnderConstruction)
 
     -- Prefixes are handled earlier, so this can be a no-op
     handleParts contextUnderConstruction (PREFIX pre model) = pure contextUnderConstruction
@@ -364,12 +363,12 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
 
 traverseCalculatedRoleE_ :: CalculatedRole -> List RolePart -> PhaseTwo Role
 traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) roleParts = do
-  role' <- foldM (unsafePartial $ handleParts) role roleParts
+  role' <- foldM (handleParts) role roleParts
   modifyDF (\domeinFile -> addRoleToDomeinFile (C role') domeinFile)
   pure (C role')
 
   where
-    handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
+    handleParts :: CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     -- Parse the query expression.
 
     -- CALCULATION
@@ -381,6 +380,8 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
     handleParts crole (SQP stateQualifiedParts) = do
       void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateQualifiedParts}
       pure crole
+
+    handleParts crole p = throwError $ Custom ("Cannot handle part '" <> show p <> "' in PhaseTwo in a CalculatedRole: " <> show roleName)
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
 -- | and insert it into a DomeinFileRecord.
@@ -396,7 +397,9 @@ traversePropertyE r ns = if isCalculatedProperty r
 
 traverseEnumeratedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
 traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
-  property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns (unsafePartial $ fromJust range) pos
+  property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns (case range of
+    Nothing -> PString
+    Just r -> r) pos
   property' <- foldM (unsafePartial handleParts) property propertyParts
   modifyDF (\df -> addPropertyToDomeinFile (Property.E property') df)
   pure (Property.E property')
@@ -483,7 +486,7 @@ handlePostponedStateQualifiedParts = do
           -- As we have postponed handling these parse tree fragments after
           -- handling all others, there can be no forward references.
           -- Notice that the property references may not be fully qualified!
-          candidates <- pure $ ARR.filter (endsWithSegments view) (keys views)
+          candidates <- pure $ ARR.filter (flip endsWithSegments view) (keys views)
           case length candidates of
             0 -> throwError $ UnknownView start view
             1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of

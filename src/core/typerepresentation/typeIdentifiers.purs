@@ -49,7 +49,6 @@ import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
-import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Utilities (class PrettyPrint)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
@@ -285,8 +284,7 @@ instance showStateIdentifier :: Show StateIdentifier where
 instance eqStateIdentifier :: Eq StateIdentifier where
   eq (StateIdentifier id1) (StateIdentifier id2) = id1 == id2
 instance ordStateIdentifier :: Ord StateIdentifier where
-  compare (StateIdentifier s1) (StateIdentifier s2) = if s1 `isContainingNamespace` s2 then LT
-    else if s2 `isContainingNamespace` s1 then GT else EQ
+  compare (StateIdentifier s1) (StateIdentifier s2) = compare s1 s2
 instance prettyPrintStateIdentifier :: PrettyPrint StateIdentifier where
   prettyPrint' t = show
 derive newtype instance writeForeignStateIdentifier :: WriteForeign StateIdentifier

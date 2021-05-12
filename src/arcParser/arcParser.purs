@@ -93,14 +93,14 @@ contextE = withPos do
         "case" -> contextE
         "party" -> contextE
         "activity" -> contextE
-        "thing" -> setRoleName thingRoleE
-        "user" -> setRoleName userRoleE
-        "context" -> setRoleName contextRoleE
+        "thing" -> addRoleNameToState thingRoleE
+        "user" -> addRoleNameToState userRoleE
+        "context" -> addRoleNameToState contextRoleE
         "external" -> withArcParserState (StateIdentifier "External") externalRoleE
         _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external"
 
-    setRoleName :: IP ContextPart -> IP ContextPart
-    setRoleName p = do
+    addRoleNameToState :: IP ContextPart -> IP ContextPart
+    addRoleNameToState p = do
       ident <- lookAhead (reservedIdentifier *> arcIdentifier)
       withArcParserState (StateIdentifier ident) p
 
@@ -160,8 +160,9 @@ userRoleE = protectSubject $ withEntireBlock
       pos <- getPosition
       kind <- reserved "user" *> pure UserRole
       uname <- arcIdentifier
+      -- We've added the role name to the state before running userRoleE.
       {state} <- getArcParserState
-      setSubject (unwrap state <> "$" <> uname)
+      setSubject (unwrap state)
       -- userRoleE cannot fail in the last line.
       ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
@@ -177,7 +178,7 @@ thingRoleE = protectObject $ withEntireBlock
       kind <- reserved "thing" *> pure RoleInContext
       uname <- arcIdentifier
       {state} <- getArcParserState
-      setObject (Simple $ ArcIdentifier pos (unwrap state <> "$" <> uname))
+      setObject (Simple $ ArcIdentifier pos (unwrap state))
       ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
 contextRoleE :: IP ContextPart

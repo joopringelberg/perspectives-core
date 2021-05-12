@@ -84,7 +84,8 @@ theSuite = suite "Test.Query.Inversion" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
+        case _ of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
@@ -107,7 +108,8 @@ theSuite = suite "Test.Query.Inversion" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
+        case _ of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
@@ -140,7 +142,8 @@ theSuite = suite "Test.Query.Inversion" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
+        case _ of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
@@ -177,7 +180,8 @@ theSuite = suite "Test.Query.Inversion" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
+        case _ of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'

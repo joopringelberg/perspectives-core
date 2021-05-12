@@ -33,7 +33,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Parsing.Arc" do
+theSuite = suite "Perspectives.Parsing.Arc" do
 
   --------------------------------------------------------------------------------
   ---- ARCIDENTIFIER
@@ -653,7 +653,7 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc" do
             otherwise -> false) viewParts)))
       otherwise -> assert "Property should have parts" false
 
-  testOnly "Parse a file" do
+  test "Parse a file" do
     fileName <- pure "arcsyntax.arc"
     text <- (readTextFile ENC.UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser text domain

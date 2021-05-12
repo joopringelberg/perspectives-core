@@ -137,22 +137,20 @@ protectOnEntry = protectLabel (SProxy :: SProxy "onEntry")
 protectOnExit :: forall a. IP a -> IP a
 protectOnExit = protectLabel (SProxy :: SProxy "onExit")
 
--- | Given a local state name, create and store in state a Transition with a
---  fully qualified state identifier.
-setOnEntry :: String -> IP Unit
-setOnEntry localStateName = do
-  {onEntry, state} <- getArcParserState
+-- | Stores a fully qualified state identifier.
+setOnEntry :: StateIdentifier -> IP Unit
+setOnEntry stateId = do
+  {onEntry} <- getArcParserState
   if isNothing onEntry
-    then void $ modifyArcParserState \s -> s {onEntry = Just (Entry (state <> (StateIdentifier localStateName)))}
+    then void $ modifyArcParserState \s -> s {onEntry = Just (Entry stateId)}
     else fail "on entry is already specified"
 
--- | Given a local state name, create and store in state a Transition with ado
---  fully qualified state identifier.
-setOnExit :: String -> IP Unit
-setOnExit localStateName = do
-  {onExit, state} <- getArcParserState
+-- | Stores a fully qualified state identifier.
+setOnExit :: StateIdentifier -> IP Unit
+setOnExit stateId = do
+  {onExit} <- getArcParserState
   if isNothing onExit
-    then void $ modifyArcParserState \s -> s {onExit = Just (Exit (state <> (StateIdentifier localStateName)))}
+    then void $ modifyArcParserState \s -> s {onExit = Just (Exit stateId)}
     else fail "on exit is already specified"
 
 -- | Apply a parser, keeping only the parsed result.

@@ -27,12 +27,14 @@ import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, 
 import Data.Array (union)
 import Data.Either (Either)
 import Data.Identity (Identity)
-import Data.List (List(..))
+import Data.List (List(..), filter)
 import Data.Map (Map, empty, lookup) as MAP
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..))
+import Effect.Aff (Aff)
 import Foreign.Object (Object, empty, values)
 import Foreign.Object (fromFoldable, union, lookup) as OBJ
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFileId(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
@@ -108,7 +110,8 @@ evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExc
   , perspectives: MAP.empty
   }
 
-type PhaseTwo a = PhaseTwo' a Identity
+-- type PhaseTwo a = PhaseTwo' a Identity
+type PhaseTwo a = PhaseTwo' a Aff
 
 -- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
 -- | an Action is a Bot, and allows exceptions.
@@ -157,9 +160,15 @@ withFrame computation = do
 -- | withNamespaces only handles the `PREFIX` element of the `ContextPart` Sum.
 -- | Computes a value in PhaseTwo with the extra namespaces.
 -- | Cumulates referredModels in PhaseTwoState, too.
-withNamespaces :: forall a. Partial => List ContextPart -> PhaseTwo a -> PhaseTwo a
+withNamespaces :: forall a. List ContextPart -> PhaseTwo a -> PhaseTwo a
 withNamespaces pairs pt = do
-  x <- pure $ OBJ.fromFoldable $ map (\(PREFIX pre mod) -> Tuple pre mod) pairs
+  x <- pure $ OBJ.fromFoldable $ map
+    (unsafePartial \(PREFIX pre mod) -> Tuple pre mod)
+    (filter (case _ of
+        (PREFIX _ _) -> true
+        otherwise -> false)
+      pairs)
+  -- x <- pure $ OBJ.fromFoldable $ map (\(PREFIX pre mod) -> Tuple pre mod) pairs
   ns <- lift $ gets _.namespaces
   -- replace keys in ns with values found in x.
   void $ modify \(s@{namespaces, referredModels}) -> s

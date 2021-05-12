@@ -62,7 +62,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
-import Prelude (bind, discard, eq, map, pure, show, void, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=))
+import Prelude (bind, discard, eq, map, pure, show, void, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=), (<>))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -200,7 +200,11 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
           (CDOM c) -> do
             (rts :: Array RoleType) <- if isQualifiedWithDomein ident
               then lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
-              else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
+              else if ident == "External"
+                then case c of
+                  (ST (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
+                  otherwise -> throwError $ Custom ("Cannot get the external role of a compound type: " <> show otherwise)
+                else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
             case uncons rts of
               Nothing -> throwError $ ContextHasNoRole c ident
               Just {head, tail} -> if null tail
