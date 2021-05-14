@@ -35,7 +35,7 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.Sentence (Sentence)
-import Perspectives.Representation.TypeIdentifiers (RoleKind, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 
 --------------------------------------------------------------------------------
@@ -86,7 +86,7 @@ data RolePart =
 ---- STATE
 --------------------------------------------------------------------------------
 newtype StateE = StateE
-  { id :: StateIdentifier
+  { id :: StateSpecification
   , condition :: Step
   , stateParts :: List StateQualifiedPart
   , subStates :: List StateE
@@ -125,9 +125,9 @@ data StateQualifiedPart =
 --------------------------------------------------------------------------------
 -- Ends up in Perspective, identified by subject and object.
 newtype RoleVerbE = RoleVerbE
-  { subject :: String
-  , object :: Step
-  , state :: StateIdentifier
+  { subject :: RoleIdentification
+  , object :: RoleIdentification
+  , state :: StateSpecification
   , roleVerbs :: RoleVerbList
   , start :: ArcPosition
   , end :: ArcPosition
@@ -138,9 +138,9 @@ newtype RoleVerbE = RoleVerbE
 --------------------------------------------------------------------------------
 -- Ends up in Perspective, identified by subject and object.
 newtype PropertyVerbE = PropertyVerbE
-  { subject :: String
-  , object :: Step
-  , state :: StateIdentifier
+  { subject :: RoleIdentification
+  , object :: RoleIdentification
+  , state :: StateSpecification
   , propertyVerbs :: List PropertyVerb
   , propsOrView :: PropsOrView
   , start :: ArcPosition
@@ -153,9 +153,9 @@ newtype PropertyVerbE = PropertyVerbE
 -- Ends up in Perspective, identified by subject and object.
 newtype ActionE = ActionE
   { id :: String
-  , subject :: String
-  , object :: Step
-  , state :: StateIdentifier
+  , subject :: RoleIdentification
+  , object :: RoleIdentification
+  , state :: StateSpecification
   , effect :: Either (List Assignment) LetStep
   , start :: ArcPosition
   , end :: ArcPosition
@@ -166,7 +166,7 @@ newtype ActionE = ActionE
 --------------------------------------------------------------------------------
 -- Ends up in State, identified by the fully qualified name in StateTransitionE.
 newtype NotificationE = NotificationE
-  { user :: String
+  { user :: RoleIdentification
   , transition :: StateTransitionE
   , message :: Sentence
   -- , level :: NotificationLevel
@@ -179,15 +179,15 @@ newtype NotificationE = NotificationE
 --------------------------------------------------------------------------------
 -- Ends up in State, identified by the fully qualified name in StateTransitionE.
 newtype AutomaticEffectE = AutomaticEffectE
-  { subject :: String
-  , object :: Maybe Step
+  { subject :: RoleIdentification
+  , object :: Maybe RoleIdentification
   , transition :: StateTransitionE
   , effect :: Either (List Assignment) LetStep
   , start :: ArcPosition
   , end :: ArcPosition
   }
 
-data StateTransitionE = Entry StateIdentifier | Exit StateIdentifier
+data StateTransitionE = Entry StateSpecification | Exit StateSpecification
 
 data PropsOrView = AllProperties | Properties (List String) | View String
 derive instance genericPropsOrView :: Generic PropsOrView _
@@ -201,6 +201,30 @@ newtype ViewE = ViewE
   , viewParts :: List String
   , pos :: ArcPosition}
 
+--------------------------------------------------------------------------------
+---- ROLEIDENTIFICATION
+--------------------------------------------------------------------------------
+data RoleIdentification = ExplicitRole EnumeratedRoleType | ImplicitRole ContextType Step
+
+derive instance genericRoleIdentification :: Generic RoleIdentification _
+instance eqRoleIdentification :: Eq RoleIdentification where eq = genericEq
+instance showRoleIdentification :: Show RoleIdentification where show = genericShow
+
+--------------------------------------------------------------------------------
+---- STATESPECIFICATION
+--------------------------------------------------------------------------------
+type StateLocalName = String
+
+data StateSpecification =
+	  ContextState ContextType (Maybe SegmentedPath)
+	| SubjectState RoleIdentification (Maybe SegmentedPath)
+	| ObjectState RoleIdentification (Maybe SegmentedPath)
+
+type SegmentedPath = String
+
+derive instance genericStateSpecification :: Generic StateSpecification _
+instance eqStateSpecification :: Eq StateSpecification where eq = genericEq
+instance showStateSpecification :: Show StateSpecification where show = genericShow
 --------------------------------------------------------------------------------
 ---- INSTANCES
 --------------------------------------------------------------------------------

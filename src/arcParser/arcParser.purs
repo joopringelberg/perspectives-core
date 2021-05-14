@@ -26,17 +26,16 @@ import Control.Alt (map, void, (<|>))
 import Data.Array (find, fromFoldable)
 import Data.Either (Either(..))
 import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
-import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (unwrap)
+import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (assignment, letWithAssignment, step)
-import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
+import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getPosition, getStateIdentifier, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getPosition, getStateIdentifier, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -44,9 +43,9 @@ import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..), StateIdentifier(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleKind(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (append, bind, discard, not, pure, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, flip, not, pure, unit, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (block1, checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
@@ -61,24 +60,27 @@ contextE = withPos do
   -- ook hier geldt: als op de volgende regel en geïndenteerd, dan moet de deelparser slagen en het hele blok consumeren.
   isIndented' <- isIndented
   isNextLine' <- isNextLine
+  ccontext <- getCurrentContext
   elements <- if isIndented' && isNextLine'
-    then withArcParserState (StateIdentifier $ qname knd uname)
-          -- The state identifier is fully qualified.
-          -- The parser starts with StateIdentifier ""
-          -- `domain` results in StateIdentifier model:<ModelName>
-          -- Each context results in: StateIdentifier model:ModelName$<ContextName>
-          (withPos do
-            uses <- many $ checkIndent *> useE
-            ind <- option Nil $ checkIndent *> contextIndexedE
-            aspects <- many $ checkIndent *> contextAspectE
-            states <- scanIdentifier >>= case _ of
-              "state" -> singleton <<< STATE <$> stateE
-              _ -> pure Nil
-            -- log "in ContextE, past looking for a state"
-            rolesAndContexts <- if null uses && null ind && null aspects && null states
-              then entireBlock1 contextPart
-              else entireBlock contextPart
-            pure $ ind <> states <> (uses <> aspects <> rolesAndContexts))
+    then inSubContext uname
+      getCurrentContext >>= \subContext ->
+        withArcParserState (ContextState subContext Nothing)
+            -- The state identifier is fully qualified.
+            -- The parser starts with StateIdentifier ""
+            -- `domain` results in StateIdentifier model:<ModelName>
+            -- Each context results in: StateIdentifier model:ModelName$<ContextName>
+            (withPos do
+              uses <- many $ checkIndent *> useE
+              ind <- option Nil $ checkIndent *> contextIndexedE
+              aspects <- many $ checkIndent *> contextAspectE
+              states <- scanIdentifier >>= case _ of
+                "state" -> singleton <<< STATE <$> stateE
+                _ -> pure Nil
+              -- log "in ContextE, past looking for a state"
+              rolesAndContexts <- if null uses && null ind && null aspects && null states
+                then entireBlock1 contextPart
+                else entireBlock contextPart
+              pure $ ind <> states <> (uses <> aspects <> rolesAndContexts))
     else pure Nil
   -- Notice: uname is unqualified.
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos}
@@ -93,19 +95,33 @@ contextE = withPos do
         "case" -> contextE
         "party" -> contextE
         "activity" -> contextE
-        "thing" -> addRoleNameToState thingRoleE
-        "user" -> addRoleNameToState userRoleE
-        "context" -> addRoleNameToState contextRoleE
-        "external" -> withArcParserState (StateIdentifier "External") externalRoleE
+        -- "thing" -> addRoleNameToState thingRoleE
+        "thing" -> lookAhead (reservedIdentifier *> arcIdentifier) >>=
+          explicitObjectState >>=
+            flip withArcParserState thingRoleE
+        -- "user" -> addRoleNameToState userRoleE
+        "user" -> lookAhead (reservedIdentifier *> arcIdentifier) >>=
+          explicitSubjectState >>=
+            flip withArcParserState userRoleE
+        -- "context" -> addRoleNameToState contextRoleE
+        "context" -> lookAhead (reservedIdentifier *> arcIdentifier) >>=
+          explicitObjectState >>=
+            flip withArcParserState contextRoleE
+        "external" -> explicitObjectState "External" >>=
+          flip withArcParserState externalRoleE
+        -- "external" -> withArcParserState (ObjectState (ExplicitRole ccontext <> "$External") Nothing) externalRoleE
         _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external"
 
-    addRoleNameToState :: IP ContextPart -> IP ContextPart
-    addRoleNameToState p = do
-      ident <- lookAhead (reservedIdentifier *> arcIdentifier)
-      withArcParserState (StateIdentifier ident) p
+    explicitSubjectState :: String -> IP StateSpecification
+    explicitSubjectState msegments = getCurrentContext >>= \(ContextType ccontext) -> pure $ SubjectState (ExplicitRole $ EnumeratedRoleType ccontext) (Just msegments)
 
-    qname :: ContextKind -> String -> String
-    qname knd cname = if knd == Domain then "model:" <> cname else cname
+    explicitObjectState :: String -> IP StateSpecification
+    explicitObjectState msegments = getCurrentContext >>= \(ContextType ccontext) -> pure $ ObjectState (ExplicitRole $ EnumeratedRoleType ccontext) (Just msegments)
+
+    -- addRoleNameToState :: IP ContextPart -> IP ContextPart
+    -- addRoleNameToState p = do
+    --   ident <- lookAhead (reservedIdentifier *> arcIdentifier)
+    --   withArcParserState (StateIdentifier ident) p
 
     contextKind :: IP ContextKind
     contextKind = (reserved "domain" *> pure Domain
@@ -161,8 +177,8 @@ userRoleE = protectSubject $ withEntireBlock
       kind <- reserved "user" *> pure UserRole
       uname <- arcIdentifier
       -- We've added the role name to the state before running userRoleE.
-      {state} <- getArcParserState
-      setSubject (unwrap state)
+      ContextType ctxt <- getCurrentContext
+      setSubject (ExplicitRole ( EnumeratedRoleType (ctxt <> "$" <> uname)))
       -- userRoleE cannot fail in the last line.
       ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
@@ -177,8 +193,8 @@ thingRoleE = protectObject $ withEntireBlock
       pos <- getPosition
       kind <- reserved "thing" *> pure RoleInContext
       uname <- arcIdentifier
-      {state} <- getArcParserState
-      setObject (Simple $ ArcIdentifier pos (unwrap state))
+      ContextType ctxt <- getCurrentContext
+      setObject (ExplicitRole ( EnumeratedRoleType (ctxt <> "$" <> uname)))
       ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
 contextRoleE :: IP ContextPart
@@ -192,8 +208,8 @@ contextRoleE = protectObject $ withEntireBlock
       pos <- getPosition
       kind <- reserved "context" *> pure ContextRole
       uname <- arcIdentifier
-      {state} <- getArcParserState
-      setObject (Simple $ ArcIdentifier pos (unwrap state <> "$" <> uname))
+      ContextType ctxt <- getCurrentContext
+      setObject (ExplicitRole ( EnumeratedRoleType (ctxt <> "$" <> uname)))
       enumeratedRole_ uname kind pos
 
 externalRoleE :: IP ContextPart
@@ -206,8 +222,8 @@ externalRoleE = protectObject $ withEntireBlock
     external_ = do
       pos <- getPosition
       knd <- reserved "external" *> pure ExternalRole
-      {state} <- getArcParserState
-      setObject (Simple $ ArcIdentifier pos (unwrap state <> "$External"))
+      ContextType ctxt <- getCurrentContext
+      setObject (ExplicitRole ( EnumeratedRoleType (ctxt <> "$External")))
       pure {uname: "External", knd, pos, parts: Nil}
 
 calculatedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
@@ -327,11 +343,26 @@ viewE = do
   refs <- sameOrIndented *> (token.parens (token.commaSep1 arcIdentifier))
   pure $ VE $ ViewE {id: uname, viewParts: refs, pos: pos}
 
+-- | Nothing `appendSegment` s = s
+-- | Just m `appendSegment` s = m$s
+appendSegment :: Maybe String -> String -> String
+appendSegment Nothing s = s
+appendSegment (Just m) s = m <> "$" <> s
+
+addSubState :: String -> StateSpecification -> StateSpecification
+addSubState localSubStateName (ContextState (ContextType cid) segpath) = ContextState
+  (ContextType (flip appendSegment cid segpath))
+  (Just localSubStateName)
+addSubState localSubStateName (SubjectState roleIdent s) = SubjectState roleIdent $ Just (s `appendSegment` localSubStateName)
+addSubState localSubStateName (ObjectState roleIdent s) = ObjectState roleIdent $ Just (s `appendSegment` localSubStateName)
+
 stateE :: IP StateE
 stateE = withPos do
   id <- reserved "state" *> token.identifier
   -- log "stateE"
-  withArcParserState (StateIdentifier id)
+  -- Can be ContextState, SubjectState and ObjectState.
+  {state} <- getArcParserState
+  withArcParserState (addSubState id state)
     do
       -- In IP, defined as an IntendParser on top of StateT ArcParserState Identity, we now have a
       -- new ArcParserState object with member 'state' being StateIdentifier "{previousStateIdentifier}$id".
@@ -366,7 +397,8 @@ perspectiveOn = try $ withPos do
   pos <- getPosition
   (stp :: Step) <- perspectiveOnKeywords *> step
   protectObject do
-    setObject stp
+    ctxt <- getCurrentContext
+    setObject (ImplicitRole ctxt stp)
     -- If 'perspectivePart' fails, nestedBlock will fail and thus perspectiveOn will fail.
     concat <$> nestedBlock perspectivePart
     -- In contrast, with the non-determinate expression outcommented below,
@@ -379,9 +411,10 @@ perspectiveOf :: IP (List StateQualifiedPart)
 perspectiveOf = try $ withPos do
   -- log "perspectiveOf"
   pos <- getPosition
-  (subject :: String) <- perspectiveOfKeywords *> arcIdentifier
+  (subject :: Step) <- perspectiveOfKeywords *> step
   protectSubject do
-    setSubject subject
+    ctxt <- getCurrentContext
+    setSubject (ImplicitRole ctxt subject)
     concat <$> nestedBlock perspectivePart
 
 perspectivePart :: IP (List StateQualifiedPart)
@@ -409,12 +442,13 @@ twoReservedWords = option (Tuple "" "") $ lookAhead (Tuple <$> reservedIdentifie
 
 inState :: IP (List StateQualifiedPart)
 inState = do
-  stateId <- StateIdentifier <$> (inStateKeywords *> arcIdentifier)
+  stateId <- inStateKeywords *> arcIdentifier
   -- We can use withArcParserState here. It will concatenate the local
   -- state identifier to the state identifier provided by the surrounding context.
   -- The assumption being that we do not refer to states out of the context that the
   -- user or role is defined in.
-  withArcParserState stateId
+  stateSpec <- subjectState (Just stateId) <|> objectState (Just stateId) <|> contextState (Just stateId)
+  withArcParserState stateSpec
     (concat <$> nestedBlock statePart)
   where
     statePart :: IP (List StateQualifiedPart)
@@ -453,19 +487,41 @@ perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> pure "perspec
 onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do
   mstateTrans <- onEntryKeywords *> optionMaybe arcIdentifier
-  currentStateId <- getStateIdentifier
-  -- The transition will be fully qualified.
+  stateSpec <- subjectState mstateTrans <|> objectState mstateTrans <|> contextState mstateTrans
   protectOnEntry do
-    setOnEntry (maybe currentStateId (append currentStateId <<< StateIdentifier) mstateTrans)
+    setOnEntry stateSpec
     concat <$> nestedBlock stateTransitionPart
+
+subjectState :: Maybe String -> IP StateSpecification
+subjectState mlocalName = reserved "of" *> reserved "subject" *> do
+  {subject} <- getArcParserState
+  case subject of
+    Nothing -> fail "A subject is required for 'in state X of subject"
+    Just s -> pure $ SubjectState s mlocalName
+
+objectState :: Maybe String -> IP StateSpecification
+objectState mlocalName = reserved "of" *> reserved "object" *> do
+  {object} <- getArcParserState
+  case object of
+    Nothing -> fail "An object is required for 'in state X of object'"
+    Just s -> pure $ ObjectState s mlocalName
+
+contextState :: Maybe String -> IP StateSpecification
+contextState mlocalName = option unit (reserved "of" *> reserved "context") *> do
+  stateSpec <- getStateIdentifier
+  case mlocalName of
+    Nothing -> pure stateSpec
+    Just s -> case stateSpec of
+      ContextState _ _ -> pure $ addSubState s stateSpec
+      otherwise -> fail "The lexical context does not provide a context state for 'in state X of context'"
 
 onExitE :: IP (List StateQualifiedPart)
 onExitE = do
   mstateTrans <- onExitKeywords *> optionMaybe arcIdentifier
-  currentStateId <- getStateIdentifier
+  stateSpec <- subjectState mstateTrans <|> objectState mstateTrans <|> contextState mstateTrans
   -- The transition will be fully qualified.
   protectOnExit do
-    setOnExit (maybe currentStateId (append currentStateId <<< StateIdentifier) mstateTrans)
+    setOnExit stateSpec
     concat <$> nestedBlock stateTransitionPart
 
 stateTransitionPart :: IP (List StateQualifiedPart)
@@ -481,7 +537,7 @@ automaticEffectE = do
   start <- getPosition
   reserved "do"
   -- User role either specified here or taken from state.
-  usr <- optionMaybe (reserved "for" *> arcIdentifier)
+  usr <- optionMaybe (reserved "for" *> step)
   isIndented >>= if _
     then do
       keyword <- scanIdentifier
@@ -490,7 +546,7 @@ automaticEffectE = do
         "letA" -> Right <$> letWithAssignment
         _ -> Left <$> nestedBlock assignment
       end <- getPosition
-      {subject, object, onEntry, onExit} <- getArcParserState
+      {subject, object, onEntry, onExit, currentContext} <- getArcParserState
       case usr of
         Nothing -> case subject, onEntry, onExit of
           Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
@@ -499,8 +555,8 @@ automaticEffectE = do
           _, Nothing, Nothing -> fail "A state transition is required"
           _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
         Just subject -> case Just subject, onEntry, onExit of
-          Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
-          Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+          Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: ImplicitRole currentContext sb, object, transition, effect, start, end}
+          Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: ImplicitRole currentContext sb, object, transition, effect, start, end}
           Nothing, _, _ -> failWithPosition "A subject is required" (arcPosition2Position start)
           _, Nothing, Nothing -> fail "A state transition is required"
           _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
@@ -511,14 +567,14 @@ notificationE = do
   start <- getPosition
   reserved "notify"
   -- User role either specified here or taken from state.
-  usr <- optionMaybe arcIdentifier
+  usr <- optionMaybe step
   message <- sentenceE
   end <- getPosition
-  {subject, onEntry, onExit} <- getArcParserState
+  {subject, onEntry, onExit, currentContext} <- getArcParserState
   case usr of
     Just user -> case onEntry, onExit of
-      Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user, transition, message, start, end}
-      Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user, transition, message, start, end}
+      Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: ImplicitRole currentContext user, transition, message, start, end}
+      Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: ImplicitRole currentContext user, transition, message, start, end}
       Nothing, Nothing -> fail "A state transition is required"
       _, _ -> fail "State transition inside state transition is not allowed"
     Nothing -> case subject, onEntry, onExit of

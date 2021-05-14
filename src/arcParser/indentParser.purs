@@ -31,13 +31,12 @@ import Control.Monad.State.Trans (get, put)
 import Data.Either (Either)
 import Data.List (List(..), many, singleton)
 import Data.Maybe (Maybe(..), isNothing)
+import Data.Newtype (unwrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
-import Effect.Class.Console (log, logShow)
-import Perspectives.Parsing.Arc.AST (StateTransitionE(..))
-import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.AST (RoleIdentification, StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
-import Perspectives.Representation.TypeIdentifiers (StateIdentifier(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..))
 import Prelude (class Monad, Unit, bind, discard, flip, not, pure, unit, ($), (*>), (<), (<*), (<<<), (<=), (<>), (>), (>>=), (&&))
 import Record (get, set) as Record
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
@@ -57,10 +56,19 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | (if we allow States to be nested, their names will be nested, too, providing a kind of scope).
 -- | Subject may be a qualified name (from the role declaration). However, it may also be unqualified or partly
 -- | qualified (from the "perspective of" expression).
+-- type ArcParserState =
+--   { subject :: Maybe Step
+--   , object :: Maybe Step
+--   , state :: StateDeterminant
+--   , onEntry :: Maybe StateTransitionE
+--   , onExit :: Maybe StateTransitionE
+--   }
+
 type ArcParserState =
-  { subject :: Maybe String
-  , object :: Maybe Step
-  , state :: StateIdentifier
+  { currentContext :: ContextType
+  , subject :: Maybe RoleIdentification
+  , object :: Maybe RoleIdentification
+  , state :: StateSpecification
   , onEntry :: Maybe StateTransitionE
   , onExit :: Maybe StateTransitionE
   }
@@ -69,7 +77,14 @@ type ArcParser = StateT ArcParserState Aff
 type IP a = IndentParser ArcParser String a
 
 initialArcParserState :: ArcParserState
-initialArcParserState = {subject: Nothing, object: Nothing, state: StateIdentifier "", onEntry: Nothing, onExit: Nothing}
+initialArcParserState =
+  { currentContext: ContextType "model:"
+  , subject: Nothing
+  , object: Nothing
+  , state: ContextState (ContextType "") Nothing
+  , onEntry: Nothing
+  , onExit: Nothing
+}
 
 getArcParserState :: IP ArcParserState
 getArcParserState = lift $ lift $ get
@@ -77,21 +92,33 @@ getArcParserState = lift $ lift $ get
 modifyArcParserState :: (ArcParserState -> ArcParserState) -> IP ArcParserState
 modifyArcParserState f = lift $ lift $ modify f
 
-withArcParserState :: forall a. StateIdentifier -> IP a -> IP a
-withArcParserState stateId a = do
+getCurrentContext :: IP ContextType
+getCurrentContext = getArcParserState >>= pure <<< _.currentContext
+
+inSubContext :: forall a. String -> IP a -> IP a
+inSubContext subContextName p = do
+  oldState@{currentContext} <- getArcParserState
+  void $ modifyArcParserState \s -> s {currentContext = ContextType $ (unwrap currentContext) <> "$" <> subContextName}
+  result <- p
+  lift $ lift $ put oldState
+  pure result
+
+withArcParserState :: forall a. StateSpecification -> IP a -> IP a
+withArcParserState stateDeterminant a = do
   oldState@{state} <- getArcParserState
-  void $ modifyArcParserState \s -> s {state = state <> stateId}
+  void $ modifyArcParserState \s -> s {state = stateDeterminant}
   result <- a
   lift $ lift $ put oldState
   pure result
 
-getStateIdentifier :: IP StateIdentifier
+getStateIdentifier :: IP StateSpecification
 getStateIdentifier = getArcParserState >>= pure <<< _.state
 
 setLabel :: forall a l r'. IsSymbol l =>
-  Cons l (Maybe a) r' (subject :: Maybe String
-  , object :: Maybe Step
-  , state :: StateIdentifier
+  Cons l (Maybe a) r' (currentContext :: ContextType
+  , subject :: Maybe RoleIdentification
+  , object :: Maybe RoleIdentification
+  , state :: StateSpecification
   , onEntry :: Maybe StateTransitionE
   , onExit :: Maybe StateTransitionE
   ) =>
@@ -104,16 +131,17 @@ setLabel l newValue = do
       -- log ("failing in setLabel with " <> reflectSymbol l)
       fail (reflectSymbol l <> " is already specified in the context")
 
-setSubject :: String -> IP Unit
+setSubject :: RoleIdentification -> IP Unit
 setSubject = setLabel (SProxy :: SProxy "subject")
 
-setObject :: Step -> IP Unit
+setObject :: RoleIdentification -> IP Unit
 setObject = setLabel (SProxy :: SProxy "object")
 
 protectLabel :: forall a l r' b. IsSymbol l =>
-  Cons l (Maybe a) r' (subject :: Maybe String
-  , object :: Maybe Step
-  , state :: StateIdentifier
+  Cons l (Maybe a) r' (currentContext :: ContextType
+  , subject :: Maybe RoleIdentification
+  , object :: Maybe RoleIdentification
+  , state :: StateSpecification
   , onEntry :: Maybe StateTransitionE
   , onExit :: Maybe StateTransitionE
   ) =>
@@ -138,7 +166,7 @@ protectOnExit :: forall a. IP a -> IP a
 protectOnExit = protectLabel (SProxy :: SProxy "onExit")
 
 -- | Stores a fully qualified state identifier.
-setOnEntry :: StateIdentifier -> IP Unit
+setOnEntry :: StateSpecification -> IP Unit
 setOnEntry stateId = do
   {onEntry} <- getArcParserState
   if isNothing onEntry
@@ -146,7 +174,7 @@ setOnEntry stateId = do
     else fail "on entry is already specified"
 
 -- | Stores a fully qualified state identifier.
-setOnExit :: StateIdentifier -> IP Unit
+setOnExit :: StateSpecification -> IP Unit
 setOnExit stateId = do
   {onExit} <- getArcParserState
   if isNothing onExit
