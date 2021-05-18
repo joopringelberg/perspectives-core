@@ -32,57 +32,60 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, filterA, foldM, fromFoldable, head, length, nub, null, reverse, uncons)
+import Data.Array (cons, filter, filterA, findIndex, foldM, foldr, fromFoldable, head, index, length, nub, null, reverse, uncons, updateAt)
+import Data.Array.Partial (head) as ARRP
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
-import Data.Map (Map, keys, empty, singleton, filter) as Map
-import Data.Maybe (Maybe(..), isJust)
+import Data.Map (Map, keys, empty, singleton, filter, insert, lookup) as Map
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, keys, lookup, unions, values)
+import Foreign.Object (Object, insert, keys, lookup, unions, values, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.InvertedQuery (RelevantProperties(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), StateQualifiedPart(..), StateTransitionE(..), StateSpecification(..)) as AST
+import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AE
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.DescriptionCompiler (compileAndSaveProperty, compileAndSaveRole, compileStep, compileVarBinding, makeSequence, qualifyLocalEnumeratedRoleName, qualifyReturnsClause)
+import Perspectives.Query.DescriptionCompiler (compileAndSaveProperty, compileAndSaveRole, compileStep, compileVarBinding, makeRoleGetter, makeSequence, qualifyLocalEnumeratedRoleName, qualifyReturnsClause)
 import Perspectives.Query.Kinked (setInvertedQueries)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain2roleType, functional, hasQueryFunction, mandatory, propertyOfRange, range, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain2roleType, firstOperand, functional, hasQueryFunction, mandatory, propertyOfRange, range, secondOperand, traverseQfd)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedProperty)
 import Perspectives.Representation.Class.Property (range) as PT
 import Perspectives.Representation.Class.Role (bindingOfRole, contextOfADT, hasNotMorePropertiesThan, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Perspective (Perspective(..))
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.State (State(..), StateFulObject(..))
+import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleTypeOfADT, roleStates, statesPerProperty)
-import Prelude (Unit, append, bind, discard, map, pure, show, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -100,6 +103,7 @@ phaseThree_ df@{_id, referredModels} = do
     (do
       qualifyBindings
       compileExpressions
+      handlePostponedStateQualifiedParts
       requalifyBindingsToCalculatedRoles
       qualifyPropertyReferences
       addInvertedQueries
@@ -253,30 +257,8 @@ compileExpressions = do
     compileExpressions' {_id,calculatedRoles, calculatedProperties, states, enumeratedRoles} ns = do
       traverse_ compileRolExpr (identifier <$> calculatedRoles)
       traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
-      enumeratedRoles' <- traverse compilePerspectiveObjects enumeratedRoles
-      -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
-      -- We will not have errors on trying to retrieve the DomeinFile here.
-      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId ns)
-      modifyDF \dfr -> modifiedDomeinFile {enumeratedRoles = enumeratedRoles'}
-
+      -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
       where
-        compilePerspectiveObjects :: EnumeratedRole -> PhaseThree EnumeratedRole
-        compilePerspectiveObjects (EnumeratedRole er@{perspectives, context}) = do
-          perspectives' <- traverse compilePerspectiveObject perspectives
-          pure (EnumeratedRole er {perspectives = perspectives'})
-          where
-            compilePerspectiveObject :: Perspective -> PhaseThree Perspective
-            compilePerspectiveObject (Perspective pr@{object}) = case object of
-              S stp -> do
-                -- The domain is the Context type that the perspective belongs to.
-                dom <- pure $ CDOM $ ST context
-                descr <- withFrame do
-                  varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
-                  compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
-                  pure $ makeSequence varb compiledCalculation
-                pure $ Perspective pr {object = Q descr}
-              Q _ -> pure $ Perspective pr
-
         compileRolExpr :: CalculatedRoleType -> PhaseThree Unit
         compileRolExpr roleType = do
           cr@(CalculatedRole {calculation, context}) <- lift2 $ getCalculatedRole roleType
@@ -292,6 +274,233 @@ compileExpressions = do
           case calculation of
             Q _ -> pure unit
             S stp -> void $ compileAndSaveProperty (RDOM $ ST role) stp cp
+
+handlePostponedStateQualifiedParts  :: PhaseThree Unit
+handlePostponedStateQualifiedParts = do
+  postponedStateQualifiedParts <- lift $ State.gets _.postponedStateQualifiedParts
+  for_ postponedStateQualifiedParts (unsafePartial handlePart)
+  where
+
+    collectRoles :: RoleIdentification -> PhaseThree (Array EnumeratedRoleType)
+    collectRoles (ExplicitRole _ rt _) = pure [rt]
+    collectRoles (ImplicitRole ctxt s) = compileStep (CDOM (ST ctxt)) s >>= \qfd -> case range qfd of
+      RDOM adt -> pure $ reduce adt
+      otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
+      where
+        -- Translate the RoleIdentification to an array of EnumeratedRoleTypes.
+        -- Notice we do not fail on UNIVERSAL or EMPTY.
+        reduce :: ADT EnumeratedRoleType -> Array EnumeratedRoleType
+        reduce (ST t) = [t]
+        reduce (SUM args) = join $ map reduce args
+        reduce (PROD args) = maybe [] reduce (head args)
+        reduce UNIVERSAL = []
+        reduce EMPTY = []
+
+    collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
+    collectStates mpath r = collectRoles r >>= \roles -> case mpath of
+      Nothing -> pure (StateIdentifier <<< unwrap <$> roles)
+      Just p ->  pure (StateIdentifier <<< flip append p <<< unwrap <$> roles)
+
+    addAll :: forall key value. Ord key => value -> Map.Map key value -> Array key -> Map.Map key value
+    addAll value = foldr (\key map -> Map.insert key value map)
+
+    stateSpec :: AST.StateTransitionE -> AST.StateSpecification
+    stateSpec (AST.Entry s) = s
+    stateSpec (AST.Exit s) = s
+
+    toQueryFunctionDescription :: RoleIdentification -> PhaseThree QueryFunctionDescription
+    toQueryFunctionDescription (ExplicitRole ctxt rt pos) = makeRoleGetter (CDOM $ ST ctxt) (ENR rt)
+    toQueryFunctionDescription (ImplicitRole ctxt stp) = withFrame do
+      varb <- compileVarBinding (CDOM (ST ctxt)) (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
+      compileStep (CDOM (ST ctxt)) stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
+
+    handlePart :: Partial => AST.StateQualifiedPart -> PhaseThree Unit
+    handlePart (AST.N (AST.NotificationE{user, transition, message, start, end})) = do
+      qualifiedUsers <- map ENR <$> collectRoles user
+      case stateSpec transition of
+        -- Notify all subjects in the context state.
+        AST.ContextState ctx mpath -> modifyAllStates qualifiedUsers [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+        -- Notify each qualifiedUser in each of the subject states.
+        -- Note that the subjects in whose states we notify, do not need be the qualified users:
+        -- 'warn me when you are at home' illustrates this independence.
+        AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates qualifiedUsers
+        -- Notify all subjects in all object states.
+        AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates qualifiedUsers
+      where
+          modifyAllStates :: Array RoleType -> Array StateIdentifier -> PhaseThree Unit
+          modifyAllStates qualifiedUsers states = for_ states
+            \stateId -> modifyPartOfState start end
+              (\(sr@{notifyOnEntry, notifyOnExit}) -> case transition of
+                AST.Entry _ -> pure $ sr {notifyOnEntry = EncodableMap $ addAll message (unwrap notifyOnEntry) qualifiedUsers}
+                AST.Exit _ -> pure $ sr {notifyOnExit = EncodableMap $ addAll message (unwrap notifyOnExit) qualifiedUsers})
+                stateId
+
+    handlePart (AST.AE (AST.AutomaticEffectE{subject, object: syntacticObject, transition, effect, start, end})) = do
+      qualifiedUsers <- map ENR <$> collectRoles subject
+      case stateSpec transition of
+        -- Execute the effect for all subjects in the context state.
+        AST.ContextState ctx mpath -> modifyAllStates qualifiedUsers [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+        -- Execute the effect for each qualifiedUser in each of the subject states.
+        -- Note that the subjects in whose states we execute, do not need be the qualified users we execute for:
+        -- 'do this automatically for me when you are at home' illustrates this independence.
+        AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates qualifiedUsers
+        -- Execute the effect for all subjects in all object states.
+        AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates qualifiedUsers
+      where
+        modifyAllStates :: Array RoleType -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllStates qualifiedUsers states = for_ states
+          (modifyPartOfState start end
+            \(sr@{automaticOnEntry, automaticOnExit, object}) -> do
+              sideEffect <- case effect of
+                Left assignments -> pure $ A (fromFoldable assignments)
+                Right letstep -> pure $ L letstep
+              object' <- case object of
+                Just _ -> pure object
+                Nothing -> case syntacticObject of
+                  Nothing -> pure Nothing
+                  Just r -> Just <$> toQueryFunctionDescription r
+              case transition of
+                AST.Entry _ -> pure $ sr {automaticOnEntry = EncodableMap $ addAll sideEffect (unwrap automaticOnEntry) qualifiedUsers, object = object'}
+                AST.Exit _ -> pure $ sr {automaticOnExit = EncodableMap $ addAll sideEffect (unwrap automaticOnExit) qualifiedUsers, object = object'})
+
+    handlePart (AST.R (AST.RoleVerbE{subject, object, state, roleVerbs:rv, start})) = do
+      -- Add, for all these users...
+      qualifiedUsers <- collectRoles subject
+      -- ... to their perspective on this object...
+      objectQfd <- toQueryFunctionDescription object
+      case state of
+        -- ... the role verbs, but only only in this context state:
+        AST.ContextState ctx mpath -> modifyAllSubjectPerspectives qualifiedUsers objectQfd [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+        -- ... the role verbs, for all these subject states:
+        -- Note that the subjects in whose states we execute, do not need be the qualified users we execute for:
+        -- 'I can check your heart beat when you are at home' illustrates this independence.
+        AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllSubjectPerspectives qualifiedUsers objectQfd
+        -- ... the role verbs, for these object states.
+        AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllSubjectPerspectives qualifiedUsers objectQfd
+      where
+        modifyAllSubjectPerspectives :: Array EnumeratedRoleType -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives qualifiedUsers objectQfd states = for_ qualifiedUsers
+          (modifyPerspective objectQfd start
+            (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) states}))
+
+    handlePart (AST.AC (AST.ActionE{id, subject, object, state, effect, start})) = do
+      -- Add, for all these users...
+      qualifiedUsers <- collectRoles subject
+      -- ... to their perspective on this object...
+      objectQfd <- toQueryFunctionDescription object
+      -- ... this action ...
+      theAction <- case effect of
+        Left assignments -> pure $ A (fromFoldable assignments)
+        Right letstep -> pure $ L letstep
+      case state of
+        -- ... but only only in this context state:
+        AST.ContextState ctx mpath -> modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+        -- ... for all these subject states:
+        -- Note that the subjects in whose states we execute, do not need be the qualified users we give access to the Action:
+        -- 'I can check your heart beat when you are at home' illustrates this independence.
+        AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction
+        -- ... for these object states.
+        AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction
+      where
+        -- Add the action for all users to their perspective on the object in all states.
+        modifyAllSubjectPerspectives :: Array EnumeratedRoleType -> QueryFunctionDescription -> SideEffect -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states = for_ qualifiedUsers
+          (modifyPerspective
+            objectQfd
+            start
+            \(Perspective pr@{actions}) -> Perspective $ pr {actions = EncodableMap (foldr
+              (\stateId actionsMap -> case Map.lookup stateId actionsMap of
+                Nothing -> Map.insert stateId (singleton id theAction) actionsMap
+                Just actionsInState -> Map.insert stateId (insert id theAction actionsInState) actionsMap)
+              (unwrap actions)
+              states)})
+
+    handlePart (AST.P (AST.PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start})) = do
+      -- Add, for all these users...
+      qualifiedUsers <- collectRoles subject
+      -- ... to their perspective on this object...
+      objectQfd <- toQueryFunctionDescription object
+      propertyTypes <- constructPropertyVerbs propsOrView
+      (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes (fromFoldable propertyVerbs)
+      case state of
+        -- ... the action, but only only in this context state:
+        AST.ContextState ctx mpath -> modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+        -- ... the action, for all these subject states:
+        -- Note that the subjects in whose states we execute, do not need be the qualified users we give access to the Action:
+        -- 'I can check your heart beat when you are at home' illustrates this independence.
+        AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs'
+        -- ... the action, for these object states.
+        AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs'
+      where
+        modifyAllSubjectPerspectives :: Array EnumeratedRoleType -> QueryFunctionDescription -> PropertyVerbs -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' states = for_ qualifiedUsers
+          (modifyPerspective
+            objectQfd
+            start
+            \(Perspective pr@{propertyVerbs:pverbs}) -> Perspective $ pr {propertyVerbs = EncodableMap (foldr
+              (\stateId pverbsMap -> case Map.lookup stateId pverbsMap of
+                Nothing -> Map.insert stateId [propertyVerbs'] pverbsMap
+                Just propertyVerbsArray -> Map.insert stateId (cons propertyVerbs' propertyVerbsArray) pverbsMap)
+              (unwrap pverbs)
+              states)})
+
+        constructPropertyVerbs :: AST.PropsOrView -> PhaseThree (ExplicitSet PropertyType)
+        constructPropertyVerbs AST.AllProperties = pure Universal
+        constructPropertyVerbs (AST.Properties ps) =
+          -- The (partial) names for properties used here may be defined outside
+          -- of the model (due to role filling). Hence we postpone looking up their
+          -- real referents to phase three. Here we assume an Enumerated PropertyType.
+          pure $ PSet (ENP <<< EnumeratedPropertyType <$> (fromFoldable ps))
+        constructPropertyVerbs (AST.View view) = do
+          (views :: Object View) <- getsDF _.views
+          -- As we have postponed handling these parse tree fragments after
+          -- handling all others, there can be no forward references.
+          -- Notice that the property references may not be fully qualified!
+          candidates <- pure $ filter (flip endsWithSegments view) (keys views)
+          case length candidates of
+            0 -> throwError $ UnknownView start view
+            1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
+              Just (View {propertyReferences}) -> pure $ PSet propertyReferences
+            _ -> throwError $ NotUniquelyIdentifying start view candidates
+
+    -- Apply, for this user, the modifier to his perspective on the object (and create a perspective if necessary).
+    modifyPerspective :: QueryFunctionDescription -> ArcPosition -> (Perspective -> Perspective) -> EnumeratedRoleType -> PhaseThree Unit
+    modifyPerspective objectQfd start modifier (EnumeratedRoleType qualifiedSubject) = do
+      -- The user role
+      mUserRole <- getsDF ((lookup qualifiedSubject) <<< _.enumeratedRoles)
+      case mUserRole of
+        Nothing -> throwError $ UnknownRole start qualifiedSubject
+        Just (EnumeratedRole er@{perspectives}) -> do
+          -- The perspective on the object
+          mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
+          perspective <- case mi of
+            Nothing -> pure $ Perspective
+              { object: objectQfd
+              , roleVerbs: EncodableMap Map.empty
+              , propertyVerbs: EncodableMap Map.empty
+              , actions: EncodableMap Map.empty
+              }
+            Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
+          -- Apply the modifier, save the changed or created perspective with the user and save in the DomeinFile.
+          modifyDF \dfr@{enumeratedRoles} -> dfr {enumeratedRoles = insert
+            qualifiedSubject
+            (EnumeratedRole $ er {perspectives = case mi of
+              Nothing -> cons (modifier perspective) perspectives
+              Just i -> unsafePartial $ fromJust $ updateAt i (modifier perspective) perspectives })
+            enumeratedRoles
+            }
+      pure unit
+
+    modifyPartOfState :: ArcPosition -> ArcPosition -> (StateRecord -> PhaseThree StateRecord) -> StateIdentifier -> PhaseThree Unit
+    modifyPartOfState start end modifyState stateId = do
+      mstate <- State.gets _.dfr >>= pure <<< lookup (unwrap stateId) <<< _.states
+      case mstate of
+        Nothing -> throwError $ StateDoesNotExist stateId start end
+        Just (State sr) -> do
+          -- modify the state
+          state' <- State <$> (modifyState sr)
+          modifyDF \dfr@{states} -> dfr {states = insert (unwrap stateId) state' states}
+      pure unit
 
 addInvertedQueries :: PhaseThree Unit
 addInvertedQueries = do
@@ -315,13 +524,11 @@ addInvertedQueries = do
         perspectivesInCalculatedRole (CalculatedRole{_id, perspectives}) = for_ perspectives (addInvertedQueriesForPerspectiveObject (CR _id))
 
         addInvertedQueriesForPerspectiveObject :: RoleType -> Perspective -> PhaseThree Unit
-        addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs}) = case object of
-          S stp -> throwError $ Custom $ "addInvertedQueriesForPerspectiveObject: perspective object not compiled for " <> (show roleType)
-          Q descr -> do
-            -- Sets the inverted queries directly in the EnumeratedRoles and Properties in the
-            -- DomeinFile we keep in PhaseTwoState.
-            sPerProp <- lift2 $ statesPerProperty p
-            setInvertedQueries (Just roleType) sPerProp (roleStates p) descr
+        addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs}) = do
+          -- Sets the inverted queries directly in the EnumeratedRoles and Properties in the
+          -- DomeinFile we keep in PhaseTwoState.
+          sPerProp <- lift2 $ statesPerProperty p
+          setInvertedQueries (Just roleType) sPerProp (roleStates p) object
 
         explicitSet2RelevantProperties :: ExplicitSet PropertyType -> RelevantProperties
         explicitSet2RelevantProperties Universal = All
@@ -407,60 +614,55 @@ compileStates = do
               automaticOnExit' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain Nothing) (unwrap automaticOnExit)
               pure $ State ar
                 { query = Q queryDescription
-                , object = Q <$> Nothing
+                , object = Nothing
                 , automaticOnEntry = EncodableMap automaticOnEntry'
                 , automaticOnExit = EncodableMap automaticOnExit'
                 }
 
         compileContextState :: ContextType -> State -> PhaseThree State
-        compileContextState context (State ar@{id:stateIdentifier, query, object, notifyOnEntry, notifyOnExit, automaticOnEntry, automaticOnExit}) =
-          withFrame
-            do
-              currentDomain <- pure (CDOM $ ST context)
-              -- add declaraton for currentcontext. Replace currentcontext expr with
-              -- lookup in the runtime environment.
-              addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True True)
-              queryDescription <- case query of
-                Q d -> pure d
-                -- We have to do this for all user role types in the notifyOnEntry, notifyOnExit, automaticOnEntry
-                -- and automaticOnExit members.
-                S stp -> do
-                  varb <- compileVarBinding currentDomain (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
-                  -- A State query only has to return the ContextInstance or RoleInstance that the state query is executed on.
-                  compiledCalculation <- compileAndDistributeStep currentDomain stp Nothing stateIdentifier
-                  pure $ makeSequence varb compiledCalculation
-              -- Add an object variable if we have an object.
-              mobjectCalculation <-  case object of
-                Nothing -> pure Nothing
-                Just object' -> do
-                  objectCalculation' <- case object' of
-                    S stp -> do
-                      -- The domain is the Context Type the State belongs to.
-                      dom <- pure $ CDOM $ ST context
-                      withFrame do
-                        varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
-                        -- The object is a RoleType.
-                        compiledCalculation <- compileStep dom stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
-                        -- The subjects are all keys of the maps in automaticOnEntry and
-                        -- automaticOnExit with expressions that refer the object.
-                        subjects <- pure $ nub $ append
-                          (fromFoldable $ Map.keys $ Map.filter (hasQueryFunction (QF.VariableLookup "object") <<< unsafePartial \(EF qfd) -> qfd) (unwrap automaticOnEntry))
-                          (fromFoldable $ Map.keys $ Map.filter (hasQueryFunction (QF.VariableLookup "object") <<< unsafePartial \(EF qfd) -> qfd) (unwrap automaticOnExit))
-                        for_ subjects \subject ->
-                          setInvertedQueries (Just subject) Map.empty [stateIdentifier] compiledCalculation
-                        pure $ makeSequence varb compiledCalculation
-                    Q calc -> pure calc
-                  addBinding "object" (SQD currentDomain (QF.VariableLookup "object") (range objectCalculation') (functional objectCalculation') (mandatory objectCalculation'))
-                  pure $ Just objectCalculation'
-              -- Now for the entries in automaticOnEntry and automaticOnExit, compile the SideEffects.
-              automaticOnEntry' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain mobjectCalculation) (unwrap automaticOnEntry)
-              automaticOnExit' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain mobjectCalculation) (unwrap automaticOnExit)
-              pure $ State ar
-                { query = Q queryDescription
-                , object = Q <$> mobjectCalculation
-                , automaticOnEntry = EncodableMap automaticOnEntry'
-                , automaticOnExit = EncodableMap automaticOnExit'
-                }
+        compileContextState context (State ar@{id:stateIdentifier, query, object, notifyOnEntry, notifyOnExit, automaticOnEntry, automaticOnExit}) = withFrame $ do
+          currentDomain <- pure (CDOM $ ST context)
+          -- add declaraton for currentcontext. Replace currentcontext expr with
+          -- lookup in the runtime environment.
+          addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True True)
+          queryDescription <- case query of
+            Q d -> pure d
+            -- We have to do this for all user role types in the notifyOnEntry, notifyOnExit, automaticOnEntry
+            -- and automaticOnExit members.
+            S stp -> do
+              varb <- compileVarBinding currentDomain (VarBinding "currentcontext" (Simple $ AE.Identity (startOf stp)))
+              -- A State query only has to return the ContextInstance or RoleInstance that the state query is executed on.
+              compiledCalculation <- compileAndDistributeStep currentDomain stp Nothing stateIdentifier
+              pure $ makeSequence varb compiledCalculation
+          -- Add an object variable if we have an object.
+          mobjectCalculation <- case object of
+            Nothing -> pure Nothing
+            Just qfd -> withFrame $ case secondOperand qfd of
+              Nothing -> throwError $ Custom "Programming error (compileContextState): object in state should be compiled to sequence of varbinding and the query for the object. This happens in handlePostponedStateQualifiedParts"
+              Just compiledCalculation -> do
+                -- Explanation. The compiledCalculation is the sequence of the binding of the
+                -- "currentcontext" variable and the computation of the object.
+                -- The first operand of the binding itself is exactly the computation of the
+                -- current context in runtime. We add that to the compile time environment here.
+                addBinding "currentcontext" (unsafePartial fromJust $ firstOperand $ unsafePartial fromJust $ firstOperand compiledCalculation)
+                -- The subjects are all keys of the maps in automaticOnEntry and
+                -- automaticOnExit with expressions that refer the object.
+                subjects <- pure $ nub $ append
+                  (fromFoldable $ Map.keys $ Map.filter (hasQueryFunction (QF.VariableLookup "object") <<< unsafePartial \(EF qfd') -> qfd') (unwrap automaticOnEntry))
+                  (fromFoldable $ Map.keys $ Map.filter (hasQueryFunction (QF.VariableLookup "object") <<< unsafePartial \(EF qfd') -> qfd') (unwrap automaticOnExit))
+                for_ subjects \subject ->
+                  setInvertedQueries (Just subject) Map.empty [stateIdentifier] compiledCalculation
+                addBinding "object" (SQD currentDomain (QF.VariableLookup "object") (range qfd) (functional qfd) (mandatory qfd))
+                pure $ Just qfd
+          -- Now for the entries in automaticOnEntry and automaticOnExit, compile the SideEffects.
+          automaticOnEntry' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain mobjectCalculation) (unwrap automaticOnEntry)
+          automaticOnExit' <- traverseWithIndex (compileSideEffect stateIdentifier currentDomain mobjectCalculation) (unwrap automaticOnExit)
+          pure $ State ar
+            { query = Q queryDescription
+            , object = mobjectCalculation
+            , automaticOnEntry = EncodableMap automaticOnEntry'
+            , automaticOnExit = EncodableMap automaticOnExit'
+            }
 
         compileSideEffect :: StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> RoleType -> SideEffect -> PhaseThree SideEffect
         compileSideEffect stateIdentifier currentDomain mobjectCalculation' userRoleType effect =

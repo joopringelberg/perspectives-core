@@ -113,10 +113,10 @@ contextE = withPos do
         _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external"
 
     explicitSubjectState :: String -> IP StateSpecification
-    explicitSubjectState msegments = getCurrentContext >>= \(ContextType ccontext) -> pure $ SubjectState (ExplicitRole $ EnumeratedRoleType ccontext) (Just msegments)
+    explicitSubjectState segments = getCurrentContext >>= \ctxt@(ContextType ccontext) -> getPosition >>= \pos -> pure $ SubjectState (ExplicitRole ctxt (EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
 
     explicitObjectState :: String -> IP StateSpecification
-    explicitObjectState msegments = getCurrentContext >>= \(ContextType ccontext) -> pure $ ObjectState (ExplicitRole $ EnumeratedRoleType ccontext) (Just msegments)
+    explicitObjectState segments = getCurrentContext >>= \ctxt@(ContextType ccontext) -> getPosition >>= \pos -> pure $ ObjectState (ExplicitRole ctxt (EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
 
     -- addRoleNameToState :: IP ContextPart -> IP ContextPart
     -- addRoleNameToState p = do
@@ -177,8 +177,8 @@ userRoleE = protectSubject $ withEntireBlock
       kind <- reserved "user" *> pure UserRole
       uname <- arcIdentifier
       -- We've added the role name to the state before running userRoleE.
-      ContextType ctxt <- getCurrentContext
-      setSubject (ExplicitRole ( EnumeratedRoleType (ctxt <> "$" <> uname)))
+      ct@(ContextType ctxt) <- getCurrentContext
+      setSubject (ExplicitRole ct ( EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
       -- userRoleE cannot fail in the last line.
       ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
@@ -193,8 +193,8 @@ thingRoleE = protectObject $ withEntireBlock
       pos <- getPosition
       kind <- reserved "thing" *> pure RoleInContext
       uname <- arcIdentifier
-      ContextType ctxt <- getCurrentContext
-      setObject (ExplicitRole ( EnumeratedRoleType (ctxt <> "$" <> uname)))
+      ct@(ContextType ctxt) <- getCurrentContext
+      setObject (ExplicitRole ct ( EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
       ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
 contextRoleE :: IP ContextPart
@@ -208,8 +208,8 @@ contextRoleE = protectObject $ withEntireBlock
       pos <- getPosition
       kind <- reserved "context" *> pure ContextRole
       uname <- arcIdentifier
-      ContextType ctxt <- getCurrentContext
-      setObject (ExplicitRole ( EnumeratedRoleType (ctxt <> "$" <> uname)))
+      ct@(ContextType ctxt) <- getCurrentContext
+      setObject (ExplicitRole ct ( EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
       enumeratedRole_ uname kind pos
 
 externalRoleE :: IP ContextPart
@@ -222,8 +222,8 @@ externalRoleE = protectObject $ withEntireBlock
     external_ = do
       pos <- getPosition
       knd <- reserved "external" *> pure ExternalRole
-      ContextType ctxt <- getCurrentContext
-      setObject (ExplicitRole ( EnumeratedRoleType (ctxt <> "$External")))
+      ct@(ContextType ctxt) <- getCurrentContext
+      setObject (ExplicitRole ct ( EnumeratedRoleType (ctxt <> "$External")) pos)
       pure {uname: "External", knd, pos, parts: Nil}
 
 calculatedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))

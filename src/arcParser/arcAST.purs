@@ -204,7 +204,7 @@ newtype ViewE = ViewE
 --------------------------------------------------------------------------------
 ---- ROLEIDENTIFICATION
 --------------------------------------------------------------------------------
-data RoleIdentification = ExplicitRole EnumeratedRoleType | ImplicitRole ContextType Step
+data RoleIdentification = ExplicitRole ContextType EnumeratedRoleType ArcPosition | ImplicitRole ContextType Step
 
 derive instance genericRoleIdentification :: Generic RoleIdentification _
 instance eqRoleIdentification :: Eq RoleIdentification where eq = genericEq

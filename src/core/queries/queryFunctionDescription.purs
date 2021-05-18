@@ -200,6 +200,10 @@ queryFunction (UQD _ f _ _ _ _) = f
 queryFunction (BQD _ f _ _ _ _ _) = f
 queryFunction (MQD _ f _ _ _ _) = f
 
+firstOperand :: QueryFunctionDescription -> Maybe QueryFunctionDescription
+firstOperand (BQD _ _ f _ _ _ _) = Just f
+firstOperand _ = Nothing
+
 secondOperand :: QueryFunctionDescription -> Maybe QueryFunctionDescription
 secondOperand (BQD _ _ _ s _ _ _) = Just s
 secondOperand _ = Nothing

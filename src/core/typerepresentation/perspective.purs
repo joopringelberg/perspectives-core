@@ -34,7 +34,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object)
 import Perspectives.Data.EncodableMap (EncodableMap)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, range)
 import Perspectives.Representation.ADT (ADT, leavesInADT)
 import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
 import Perspectives.Representation.SideEffect (SideEffect)
@@ -48,7 +48,7 @@ import Prelude (class Eq, class Show, ($), (&&))
 newtype Perspective = Perspective PerspectiveRecord
 
 type PerspectiveRecord =
-  { object :: Calculation
+  { object :: QueryFunctionDescription
   , roleVerbs :: EncodableMap StateIdentifier RoleVerbList
 	, propertyVerbs :: EncodableMap StateIdentifier (Array PropertyVerbs)
 	, actions :: EncodableMap StateIdentifier (Object SideEffect)
@@ -74,9 +74,8 @@ instance decodePerspective :: Decode Perspective where
 -----------------------------------------------------------
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 objectOfPerspective :: Partial => Perspective -> ADT EnumeratedRoleType
-objectOfPerspective (Perspective {object}) = case object of
-  Q qfd -> case range qfd of
-    RDOM adt -> adt
+objectOfPerspective (Perspective {object}) = case range object of
+  RDOM adt -> adt
 
 -- | Disregarding state, returns true iff the perspective lets the user apply the
 -- | verb to the property.

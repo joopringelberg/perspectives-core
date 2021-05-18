@@ -36,7 +36,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
-import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Sentence (Sentence)
 import Perspectives.Representation.SideEffect (SideEffect)
@@ -48,7 +48,7 @@ type StateRecord =
 	{ id :: StateIdentifier
 	, stateFulObject :: StateFulObject
 	, query :: Calculation
-	, object :: Maybe Calculation
+	, object :: Maybe QueryFunctionDescription
 	-- the key in these maps is the subject the effect or notification is for.
 	, notifyOnEntry :: EncodableMap RoleType Sentence
 	, notifyOnExit :: EncodableMap RoleType Sentence

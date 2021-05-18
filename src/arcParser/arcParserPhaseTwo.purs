@@ -26,31 +26,20 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets, modify)
-import Data.Array (cons, elemIndex, length, group)
-import Data.Array (filter, fromFoldable) as ARR
-import Data.Array.NonEmpty (NonEmptyArray, head) as ARNE
-import Data.Array.NonEmpty (toArray)
-import Data.Array.Partial (head) as ARRP
-import Data.Either (Either(..))
-import Data.Foldable (foldl, for_)
+import Data.Array (cons, elemIndex)
+import Data.Array (fromFoldable) as ARR
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head)
-import Data.Map (insert, lookup, empty) as MAP
-import Data.Map (toUnfoldable)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..), fst, snd)
-import Foreign.Object (Object, insert, keys, lookup, singleton)
+import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, areLastSegmentsOf, endsWithSegments, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateTransitionE(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression.AST (Step) as Expr
-import Perspectives.Parsing.Arc.Position (ArcPosition)
+import Perspectives.Identifiers (Namespace, isQualifiedWithDomein)
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -62,49 +51,18 @@ import Perspectives.Representation.Class.Role (Role(..))
 import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
-import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier, ViewType(..), externalRoleType_, roletype2string)
+import Perspectives.Representation.State (State(..), StateFulObject(..), constructState)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_)
 import Perspectives.Representation.View (View(..)) as VIEW
-import Prelude (Unit, bind, discard, flip, pure, show, void, ($), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
   -- Traverse the model parse tree and construct a DomeinFileRecord in PhaseTwoState.
   (Context {_id}) <- traverseContextE c ns
-
-  -- Add perspectives to PhaseTwoState.
-  handlePostponedStateQualifiedParts
-
-  -- Modify the DomeinFileRecord in PhaseTwoState so that all perspectives
-  -- are stored in their subject roles.
-  perspectives <- lift $ gets _.perspectives
-  (perRole :: Array (ARNE.NonEmptyArray (Tuple (Tuple RoleType Expr.Step) Perspective))) <- pure $ group (toUnfoldable perspectives)
-  modifyDF \domeinFileRecord -> foldl
-    (\dfr@{enumeratedRoles, calculatedRoles} perspectivesForOneRole -> let
-      (rname :: String) = roletype2string $ fst $ fst $ ARNE.head perspectivesForOneRole
-      -- modify the role in the domeinfile
-      in case lookup rname enumeratedRoles of
-        Nothing -> case lookup rname calculatedRoles of
-          Nothing -> dfr
-          Just (CalculatedRole cr) -> dfr { calculatedRoles =
-            insert
-              rname
-              (CalculatedRole cr { perspectives = toArray (snd <$> perspectivesForOneRole)})
-              calculatedRoles
-          }
-        Just (EnumeratedRole er) -> dfr { enumeratedRoles =
-          insert
-            rname
-            (EnumeratedRole er { perspectives = toArray (snd <$> perspectivesForOneRole)})
-            enumeratedRoles})
-    domeinFileRecord
-    perRole
   domeinFileRecord <- getDF
   pure $ DomeinFile (domeinFileRecord {_id = unwrap _id})
 
@@ -308,10 +266,17 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 traverseStateE :: StateFulObject -> StateE -> PhaseTwo State
 traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = do
   subStates' <- traverse (traverseStateE stateFulObect) subStates
-  state <- pure $ constructState id condition stateFulObect subStates'
+  stateId <- toStateIdentifier id
+  state <- pure $ constructState stateId condition stateFulObect subStates'
   -- Postpone all stateParts because there may be forward references to user and subject.
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateParts}
   pure state
+  where
+    toStateIdentifier :: StateSpecification -> PhaseTwo StateIdentifier
+    toStateIdentifier (ContextState (ContextType ctxt) spath)  = case spath of
+      Nothing -> pure $ StateIdentifier ctxt
+      Just segments -> pure $ StateIdentifier (ctxt <> "$" <> segments)
+    toStateIdentifier _ = throwError (Custom "Programming error: State should be specified with ContextState.")
 
 addStateToDomeinFile :: State -> DomeinFileRecord -> DomeinFileRecord
 addStateToDomeinFile state@(State{id}) dfr@{states} = dfr {states = insert (unwrap id) state states}
@@ -431,132 +396,3 @@ addPropertyToDomeinFile :: Property.Property -> DomeinFileRecord -> DomeinFileRe
 addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties} = case property of
   (Property.E r@(EnumeratedProperty{_id})) -> df {enumeratedProperties = insert (unwrap _id) r enumeratedProperties}
   (Property.C r@(CalculatedProperty{_id})) -> df {calculatedProperties = insert (unwrap _id) r calculatedProperties}
-
-handlePostponedStateQualifiedParts  :: PhaseTwo Unit
-handlePostponedStateQualifiedParts = do
-  postponedStateQualifiedParts <- lift $ gets _.postponedStateQualifiedParts
-  for_ postponedStateQualifiedParts (unsafePartial handlePart)
-  where
-
-    handlePart :: Partial => StateQualifiedPart -> PhaseTwo Unit
-    handlePart (N (NotificationE{user, transition, message, start, end})) = do
-      qualifiedUser <- findRole user start
-      modifyPartOfState transition start end
-        \(sr@{notifyOnEntry, notifyOnExit}) -> case transition of
-          Entry _ -> sr {notifyOnEntry = EncodableMap $ MAP.insert qualifiedUser message (unwrap notifyOnEntry)}
-          Exit _ -> sr {notifyOnExit = EncodableMap $ MAP.insert qualifiedUser message (unwrap notifyOnExit)}
-
-    handlePart (AE (AutomaticEffectE{subject, object, transition, effect, start, end})) = do
-      qualifiedSubject <- findRole subject start
-      modifyPartOfState transition start end
-        \(sr@{automaticOnEntry, automaticOnExit}) -> let
-          sideEffect = case effect of
-            Left assignments -> A (ARR.fromFoldable assignments)
-            Right letstep -> L letstep
-          in case transition of
-            Entry _ -> sr {automaticOnEntry = EncodableMap $ MAP.insert qualifiedSubject sideEffect (unwrap automaticOnEntry), object = S <$> object}
-            Exit _ -> sr {automaticOnExit = EncodableMap $ MAP.insert qualifiedSubject sideEffect (unwrap automaticOnExit), object = S <$> object}
-
-    handlePart (R (RoleVerbE{subject, object, state, roleVerbs:rv, start})) =
-      modifyPerspective subject object start
-        \(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ MAP.insert state rv (unwrap roleVerbs)}
-
-    handlePart (P (PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start})) = do
-      -- Construct the map of property types and property verbs.
-      porv <- f propsOrView
-      (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs porv (ARR.fromFoldable propertyVerbs)
-      modifyPerspective subject object start
-        \(Perspective pr@{propertyVerbs:pverbs}) -> Perspective $ pr {propertyVerbs =
-          EncodableMap $ MAP.insert
-            state
-            case MAP.lookup state (unwrap pverbs) of
-              Nothing -> [propertyVerbs']
-              Just pv -> cons propertyVerbs' pv
-            (unwrap pverbs)}
-      where
-        f :: PropsOrView -> PhaseTwo (ExplicitSet PropertyType)
-        f AllProperties = pure Universal
-        f (Properties ps) =
-          -- The (partial) names for properties used here may be defined outside
-          -- of the model (due to role filling). Hence we postpone looking up their
-          -- real referents to phase three. Here we assume an Enumerated PropertyType.
-          pure $ PSet (ENP <<< EnumeratedPropertyType <$> (ARR.fromFoldable ps))
-        f (View view) = do
-          (views :: Object VIEW.View) <- getsDF _.views
-          -- As we have postponed handling these parse tree fragments after
-          -- handling all others, there can be no forward references.
-          -- Notice that the property references may not be fully qualified!
-          candidates <- pure $ ARR.filter (flip endsWithSegments view) (keys views)
-          case length candidates of
-            0 -> throwError $ UnknownView start view
-            1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
-              Just (VIEW.View {propertyReferences}) -> pure $ PSet propertyReferences
-            _ -> throwError $ NotUniquelyIdentifying start view candidates
-
-    handlePart (AC (ActionE{id, subject, object, state, effect, start})) = modifyPerspective subject object start
-      \(Perspective pr@{actions}) -> let
-        sideEffect = case effect of
-          Left assignments -> A (ARR.fromFoldable assignments)
-          Right letstep -> L letstep
-        in case MAP.lookup state (unwrap actions) of
-          Nothing -> Perspective $ pr { actions = EncodableMap $ MAP.insert
-            state
-            (singleton id sideEffect)
-            (unwrap actions)}
-          Just effects -> Perspective $ pr { actions = EncodableMap $ MAP.insert
-            state
-            (insert id sideEffect effects)
-            (unwrap actions) }
-
-    modifyPerspective :: String -> Expr.Step -> ArcPosition -> (Perspective -> Perspective) -> PhaseTwo Unit
-    modifyPerspective subject object start modifier = do
-      qualifiedSubject <- findRole subject start
-      -- Find the perspective by subject and object in PhaseTwoState.
-      mperspective <- findPerspective qualifiedSubject object
-      (perspective :: Perspective) <- case mperspective of
-        Nothing -> pure $ Perspective
-          { object: S object
-          , roleVerbs: EncodableMap MAP.empty
-          , propertyVerbs: EncodableMap MAP.empty
-          , actions: EncodableMap MAP.empty
-          }
-        Just p -> pure p
-      -- Save in state
-      void $ modify \s@{perspectives} -> s {perspectives = MAP.insert
-        (Tuple qualifiedSubject object)
-        -- Modify it
-        (modifier perspective)
-        perspectives}
-
-    modifyPartOfState :: StateTransitionE -> ArcPosition -> ArcPosition -> (StateRecord -> StateRecord) -> PhaseTwo Unit
-    modifyPartOfState transition start end modifyState = do
-      stateId <- case transition of
-        Entry s -> pure s
-        Exit s -> pure s
-      -- The state is a fully qualified StateIdentifier.
-      mstate <- getState stateId
-      case mstate of
-        Nothing -> throwError $ StateDoesNotExist stateId start end
-        Just (State sr) -> do
-          -- modify the state
-          state' <- pure $ State (modifyState sr)
-          modifyDF (\domeinFile -> addStateToDomeinFile state' domeinFile)
-
-    -- Look up the role in the DomainFile, because it must be defined locally.
-    -- This is because we can only specify perspectives for roles that are locally defined.
-    -- In the same vein, we only define notifications and automatic effects for locally
-    -- defined user roles.
-    -- It may be both qualified and unqualified, where insufficient qualification is an error.
-    findRole :: String -> ArcPosition -> PhaseTwo RoleType
-    findRole partialRoleName start = do
-      {enumeratedRoles, calculatedRoles} <- gets _.dfr
-      ecandidates <- pure $ ARR.filter (areLastSegmentsOf partialRoleName) (keys enumeratedRoles)
-      case length ecandidates of
-        0 -> do
-          ccandidates <- pure $ ARR.filter (areLastSegmentsOf partialRoleName) (keys calculatedRoles)
-          case length ccandidates of
-            0 -> throwError $ UnknownRole start partialRoleName
-            1 -> pure $ CR $ CalculatedRoleType (unsafePartial $ ARRP.head ccandidates)
-            _ -> throwError $ NotUniquelyIdentifying start partialRoleName ccandidates
-        1 -> pure $ ENR $ EnumeratedRoleType (unsafePartial $ ARRP.head ecandidates)
-        _ -> throwError $ NotUniquelyIdentifying start partialRoleName ecandidates
