@@ -32,7 +32,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Parsing.Arc" do
+theSuite = suite "Perspectives.Parsing.Arc" do
 
   --------------------------------------------------------------------------------
   ---- ARCIDENTIFIER

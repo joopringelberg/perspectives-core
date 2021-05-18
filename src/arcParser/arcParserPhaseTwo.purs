@@ -39,7 +39,7 @@ import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), StateE(..), StateSpecification(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -276,7 +276,13 @@ traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = d
     toStateIdentifier (ContextState (ContextType ctxt) spath)  = case spath of
       Nothing -> pure $ StateIdentifier ctxt
       Just segments -> pure $ StateIdentifier (ctxt <> "$" <> segments)
-    toStateIdentifier _ = throwError (Custom "Programming error: State should be specified with ContextState.")
+    toStateIdentifier (SubjectState (ExplicitRole _ (EnumeratedRoleType er) _) spath) = case spath of
+      Nothing -> pure $ StateIdentifier er
+      Just segments -> pure $ StateIdentifier (er <> "$" <> segments)
+    toStateIdentifier (ObjectState (ExplicitRole _ (EnumeratedRoleType er) _) spath) = case spath of
+      Nothing -> pure $ StateIdentifier er
+      Just segments -> pure $ StateIdentifier (er <> "$" <> segments)
+    toStateIdentifier _ = throwError (Custom "Programming error: State should be specified with a ContextState, or an ExplicitRole.")
 
 addStateToDomeinFile :: State -> DomeinFileRecord -> DomeinFileRecord
 addStateToDomeinFile state@(State{id}) dfr@{states} = dfr {states = insert (unwrap id) state states}
