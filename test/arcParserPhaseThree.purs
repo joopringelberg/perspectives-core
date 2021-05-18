@@ -52,7 +52,7 @@ import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb, RoleVerbLi
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
 import Perspectives.Utilities (prettyPrint)
-import Test.Parsing.DomeinFileSelectors (ensureCRole, ensureDescription, ensureERole, ensureEnumeratedProperty, ensureObjectsAreCompiled, ensurePerspectiveOn, ensurePropertyVerbsInState, ensureState, enumeratedPropertyIsFunctional, exists, failure, haveVerbs, isCalculationOf, objectOfPerspective, stateQuery)
+import Test.Parsing.DomeinFileSelectors (ensureCRole, ensureDescription, ensureERole, ensureEnumeratedProperty, ensurePerspectiveOn, ensurePropertyVerbsInState, ensureState, enumeratedPropertyIsFunctional, exists, failure, haveVerbs, isCalculationOf, objectOfPerspective, stateQuery)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (Test, TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -66,7 +66,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   -- test "TypeLevelObjectGetters" do
   --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
   --   case r of
@@ -121,10 +121,9 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
                   -- logShow dr'
                   ensureCRole "model:MyTestDomain$AnotherRole" dr' >>= exists
                   ensureERole "model:MyTestDomain$SomeUser" dr' >>=
-                    ensureObjectsAreCompiled >>=
-                      ensurePerspectiveOn "model:MyTestDomain$YetAnotherRole" >>=
-                        objectOfPerspective >>=
-                          isCalculationOf (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")))
+                    ensurePerspectiveOn "model:MyTestDomain$YetAnotherRole" >>=
+                      objectOfPerspective >>=
+                        isCalculationOf (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")))
 
   test "Testing qualifyActionRoles: External." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  user Driver\n    perspective on External\n      all roleverbs" ARC.domain
@@ -143,9 +142,8 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
               (Right correctedDFR) -> do
                 -- logShow correctedDFR
                 ensureERole "model:MyTestDomain$Driver" correctedDFR >>=
-                  ensureObjectsAreCompiled >>=
-                    ensurePerspectiveOn "model:MyTestDomain$External" >>=
-                      exists
+                  ensurePerspectiveOn "model:MyTestDomain$External" >>=
+                    exists
 
 
   test "Testing qualifyActionRoles: ContextHasNoRole." do
@@ -444,7 +442,7 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
                     ensurePropertyVerbsInState "model:Test$Party$LateParty" >>=
                       exists
 
-  testOnly "Automatic effect on entry (two assignments)" do
+  test "Automatic effect on entry (two assignments)" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Prop2 (mandatory, functional, Number)\n  thing Party (mandatory, functional)\n    property Prop1 (mandatory, functional, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do for Gast\n          Prop2 = 10 for Gast\n" ARC.domain
     case r of
       (Left e) -> assert ("Parser error:" <> show e) false

@@ -60,10 +60,9 @@ contextE = withPos do
   -- ook hier geldt: als op de volgende regel en geïndenteerd, dan moet de deelparser slagen en het hele blok consumeren.
   isIndented' <- isIndented
   isNextLine' <- isNextLine
-  ccontext <- getCurrentContext
   elements <- if isIndented' && isNextLine'
     then inSubContext uname
-      getCurrentContext >>= \subContext ->
+      (getCurrentContext >>= \subContext ->
         withArcParserState (ContextState subContext Nothing)
             -- The state identifier is fully qualified.
             -- The parser starts with StateIdentifier ""
@@ -80,7 +79,7 @@ contextE = withPos do
               rolesAndContexts <- if null uses && null ind && null aspects && null states
                 then entireBlock1 contextPart
                 else entireBlock contextPart
-              pure $ ind <> states <> (uses <> aspects <> rolesAndContexts))
+              pure $ ind <> states <> (uses <> aspects <> rolesAndContexts)))
     else pure Nil
   -- Notice: uname is unqualified.
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos}
@@ -95,21 +94,17 @@ contextE = withPos do
         "case" -> contextE
         "party" -> contextE
         "activity" -> contextE
-        -- "thing" -> addRoleNameToState thingRoleE
         "thing" -> lookAhead (reservedIdentifier *> arcIdentifier) >>=
           explicitObjectState >>=
             flip withArcParserState thingRoleE
-        -- "user" -> addRoleNameToState userRoleE
         "user" -> lookAhead (reservedIdentifier *> arcIdentifier) >>=
           explicitSubjectState >>=
             flip withArcParserState userRoleE
-        -- "context" -> addRoleNameToState contextRoleE
         "context" -> lookAhead (reservedIdentifier *> arcIdentifier) >>=
           explicitObjectState >>=
             flip withArcParserState contextRoleE
         "external" -> explicitObjectState "External" >>=
           flip withArcParserState externalRoleE
-        -- "external" -> withArcParserState (ObjectState (ExplicitRole ccontext <> "$External") Nothing) externalRoleE
         _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external"
 
     explicitSubjectState :: String -> IP StateSpecification
@@ -343,18 +338,20 @@ viewE = do
   refs <- sameOrIndented *> (token.parens (token.commaSep1 arcIdentifier))
   pure $ VE $ ViewE {id: uname, viewParts: refs, pos: pos}
 
--- | Nothing `appendSegment` s = s
--- | Just m `appendSegment` s = m$s
-appendSegment :: Maybe String -> String -> String
-appendSegment Nothing s = s
-appendSegment (Just m) s = m <> "$" <> s
+-- | Nothing `appendSegment` s = Just s
+-- | Just m `appendSegment` s = Just m$s
+appendSegment :: Maybe String -> String -> Maybe String
+appendSegment Nothing s = Just s
+appendSegment (Just m) s = Just (m <> "$" <> s)
 
-addSubState :: String -> StateSpecification -> StateSpecification
-addSubState localSubStateName (ContextState (ContextType cid) segpath) = ContextState
-  (ContextType (flip appendSegment cid segpath))
-  (Just localSubStateName)
-addSubState localSubStateName (SubjectState roleIdent s) = SubjectState roleIdent $ Just (s `appendSegment` localSubStateName)
-addSubState localSubStateName (ObjectState roleIdent s) = ObjectState roleIdent $ Just (s `appendSegment` localSubStateName)
+addSubState :: StateSpecification -> String -> StateSpecification
+-- append the local substate name to the segments we (maybe) already have.
+addSubState (ContextState (ContextType cid) s) localSubStateName = ContextState
+  (ContextType cid)
+  (s `appendSegment` localSubStateName)
+-- append the local substate name to the segments we maybe already have.
+addSubState (SubjectState roleIdent s) localSubStateName = SubjectState roleIdent (s `appendSegment` localSubStateName)
+addSubState (ObjectState roleIdent s) localSubStateName = ObjectState roleIdent (s `appendSegment` localSubStateName)
 
 stateE :: IP StateE
 stateE = withPos do
@@ -362,7 +359,7 @@ stateE = withPos do
   -- log "stateE"
   -- Can be ContextState, SubjectState and ObjectState.
   {state} <- getArcParserState
-  withArcParserState (addSubState id state)
+  withArcParserState (state `addSubState` id)
     do
       -- In IP, defined as an IntendParser on top of StateT ArcParserState Identity, we now have a
       -- new ArcParserState object with member 'state' being StateIdentifier "{previousStateIdentifier}$id".
@@ -509,11 +506,8 @@ objectState mlocalName = reserved "of" *> reserved "object" *> do
 contextState :: Maybe String -> IP StateSpecification
 contextState mlocalName = option unit (reserved "of" *> reserved "context") *> do
   stateSpec <- getStateIdentifier
-  case mlocalName of
-    Nothing -> pure stateSpec
-    Just s -> case stateSpec of
-      ContextState _ _ -> pure $ addSubState s stateSpec
-      otherwise -> fail "The lexical context does not provide a context state for 'in state X of context'"
+  c <- getCurrentContext
+  pure $ ContextState c mlocalName
 
 onExitE :: IP (List StateQualifiedPart)
 onExitE = do

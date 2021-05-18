@@ -26,7 +26,6 @@ import Control.Monad.Except (ExceptT, lift, runExceptT)
 import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, runStateT)
 import Data.Array (union)
 import Data.Either (Either)
-import Data.Identity (Identity)
 import Data.List (List(..), filter)
 import Data.Map (Map, empty, lookup) as MAP
 import Data.Maybe (Maybe)

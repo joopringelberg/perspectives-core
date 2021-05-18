@@ -110,7 +110,7 @@ liftToMPT = lift <<< lift
 serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> RoleType -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor_ cid userId userType = do
   -- All Roletypes the user may see in this context, expressed as Calculations.
-  (roleQfds :: Array QueryFunctionDescription) <- liftToMPT (userType ###= (perspectivesClosure_ >=> pure <<< unsafePartial perspectiveObjectQfd))
+  (roleQfds :: Array QueryFunctionDescription) <- liftToMPT (userType ###= (perspectivesClosure_ >=> pure <<< perspectiveObjectQfd))
   for_ roleQfds
     \roleQfd -> do
       -- All instances of this RoleType the user may see in this context.

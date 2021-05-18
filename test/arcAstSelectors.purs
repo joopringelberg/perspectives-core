@@ -2,23 +2,22 @@ module Test.Parsing.ArcAstSelectors where
 
 import Prelude
 
-import Data.List (List(..), elemIndex, filter, find, findIndex, fromFoldable, null)
+import Data.List (List(..), filter, find, findIndex, fromFoldable, null)
 import Data.Maybe (Maybe(..), isJust)
-import Data.Traversable (traverse)
 import Effect.Aff (Aff, throwError, error)
 import Effect.Class.Console (logShow)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyVerbE(..), PropsOrView, RoleE(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyVerbE(..), PropsOrView, RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..), StateIdentifier(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleKind(..))
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerbList) as Verbs
 
 failure :: forall a. String -> Aff a
 failure = throwError <<< error
 
-blancoState :: StateIdentifier
-blancoState = StateIdentifier ""
+blancoState :: StateSpecification
+blancoState = ContextState (ContextType "model:") Nothing
 
 allPropertyVerbs :: Array Verbs.PropertyVerb
 allPropertyVerbs = [Verbs.RemovePropertyValue, Verbs.DeleteProperty, Verbs.AddPropertyValue, Verbs.SetPropertyValue]
@@ -53,7 +52,7 @@ ensureContext cid (ContextE{contextParts}) =  case find (case _ of
     Just (CE c) -> pure c
     _ -> failure ("No context '" <> show cid <> "'.")
 
-ensureStateInContext :: StateIdentifier -> ContextE -> Aff StateE
+ensureStateInContext :: StateSpecification -> ContextE -> Aff StateE
 ensureStateInContext stateId (ContextE{contextParts}) = case find (case _ of
   STATE (StateE{id}) -> id == stateId
   _ -> false)
@@ -69,12 +68,14 @@ stateParts (StateE{stateParts:sp}) = pure sp
 --------------------------------------------------------------------------------
 ---- STATE
 --------------------------------------------------------------------------------
-ensureSubState :: StateIdentifier -> StateE -> Aff StateE
-ensureSubState stateId (StateE{subStates}) = case find (case _ of
-  StateE{id} -> id == stateId)
-  subStates of
-    Just s -> pure s
-    _ -> failure ("No state '" <> show stateId <> "'.")
+ensureSubState :: StateSpecification -> StateE -> Aff StateE
+ensureSubState stateId (StateE{subStates}) = do
+  -- logShow subStates
+  case find (case _ of
+    StateE{id} -> id == stateId)
+    subStates of
+      Just s -> pure s
+      _ -> failure ("No state '" <> show stateId <> "'.")
 
 ensureOnEntry :: (List StateQualifiedPart) -> Aff (List StateQualifiedPart)
 ensureOnEntry sqps = case filter (case _ of
@@ -102,7 +103,10 @@ ensureOnExit sqps = case filter (case _ of
 
 isNotified :: String -> (List StateQualifiedPart) -> Aff Unit
 isNotified usr sqps = case filter (case _ of
-  N (NotificationE {user}) -> usr == user
+  N (NotificationE {user}) -> case user of
+    ExplicitRole _ (EnumeratedRoleType u) _ -> usr == u
+    (ImplicitRole _ (Simple (ArcIdentifier _ rl))) -> rl == usr
+    _ -> false
   _ -> false) sqps of
     Nil -> failure $ "User '" <> usr <> "' is not notified."
     _ -> pure unit
@@ -120,23 +124,36 @@ hasAutomaticAction sqps = if isJust $ findIndex (case _ of
 -- hasProperty :: RoleE -> PropertyE
 
 -- | Get all parts for a particular state
-ensureStateInRole :: StateIdentifier -> RoleE -> Aff (List StateQualifiedPart)
-ensureStateInRole stateId (RoleE{roleParts}) =
+ensureStateInRole :: (StateSpecification -> Boolean) -> RoleE -> Aff (List StateQualifiedPart)
+ensureStateInRole tester (RoleE{roleParts}) = do
+  -- logShow roleParts
   pure $ join $ map (\(rp :: RolePart) ->
     case rp of
       SQP parts -> filter (unsafePartial \sp -> case sp of
-          R (RoleVerbE{state}) -> eq state stateId
-          P (PropertyVerbE{state}) -> eq state stateId
-          AC (ActionE{state}) -> eq state stateId
-          N (NotificationE{transition}) -> transitionForState stateId transition
-          AE (AutomaticEffectE{transition}) -> transitionForState stateId transition)
+          R (RoleVerbE{state}) -> tester state
+          P (PropertyVerbE{state}) -> tester state
+          AC (ActionE{state}) -> tester state
+          N (NotificationE{transition}) -> transitionForState tester transition
+          AE (AutomaticEffectE{transition}) -> transitionForState tester transition)
         parts
       _ -> Nil)
     roleParts
 
-transitionForState :: StateIdentifier -> StateTransitionE -> Boolean
-transitionForState stateId (Entry s) = eq stateId s
-transitionForState stateId (Exit s) = eq stateId s
+isStateWithContext :: String -> StateSpecification -> Boolean
+isStateWithContext contextName (ContextState (ContextType ctxt) _) = contextName == ctxt
+isStateWithContext _ _ = false
+
+isStateWithContext_ :: String -> Maybe String -> StateSpecification -> Boolean
+isStateWithContext_ contextName path (ContextState (ContextType ctxt) p) = contextName == ctxt && path == p
+isStateWithContext_ _ _ _ = false
+
+isStateWithExplicitRole :: String -> StateSpecification -> Boolean
+isStateWithExplicitRole roleName (SubjectState (ExplicitRole _ (EnumeratedRoleType r) _) _) = roleName == r
+isStateWithExplicitRole _ _ = false
+
+transitionForState :: (StateSpecification -> Boolean) -> StateTransitionE -> Boolean
+transitionForState tester (Entry s) = tester s
+transitionForState tester (Exit s) = tester s
 
 ensurePerspectiveOn :: String -> (List StateQualifiedPart) -> Aff (List StateQualifiedPart)
 ensurePerspectiveOn objectId = ensurePerspectiveOn_ (Simple (ArcIdentifier (ArcPosition{line: 0, column: 0}) objectId))
@@ -148,21 +165,32 @@ perspectiveExists l = if null l
 
 ensurePerspectiveOn_ :: Step -> (List StateQualifiedPart) -> Aff (List StateQualifiedPart)
 ensurePerspectiveOn_ objectId sp = case filter (case _ of
-  R (RoleVerbE{object}) -> object == objectId
-  P (PropertyVerbE{object}) -> object == objectId
-  AC (ActionE{object}) -> object == objectId
+  R (RoleVerbE{object}) -> case object of
+    ImplicitRole _ stp -> objectId == stp
+    _ -> false
+  P (PropertyVerbE{object}) -> case object of
+    ImplicitRole _ stp -> objectId == stp
+    _ -> false
+  AC (ActionE{object}) -> case object of
+    ImplicitRole _ stp -> objectId == stp
+    _ -> false
   _ -> false) sp of
     notAny | null notAny -> failure ("No perspective on '" <> show objectId <> "'.")
     ps -> pure ps
 
-ensurePerspectiveOf :: String -> (List StateQualifiedPart) -> Aff (List StateQualifiedPart)
-ensurePerspectiveOf userName sp = case filter (case _ of
-  R (RoleVerbE{subject}) -> subject == userName
-  P (PropertyVerbE{subject}) -> subject == userName
-  AC (ActionE{subject}) -> subject == userName
+ensurePerspectiveOf :: (RoleIdentification -> Boolean) -> (List StateQualifiedPart) -> Aff (List StateQualifiedPart)
+ensurePerspectiveOf tester sp = case filter (case _ of
+  R (RoleVerbE{subject}) -> tester subject
+  P (PropertyVerbE{subject}) -> tester subject
+  AC (ActionE{subject}) -> tester subject
   _ -> false) sp of
-    notAny | null notAny -> failure ("No perspective of '" <> userName <> "'.")
+    notAny | null notAny -> failure "No perspective of X found"
     ps -> pure ps
+
+-- (Simple (ArcIdentifier (ArcPosition { column: 22, line: 4 }) "SomeUser")
+isImplicitRoleOnIdentifier :: String -> RoleIdentification -> Boolean
+isImplicitRoleOnIdentifier localRoleName (ImplicitRole _ (Simple (ArcIdentifier _ rl))) = rl == localRoleName
+isImplicitRoleOnIdentifier _ _ = false
 
 -- | Ensure the RoleVerbList holds in the list of StateQualifiedParts
 ensureRoleVerbs :: Verbs.RoleVerbList -> List StateQualifiedPart -> Aff Unit

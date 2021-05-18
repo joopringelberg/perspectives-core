@@ -7,23 +7,22 @@ import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.List (List(..), filter, findIndex, head, index, length, (:))
 import Data.Maybe (Maybe(..), isJust)
-import Effect.Class (liftEffect)
 import Effect.Class.Console (log, logShow)
 import Effect.Exception (message)
 import Node.Encoding as ENC
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc (automaticEffectE, contextE, domain, propertyE, thingRoleE, userRoleE, viewE)
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), PropsOrView(..), RoleE(..), RolePart(..), StateQualifiedPart, ViewE(..))
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), PropsOrView(..), RoleE(..), RolePart(..), StateQualifiedPart, StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier)
 import Perspectives.Representation.Context (ContextKind(..))
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..), StateIdentifier(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), RoleKind(..))
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerbList(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..)) as RV
-import Test.Parsing.ArcAstSelectors (actionExists, allPropertyVerbs, blancoState, ensureAction, ensureContext, ensureOnEntry, ensureOnExit, ensurePerspectiveOf, ensurePerspectiveOn, ensurePropertyVerbsForPropsOrView, ensureRoleVerbs, ensureStateInContext, ensureStateInRole, ensureSubState, ensureUserRole, failure, hasAutomaticAction, isIndexed, isNotified, perspectiveExists, stateExists, stateParts)
+import Test.Parsing.ArcAstSelectors (actionExists, allPropertyVerbs, ensureAction, ensureContext, ensureOnEntry, ensureOnExit, ensurePerspectiveOf, ensurePerspectiveOn, ensurePropertyVerbsForPropsOrView, ensureRoleVerbs, ensureStateInContext, ensureStateInRole, ensureSubState, ensureUserRole, failure, hasAutomaticAction, isImplicitRoleOnIdentifier, isIndexed, isNotified, isStateWithContext, isStateWithContext_, isStateWithExplicitRole, perspectiveExists, stateExists, stateParts)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
@@ -33,7 +32,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc" do
+theSuite = suiteOnly "Perspectives.Parsing.Arc" do
 
   --------------------------------------------------------------------------------
   ---- ARCIDENTIFIER
@@ -196,11 +195,10 @@ theSuite = suite "Perspectives.Parsing.Arc" do
     case r of
       Left e -> assert (show e) false
       Right (RE rl@(RoleE rr)) -> do
-        -- logShow rr
-        ensureStateInRole blancoState rl >>=
+        ensureStateInRole (isStateWithContext "model:") rl >>=
           ensurePerspectiveOn "MyObject" >>=
             ensureRoleVerbs (Including [RV.Remove, RV.Create])
-        ensureStateInRole blancoState rl >>=
+        ensureStateInRole (isStateWithContext "model:") rl >>=
           ensurePerspectiveOn "MyObject" >>=
             ensurePropertyVerbsForPropsOrView [Consult] (View "MyView")
       _ -> assert "There should be a PRE RoleE" false
@@ -210,7 +208,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) false
       Right (RE rl) ->
-        ensureStateInRole blancoState rl >>=
+        ensureStateInRole (isStateWithContext "model:") rl >>=
           ensurePerspectiveOn "External" >>= perspectiveExists
       otherwise -> assert "Parsed an unexpected type" false
 
@@ -219,7 +217,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) false
       Right (RE rl) ->
-        ensureStateInRole blancoState rl >>=
+        ensureStateInRole (isStateWithContext "model:") rl >>=
           ensurePerspectiveOn "MyObject" >>=
             ensurePropertyVerbsForPropsOrView allPropertyVerbs (View "MyView")
       otherwise -> assert "Parsed an unexpected type" false
@@ -229,7 +227,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) false
       Right (RE rl) ->
-        ensureStateInRole blancoState rl >>=
+        ensureStateInRole (isStateWithContext "model:") rl >>=
           ensurePerspectiveOn "MyObject" >>=
             ensureRoleVerbs (Including [RV.Remove, RV.Create])
       otherwise -> assert "Parsed an unexpected type" false
@@ -239,10 +237,10 @@ theSuite = suite "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) false
       (Right (RE rl)) -> do
-        ensureStateInRole blancoState rl >>=
+        ensureStateInRole (isStateWithContext "model:") rl >>=
           ensurePerspectiveOn "MyObject" >>=
             ensurePropertyVerbsForPropsOrView [RV.AddPropertyValue] (Properties ("MyFirstProp" : Nil))
-        ensureStateInRole blancoState rl >>=
+        ensureStateInRole (isStateWithContext "model:") rl >>=
           ensurePerspectiveOn "MyObject" >>=
             ensurePropertyVerbsForPropsOrView [RV.RemovePropertyValue] (Properties ("MySecondProp" : Nil))
       otherwise -> assert "Parsed an unexpected type" false
@@ -268,7 +266,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Left e) -> assert (show e) false
       Right dom -> do
         ensureUserRole "GoedeGast" dom >>=
-          ensureStateInRole (StateIdentifier "model:Feest") >>=
+          ensureStateInRole (isStateWithExplicitRole "model:Feest$GoedeGast") >>=
             perspectiveExists
 
   --------------------------------------------------------------------------------
@@ -477,7 +475,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Left e) -> assert (show e) false
       Right dom ->
         ensureContext "MyCase" dom >>=
-          ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>= stateExists
+          ensureStateInContext (ContextState (ContextType "model:MyTestDomain$MyCase") (Just "SomeState")) >>= stateExists
 
   test "Domain with a Context with a state with a substate" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    state SomeState = SomeRole >> SomeProp > 10\n      state NestedState = true\n        perspective on SomeRole\n          perspective of SomeUser\n            all roleverbs" domain
@@ -485,8 +483,8 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Left e) -> assert (show e) false
       Right dom ->
         ensureContext "MyCase" dom >>=
-          ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
-            ensureSubState (StateIdentifier "model:MyTestDomain$MyCase$SomeState$NestedState") >>= stateExists
+          ensureStateInContext (ContextState (ContextType "model:MyTestDomain$MyCase") (Just "SomeState")) >>=
+            ensureSubState (ContextState (ContextType "model:MyTestDomain$MyCase") (Just "SomeState$NestedState")) >>= stateExists
 
   test "Domain with a context with a state with perspective on in perspective of" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    state SomeState = SomeRole >> SomeProp > 10\n      perspective of SomeUser\n        perspective on SomeRole\n          all roleverbs" domain
@@ -494,9 +492,9 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Left e) -> assert (show e) false
       Right dom ->
         ensureContext "MyCase" dom >>=
-          ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
+          ensureStateInContext (ContextState (ContextType "model:MyTestDomain$MyCase") (Just "SomeState")) >>=
             stateParts >>=
-              ensurePerspectiveOf "SomeUser" >>=
+              ensurePerspectiveOf (isImplicitRoleOnIdentifier "SomeUser") >>=
                 ensurePerspectiveOn "SomeRole" >>=
                   perspectiveExists
 
@@ -506,9 +504,9 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Left e) -> assert (show e) false
       Right dom ->
         ensureContext "MyCase" dom >>=
-          ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
+          ensureStateInContext (ContextState (ContextType "model:MyTestDomain$MyCase") (Just "SomeState")) >>=
             stateParts >>=
-              ensurePerspectiveOf "SomeUser" >>=
+              ensurePerspectiveOf (isImplicitRoleOnIdentifier "SomeUser") >>=
                 ensurePerspectiveOn "SomeRole" >>=
                   perspectiveExists
 
@@ -520,7 +518,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       Right dom -> do
         logShow dom
         ensureContext "MyCase" dom >>=
-          ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
+          ensureStateInContext (ContextState (ContextType "model:MyTestDomain$MyCase") (Just "SomeState")) >>=
             stateExists
 
   test "A state with an on entry and notification" do
@@ -529,7 +527,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Left e) -> assert (show e) false
       Right dom ->
         ensureContext "MyCase" dom >>=
-          ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
+          ensureStateInContext (ContextState (ContextType "model:MyTestDomain$MyCase") (Just "SomeState")) >>=
             stateParts >>=
               ensureOnEntry >>=
                 isNotified "SomeUser"
@@ -546,7 +544,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Left e) -> assert (show e) false
       Right dom ->
         ensureContext "MyCase" dom >>=
-          ensureStateInContext (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
+          ensureStateInContext (ContextState (ContextType "model:MyTestDomain$MyCase") (Just "SomeState")) >>=
             stateParts >>=
               ensureOnExit >>=
                 hasAutomaticAction
@@ -568,12 +566,12 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       Right dom -> do
         ensureContext "MyCase" dom >>=
           ensureUserRole "SomeUser" >>=
-            ensureStateInRole (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
+            ensureStateInRole (isStateWithContext_ "model:MyTestDomain$MyCase" (Just "SomeState")) >>=
               ensurePerspectiveOn "SomeRole" >>=
                 perspectiveExists
         try (ensureContext "MyCase" dom >>=
           ensureUserRole "SomeUser" >>=
-            ensureStateInRole (StateIdentifier "model:MyTestDomain$MyCase") >>=
+            ensureStateInRole (isStateWithContext_ "model:MyTestDomain$MyCase" Nothing) >>=
               ensurePerspectiveOn "SomeRole" >>=
                 perspectiveExists) >>= case _ of
                   Left e -> assert ("Expected another error than: " <> message e) (message e == "No perspective on '(Simple (ArcIdentifier (ArcPosition { column: 0, line: 0 }) \"SomeRole\"))'.")
@@ -589,7 +587,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       Right dom -> do
         ensureContext "MyCase" dom >>=
           ensureUserRole "SomeUser" >>=
-            ensureStateInRole (StateIdentifier "model:MyTestDomain$MyCase$SomeState") >>=
+            ensureStateInRole (isStateWithContext_ "model:MyTestDomain$MyCase" (Just "SomeState")) >>=
               ensurePerspectiveOn "SomeRole" >>=
                 ensureAction "MyAction" >>=
                   actionExists

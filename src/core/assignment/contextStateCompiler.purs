@@ -68,10 +68,7 @@ import Perspectives.Utilities (findM)
 compileState :: StateIdentifier -> MP CompiledContextState
 compileState stateId = do
     State {query, object, automaticOnEntry, automaticOnExit} <- getState stateId
-    (mobjectGetter :: Maybe (ContextInstance ~~> RoleInstance)) <- traverse
-      -- we know the queryfunction description is there, by now, hence unsafePartial.
-      (unsafePartial case _ of
-        Q calc -> roleFunctionFromQfd calc) object
+    (mobjectGetter :: Maybe (ContextInstance ~~> RoleInstance)) <- traverse roleFunctionFromQfd object
     (automaticOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
       (\subject (effect :: SideEffect) ->
         unsafePartial case effect of

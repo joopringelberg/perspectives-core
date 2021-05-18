@@ -12,14 +12,12 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Set (fromFoldable, subset)
-import Data.Traversable (for)
 import Effect.Aff (Aff, throwError, error)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFileRecord)
-import Perspectives.Parsing.Arc (propertyVerbs)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription, Range, domain, range)
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, Range, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
@@ -27,7 +25,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet, subsetPSet)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), objectOfPerspective) as Perspective
 import Perspectives.Representation.Range (Range) as Range
-import Perspectives.Representation.State (State(..))
+import Perspectives.Representation.State (State)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), StateIdentifier(..))
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 import Test.Unit (Test)
@@ -68,13 +66,13 @@ ensurePerspectiveOn roleName (EnumeratedRole{perspectives}) = case head $ filter
   Just p -> pure p
 
 -- | Use this function in phaseThree.
-ensureObjectsAreCompiled :: EnumeratedRole -> Aff EnumeratedRole
-ensureObjectsAreCompiled p@(EnumeratedRole{perspectives}) = do
-  for_ perspectives
-    (\(Perspective.Perspective{object}) -> case object of
-      Q _ -> pure p
-      _ -> failure "The object of the Perspective should be a description.")
-  pure p
+-- ensureObjectsAreCompiled :: EnumeratedRole -> Aff EnumeratedRole
+-- ensureObjectsAreCompiled p@(EnumeratedRole{perspectives}) = do
+--   for_ perspectives
+--     (\(Perspective.Perspective{object}) -> case object of
+--       Q _ -> pure p
+--       _ -> failure "The object of the Perspective should be a description.")
+--   pure p
 
 --------------------------------------------------------------------------------
 ---- CALCULATEDROLE
@@ -137,12 +135,11 @@ ensureRoleVerbsInState stateName (Perspective.Perspective {roleVerbs}) = case Ma
   Nothing -> failure ("There should be an entry in roleVerbs for state '" <> stateName <> "'.")
   Just rv -> pure rv
 
-objectOfPerspective :: Perspective.Perspective -> Aff Calculation
+objectOfPerspective :: Perspective.Perspective -> Aff QueryFunctionDescription
 objectOfPerspective (Perspective.Perspective{object}) = pure object
 
-isCalculationOf :: Range -> Calculation -> Aff Unit
-isCalculationOf r (S _) = failure "Calculation should a description."
-isCalculationOf r (Q qfd) = if r == range qfd
+isCalculationOf :: Range -> QueryFunctionDescription -> Aff Unit
+isCalculationOf r qfd = if r == range qfd
   then pure unit
   else failure ("Calculation is not the right type")
 

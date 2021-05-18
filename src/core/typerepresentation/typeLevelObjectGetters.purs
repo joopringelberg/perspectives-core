@@ -46,7 +46,7 @@ import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWi
 import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.InvertedQuery (RelevantProperties(..))
-import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, roleRange)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.Class.Context (allContextTypes)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
@@ -488,10 +488,8 @@ perspectivesOfRole_ :: RoleType ~~~> Perspective
 perspectivesOfRole_ (ENR erole) = ArrayT (getEnumeratedRole erole >>= pure <<< perspectives)
 perspectivesOfRole_ (CR crole) = ArrayT (getCalculatedRole crole >>= pure <<< perspectives)
 
-perspectiveObjectQfd :: Partial => Perspective -> QueryFunctionDescription
-perspectiveObjectQfd (Perspective{object}) = do
-  case object of
-    Q calc -> calc
+perspectiveObjectQfd :: Perspective -> QueryFunctionDescription
+perspectiveObjectQfd (Perspective{object}) = object
 
 statesPerProperty :: Perspective -> MonadPerspectives (Map.Map PropertyType (Array StateIdentifier))
 statesPerProperty (Perspective{propertyVerbs, object}) = foldWithIndexM f Map.empty (unwrap propertyVerbs)
@@ -511,7 +509,7 @@ statesPerProperty (Perspective{propertyVerbs, object}) = foldWithIndexM f Map.em
 
     propertyVerbs2PropertyArray :: PropertyVerbs -> MonadPerspectives (Array PropertyType)
     propertyVerbs2PropertyArray (PropertyVerbs pset _) = case pset of
-      Universal -> allProperties (unsafePartial roleRange (unsafePartial case object of Q qfd -> qfd))
+      Universal -> allProperties (unsafePartial roleRange object)
       Empty -> pure []
       PSet props -> pure props
 

@@ -34,10 +34,11 @@ import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
+import Effect.Class.Console (log)
 import Perspectives.Parsing.Arc.AST (RoleIdentification, StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..))
-import Prelude (class Monad, Unit, bind, discard, flip, not, pure, unit, ($), (*>), (<), (<*), (<<<), (<=), (<>), (>), (>>=), (&&))
+import Prelude (class Monad, Unit, bind, discard, flip, not, pure, show, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (>), (>>=))
 import Record (get, set) as Record
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
@@ -81,7 +82,7 @@ initialArcParserState =
   { currentContext: ContextType "model:"
   , subject: Nothing
   , object: Nothing
-  , state: ContextState (ContextType "") Nothing
+  , state: ContextState (ContextType "model:") Nothing
   , onEntry: Nothing
   , onExit: Nothing
 }
@@ -98,8 +99,12 @@ getCurrentContext = getArcParserState >>= pure <<< _.currentContext
 inSubContext :: forall a. String -> IP a -> IP a
 inSubContext subContextName p = do
   oldState@{currentContext} <- getArcParserState
-  void $ modifyArcParserState \s -> s {currentContext = ContextType $ (unwrap currentContext) <> "$" <> subContextName}
+  void $ modifyArcParserState \s -> s {currentContext = case unwrap currentContext of
+    "model:" -> ContextType ("model:" <> subContextName)
+    m -> ContextType (m <> "$" <> subContextName)}
+  -- getCurrentContext >>= \c -> log ("Entered context " <> show c)
   result <- p
+  -- log ("Restoring context " <> show currentContext)
   lift $ lift $ put oldState
   pure result
 
@@ -107,7 +112,9 @@ withArcParserState :: forall a. StateSpecification -> IP a -> IP a
 withArcParserState stateDeterminant a = do
   oldState@{state} <- getArcParserState
   void $ modifyArcParserState \s -> s {state = stateDeterminant}
+  -- log ("State now is " <> show stateDeterminant)
   result <- a
+  -- log ("Restoring state " <> show state)
   lift $ lift $ put oldState
   pure result
 
