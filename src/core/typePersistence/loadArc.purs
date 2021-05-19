@@ -27,8 +27,8 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (delete, filterA, findIndex, head)
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
+import Data.List(List(..))
 import Data.Maybe (Maybe(..), isJust)
-import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, keys, lookup, values)
@@ -72,12 +72,12 @@ loadAndCompileArcFile_ text = catchError
     case r of
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
       (Right ctxt) -> do
-        (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty
+        (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
         case result of
           (Left e) -> pure $ Left [e]
           (Right (DomeinFile dr'@{_id})) -> do
             dr'' <- pure dr' {referredModels = state.referredModels}
-            (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr''
+            (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr'' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> pure $ Left [e]
               (Right correctedDFR@{referredModels}) -> do

@@ -151,6 +151,10 @@ isStateWithExplicitRole :: String -> StateSpecification -> Boolean
 isStateWithExplicitRole roleName (SubjectState (ExplicitRole _ (EnumeratedRoleType r) _) _) = roleName == r
 isStateWithExplicitRole _ _ = false
 
+isStateWithExplicitRole_ :: String -> Maybe String -> StateSpecification -> Boolean
+isStateWithExplicitRole_ roleName path (SubjectState (ExplicitRole _ (EnumeratedRoleType r) _) p) = roleName == r && path == p
+isStateWithExplicitRole_ _ _ _ = false
+
 transitionForState :: (StateSpecification -> Boolean) -> StateTransitionE -> Boolean
 transitionForState tester (Entry s) = tester s
 transitionForState tester (Exit s) = tester s
@@ -164,17 +168,19 @@ perspectiveExists l = if null l
   else pure unit
 
 ensurePerspectiveOn_ :: Step -> (List StateQualifiedPart) -> Aff (List StateQualifiedPart)
-ensurePerspectiveOn_ objectId sp = case filter (case _ of
-  R (RoleVerbE{object}) -> case object of
-    ImplicitRole _ stp -> objectId == stp
-    _ -> false
-  P (PropertyVerbE{object}) -> case object of
-    ImplicitRole _ stp -> objectId == stp
-    _ -> false
-  AC (ActionE{object}) -> case object of
-    ImplicitRole _ stp -> objectId == stp
-    _ -> false
-  _ -> false) sp of
+ensurePerspectiveOn_ objectId sp = do
+  -- logShow sp
+  case filter (case _ of
+    R (RoleVerbE{object}) -> case object of
+      ImplicitRole _ stp -> objectId == stp
+      _ -> false
+    P (PropertyVerbE{object}) -> case object of
+      ImplicitRole _ stp -> objectId == stp
+      _ -> false
+    AC (ActionE{object}) -> case object of
+      ImplicitRole _ stp -> objectId == stp
+      _ -> false
+    _ -> false) sp of
     notAny | null notAny -> failure ("No perspective on '" <> show objectId <> "'.")
     ps -> pure ps
 

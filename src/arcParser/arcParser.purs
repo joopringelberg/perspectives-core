@@ -29,15 +29,16 @@ import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log, logShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (assignment, letWithAssignment, step)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getPosition, getStateIdentifier, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
+import Perspectives.Parsing.Arc.Token (isReservedName, reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.Range (Range(..))
@@ -112,11 +113,6 @@ contextE = withPos do
 
     explicitObjectState :: String -> IP StateSpecification
     explicitObjectState segments = getCurrentContext >>= \ctxt@(ContextType ccontext) -> getPosition >>= \pos -> pure $ ObjectState (ExplicitRole ctxt (EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
-
-    -- addRoleNameToState :: IP ContextPart -> IP ContextPart
-    -- addRoleNameToState p = do
-    --   ident <- lookAhead (reservedIdentifier *> arcIdentifier)
-    --   withArcParserState (StateIdentifier ident) p
 
     contextKind :: IP ContextKind
     contextKind = (reserved "domain" *> pure Domain
@@ -440,11 +436,19 @@ twoReservedWords = option (Tuple "" "") $ lookAhead (Tuple <$> reservedIdentifie
 inState :: IP (List StateQualifiedPart)
 inState = do
   stateId <- inStateKeywords *> arcIdentifier
+  mspecifier <- optionMaybe (reserved "of" *> (reserved' "subject" <|> reserved' "object" <|> reserved' "context"))
+  currentState <- getCurrentState
+  stateSpec <- case mspecifier of
+    Nothing -> pure $ addSubState currentState stateId
+    Just "object" -> ObjectState <$> getObject <*> pure (Just stateId)
+    Just "subject" -> SubjectState <$> getSubject <*> pure (Just stateId)
+    Just "context" -> ContextState <$> getCurrentContext <*> pure (Just stateId)
+    -- This case will never occur.
+    _ -> fail "This will never occur"
   -- We can use withArcParserState here. It will concatenate the local
   -- state identifier to the state identifier provided by the surrounding context.
   -- The assumption being that we do not refer to states out of the context that the
   -- user or role is defined in.
-  stateSpec <- subjectState (Just stateId) <|> objectState (Just stateId) <|> contextState (Just stateId)
   withArcParserState stateSpec
     (concat <$> nestedBlock statePart)
   where
@@ -483,37 +487,47 @@ perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> pure "perspec
 -- |    on entry: <stateName>
 onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do
-  mstateTrans <- onEntryKeywords *> optionMaybe arcIdentifier
-  stateSpec <- subjectState mstateTrans <|> objectState mstateTrans <|> contextState mstateTrans
+  void $ onEntryKeywords
+  stateSpec <- optionMaybe (reserved "of") >>= case _ of
+    Just _ -> (subjectState <|> objectState <|> contextState <|> subState) <?> "one of subject, object or context or a state name"
+    Nothing -> getCurrentState
   protectOnEntry do
     setOnEntry stateSpec
     concat <$> nestedBlock stateTransitionPart
 
-subjectState :: Maybe String -> IP StateSpecification
-subjectState mlocalName = reserved "of" *> reserved "subject" *> do
+subState :: IP StateSpecification
+subState = addSubState <$> getCurrentState <*> arcIdentifier
+
+subjectState :: IP StateSpecification
+subjectState = reserved "subject" *> do
   {subject} <- getArcParserState
   case subject of
     Nothing -> fail "A subject is required for 'in state X of subject"
-    Just s -> pure $ SubjectState s mlocalName
+    Just s -> do
+      msubState <- optionMaybe arcIdentifier
+      pure $ SubjectState s msubState
 
-objectState :: Maybe String -> IP StateSpecification
-objectState mlocalName = reserved "of" *> reserved "object" *> do
+objectState :: IP StateSpecification
+objectState = reserved "object" *> do
   {object} <- getArcParserState
   case object of
     Nothing -> fail "An object is required for 'in state X of object'"
-    Just s -> pure $ ObjectState s mlocalName
+    Just s -> do
+      msubState <- optionMaybe arcIdentifier
+      pure $ ObjectState s msubState
 
-contextState :: Maybe String -> IP StateSpecification
-contextState mlocalName = option unit (reserved "of" *> reserved "context") *> do
-  stateSpec <- getStateIdentifier
-  c <- getCurrentContext
-  pure $ ContextState c mlocalName
+contextState :: IP StateSpecification
+contextState = reserved "context" *> do
+  {currentContext} <- getArcParserState
+  msubState <- optionMaybe arcIdentifier
+  pure $ ContextState currentContext msubState
 
 onExitE :: IP (List StateQualifiedPart)
 onExitE = do
-  mstateTrans <- onExitKeywords *> optionMaybe arcIdentifier
-  stateSpec <- subjectState mstateTrans <|> objectState mstateTrans <|> contextState mstateTrans
-  -- The transition will be fully qualified.
+  void $ onExitKeywords
+  stateSpec <- (optionMaybe (reserved "of") >>= case _ of
+    Just _ -> (subjectState <|> objectState <|> contextState <|> subState) <?> "one of subject, object or context or a state name"
+    Nothing -> getCurrentState)
   protectOnExit do
     setOnExit stateSpec
     concat <$> nestedBlock stateTransitionPart

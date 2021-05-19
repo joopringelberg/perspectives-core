@@ -6,6 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
@@ -18,7 +19,7 @@ import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (runPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
@@ -52,12 +53,12 @@ makeTest_ test title source errorHandler theTest = test title do
     (Left e) -> assert (show e) false
     (Right ctxt@(ContextE{id})) -> do
       -- logShow ctxt
-      evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-      case _ of
+      runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+      case r of
         (Left e) -> assert (show e) false
         (Right (DomeinFile dr')) -> do
           -- logShow dr'
-          x <- runP $ phaseThree dr'
+          x <- runP $ phaseThree dr' state.postponedStateQualifiedParts
           case x of
             (Left e) -> errorHandler e
             (Right correctedDFR) -> theTest correctedDFR

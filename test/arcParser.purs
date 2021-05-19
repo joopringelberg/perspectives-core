@@ -22,7 +22,7 @@ import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), RoleKind(..))
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerbList(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..)) as RV
-import Test.Parsing.ArcAstSelectors (actionExists, allPropertyVerbs, ensureAction, ensureContext, ensureOnEntry, ensureOnExit, ensurePerspectiveOf, ensurePerspectiveOn, ensurePropertyVerbsForPropsOrView, ensureRoleVerbs, ensureStateInContext, ensureStateInRole, ensureSubState, ensureUserRole, failure, hasAutomaticAction, isImplicitRoleOnIdentifier, isIndexed, isNotified, isStateWithContext, isStateWithContext_, isStateWithExplicitRole, perspectiveExists, stateExists, stateParts)
+import Test.Parsing.ArcAstSelectors (actionExists, allPropertyVerbs, ensureAction, ensureContext, ensureOnEntry, ensureOnExit, ensurePerspectiveOf, ensurePerspectiveOn, ensurePropertyVerbsForPropsOrView, ensureRoleVerbs, ensureStateInContext, ensureStateInRole, ensureSubState, ensureUserRole, failure, hasAutomaticAction, isImplicitRoleOnIdentifier, isIndexed, isNotified, isStateWithContext, isStateWithExplicitRole, isStateWithExplicitRole_, perspectiveExists, stateExists, stateParts)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
@@ -566,12 +566,12 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       Right dom -> do
         ensureContext "MyCase" dom >>=
           ensureUserRole "SomeUser" >>=
-            ensureStateInRole (isStateWithContext_ "model:MyTestDomain$MyCase" (Just "SomeState")) >>=
+            ensureStateInRole (isStateWithExplicitRole_ "model:MyTestDomain$MyCase$SomeUser" (Just "SomeState")) >>=
               ensurePerspectiveOn "SomeRole" >>=
                 perspectiveExists
         try (ensureContext "MyCase" dom >>=
           ensureUserRole "SomeUser" >>=
-            ensureStateInRole (isStateWithContext_ "model:MyTestDomain$MyCase" Nothing) >>=
+            ensureStateInRole (isStateWithExplicitRole_ "model:MyTestDomain$MyCase$SomeUser" Nothing) >>=
               ensurePerspectiveOn "SomeRole" >>=
                 perspectiveExists) >>= case _ of
                   Left e -> assert ("Expected another error than: " <> message e) (message e == "No perspective on '(Simple (ArcIdentifier (ArcPosition { column: 0, line: 0 }) \"SomeRole\"))'.")
@@ -587,7 +587,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       Right dom -> do
         ensureContext "MyCase" dom >>=
           ensureUserRole "SomeUser" >>=
-            ensureStateInRole (isStateWithContext_ "model:MyTestDomain$MyCase" (Just "SomeState")) >>=
+            ensureStateInRole (isStateWithExplicitRole_ "model:MyTestDomain$MyCase$SomeUser" (Just "SomeState")) >>=
               ensurePerspectiveOn "SomeRole" >>=
                 ensureAction "MyAction" >>=
                   actionExists

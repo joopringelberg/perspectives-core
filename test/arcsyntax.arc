@@ -28,7 +28,7 @@ domain Feest
   user Gast filledBy sys:User
     aspect sys:User
     indexed TheGuest
-    on exit SomeState
+    on exit of SomeState
       notify GoedeGast "Goodbye {user >> FirstName}."
     state SomeState = SomeProp > AnotherProp
       on entry
@@ -57,7 +57,7 @@ domain Feest
       only (Create)
     perspective on Eregast
   user Eregast = Gast > binding
-    on entry DureWens
+    on entry of DureWens
       do
         letA
             a <- createRole Gast

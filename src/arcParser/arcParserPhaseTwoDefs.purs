@@ -73,15 +73,16 @@ type PhaseTwo' a m = ExceptT PerspectivesError (StateT PhaseTwoState m) a
 
 -- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
 runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord empty empty
+runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord empty empty Nil
 
 runPhaseTwo_' :: forall a m.
   PhaseTwo' a m ->
   DomeinFileRecord ->
   Object ContextType ->
   Object EnumeratedRoleType ->
+  List StateQualifiedPart ->
   m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_' computation dfr indexedContexts indexedRoles = runStateT (runExceptT computation)
+runPhaseTwo_' computation dfr indexedContexts indexedRoles postponedParts = runStateT (runExceptT computation)
   { bot: false
   , dfr: dfr
   , namespaces: defaultNamespaces
@@ -89,10 +90,11 @@ runPhaseTwo_' computation dfr indexedContexts indexedRoles = runStateT (runExcep
   , indexedContexts
   , indexedRoles
   , variableBindings: ENV.empty
-  , postponedStateQualifiedParts: Nil
+  , postponedStateQualifiedParts: postponedParts
   , perspectives: MAP.empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
+-- | Used in the test modules.
 evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
 evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord empty empty
 

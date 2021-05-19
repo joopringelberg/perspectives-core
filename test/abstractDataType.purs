@@ -6,8 +6,8 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
-import Effect.Class.Console (logShow)
+import Data.Tuple (Tuple(..))
+-- import Effect.Class.Console (logShow)
 import Foreign.Object (lookup)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Parsing.Arc (domain) as ARC
@@ -15,7 +15,7 @@ import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (runPhaseTwo')
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Role (binding, roleADT)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
@@ -32,12 +32,12 @@ theSuite = suite  "Perspectives.Representation.ADT" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x <- runP $ phaseThree dr'
+            x <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{enumeratedRoles, calculatedRoles}) -> do

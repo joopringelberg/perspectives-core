@@ -17,6 +17,7 @@ import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..), fst)
 import Effect.Aff (Aff, throwError, error)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
@@ -32,7 +33,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo', runPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), queryFunction, range, secondOperand)
 import Perspectives.Representation.ADT (ADT(..))
@@ -66,7 +67,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
   -- test "TypeLevelObjectGetters" do
   --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
   --   case r of
@@ -110,11 +111,11 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _  of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr)) -> do
-            (runP $ phaseThree dr) >>=
+            (runP $ phaseThree dr state.postponedStateQualifiedParts) >>=
               case _ of
                 (Left e) -> assert (show e) false
                 (Right dr') -> do
@@ -131,12 +132,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            (runP $ phaseThree dr') >>=
+            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
             case _ of
               (Left e) -> assert (show e) false
               (Right correctedDFR) -> do
@@ -152,12 +153,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            (runP $ phaseThree dr') >>=
+            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
             case _ of
               (Left (ContextHasNoRole _ _)) -> assert "" true
               otherwise -> do
@@ -170,12 +171,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            (runP $ phaseThree dr') >>=
+            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
             case _ of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{enumeratedRoles}) -> do
@@ -192,12 +193,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            (runP $ phaseThree dr') >>=
+            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
             case _ of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{enumeratedRoles}) -> do
@@ -214,12 +215,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            (runP $ phaseThree dr') >>=
+            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
             case _ of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{enumeratedRoles}) -> do
@@ -236,12 +237,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            (runP $ phaseThree dr') >>=
+            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
             case _ of
               (Left (UnknownRole _ _)) -> assert "" true
               otherwise -> do
@@ -253,12 +254,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            (runP $ phaseThree dr') >>=
+            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
             -- logShow x'
             case _ of
               (Left e@(NotUniquelyIdentifying _ _ _)) -> do
@@ -273,12 +274,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            (runP $ phaseThree dr') >>=
+            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
             case _ of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{views}) -> do
@@ -298,12 +299,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (UnknownProperty _ _ _)) -> assert "" true
               otherwise -> assert "The view refers to a non-existing property 'Datu' and that should be detected." false
@@ -314,12 +315,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{views}) -> do
@@ -353,18 +354,18 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _  of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               Right dfr ->
                 ensureERole "model:MyTestDomain$Guest" dfr >>=
                   ensurePerspectiveOn "model:MyTestDomain$Feest" >>=
-                    ensurePropertyVerbsInState "model:MyTestDomain" >>=
+                    ensurePropertyVerbsInState "model:MyTestDomain$Guest" >>=
                       Universal `haveVerbs` [Consult]
 
 
@@ -374,12 +375,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{views}) -> do
@@ -397,12 +398,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert ("Parser error: " <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert ("PhaseTwo error:" <> show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert ("PhaseThree error:" <> show e) false
               (Right correctedDFR@{calculatedRoles}) -> do
@@ -422,17 +423,17 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
 
 
   test "Perspective in state" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Voornaam (mandatory, functional, String)\n    view AnotherView (Voornaam)\n    in state Party$LateParty\n      perspective on Party\n        view ViewOnParty (Consult)\n  thing Party (mandatory, functional)\n    state LateParty = Datum > '2019-11-04'\n    property Naam (mandatory, functional, String)\n    property Datum (mandatory, functional, DateTime)\n    view ViewOnParty (Naam)\n    view AnotherView (Datum)" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Voornaam (mandatory, functional, String)\n    view AnotherView (Voornaam)\n    in state Party$LateParty\n      --perspective on Party\n        --view ViewOnParty (Consult)\n  thing Party (mandatory, functional)\n    state LateParty = Datum > '2019-11-04'\n      perspective of Gast\n        view ViewOnParty (Consult)\n    property Naam (mandatory, functional, String)\n    property Datum (mandatory, functional, DateTime)\n    view ViewOnParty (Naam)\n    view AnotherView (Datum)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR) -> do
@@ -448,12 +449,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert ("PhaseTwo error:" <> show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               Left e -> assert ("PhaseThree error:" <> show e) false
               Right correctedDFR -> do
@@ -496,7 +497,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -528,7 +529,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -556,7 +557,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -583,7 +584,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (RoleDoesNotBind _ _ _)) -> assert "ok" true
               otherwise -> do
@@ -600,7 +601,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (NotARoleDomain _ _ _)) -> assert "ok" true
               otherwise -> do
@@ -617,7 +618,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (ContextHasNoRole _ _)) -> assert "ok" true
               otherwise -> do
@@ -634,7 +635,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -661,7 +662,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (NotAContextDomain _ _ _)) -> assert "ok" true
               otherwise -> do
@@ -678,7 +679,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (NotFunctional _ _ _)) -> assert "ok" true
               otherwise -> do
@@ -695,7 +696,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
               otherwise -> do
@@ -711,7 +712,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (NotFunctional _ _ _)) -> assert "ok" true
               -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
@@ -729,7 +730,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -756,7 +757,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (NotFunctional _ _ _)) -> assert "ok" true
               -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
@@ -774,7 +775,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -803,7 +804,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -832,7 +833,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (UnknownRole _ _)) -> assert "ok" true
               -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
@@ -850,7 +851,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (LocalRoleDoesNotBind _ _ _ _)) -> assert "ok" true
               otherwise -> do
@@ -867,7 +868,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -896,7 +897,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -925,7 +926,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (RoleHasNoProperty _ _)) -> assert "ok" true
               otherwise -> do
@@ -942,7 +943,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (CannotCreateCalculatedProperty _ _ _)) -> assert "ok" true
               otherwise -> do
@@ -959,7 +960,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
@@ -992,7 +993,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (WrongPropertyRange _ _ PNumber PBool)) -> assert "ok" true
               otherwise -> do
@@ -1009,7 +1010,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left (NotAPropertyRange _ _ PNumber)) -> assert "ok" true
               otherwise -> do
@@ -1026,7 +1027,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do

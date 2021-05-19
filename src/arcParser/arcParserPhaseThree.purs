@@ -37,6 +37,7 @@ import Data.Array.Partial (head) as ARRP
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
+import Data.List (List)
 import Data.Map (Map, keys, empty, singleton, filter, insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
@@ -45,12 +46,13 @@ import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (logShow)
 import Foreign.Object (Object, insert, keys, lookup, unions, values, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
@@ -87,15 +89,15 @@ import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleTypeOfADT, roleStates, statesPerProperty)
 import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
-phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
-phaseThree df@{_id} = do
+phaseThree :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
+phaseThree df@{_id} postponedParts = do
   -- Store the DomeinFile in cache. If a prefix for the domain is defined in the file,
   -- phaseThree_ will try to retrieve it.
   void $ storeDomeinFileInCache _id (DomeinFile df)
-  phaseThree_ df <* removeDomeinFileFromCache _id
+  phaseThree_ df postponedParts <* removeDomeinFileFromCache _id
 
-phaseThree_ :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
-phaseThree_ df@{_id, referredModels} = do
+phaseThree_ :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
+phaseThree_ df@{_id, referredModels} postponedParts = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
   indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
   indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
@@ -112,6 +114,7 @@ phaseThree_ df@{_id, referredModels} = do
     df
     indexedContexts
     indexedRoles
+    postponedParts
   case ei of
     (Left e) -> pure $ Left e
     otherwise -> pure $ Right dfr
@@ -258,6 +261,10 @@ compileExpressions = do
       traverse_ compileRolExpr (identifier <$> calculatedRoles)
       traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
       -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
+      -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
+      -- We will not have errors on trying to retrieve the DomeinFile here.
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId ns)
+      modifyDF \dfr -> modifiedDomeinFile
       where
         compileRolExpr :: CalculatedRoleType -> PhaseThree Unit
         compileRolExpr roleType = do
@@ -277,8 +284,13 @@ compileExpressions = do
 
 handlePostponedStateQualifiedParts  :: PhaseThree Unit
 handlePostponedStateQualifiedParts = do
-  postponedStateQualifiedParts <- lift $ State.gets _.postponedStateQualifiedParts
-  for_ postponedStateQualifiedParts (unsafePartial handlePart)
+  df@{_id} <- lift $ State.gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    do
+      postponedStateQualifiedParts <- lift $ State.gets _.postponedStateQualifiedParts
+      for_ postponedStateQualifiedParts (unsafePartial handlePart)
   where
 
     collectRoles :: RoleIdentification -> PhaseThree (Array EnumeratedRoleType)
@@ -299,7 +311,8 @@ handlePostponedStateQualifiedParts = do
     collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
     collectStates mpath r = collectRoles r >>= \roles -> case mpath of
       Nothing -> pure (StateIdentifier <<< unwrap <$> roles)
-      Just p ->  pure (StateIdentifier <<< flip append p <<< unwrap <$> roles)
+      Just p ->  pure (StateIdentifier <<< flip append p <<< flip append "$" <<< unwrap <$> roles)
+
 
     addAll :: forall key value. Ord key => value -> Map.Map key value -> Array key -> Map.Map key value
     addAll value = foldr (\key map -> Map.insert key value map)
@@ -336,6 +349,7 @@ handlePostponedStateQualifiedParts = do
                 stateId
 
     handlePart (AST.AE (AST.AutomaticEffectE{subject, object: syntacticObject, transition, effect, start, end})) = do
+      logShow transition
       qualifiedUsers <- map ENR <$> collectRoles subject
       case stateSpec transition of
         -- Execute the effect for all subjects in the context state.
@@ -424,7 +438,7 @@ handlePostponedStateQualifiedParts = do
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes (fromFoldable propertyVerbs)
       case state of
         -- ... the action, but only only in this context state:
-        AST.ContextState ctx mpath -> modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+        AST.ContextState ctx mpath -> modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' [(StateIdentifier $ (maybe (unwrap ctx) ((append (unwrap ctx)) <<< (append "$")) mpath))]
         -- ... the action, for all these subject states:
         -- Note that the subjects in whose states we execute, do not need be the qualified users we give access to the Action:
         -- 'I can check your heart beat when you are at home' illustrates this independence.

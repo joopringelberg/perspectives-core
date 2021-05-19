@@ -125,7 +125,7 @@ haveVerbs props verbs pvArr = case find (\(Perspective.PropertyVerbs propset ver
 --------------------------------------------------------------------------------
 ensurePropertyVerbsInState  :: String -> Perspective.Perspective -> Aff (Array Perspective.PropertyVerbs)
 ensurePropertyVerbsInState stateName (Perspective.Perspective{propertyVerbs}) = do
-  log $ showTree (unwrap propertyVerbs)
+  -- log $ showTree (unwrap propertyVerbs)
   case Map.lookup (StateIdentifier stateName) (unwrap propertyVerbs) of
     Nothing -> failure ("There should be an entry in propertyVerbs for state '" <> stateName <> "'.")
     Just pv -> pure pv

@@ -7,7 +7,7 @@ import Data.Array (catMaybes, cons, find, head, intercalate, intersect, last, le
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
-import Data.Tuple (fst)
+import Data.Tuple (Tuple(..), fst)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
@@ -19,7 +19,7 @@ import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo', runPhaseTwo_')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo', runPhaseTwo', runPhaseTwo_')
 import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Query.Kinked (invert)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, queryFunction)
@@ -84,12 +84,12 @@ theSuite = suite "Test.Query.Inversion" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{calculatedProperties}) -> do
@@ -108,12 +108,12 @@ theSuite = suite "Test.Query.Inversion" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{calculatedProperties}) -> do
@@ -142,12 +142,12 @@ theSuite = suite "Test.Query.Inversion" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{calculatedProperties}) -> do
@@ -180,12 +180,12 @@ theSuite = suite "Test.Query.Inversion" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo' (traverseDomain ctxt "model:") >>=
-        case _ of
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x' <- runP $ phaseThree dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{calculatedProperties}) -> do

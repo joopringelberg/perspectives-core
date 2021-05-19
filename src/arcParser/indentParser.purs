@@ -96,6 +96,19 @@ modifyArcParserState f = lift $ lift $ modify f
 getCurrentContext :: IP ContextType
 getCurrentContext = getArcParserState >>= pure <<< _.currentContext
 
+getCurrentState :: IP StateSpecification
+getCurrentState = getArcParserState >>= pure <<< _.state
+
+getObject :: IP RoleIdentification
+getObject = getArcParserState >>= \{object} -> case object of
+  Nothing -> fail "No object is in scope."
+  Just o -> pure o
+
+getSubject :: IP RoleIdentification
+getSubject = getArcParserState >>= \{subject} -> case subject of
+  Nothing -> fail "No object is in scope."
+  Just s -> pure s
+
 inSubContext :: forall a. String -> IP a -> IP a
 inSubContext subContextName p = do
   oldState@{currentContext} <- getArcParserState
