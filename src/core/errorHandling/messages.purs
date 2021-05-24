@@ -110,6 +110,7 @@ data PerspectivesError
     | ApiErrorBoundary String
     | RuleErrorBoundary String String
     | ParserError String ArcPosition
+    | MissingObject ArcPosition ArcPosition
     | Custom String
 
 derive instance eqPerspectivesError :: Eq PerspectivesError
@@ -130,6 +131,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (Custom s) = s
   show (ParserError message pos) = "(ParserError) " <> message <> show pos
   -- TODO: Als extra kunnen we de Constructors hieronder voorzien van ArcPosition.
+  show (MissingObject start end) = "(MissingObject) The expression contains a reference to the 'object' variable but there is no current object in scope (between " <> show start <> " and " <> show end <> ")"
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here)."

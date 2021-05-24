@@ -37,6 +37,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
+data Statements = Let LetStep | Statements (Array Assignment)
 
 newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, assignments :: Array Assignment}
 
@@ -62,6 +63,36 @@ data Assignment =
   | DeleteProperty (WithTextRange (propertyIdentifier :: String, roleExpression :: Maybe Step))
   | PropertyAssignment (WithTextRange (propertyIdentifier :: String, operator :: AssignmentOperator, valueExpression :: Step, roleExpression :: Maybe Step ))
   | ExternalEffect (WithTextRange (effectName :: String, arguments :: (Array Step) ) )
+
+startOfAssignment :: Assignment -> ArcPosition
+startOfAssignment (Remove{start}) = start
+startOfAssignment (CreateRole{start}) = start
+startOfAssignment (CreateContext{start}) = start
+startOfAssignment (CreateContext_{start}) = start
+startOfAssignment (Move{start}) = start
+startOfAssignment (Bind{start}) = start
+startOfAssignment (Bind_{start}) = start
+startOfAssignment (Unbind{start}) = start
+startOfAssignment (Unbind_{start}) = start
+startOfAssignment (DeleteRole{start}) = start
+startOfAssignment (DeleteProperty{start}) = start
+startOfAssignment (PropertyAssignment{start}) = start
+startOfAssignment (ExternalEffect{start}) = start
+
+endOfAssignment :: Assignment -> ArcPosition
+endOfAssignment (Remove{end}) = end
+endOfAssignment (CreateRole{end}) = end
+endOfAssignment (CreateContext{end}) = end
+endOfAssignment (CreateContext_{end}) = end
+endOfAssignment (Move{end}) = end
+endOfAssignment (Bind{end}) = end
+endOfAssignment (Bind_{end}) = end
+endOfAssignment (Unbind{end}) = end
+endOfAssignment (Unbind_{end}) = end
+endOfAssignment (DeleteRole{end}) = end
+endOfAssignment (DeleteProperty{end}) = end
+endOfAssignment (PropertyAssignment{end}) = end
+endOfAssignment (ExternalEffect{end}) = end
 
 derive instance genericLetStep :: Generic LetStep _
 instance showLetStep :: Show LetStep where show = genericShow

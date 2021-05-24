@@ -1,0 +1,220 @@
+-- BEGIN LICENSE
+-- Perspectives Distributed Runtime
+-- SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
+-- SPDX-License-Identifier: GPL-3.0-or-later
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program.  If not, see <https://www.gnu.org/licenses/>.
+--
+-- Full text of this license can be found in the LICENSE directory in the projects root.
+
+-- END LICENSE
+
+-- | Functions in this module add the contextual variables "currentcontext" and "object"
+-- | to the lexical representation of expressions and statements, if they contain a
+-- | reference to them.
+
+module Perspectives.Parsing.Arc.ContextualVariables where
+
+import Control.Monad.Error.Class (class MonadError, throwError)
+import Control.Monad.State (StateT, execStateT, modify)
+import Data.Array (catMaybes, cons, foldMap, head, last, length)
+import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (ala)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.Parsing.Arc.Expression (endOf, startOf)
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Position (ArcPosition)
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetStep(..), Statements(..), endOfAssignment, startOfAssignment)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Prelude (class Monad, Unit, bind, discard, pure, unit, void, ($), (<$>), (<>), (==), (||), (>))
+
+--------------------------------------------------------------------------
+--- VARIABLE REFERENCES IN EXPRESSIONS
+--------------------------------------------------------------------------
+-- | True only if the Step itself is a reference to the named variable,
+-- | or if one its constituents contain a reference to the named variable.
+stepContainsVariableReference :: String -> Step -> Boolean
+stepContainsVariableReference varName (Simple (Variable _ n)) = varName == n
+
+stepContainsVariableReference varName (Binary (BinaryStep{left, right} )) = stepContainsVariableReference varName left || stepContainsVariableReference varName right
+
+stepContainsVariableReference varName (Unary (LogicalNot _ s)) = stepContainsVariableReference varName s
+stepContainsVariableReference varName (Unary (Exists _ s)) = stepContainsVariableReference varName s
+stepContainsVariableReference varName (Unary (Binds _ s)) = stepContainsVariableReference varName s
+stepContainsVariableReference varName (Unary (BoundBy _ s)) = stepContainsVariableReference varName s
+stepContainsVariableReference varName (Unary (Available _ s)) = stepContainsVariableReference varName s
+
+stepContainsVariableReference varName (PureLet (PureLetStep{bindings, body})) = stepContainsVariableReference varName body ||
+  ala Disj foldMap
+    (catMaybes $ (\(VarBinding n stp) -> if varName == n then Nothing else Just (stepContainsVariableReference varName stp)) <$> bindings)
+
+stepContainsVariableReference varName (Computation(ComputationStep{arguments})) =
+  ala Disj foldMap
+    ((stepContainsVariableReference varName) <$> arguments)
+
+stepContainsVariableReference _ _ = false
+
+--------------------------------------------------------------------------
+--- VARIABLE REFERENCES IN STATEMENTS
+--------------------------------------------------------------------------
+-- | True only if the Statement contains a reference to the named variable.
+statementContainsVariableReference :: String -> Statements -> Boolean
+statementContainsVariableReference varName (Let (LetStep{bindings, assignments})) =
+  ala Disj foldMap (assignmentContainsReference varName <$> assignments)
+  ||
+  ala Disj foldMap
+    (catMaybes $ (\(VarBinding n stp) -> if varName == n then Nothing else Just (stepContainsVariableReference varName stp)) <$> bindings)
+
+statementContainsVariableReference varName (Statements stats) =
+  ala Disj foldMap (assignmentContainsReference varName <$> stats)
+
+assignmentContainsReference :: String -> Assignment -> Boolean
+assignmentContainsReference varName (Remove {roleExpression}) = stepContainsVariableReference varName roleExpression
+
+assignmentContainsReference varName (CreateRole {contextExpression}) = maybe false (stepContainsVariableReference varName) contextExpression
+
+assignmentContainsReference varName (CreateContext {contextExpression}) =
+  maybe false (stepContainsVariableReference varName) contextExpression
+
+assignmentContainsReference varName (CreateContext_ {roleExpression}) =
+  stepContainsVariableReference varName roleExpression
+
+assignmentContainsReference varName (Move {roleExpression, contextExpression}) =
+  stepContainsVariableReference varName roleExpression
+  ||
+  maybe false (stepContainsVariableReference varName) contextExpression
+
+assignmentContainsReference varName (Bind {bindingExpression, contextExpression}) =
+  stepContainsVariableReference varName bindingExpression
+  ||
+  maybe false (stepContainsVariableReference varName) contextExpression
+
+assignmentContainsReference varName (Bind_ {bindingExpression, binderExpression}) =
+  stepContainsVariableReference varName bindingExpression
+  ||
+  stepContainsVariableReference varName binderExpression
+
+assignmentContainsReference varName (Unbind {bindingExpression}) =
+  stepContainsVariableReference varName bindingExpression
+
+assignmentContainsReference varName (Unbind_ {bindingExpression, binderExpression}) =
+  stepContainsVariableReference varName bindingExpression
+  ||
+  stepContainsVariableReference varName binderExpression
+
+assignmentContainsReference varName (DeleteRole {contextExpression}) = maybe false (stepContainsVariableReference varName) contextExpression
+
+assignmentContainsReference varName (DeleteProperty {roleExpression}) =
+  maybe false (stepContainsVariableReference varName) roleExpression
+
+assignmentContainsReference varName (PropertyAssignment {valueExpression, roleExpression}) =
+  stepContainsVariableReference varName valueExpression
+  ||
+  maybe false (stepContainsVariableReference varName) roleExpression
+
+assignmentContainsReference varName (ExternalEffect {arguments}) =
+  ala Disj foldMap $ stepContainsVariableReference varName <$> arguments
+
+--------------------------------------------------------------------------
+--- A MONAD TO COLLECT VARIABLE BINDINGS
+--------------------------------------------------------------------------
+type CollectingBindings m = StateT (Array VarBinding) m
+
+-- | Run a computation that adds VarBinding instances to state, return
+-- | an Array of those bindings (possibly empty).
+collectBindings :: forall a m. Monad m => CollectingBindings m a -> m (Array VarBinding)
+collectBindings x = execStateT x []
+
+-- | In CollectingBindings, add a VarBinding to state.
+addBinding :: forall m. Monad m => VarBinding -> CollectingBindings m (Array VarBinding)
+addBinding vb = modify (cons vb)
+
+--------------------------------------------------------------------------
+--- ADD CONTEXTUAL VARIABLES TO AN EXPRESSION
+--------------------------------------------------------------------------
+addContextualVariablesToExpression :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> m Step
+addContextualVariablesToExpression stp mobject = case stp of
+  (PureLet (PureLetStep r@{bindings})) -> do
+    extraBindings <- collectBindings do
+      addCurrentContext stp
+      addObject stp
+    pure $ PureLet (PureLetStep r {bindings = extraBindings <> bindings})
+  _ -> do
+    bindings <- collectBindings do
+      addCurrentContext stp
+      addObject stp
+    if length bindings > 0
+      then pure $ PureLet (PureLetStep
+        { start: startOf stp
+        , end: endOf stp
+        , bindings
+        , body: stp
+        })
+      else pure stp
+  where
+    addCurrentContext :: Step -> CollectingBindings m Unit
+    addCurrentContext stp' = if stepContainsVariableReference "currentcontext" stp'
+      then void $ addBinding (VarBinding "currentcontext" (Simple $ Identity (startOf stp')))
+      else pure unit
+
+    addObject :: Step -> CollectingBindings m Unit
+    addObject stp' = if stepContainsVariableReference "object" stp'
+      then case mobject of
+        Nothing -> throwError (MissingObject (startOf stp') (endOf stp'))
+        Just obj -> void $ addBinding (VarBinding "object" obj)
+      else pure unit
+
+--------------------------------------------------------------------------
+--- ADD CONTEXTUAL VARIABLES TO STATEMENTS
+--------------------------------------------------------------------------
+addContextualVariablesToStatements :: forall m. MonadError PerspectivesError m => Statements -> Maybe Step -> m Statements
+addContextualVariablesToStatements stmts mobject = case stmts of
+  Let (LetStep r@{bindings, assignments}) -> do
+    extraBindings <- collectBindings do
+      addCurrentContext stmts
+      addObject stmts
+    pure $ Let (LetStep r {bindings = extraBindings <> bindings})
+  Statements stmtArray -> do
+    bindings <- collectBindings do
+      addCurrentContext stmts
+      addObject stmts
+    if length bindings > 0
+      then pure $ Let (LetStep
+        { start: unsafePartial $ startOfStatements stmts
+        , end: unsafePartial $ endOfStatements stmts
+        , bindings
+        , assignments: stmtArray
+        })
+      else pure stmts
+  where
+    addCurrentContext :: Statements -> CollectingBindings m Unit
+    addCurrentContext stmts' = if statementContainsVariableReference "currentcontext" stmts'
+      then void $ addBinding (VarBinding "currentcontext" (Simple $ Identity (unsafePartial $ startOfStatements stmts')))
+      else pure unit
+
+    addObject :: Statements -> CollectingBindings m Unit
+    addObject stmts' = if statementContainsVariableReference "object" stmts'
+      then case mobject of
+        Nothing -> throwError (MissingObject (unsafePartial $ startOfStatements stmts') (unsafePartial $ endOfStatements stmts'))
+        Just obj -> void $ addBinding (VarBinding "object" obj)
+      else pure unit
+
+    startOfStatements :: Partial => Statements -> ArcPosition
+    startOfStatements (Let (LetStep{start})) = start
+    startOfStatements (Statements stmtArray) = startOfAssignment (fromJust $ head stmtArray)
+
+    endOfStatements :: Partial => Statements -> ArcPosition
+    endOfStatements (Let (LetStep{end})) = end
+    endOfStatements (Statements stmtArray) = endOfAssignment (fromJust $ last stmtArray)

@@ -20,8 +20,6 @@
 
 -- END LICENSE
 
--- THIS MODULE IS OBSOLETE
-
 module Perspectives.Representation.Assignment where
 
 import Data.Generic.Rep (class Generic)
