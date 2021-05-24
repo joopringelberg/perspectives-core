@@ -85,7 +85,6 @@ import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
@@ -94,7 +93,7 @@ import Perspectives.Representation.Range (Range)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -- | Step represents an Expression conforming to the grammar given above.
-data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | Let LetStep | PureLet PureLetStep | Computation ComputationStep
+data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | PureLet PureLetStep | Computation ComputationStep
 
 data SimpleStep =
   ArcIdentifier ArcPosition String
@@ -122,8 +121,6 @@ data UnaryStep =
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step, parenthesised :: Boolean}
 
-newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, assignments :: Array Assignment}
-
 newtype PureLetStep = PureLetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, body :: Step}
 
 newtype ComputationStep = ComputationStep {functionName :: String, arguments :: Array Step, computedType :: String, start :: ArcPosition, end :: ArcPosition}
@@ -149,31 +146,6 @@ data Operator =
   | Union ArcPosition
   | Intersection ArcPosition
 
--- newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Maybe Step}
-
-data AssignmentOperator =
-  Set ArcPosition
-  | AddTo ArcPosition
-  | DeleteFrom ArcPosition
-
-type WithTextRange f = {start :: ArcPosition, end :: ArcPosition | f}
-
-data Assignment =
-	Remove (WithTextRange (roleExpression :: Step))
-	| CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
-  | CreateContext (WithTextRange (contextTypeIdentifier :: String, roleTypeIdentifier :: String, contextExpression :: Maybe Step))
-  | CreateContext_ (WithTextRange (contextTypeIdentifier :: String, roleExpression :: Step))
-  | Move (WithTextRange (roleExpression :: Step, contextExpression :: Maybe Step))
-  | Bind (WithTextRange (bindingExpression :: Step, roleIdentifier :: String, contextExpression :: Maybe Step))
-  | Bind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
-  -- TODO: Maybe String voor roleIdentifier. Pas de parser aan.
-  | Unbind (WithTextRange (bindingExpression :: Step, roleIdentifier :: Maybe String))
-  | Unbind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
-  | DeleteRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
-  | DeleteProperty (WithTextRange (propertyIdentifier :: String, roleExpression :: Maybe Step))
-  | PropertyAssignment (WithTextRange (propertyIdentifier :: String, operator :: AssignmentOperator, valueExpression :: Step, roleExpression :: Maybe Step ))
-  | ExternalEffect (WithTextRange (effectName :: String, arguments :: (Array Step) ) )
-
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
 instance eqStep :: Eq Step where eq = genericEq
@@ -186,7 +158,6 @@ instance prettyPrintStep :: PrettyPrint Step where
   prettyPrint' t (Simple s) = prettyPrint' t s
   prettyPrint' t (Binary s) = prettyPrint' t s
   prettyPrint' t (Unary s) = prettyPrint' t s
-  prettyPrint' t (Let s) = prettyPrint' t s
   prettyPrint' t (PureLet s) = prettyPrint' t s
   prettyPrint' t (Computation s) = prettyPrint' t s
 
@@ -240,17 +211,6 @@ instance prettyPrintUnaryStep :: PrettyPrint UnaryStep where
   prettyPrint' t (BoundBy _ s) = "BoundBy " <> prettyPrint' t s
   prettyPrint' t (Available _ s) = "Available " <> prettyPrint' t s
 
-derive instance genericLetStep :: Generic LetStep _
-instance showLetStep :: Show LetStep where show = genericShow
-instance eqLetStep :: Eq LetStep where eq u1 u2 = genericEq u1 u2
-derive instance ordLetStap :: Ord LetStep
-instance encodeLetStep :: Encode LetStep where
-  encode q = genericEncode defaultOptions q
-instance decodeLetStep :: Decode LetStep where
-  decode q = genericDecode defaultOptions q
-instance prettyPrintLetStep :: PrettyPrint LetStep where
-  prettyPrint' t (LetStep {bindings, assignments}) = "LetStep\n" <> intercalate (t <> "\n") (prettyPrint' (t <> "  ") <$> bindings) <> "\n" <> t <> "in\n" <> intercalate (t <> "\n") (prettyPrint' (t <> "  ") <$> assignments)
-
 derive instance genericPureLetStep :: Generic PureLetStep _
 instance showPureLetStep :: Show PureLetStep where show = genericShow
 instance eqPureLetStep :: Eq PureLetStep where eq u1 u2 = genericEq u1 u2
@@ -299,47 +259,6 @@ instance prettyPrintOperator :: PrettyPrint Operator where
   prettyPrint' t (Sequence _) = "Sequence"
   prettyPrint' t (Union _) = "Union"
   prettyPrint' t (Intersection _) = "Intersection"
-
-derive instance genericAssignment :: Generic Assignment _
-instance showAssignment :: Show Assignment where show = genericShow
-instance eqAssignment :: Eq Assignment where eq = genericEq
-derive instance ordAssignment :: Ord Assignment
-instance encodeAssignment :: Encode Assignment where
-  encode q = genericEncode defaultOptions q
-instance decodeAssignment :: Decode Assignment where
-  decode q = genericDecode defaultOptions q
-instance prettyPrintAssignment :: PrettyPrint Assignment where
-  prettyPrint' t (Remove {roleExpression}) = "Remove " <> prettyPrint' t roleExpression
-  prettyPrint' t (CreateRole {roleIdentifier, contextExpression}) = "CreateRole " <> roleIdentifier <> " " <> prettyPrint' t contextExpression
-  prettyPrint' t (CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression}) = let
-    context = if isNothing contextExpression then "current context" else prettyPrint' t contextExpression
-    in
-      "CreateContext " <> contextTypeIdentifier <> " bound to " <> roleTypeIdentifier <> " in " <> context
-  prettyPrint' t (CreateContext_ {contextTypeIdentifier, roleExpression}) = "CreateContext_ " <> contextTypeIdentifier <> " bound to " <> prettyPrint' t roleExpression
-  prettyPrint' t (Move {roleExpression, contextExpression}) = "Move " <> prettyPrint' t roleExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
-  prettyPrint' t (Bind {bindingExpression, contextExpression}) = "Bind " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
-  prettyPrint' t (Bind_ {bindingExpression, binderExpression}) = "Bind_ " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") binderExpression
-  prettyPrint' t (Unbind {bindingExpression, roleIdentifier}) = "Unbind " <> prettyPrint' t bindingExpression <> "\n" <> t <> show roleIdentifier
-  prettyPrint' t (Unbind_ {bindingExpression, binderExpression}) = "Unbind_ " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") binderExpression
-  prettyPrint' t (DeleteRole {roleIdentifier, contextExpression}) = "DeleteRole " <> roleIdentifier <> " " <> prettyPrint' t contextExpression
-  prettyPrint' t (DeleteProperty {propertyIdentifier, roleExpression}) = "DeleteProperty " <> propertyIdentifier <> " " <> prettyPrint' t roleExpression
-  prettyPrint' t (PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression}) = "PropertyAssignment " <> propertyIdentifier <> " " <> prettyPrint' t operator <> " " <> "\n" <> t <> prettyPrint' (t <> "  ") valueExpression <> "\n" <> t <> prettyPrint' (t <> "  ") roleExpression
-  prettyPrint' t (ExternalEffect {arguments}) = "ExternalEffect\n" <> intercalate ("\n" <> t) (prettyPrint' (t <> "  ") <$> arguments)
-
-derive instance genericAssignmentOperator :: Generic AssignmentOperator _
-instance showAssignmentOperator :: Show AssignmentOperator where show = genericShow
-instance eqAssignmentOperator :: Eq AssignmentOperator where eq = genericEq
-derive instance ordAssignmentOperator :: Ord AssignmentOperator
-instance encodeAssignmentOperator :: Encode AssignmentOperator where
-  encode = genericEncode defaultOptions
-instance decodeAssignmentOperator :: Decode AssignmentOperator where
-  decode = genericDecode defaultOptions
-instance prettyPrintAssignmentOperator :: PrettyPrint AssignmentOperator where
-  prettyPrint' _ (Set _) = "Set"
-  prettyPrint' _ (AddTo _) = "AddTo"
-  prettyPrint' _ (DeleteFrom _) = "DeleteFrom"
-
--- newtype ComputationStep = ComputationStep {functionName :: String, arguments :: List Step, computedType :: String}
 
 derive instance genericComputationStep :: Generic ComputationStep _
 instance showComputationStep :: Show ComputationStep where show s = genericShow s

@@ -35,7 +35,7 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep)
+import Perspectives.Parsing.Arc.Statement.AST (Assignment, LetStep)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Prelude (class Eq, class Show)
 

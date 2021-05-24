@@ -29,16 +29,17 @@ import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log, logShow)
+import Effect.Class.Console (log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression (assignment, letWithAssignment, step)
+import Perspectives.Parsing.Arc.Expression (step)
+import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Parsing.Arc.Token (isReservedName, reservedIdentifier, token)
+import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.Range (Range(..))
@@ -46,7 +47,7 @@ import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleKind(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, flip, not, pure, unit, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (block1, checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
@@ -499,7 +500,7 @@ subState :: IP StateSpecification
 subState = addSubState <$> getCurrentState <*> arcIdentifier
 
 subjectState :: IP StateSpecification
-subjectState = reserved "subject" *> do
+subjectState = reserved "subject" *> reserved "state" *> do
   {subject} <- getArcParserState
   case subject of
     Nothing -> fail "A subject is required for 'in state X of subject"
@@ -508,7 +509,7 @@ subjectState = reserved "subject" *> do
       pure $ SubjectState s msubState
 
 objectState :: IP StateSpecification
-objectState = reserved "object" *> do
+objectState = reserved "object" *> reserved "state" *> do
   {object} <- getArcParserState
   case object of
     Nothing -> fail "An object is required for 'in state X of object'"
@@ -517,7 +518,7 @@ objectState = reserved "object" *> do
       pure $ ObjectState s msubState
 
 contextState :: IP StateSpecification
-contextState = reserved "context" *> do
+contextState = reserved "context" *> reserved "state" *> do
   {currentContext} <- getArcParserState
   msubState <- optionMaybe arcIdentifier
   pure $ ContextState currentContext msubState
@@ -555,6 +556,7 @@ automaticEffectE = do
         _ -> Left <$> nestedBlock assignment
       end <- getPosition
       {subject, object, onEntry, onExit, currentContext} <- getArcParserState
+      log ("automaticEffectE: object = " <> show object)
       case usr of
         Nothing -> case subject, onEntry, onExit of
           Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
@@ -578,16 +580,16 @@ notificationE = do
   usr <- optionMaybe step
   message <- sentenceE
   end <- getPosition
-  {subject, onEntry, onExit, currentContext} <- getArcParserState
+  {subject, onEntry, onExit, currentContext, object} <- getArcParserState
   case usr of
     Just user -> case onEntry, onExit of
-      Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: ImplicitRole currentContext user, transition, message, start, end}
-      Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: ImplicitRole currentContext user, transition, message, start, end}
+      Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: ImplicitRole currentContext user, transition, message, object, start, end}
+      Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: ImplicitRole currentContext user, transition, message, object, start, end}
       Nothing, Nothing -> fail "A state transition is required"
       _, _ -> fail "State transition inside state transition is not allowed"
     Nothing -> case subject, onEntry, onExit of
-      Just u, Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: u, transition, message, start, end}
-      Just u, Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: u, transition, message, start, end}
+      Just u, Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: u, transition, message, object, start, end}
+      Just u, Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: u, transition, message, object, start, end}
       Nothing, _, _ -> fail "A subject is required"
       _, Nothing, Nothing -> fail "A state transition is required"
       _, Just _, Just _ -> fail "State transition inside state transition is not allowed"

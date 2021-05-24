@@ -23,7 +23,8 @@
 module Perspectives.Query.ExpandPrefix where
 
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), ComputationStep(..), LetStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..),  LetStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Prelude (pure, (<$>), bind, ($))
 
@@ -34,7 +35,6 @@ instance containsPrefixesStep :: ContainsPrefixes Step where
   expandPrefix (Simple s) = Simple <$> expandPrefix s
   expandPrefix (Binary s) = Binary <$> expandPrefix s
   expandPrefix (Unary s) = Unary <$> expandPrefix s
-  expandPrefix (Let s) = Let <$> expandPrefix s
   expandPrefix (PureLet s) = PureLet <$> expandPrefix s
   expandPrefix (Computation s) = Computation <$> expandPrefix s
 

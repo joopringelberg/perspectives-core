@@ -31,15 +31,14 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.String (length)
 import Data.String.CodeUnits as SCU
 import Effect.Unsafe (unsafePerformEffect)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), ComputationStep(..), LetStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
-import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition, nestedBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Range(..))
-import Prelude (bind, discard, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>))
-import Text.Parsing.Indent (withPos)
+import Prelude (bind, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>))
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char)
@@ -77,7 +76,6 @@ step_ parenthesised = do
       case keyword of
         "filter" -> reserved "filter" *> step
         "letE" -> pureLetStep
-        "letA" -> (Let <$> letWithAssignment)
         "callExternal" -> computationStep
         u | isUnaryKeyword u -> unaryStep
         _ -> simpleStep
@@ -220,7 +218,6 @@ startOf stp = case stp of
   (Simple s) -> startOfSimple s
   (Binary (BinaryStep{start})) -> start
   (Unary us) -> startOfUnary us
-  (Let (LetStep {start})) -> start
   (PureLet (PureLetStep {start})) -> start
   (Computation (ComputationStep {start})) -> start
 
@@ -252,7 +249,6 @@ endOf stp = case stp of
   (Simple s) -> endOfSimple s
   (Binary (BinaryStep{end})) -> end
   (Unary us) -> endOfUnary us
-  (Let (LetStep {end})) -> end
   (PureLet (PureLetStep {end})) -> end
   (Computation (ComputationStep {end})) -> end
 
@@ -286,162 +282,6 @@ endOf stp = case stp of
     line_ :: ArcPosition -> Int
     line_ (ArcPosition{line}) = line
 
-assignment :: IP Assignment
-assignment = isPropertyAssignment >>= if _
-  then propertyAssignment
-  else roleAssignment
-
-roleAssignment :: IP Assignment
-roleAssignment = do
-  keyword <- lookAhead reservedIdentifier <?> "Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, or callEffect"
-  case keyword of
-    "remove" -> removal
-    "createRole" -> roleCreation
-    "move" -> move
-    "bind" -> bind'
-    "bind_" -> bind_
-    "unbind" -> unbind
-    "unbind_" -> unbind_
-    "delete" -> roleDeletion
-    "callEffect" -> callEffect
-    s -> fail ("Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, or callEffect but found '" <> s <> "'.")
-
-removal :: IP Assignment
-removal = do
-  start <- getPosition
-  roleExpression <- (reserved "remove" *> step)
-  end <- getPosition
-  pure $ Remove {start, end, roleExpression}
-
-roleCreation :: IP Assignment
-roleCreation = do
-  start <- getPosition
-  roleIdentifier <- reserved "createRole" *> arcIdentifier
-  contextExpression <- optionMaybe (reserved "in" *> step)
-  end <- getPosition
-  pure $ CreateRole {start, end, roleIdentifier, contextExpression}
-
--- createContext ContextType bound to RoleType [ in <contextExpression>]
-createContext :: IP Assignment
-createContext = do
-  start <- getPosition
-  contextTypeIdentifier <- reserved "createContext" *> arcIdentifier
-  roleTypeIdentifier <- reserved "bound" *> reserved "to" *> arcIdentifier
-  contextExpression <- optionMaybe (reserved "in" *> step)
-  end <- getPosition
-  pure $ CreateContext {start, end, contextTypeIdentifier, roleTypeIdentifier, contextExpression}
-
--- createContext_ ContextType bound to <roleExpression>
-createContext_ :: IP Assignment
-createContext_ = do
-  start <- getPosition
-  contextTypeIdentifier <- reserved "createContext" *> arcIdentifier
-  roleExpression <- reserved "bound" *> reserved "to" *> step
-  end <- getPosition
-  pure $ CreateContext_ {start, end, contextTypeIdentifier, roleExpression}
-
-move :: IP Assignment
-move = do
-  start <- getPosition
-  roleExpression <- (reserved "move" *> step)
-  contextExpression <- optionMaybe (reserved "to" *> step)
-  end <- getPosition
-  pure $ Move {start, end, roleExpression, contextExpression}
-
-bind' :: IP Assignment
-bind' = do
-  start <- getPosition
-  bindingExpression <- (reserved "bind" *> step)
-  roleIdentifier <- reserved "to" *> arcIdentifier
-  contextExpression <- optionMaybe (reserved "in" *> step)
-  end <- getPosition
-  pure $ Bind {start, end, bindingExpression, roleIdentifier, contextExpression}
-
-bind_ :: IP Assignment
-bind_ = do
-  start <- getPosition
-  bindingExpression <- (reserved "bind_" *> step)
-  binderExpression <- reserved "to" *> step
-  end <- getPosition
-  pure $ Bind_ {start, end, bindingExpression, binderExpression}
-
-unbind :: IP Assignment
-unbind = do
-  start <- getPosition
-  bindingExpression <- (reserved "unbind" *> step)
-  roleIdentifier <- optionMaybe (reserved "from" *> arcIdentifier)
-  end <- getPosition
-  pure $ Unbind {start, end, bindingExpression, roleIdentifier}
-
-unbind_ :: IP Assignment
-unbind_ = do
-  start <- getPosition
-  bindingExpression <- (reserved "unbind_" *> step)
-  binderExpression <- reserved "from" *> step
-  end <- getPosition
-  pure $ Unbind_ {start, end, bindingExpression, binderExpression}
-
-isPropertyAssignment :: IP Boolean
-isPropertyAssignment = do
-  keyword <- option "" (lookAhead reservedIdentifier)
-  case keyword of
-    "delete" -> pure true
-    otherwise -> isJust <$> optionMaybe (lookAhead (arcIdentifier *> assignmentOperator))
-
-propertyAssignment :: IP Assignment
-propertyAssignment = do
-  keyword <- option "" (lookAhead reservedIdentifier)
-  case keyword of
-    "delete" -> propertyDeletion
-    _ -> propertyAssignment'
-  where
-    propertyAssignment' :: IP Assignment
-    propertyAssignment' = try do
-      start <- getPosition
-      propertyIdentifier <- arcIdentifier
-      op <- assignmentOperator
-      val <- step
-      end <- getPosition
-      roleExpression <- optionMaybe (reserved "for" *> step)
-      pure $ PropertyAssignment {start, end, propertyIdentifier, operator: op, valueExpression: val, roleExpression}
-
-    propertyDeletion :: IP Assignment
-    propertyDeletion = try do
-      start <- getPosition
-      reserved "delete"
-      reserved "property"
-      propertyIdentifier <- arcIdentifier
-      roleExpression <- optionMaybe (reserved "from" *> step)
-      end <- getPosition
-      pure $ DeleteProperty {start, end, propertyIdentifier, roleExpression}
-
-
-assignmentOperator :: IP AssignmentOperator
-assignmentOperator = try
-  (DeleteFrom <$> (getPosition <* token.reservedOp "=-"))
-  <|>
-  (AddTo <$> (getPosition <* token.reservedOp "=+"))
-  <|>
-  ((Set <$> (getPosition <* token.reservedOp "="))
-  ) <?> "=, =+, =-"
-
-roleDeletion :: IP Assignment
-roleDeletion = try do
-  start <- getPosition
-  reserved "delete"
-  roleIdentifier <- arcIdentifier
-  contextExpression <- optionMaybe (reserved "from" *> step)
-  end <- getPosition
-  pure $ DeleteRole {start, end, roleIdentifier, contextExpression}
-
-callEffect :: IP Assignment
-callEffect = try do
-  start <- getPosition
-  effectName <- reserved "callEffect" *> arcIdentifier
-  arguments <- token.parens (token.commaSep step)
-  end <- getPosition
-  pure $ ExternalEffect {start, end, effectName, arguments: (fromFoldable arguments)}
-
 -- | Parse between single quotes.
 dateTimeLiteral :: IP String
 dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
@@ -454,21 +294,6 @@ dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
     dateChar :: IP Char
     dateChar = alphaNum <|> char ':' <|> char '+' <|> char '-' <|> char ' ' <|> char '.'
 
--- letStep = do
---   lookAhead (reserved "let*")
---   start <- getPosition
---   bindings <- withEntireBlock (\_ bs -> bs) (reserved "let*") binding
---   massignments <- optionMaybe $ try $ withEntireBlock (\_ bs -> bs) (reserved "in") assignment
---   case massignments of
---     (Just assignments) -> do
---       end <- getPosition
---       pure $ Let $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
---     Nothing -> do
---       body <- reserved "in" *> step
---       end <- getPosition
---       pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
-
-
 binding :: IP VarBinding
 binding = VarBinding <$> (lowerCaseName <* token.reservedOp "<-") <*> defer \_ -> step
 
@@ -480,15 +305,6 @@ pureLetStep = do
   body <- reserved "in" *> step
   end <- getPosition
   pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
-
--- | A let with assignments: letA <binding>+ in <assignment>+.
-letWithAssignment :: IP LetStep
-letWithAssignment = withPos $ try do
-  start <- getPosition
-  bindings <- reserved "letA" *> nestedBlock binding
-  assignments <- reserved "in" *> nestedBlock assignment
-  end <- getPosition
-  pure $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
 
 computationStep :: IP Step
 computationStep = try do

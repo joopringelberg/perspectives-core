@@ -30,8 +30,9 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep, Step)
+import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
+import Perspectives.Parsing.Arc.Statement.AST (Assignment, LetStep)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.Sentence (Sentence)
@@ -170,6 +171,7 @@ newtype NotificationE = NotificationE
   , transition :: StateTransitionE
   , message :: Sentence
   -- , level :: NotificationLevel
+  , object :: Maybe RoleIdentification
   , start :: ArcPosition
   , end :: ArcPosition
   }

@@ -469,24 +469,33 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
                           Just (BinaryCombinator GreaterThanF) -> pure unit
                           _ -> failure "The condition should have operator '>'"
 
-                -- case lookup "model:Test$Gast_bot$ChangeParty" actions of
-                --   (Just (Action{condition, effect})) -> do
-                --     assert "The condition should have operator '>'"
-                --       (case condition of
-                --         (Q (BQD _ (BinaryCombinator GreaterThanF) _ _ _ _ _)) -> true
-                --         otherwise -> false)
-                --     case extractEffect effect of
-                --       (BQD _ (BinaryCombinator SequenceF) crea rem _ _ _) -> do
-                --           assert "There should be a CreateRole on Gast" (case crea of
-                --             (UQD _ (CreateRole (EnumeratedRoleType "model:Test$Gast")) (SQD _ (DataTypeGetter IdentityF) _ _ _) _ _ _) -> true
-                --             otherwise -> false)
-                --           assert "There should be a Remove assignment on Gast" (case rem of
-                --             (UQD _ Remove (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$Gast"))) _ _ _) _ _ _) -> true
-                --             otherwise -> false)
-                --       otherwise -> assert "Side effect expected" false
-                --   Nothing -> assert "The effect should compile to a sequence" false
-{-
+  testOnly "Automatic effect on entry (use of object state)" do
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Prop2 (mandatory, functional, Number)\n    perspective on Party\n      on entry of object state SomeState\n        do\n          Prop1 = 10\n  thing Party (mandatory, functional)\n    property Prop1 (mandatory, functional, Number)\n    state SomeState = Prop1 > 10" ARC.domain
+    case r of
+      (Left e) -> assert ("Parser error:" <> show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
+          (Left e) -> assert ("PhaseTwo error:" <> show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+            case x' of
+              Left e -> assert ("PhaseThree error:" <> show e) false
+              Right correctedDFR -> do
+                -- logShow correctedDFR
+                ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
+                  enumeratedPropertyIsFunctional true
+                ensureState "model:Test$Party$SomeState" correctedDFR >>=
+                  stateQuery >>=
+                    ensureDescription >>=
+                      \qfd -> do
+                        case queryFunction <$> secondOperand qfd of
+                          Just (BinaryCombinator GreaterThanF) -> pure unit
+                          _ -> failure "The condition should have operator '>'"
 
+{-
   test "Bot Action with move" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on Gast\n      if Gast >> Prop1 > 10 then\n        move C1 >> binding >> context >> Employee to C2 >> binding >> context\n  context: C1 filledBy Company\n  context: C2 filledBy Company\n  party: Company\n    user Employee\n" ARC.domain
     case r of

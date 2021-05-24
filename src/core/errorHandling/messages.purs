@@ -32,7 +32,8 @@ import Data.List.Lazy.NonEmpty (singleton)
 import Data.List.Lazy.Types (NonEmptyList)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Parsing.Arc.Expression.AST (LetStep(..), PureLetStep(..), Step)
+import Perspectives.Parsing.Arc.Expression.AST (PureLetStep(..), Step)
+import Perspectives.Parsing.Arc.Statement.AST (LetStep(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
@@ -118,7 +119,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (CyclicAspects pos c) = "Context '" <> unwrap c <> "' has cyclic aspects: " <> show pos
   show (WrongRoleKind roletype expected found) = "Role '" <> show roletype <> "' has kind '" <> show found <> "' but should have kind '" <> show expected<> "'."
   -- show (MissingForUser pos localBotName) = "(MissingForUser) The BotRole '" <> localBotName <> "' should have a 'ForUser' clause: " <> show pos
-  show (MissingRoleForPropertyAssignment start end) = "(MissingRoleForPropertyAssignment) The role for this property changes is not specified (between " <> show start <> "and " <> show end <> ")."
+  show (MissingRoleForPropertyAssignment start end) = "(MissingRoleForPropertyAssignment) The role for this property assignment is not specified (between " <> show start <> "and " <> show end <> ")."
   show (NotWellFormedName pos name) = "(NotWellFormedName) The name '" <> name <> "' is not well-formed (it cannot be expanded to a fully qualified name): " <> show pos
   show (RoleMissingInContext pos localRoleName ctxt) = "(RoleMissingInContext) The local role name '" <> localRoleName <> "' cannot be found in the context: '" <> ctxt <> "', at: " <> show pos
   show (UnknownRole pos qname) = "(UnknownRole) The role '" <> qname <> "' is not defined, at: " <> show pos

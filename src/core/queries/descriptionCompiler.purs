@@ -181,7 +181,6 @@ compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
 compileStep currentDomain (Unary st) = compileUnaryStep currentDomain st
 compileStep currentDomain (Binary st) = compileBinaryStep currentDomain st
 compileStep currentDomain (PureLet st) = compileLetStep currentDomain st
-compileStep currentDomain (Let st) = throwError $ NotAPureLet st
 compileStep currentDomain (Computation st) = compileComputationStep currentDomain st
 
 ------------------------------------------------------------------------------------
@@ -501,6 +500,7 @@ compileLetStep currentDomain (PureLetStep{bindings, body}) = do
         -- no bindings at all. Just the body. This will probably never occur as the parser breaks on it.
         Nothing -> compileStep currentDomain body
         (Just {head: bnd, tail}) -> do
+          -- compileVarBinding also adds a variable binding to the compile time environment.
           head_ <- compileVarBinding currentDomain bnd
           makeSequence <$> foldM addVarBindingToSequence head_ tail <*> compileStep currentDomain body
 
