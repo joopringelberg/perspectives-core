@@ -144,6 +144,7 @@ addBinding vb = modify (cons vb)
 --------------------------------------------------------------------------
 --- ADD CONTEXTUAL VARIABLES TO AN EXPRESSION
 --------------------------------------------------------------------------
+
 addContextualVariablesToExpression :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> m Step
 addContextualVariablesToExpression stp mobject = case stp of
   (PureLet (PureLetStep r@{bindings})) -> do

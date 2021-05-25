@@ -41,10 +41,11 @@ import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCal
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
-import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range, roleRange, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
@@ -106,11 +107,10 @@ makeRoleGetter currentDomain rt@(ENR et) = do
 -- | Saves it in the DomainCache.
 compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT EnumeratedRoleType)
 compileAndSaveRole dom step (CalculatedRole cr@{_id}) = withFrame do
-  varb <- compileVarBinding dom (VarBinding "currentcontext" (Simple $ Identity (startOf step)))
-  compiledExpression <- compileStep dom step >>= traverseQfd (qualifyReturnsClause (startOf step))
-  descr <- pure $ makeSequence varb compiledExpression
+  expressionWithEnvironment <- addContextualVariablesToExpression step Nothing
+  compiledExpression <- compileStep dom expressionWithEnvironment >>= traverseQfd (qualifyReturnsClause (startOf step))
   -- Save the result in DomeinCache.
-  lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q descr})
+  lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
   pure $ unsafePartial $ domain2roleType $ range compiledExpression
 
 -- | Ensures that the range of the QueryFunctionDescription is a qualified
@@ -166,11 +166,11 @@ makePropertyGetter currentDomain pt = do
 -- | Saves it in the DomainCache.
 compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> PhaseThree QT.Range
 compileAndSaveProperty dom step (CalculatedProperty cp@{_id}) = withFrame do
-  varb <- compileVarBinding dom (VarBinding "currentrole" (Simple $ Identity (startOf step)))
-  compiledExpression <- compileStep dom step >>= traverseQfd (qualifyReturnsClause (startOf step))
-  descr <- pure $ makeSequence varb compiledExpression
+  -- We add the role as the variable "object"
+  expressionWithEnvironment <- addContextualVariablesToExpression step (Just $ Simple $ Identity (startOf step))
+  compiledExpression <- compileStep dom expressionWithEnvironment >>= traverseQfd (qualifyReturnsClause (startOf step))
   -- Save the result in DomeinCache.
-  lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q descr})
+  lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
   pure $ range compiledExpression
 
 ------------------------------------------------------------------------------------

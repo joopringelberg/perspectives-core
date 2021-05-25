@@ -59,12 +59,13 @@ import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegmen
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), StateQualifiedPart(..), StateTransitionE(..), StateSpecification(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression, addContextualVariablesToStatements)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
-import Perspectives.Parsing.Arc.Expression.AST (Step(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AE
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileAndSaveProperty, compileAndSaveRole, compileStep, compileVarBinding, makeRoleGetter, makeSequence, qualifyLocalEnumeratedRoleName, qualifyReturnsClause)
@@ -335,6 +336,14 @@ handlePostponedStateQualifiedParts = do
       -- Put the variable binding and the compiled step in a sequence.
       pure $ makeSequence varb compiledCalculation
 
+    addContextualVariablesToRoleIdentification :: RoleIdentification -> PhaseThree Step
+    addContextualVariablesToRoleIdentification (ExplicitRole ctxt (EnumeratedRoleType rt) pos) = pure $ (Simple $ ArcIdentifier pos rt)
+    addContextualVariablesToRoleIdentification (ImplicitRole ctxt stp) = addContextualVariablesToExpression stp Nothing
+
+    roleIdentification2Step :: RoleIdentification -> Step
+    roleIdentification2Step (ExplicitRole ctxt (EnumeratedRoleType rt) pos) = Simple $ ArcIdentifier pos rt
+    roleIdentification2Step (ImplicitRole ctxt stp) = stp
+
     -- Set compile time variables for "currentcontext" and "object"
     addCompileTimeVars :: Domain -> Maybe QueryFunctionDescription -> PhaseThree Unit
     addCompileTimeVars currentDomain mcompiledObject = do
@@ -354,33 +363,26 @@ handlePostponedStateQualifiedParts = do
       -- we compute the object in. If it is either subject- or object state, their RoleSpecification contains the
       -- context type we compute the subject or object from.
       currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType $ transition2stateSpec transition)
-      -- Compile the object expression into a sequence of a runtime binding for "currentcontext" and the
-      -- computation of the object.
-      (contextPlusObject :: Maybe QueryFunctionDescription) <- traverse objectToQueryFunctionDescription syntacticObject
+      -- Add "currentcontext" in a Let if it is used in the syntacticObject.
+      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (flip addContextualVariablesToExpression Nothing) (roleIdentification2Step <$> syntacticObject)
+        -- Make a QueryFunctionDescription of a function that computes the object.
+      (compiledObject :: Maybe QueryFunctionDescription) <-
+        withFrame
+          (traverse (compileStep currentDomain) syntacticObjectWithEnvironment)
+      -- Then compile the parts of the sentence, tacking each compiled part onto that sequence.
+      -- The expressions in the Sentence are compiled with respect to the current context.
+      compiledMessage <- compileSentence currentDomain message
 
-      withFrame do
-        -- Set compile time variables for "currentcontext" and for "object" too, if it is provided.
-        -- The descriptioncompiler might need them to compile the Sentence.
-        addCompileTimeVars currentDomain contextPlusObject
-
-        -- Create a sequence of runtime binding expressions for the "currentcontext" and "object"
-        -- variable (if provided).
-        -- Then compile the parts of the sentence, tacking each compiled part onto that sequence.
-        -- The expressions in the Sentence are compiled with respect to the current context.
-        compiledMessage <- case contextPlusObject of
-          Nothing -> compileRuntimeContextBinding currentDomain start >>= compileSentence currentDomain message
-          Just contextPlusObject -> compileSentence currentDomain message contextPlusObject
-
-        qualifiedUsers <- map ENR <$> collectRoles user
-        case transition2stateSpec transition of
-          -- Notify all subjects in the context state.
-          AST.ContextState ctx mpath -> modifyAllStates compiledMessage contextPlusObject qualifiedUsers [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
-          -- Notify each qualifiedUser in each of the subject states.
-          -- Note that the subjects in whose states we notify, do not need be the qualified users:
-          -- 'warn me when you are at home' illustrates this independence.
-          AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates compiledMessage contextPlusObject qualifiedUsers
-          -- Notify all subjects in all object states.
-          AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates compiledMessage contextPlusObject qualifiedUsers
+      qualifiedUsers <- map ENR <$> collectRoles user
+      case transition2stateSpec transition of
+        -- Notify all subjects in the context state.
+        AST.ContextState ctx mpath -> modifyAllStates compiledMessage compiledObject qualifiedUsers [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+        -- Notify each qualifiedUser in each of the subject states.
+        -- Note that the subjects in whose states we notify, do not need be the qualified users:
+        -- 'warn me when you are at home' illustrates this independence.
+        AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates compiledMessage compiledObject qualifiedUsers
+        -- Notify all subjects in all object states.
+        AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates compiledMessage compiledObject qualifiedUsers
       where
           modifyAllStates :: Sentence.Sentence -> Maybe QueryFunctionDescription -> Array RoleType -> Array StateIdentifier -> PhaseThree Unit
           modifyAllStates compiledMessage objectCalculation qualifiedUsers states = for_ states
@@ -389,53 +391,64 @@ handlePostponedStateQualifiedParts = do
               end
               (\(sr@{notifyOnEntry, notifyOnExit, object}) -> do
                 object' <- case object of
-                  Just _ -> pure object
+                  -- No object in the state? Replace it by the calculation we've computed here.
                   Nothing -> pure objectCalculation
+                  -- Otherwise, just keep what we have.
+                  Just _ -> pure object
                 case transition of
                   AST.Entry _ -> pure $ sr {notifyOnEntry = EncodableMap $ addAll compiledMessage (unwrap notifyOnEntry) qualifiedUsers, object = object'}
                   AST.Exit _ -> pure $ sr {notifyOnExit = EncodableMap $ addAll compiledMessage (unwrap notifyOnExit) qualifiedUsers, object = object'})
               stateId
 
-          compileSentence :: Domain -> Sentence.Sentence -> QueryFunctionDescription -> PhaseThree Sentence.Sentence
-          compileSentence currentDomain (Sentence.Sentence parts) vars = Sentence.Sentence <$> traverse compilePart parts
+          compileSentence :: Domain -> Sentence.Sentence -> PhaseThree Sentence.Sentence
+          compileSentence currentDomain (Sentence.Sentence parts) = Sentence.Sentence <$> traverse compilePart parts
             where
               compilePart :: Sentence.SentencePart -> PhaseThree Sentence.SentencePart
               compilePart hr@(Sentence.HR _) = pure hr
               compilePart cp@(Sentence.CP (Q _)) = pure cp
               compilePart (Sentence.CP (S stp)) = do
-                compiledPart <- makeSequence <$> pure vars <*> compileStep currentDomain stp
+                -- compiledPart <- makeSequence <$> pure vars <*> compileStep currentDomain stp
+                expressionWithEnvironment <- addContextualVariablesToExpression stp (roleIdentification2Step <$> syntacticObject)
+                compiledPart <- withFrame (compileStep currentDomain expressionWithEnvironment)
                 pure (Sentence.CP (Q compiledPart))
-
 
     handlePart (AST.AE (AST.AutomaticEffectE{subject, object: syntacticObject, transition, effect, start, end})) = do
       -- logShow transition
       currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType $ transition2stateSpec transition)
+      -- Add "currentcontext" in a Let if it is used in the syntacticObject.
+      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (flip addContextualVariablesToExpression Nothing) (roleIdentification2Step <$> syntacticObject)
+        -- Make a QueryFunctionDescription of a function that computes the object.
+      (compiledObject :: Maybe QueryFunctionDescription) <-
+        withFrame
+          (traverse (compileStep currentDomain) syntacticObjectWithEnvironment)
+      -- Compile the side effect.
+      (sideEffect :: QueryFunctionDescription) <- case effect of
+        Left assignments -> pure $ A (fromFoldable assignments)
+        Right letstep -> addContextualVariablesToStatements letstep syntacticObjectWithEnvironment >>=
+          compileLetStep_ currentDomain
       qualifiedUsers <- map ENR <$> collectRoles subject
       case transition2stateSpec transition of
         -- Execute the effect for all subjects in the context state.
-        AST.ContextState ctx mpath -> modifyAllStates qualifiedUsers [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+        AST.ContextState ctx mpath -> modifyAllStates compiledObject sideEffect qualifiedUsers [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
         -- Execute the effect for each qualifiedUser in each of the subject states.
         -- Note that the subjects in whose states we execute, do not need be the qualified users we execute for:
         -- 'do this automatically for me when you are at home' illustrates this independence.
-        AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates qualifiedUsers
+        AST.SubjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates compiledObject sideEffect qualifiedUsers
         -- Execute the effect for all subjects in all object states.
-        AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates qualifiedUsers
+        AST.ObjectState ridentification mpath -> collectStates mpath ridentification >>= modifyAllStates compiledObject sideEffect qualifiedUsers
       where
-        modifyAllStates :: Array RoleType -> Array StateIdentifier -> PhaseThree Unit
-        modifyAllStates qualifiedUsers states = for_ states
+        modifyAllStates :: Maybe QueryFunctionDescription -> QueryFunctionDescription -> Array RoleType -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllStates objectCalculation sideEffect qualifiedUsers states = for_ states
           (modifyPartOfState start end
             \(sr@{automaticOnEntry, automaticOnExit, object}) -> do
               object' <- case object of
+                -- No object in the state? Replace it by the calculation we've computed here.
+                Nothing -> pure objectCalculation
+                -- Otherwise, just keep what we have.
                 Just _ -> pure object
-                Nothing -> traverse objectToQueryFunctionDescription syntacticObject
-                -- Add "currentcontext" and "object" to the compile time environment.
-              -- addBinding "currentcontext" (SQD currentDomain (QF.VariableLookup "currentcontext") currentDomain True True)
-              sideEffect <- case effect of
-                Left assignments -> pure $ A (fromFoldable assignments)
-                Right letstep -> pure $ L letstep
               case transition of
-                AST.Entry _ -> pure $ sr {automaticOnEntry = EncodableMap $ addAll sideEffect (unwrap automaticOnEntry) qualifiedUsers, object = object'}
-                AST.Exit _ -> pure $ sr {automaticOnExit = EncodableMap $ addAll sideEffect (unwrap automaticOnExit) qualifiedUsers, object = object'})
+                AST.Entry _ -> pure $ sr {automaticOnEntry = EncodableMap $ addAll (EF sideEffect) (unwrap automaticOnEntry) qualifiedUsers, object = object'}
+                AST.Exit _ -> pure $ sr {automaticOnExit = EncodableMap $ addAll (EF sideEffect) (unwrap automaticOnExit) qualifiedUsers, object = object'})
 
     handlePart (AST.R (AST.RoleVerbE{subject, object, state, roleVerbs:rv, start})) = do
       -- Add, for all these users...
@@ -680,10 +693,9 @@ compileStates = do
                 -- We have to do this for all user role types in the notifyOnEntry, notifyOnExit, automaticOnEntry
                 -- and automaticOnExit members.
                 S stp -> do
-                  varb <- compileVarBinding currentDomain (VarBinding "object" (Simple $ AE.Identity (startOf stp)))
                   -- A State query only has to return the ContextInstance or RoleInstance that the state query is executed on.
-                  compiledCalculation <- compileAndDistributeStep currentDomain stp Nothing stateIdentifier
-                  pure $ makeSequence varb compiledCalculation
+                  expressionWithEnvironment <- addContextualVariablesToExpression stp Nothing
+                  compileAndDistributeStep currentDomain expressionWithEnvironment Nothing stateIdentifier
               -- Add inverted queries for the object calculation.
               setInvertedQueriesForStateObject state
               -- Now for the entries in automaticOnEntry and automaticOnExit, compile the SideEffects.
