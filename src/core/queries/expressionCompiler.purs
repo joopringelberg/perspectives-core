@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.Query.DescriptionCompiler where
+module Perspectives.Query.ExpressionCompiler where
 
 -- | From the Abstract Syntax Tree that results from a query-path expression (see `Perspectives.QueryAST` for the AST),
 -- | create a QueryFunctionDescription data element.

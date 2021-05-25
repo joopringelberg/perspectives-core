@@ -68,7 +68,7 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileAndSaveProperty, compileAndSaveRole, compileStep, compileVarBinding, makeRoleGetter, makeSequence, qualifyLocalEnumeratedRoleName, qualifyReturnsClause)
+import Perspectives.Query.ExpressionCompiler (addVarBindingToSequence, compileAndSaveProperty, compileAndSaveRole, compileStep, compileVarBinding, makeRoleGetter, makeSequence, qualifyLocalEnumeratedRoleName, qualifyReturnsClause)
 import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, firstOperand, functional, hasQueryFunction, mandatory, propertyOfRange, range, secondOperand, traverseQfd)
 import Perspectives.Representation.ADT (ADT(..), reduce)
@@ -627,7 +627,7 @@ addInvertedQueries = do
 -- | distribute inverted versions of it over all definitions of EnumeratedRoles and EnumeratedProperties that
 -- | are visited during query traversal. These inverted versions are used to compute the users that should be
 -- | informed of changes.
--- | This function calls [compileStep](Perspectives.Query.DescriptionCompiler.html#t:compileStep).
+-- | This function calls [compileStep](Perspectives.Query.ExpressionCompiler.html#t:compileStep).
 -- | It also has a side effect on the DomeinFileRecord that is kept in [PhaseTwoState](Perspectives.Parsing.Arc.PhaseTwoDefs.html#t:PhaseTwoState): it
 -- |  * changes EnumeratedRoles
 -- |  * changes EnumeratedProperties

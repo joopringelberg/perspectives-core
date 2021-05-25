@@ -50,7 +50,7 @@ import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDo
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
-import Perspectives.Query.DescriptionCompiler (makeComposition)
+import Perspectives.Query.ExpressionCompiler (makeComposition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedRole)

@@ -23,7 +23,7 @@
 -- | The QueryCompiler constructs functions to calculate an instance of a Role for a Context or a Value for a Property,
 -- | from a `QueryFunctionDescription`. It operates on a Variant `CompiledFunction` that covers all combinations of
 -- | Domain and Range that can be computed.
--- | Instances of `QueryFunctionDescription` are computed by the function [compileQueryStep](Perspectives.Query.DescriptionCompiler.html#t:compileQueryStep).
+-- | Instances of `QueryFunctionDescription` are computed by the function [compileQueryStep](Perspectives.Query.ExpressionCompiler.html#t:compileQueryStep).
 
 module Perspectives.Query.UnsafeCompiler where
 
