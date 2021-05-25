@@ -34,11 +34,12 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (step)
-import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
+import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment)
+import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Context (ContextKind(..))
@@ -552,8 +553,8 @@ automaticEffectE = do
       keyword <- scanIdentifier
       effect <- case keyword of
         "letE" -> fail "letE does not allow assignment operators, so this will not have an effect. Did you mean 'letA'?"
-        "letA" -> Right <$> letWithAssignment
-        _ -> Left <$> nestedBlock assignment
+        "letA" -> Let <$> letWithAssignment
+        _ -> Statements <<< fromFoldable <$> nestedBlock assignment
       end <- getPosition
       {subject, object, onEntry, onExit, currentContext} <- getArcParserState
       log ("automaticEffectE: object = " <> show object)

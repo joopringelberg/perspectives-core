@@ -50,16 +50,15 @@ import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDo
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
-import Perspectives.Query.ExpressionCompiler (makeComposition)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, functional)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, functional, mandatory)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, functional, mandatory) as RL
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, and, or)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType)
 
 -- | For a User RoleType, and an ADT EnumeratedRoleType that represents the Object of a Perspective,
@@ -72,7 +71,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 -- | If the binding adds properties, store an InvertedQuery in onRoleDelta_binder of the role.
 
 setInvertedQueriesForUserAndRole ::
-  Maybe RoleType ->
+  Array RoleType ->
   ADT EnumeratedRoleType ->
   Map PropertyType (Array StateIdentifier) ->
   Boolean ->
@@ -83,12 +82,12 @@ setInvertedQueriesForUserAndRole ::
 --  * alle PropertyTypes eruit halen.
 --  * de states van een PropertyType aflezen.
 --  * de map filteren.
-setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnThisRole qWithAkink = do
+setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOnThisRole qWithAkink = do
   if perspectiveOnThisRole
     -- Add qWithAkink in onContextDelta_context of role.
     then addToOnContextDelta qWithAkink role (concat $ fromFoldable $ values statesPerProperty)
     else pure unit
-  (propsOfRole :: Array PropertyType) <- lift2 $ allLocallyRepresentedProperties (ST role)
+  (propsOfRole :: Array PropertyType) <- lift2 $ RL.allLocallyRepresentedProperties (ST role)
   propertiesOnThisLevel <- pure $ intersect (fromFoldable $ keys statesPerProperty) propsOfRole
   -- For all properties that are on this level in the telescope:
   -- set an inverted query for all states for that property.
@@ -100,7 +99,7 @@ setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnT
   -- recursive call, where we just pass the submap with properties that do not reside
   -- on this level, and the states in that map.
   mapBelowThisLevel <- pure (filterKeys (isNothing <<< (flip elemIndex) propertiesOnThisLevel) statesPerProperty)
-  bindingCarriesProperty <- (lift2 $ addBindingStep b qWithAkink) >>= setInvertedQueriesForUserAndRole user b mapBelowThisLevel false
+  bindingCarriesProperty <- (lift2 $ addBindingStep b qWithAkink) >>= setInvertedQueriesForUserAndRole users b mapBelowThisLevel false
   -- After processing the binding telescope:
   if (bindingCarriesProperty || length propertiesOnThisLevel > 0) && not perspectiveOnThisRole
     -- Now set an inverted query on this level of the telescope, for all states for
@@ -123,7 +122,7 @@ setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnT
               { description: qwk
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
-              , user
+              , users
               , states
               , statesPerProperty: EncodableMap statesPerProperty
               })
@@ -134,7 +133,7 @@ setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnT
               { description: qwk
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
-              , user
+              , users
               , states
               , statesPerProperty: EncodableMap statesPerProperty
               })
@@ -151,7 +150,7 @@ setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnT
               { description: removeFirstBackwardsStep qwk
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
-              , user
+              , users
               , states
               , statesPerProperty: EncodableMap statesPerProperty
               })
@@ -161,7 +160,7 @@ setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnT
             { description: removeFirstBackwardsStep qwk
             , backwardsCompiled: Nothing
             , forwardsCompiled: Nothing
-            , user
+            , users
             , states
             , statesPerProperty: EncodableMap statesPerProperty
             }) onRoleDelta_binder}) roles}
@@ -178,7 +177,7 @@ setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnT
                 { description: ZQ backwards' forwards'
                 , backwardsCompiled: Nothing
                 , forwardsCompiled: Nothing
-                , user
+                , users
                 , states
                 , statesPerProperty: EncodableMap statesPerProperty
                 })
@@ -188,7 +187,7 @@ setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnT
               {description: ZQ backwards' forwards'
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
-              , user
+              , users
               , states
               , statesPerProperty: EncodableMap statesPerProperty
               }) onPropertyDelta}) enumeratedProperties}
@@ -211,31 +210,41 @@ setInvertedQueriesForUserAndRole user (ST role) statesPerProperty perspectiveOnT
 
     addBindingStep :: ADT EnumeratedRoleType -> QueryWithAKink -> MP QueryWithAKink
     addBindingStep b (ZQ backwards _) = do
-      fun <- getEnumeratedRole role >>= functional
-      man <- getEnumeratedRole role >>= mandatory
+      fun <- getEnumeratedRole role >>= RL.functional
+      man <- getEnumeratedRole role >>= RL.mandatory
       backwards' <- pure $ makeComposition (SQD (RDOM b) (DataTypeGetterWithParameter GetRoleBindersF (unwrap role)) (RDOM (ST role)) (bool2threeValued fun) (bool2threeValued man)) <$> backwards
       pure $ ZQ backwards' Nothing
 
     -- | Collect the Properties defined on the EnumeratedRoleType and its Aspect Roles (transitively closed).
     -- | Returns true iff the property is one of them.
     isPropertyOfRole :: PropertyType -> MP Boolean
-    isPropertyOfRole p = allLocallyRepresentedProperties (ST role) >>= \ps -> pure $ isJust $ elemIndex p ps
+    isPropertyOfRole p = RL.allLocallyRepresentedProperties (ST role) >>= \ps -> pure $ isJust $ elemIndex p ps
 
-setInvertedQueriesForUserAndRole user (PROD terms) props perspectiveOnThisRole invertedQ = do
+setInvertedQueriesForUserAndRole users (PROD terms) props perspectiveOnThisRole invertedQ = do
   x <- traverse
-    (\t -> setInvertedQueriesForUserAndRole user t props perspectiveOnThisRole invertedQ)
+    (\t -> setInvertedQueriesForUserAndRole users t props perspectiveOnThisRole invertedQ)
     terms
   pure $ ala Conj foldMap x
 
-setInvertedQueriesForUserAndRole user (SUM terms) props perspectiveOnThisRole invertedQ = do
+setInvertedQueriesForUserAndRole users (SUM terms) props perspectiveOnThisRole invertedQ = do
   x <- traverse
-    (\t -> setInvertedQueriesForUserAndRole user t props perspectiveOnThisRole invertedQ)
+    (\t -> setInvertedQueriesForUserAndRole users t props perspectiveOnThisRole invertedQ)
     terms
   pure $ ala Disj foldMap x
 
 -- This handles the EMPTY and UNIVERSAL case.
-setInvertedQueriesForUserAndRole user _ props perspectiveOnThisRole invertedQ = pure false
+setInvertedQueriesForUserAndRole users _ props perspectiveOnThisRole invertedQ = pure false
 
 isRelevant :: PropertyType -> RelevantProperties -> Boolean
 isRelevant t All = true
 isRelevant t (Properties set) = isJust $ elemIndex t set
+
+makeComposition :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
+makeComposition left right = BQD
+  (domain left)
+  (BinaryCombinator ComposeF)
+  left
+  right
+  (range right)
+  (and (functional left) (functional right))
+  (or (functional left) (functional right))

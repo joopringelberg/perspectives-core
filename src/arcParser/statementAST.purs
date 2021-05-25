@@ -94,6 +94,14 @@ endOfAssignment (DeleteProperty{end}) = end
 endOfAssignment (PropertyAssignment{end}) = end
 endOfAssignment (ExternalEffect{end}) = end
 
+derive instance genericStatements :: Generic Statements _
+instance showStatements :: Show Statements where show = genericShow
+instance eqStatements :: Eq Statements where eq = genericEq
+instance encodeStatements :: Encode Statements where
+  encode = genericEncode defaultOptions
+instance decodeStatements :: Decode Statements where
+  decode = genericDecode defaultOptions
+
 derive instance genericLetStep :: Generic LetStep _
 instance showLetStep :: Show LetStep where show = genericShow
 instance eqLetStep :: Eq LetStep where eq u1 u2 = genericEq u1 u2

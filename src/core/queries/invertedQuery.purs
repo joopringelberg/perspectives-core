@@ -37,7 +37,7 @@ import Data.Array (union) as ARR
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe, fromJust, isJust, isNothing)
+import Data.Maybe (Maybe, fromJust)
 import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -54,7 +54,7 @@ newtype InvertedQuery = InvertedQuery
   { description :: QueryWithAKink
   , backwardsCompiled :: (Maybe HiddenFunction)
   , forwardsCompiled :: (Maybe HiddenFunction)
-  , user :: Maybe RoleType
+  , users :: Array RoleType
   -- Yield PerspectiveObject InvertedQueryResult data only in one of these states:
   , states :: Array StateIdentifier
   , statesPerProperty :: EncodableMap PropertyType (Array StateIdentifier)
@@ -76,7 +76,7 @@ instance decodeInvertedQuery :: Decode InvertedQuery where
   decode = genericDecode defaultOptions
 
 instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
-  prettyPrint' t (InvertedQuery{description, user, states}) = "InvertedQuery " <> prettyPrint' (t <> "  ") description <> show user <> show states
+  prettyPrint' t (InvertedQuery{description, users, states}) = "InvertedQuery " <> prettyPrint' (t <> "  ") description <> show users <> show states
 
 equalDescriptions :: InvertedQuery -> InvertedQuery -> Boolean
 equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}) = d1 == d2
@@ -88,22 +88,22 @@ addInvertedQuery = cons
 --   Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes usersAndProps) qs
 
 isStateQuery :: InvertedQuery -> Boolean
-isStateQuery (InvertedQuery{user}) = isNothing user
+isStateQuery (InvertedQuery{users}) = null users
 
 -- | This is a Partial function. Do not apply when the description has Nothing for its
 -- | backwards part.
 shouldResultInContextStateQuery :: Partial => InvertedQuery -> Boolean
-shouldResultInContextStateQuery (InvertedQuery{description, user}) = isNothing user &&
+shouldResultInContextStateQuery (InvertedQuery{description, users}) = null users &&
   (isContextDomain $ range $ fromJust $ backwards description)
 
 -- | This is a Partial function. Do not apply when the description has Nothing for its
 -- | backwards part.
 shouldResultInRoleStateQuery :: Partial => InvertedQuery -> Boolean
-shouldResultInRoleStateQuery (InvertedQuery{description, user}) = isNothing user &&
+shouldResultInRoleStateQuery (InvertedQuery{description, users}) = null users &&
   (isRoleDomain $ range $ fromJust $ backwards description)
 
 shouldResultInPerspectiveObject :: InvertedQuery -> Boolean
-shouldResultInPerspectiveObject (InvertedQuery{user}) = isJust user
+shouldResultInPerspectiveObject (InvertedQuery{users}) = not $ null users
 
 -----------------------------------------------------------
 -- UserPropsAndVerbs

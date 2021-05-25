@@ -92,7 +92,7 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
   pure $ nub $ union users1 users2
 
 handleBackwardQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array RoleInstance)
-handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, user, states}) = do
+handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:userTypes, states}) = do
   if unsafePartial shouldResultInContextStateQuery iq
     then createContextStateQuery
     else if unsafePartial shouldResultInRoleStateQuery iq
@@ -121,7 +121,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, user, stat
       join <$> for allowed \ci -> do
         -- Remove 'me'
         -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
-        lift2 ((ci ##= getRoleInstances (unsafePartial $ fromJust user)) >>= filterA notIsMe)
+        lift2 (join <$> traverse (\userType -> (ci ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
 
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
 addInvertedQueryResult result = lift $ AA.modify \(Transaction r@{invertedQueryResults}) -> Transaction (r {invertedQueryResults = union [result] invertedQueryResults})
@@ -184,7 +184,7 @@ runForwardsComputation ::
   InvertedQuery ->
   (Array RoleInstance) ->
   MonadPerspectivesTransaction (Array RoleInstance)
-runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled, user, statesPerProperty}) users = do
+runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled, statesPerProperty}) users = do
   case forwardsCompiled of
     Nothing -> if isNothing (forwards description)
       then do

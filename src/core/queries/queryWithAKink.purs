@@ -161,24 +161,24 @@ invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q
 ---- SET INVERTED QUERIES
 --------------------------------------------------------------------------------------------------------------
 setInvertedQueries ::
-  Maybe RoleType ->
+  Array RoleType ->
   Map PropertyType (Array StateIdentifier) ->
   Array StateIdentifier ->
   QueryFunctionDescription ->
   PhaseThree Unit
-setInvertedQueries user statesPerProperty roleStates qfd = do
+setInvertedQueries users statesPerProperty roleStates qfd = do
   (zqs :: (Array QueryWithAKink)) <- invert qfd
   for_ zqs \qwk@(ZQ backward forward) -> do
     case backward of
-      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk user (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
+      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
       -- Assuming an SQD otherwise
       -- (Just b) -> unsafePartial $ setPathForStep b b usersAndProps
-      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk  user (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
+      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk  users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
       Nothing -> pure unit
     -- TODO. Voor de rol zetten we nu voor de tweede keer de InvertedQuery.
     case forward, backward, domain <$> backward of
       Nothing, Just bw, Just (RDOM role) ->
-        void $ setInvertedQueriesForUserAndRole user role statesPerProperty true qwk
+        void $ setInvertedQueriesForUserAndRole users role statesPerProperty true qwk
       _, _, _ -> pure unit

@@ -31,6 +31,7 @@ module Perspectives.Query.ExpressionCompiler where
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
 import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, reverse, uncons)
+import Data.Map (Map, empty, singleton)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
@@ -47,12 +48,13 @@ import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range, roleRange, sumOfDomains, traverseQfd)
+import Perspectives.Query.Kinked (setInvertedQueries)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, propertyOfRange, range, roleRange, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..), sum)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -172,6 +174,38 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{_id}) = withFrame do
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
   pure $ range compiledExpression
+
+------------------------------------------------------------------------------------
+------ COMPILING STEPS AND DISTRIBUTING THEIR INVERSION OVER THE DOMEINFILE.
+------------------------------------------------------------------------------------
+-- | Use `compileAndDistributeStep` to compile a parsed expression into a QueryFunctionDescription, and to
+-- | distribute inverted versions of it over all definitions of EnumeratedRoles and EnumeratedProperties that
+-- | are visited during query traversal. These inverted versions are used to compute the users that should be
+-- | informed of changes.
+-- | This function calls [compileStep](Perspectives.Query.ExpressionCompiler.html#t:compileStep).
+-- | It also has a side effect on the DomeinFileRecord that is kept in [PhaseTwoState](Perspectives.Parsing.Arc.PhaseTwoDefs.html#t:PhaseTwoState): it
+-- |  * changes EnumeratedRoles
+-- |  * changes EnumeratedProperties
+-- | We only call `compileAndDistributeStep` in the function `compileStates`. This function
+-- | also modifies the DomeinFileRecord, but just the CalculatedRole, CalculatedProperty and Action definitions in it.
+-- | Hence we do not risk to modify a definition that will be overwritten soon after without including that modification.
+compileAndDistributeStep ::
+  Domain ->
+  Step ->
+  Array RoleType ->
+  Array StateIdentifier ->
+  PhaseThree QueryFunctionDescription
+compileAndDistributeStep dom stp users stateIdentifiers = do
+  descr' <- compileStep dom stp
+  descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
+  -- The description may be a path and then should be seen as an implicit perspective on its results, like a CalculatedProperty (it could also be a constant, or it could result in a ContextInstance or a RoleInstance).
+  -- Hence we should create a Map of the PropertyType and the StateIdentifier.
+  (statesPerProperty :: Map PropertyType (Array StateIdentifier)) <- pure case propertyOfRange descr of
+    Nothing -> empty
+    Just p -> singleton p stateIdentifiers
+  setInvertedQueries users statesPerProperty stateIdentifiers descr
+  pure descr
+
 
 ------------------------------------------------------------------------------------
 ------ COMPILING STEPS
@@ -511,16 +545,6 @@ addVarBindingToSequence seq v = makeSequence <$> pure seq <*> (compileVarBinding
 
 makeSequence :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
 makeSequence left right = BQD (domain left) (QF.BinaryCombinator SequenceF) left right (range right) (THREE.and (functional left) (functional right)) (THREE.or (functional left) (functional right))
-
-makeComposition :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
-makeComposition left right = BQD
-  (domain left)
-  (QF.BinaryCombinator ComposeF)
-  left
-  right
-  (range right)
-  (THREE.and (functional left) (functional right))
-  (THREE.or (functional left) (functional right))
 
 -- | Make a QueryFunctionDescription of a runtime function that evaluates the step of the binding and
 -- | adds a name-value pair to the runtime environment. Add the name-QueryFunctionDescription pair to the

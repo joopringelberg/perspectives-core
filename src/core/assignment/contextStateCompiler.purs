@@ -43,22 +43,21 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (CompiledContextState, cacheCompiledContextState, retrieveCompiledContextState)
 import Perspectives.Assignment.Update (setActiveContextState, setInActiveContextState)
 import Perspectives.CollectAffectedContexts (lift2)
+import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=))
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (getActiveStates_)
 import Perspectives.Names (getMySystem)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
-import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, roleFunctionFromQfd)
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
-import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -70,14 +69,11 @@ compileState stateId = do
     State {query, object, automaticOnEntry, automaticOnExit} <- getState stateId
     (mobjectGetter :: Maybe (ContextInstance ~~> RoleInstance)) <- traverse roleFunctionFromQfd object
     (automaticOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\subject (effect :: SideEffect) ->
-        unsafePartial case effect of
-          EF qfd -> compileAssignment qfd >>= pure <<< withAuthoringRole subject)
+      (\subject (effect :: QueryFunctionDescription) -> compileAssignment effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnEntry)
     (automaticOnExit' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\subject (effect :: SideEffect) ->
-        unsafePartial case effect of
-          EF qfd -> compileAssignment qfd >>= pure <<< withAuthoringRole subject)
+      (\subject (effect :: QueryFunctionDescription) ->
+        compileAssignment effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnExit)
     -- TODO notifyOnEntry, notifyOnExit.
 

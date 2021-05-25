@@ -52,11 +52,10 @@ import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Upd
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates_)
 import Perspectives.Names (getMySystem)
-import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (role2propertyValue)
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
-import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -67,14 +66,10 @@ compileState :: StateIdentifier -> MP CompiledRoleState
 compileState stateId = do
     State {query, object, automaticOnEntry, automaticOnExit} <- getState stateId
     (automaticOnEntry' :: Map RoleType (Updater RoleInstance)) <- traverseWithIndex
-      (\subject (effect :: SideEffect) ->
-        unsafePartial case effect of
-          EF qfd -> compileAssignmentFromRole qfd >>= pure <<< withAuthoringRole subject)
+      (\subject (effect :: QueryFunctionDescription) -> compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnEntry)
     (automaticOnExit' :: Map RoleType (Updater RoleInstance)) <- traverseWithIndex
-      (\subject (effect :: SideEffect) ->
-        unsafePartial case effect of
-          EF qfd -> compileAssignmentFromRole qfd >>= pure <<< withAuthoringRole subject)
+      (\subject (effect :: QueryFunctionDescription) -> compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnExit)
     -- TODO notifyOnEntry, notifyOnExit.
 

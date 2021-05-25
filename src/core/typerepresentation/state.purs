@@ -39,7 +39,6 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Sentence (Sentence)
-import Perspectives.Representation.SideEffect (SideEffect)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, StateIdentifier)
 
 newtype State = State StateRecord
@@ -52,8 +51,8 @@ type StateRecord =
 	-- the key in these maps is the subject the effect or notification is for.
 	, notifyOnEntry :: EncodableMap RoleType Sentence
 	, notifyOnExit :: EncodableMap RoleType Sentence
-	, automaticOnEntry :: EncodableMap RoleType SideEffect
-	, automaticOnExit :: EncodableMap RoleType SideEffect
+	, automaticOnEntry :: EncodableMap RoleType QueryFunctionDescription
+	, automaticOnExit :: EncodableMap RoleType QueryFunctionDescription
 	, subStates :: Array StateIdentifier
 	}
 
