@@ -53,7 +53,7 @@ import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb, RoleVerbLi
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
 import Perspectives.Utilities (prettyPrint)
-import Test.Parsing.DomeinFileSelectors (ensureCRole, ensureDescription, ensureERole, ensureEnumeratedProperty, ensurePerspectiveOn, ensurePropertyVerbsInState, ensureState, enumeratedPropertyIsFunctional, exists, failure, haveVerbs, isCalculationOf, objectOfPerspective, stateQuery)
+import Test.Parsing.DomeinFileSelectors (ensureCRole, ensureDescription, ensureERole, ensureEnumeratedProperty, ensurePerspectiveOn, ensurePropertyVerbsInState, ensureState, enumeratedPropertyIsFunctional, exists, failure, haveVerbs, isCalculationOf, objectOfPerspective, stateQuery, ensureOnEntry)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (Test, TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -416,8 +416,8 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
                       assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$SubContext$Modellen))' as its Range"
                         (range c == (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen"))))
                       assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter model:Couchdb$Models)'"
-                        case queryFunction <$> secondOperand c of
-                          Just (ExternalCoreRoleGetter "model:Couchdb$Models") -> true
+                        case queryFunction c of
+                          (ExternalCoreRoleGetter "model:Couchdb$Models") -> true
                           otherwise -> false
                     otherwise -> assert "calculation is not compiled" false
 
@@ -465,11 +465,37 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
                   stateQuery >>=
                     ensureDescription >>=
                       \qfd -> do
-                        case queryFunction <$> secondOperand qfd of
-                          Just (BinaryCombinator GreaterThanF) -> pure unit
+                        case queryFunction qfd of
+                          (BinaryCombinator GreaterThanF) -> pure unit
                           _ -> failure "The condition should have operator '>'"
 
-  testOnly "Automatic effect on entry (use of object state)" do
+  test "Automatic effect on entry (delete property)" do
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Prop2 (mandatory, functional, Number)\n  thing Party (mandatory, functional)\n    property Prop1 (mandatory, functional, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do for Gast\n          delete property Prop2 from Gast\n" ARC.domain
+    case r of
+      (Left e) -> assert ("Parser error:" <> show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        case r of
+          (Left e) -> assert ("PhaseTwo error:" <> show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+            case x' of
+              Left e -> assert ("PhaseThree error:" <> show e) false
+              Right correctedDFR -> do
+                -- logShow correctedDFR
+                ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
+                  enumeratedPropertyIsFunctional true
+                ensureState "model:Test$Party$SomeState" correctedDFR >>=
+                  stateQuery >>=
+                    ensureDescription >>=
+                      \qfd -> do
+                        case queryFunction qfd of
+                          (BinaryCombinator GreaterThanF) -> pure unit
+                          _ -> failure "The condition should have operator '>'"
+
+  test "Automatic effect on entry (use of object state)" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Prop2 (mandatory, functional, Number)\n    perspective on Party\n      on entry of object state SomeState\n        do\n          Prop1 = 10\n  thing Party (mandatory, functional)\n    property Prop1 (mandatory, functional, Number)\n    state SomeState = Prop1 > 10" ARC.domain
     case r of
       (Left e) -> assert ("Parser error:" <> show e) false
@@ -491,43 +517,43 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
                   stateQuery >>=
                     ensureDescription >>=
                       \qfd -> do
-                        case queryFunction <$> secondOperand qfd of
-                          Just (BinaryCombinator GreaterThanF) -> pure unit
+                        -- logShow qfd
+                        case queryFunction qfd of
+                          (BinaryCombinator GreaterThanF) -> pure unit
                           _ -> failure "The condition should have operator '>'"
 
-{-
   test "Bot Action with move" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on Gast\n      if Gast >> Prop1 > 10 then\n        move C1 >> binding >> context >> Employee to C2 >> binding >> context\n  context: C1 filledBy Company\n  context: C2 filledBy Company\n  party: Company\n    user Employee\n" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    property Prop1 (mandatory, functional, Number)\n    state SomeState = Prop1 > 10\n      on entry \n        do for Gast\n          move C1 >> binding >> context >> Employee to C2 >> binding >> context\n  context C1 filledBy Company\n  context C2 filledBy Company\n  party Company\n    user Employee\n" ARC.domain
     case r of
-      (Left e) -> assert (show e) false
+      (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{actions}) -> do
-                -- logShow correctedDFR
-                case lookup "model:Test$Gast_bot$ChangeGast" actions of
-                  Just (Action{effect}) -> do
-                    case extractEffect effect of
-                      (BQD _ qf rle cte _ _ _) -> do
-                        assert "The queryfunction should be move" (eq qf QF.Move )
-                        assert "The binding should be a rolgetter for model:Test$Company$Employee"
-                          case rle of
-                            (BQD _ _ _ _ (RDOM (ST (EnumeratedRoleType "model:Test$Company$Employee"))) _ _) -> true
-                            otherwise -> false
-                        -- logShow cte
-                        assert "The role to move should come from C2"
-                          case cte of
-                            (BQD _ _ (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$C2"))) _ _ _) _ _ _ _) -> true
-                            otherwise -> false
-                      otherwise -> assert "Side effect expected" false
-                  Nothing -> assert "The effect should compile to a binary query function" false
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+          case r of
+            (Left e) -> assert ("PhaseTwo error:" <> show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+              case x' of
+                Left e -> assert ("PhaseThree error:" <> show e) false
+                Right correctedDFR -> do
+                  ensureState "model:Test$Gast$SomeState" correctedDFR >>=
+                    ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+                      (case _ of
+                        (BQD _ qf rle cte _ _ _) -> do
+                          assert "The queryfunction should be move" (eq qf QF.Move )
+                          assert "The binding should be a rolgetter for model:Test$Company$Employee"
+                            case rle of
+                              (BQD _ _ _ _ (RDOM (ST (EnumeratedRoleType "model:Test$Company$Employee"))) _ _) -> true
+                              otherwise -> false
+                          -- logShow cte
+                          assert "The role to move should come from C2"
+                            case cte of
+                              (BQD _ _ (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$C2"))) _ _ _) _ _ _ _) -> true
+                              otherwise -> false
+                        otherwise -> assert "Side effect expected" false)
 
+{-
   test "Bot Action with move to current context" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain Test\n  context: C1 filledBy Company\n  context: C2 filledBy Company\n  party: Company\n    user Employee\n    user Gast (mandatory, functional)\n      property Prop1 (mandatory, functional, Number)\n    bot: for Gast\n      perspective on Gast\n        if Gast >> Prop1 > 10 then\n          move extern >> binder C1 >> context >> C2 >> binding >> context >> Employee\n" ARC.domain
     case r of

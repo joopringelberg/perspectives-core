@@ -218,7 +218,6 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
           -- delete property PropertyType from <roleExpression>
           Just e -> ensureRole subjects e
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
-        -- TODO. currentDomain is altijd een CDOM, dus dat gaat hier fout??
         pure $ UQD currentDomain (QF.DeleteProperty qualifiedProperty) roleQfd currentDomain True True
 
       PropertyAssignment f@{propertyIdentifier, operator, valueExpression, roleExpression, start, end} -> do
