@@ -556,7 +556,7 @@ automaticEffectE = do
         _ -> Statements <<< fromFoldable <$> nestedBlock assignment
       end <- getPosition
       {subject, object, onEntry, onExit, currentContext} <- getArcParserState
-      log ("automaticEffectE: object = " <> show object)
+      -- log ("automaticEffectE: object = " <> show object)
       case usr of
         Nothing -> case subject, onEntry, onExit of
           Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}

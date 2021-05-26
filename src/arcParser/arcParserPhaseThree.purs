@@ -281,9 +281,10 @@ handlePostponedStateQualifiedParts = do
 
     collectRoles :: RoleIdentification -> PhaseThree (Array EnumeratedRoleType)
     collectRoles (ExplicitRole _ rt _) = pure [rt]
-    collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd -> case range qfd of
-      RDOM adt -> pure $ reduce adt
-      otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
+    collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd ->
+      case range qfd of
+        RDOM adt -> pure $ reduce adt
+        otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
       where
         -- Translate the RoleIdentification to an array of EnumeratedRoleTypes.
         -- Notice we do not fail on UNIVERSAL or EMPTY.
@@ -383,7 +384,6 @@ handlePostponedStateQualifiedParts = do
 
     -- Compiles and distributes all expressions in the automatic effect.
     handlePart (AST.AE (AST.AutomaticEffectE{subject, object: syntacticObject, transition, effect, start, end})) = do
-      -- logShow transition
       currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType $ transition2stateSpec transition)
       -- Add "currentcontext" in a Let if it is used in the syntacticObject.
       (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (flip addContextualVariablesToExpression Nothing) (roleIdentification2Step <$> syntacticObject)

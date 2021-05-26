@@ -22,7 +22,9 @@
 
 -- | From the syntax tree that describes a Statement, we construct a QueryFunctionDescription.
 
-module Perspectives.Query.StatementCompiler where
+module Perspectives.Query.StatementCompiler
+  (compileStatement)
+where
 
 import Control.Monad.Except (throwError)
 import Control.Monad.Trans.Class (lift)
@@ -33,6 +35,7 @@ import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (Object, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###>))
@@ -58,9 +61,10 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
+import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
 
 -- The user RoleType is necessary for setting inverted queries.
+-- The domain should be a CDOM.
 -- | The expressions in the statements are compiled and inverted as well.
 compileStatement ::
   Array StateIdentifier ->
@@ -214,6 +218,7 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
           -- delete property PropertyType from <roleExpression>
           Just e -> ensureRole subjects e
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
+        -- TODO. currentDomain is altijd een CDOM, dus dat gaat hier fout??
         pure $ UQD currentDomain (QF.DeleteProperty qualifiedProperty) roleQfd currentDomain True True
 
       PropertyAssignment f@{propertyIdentifier, operator, valueExpression, roleExpression, start, end} -> do
@@ -221,18 +226,8 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
           Nothing -> case mobjectCalculation of
             Nothing -> throwError $ MissingRoleForPropertyAssignment start end
             Just objectCalculation -> pure objectCalculation
-          -- PropertyType =+ 10 for <roleExpression>
-          -- Note that currentDomain now is a RDOM.
-          -- currentDomain is used as starting point in ensureRole.
-          -- Hence this goes wrong.
           Just e -> do
-            -- currentDomain is an RDOM by construction.
-            -- But we need to compile a querydescription for the roleExpression
-            -- with respect to its context (so we cannot use ensureRole here).
-            contextDomain <- case currentDomain of
-              RDOM adt -> lift2 $ contextOfADT adt
-              otherwise -> throwError $ NotARoleDomain currentDomain (startOf e) (endOf e)
-            qfd <- compileAndDistributeStep (CDOM contextDomain) e subjects stateIdentifiers
+            qfd <- compileAndDistributeStep currentDomain e subjects stateIdentifiers
             case range qfd of
               (RDOM _) -> pure qfd
               otherwise -> throwError $ NotARoleDomain (range qfd) (startOf e) (endOf e)
