@@ -33,7 +33,7 @@ import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>))
 import Text.Parsing.Indent (withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
+import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, (<?>))
 
 assignment :: IP Assignment
 assignment = isPropertyAssignment >>= if _
@@ -145,7 +145,7 @@ propertyAssignment = do
     _ -> propertyAssignment'
   where
     propertyAssignment' :: IP Assignment
-    propertyAssignment' = try do
+    propertyAssignment' = do
       start <- getPosition
       propertyIdentifier <- arcIdentifier
       op <- assignmentOperator
@@ -155,7 +155,7 @@ propertyAssignment = do
       pure $ PropertyAssignment {start, end, propertyIdentifier, operator: op, valueExpression: val, roleExpression}
 
     propertyDeletion :: IP Assignment
-    propertyDeletion = try do
+    propertyDeletion = do
       start <- getPosition
       reserved "delete"
       reserved "property"
@@ -166,7 +166,7 @@ propertyAssignment = do
 
 
 assignmentOperator :: IP AssignmentOperator
-assignmentOperator = try
+assignmentOperator =
   (DeleteFrom <$> (getPosition <* token.reservedOp "=-"))
   <|>
   (AddTo <$> (getPosition <* token.reservedOp "=+"))
@@ -175,7 +175,7 @@ assignmentOperator = try
   ) <?> "=, =+, =-"
 
 roleDeletion :: IP Assignment
-roleDeletion = try do
+roleDeletion = do
   start <- getPosition
   reserved "delete"
   roleIdentifier <- arcIdentifier
@@ -184,30 +184,16 @@ roleDeletion = try do
   pure $ DeleteRole {start, end, roleIdentifier, contextExpression}
 
 callEffect :: IP Assignment
-callEffect = try do
+callEffect = do
   start <- getPosition
   effectName <- reserved "callEffect" *> arcIdentifier
   arguments <- token.parens (token.commaSep step)
   end <- getPosition
   pure $ ExternalEffect {start, end, effectName, arguments: (fromFoldable arguments)}
 
--- letStep = do
---   lookAhead (reserved "let*")
---   start <- getPosition
---   bindings <- withEntireBlock (\_ bs -> bs) (reserved "let*") binding
---   massignments <- optionMaybe $ try $ withEntireBlock (\_ bs -> bs) (reserved "in") assignment
---   case massignments of
---     (Just assignments) -> do
---       end <- getPosition
---       pure $ Let $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
---     Nothing -> do
---       body <- reserved "in" *> step
---       end <- getPosition
---       pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
-
 -- | A let with assignments: letA <binding>+ in <assignment>+.
 letWithAssignment :: IP LetStep
-letWithAssignment = withPos $ try do
+letWithAssignment = withPos do
   start <- getPosition
   bindings <- reserved "letA" *> nestedBlock binding
   assignments <- reserved "in" *> nestedBlock assignment
