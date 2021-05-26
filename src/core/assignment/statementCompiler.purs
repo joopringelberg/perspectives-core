@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
--- | An Abstract Syntax Tree data model for Perspectives statements.
+-- | From the syntax tree that describes a Statement, we construct a QueryFunctionDescription.
 
 module Perspectives.Query.StatementCompiler where
 
@@ -40,12 +40,12 @@ import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
-import Perspectives.Parsing.Arc.Expression.AST (Step)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, withFrame)
+import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.ExpressionCompiler (addVarBindingToSequence, compileAndDistributeStep, compileVarBinding, makeSequence)
+import Perspectives.Query.ExpressionCompiler (addVarBindingToSequence, compileAndDistributeStep, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
@@ -61,6 +61,7 @@ import Perspectives.Types.ObjectGetters (lookForUnqualifiedContextType, lookForU
 import Prelude (bind, discard, pure, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
 
 -- The user RoleType is necessary for setting inverted queries.
+-- | The expressions in the statements are compiled and inverted as well.
 compileStatement ::
   Array StateIdentifier ->
   Domain ->
@@ -68,7 +69,7 @@ compileStatement ::
   Array RoleType ->
   Statements ->
   PhaseThree QueryFunctionDescription
-compileStatement stateIdentifier currentDomain mobjectCalculation' userRoleTypes statements =
+compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleTypes statements =
   case statements of
     -- Compile a series of Assignments into a QueryDescription.
     Statements assignments -> sequenceOfAssignments userRoleTypes (reverse assignments) mobjectCalculation'
@@ -86,21 +87,29 @@ compileStatement stateIdentifier currentDomain mobjectCalculation' userRoleTypes
       Nothing -> sequenceOfAssignments userRoleTypes assignments mobjectCalculation'
       (Just {head: bnd, tail}) -> do
         -- compileVarBinding also adds a variable binding to the compile time environment.
-        head_ <- compileVarBinding currentDomain bnd
+        head_ <- compileVarBinding bnd
         makeSequence <$> foldM addVarBindingToSequence head_ tail <*> sequenceOfAssignments userRoleTypes assignments mobjectCalculation'
+    where
+      -- Inverts the result as well.
+      compileVarBinding :: VarBinding -> PhaseThree QueryFunctionDescription
+      compileVarBinding (VarBinding varName step) = do
+          step_ <- compileAndDistributeStep
+            currentDomain
+            step
+            userRoleTypes
+            stateIdentifiers
+          addBinding varName step_
+          pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) (functional step_) (mandatory step_)
 
   -- This will return a QueryFunctionDescription that describes either a single assignment, or
   -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
   sequenceOfAssignments :: Array RoleType -> Array Assignment -> Maybe QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-  sequenceOfAssignments subjects assignments' objectCalculation = sequenceOfAssignments_ assignments'
+  sequenceOfAssignments subjects assignments objectCalculation = case uncons assignments of
+    Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
+    (Just {head, tail}) -> do
+      head_ <- describeAssignmentStatement subjects head objectCalculation
+      foldM addAssignmentToSequence head_ tail
     where
-      sequenceOfAssignments_ :: Array Assignment -> PhaseThree QueryFunctionDescription
-      sequenceOfAssignments_ assignments = case uncons assignments of
-        Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
-        (Just {head, tail}) -> do
-          head_ <- describeAssignmentStatement subjects head objectCalculation
-          foldM addAssignmentToSequence head_ tail
-
       -- Returns a BQD with QueryFunction (BinaryCombinator SequenceF)
       addAssignmentToSequence :: QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription
       addAssignmentToSequence seq v = makeSequence <$> pure seq <*> (describeAssignmentStatement subjects v objectCalculation)
@@ -223,14 +232,14 @@ compileStatement stateIdentifier currentDomain mobjectCalculation' userRoleTypes
             contextDomain <- case currentDomain of
               RDOM adt -> lift2 $ contextOfADT adt
               otherwise -> throwError $ NotARoleDomain currentDomain (startOf e) (endOf e)
-            qfd <- compileAndDistributeStep (CDOM contextDomain) e subjects stateIdentifier
+            qfd <- compileAndDistributeStep (CDOM contextDomain) e subjects stateIdentifiers
             case range qfd of
               (RDOM _) -> pure qfd
               otherwise -> throwError $ NotARoleDomain (range qfd) (startOf e) (endOf e)
 
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
         -- Compile the value expression to a QueryFunctionDescription. Its range must comply with the range of the qualifiedProperty. It is compiled relative to the current context; not relative to the object!
-        valueQfd <- compileAndDistributeStep currentDomain valueExpression subjects stateIdentifier
+        valueQfd <- compileAndDistributeStep currentDomain valueExpression subjects stateIdentifiers
         rangeOfProperty <- lift $ lift $ getEnumeratedProperty qualifiedProperty >>= PT.range
         fname <- case operator of
           Set _ -> pure $ QF.SetPropertyValue qualifiedProperty
@@ -253,7 +262,7 @@ compileStatement stateIdentifier currentDomain mobjectCalculation' userRoleTypes
                   then do
                     -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
                     -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
-                    compiledArguments <- traverse (\s -> compileAndDistributeStep currentDomain s subjects stateIdentifier) arguments
+                    compiledArguments <- traverse (\s -> compileAndDistributeStep currentDomain s subjects stateIdentifiers) arguments
                     pure $ MQD currentDomain (QF.ExternalEffectFullFunction effectName) compiledArguments currentDomain Unknown Unknown
                   else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
             -- TODO: behandel hier Foreign functions.
@@ -316,18 +325,20 @@ compileStatement stateIdentifier currentDomain mobjectCalculation' userRoleTypes
               (Just (EnumeratedRole {_id:candidate})) | length candidates == 1 -> pure $ Just candidate
               otherwise -> throwError $ NotUniquelyIdentifying start ident (identifier_ <$> candidates)
 
+        -- Compiles the Step and inverts it as well.
         ensureContext :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription
         ensureContext userTypes stp  = do
           -- An expression that results in a ContextInstance, in this state, for this usertype.
-          qfd <- compileAndDistributeStep currentDomain stp userTypes stateIdentifier
+          qfd <- compileAndDistributeStep currentDomain stp userTypes stateIdentifiers
           case range qfd of
             (CDOM _) -> pure qfd
             otherwise -> throwError $ NotAContextDomain (range qfd) (startOf stp) (endOf stp)
 
+        -- Compiles the Step and inverts it as well.
         ensureRole :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription
         ensureRole userTypes stp = do
           -- An expression that results in a RoleInstance, in this state, for this usertype.
-          qfd <- compileAndDistributeStep currentDomain stp userTypes stateIdentifier
+          qfd <- compileAndDistributeStep currentDomain stp userTypes stateIdentifiers
           case range qfd of
             (RDOM _) -> pure qfd
             otherwise -> throwError $ NotARoleDomain (range qfd) (startOf stp) (endOf stp)

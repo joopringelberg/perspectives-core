@@ -24,7 +24,6 @@ module Perspectives.Parsing.Arc where
 
 import Control.Alt (map, void, (<|>))
 import Data.Array (find, fromFoldable)
-import Data.Either (Either(..))
 import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
@@ -721,7 +720,7 @@ actionE = do
     Nothing, _ -> fail "User role is not specified"
     _, Nothing -> fail "object of perspective must be given"
     Just s, Just o -> do
-      effect <- Left <$> block1 assignment <|> Right <$> letWithAssignment
+      effect <- Statements <$> fromFoldable <$> block1 assignment <|> Let <$> letWithAssignment
       end <- getPosition
       pure $ singleton $ AC $ ActionE {id, subject: s, object: o, state, effect, start, end}
 

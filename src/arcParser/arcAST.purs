@@ -24,7 +24,6 @@ module Perspectives.Parsing.Arc.AST where
 
 import Prelude
 
-import Data.Either (Either)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
@@ -32,7 +31,7 @@ import Data.List (List)
 import Data.Maybe (Maybe)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment, LetStep, Statements)
+import Perspectives.Parsing.Arc.Statement.AST (Statements)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.Sentence (Sentence)
@@ -157,7 +156,7 @@ newtype ActionE = ActionE
   , subject :: RoleIdentification
   , object :: RoleIdentification
   , state :: StateSpecification
-  , effect :: Either (List Assignment) LetStep
+  , effect :: Statements
   , start :: ArcPosition
   , end :: ArcPosition
   }

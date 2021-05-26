@@ -33,7 +33,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.InvertedQuery (QueryWithAKink(..))
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setPathForStep)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, lookupVariableBinding)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (compose, inversionIsFunctional, inversionIsMandatory, invertFunction)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, replaceDomain)
@@ -127,6 +127,19 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
 invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ (compose source criterium)
 
 invert_ (BQD _ (BinaryCombinator f) qfd1 qfd2 _ _ _) = append <$> invert_ qfd1 <*> invert_ qfd2
+
+-- We balance VariableLookup, where we invert the expression we look up,
+-- simply by storing the compiled expression under the variable name.
+invert_ (UQD _ (BindVariable varName) qfd _ _ _) = do
+  addBinding varName qfd
+  -- As we invert the expression that the variable is bound to
+  -- each time we refer it, we do not need invert it here.
+  pure []
+
+-- Push a frame. We will encounter BindVariable instances in the first
+-- part of the seqence that is the qfd.
+invert_ (UQD _ WithFrame qfd _ _ _) = do
+  withFrame (invert_ qfd)
 
 invert_ (UQD _ _ qfd _ _ _) = invert_ qfd
 

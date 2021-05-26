@@ -27,6 +27,8 @@ module Perspectives.Query.ExpressionCompiler where
 -- | The code in this module sees to it that each function is applied to the right type of arguments.
 -- | For example, each step in a path must be followed by a step that takes as its domain the
 -- | range of its predecessor. Otherwise, an error is thrown that will be presented to the modeller.
+-- | Use `compileAndDistributeStep` to create the QueryFunctionDescription *and* invert it,
+-- | and distribute it throughout the domain.
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
@@ -73,6 +75,13 @@ import Prelude (bind, discard, eq, map, pure, show, void, ($), (&&), (<$>), (<*>
 type FD = PhaseThree QueryFunctionDescription
 
 ------------------------------------------------------------------------------------
+------ COMPILING EXPRESSIONS
+-- Compiles a Step and qualifies any returns clauses in it.
+------------------------------------------------------------------------------------
+compileExpression :: Domain -> Step -> FD
+compileExpression domain stp = compileStep domain stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
+
+------------------------------------------------------------------------------------
 ------ COMPILING ROLE REFERENCES
 ------------------------------------------------------------------------------------
 -- Describe a conjunction of rolegetters.
@@ -110,7 +119,7 @@ makeRoleGetter currentDomain rt@(ENR et) = do
 compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT EnumeratedRoleType)
 compileAndSaveRole dom step (CalculatedRole cr@{_id}) = withFrame do
   expressionWithEnvironment <- addContextualVariablesToExpression step Nothing
-  compiledExpression <- compileStep dom expressionWithEnvironment >>= traverseQfd (qualifyReturnsClause (startOf step))
+  compiledExpression <- compileExpression dom expressionWithEnvironment
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
   pure $ unsafePartial $ domain2roleType $ range compiledExpression
@@ -170,7 +179,7 @@ compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> PhaseThree QT.
 compileAndSaveProperty dom step (CalculatedProperty cp@{_id}) = withFrame do
   -- We add the role as the variable "object"
   expressionWithEnvironment <- addContextualVariablesToExpression step (Just $ Simple $ Identity (startOf step))
-  compiledExpression <- compileStep dom expressionWithEnvironment >>= traverseQfd (qualifyReturnsClause (startOf step))
+  compiledExpression <- compileExpression dom expressionWithEnvironment
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
   pure $ range compiledExpression
@@ -196,8 +205,7 @@ compileAndDistributeStep ::
   Array StateIdentifier ->
   PhaseThree QueryFunctionDescription
 compileAndDistributeStep dom stp users stateIdentifiers = do
-  descr' <- compileStep dom stp
-  descr <- traverseQfd (qualifyReturnsClause (startOf stp)) descr'
+  descr <- compileExpression dom stp
   -- The description may be a path and then should be seen as an implicit perspective on its results, like a CalculatedProperty (it could also be a constant, or it could result in a ContextInstance or a RoleInstance).
   -- Hence we should create a Map of the PropertyType and the StateIdentifier.
   (statesPerProperty :: Map PropertyType (Array StateIdentifier)) <- pure case propertyOfRange descr of
@@ -547,8 +555,8 @@ makeSequence :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFun
 makeSequence left right = BQD (domain left) (QF.BinaryCombinator SequenceF) left right (range right) (THREE.and (functional left) (functional right)) (THREE.or (functional left) (functional right))
 
 -- | Make a QueryFunctionDescription of a runtime function that evaluates the step of the binding and
--- | adds a name-value pair to the runtime environment. Add the name-QueryFunctionDescription pair to the
--- | compile time environment (PhaseThree).
+-- | adds a name-value pair to the runtime environment. Add the name-QueryFunctionDescription pair to
+-- | the compile time environment (PhaseThree).
 compileVarBinding :: Domain -> VarBinding -> FD
 compileVarBinding currentDomain (VarBinding varName step) = do
   step_ <- compileStep currentDomain step
