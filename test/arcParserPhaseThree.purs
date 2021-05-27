@@ -642,7 +642,7 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
         assert "Expected the error NotAContextDomain" false
 
   expectErrorOnly "Bind: in-clause does selects non-functional context"
-    "domain Test\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          bind Gast to EreGast in AParty >> binding >> context\n  context AParty (mandatory) filledBy Party\n  case Party\n    user EreGast (functional) filledBy Gast\n"
+    "domain Test\n  user Gast (relational)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          bind Gast to EreGast in AParty >> binding >> context\n  context AParty (mandatory, relational) filledBy Party\n  case Party\n    user EreGast filledBy Gast\n"
     case _ of
       (Left (NotFunctional _ _ _)) -> assert "ok" true
       otherwise -> do

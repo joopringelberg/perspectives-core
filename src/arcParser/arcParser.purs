@@ -46,7 +46,7 @@ import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleKind(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, flip, not, pure, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (block1, checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
@@ -237,8 +237,9 @@ enumeratedRole_ uname knd pos = do
     mandatory :: IP RolePart
     mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute true)))
 
+    -- Roles are by default functional.
     functional :: IP RolePart
-    functional = (reserved "functional" *> (pure (FunctionalAttribute true)))
+    functional = (reserved "relational" *> (pure (FunctionalAttribute false)))
 
     unlinked :: IP RolePart
     unlinked = (reserved "unlinked" *> (pure UnlinkedAttribute))
@@ -318,8 +319,9 @@ propertyE = do
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
 
+          -- Properties are by default functional.
           functional :: IP PropertyPart
-          functional = (reserved "functional" *> (pure (FunctionalAttribute' true)))
+          functional = (reserved "relational" *> (pure (FunctionalAttribute' false)))
 
           range :: IP PropertyPart
           range = (reserved "Boolean" *> (pure $ Ran PBool)

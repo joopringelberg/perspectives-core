@@ -35,7 +35,6 @@ import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
-import Effect.Class.Console (log, logShow)
 import Foreign.Object (Object, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###>))
@@ -54,14 +53,14 @@ import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfRole, contextOfADT, hasNotMorePropertiesThan, lessThanOrEqualTo)
+import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, lessThanOrEqualTo)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
+import Prelude (bind, discard, pure, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
 
 -- The user RoleType is necessary for setting inverted queries.
 -- The domain should be a CDOM.
