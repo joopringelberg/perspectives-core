@@ -28,7 +28,6 @@ import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
@@ -553,7 +552,7 @@ automaticEffectE = do
       effect <- case keyword of
         "letE" -> fail "letE does not allow assignment operators, so this will not have an effect. Did you mean 'letA'?"
         "letA" -> Let <$> letWithAssignment
-        _ -> Statements <<< fromFoldable <$> nestedBlock assignment
+        _ -> Statements <<< fromFoldable <$> nestedBlock assignment <?> "an indented block of assignments."
       end <- getPosition
       {subject, object, onEntry, onExit, currentContext} <- getArcParserState
       -- log ("automaticEffectE: object = " <> show object)

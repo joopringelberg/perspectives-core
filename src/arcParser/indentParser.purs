@@ -34,11 +34,10 @@ import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
-import Effect.Class.Console (log)
 import Perspectives.Parsing.Arc.AST (RoleIdentification, StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..))
-import Prelude (class Monad, Unit, bind, discard, flip, not, pure, show, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (>), (>>=))
+import Prelude (class Monad, Unit, bind, discard, flip, not, pure, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (==), (>), (>>=), (||))
 import Record (get, set) as Record
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
@@ -290,6 +289,13 @@ isIndented = do
     (indentParserPosition :: ArcPosition) <- get'
     (parserPosition :: ArcPosition) <- getPosition
     pure $ not (sourceColumn parserPosition <= sourceColumn indentParserPosition)
+
+isSameOrIndented :: IP Boolean
+isSameOrIndented = do
+    (indentParserPosition :: ArcPosition) <- get'
+    (parserPosition :: ArcPosition) <- getPosition
+    pure ((not (sourceColumn parserPosition <= sourceColumn indentParserPosition)) ||
+      (sourceLine parserPosition == sourceLine indentParserPosition))
 
 isNextLine :: IP Boolean
 isNextLine = do
