@@ -36,7 +36,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment)
+import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoReservedWords)
 import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -428,12 +428,6 @@ perspectivePart = do
     "perspective", "on" -> perspectiveOn
     "perspective", "of" -> perspectiveOf
     _, _ -> fail "Expected: view, props, only, except, all, in, on, action, perspective"
-
--- | Looking ahead, find at least one reserved identifier, two if possible.
--- | If only one is found, returns Tuple <theword> "".
--- | If none is found, returns Tuple "" "".
-twoReservedWords :: IP (Tuple String String)
-twoReservedWords = option (Tuple "" "") $ lookAhead (Tuple <$> reservedIdentifier <*> (option "" reservedIdentifier))
 
 inState :: IP (List StateQualifiedPart)
 inState = do

@@ -25,12 +25,13 @@ module Perspectives.Parsing.Arc.Statement where
 import Control.Alt ((<|>))
 import Data.Array (fromFoldable)
 import Data.Maybe (isJust)
+import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.Expression (binding, step)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved)
 import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, nestedBlock)
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
-import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>))
+import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>), (<*>))
 import Text.Parsing.Indent (withPos)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, (<?>))
@@ -132,10 +133,15 @@ unbind_ = do
 
 isPropertyAssignment :: IP Boolean
 isPropertyAssignment = do
-  keyword <- option "" (lookAhead reservedIdentifier)
-  case keyword of
-    "delete" -> pure true
-    otherwise -> isJust <$> optionMaybe (lookAhead (arcIdentifier *> assignmentOperator))
+  (Tuple first second) <- twoReservedWords
+  case first, second of
+    "delete", "property" -> pure true
+    "delete", "role" -> pure false
+    _, _ -> isJust <$> optionMaybe (lookAhead (arcIdentifier *> assignmentOperator))
+  -- keyword <- option "" (lookAhead reservedIdentifier)
+  -- case keyword of
+  --   "delete" -> pure true
+  --   otherwise -> isJust <$> optionMaybe (lookAhead (arcIdentifier *> assignmentOperator))
 
 propertyAssignment :: IP Assignment
 propertyAssignment = do
@@ -178,6 +184,7 @@ roleDeletion :: IP Assignment
 roleDeletion = do
   start <- getPosition
   reserved "delete"
+  reserved "role"
   roleIdentifier <- arcIdentifier
   contextExpression <- optionMaybe (reserved "from" *> step)
   end <- getPosition
@@ -199,3 +206,9 @@ letWithAssignment = withPos do
   assignments <- reserved "in" *> nestedBlock assignment
   end <- getPosition
   pure $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
+
+-- | Looking ahead, find at least one reserved identifier, two if possible.
+-- | If only one is found, returns Tuple <theword> "".
+-- | If none is found, returns Tuple "" "".
+twoReservedWords :: IP (Tuple String String)
+twoReservedWords = option (Tuple "" "") $ lookAhead (Tuple <$> reservedIdentifier <*> (option "" reservedIdentifier))
