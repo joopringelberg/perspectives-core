@@ -138,7 +138,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                   -- logShow calculation
 
   test "A Context with an external property and role." do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    external\n      property MyProp (mandatory, functional, String) " ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    external\n      property MyProp (mandatory, String) " ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -521,7 +521,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
           otherwise -> assert "The name of the aspect is not well-formed and that should be detected." false
 
   test "Role with Aspect" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  thing Wens (mandatory, functional)\n    aspect model:MyAspectModel$MyAspect$MyAspectRole" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  thing Wens (mandatory)\n    aspect model:MyAspectModel$MyAspect$MyAspectRole" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -537,7 +537,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                 (isJust (elemIndex (EnumeratedRoleType "model:MyAspectModel$MyAspect$MyAspectRole") roleAspects))
 
   test "Role with binding to Context" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  context Uitje (mandatory, functional) filledBy Speeltuin" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  context Uitje (mandatory) filledBy Speeltuin" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -553,7 +553,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               otherwise -> assert "The binding of Uitje should be an External Role" false
 
   test "Role with a state" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  thing Party (mandatory, functional)\n    property Prop1 (mandatory, functional, Number)\n    state SomeState = Prop1 > 10\n" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  thing Party (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -566,7 +566,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               exists
 
   -- test "Action with Condition" do
-  --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    perspective on: Party\n      Consult with ViewOnGuest\n        subjectView: AnotherView\n        if Prop1 > 10" ARC.domain
+  --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory)\n    perspective on: Party\n      Consult with ViewOnGuest\n        subjectView: AnotherView\n        if Prop1 > 10" ARC.domain
   --   case r of
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
@@ -585,7 +585,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --             otherwise -> assert "There should be an action Consult Party" false
 
   -- test "Action with a DateTime Condition" do
-  --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory, functional)\n    perspective on: Party\n      Consult with ViewOnGuest\n        subjectView: AnotherView\n        if MyProp > '1995-12-17'" ARC.domain
+  --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory)\n    perspective on: Party\n      Consult with ViewOnGuest\n        subjectView: AnotherView\n        if MyProp > '1995-12-17'" ARC.domain
   --   case r of
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
@@ -628,7 +628,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --             otherwise -> assert "There should be an action Change Party" false
 
   test "A role with a CalculatedProperty" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  thing Guest (mandatory, functional)\n    property NumberOfGuests = this >>= sum" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  thing Guest (mandatory)\n    property NumberOfGuests = this >>= sum" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do

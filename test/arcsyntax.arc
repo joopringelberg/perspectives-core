@@ -16,13 +16,13 @@ domain Feest
         all roleverbs
     state BigParty = AantalGasten > 10
   external
-    property AantalGasten (mandatory, functional, Number)
-  thing Wens (mandatory, functional)
+    property AantalGasten (mandatory, Number)
+  thing Wens (mandatory)
     state DureWens = Wens >> Bedrag > 10
       on exit
         notify Gast "Hello {Gast >> FirstName}!"
     property Naam (mandatory, String)
-    property  Bedrag (functional, Number)
+    property  Bedrag (Number)
     aspect pre:MyAspect$MyAspectRole
     view ViewOpWens (Naam, Bedrag)
   user Gast filledBy sys:User
@@ -64,10 +64,10 @@ domain Feest
         in
           Bedrag = 10
 
-  context Partijtje (functional) filledBy VoetbalWedstrijd
+  context Partijtje filledBy VoetbalWedstrijd
     property VoorBigBrother = Datum > '1995-12-17'
     -- comment
-    property Datum (mandatory, functional, DateTime)
+    property Datum (mandatory, DateTime)
   -- A nested context
   activity EzeltjePrik
     indexed MyEzel
