@@ -189,7 +189,8 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     -- perspectives and states. Hence we postpone them to the very last.
     -- Notice that no perspectives are created!
     handleParts roleName erole (SQP stateQualifiedParts) = do
-      lift $ void $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateQualifiedParts}
+      parts <- traverse expandPrefix stateQualifiedParts
+      lift $ void $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
       pure erole
 
     -- VIEW
@@ -269,7 +270,8 @@ traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = d
   stateId <- toStateIdentifier id
   state <- pure $ constructState stateId condition stateFulObect subStates'
   -- Postpone all stateParts because there may be forward references to user and subject.
-  void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateParts}
+  parts <- traverse expandPrefix stateParts
+  void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
   pure state
   where
     toStateIdentifier :: StateSpecification -> PhaseTwo StateIdentifier
@@ -349,7 +351,8 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
 
     -- PERSPECTIVE
     handleParts crole (SQP stateQualifiedParts) = do
-      void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> stateQualifiedParts}
+      parts <- traverse expandPrefix stateQualifiedParts
+      void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
       pure crole
 
     handleParts crole p = throwError $ Custom ("Cannot handle part '" <> show p <> "' in PhaseTwo in a CalculatedRole: " <> show roleName)

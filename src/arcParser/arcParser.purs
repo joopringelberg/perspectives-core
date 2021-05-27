@@ -314,7 +314,7 @@ propertyE = do
     -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
     -- a valid property attribute specification.
     propertyAttributes :: IP (List PropertyPart)
-    propertyAttributes = token.parens (((mandatory <|> functional <|> range) <?> "mandatory, functional or a range (Boolean, Number, String or DateTime)") `sepBy` token.symbol ",")
+    propertyAttributes = token.parens (((mandatory <|> functional <|> range) <?> "mandatory, relational or a range (Boolean, Number, String or DateTime)") `sepBy` token.symbol ",")
         where
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))

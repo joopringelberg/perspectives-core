@@ -23,10 +23,13 @@
 module Perspectives.Query.ExpandPrefix where
 
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..),  LetStep(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), RoleIdentification(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
-import Prelude (pure, (<$>), bind, ($))
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetStep(..), Statements(..))
+import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
+import Prelude (pure, (<$>), bind, ($), (>>=), flip, (<<<))
 
 class ContainsPrefixes s where
   expandPrefix :: s -> PhaseTwo s
@@ -123,3 +126,68 @@ instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
     eeffectName <- expandNamespace effectName
     earguments <- traverse expandPrefix arguments
     pure $ ExternalEffect r {effectName = eeffectName, arguments = earguments}
+
+instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPart where
+  expandPrefix (R (RoleVerbE r@{subject, object, state})) = do
+    subject' <- expandPrefix subject
+    object' <- expandPrefix object
+    state' <- expandPrefix state
+    pure (R (RoleVerbE r {subject = subject', object = object', state = state'}))
+  expandPrefix (P (PropertyVerbE r@{subject, object, state})) = do
+    subject' <- expandPrefix subject
+    object' <- expandPrefix object
+    state' <- expandPrefix state
+    pure (P (PropertyVerbE r {subject = subject', object = object', state = state'}))
+  expandPrefix (AC (ActionE r@{subject, object, state})) = do
+    subject' <- expandPrefix subject
+    object' <- expandPrefix object
+    state' <- expandPrefix state
+    pure (AC (ActionE r {subject = subject', object = object', state = state'}))
+  expandPrefix (N (NotificationE r@{user, transition, message, object})) = do
+    user' <- expandPrefix user
+    transition' <- expandPrefix transition
+    message' <- expandPrefix message
+    object' <- traverse expandPrefix object
+    pure (N (NotificationE r {user = user', transition = transition', message = message', object = object'}))
+  expandPrefix (AE (AutomaticEffectE r@{subject, object, transition, effect})) = do
+    subject' <- expandPrefix subject
+    object' <- traverse expandPrefix object
+    transition' <- expandPrefix transition
+    effect' <- expandPrefix effect
+    pure (AE (AutomaticEffectE r {subject = subject', object = object', transition = transition', effect = effect'}))
+  expandPrefix (SUBSTATE s) = SUBSTATE <$> expandPrefix s
+
+instance containsPrefixesRoleIdentification :: ContainsPrefixes RoleIdentification where
+  expandPrefix r@(ExplicitRole _ _ _) = pure r
+  expandPrefix (ImplicitRole ct s) = expandPrefix s >>= pure <<< ImplicitRole ct
+
+instance containsPrefixesStateSpecification :: ContainsPrefixes StateSpecification where
+  expandPrefix c@(ContextState _ _) = pure c
+  expandPrefix (SubjectState rid spath) = expandPrefix rid >>= pure <<< flip SubjectState spath
+  expandPrefix (ObjectState rid spath) = expandPrefix rid >>= pure <<< flip ObjectState spath
+
+instance containsPrefixesStateTransitionE :: ContainsPrefixes StateTransitionE where
+  expandPrefix (Entry s) = Entry <$> expandPrefix s
+  expandPrefix (Exit s) = Exit <$> expandPrefix s
+
+instance containsPrefixesSentence :: ContainsPrefixes Sentence where
+  expandPrefix (Sentence sparts) = traverse expandPrefix sparts >>= pure <<< Sentence
+
+instance containsPrefixesSentencPart :: ContainsPrefixes SentencePart where
+  expandPrefix (HR s) = pure $ HR s
+  expandPrefix (CP c) = CP <$> expandPrefix c
+
+instance containsprefixesStatements :: ContainsPrefixes Statements where
+  expandPrefix (Let stp) = Let <$> expandPrefix stp
+  expandPrefix (Statements stmts) = Statements <$> traverse expandPrefix stmts
+
+instance containsPrefixesStateE :: ContainsPrefixes StateE where
+  expandPrefix (StateE r@{condition, stateParts, subStates}) = do
+    condition' <- expandPrefix condition
+    stateParts' <- traverse expandPrefix stateParts
+    subStates' <- traverse expandPrefix subStates
+    pure (StateE r {condition = condition', stateParts = stateParts', subStates = subStates'})
+
+instance containsPrefixesCalculation :: ContainsPrefixes Calculation where
+  expandPrefix (S stp) = S <$> expandPrefix stp
+  expandPrefix q@(Q _) = pure q
