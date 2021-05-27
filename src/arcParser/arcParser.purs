@@ -232,7 +232,7 @@ enumeratedRole_ uname knd pos = do
     -- it will cause looping as long as it is used
     -- both in userRoleE and thingRoleE. I do not understand why.
     roleAttributes :: IP (List RolePart)
-    roleAttributes = token.parens ((mandatory <|> functional <|> unlinked) `sepBy` token.symbol ",")
+    roleAttributes = token.parens (((mandatory <|> functional <|> unlinked) <?> "mandatory, functional, unlinked.") `sepBy` token.symbol ",")
 
     mandatory :: IP RolePart
     mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute true)))
@@ -314,7 +314,7 @@ propertyE = do
     -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
     -- a valid property attribute specification.
     propertyAttributes :: IP (List PropertyPart)
-    propertyAttributes = token.parens ((mandatory <|> functional <|> range) `sepBy` token.symbol ",")
+    propertyAttributes = token.parens (((mandatory <|> functional <|> range) <?> "mandatory, functional or a range (Boolean, Number, String or DateTime)") `sepBy` token.symbol ",")
         where
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
@@ -327,7 +327,7 @@ propertyE = do
           range = (reserved "Boolean" *> (pure $ Ran PBool)
             <|> reserved "Number" *> (pure $ Ran PNumber)
             <|> reserved "String" *> (pure $ Ran PString)
-            <|> reserved "DateTime" *> (pure $ Ran PDate)) <?> "Boolean, Number, String or DateTime"
+            <|> reserved "DateTime" *> (pure $ Ran PDate))
 
 viewE :: IP RolePart
 viewE = do
