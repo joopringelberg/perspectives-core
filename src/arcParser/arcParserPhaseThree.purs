@@ -36,7 +36,7 @@ import Data.Array (cons, filter, findIndex, foldr, fromFoldable, head, index, le
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
-import Data.List (List)
+import Data.List (List(..))
 import Data.Map (Map, empty, insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
@@ -57,7 +57,7 @@ import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExp
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
-import Perspectives.Parsing.Arc.Position (ArcPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, qualifyLocalEnumeratedRoleName, compileExpression)
@@ -73,9 +73,10 @@ import Perspectives.Representation.Class.Role (roleADT)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
-import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType, ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType, ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
 import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=))
@@ -541,14 +542,29 @@ handlePostponedStateQualifiedParts = do
 
     modifyPartOfState :: ArcPosition -> ArcPosition -> (StateRecord -> PhaseThree StateRecord) -> StateIdentifier -> PhaseThree Unit
     modifyPartOfState start end modifyState stateId = do
+      -- log ("Will modify state " <> show stateId)
       mstate <- State.gets _.dfr >>= pure <<< lookup (unwrap stateId) <<< _.states
       case mstate of
-        Nothing -> throwError $ StateDoesNotExist stateId start end
+        Nothing -> isContextRootState stateId >>= if _
+          then do
+            state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true")) (Cnt (ContextType (unwrap stateId))) Nil)
+            modifyDF \drf@{states} -> drf {states = insert (unwrap stateId) state' states}
+          else isRoleRootState stateId >>= if _
+            then do
+              state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true")) (Rle (EnumeratedRoleType (unwrap stateId))) Nil)
+              modifyDF \drf@{states} -> drf {states = insert (unwrap stateId) state' states}
+            else throwError $ StateDoesNotExist stateId start end
         Just (State sr) -> do
           -- modify the state
           state' <- State <$> (modifyState sr)
           modifyDF \dfr@{states} -> dfr {states = insert (unwrap stateId) state' states}
       pure unit
+      where
+        isContextRootState :: StateIdentifier -> PhaseThree Boolean
+        isContextRootState (StateIdentifier s) = State.gets _.dfr >>= pure <<< isJust <<< lookup s <<< _.contexts
+
+        isRoleRootState :: StateIdentifier -> PhaseThree Boolean
+        isRoleRootState (StateIdentifier s) = State.gets _.dfr >>= pure <<< isJust <<< lookup s <<< _.enumeratedRoles
 
 invertPerspectiveObjects :: PhaseThree Unit
 invertPerspectiveObjects = do
