@@ -32,15 +32,15 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, null)
-import Data.Array (union) as ARR
+import Data.Array (cons, findIndex, index, length, modifyAt, null, union)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe, fromJust)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, isContextDomain, isRoleDomain, range)
@@ -76,16 +76,29 @@ instance decodeInvertedQuery :: Decode InvertedQuery where
   decode = genericDecode defaultOptions
 
 instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
-  prettyPrint' t (InvertedQuery{description, users, states}) = "InvertedQuery " <> prettyPrint' (t <> "  ") description <> show users <> show states
+  prettyPrint' t (InvertedQuery{description, users, states, statesPerProperty}) =
+    "\nInvertedQuery " <> prettyPrint' (t <> "  ") description <>
+    ("\n" <> t <> "    users:") <> prettyPrint' (t <> "    ") users <>
+    ("\n" <> t <> "    states:") <> prettyPrint' (t <> "    ") states <>
+    ("\n" <> t <> "    statesPerProperty:") <> prettyPrint' (t <> "    ") statesPerProperty
 
 equalDescriptions :: InvertedQuery -> InvertedQuery -> Boolean
 equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}) = d1 == d2
 
+-- | If we find an existing inverted query with the same description, we compare states and users.
+-- | If the new query specifies the same users, we add its states;
+-- | if it specifies the same states, we add its users.
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
-addInvertedQuery = cons
--- addInvertedQuery q@(InvertedQuery{usersAndProps}) qs = case findIndex (equalDescriptions q) qs of
---   Nothing -> cons q qs
---   Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes usersAndProps) qs
+addInvertedQuery q@(InvertedQuery{users, states}) qs = case findIndex (equalDescriptions q) qs of
+  Nothing -> cons q qs
+  Just i -> case unsafePartial $ fromJust $ index qs i of
+    InvertedQuery{users:users1, states:states1} -> if ((length $ (union users users1)) == length users)
+      then unsafePartial $ fromJust $ modifyAt i (\(InvertedQuery qr) -> InvertedQuery $ qr {states = union states states1}) qs
+      else if ((length $ (union states states1)) == length states)
+        then unsafePartial $ fromJust $ modifyAt i (\(InvertedQuery qr) -> InvertedQuery $ qr {users = union users users1}) qs
+        else qs
+
+  -- Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes usersAndProps) qs
 
 isStateQuery :: InvertedQuery -> Boolean
 isStateQuery (InvertedQuery{users}) = null users
@@ -141,7 +154,7 @@ instance eqRelevantProperties :: Eq RelevantProperties where
 instance semigroupRelevantProperties :: Semigroup RelevantProperties where
   append All _ = All
   append _ All = All
-  append (Properties p1) (Properties p2) = Properties (ARR.union p1 p2)
+  append (Properties p1) (Properties p2) = Properties (union p1 p2)
 
 instance monoidRelevantProperties :: Monoid RelevantProperties where
   mempty = Properties []
@@ -169,7 +182,7 @@ instance showQueryWithAKink :: Show QueryWithAKink where
   show = genericShow
 
 instance prettyPrintQueryWithAKink :: PrettyPrint QueryWithAKink where
-  prettyPrint' tab (ZQ bw fw) = "QueryWithAKink\n" <> (prettyPrint' (tab <> "  ") bw) <> (prettyPrint' (tab <> "  ") fw)
+  prettyPrint' tab (ZQ bw fw) = "QueryWithAKink\n" <> ((tab <> "  ") <> "backwards:" <> prettyPrint' (tab <> "  ") bw) <> (tab <> "  ") <> "forwards:" <> (prettyPrint' (tab <> "  ") fw)
 
 instance eqQueryWithAKink :: Eq QueryWithAKink where
   eq = genericEq

@@ -37,6 +37,7 @@ import Data.Map (Map, empty, singleton)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
+-- import Effect.Class.Console (log, logShow)
 import Foreign.Object (keys)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -205,7 +206,9 @@ compileAndDistributeStep ::
   Array StateIdentifier ->
   PhaseThree QueryFunctionDescription
 compileAndDistributeStep dom stp users stateIdentifiers = do
+  -- log ("compileAndDistributeStep:\n" <> "  step = " <> show stp <> "\n  users = " <> show users <> "\n  stateIdentifiers = " <> show stateIdentifiers)
   descr <- compileExpression dom stp
+  -- logShow descr
   -- The description may be a path and then should be seen as an implicit perspective on its results, like a CalculatedProperty (it could also be a constant, or it could result in a ContextInstance or a RoleInstance).
   -- Hence we should create a Map of the PropertyType and the StateIdentifier.
   (statesPerProperty :: Map PropertyType (Array StateIdentifier)) <- pure case propertyOfRange descr of

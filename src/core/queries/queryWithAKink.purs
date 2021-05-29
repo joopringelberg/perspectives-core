@@ -180,6 +180,7 @@ setInvertedQueries ::
   QueryFunctionDescription ->
   PhaseThree Unit
 setInvertedQueries users statesPerProperty roleStates qfd = do
+  -- log ("setInvertedQueries:" <> "\n users =" <> show users <> "\n states = " <> show roleStates <> "\n statesPerProperty = " <> showTree statesPerProperty <> "\n qfd = " <> show qfd)
   (zqs :: (Array QueryWithAKink)) <- invert qfd
   for_ zqs \qwk@(ZQ backward forward) -> do
     case backward of
@@ -190,7 +191,6 @@ setInvertedQueries users statesPerProperty roleStates qfd = do
       (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk  users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
       Nothing -> pure unit
-    -- TODO. Voor de rol zetten we nu voor de tweede keer de InvertedQuery.
     case forward, backward, domain <$> backward of
       Nothing, Just bw, Just (RDOM role) ->
         void $ setInvertedQueriesForUserAndRole users role statesPerProperty true qwk

@@ -60,7 +60,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
+import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
 
 -- The user RoleType is necessary for setting inverted queries.
 -- The domain should be a CDOM.
