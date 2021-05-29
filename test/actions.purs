@@ -4,12 +4,13 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Array (length, null)
+import Data.Either (either)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, binding, getProperty, getEnumeratedRoleInstances)
-import Perspectives.LoadCRL.FS (loadAndSaveCrlFile)
+import Perspectives.LoadCRL.FS (loadAndCacheCrlFile, loadAndSaveCrlFile)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
@@ -26,12 +27,12 @@ modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Actions" do
-
+  -- TODO. Dit kan nog niet werken vanwege withSystem. Die laadt model:PerspectivesSysteem
   test "compileAssignment: Remove" $ runP $ withSystem do
     modelErrors <- loadCompileAndCacheArcFile' "actions" testDirectory
     if null modelErrors
       then do
-        instanceErrors <- loadAndSaveCrlFile "actionsTestcase1.crl" testDirectory
+        instanceErrors <- loadAndCacheCrlFile "actionsTestcase1.crl" testDirectory >>= either (pure <<< identity) (\_ -> pure [])
         if null instanceErrors
           then do
             instances <- ((ContextInstance "model:User$MyTestCase") ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCase1$ARole"))

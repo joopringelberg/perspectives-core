@@ -73,7 +73,7 @@ theSuite :: Free TestF Unit
 theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
 
   makeTest "compileSimpleStep: ArcIdentifier, Role."
-    "domain: Test\n  thing: Role = AnotherRole\n  thing: AnotherRole (mandatory, functional)"
+    "domain Test\n  thing Role = AnotherRole\n  thing AnotherRole (mandatory)"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedRoles}) -> do
       -- logShow correctedDFR
@@ -90,14 +90,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               otherwise -> false)
 
   makeTest "compileSimpleStep: ArcIdentifier, missing Role."
-    "domain: Test\n  thing: Role = AnotherRole"
+    "domain Test\n  thing Role = AnotherRole"
     (\e -> case e of
       (ContextHasNoRole _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no role AnotherRole" false)
 
   makeTest "compileSimpleStep: ArcIdentifier, Property."
-    "domain: Test\n  thing: Role (mandatory, functional)\n    property: Prop1 = Prop2\n    property: Prop2 (mandatory, functional, Boolean)\n"
+    "domain Test\n  thing Role (mandatory)\n    property Prop1 = Prop2\n    property Prop2 (mandatory, Boolean)\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -114,14 +114,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               otherwise -> false)
 
   makeTest "compileSimpleStep: ArcIdentifier, missing Property."
-    "domain: Test\n  thing: Role (mandatory, functional)\n    property: Prop1 = Prop2"
+    "domain Test\n  thing Role (mandatory)\n    property Prop1 = Prop2"
     (\e -> case e of
       (RoleHasNoProperty _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no property Prop2" false)
 
   makeTest "compileSimpleStep: Value."
-    "domain: Test\n  thing: Role (mandatory, functional)\n    property: Prop1 = 1"
+    "domain Test\n  thing Role (mandatory)\n    property Prop1 = 1"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -138,7 +138,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               otherwise -> false)
 
   makeTest "compileSimpleStep: Binding."
-    "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: Role2\n    property: Prop1 = binding >> Prop2\n  thing: Role2 (mandatory, functional)\n    property: Prop2 (mandatory, functional, Boolean)"
+    "domain Test\n  thing Role1 (mandatory) filledBy Role2\n    property Prop1 = binding >> Prop2\n  thing Role2 (mandatory)\n    property Prop2 (mandatory, Boolean)"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -152,14 +152,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileSimpleStep: Binding, missing binding."
-    "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: None\n    property: Prop1 = binding >> Prop2\n"
+    "domain Test\n  thing Role1 (mandatory) filledBy None\n    property Prop1 = binding >> Prop2\n"
     (\e -> case e of
       (RoleHasNoBinding _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there can be no binding for Role1" false)
 
   makeTest "compileSimpleStep: Binder."
-    "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: Role2\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = Role2 >> binder Role1\n"
+    "domain Test\n  thing Role1 (mandatory) filledBy Role2\n  thing Role2 (mandatory)\n  thing Role3 = Role2 >> binder Role1\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedRoles}) -> do
       -- logShow correctedDFR
@@ -172,15 +172,18 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               otherwise -> false
               )
 
-  makeTest "compileSimpleStep: Binder, missing binding."
-    "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: None\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = Role2 >> binder Role1\n"
-    (\e -> case e of
-      (RoleDoesNotBind _ _ _) -> pure unit
-      e' -> assert (show e') false)
-    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no binding for Role1" false)
+  -- TODO. It is not clear how None should be compiled or what its effect should be.
+  -- makeTestOnly "compileSimpleStep: Binder, missing binding."
+  --   "domain Test\n  thing Role1 (mandatory) filledBy None\n  thing Role2 (mandatory)\n  thing Role3 = Role2 >> binder Role1\n"
+  --   (\e -> case e of
+  --     (RoleDoesNotBind _ _ _) -> pure unit
+  --     e' -> assert (show e') false)
+  --   (\(correctedDFR@{calculatedRoles}) -> do
+  --     logShow correctedDFR
+  --     assert "It should be detected that there is no binding for Role1" false)
 
   makeTest "compileSimpleStep: Context."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n  thing: Role2 = Role1 >> context >> Role1\n"
+    "domain Test\n  thing Role1 (mandatory)\n  thing Role2 = Role1 >> context >> Role1\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedRoles}) -> do
       -- logShow correctedDFR
@@ -194,14 +197,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileSimpleStep: Context, wrong argument type."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = binder Role1\n"
+    "domain Test\n  thing Role1 (mandatory)\n  thing Role2 (mandatory)\n  thing Role3 = binder Role1\n"
     (\e -> case e of
       (IncompatibleQueryArgument _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that context cannot be applied to a Context" false)
 
   makeTest "compileSimpleStep: Extern."
-    "domain: Test\n  thing: Role1 = extern\n"
+    "domain Test\n  thing Role1 = extern\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedRoles}) -> do
       -- logShow correctedDFR
@@ -215,37 +218,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileSimpleStep: Extern, wrong argument type."
-    "domain: Test\n  thing: Role1 = Role2 >> extern\n  thing: Role2 (mandatory, functional)\n"
+    "domain Test\n  thing Role1 = Role2 >> extern\n  thing Role2 (mandatory)\n"
     (\e -> case e of
       (IncompatibleQueryArgument _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that extern cannot be applied to a Role" false)
 
-  makeTest "compileSimpleStep: CreateContext."
-    "domain: Test\n  case: Case1\n    thing: Role1 (mandatory, functional)\n    thing: Role2 = createContext Case1 >> Role1\n"
-    (\e -> assert (show e) false)
-    (\(correctedDFR@{calculatedRoles}) -> do
-      -- logShow correctedDFR
-      case lookup "model:Test$Case1$Role2" calculatedRoles of
-        Nothing -> assert "There should be a role 'Role2'" false
-        Just (CalculatedRole{calculation}) -> do
-          assert "The calculation should be a composition,of which the first operand is a simple function the queryfunction is '(CreateContext \"model:Test$Case1\")'"
-            case calculation of
-              (Q (BQD _ _ (SQD _ (DataTypeGetterWithParameter CreateContextF "model:Test$Case1") _ _ _) _ _ _ _)) -> true
-              otherwise -> false
-              )
-
-  makeTest "compileSimpleStep: CreateContext, context type not defined."
-    "domain: Test\n  case: Case1\n    thing: Role1 (mandatory, functional)\n    thing: Role2 = createContext Case2 >> Role1\n"
-    (\e -> case e of
-      (UnknownContext _ _) -> pure unit
-      e' -> assert (show e') false)
-    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the context type that is being created is not defined" false)
-
-  -- Skipping createRole because it is an exact copy of createContext
-
   makeTest "compileSimpleStep: Identity."
-    "domain: Test\n  thing: Guest (mandatory, functional)\n  thing: GuestToo = Guest >> this"
+    "domain Test\n  thing Guest (mandatory)\n  thing GuestToo = Guest >> this"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedRoles}) -> do
       -- logShow correctedDFR
@@ -259,7 +239,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileUnaryStep: LogicalNot."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 = not Prop1\n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Boolean)\n    property Prop2 = not Prop1\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -273,14 +253,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileUnaryStep: LogicalNot, wrong argument type"
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, String)\n    property: Prop2 = not Prop1\n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, String)\n    property Prop2 = not Prop1\n"
     (\e -> case e of
       (IncompatibleQueryArgument _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that 'not' must be applied to a Boolean value" false)
 
   makeTest "compileUnaryStep: exists."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 = exists Prop1\n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Boolean)\n    property Prop2 = exists Prop1\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -294,14 +274,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileUnaryStep: exists, wrong argument type"
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, String)\n    property: Prop2 = exists context\n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, String)\n    property Prop2 = exists context\n"
     (\e -> case e of
       (IncompatibleQueryArgument _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that exists cannot be usefully applied to a Context" false)
 
   makeTest "compileUnaryStep: available."
-    "domain: Test\n  thing: SomeOtherRole\n  thing: Role1 (mandatory, functional) filledBy: SomeOtherRole\n    property: HasBinding = available binding\n"
+    "domain Test\n  thing SomeOtherRole\n  thing Role1 (mandatory) filledBy SomeOtherRole\n    property HasBinding = available binding\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -319,14 +299,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileUnaryStep: available, wrong argument type"
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, String)\n    property: Prop2 = available Prop1\n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, String)\n    property Prop2 = available Prop1\n"
     (\e -> case e of
       (IncompatibleQueryArgument _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that available cannot be applied to a Value" false)
 
   makeTest "compileBinaryStep: compose."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n  thing: Role3 (mandatory, functional)\n    property: Prop2 = context >> Role1 >> Prop1\n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Boolean)\n  thing Role3 (mandatory)\n    property Prop2 = context >> Role1 >> Prop1\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -340,14 +320,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileBinaryStep: compose with incompatible types"
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n  thing: Role3 (mandatory, functional)\n    property: Prop2 = context >> binding >> Prop1\n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Boolean)\n  thing Role3 (mandatory)\n    property Prop2 = context >> binding >> Prop1\n"
     (\e -> case e of
       (IncompatibleQueryArgument _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)
 
   makeTest "compileBinaryStep: make a comparison."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 (mandatory, functional, Boolean)\n    property: Prop3 = Prop1 == Prop2\n    \n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Boolean)\n    property Prop2 (mandatory, Boolean)\n    property Prop3 = Prop1 == Prop2\n    \n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -361,14 +341,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileBinaryStep: make a comparison, terms have different result types."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 (mandatory, functional, String)\n    property: Prop3 = Prop1 == Prop2\n    \n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Boolean)\n    property Prop2 (mandatory, String)\n    property Prop3 = Prop1 == Prop2\n    \n"
     (\e -> case e of
       (TypesCannotBeCompared _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)
 
   makeTest "compileBinaryStep: make a binary operation with 'and'."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 (mandatory, functional, Boolean)\n    property: Prop3 = Prop1 and Prop2\n    \n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Boolean)\n    property Prop2 (mandatory, Boolean)\n    property Prop3 = Prop1 and Prop2\n    \n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -382,14 +362,14 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileBinaryStep: make a binary operation with `and` on Number."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n    property: Prop2 (mandatory, functional, Number)\n    property: Prop3 = Prop1 and Prop2\n    \n"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Number)\n    property Prop2 (mandatory, Number)\n    property Prop3 = Prop1 and Prop2\n    \n"
     (\e -> case e of
       (WrongTypeForOperator _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)
 
   makeTest "compileBinaryStep: make a binary operation with 'filter'."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n  thing: Role2 = filter Role1 with Prop1"
+    "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Boolean)\n  thing Role2 = filter Role1 with Prop1"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedRoles}) -> do
       -- logShow correctedDFR
@@ -403,7 +383,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 
   makeTest "compileBinaryStep: make a binary operation with '>>='."
-    "domain: Test\n  thing: Guest (mandatory, functional)\n    property: NumberOfGuests = this >>= count"
+    "domain Test\n  thing Guest (mandatory)\n    property NumberOfGuests = this >>= count"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
@@ -417,7 +397,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
               )
 {-
   makeTest "compileLetStep."
-    "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          AnotherProp = a\n          Prop1 = a\n"
+    "domain Test\n  user: Self\n    property Prop1 (mandatory, Number)\n    property AnotherProp (mandatory, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          AnotherProp = a\n          Prop1 = a\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{enumeratedRoles, actions}) -> do
       -- logShow correctedDFR
@@ -441,7 +421,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
           )
 
   test "compileLetStep. Rule with PureLetStep" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          a\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain Test\n  user: Self\n    property Prop1 (mandatory, Number)\n    property AnotherProp (mandatory, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          a\n" ARC.domain
     case r of
       (Left (ParseError m _)) -> do
         assert "bla" true

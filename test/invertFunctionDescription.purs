@@ -44,7 +44,7 @@ theSuite :: Free TestF Unit
 theSuite = suite "Test.Query.Inversion" do
 
   -- testOnly "InverseQueries" $ runP $ withSystem do
-  test "InverseQueries" $ runP $ do
+  testSkip "InverseQueries" $ runP $ do
     _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     modelErrors <- loadCompileAndSaveArcFile' "invertedQueryTest" "test"
     -- logShow modelErrors
@@ -79,7 +79,7 @@ theSuite = suite "Test.Query.Inversion" do
   --       )
 
   test "Constant" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = true" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  case TestCase1\n    thing ARole\n      property Prop1 = true" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -102,8 +102,8 @@ theSuite = suite "Test.Query.Inversion" do
                       inv <- invertFD c
                       assert "The inversion of a Constant should be Nothing" (null inv)
 
-  test "Property of another role in the same context" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = context >> AnotherRole >> Prop2\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)" ARC.domain
+  test "Property of another role in the same context (1)" do
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  case TestCase1\n    thing ARole\n      property Prop1 = context >> AnotherRole >> Prop2\n    thing AnotherRole\n      property Prop2 (mandatory, Boolean)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -136,8 +136,8 @@ theSuite = suite "Test.Query.Inversion" do
                           (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
                           otherwise -> false) paths)
 
-  test "Property of another role in the same context" do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = context >> NestedContext >> binding >> context >> AnotherRole >> Prop2\n    context: NestedContext filledBy: SubCase\n    case: SubCase\n      thing: AnotherRole\n        property: Prop2 (mandatory, functional, Boolean)" ARC.domain
+  test "Property of another role in the same context (2)" do
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  case TestCase1\n    thing ARole\n      property Prop1 = context >> NestedContext >> binding >> context >> AnotherRole >> Prop2\n    context NestedContext filledBy SubCase\n    case SubCase\n      thing AnotherRole\n        property Prop2 (mandatory, Boolean)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -175,7 +175,7 @@ theSuite = suite "Test.Query.Inversion" do
                           otherwise -> false) paths)
 
   test "A filter expression should yield five inverse queries." do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = filter context >> AnotherRole with Prop2 >> Prop3\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)\n      property: Prop3 (mandatory, functional, Boolean)\n" ARC.domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  case TestCase1\n    thing ARole\n      property Prop1 = filter context >> AnotherRole with Prop2 >> Prop3\n    thing AnotherRole\n      property Prop2 (mandatory, Boolean)\n      property Prop3 (mandatory, Boolean)\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do

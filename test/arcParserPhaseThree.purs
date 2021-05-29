@@ -3,57 +3,38 @@ module Test.Parsing.Arc.PhaseThree where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (elemIndex, filter, find, head, length)
-import Data.Array (fromFoldable) as ARR
+import Data.Array (elemIndex, filter, head, length)
 import Data.Either (Either(..))
-import Data.Lens (_Just, preview, traversed)
-import Data.Lens.At (at)
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
-import Data.Map (Map, lookup, values) as Map
-import Data.Map (showTree)
-import Data.Map.Internal (keys)
-import Data.Maybe (Maybe(..), isJust, isNothing)
-import Data.Newtype (unwrap)
-import Data.Set (subset, fromFoldable)
-import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..), fst)
-import Effect.Aff (Aff, throwError, error)
-import Effect.Class.Console (log, logShow)
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
+import Effect.Aff (Aff)
+import Effect.Class.Console (logShow)
 import Foreign.Object (lookup)
-import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, runTypeLevelToArray, (###=))
+import Perspectives.CoreTypes (MonadPerspectives, (###=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
-import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AST
-import Perspectives.Parsing.Arc.Expression.AST (Step(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo', runPhaseTwo')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (runPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), queryFunction, range, secondOperand)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), queryFunction, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getPerspectType)
 import Perspectives.Representation.Class.Role (allProperties)
-import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.ExplicitSet (ExplicitSet(..), subsetPSet)
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
-import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb, RoleVerbList(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Representation.Verbs (PropertyVerb(..))
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
-import Perspectives.Utilities (prettyPrint)
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_)
 import Test.Parsing.DomeinFileSelectors (ensureCRole, ensureDescription, ensureERole, ensureEnumeratedProperty, ensurePerspectiveOn, ensurePropertyVerbsInState, ensureState, enumeratedPropertyIsFunctional, exists, failure, haveVerbs, isCalculationOf, objectOfPerspective, stateQuery, ensureOnEntry)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (Test, TestF, TestSuite, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -68,43 +49,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
-  -- test "TypeLevelObjectGetters" do
-  --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
-  --   case r of
-  --     (Left e) -> assert (show e) false
-  --     (Right ctxt@(ContextE{id})) -> do
-  --       case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
-  --         (Left e) -> assert (show e) false
-  --         (Right df@(DomeinFile dr')) -> do
-  --           -- logShow dr'
-  --           (Context {_id}) <- runP $
-  --             withDomeinFile "model:MyTestDomain" df
-  --               (getPerspectType (ContextType "model:MyTestDomain"))
-  --           assert "Should be able to retrieve the context that represents the domain"
-  --             (_id == ContextType "model:MyTestDomain")
-  --           (CalculatedRole {_id:crid}) <- runP $
-  --             withDomeinFile "model:MyTestDomain" df
-  --               (getPerspectType (CalculatedRoleType "model:MyTestDomain$AnotherRole"))
-  --           assert "Should be able to retrieve the role AnotherRole"
-  --             (crid == CalculatedRoleType "model:MyTestDomain$AnotherRole")
-  --
-  --           roles <- runP $
-  --             withDomeinFile "model:MyTestDomain" df
-  --               ((ContextType "model:MyTestDomain") ###= roleInContext)
-  --           assert "roleInContext should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
-  --             case head roles of
-  --               (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
-  --               otherwise -> false
-  --
-  --           roles'' <- runP $
-  --             withDomeinFile "model:MyTestDomain" df
-  --               ((ContextType "model:MyTestDomain") ###= (lookForUnqualifiedRoleType "AnotherRole"))
-  --           assert "lookForUnqualifiedRoleType should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
-  --             (isJust (head roles''))
-
-  -- test "Testing qualifyActionRoles." do
-  --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
 
   test "Testing qualifyActionRoles." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Role (mandatory) filledBy YetAnotherRole\n  thing AnotherRole = Role >> binding\n  thing YetAnotherRole (mandatory)\n  user SomeUser\n    perspective on AnotherRole\n      all roleverbs" ARC.domain
@@ -843,7 +788,7 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
                 otherwise -> assert "The binding should be a rolgetter" false
             otherwise -> assert "Side effect expected" false
 
-  domainTestOnly "Bot Action with callEffect"
+  domainTest "Bot Action with callEffect"
     "domain Test\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          callEffect cdb:AddModelToLocalStore( AModel >> Name )\n  thing AModel\n    property Name (mandatory, String)\n"
     \correctedDFR ->
       ensureState "model:Test$Gast$SomeState" correctedDFR >>=
@@ -854,11 +799,11 @@ theSuite = suiteOnly "Perspectives.Parsing.Arc.PhaseThree" do
               assert "There should be one argument" (length args == 1)
             otherwise -> assert "Side effect expected" false
 
-extractEffect :: Maybe SideEffect -> QueryFunctionDescription
-extractEffect = unsafePartial extractEffect_
-  where
-    extractEffect_ :: Partial => Maybe SideEffect -> QueryFunctionDescription
-    extractEffect_ (Just (EF (UQD _ _ (BQD _ _ _ mqd _ _ _) _ _ _))) = mqd
+-- extractEffect :: Maybe SideEffect -> QueryFunctionDescription
+-- extractEffect = unsafePartial extractEffect_
+--   where
+--     extractEffect_ :: Partial => Maybe SideEffect -> QueryFunctionDescription
+--     extractEffect_ (Just (EF (UQD _ _ (BQD _ _ _ mqd _ _ _) _ _ _))) = mqd
 
 -- x :: DomeinFileRecord -> MonadPerspectives (Array RoleType)
 -- x correctedDFR = withDomeinFile "model:MyTestDomain"

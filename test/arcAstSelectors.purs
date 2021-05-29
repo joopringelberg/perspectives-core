@@ -5,7 +5,6 @@ import Prelude
 import Data.List (List(..), filter, find, findIndex, fromFoldable, null)
 import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff (Aff, throwError, error)
-import Effect.Class.Console (logShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyVerbE(..), PropsOrView, RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))

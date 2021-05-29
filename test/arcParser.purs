@@ -13,7 +13,7 @@ import Node.Encoding as ENC
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc (automaticEffectE, contextE, domain, propertyE, thingRoleE, userRoleE, viewE)
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), PropsOrView(..), RoleE(..), RolePart(..), StateQualifiedPart, StateSpecification(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), StateQualifiedPart, StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
@@ -531,6 +531,28 @@ theSuite = suite "Perspectives.Parsing.Arc" do
             stateParts >>=
               ensureOnEntry >>=
                 isNotified "SomeUser"
+
+  test "on entry directly nested in role" do
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    user Self\n      on entry\n        notify SomeUser \"Hello {SomeUser >> FirstName}!\"\n  case AnotherCase" domain
+    case r of
+      (Left e) -> assert (show e) false
+      Right dom ->
+        ensureContext "MyCase" dom >>=
+          ensureUserRole "Self" >>=
+            ensureStateInRole (isStateWithExplicitRole_ "model:MyTestDomain$MyCase$Self" Nothing) >>=
+              ensureOnEntry >>=
+                isNotified "SomeUser"
+
+  test "on entry directly nested in role with assignment" do
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    user Self\n      on entry\n        do\n          Prop1 = false for ARole\n  case AnotherCase" domain
+    case r of
+      (Left e) -> assert (show e) false
+      Right dom ->
+        ensureContext "MyCase" dom >>=
+          ensureUserRole "Self" >>=
+            ensureStateInRole (isStateWithExplicitRole_ "model:MyTestDomain$MyCase$Self" Nothing) >>=
+              ensureOnEntry >>=
+                hasAutomaticAction
 
   test "Failing: A state with an on exit and automatic action, no user" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  case MyCase\n    state SomeState = true\n      on exit\n        do\n          remove SomeRole" domain

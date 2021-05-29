@@ -20,7 +20,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
+theSuite = suiteOnly "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
 
   test "Constant condition: true"
     (runP do
@@ -29,7 +29,10 @@ theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
         then
           do
           EnumeratedRole{onRoleDelta_binding, onRoleDelta_binder, onContextDelta_context, onContextDelta_role} <- getEnumeratedRole (EnumeratedRoleType "model:Test$TestCase1$ARole")
-          -- logShow ( (onContextDelta_context))
+          -- log (prettyPrint onRoleDelta_binding)
+          -- log (prettyPrint onRoleDelta_binder)
+          -- log (prettyPrint onContextDelta_context)
+          -- log (prettyPrint onContextDelta_role)
           liftAff $ assert "There should be one AffectedContextQueries on ARole" (length (onRoleDelta_binding <> onRoleDelta_binder <> onContextDelta_role <> onContextDelta_context) == 1)
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
@@ -41,10 +44,10 @@ theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
         then
           do
           EnumeratedProperty{onPropertyDelta} <- getEnumeratedProperty (EnumeratedPropertyType "model:Test$TestCase2$ARole$Prop1")
-          -- logShow $ length onPropertyDelta
-          liftAff $ assert "There should be two AffectedContextQueries on ARole$Prop1" (length onPropertyDelta == 2)
+          -- log $ prettyPrint onPropertyDelta
+          liftAff $ assert "There should be two AffectedContextQueries on ARole$Prop1" (length onPropertyDelta == 1)
           EnumeratedRole{onContextDelta_context} <- getEnumeratedRole (EnumeratedRoleType "model:Test$TestCase2$ARole")
-          -- logShow onContextDelta_context
+          -- log $ prettyPrint onContextDelta_context
           liftAff $ assert "There should two AffectedContextQueries in onContextDelta_context on ARole" (length onContextDelta_context == 2)
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
@@ -56,6 +59,7 @@ theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
         then
           do
           EnumeratedProperty{onPropertyDelta} <- getEnumeratedProperty (EnumeratedPropertyType "model:Test$TestCase3$SubCase1$External$Prop2")
+          -- log (prettyPrint onPropertyDelta)
           liftAff $ assert "There should be a single AffectedContextQuery on SubCase$External$Prop2" (length onPropertyDelta == 1)
           EnumeratedRole{onRoleDelta_binder} <- getEnumeratedRole (EnumeratedRoleType "model:Test$TestCase3$SubCase1$External")
           liftAff $ assert "There should be a single AffectedContextQuery in OnRoleDelta_binder on ARole" (length onRoleDelta_binder == 1)
@@ -76,7 +80,6 @@ theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
           -- KLOPT DIT WEL? in de code staat: geen inverted queries op externe rol.
           er@(EnumeratedRole{onContextDelta_context}) <- getEnumeratedRole (EnumeratedRoleType "model:Test$TestCase4$NestedContext")
           -- logShow er
-          -- geen enkele inverted query op deze rol.
           liftAff $ assert "There should be a single AffectedContextQuery in onContextDelta_context on NestedContext" (length onContextDelta_context == 1)
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
