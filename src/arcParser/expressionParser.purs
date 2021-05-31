@@ -27,6 +27,7 @@ import Control.Lazy (defer)
 import Data.Array (elemIndex, fromFoldable, many)
 import Data.DateTime (DateTime)
 import Data.JSDate (JSDate, parse, toDateTime)
+import Data.List (List(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.String (length)
 import Data.String.CodeUnits as SCU
@@ -40,7 +41,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Range(..))
 import Prelude (bind, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>))
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, try, (<?>))
+import Text.Parsing.Parser.Combinators (between, lookAhead, manyTill, option, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char)
 import Text.Parsing.Parser.Token (alphaNum)
 
@@ -310,7 +311,13 @@ computationStep :: IP Step
 computationStep = try do
   start <- getPosition
   functionName <- reserved "callExternal" *> arcIdentifier
-  arguments <- token.parens (token.commaSep step)
+  arguments <- token.symbol "(" *>
+    (((token.symbol ")") *> pure Nil)
+    <|>
+    do
+      first <- step
+      rest <- manyTill (token.comma *> step) (token.symbol ")")
+      pure (Cons first rest))
   computedType <- reserved "returns" *> (arcIdentifier <|> propertyRange)
   end <- getPosition
   pure $ Computation $ ComputationStep {functionName, arguments: (fromFoldable arguments), computedType, start, end}
