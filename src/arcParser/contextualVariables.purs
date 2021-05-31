@@ -28,7 +28,8 @@ module Perspectives.Parsing.Arc.ContextualVariables where
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.State (StateT, execStateT, modify)
-import Data.Array (catMaybes, cons, foldMap, head, last, length)
+import Data.Array (catMaybes, foldMap, head, last, length, union)
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala)
@@ -137,9 +138,9 @@ type CollectingBindings m = StateT (Array VarBinding) m
 collectBindings :: forall a m. Monad m => CollectingBindings m a -> m (Array VarBinding)
 collectBindings x = execStateT x []
 
--- | In CollectingBindings, add a VarBinding to state.
+-- | In CollectingBindings, add a VarBinding to state, if it is not yet there.
 addBinding :: forall m. Monad m => VarBinding -> CollectingBindings m (Array VarBinding)
-addBinding vb = modify (cons vb)
+addBinding vb = modify (union [vb])
 
 --------------------------------------------------------------------------
 --- ADD CONTEXTUAL VARIABLES TO AN EXPRESSION
@@ -148,14 +149,18 @@ addBinding vb = modify (cons vb)
 addContextualVariablesToExpression :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> m Step
 addContextualVariablesToExpression stp mobject = case stp of
   (PureLet (PureLetStep r@{bindings})) -> do
+    -- TODO. Let op: we zouden óók in de bindings zelf moeten zoeken naar verwijzingen naar "object" en "currentcontext".
     extraBindings <- collectBindings do
-      addCurrentContext stp
-      addObject stp
+      for_ bindings \(VarBinding _ stp') -> do
+        addCurrentContextForStep stp'
+        addObjectForStep stp' mobject
+      addCurrentContextForStep stp
+      addObjectForStep stp mobject
     pure $ PureLet (PureLetStep r {bindings = extraBindings <> bindings})
   _ -> do
     bindings <- collectBindings do
-      addCurrentContext stp
-      addObject stp
+      addCurrentContextForStep stp
+      addObjectForStep stp mobject
     if length bindings > 0
       then pure $ PureLet (PureLetStep
         { start: startOf stp
@@ -164,18 +169,18 @@ addContextualVariablesToExpression stp mobject = case stp of
         , body: stp
         })
       else pure stp
-  where
-    addCurrentContext :: Step -> CollectingBindings m Unit
-    addCurrentContext stp' = if stepContainsVariableReference "currentcontext" stp'
-      then void $ addBinding (VarBinding "currentcontext" (Simple $ Identity (startOf stp')))
-      else pure unit
 
-    addObject :: Step -> CollectingBindings m Unit
-    addObject stp' = if stepContainsVariableReference "object" stp'
-      then case mobject of
-        Nothing -> throwError (MissingObject (startOf stp') (endOf stp'))
-        Just obj -> void $ addBinding (VarBinding "object" obj)
-      else pure unit
+addCurrentContextForStep :: forall m. MonadError PerspectivesError m => Step -> CollectingBindings m Unit
+addCurrentContextForStep stp' = if stepContainsVariableReference "currentcontext" stp'
+  then void $ addBinding (VarBinding "currentcontext" (Simple $ Identity (startOf stp')))
+  else pure unit
+
+addObjectForStep :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> CollectingBindings m Unit
+addObjectForStep stp' mobject = if stepContainsVariableReference "object" stp'
+  then case mobject of
+    Nothing -> throwError (MissingObject (startOf stp') (endOf stp'))
+    Just obj -> void $ addBinding (VarBinding "object" obj)
+  else pure unit
 
 --------------------------------------------------------------------------
 --- ADD CONTEXTUAL VARIABLES TO STATEMENTS
@@ -184,6 +189,9 @@ addContextualVariablesToStatements :: forall m. MonadError PerspectivesError m =
 addContextualVariablesToStatements stmts mobject = case stmts of
   Let (LetStep r@{bindings, assignments}) -> do
     extraBindings <- collectBindings do
+      for_ bindings \(VarBinding _ stp) -> do
+        addCurrentContextForStep stp
+        addObjectForStep stp mobject
       addCurrentContext stmts
       addObject stmts
     pure $ Let (LetStep r {bindings = extraBindings <> bindings})
