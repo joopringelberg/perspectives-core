@@ -53,7 +53,7 @@ import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDom
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), StateQualifiedPart(..), StateTransitionE(..), StateSpecification(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateSpecification(..), StateTransitionE(..))
-import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression, addContextualVariablesToStatements)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
@@ -396,12 +396,13 @@ handlePostponedStateQualifiedParts = do
       -- Compile the side effect. Will invert all expressions in the statements, too, including
       -- the object if it is referenced.
       states <- stateSpec2States (transition2stateSpec transition)
+      effectWithEnvironment <- addContextualVariablesToStatements effect (roleIdentification2Step <$> syntacticObject)
       (sideEffect :: QueryFunctionDescription) <- compileStatement
         states
         currentDomain
         compiledObject
         qualifiedUsers
-        effect
+        effectWithEnvironment
       modifyAllStates compiledObject sideEffect qualifiedUsers states
       where
         modifyAllStates :: Maybe QueryFunctionDescription -> QueryFunctionDescription -> Array RoleType -> Array StateIdentifier -> PhaseThree Unit
