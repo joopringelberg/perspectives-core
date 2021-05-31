@@ -201,7 +201,7 @@ contextRoleE = protectObject $ withEntireBlock
       uname <- arcIdentifier
       ct@(ContextType ctxt) <- getCurrentContext
       setObject (ExplicitRole ct ( EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
-      enumeratedRole_ uname kind pos
+      ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
 externalRoleE :: IP ContextPart
 externalRoleE = protectObject $ withEntireBlock
@@ -548,7 +548,7 @@ automaticEffectE = do
       effect <- case keyword of
         "letE" -> fail "letE does not allow assignment operators, so this will not have an effect. Did you mean 'letA'?"
         "letA" -> Let <$> letWithAssignment
-        _ -> Statements <<< fromFoldable <$> nestedBlock assignment <?> "an indented block of assignments."
+        _ -> Statements <<< fromFoldable <$> nestedBlock assignment
       end <- getPosition
       {subject, object, onEntry, onExit, currentContext} <- getArcParserState
       -- log ("automaticEffectE: object = " <> show object)
