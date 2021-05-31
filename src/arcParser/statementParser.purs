@@ -24,6 +24,7 @@ module Perspectives.Parsing.Arc.Statement where
 
 import Control.Alt ((<|>))
 import Data.Array (fromFoldable)
+import Data.List (List(..))
 import Data.Maybe (isJust)
 import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.Expression (binding, step)
@@ -34,7 +35,7 @@ import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>), (<*>))
 import Text.Parsing.Indent (withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, (<?>))
+import Text.Parsing.Parser.Combinators (lookAhead, manyTill, option, optionMaybe, (<?>))
 
 assignment :: IP Assignment
 assignment = isPropertyAssignment >>= if _
@@ -194,7 +195,15 @@ callEffect :: IP Assignment
 callEffect = do
   start <- getPosition
   effectName <- reserved "callEffect" *> arcIdentifier
-  arguments <- token.parens (token.commaSep step)
+  arguments <- token.symbol "(" *>
+    (((token.symbol ")") *> pure Nil)
+    <|>
+    do
+      first <- step
+      -- By using manyTill we get the errir messages inside arguments to the end user.
+      -- sepBy would hide them.
+      rest <- manyTill (token.comma *> step) (token.symbol ")")
+      pure (Cons first rest))
   end <- getPosition
   pure $ ExternalEffect {start, end, effectName, arguments: (fromFoldable arguments)}
 

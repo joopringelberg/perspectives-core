@@ -316,6 +316,8 @@ computationStep = try do
     <|>
     do
       first <- step
+      -- By using manyTill we get the errir messages inside arguments to the end user.
+      -- sepBy would hide them.
       rest <- manyTill (token.comma *> step) (token.symbol ")")
       pure (Cons first rest))
   computedType <- reserved "returns" *> (arcIdentifier <|> propertyRange)
