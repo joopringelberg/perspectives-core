@@ -84,8 +84,7 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
 
   compileLetStep :: LetStep -> PhaseThree QueryFunctionDescription
   compileLetStep (LetStep {bindings, assignments}) = withFrame
-    -- We have to reverse the bindings, because foldM associates the wrong way.
-    case uncons (reverse bindings) of
+    case uncons bindings of
       -- no bindings at all. Just the body. This will probably never occur as the parser breaks on it.
       Nothing -> sequenceOfAssignments userRoleTypes assignments mobjectCalculation'
       (Just {head: bnd, tail}) -> do
