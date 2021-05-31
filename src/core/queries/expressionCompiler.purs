@@ -37,7 +37,6 @@ import Data.Map (Map, empty, singleton)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
--- import Effect.Class.Console (log, logShow)
 import Foreign.Object (keys)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -540,8 +539,7 @@ compileLetStep currentDomain (PureLetStep{bindings, body}) = do
   where
     compileLetStep_ :: FD
     compileLetStep_ = withFrame
-      -- We have to reverse the bindings, because foldM associates the wrong way.
-      case uncons (reverse bindings) of
+      case uncons bindings of
         -- no bindings at all. Just the body. This will probably never occur as the parser breaks on it.
         Nothing -> compileStep currentDomain body
         (Just {head: bnd, tail}) -> do
