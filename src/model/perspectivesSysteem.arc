@@ -131,15 +131,16 @@ domain System
       state InviteUnconnectedUser = IWantToInviteAnUnconnectedUser and exists Message
         on entry
           do for Inviter
-            SerialisedInvitation = callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType modelSystem$Invitation$Invitee ) returns String
+            SerialisedInvitation = callExternal ser:SerialiseFor( filter object >> context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns String
 
       view ForInvitee (InviterLastName, Message)
 
+    user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
+
     user Invitee (mandatory) filledBy Guest
       perspective on Inviter
-      perspective on extern (ForInvitee) Consult
-
-    user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
+      perspective on extern
+        view ForInvitee (Consult)
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
