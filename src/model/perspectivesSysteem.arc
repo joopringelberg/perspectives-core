@@ -1,152 +1,146 @@
 -- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021
-domain: System
-  use: sys for model:System
-  use: cdb for model:Couchdb
-  use: ser for model:Serialise
+domain System
+  use sys for model:System
+  use cdb for model:Couchdb
+  use ser for model:Serialise
 
-  case: TrustedCluster
-    external:
-      property: Naam (mandatory, functional, String)
-      view: Kaartje (Naam)
-    user: ClusterGenoot (not mandatory, not functional) filledBy: User
-      property: Url (mandatory, functional, String)
-      view: Adressering (Url, Voornaam)
-      perspective on: ClusterGenoot (Adressering) Consult
+  case TrustedCluster
+    external
+      property Naam (mandatory, String)
+      view Kaartje (Naam)
+    user ClusterGenoot (relational) filledBy User
+      property Url (mandatory, String)
+      view Adressering (Url, Voornaam)
+      perspective on ClusterGenoot
+        view Adressering (Consult)
 
-  case: PerspectivesSystem
-    indexed: sys:MySystem
-    aspect: sys:RootContext
+  case PerspectivesSystem
+    indexed sys:MySystem
+    aspect sys:RootContext
 
-    external:
-      aspect: sys:RootContext$External
-      property: ModelOphaalTeller (mandatory, functional, Number)
-      property: ConnectedToAMQPBroker (not mandatory, functional, Boolean)
-      property: CardClipBoard (not mandatory, functional, String)
+    external
+      aspect sys:RootContext$External
+      property ModelOphaalTeller (mandatory, Number)
+      property ConnectedToAMQPBroker (Boolean)
+      property CardClipBoard (String)
 
-    context: TheTrustedCluster (not mandatory, functional) filledBy: TrustedCluster
+    context TheTrustedCluster filledBy TrustedCluster
 
-    user: User (mandatory, functional)
-      property: Achternaam (mandatory, not functional, String)
-      property: Voornaam (mandatory, not functional, String)
-      property: Channel = (binder Initiator either binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
-      indexed: sys:Me
-      view: VolledigeNaam (Voornaam, Achternaam)
-      perspective on: User
-      perspective on: ModelsInUse
-      perspective on: IndexedContextOfModel
-      perspective on: RootUsers
+    user User (mandatory)
+      property Achternaam (mandatory, relational, String)
+      property Voornaam (mandatory, relational, String)
+      property Channel = (binder Initiator either binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
+      indexed sys:Me
+      view VolledigeNaam (Voornaam, Achternaam)
+      perspective on User
+      perspective on ModelsInUse
+      perspective on IndexedContextOfModel
+      perspective on RootUsers
 
-    context: IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
+    context IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
 
-    thing: RootUsers = IndexedContexts >> binding >> context >> RootUser
+    thing RootUsers = IndexedContexts >> binding >> context >> RootUser
 
-    context: Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
+    context Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
 
-    context: Modellen = filter callExternal cdb:Models() returns: sys:Model$External with not IsLibrary
+    context Modellen = filter callExternal cdb:Models() returns sys:Model$External with not IsLibrary
 
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
-    context: IndexedContexts (not mandatory, not functional) filledBy: sys:RootContext
-
-    context: ModelsInUse (not mandatory, not functional) filledBy: Model
-
-    bot: for User
-      -- This rule creates an entry in IndexedContexts if its model has been taken in use.
-      perspective on: ModelsInUse
-        rule BindModelInIndexedContext:
-        if exists (object >> binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts) then
-          bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
-
-      -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
-      perspective on: DanglingIndexedContext
-        rule RemoveDanglingIndexedContext:
-          if exists DanglingIndexedContext then
+    context IndexedContexts (relational) filledBy sys:RootContext
+      state Dangles = not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
+        -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
+        on entry
+          do for User
             -- After removing the object, we can no longer find the name, so bind it first.
-            let* model <- object >> binding >> context >> contextType >> modelname
+            letA
+              model <- object >> binding >> context >> contextType >> modelname
             in
               remove object
               -- Until we've got sound and complete cascade delete, do not remove the model.
               -- callEffect cdb:RemoveModelFromLocalStore (model)
 
-    -- An entry in IndexedContexts is dangling if its model is not in use.
-    context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
+    context ModelsInUse (relational) filledBy Model
+      state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
+        -- Create an entry in IndexedContexts if its model has been taken in use.
+        on entry
+          do for User
+            bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
 
-    context: PendingInvitations = callExternal cdb:PendingInvitations() returns: sys:Invitation$External
+    context PendingInvitations = callExternal cdb:PendingInvitations() returns sys:Invitation$External
 
-    thing: Databases (mandatory, not functional)
-      -- Name is one of: post, data, models.
-      property: Name (mandatory, functional, String)
-      property: Identifier (mandatory, functional, String)
+    thing Databases (mandatory, relational)
+      -- Name is one of post, data, models.
+      property Name (mandatory, String)
+      property Identifier (mandatory, String)
 
-  case: PhysicalContext
-    user: UserWithAddress
+  case PhysicalContext
+    user UserWithAddress
       -- The public URL of the PDR of the UserWithAddress.
-      property: Host (not mandatory, functional, String)
+      property Host (String)
       -- The port where Couchdb listens.
-      property: Port (not mandatory, functional, Number)
+      property Port (Number)
       -- The public URL of the RelayServer of the UserWithAddress
-      property: RelayHost (not mandatory, functional, String)
+      property RelayHost (String)
       -- The port where Couchdb listens on the RelayServer.
-      property: RelayPort (not mandatory, functional, String)
+      property RelayPort (String)
 
   -- A Channel is shared by just two users.
-  case: Channel
-    external:
-      property: ChannelDatabaseName (mandatory, functional, String)
-    aspect: sys:PhysicalContext
-    user: Initiator filledBy: sys:PerspectivesSystem$User
-      aspect: sys:PhysicalContext$UserWithAddress
-      perspective on: ConnectedPartner
-      perspective on: Initiator
-    user: ConnectedPartner filledBy: sys:PerspectivesSystem$User
+  case Channel
+    aspect sys:PhysicalContext
+    external
+      property ChannelDatabaseName (mandatory, String)
+    user Initiator filledBy sys:PerspectivesSystem$User
+      aspect sys:PhysicalContext$UserWithAddress
+      perspective on ConnectedPartner
+      perspective on Initiator
+    user ConnectedPartner filledBy sys:PerspectivesSystem$User
       -- The public URL of the PDR of the partner.
-      aspect: sys:PhysicalContext$UserWithAddress
-      perspective on: Initiator
-      perspective on: ConnectedPartner
-    user: Me = filter (Initiator either ConnectedPartner) with binds sys:Me
-    user: You = filter (Initiator either ConnectedPartner) with not binds sys:Me
+      aspect sys:PhysicalContext$UserWithAddress
+      perspective on Initiator
+      perspective on ConnectedPartner
+    user Me = filter (Initiator either ConnectedPartner) with binds sys:Me
+    user You = filter (Initiator either ConnectedPartner) with not binds sys:Me
 
-  case: Model
-    aspect: sys:RootContext
-    external:
-      aspect: sys:RootContext$External
-      property: Description (mandatory, functional, String)
-      property: ModelIdentification (mandatory, functional, String)
-      property: Url (mandatory, functional, String)
-      property: IsLibrary (mandatory, functional, Boolean)
-    user: Author (not mandatory, functional) filledBy: User
-      aspect: sys:RootContext$RootUser
-      perspective on: extern
-    context: IndexedContext (mandatory, functional) filledBy: sys:RootContext
-      property: Name (mandatory, functional, String)
-    thing: IndexedRole (not mandatory, not functional)
-      property: Name (mandatory, functional, String)
+  case Model
+    aspect sys:RootContext
+    external
+      aspect sys:RootContext$External
+      property Description (mandatory, String)
+      property ModelIdentification (mandatory, String)
+      property Url (mandatory, String)
+      property IsLibrary (mandatory, Boolean)
+    user Author filledBy User
+      aspect sys:RootContext$RootUser
+      perspective on extern
+    context IndexedContext (mandatory) filledBy sys:RootContext
+      property Name (mandatory, String)
+    thing IndexedRole (relational)
+      property Name (mandatory, String)
 
-  case: RootContext
-    external:
-      property: Name (mandatory, functional, String)
-    user: RootUser filledBy: sys:PerspectivesSystem$User
+  case RootContext
+    external
+      property Name (mandatory, String)
+    user RootUser filledBy sys:PerspectivesSystem$User
 
-  case: Invitation
-    external:
-      property: IWantToInviteAnUnconnectedUser (not mandatory, functional, Boolean)
-      property: SerialisedInvitation (not mandatory, functional, String)
-      property: Message (not mandatory, functional, String)
-      property: InviterLastName = context >> Inviter >> Achternaam
+  case Invitation
+    external
+      property IWantToInviteAnUnconnectedUser (Boolean)
+      property SerialisedInvitation (String)
+      property Message (String)
+      property InviterLastName = context >> Inviter >> Achternaam
+      state InviteUnconnectedUser = IWantToInviteAnUnconnectedUser and exists Message
+        on entry
+          do for Inviter
+            SerialisedInvitation = callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType modelSystem$Invitation$Invitee ) returns String
 
-      view: ForInvitee (InviterLastName, Message)
+      view ForInvitee (InviterLastName, Message)
 
-    user: Invitee (mandatory, functional) filledBy: Guest
-      perspective on: Inviter
-      perspective on: extern (ForInvitee) Consult
+    user Invitee (mandatory) filledBy Guest
+      perspective on Inviter
+      perspective on extern (ForInvitee) Consult
 
-    user: Inviter (mandatory, functional) filledBy: sys:PerspectivesSystem$User
-
-    bot: for Inviter
-      perspective on: extern
-        rule SerialiseInviation:
-          if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then
-            SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
+    user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
-    user: Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
-      perspective on: Invitee
+    user Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
+      perspective on Invitee
