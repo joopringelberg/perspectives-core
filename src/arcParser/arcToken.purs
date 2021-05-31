@@ -80,13 +80,13 @@ perspectDef = LanguageDef
                   , "properties"
                   , "filledBy"
                   , "for"
-                  , "callExternal"
                   , "callEffect"
 
                   -- Properties
                   , "property"
                   , "mandatory"
-                  , "functional"
+                  , "relational"
+                  , "unlinked"
                   , "not"
                   , "Number"
                   , "String"
@@ -111,6 +111,9 @@ perspectDef = LanguageDef
                   , "notify"
                   , "do"
                   , "action"
+                  , "object"
+                  , "subject"
+
 
                   -- Queries
                   , "filter"
@@ -118,6 +121,8 @@ perspectDef = LanguageDef
                   -- Expressions
                   , "remove"
                   , "createRole"
+                  , "createContext"
+                  , "bound"
                   , "move"
                   , "bind"
                   , "bind_"
@@ -132,6 +137,17 @@ perspectDef = LanguageDef
                   , "binds"
                   , "boundBy"
                   , "available"
+                  , "with"
+                  , "letE"
+                  , "from"
+                  , "role"
+
+                  -- Functions in expressions
+                  , "specialisesRoleType"
+                  , "roleTypes"
+                  , "contextType"
+                  , "modelname"
+                  , "returns"
 
                   ]
                 , caseSensitive:   true
