@@ -37,10 +37,11 @@ import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Foreign.Object (Object, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes ((###>))
+import Perspectives.CoreTypes ((###>), (###=))
+import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame)
@@ -49,7 +50,7 @@ import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperato
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (addVarBindingToSequence, compileAndDistributeStep, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, mandatory, range)
-import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty)
 import Perspectives.Representation.Class.Property (range) as PT
@@ -58,8 +59,8 @@ import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
 import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
 
 -- The user RoleType is necessary for setting inverted queries.
@@ -270,8 +271,16 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
           (ct :: ADT ContextType) <- case range contextFunctionDescription of
             (CDOM ct') -> pure ct'
             otherwise -> throwError $ NotAContextDomain otherwise start end
-          mrt <- lift2 (ct ###> lookForUnqualifiedRoleTypeOfADT roleIdentifier)
-          case mrt of
+          mrt <- if isQualifiedWithDomein roleIdentifier
+            then if isExternalRole roleIdentifier
+              then pure [ENR $ EnumeratedRoleType roleIdentifier]
+              else lift2 $ runArrayT $ lookForRoleTypeOfADT roleIdentifier ct
+            else if roleIdentifier == "External"
+              then case ct of
+                (ST (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
+                otherwise -> throwError $ Custom ("Cannot get the external role of a compound type: " <> show otherwise)
+              else lift2 (ct ###= lookForUnqualifiedRoleTypeOfADT roleIdentifier)
+          case head mrt of
             Just (ENR et) -> pure et
             Just (CR ct') -> throwError $ CannotCreateCalculatedRole ct' start end
             otherwise -> throwError $ ContextHasNoRole ct roleIdentifier

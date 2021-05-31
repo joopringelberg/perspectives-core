@@ -32,7 +32,7 @@ module Perspectives.Query.ExpressionCompiler where
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
-import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, reverse, uncons)
+import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, uncons)
 import Data.Map (Map, empty, singleton)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
@@ -43,7 +43,7 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
@@ -242,7 +242,9 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
         Nothing -> case currentDomain of
           (CDOM c) -> do
             (rts :: Array RoleType) <- if isQualifiedWithDomein ident
-              then lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
+              then if isExternalRole ident
+                then pure [ENR $ EnumeratedRoleType ident]
+                else lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
               else if ident == "External"
                 then case c of
                   (ST (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
