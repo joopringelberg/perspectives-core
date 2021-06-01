@@ -304,7 +304,7 @@ handlePostponedStateQualifiedParts = do
     stateSpec2States :: StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
-      AST.ContextState ctx mpath -> pure [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx)) mpath))]
+      AST.ContextState ctx mpath -> pure [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx) <<< append "$") mpath))]
       -- Execute the effect for each qualifiedUser in each of the subject states.
       -- Note that the subjects in whose states we execute, do not need be the qualified users we execute for:
       -- 'do this automatically for me when you are at home' illustrates this independence.
@@ -516,6 +516,7 @@ handlePostponedStateQualifiedParts = do
     modifyPerspective :: QueryFunctionDescription -> ArcPosition -> (Perspective -> Perspective) -> EnumeratedRoleType -> PhaseThree Unit
     modifyPerspective objectQfd start modifier (EnumeratedRoleType qualifiedSubject) = do
       -- The user role
+      -- TODO. Hier mogen ook calculated roles verschijnen.
       mUserRole <- getsDF ((lookup qualifiedSubject) <<< _.enumeratedRoles)
       case mUserRole of
         Nothing -> throwError $ UnknownRole start qualifiedSubject
