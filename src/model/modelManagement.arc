@@ -1,73 +1,70 @@
--- Copyright Joop Ringelberg and Cor Baars, 2020
-domain: ModelManagement
-  use: sys for model:System
-  use: mm for model:ModelManagement
-  use: p for model:Parsing
+-- Copyright Joop Ringelberg and Cor Baars, 2020, 2021
+domain ModelManagement
+  use sys for model:System
+  use mm for model:ModelManagement
+  use p for model:Parsing
 
   -- The model description case.
-  case: Model
-    external:
-      aspect: sys:Model$External
-    aspect: sys:Model
+  case Model
+    aspect sys:Model
+    external
+      aspect sys:Model$External
 
-  case: ModelManagementApp
-    external:
-      aspect: sys:RootContext$External
-    aspect: sys:RootContext
-    indexed: mm:MyManagedModels
+  case ModelManagementApp
+    indexed mm:MyManagedModels
+    aspect sys:RootContext
+    external
+      aspect sys:RootContext$External
 
-    context: Models filledBy: ManagedModel
+    context Models filledBy ManagedModel
 
-    thing: Repository (mandatory, functional)
-      property: Name (mandatory, functional, String)
-      property: Url (mandatory, functional, String)
-      property: Description (not mandatory, functional, String)
+    thing Repository (mandatory)
+      property Name (mandatory, String)
+      property Url (mandatory, String)
+      property Description (String)
 
-    user: Manager filledBy: sys:PerspectivesSystem$User
-      perspective on: Models
-      perspective on: Repository
+    user Manager filledBy sys:PerspectivesSystem$User
+      perspective on Models
+      perspective on Repository
 
-  case: ManagedModel
-    external:
-      property: ArcUrl (mandatory, functional, String)
-      property: ArcSource (mandatory, functional, String)
-      property: ArcFeedback (mandatory, functional, String)
-      property: ArcOK = ArcFeedback == "OK"
-      property: CrlUrl (mandatory, functional, String)
-      property: CrlSource (mandatory, functional, String)
-      property: CrlFeedback (mandatory, functional, String)
-      property: CrlOK = CrlFeedback == "OK"
-      property: Name = context >> ModelDescription >> Name
+  case ManagedModel
+    external
+      state Root = true
+        state ProcessArc = exists ArcSource and not exists ArcFeedback
+          on entry
+            do for Author
+              ArcFeedback = extern >> callExternal p:ParseAndCompileArc( ArcSource ) returns String
+        state ProcessCrl = exists CrlSource and not exists CrlFeedback
+          on entry
+            do for Author
+              CrlFeedback = extern >> callExternal p:ParseAndCompileCrl( CrlSource ) returns String
+        state UploadToRepository = ArcOK and CrlOK
+          on entry
+            do for Author
+              callEffect p:UploadToRepository( extern >> ArcSource, extern >> CrlSource, Repository >> Url )
+      property ArcUrl (mandatory, String)
+      property ArcSource (mandatory, String)
+      property ArcFeedback (mandatory, String)
+      property ArcOK = ArcFeedback == "OK"
+      property CrlUrl (mandatory, String)
+      property CrlSource (mandatory, String)
+      property CrlFeedback (mandatory, String)
+      property CrlOK = CrlFeedback == "OK"
+      property Name = context >> ModelDescription >> Name
 
-      view: Paths (ArcUrl, CrlUrl)
-      view: Feedback (ArcFeedback, CrlFeedback)
+      view Paths (ArcUrl, CrlUrl)
+      view Feedback (ArcFeedback, CrlFeedback)
 
-    thing: Repository (mandatory, functional) filledBy: ModelManagementApp$Repository
+    thing Repository (mandatory) filledBy ModelManagementApp$Repository
 
-    context: ModelDescription (not mandatory, functional) filledBy: sys:Model
+    context ModelDescription filledBy sys:Model
 
-    user: Author (mandatory, functional) filledBy: Manager
-      perspective on: extern Consult
+    user Author (mandatory) filledBy Manager
+      perspective on extern
+        props (Consult)
         --Create (Paths)
         --Change (Paths)
         --Delete (Feedback)
 
-      perspective on: ModelDescription
-      perspective on: Repository
-
-    bot: for Author
-      perspective on: extern
-        rule ProcessArc:
-          if extern >> ((exists ArcSource) and not exists ArcFeedback) then
-            ArcFeedback = extern >> callExternal p:ParseAndCompileArc( ArcSource ) returns: String
-    bot: for Author
-      perspective on: extern
-        rule ProcessCrl:
-          if extern >> ((exists CrlSource) and not exists CrlFeedback) then
-            CrlFeedback = extern >> callExternal p:ParseAndCompileCrl( CrlSource ) returns: String
-    bot: for Author
-      perspective on: extern
-        rule UploadToRepository:
-          if extern >> (ArcOK and CrlOK) then
-            -- TODO. Add a reload time property and set it after uploading.
-            callEffect p:UploadToRepository( extern >> ArcSource, extern >> CrlSource, Repository >> Url )
+      perspective on ModelDescription
+      perspective on Repository
