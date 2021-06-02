@@ -8,8 +8,11 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
+import Node.Encoding as ENC
+import Node.FS.Aff (readTextFile)
+import Node.Path as Path
 import Perspectives.CoreTypes (MonadPerspectives, (###=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
@@ -799,6 +802,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               assert "There should be one argument" (length args == 1)
             otherwise -> assert "Side effect expected" false
 
+  -- fileTestOnly "Read model:System" "perspectivesSysteem.arc"
+
 -- extractEffect :: Maybe SideEffect -> QueryFunctionDescription
 -- extractEffect = unsafePartial extractEffect_
 --   where
@@ -847,6 +852,27 @@ domainTest = domainTestX test
 
 domainTestOnly :: TestName -> ModelText -> DomainTester -> TestSuite
 domainTestOnly = domainTestX testOnly
+
+type FileName = String
+fileTestOnly :: TestName -> FileName -> TestSuite
+fileTestOnly testName fileName =
+  testOnly testName do
+    modelDirectory <- pure "/Users/joopringelberg/Code/perspectives-core/src/model"
+    modelText <- readTextFile ENC.UTF8 (Path.concat [modelDirectory, fileName])
+    (r :: Either ParseError ContextE) <- runIndentParser modelText ARC.domain
+    case r of
+      (Left e) -> assert ("Parser error:" <> show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r' state) ->
+          case r' of
+            (Left e) -> assert ("PhaseTwo error:" <> show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+              case x of
+                Left e -> assert ("PhaseThree error:" <> show e) false
+                Right correctedDFR -> assert "OK" true
 
 domainTestX ::
     (String -> Test -> TestSuite) ->

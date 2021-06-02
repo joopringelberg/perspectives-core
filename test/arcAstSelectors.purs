@@ -9,7 +9,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyVerbE(..), PropsOrView, RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleKind(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), RoleKind(..), roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerbList) as Verbs
 
 failure :: forall a. String -> Aff a
@@ -103,7 +103,7 @@ ensureOnExit sqps = case filter (case _ of
 isNotified :: String -> (List StateQualifiedPart) -> Aff Unit
 isNotified usr sqps = case filter (case _ of
   N (NotificationE {user}) -> case user of
-    ExplicitRole _ (EnumeratedRoleType u) _ -> usr == u
+    ExplicitRole _ u _ -> usr == roletype2string u
     (ImplicitRole _ (Simple (ArcIdentifier _ rl))) -> rl == usr
     _ -> false
   _ -> false) sqps of
@@ -147,11 +147,11 @@ isStateWithContext_ contextName path (ContextState (ContextType ctxt) p) = conte
 isStateWithContext_ _ _ _ = false
 
 isStateWithExplicitRole :: String -> StateSpecification -> Boolean
-isStateWithExplicitRole roleName (SubjectState (ExplicitRole _ (EnumeratedRoleType r) _) _) = roleName == r
+isStateWithExplicitRole roleName (SubjectState (ExplicitRole _ r _) _) = roleName == roletype2string r
 isStateWithExplicitRole _ _ = false
 
 isStateWithExplicitRole_ :: String -> Maybe String -> StateSpecification -> Boolean
-isStateWithExplicitRole_ roleName path (SubjectState (ExplicitRole _ (EnumeratedRoleType r) _) p) = roleName == r && path == p
+isStateWithExplicitRole_ roleName path (SubjectState (ExplicitRole _ r _) p) = roleName == roletype2string r && path == p
 isStateWithExplicitRole_ _ _ _ = false
 
 transitionForState :: (StateSpecification -> Boolean) -> StateTransitionE -> Boolean
