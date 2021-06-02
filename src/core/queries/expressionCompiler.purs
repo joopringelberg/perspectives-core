@@ -30,14 +30,17 @@ module Perspectives.Query.ExpressionCompiler where
 -- | Use `compileAndDistributeStep` to create the QueryFunctionDescription *and* invert it,
 -- | and distribute it throughout the domain.
 
+import Control.Monad.Error.Class (try)
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
 import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, uncons)
+import Data.Either (Either(..))
 import Data.Map (Map, empty, singleton)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
-import Foreign.Object (keys)
+import Effect.Class.Console (logShow)
+import Foreign.Object (keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile)
@@ -58,7 +61,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
-import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
+import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
@@ -137,21 +140,36 @@ qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM 
     _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
 qualifyReturnsClause pos qfd = pure qfd
 
+-- | Finds a RoleType defined in the model we're compiling whose string value ends with the given segments,
+-- | or throws an error.
+-- | If the name happens to be fully qualified, we check whether it occurs in the model we're compiling or
+-- | in another known model.
+qualifyLocalRoleName :: ArcPosition -> String -> PhaseThree RoleType
+qualifyLocalRoleName pos ident = do
+  {enumeratedRoles, calculatedRoles} <- lift $ gets _.dfr
+  if isQualifiedWithDomein ident
+    then case lookup ident enumeratedRoles of
+      Just _ -> pure $ ENR $ EnumeratedRoleType ident
+      Nothing -> case lookup ident calculatedRoles of
+        Just _ -> pure $ CR $ CalculatedRoleType ident
+        Nothing -> lift $ lift $ getRoleType ident
+    else (try (ENR <$> qualifyLocalEnumeratedRoleName pos ident (keys enumeratedRoles))) >>= case _ of
+      Left _ -> (CR <$> qualifyLocalCalculatedRoleName pos ident (keys calculatedRoles))
+      Right r -> pure r
+
 qualifyLocalEnumeratedRoleName :: ArcPosition -> String -> Array String -> PhaseThree EnumeratedRoleType
-qualifyLocalEnumeratedRoleName pos ident roleIdentifiers = EnumeratedRoleType <$> (qualifyLocalRoleName_ pos ident roleIdentifiers )
+qualifyLocalEnumeratedRoleName pos ident roleIdentifiers = EnumeratedRoleType <$> (qualifyLocalRoleName_ pos ident roleIdentifiers)
 
 qualifyLocalCalculatedRoleName :: ArcPosition -> String -> Array String -> PhaseThree CalculatedRoleType
 qualifyLocalCalculatedRoleName pos ident roleIdentifiers = CalculatedRoleType <$> (qualifyLocalRoleName_ pos ident roleIdentifiers )
 
 qualifyLocalRoleName_ :: ArcPosition -> String -> Array String -> PhaseThree String
-qualifyLocalRoleName_ pos ident roleIdentifiers = if isQualifiedWithDomein ident
-  then pure ident
-  else do
-    (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) roleIdentifiers
-    case head candidates of
-      Nothing -> throwError $ UnknownRole pos ident
-      (Just qname) | length candidates == 1 -> pure qname
-      otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
+qualifyLocalRoleName_ pos ident roleIdentifiers = do
+  (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) roleIdentifiers
+  case head candidates of
+    Nothing -> throwError $ UnknownRole pos ident
+    (Just qname) | length candidates == 1 -> pure qname
+    otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
 
 ------------------------------------------------------------------------------------
 ------ COMPILING PROPERTY REFERENCES

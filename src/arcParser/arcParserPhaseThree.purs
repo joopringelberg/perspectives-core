@@ -36,11 +36,11 @@ import Data.Array (cons, filter, findIndex, foldr, fromFoldable, head, index, le
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
-import Data.List (List(..))
+import Data.List (List)
 import Data.Map (Map, empty, insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, unions, singleton)
@@ -57,10 +57,10 @@ import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExp
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
-import Perspectives.Parsing.Arc.Position (ArcPosition(..))
+import Perspectives.Parsing.Arc.Position (ArcPosition(..), arcParserStartPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, qualifyLocalEnumeratedRoleName, compileExpression)
+import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName)
 import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription, range)
 import Perspectives.Query.StatementCompiler (compileStatement)
@@ -69,14 +69,14 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole)
-import Perspectives.Representation.Class.Role (roleADT)
+import Perspectives.Representation.Class.Role (getRole, getRoleType, roleADT, Role(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType, ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
 import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=))
@@ -96,10 +96,11 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
   (Tuple ei {dfr}) <- runPhaseTwo_'
     (do
       qualifyBindings
+      qualifyStateNames
       compileCalculatedRolesAndProperties
-      handlePostponedStateQualifiedParts
       requalifyBindingsToCalculatedRoles
       qualifyPropertyReferences
+      handlePostponedStateQualifiedParts
       invertPerspectiveObjects
       compileStates
       )
@@ -144,14 +145,41 @@ qualifyBindings = (lift $ State.gets _.dfr) >>= qualifyBindings'
         qualifyBinding pos i@(EnumeratedRoleType ident) = do
           q <- try $ ST <$> qualifyLocalEnumeratedRoleName pos ident (keys eroles)
           case q of
-            -- We introduce an intentional semantic error here by attempting to qualify the binding, that we know not
+            -- We continue an intentional semantic error introduced while parsing here by attempting to qualify the binding, that we know not
             -- to be an EnumeratedRole, as an EnumeratedRole. However, with requalifyBindingsToCalculatedRoles we will
             -- correct that error. We cannot do otherwise because at this state we don't have compiled the expressions
             -- of the CalculatedRoles yet.
             -- If not found in the EnumeratedRoles, try the CalculatedRoles
-            Left (UnknownRole _ _) -> ST <$> qualifyLocalEnumeratedRoleName pos ident (keys croles)
+            Left (UnknownRole _ _) -> do
+              q' <- try $ ST <$> qualifyLocalEnumeratedRoleName pos ident (keys croles)
+              case q' of
+                -- If we cannot find the identifier in the Calculated roles, it may be in another namespace.
+                Left (UnknownRole _ _) -> do
+                  if isQualifiedWithDomein ident
+                    then do
+                      rl <- lift $ lift $ getRoleType ident >>= getRole
+                      case rl of
+                        E (EnumeratedRole{_id}) -> pure $ ST _id
+                        C r -> lift2 $ roleADT r
+                    else throwError $ NotWellFormedName pos ident
+                Left e -> throwError e
+                Right adt -> pure adt
             Left e -> throwError e
             Right adt -> pure adt
+
+-- | States that are constructed out of a SubjectState StateSpecification may have an unqualified name because
+-- | an ExplicitRole RoleIdentification may have a RoleType that is not fully qualified.
+qualifyStateNames :: PhaseThree Unit
+qualifyStateNames = (lift $ State.gets _.dfr) >>= qualifyStateNames'
+  where
+    qualifyStateNames' :: DomeinFileRecord -> PhaseThree Unit
+    qualifyStateNames' {states} = for states (\(State sr@{id}) -> do
+      qid <- if isQualifiedWithDomein (unwrap id)
+        then pure $ unwrap id
+        -- Note that the validity of this depends on the unqualfied name being a reference to a role!
+        else qualifyLocalRoleName arcParserStartPosition (unwrap id) >>= pure <<< roletype2string
+      pure $ State sr {id = StateIdentifier qid}) >>=
+    \qstates -> modifyDF (\df -> df {states = qstates})
 
 -- | For each (Enumerated) role with a binding to the name of a CalculatedRole (falsely declared to be Enumerated!),
 -- | replace that binding with the ADT of the (now compiled) CalculatedRole.
@@ -280,8 +308,11 @@ handlePostponedStateQualifiedParts = do
       for_ postponedStateQualifiedParts (unsafePartial handlePart)
   where
 
-    collectRoles :: RoleIdentification -> PhaseThree (Array EnumeratedRoleType)
-    collectRoles (ExplicitRole _ rt _) = pure [rt]
+    -- | Qualifies incomplete names and changes RoleType constructor to CalculatedRoleType if necessary.
+    collectRoles :: RoleIdentification -> PhaseThree (Array RoleType)
+    collectRoles (ExplicitRole _ rt pos) = do
+      r <- (\a -> [a]) <$> qualifyLocalRoleName pos (roletype2string rt)
+      pure r
     collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd ->
       case range qfd of
         RDOM adt -> pure $ reduce adt
@@ -289,18 +320,20 @@ handlePostponedStateQualifiedParts = do
       where
         -- Translate the RoleIdentification to an array of EnumeratedRoleTypes.
         -- Notice we do not fail on UNIVERSAL or EMPTY.
-        reduce :: ADT EnumeratedRoleType -> Array EnumeratedRoleType
-        reduce (ST t) = [t]
+        reduce :: ADT EnumeratedRoleType -> Array RoleType
+        reduce (ST t) = [ENR t]
         reduce (SUM args) = join $ map reduce args
         reduce (PROD args) = maybe [] reduce (head args)
         reduce UNIVERSAL = []
         reduce EMPTY = []
 
+    -- | Correctly handles incomplete (not qualified) RoleIdentifications.
     collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
     collectStates mpath r = collectRoles r >>= \roles -> case mpath of
-      Nothing -> pure (StateIdentifier <<< unwrap <$> roles)
-      Just p ->  pure (StateIdentifier <<< flip append p <<< flip append "$" <<< unwrap <$> roles)
+      Nothing -> pure (StateIdentifier <<< roletype2string <$> roles)
+      Just p ->  pure (StateIdentifier <<< flip append p <<< flip append "$" <<< roletype2string <$> roles)
 
+    -- | Correctly handles incomplete (not qualified) RoleIdentifications that may occur in the SubjectState case.
     stateSpec2States :: StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
@@ -327,7 +360,8 @@ handlePostponedStateQualifiedParts = do
         (compileExpression currentDomain syntacticObjectWithEnvironment)
 
     roleIdentification2Step :: RoleIdentification -> Step
-    roleIdentification2Step (ExplicitRole ctxt (EnumeratedRoleType rt) pos) = Simple $ ArcIdentifier pos rt
+    roleIdentification2Step (ExplicitRole ctxt (ENR (EnumeratedRoleType rt)) pos) = Simple $ ArcIdentifier pos rt
+    roleIdentification2Step (ExplicitRole ctxt (CR (CalculatedRoleType rt)) pos) = Simple $ ArcIdentifier pos rt
     roleIdentification2Step (ImplicitRole ctxt stp) = stp
 
     handlePart :: Partial => AST.StateQualifiedPart -> PhaseThree Unit
@@ -344,7 +378,9 @@ handlePostponedStateQualifiedParts = do
       (compiledObject :: Maybe QueryFunctionDescription) <-
         withFrame
           (traverse (compileExpression currentDomain) syntacticObjectWithEnvironment)
-      qualifiedUsers <- map ENR <$> collectRoles user
+      -- subject is by default constructed as Enumerated but may well be an unqualified segmented name.
+      -- Qualify first!
+      qualifiedUsers <- collectRoles user
       states <- stateSpec2States (transition2stateSpec transition)
       -- Then compile the parts of the sentence, tacking each compiled part onto that sequence.
       -- The expressions in the Sentence are compiled with respect to the current context.
@@ -392,7 +428,9 @@ handlePostponedStateQualifiedParts = do
       (compiledObject :: Maybe QueryFunctionDescription) <-
         withFrame
           (traverse (compileExpression currentDomain) syntacticObjectWithEnvironment)
-      qualifiedUsers <- map ENR <$> collectRoles subject
+      -- subject is by default constructed as Enumerated but may well be an unqualified segmented name.
+      -- Qualify first!
+      qualifiedUsers <- collectRoles subject
       -- Compile the side effect. Will invert all expressions in the statements, too, including
       -- the object if it is referenced.
       states <- stateSpec2States (transition2stateSpec transition)
@@ -429,7 +467,7 @@ handlePostponedStateQualifiedParts = do
       -- ... the role verbs.
       modifyAllSubjectPerspectives qualifiedUsers objectQfd states
       where
-        modifyAllSubjectPerspectives :: Array EnumeratedRoleType -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd states = for_ qualifiedUsers
           (modifyPerspective objectQfd start
             (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) states}))
@@ -451,12 +489,12 @@ handlePostponedStateQualifiedParts = do
         states
         currentDomain
         (Just objectQfd)
-        (ENR <$> qualifiedUsers)
+        qualifiedUsers
         effect
       modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states
       where
         -- Add the action for all users to their perspective on the object in all states.
-        modifyAllSubjectPerspectives :: Array EnumeratedRoleType -> QueryFunctionDescription -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states = for_ qualifiedUsers
           (modifyPerspective
             objectQfd
@@ -481,7 +519,7 @@ handlePostponedStateQualifiedParts = do
       -- ... the action.
       modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' states
       where
-        modifyAllSubjectPerspectives :: Array EnumeratedRoleType -> QueryFunctionDescription -> PropertyVerbs -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PropertyVerbs -> Array StateIdentifier -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' states = for_ qualifiedUsers
           (modifyPerspective
             objectQfd
@@ -513,15 +551,11 @@ handlePostponedStateQualifiedParts = do
             _ -> throwError $ NotUniquelyIdentifying start view candidates
 
     -- Apply, for this user, the modifier to his perspective on the object (and create a perspective if necessary).
-    modifyPerspective :: QueryFunctionDescription -> ArcPosition -> (Perspective -> Perspective) -> EnumeratedRoleType -> PhaseThree Unit
-    modifyPerspective objectQfd start modifier (EnumeratedRoleType qualifiedSubject) = do
-      -- The user role
-      -- TODO. Hier mogen ook calculated roles verschijnen.
-      mUserRole <- getsDF ((lookup qualifiedSubject) <<< _.enumeratedRoles)
-      case mUserRole of
-        Nothing -> throwError $ UnknownRole start qualifiedSubject
-        Just (EnumeratedRole er@{perspectives}) -> do
-          -- The perspective on the object
+    modifyPerspective :: QueryFunctionDescription -> ArcPosition -> (Perspective -> Perspective) -> RoleType -> PhaseThree Unit
+    modifyPerspective objectQfd start modifier userRole =
+      case userRole of
+        ENR (EnumeratedRoleType r) -> do
+          EnumeratedRole er@{perspectives} <- getsDF (unsafePartial fromJust <<< lookup r <<< _.enumeratedRoles)
           mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
           perspective <- case mi of
             -- TODO. Invert objectQfd hier.
@@ -532,28 +566,44 @@ handlePostponedStateQualifiedParts = do
               , actions: EncodableMap Map.empty
               }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
-          -- Apply the modifier, save the changed or created perspective with the user and save in the DomeinFile.
           modifyDF \dfr@{enumeratedRoles} -> dfr {enumeratedRoles = insert
-            qualifiedSubject
+            r
             (EnumeratedRole $ er {perspectives = case mi of
               Nothing -> cons (modifier perspective) perspectives
               Just i -> unsafePartial $ fromJust $ updateAt i (modifier perspective) perspectives })
             enumeratedRoles
             }
-      pure unit
+        CR (CalculatedRoleType r) -> do
+          CalculatedRole er@{perspectives} <- getsDF (unsafePartial fromJust <<< lookup r <<< _.calculatedRoles)
+          mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
+          perspective <- case mi of
+            -- TODO. Invert objectQfd hier.
+            Nothing -> pure $ Perspective
+              { object: objectQfd
+              , roleVerbs: EncodableMap Map.empty
+              , propertyVerbs: EncodableMap Map.empty
+              , actions: EncodableMap Map.empty
+              }
+            Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
+          modifyDF \dfr@{calculatedRoles} -> dfr {calculatedRoles = insert
+            r
+            (CalculatedRole $ er {perspectives = case mi of
+              Nothing -> cons (modifier perspective) perspectives
+              Just i -> unsafePartial $ fromJust $ updateAt i (modifier perspective) perspectives })
+            calculatedRoles
+            }
 
     modifyPartOfState :: ArcPosition -> ArcPosition -> (StateRecord -> PhaseThree StateRecord) -> StateIdentifier -> PhaseThree Unit
     modifyPartOfState start end modifyState stateId = do
-      -- log ("Will modify state " <> show stateId)
       mstate <- State.gets _.dfr >>= pure <<< lookup (unwrap stateId) <<< _.states
       case mstate of
         Nothing -> isContextRootState stateId >>= if _
           then do
-            state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true")) (Cnt (ContextType (unwrap stateId))) Nil)
+            state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true")) (Cnt (ContextType (unwrap stateId))) [])
             modifyDF \drf@{states} -> drf {states = insert (unwrap stateId) state' states}
           else isRoleRootState stateId >>= if _
             then do
-              state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true")) (Rle (EnumeratedRoleType (unwrap stateId))) Nil)
+              state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true")) (Rle (EnumeratedRoleType (unwrap stateId))) [])
               modifyDF \drf@{states} -> drf {states = insert (unwrap stateId) state' states}
             else throwError $ StateDoesNotExist stateId start end
         Just (State sr) -> do

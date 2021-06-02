@@ -161,7 +161,8 @@ instance ordActionInstance :: Ord ActionInstance where
 -----------------------------------------------------------
 -- | A StateEvaluation is a combination of an instance of a Context, the user role type
 -- | played in it by the current (own) user and a State type (its root state).
-data StateEvaluation = ContextStateEvaluation StateIdentifier ContextInstance RoleType |
+data StateEvaluation =
+  ContextStateEvaluation StateIdentifier ContextInstance RoleType |
   RoleStateEvaluation StateIdentifier RoleInstance RoleType
 
 derive instance genericStateEvaluation :: Generic StateEvaluation _

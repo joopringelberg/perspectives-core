@@ -29,6 +29,15 @@ import Data.Generic.Rep.Show (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 
+-- | `Position` represents the position of the parser in the input.
+-- |
+-- | - `line` is the current line in the input
+-- | - `column` is the column of the next character in the current line that will be parsed
+newtype ArcPosition = ArcPosition
+  { line :: Int
+  , column :: Int
+  }
+
 derive instance genericArcPosition :: Generic ArcPosition _
 instance showArcPosition :: Show ArcPosition where show = genericShow
 
@@ -42,11 +51,5 @@ instance decodeArcPosition :: Decode ArcPosition where
 instance encodeArcPosition :: Encode ArcPosition where
   encode = genericEncode defaultOptions
 
--- | `Position` represents the position of the parser in the input.
--- |
--- | - `line` is the current line in the input
--- | - `column` is the column of the next character in the current line that will be parsed
-newtype ArcPosition = ArcPosition
-  { line :: Int
-  , column :: Int
-  }
+arcParserStartPosition :: ArcPosition
+arcParserStartPosition = ArcPosition{line: 1, column: 1}

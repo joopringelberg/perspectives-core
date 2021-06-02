@@ -179,14 +179,14 @@ instance showPerspectivesError :: Show PerspectivesError where
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
-type MultipleErrors = NonEmptyList PerspectivesError
+type MultiplePerspectivesErrors = NonEmptyList PerspectivesError
 
 -- | An error monad, used in this library to encode possible failures when
 -- | checking a Perspectives model data.
 -- |
 -- | The `Alt` instance for `Except` allows us to accumulate errors,
 -- | unlike `Either`, which preserves only the last error.
-type PF = ExceptT MultipleErrors MonadPerspectives
+type PF = ExceptT MultiplePerspectivesErrors MonadPerspectives
 
 -- | Throws a failure error in `F`.
 fail :: forall a. PerspectivesError -> PF a

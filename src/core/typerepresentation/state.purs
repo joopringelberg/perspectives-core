@@ -27,7 +27,6 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.List (List)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Foreign (unsafeFromForeign)
@@ -56,7 +55,7 @@ type StateRecord =
 	, subStates :: Array StateIdentifier
 	}
 
-constructState :: StateIdentifier -> Step -> StateFulObject -> List State -> State
+constructState :: StateIdentifier -> Step -> StateFulObject -> Array StateIdentifier -> State
 constructState id condition stateFulObject subStates = State
 	{id: id
 	, stateFulObject
@@ -66,7 +65,7 @@ constructState id condition stateFulObject subStates = State
 	, notifyOnExit: EncodableMap empty
 	, automaticOnEntry: EncodableMap empty
 	, automaticOnExit: EncodableMap empty
-	, subStates: []
+	, subStates
 	}
 derive instance newtypeState :: Newtype State _
 

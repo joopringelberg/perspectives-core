@@ -34,7 +34,7 @@ import Data.List (List(..), filter, findIndex, foldM, head)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
@@ -54,7 +54,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEn
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.State (State(..), StateFulObject(..), constructState)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.View (View(..)) as VIEW
 import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=))
 
@@ -214,10 +214,14 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
         else do
           -- If the RoleKind is ContextRole, we should construct the name of the External
           -- Role of the binding (which then is a Context)
+          -- This is because the ArcIdentifier following 'filledBy' for a ContextRole, identifies the context - not its
+          -- external role.
           expandedBnd <- if kindOfRole == ContextRole
             then expandNamespace (externalRoleType_ bnd)
             else expandNamespace bnd
           -- By default, comma separated types form a SUM wrt binding.
+          -- We assume expandedBnd refers to an EnumeratedRoleType. This need not be so;
+          -- it will be repaired in PhaseThree.
           pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding expandedBnd})
 
     -- ROLEASPECT
@@ -239,7 +243,6 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       pure (EnumeratedRole $ roleUnderConstruction {rootState = Just ident})
 
     -- We we add roleName as another disjunct of a sum type.
-    -- `roleName` should be qualified.
     -- Notice that we treat roles as units here; not as collections of properties!
     addToADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
     addToADT adt roleName = case adt of
@@ -266,24 +269,25 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 
 traverseStateE :: StateFulObject -> StateE -> PhaseTwo State
 traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = do
-  subStates' <- traverse (traverseStateE stateFulObect) subStates
+  subStateIds <- for subStates (toStateIdentifier <<< \(StateE{id:id'}) -> id')
   stateId <- toStateIdentifier id
-  state <- pure $ constructState stateId condition stateFulObect subStates'
+  state <- pure $ constructState stateId condition stateFulObect (ARR.fromFoldable subStateIds)
   -- Postpone all stateParts because there may be forward references to user and subject.
   parts <- traverse expandPrefix stateParts
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
   pure state
   where
+    -- NOTE that the StateIdentifiers constructed out of SubjectState need not be fully qualified.
     toStateIdentifier :: StateSpecification -> PhaseTwo StateIdentifier
     toStateIdentifier (ContextState (ContextType ctxt) spath)  = case spath of
       Nothing -> pure $ StateIdentifier ctxt
       Just segments -> pure $ StateIdentifier (ctxt <> "$" <> segments)
-    toStateIdentifier (SubjectState (ExplicitRole _ (EnumeratedRoleType er) _) spath) = case spath of
-      Nothing -> pure $ StateIdentifier er
-      Just segments -> pure $ StateIdentifier (er <> "$" <> segments)
-    toStateIdentifier (ObjectState (ExplicitRole _ (EnumeratedRoleType er) _) spath) = case spath of
-      Nothing -> pure $ StateIdentifier er
-      Just segments -> pure $ StateIdentifier (er <> "$" <> segments)
+    toStateIdentifier (SubjectState (ExplicitRole _ rt _) spath) = case spath of
+      Nothing -> pure $ StateIdentifier $ roletype2string rt
+      Just segments -> pure $ StateIdentifier (roletype2string rt <> "$" <> segments)
+    toStateIdentifier (ObjectState (ExplicitRole _ rt _) spath) = case spath of
+      Nothing -> pure $ StateIdentifier $ roletype2string rt
+      Just segments -> pure $ StateIdentifier (roletype2string rt <> "$" <> segments)
     toStateIdentifier _ = throwError (Custom "Programming error: State should be specified with a ContextState, or an ExplicitRole.")
 
 addStateToDomeinFile :: State -> DomeinFileRecord -> DomeinFileRecord

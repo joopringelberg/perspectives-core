@@ -35,7 +35,7 @@ import Perspectives.Parsing.Arc.Statement.AST (Statements)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.Sentence (Sentence)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind)
+import Perspectives.Representation.TypeIdentifiers (ContextType, RoleKind, RoleType)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 
 --------------------------------------------------------------------------------
@@ -205,7 +205,9 @@ newtype ViewE = ViewE
 --------------------------------------------------------------------------------
 ---- ROLEIDENTIFICATION
 --------------------------------------------------------------------------------
-data RoleIdentification = ExplicitRole ContextType EnumeratedRoleType ArcPosition | ImplicitRole ContextType Step
+data RoleIdentification =
+  ExplicitRole ContextType RoleType ArcPosition |
+  ImplicitRole ContextType Step
 
 derive instance genericRoleIdentification :: Generic RoleIdentification _
 instance eqRoleIdentification :: Eq RoleIdentification where eq = genericEq
