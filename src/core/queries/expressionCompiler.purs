@@ -39,7 +39,6 @@ import Data.Map (Map, empty, singleton)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
-import Effect.Class.Console (logShow)
 import Foreign.Object (keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -53,7 +52,6 @@ import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.DescriptionCompiler (qualifyReturnsClause)
 import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, propertyOfRange, range, roleRange, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
@@ -142,9 +140,9 @@ qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM 
   case computedTypeADT of
     ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure qfd
     _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
-qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCorePropertyGetter f) args (VDOM ran mrop) isF isM) = throwError "qualifyReturnsClause: implement case ExternalCorePropertyGetter"
-qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreContextGetter f) args (CDOM (ST (ContextType computedType))) isF isM) = throwError "qualifyReturnsClause: implement case ExternalCoreContextGetter"
-qualifyReturnsClause pos qfd@(MQD dom' (QF.ForeignRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = throwError "qualifyReturnsClause: implement case ForeignRoleGetter"
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCorePropertyGetter f) args (VDOM ran mrop) isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ExternalCorePropertyGetter"
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreContextGetter f) args (CDOM (ST (ContextType computedType))) isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ExternalCoreContextGetter"
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ForeignRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ForeignRoleGetter"
 qualifyReturnsClause pos qfd = pure qfd
 
 -- | Finds a RoleType defined in the model we're compiling whose string value ends with the given segments,
