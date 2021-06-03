@@ -30,7 +30,7 @@ module Perspectives.Query.ExpressionCompiler where
 -- | Use `compileAndDistributeStep` to create the QueryFunctionDescription *and* invert it,
 -- | and distribute it throughout the domain.
 
-import Control.Monad.Error.Class (try)
+import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
 import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, uncons)
@@ -53,6 +53,7 @@ import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Query.DescriptionCompiler (qualifyReturnsClause)
 import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, propertyOfRange, range, roleRange, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
@@ -62,6 +63,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
@@ -134,10 +136,15 @@ qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM 
   -- Note that it doesn't matter if we take the roles from the cache or from
   -- PhaseThreeState: the role identifiers are identical.
   enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
-  computedTypeADT <- ST <$> qualifyLocalEnumeratedRoleName pos computedType (keys enumeratedRoles)
+  computedTypeADT <- catchError
+    (ST <$> qualifyLocalEnumeratedRoleName pos computedType (keys enumeratedRoles))
+    (\_ -> lift $ lift $ getEnumeratedRole (EnumeratedRoleType computedType) >>= \(EnumeratedRole{_id}) -> pure $ ST _id)
   case computedTypeADT of
     ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure qfd
     _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCorePropertyGetter f) args (VDOM ran mrop) isF isM) = throwError "qualifyReturnsClause: implement case ExternalCorePropertyGetter"
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreContextGetter f) args (CDOM (ST (ContextType computedType))) isF isM) = throwError "qualifyReturnsClause: implement case ExternalCoreContextGetter"
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ForeignRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = throwError "qualifyReturnsClause: implement case ForeignRoleGetter"
 qualifyReturnsClause pos qfd = pure qfd
 
 -- | Finds a RoleType defined in the model we're compiling whose string value ends with the given segments,

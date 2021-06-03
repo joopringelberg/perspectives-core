@@ -49,7 +49,9 @@ instance eqEncodableMap :: (Eq k, Eq v) => Eq (EncodableMap k v) where eq (Encod
 instance encodeEncodableMap :: (Encode k, Encode v) => Encode (EncodableMap k v) where
 	encode (EncodableMap m) = encode ((\(Tuple k v) -> [encode k, encode v]) <$> (toUnfoldable m :: Array (Tuple k v)))
 instance decodeEncodableMap :: (Ord k, Decode k, Decode v) => Decode (EncodableMap k v) where
-  decode f = EncodableMap <<< fromFoldable <$> (traverse (\pair -> Tuple <$> (unsafePartial $ decode $ head pair) <*> (unsafePartial $ decode (head $ tail pair))) (unsafeFromForeign f :: Array (Array Foreign)))
+  decode f = EncodableMap <<< fromFoldable <$> (traverse
+		(\pair -> Tuple <$> (unsafePartial $ decode $ head pair) <*> (unsafePartial $ decode (head $ tail pair)))
+		(unsafeFromForeign f :: Array (Array Foreign)))
 
 instance prettyPrintEncodableMap :: (Show k, Show v) => PrettyPrint (EncodableMap k v) where
 	prettyPrint' t (EncodableMap mp) = showTree mp

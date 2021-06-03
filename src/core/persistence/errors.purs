@@ -52,7 +52,8 @@ handleNotFound funcName docName e = parsePouchError funcName docName e >>=
     Nothing -> throwError e
 
 parsePouchError :: forall m. MonadError Error m => String -> DocumentName -> Error -> m PouchError
-parsePouchError funcName docName e = case readPouchError (message e) of
-  -- Generate messages as we did before, using handleError.
-  Right err -> pure err
-  Left parseErrors -> throwError $ error (funcName <> ": cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (show e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
+parsePouchError funcName docName e = do
+  case readPouchError (message e) of
+    -- Generate messages as we did before, using handleError.
+    Right err -> pure err
+    Left parseErrors -> throwError $ error (funcName <> ": cannot parse error thrown by Pouchdb.\n" <> "The PouchError is:\n" <> (show e) <> "\nAnd these are the parse errors:\n" <> (show parseErrors))
