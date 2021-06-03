@@ -29,7 +29,6 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
-import Foreign (unsafeFromForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
@@ -73,7 +72,7 @@ derive instance genericState :: Generic State _
 instance showState :: Show State where show = genericShow
 instance eqState :: Eq State where eq = genericEq
 instance encodeState :: Encode State where encode = genericEncode defaultOptions
-instance decodeState :: Decode State where decode = unsafeFromForeign
+instance decodeState :: Decode State where decode = genericDecode defaultOptions
 
 data NotificationLevel = Alert
 derive instance genericNotificationLevel :: Generic NotificationLevel _
@@ -96,4 +95,4 @@ derive instance genericStateFulObject :: Generic StateFulObject _
 instance showStateFulObject :: Show StateFulObject where show = genericShow
 instance eqStateFulObject :: Eq StateFulObject where eq = genericEq
 instance encodeStateFulObject :: Encode StateFulObject where encode = genericEncode defaultOptions
-instance decodeStateFulObject :: Decode StateFulObject where decode = unsafeFromForeign
+instance decodeStateFulObject :: Decode StateFulObject where decode = genericDecode defaultOptions
