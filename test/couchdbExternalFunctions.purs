@@ -37,7 +37,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
+theSuite = suite "Perspectives.Extern.Couchdb" do
 
   test "models" $ runP $ withSystem do
 
@@ -116,7 +116,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Parsing") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Parsing: " <> show errs) false
 
-  testOnly "upload model:ModelManagement to repository from files (without testuser)" $ runP do
+  test "upload model:ModelManagement to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory

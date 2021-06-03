@@ -119,8 +119,8 @@ instance encodeQueryFunctionDescription :: Encode QueryFunctionDescription where
   encode = writeImpl
 
 instance decodeQueryFunctionDescription :: Decode QueryFunctionDescription where
-  decode q = genericDecode defaultOptions q
-  -- decode = readImpl
+  -- decode q = genericDecode defaultOptions q
+  decode = readImpl
 
 instance showQueryFunctionDescription :: Show QueryFunctionDescription where
   show q = genericShow q

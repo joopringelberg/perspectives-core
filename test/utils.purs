@@ -5,11 +5,12 @@ import Prelude
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff, error, throwError, try)
+import Effect.Class.Console (log)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
-import Perspectives.Persistence.API (createDatabase, deleteDatabase)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.Persistence.API (createDatabase, deleteDatabase)
 import Perspectives.Persistence.State (getCouchdbBaseURL)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
@@ -25,7 +26,8 @@ couchdbPort :: Int
 couchdbPort = 5984
 
 runP_ :: forall a. String -> MonadPerspectives a -> Aff a
-runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort "http://joopringelberg.nl/cbd/repository"
+runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort "http://127.0.0.1:5984/repository"
+-- "http://joopringelberg.nl/cbd/repository"
 
 runP :: forall a. MonadPerspectives a -> Aff a
 runP = runP_ "test"

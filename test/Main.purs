@@ -34,6 +34,7 @@ import Test.Utilities as UT
 import Test.Invitation as IT
 import Test.TypeLevelQueries as TLQ
 import Test.Instances.ObjectGetters as IOG
+import Test.DomeinFile.Encoding as DFE
 import Test.Guid as GUID
 
 
@@ -69,3 +70,4 @@ main = runTest do
   TLQ.theSuite
   IOG.theSuite
   GUID.theSuite
+  DFE.theSuite
