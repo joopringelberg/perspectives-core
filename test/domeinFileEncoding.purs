@@ -30,8 +30,8 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
-  testOnly "En-decode a DomeinFile" $ runP do
+theSuite = suite "Perspectives.Extern.Couchdb" do
+  test "En-decode a DomeinFile" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory

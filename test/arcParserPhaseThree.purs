@@ -585,7 +585,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   expectError "Bind: in-clause does not select a context"
     "domain Test\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          bind Gast to EreGast in AParty >> binding\n  context AParty filledBy Party\n  case Party\n    user EreGast filledBy Gast\n"
     case _ of
-      (Left (NotAContextDomain _ _ _)) -> assert "ok" true
+      (Left (NotAContextDomain _ _ _ _)) -> assert "ok" true
       otherwise -> do
         -- logShow otherwise
         assert "Expected the error NotAContextDomain" false

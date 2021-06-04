@@ -37,7 +37,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Extern.Couchdb" do
+theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   test "models" $ runP $ withSystem do
 
@@ -84,7 +84,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Couchdb: " <> show errs) false
 
-  test "upload model:System to repository from files" $ runP do
+  testOnly "upload model:System to repository from files" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
