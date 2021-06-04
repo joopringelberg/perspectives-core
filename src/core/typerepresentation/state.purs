@@ -90,7 +90,7 @@ instance revisionState :: Revision State where
   changeRevision _ s = s
 
 
-data StateFulObject = Cnt ContextType | Rle EnumeratedRoleType
+data StateFulObject = Cnt ContextType | Orole EnumeratedRoleType | Srole EnumeratedRoleType
 derive instance genericStateFulObject :: Generic StateFulObject _
 instance showStateFulObject :: Show StateFulObject where show = genericShow
 instance eqStateFulObject :: Eq StateFulObject where eq = genericEq

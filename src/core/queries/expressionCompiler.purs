@@ -46,6 +46,7 @@ import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCal
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
+import Perspectives.Parsing.Arc.AST (StateKind(..))
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
@@ -68,7 +69,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctional
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, show, void, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=), (<>))
 
@@ -120,8 +121,9 @@ makeRoleGetter currentDomain rt@(ENR et) = do
 -- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
 -- | Saves it in the DomainCache.
 compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT EnumeratedRoleType)
-compileAndSaveRole dom step (CalculatedRole cr@{_id}) = withFrame do
-  expressionWithEnvironment <- addContextualVariablesToExpression step Nothing
+compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole}) = withFrame do
+  -- The expression that gives the role instances is always compiled wrt the context.
+  expressionWithEnvironment <- addContextualVariablesToExpression step Nothing CState
   compiledExpression <- compileExpression dom expressionWithEnvironment
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
@@ -199,13 +201,20 @@ makePropertyGetter currentDomain pt = do
 -- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
 -- | Saves it in the DomainCache.
 compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> PhaseThree QT.Range
-compileAndSaveProperty dom step (CalculatedProperty cp@{_id}) = withFrame do
+compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role}) = withFrame do
   -- We add the role as the variable "object"
+  kindOfRole <- unsafePartial $ roleKind role
   expressionWithEnvironment <- addContextualVariablesToExpression step (Just $ Simple $ Identity (startOf step))
+    case kindOfRole of
+      UserRole -> SState
+      _ -> OState
   compiledExpression <- compileExpression dom expressionWithEnvironment
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
   pure $ range compiledExpression
+  where
+    roleKind :: Partial => EnumeratedRoleType -> PhaseThree RoleKind
+    roleKind (EnumeratedRoleType s) = gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
 
 ------------------------------------------------------------------------------------
 ------ COMPILING STEPS AND DISTRIBUTING THEIR INVERSION OVER THE DOMEINFILE.

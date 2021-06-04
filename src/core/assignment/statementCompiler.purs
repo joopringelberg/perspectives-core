@@ -69,11 +69,12 @@ import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), 
 compileStatement ::
   Array StateIdentifier ->
   Domain ->
+  Domain ->
   Maybe QueryFunctionDescription ->
   Array RoleType ->
   Statements ->
   PhaseThree QueryFunctionDescription
-compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleTypes statements =
+compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalculation' userRoleTypes statements =
   case statements of
     -- Compile a series of Assignments into a QueryDescription.
     Statements assignments -> sequenceOfAssignments userRoleTypes (reverse assignments) mobjectCalculation'
@@ -126,24 +127,24 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
   describeAssignmentStatement subjects ass mobjectCalculation = case ass of
       Remove {roleExpression} -> do
         rle <- ensureRole subjects roleExpression
-        pure $ UQD currentDomain QF.Remove rle currentDomain True True
+        pure $ UQD qualificationDomain QF.Remove rle qualificationDomain True True
       CreateRole {roleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- case contextExpression of
-          Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
+          Nothing -> pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
           (Just stp) -> ensureContext subjects stp
         qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
         pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain True True
 
       CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- case contextExpression of
-          Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
+          Nothing -> pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
           (Just stp) -> ensureContext subjects stp
         qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
         pure $ UQD currentDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte currentDomain True True
 
       CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
-        cte <- pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
+        cte <- pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
         roleQfd <- ensureRole subjects roleExpression
         qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
         pure $ UQD currentDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd currentDomain True True
@@ -159,7 +160,8 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
         -- bindingExpression should result in roles
         (bindings :: QueryFunctionDescription) <- ensureRole subjects bindingExpression
         (cte :: QueryFunctionDescription) <- case contextExpression of
-          Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
+          -- TODO. ALS het currentDomain een rol is, moeten we de context ervan nemen???
+          Nothing -> pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
           (Just (stp :: Step)) -> ensureContext subjects stp
         -- binderType should be an EnumeratedRoleType (local name should resolve w.r.t. the contextExpression)
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
@@ -204,7 +206,7 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
 
       DeleteRole f@{roleIdentifier, contextExpression} -> do
         (contextQfd :: QueryFunctionDescription) <- case contextExpression of
-          Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
+          Nothing -> pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
           (Just stp) -> ensureContext subjects stp
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier contextQfd f.start f.end
         pure $ UQD currentDomain (QF.DeleteRole qualifiedRoleIdentifier) contextQfd currentDomain True True
@@ -270,7 +272,7 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
         qualifyWithRespectTo roleIdentifier contextFunctionDescription start end = do
           (ct :: ADT ContextType) <- case range contextFunctionDescription of
             (CDOM ct') -> pure ct'
-            otherwise -> throwError $ NotAContextDomain otherwise start end
+            otherwise -> throwError $ NotAContextDomain contextFunctionDescription otherwise start end
           mrt <- if isQualifiedWithDomein roleIdentifier
             then if isExternalRole roleIdentifier
               then pure [ENR $ EnumeratedRoleType roleIdentifier]
@@ -289,7 +291,7 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
         qualifyContextTypeWithRespectTo contextIdentifier contextFunctionDescription start end = do
           (ct :: ADT ContextType) <- case range contextFunctionDescription of
             (CDOM ct') -> pure ct'
-            otherwise -> throwError $ NotAContextDomain otherwise start end
+            otherwise -> throwError $ NotAContextDomain contextFunctionDescription otherwise start end
           mrt <- lift2 (ct ###> lookForUnqualifiedContextType contextIdentifier)
           case mrt of
             Just ctype -> pure ctype
@@ -333,7 +335,7 @@ compileStatement stateIdentifiers currentDomain mobjectCalculation' userRoleType
           qfd <- compileAndDistributeStep currentDomain stp userTypes stateIdentifiers
           case range qfd of
             (CDOM _) -> pure qfd
-            otherwise -> throwError $ NotAContextDomain (range qfd) (startOf stp) (endOf stp)
+            otherwise -> throwError $ NotAContextDomain qfd (range qfd) (startOf stp) (endOf stp)
 
         -- Compiles the Step and inverts it as well.
         ensureRole :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription

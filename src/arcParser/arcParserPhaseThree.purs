@@ -53,14 +53,14 @@ import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDom
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), StateQualifiedPart(..), StateTransitionE(..), StateSpecification(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateSpecification(..), StateTransitionE(..))
-import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression, addContextualVariablesToStatements)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression, addContextualVariablesToStatements, stateSpec2stateKind)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..), arcParserStartPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName)
+import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName)
 import Perspectives.Query.Kinked (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription, range)
 import Perspectives.Query.StatementCompiler (compileStatement)
@@ -76,7 +76,7 @@ import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(.
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
 import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=))
@@ -102,7 +102,6 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
       invertPerspectiveObjects
-      compileStates
       )
     df
     indexedContexts
@@ -352,17 +351,12 @@ handlePostponedStateQualifiedParts = do
     -- a runtime variable binding of "currentcontext" (that can be referred in the
     -- expression that defines the object) and the object expression itself.
     -- This function leaves the compile time environment as it is.
-    objectToQueryFunctionDescription :: RoleIdentification -> Domain -> PhaseThree QueryFunctionDescription
-    objectToQueryFunctionDescription syntacticObject currentDomain = do
-      (syntacticObjectWithEnvironment :: Step) <- addContextualVariablesToExpression (roleIdentification2Step syntacticObject) Nothing
+    objectToQueryFunctionDescription :: RoleIdentification -> Domain -> StateSpecification -> PhaseThree QueryFunctionDescription
+    objectToQueryFunctionDescription syntacticObject currentDomain stateSpec = do
+      (syntacticObjectWithEnvironment :: Step) <- addContextualVariablesToExpression (roleIdentification2Step syntacticObject) Nothing (stateSpec2stateKind stateSpec)
         -- Make a QueryFunctionDescription of a function that computes the object.
       withFrame
         (compileExpression currentDomain syntacticObjectWithEnvironment)
-
-    roleIdentification2Step :: RoleIdentification -> Step
-    roleIdentification2Step (ExplicitRole ctxt (ENR (EnumeratedRoleType rt)) pos) = Simple $ ArcIdentifier pos rt
-    roleIdentification2Step (ExplicitRole ctxt (CR (CalculatedRoleType rt)) pos) = Simple $ ArcIdentifier pos rt
-    roleIdentification2Step (ImplicitRole ctxt stp) = stp
 
     handlePart :: Partial => AST.StateQualifiedPart -> PhaseThree Unit
 
@@ -371,46 +365,56 @@ handlePostponedStateQualifiedParts = do
       -- Take the context from the state specification. If we have context state, it must be the context that
       -- we compute the object in. If it is either subject- or object state, their RoleSpecification contains the
       -- context type we compute the subject or object from.
-      currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType $ transition2stateSpec transition)
+      contextDomain <- pure (CDOM $ ST $ stateSpec2ContextType (transition2stateSpec transition))
+      currentDomain <- statespec2Domain (transition2stateSpec transition)
       -- Add "currentcontext" in a Let if it is used in the syntacticObject.
-      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (flip addContextualVariablesToExpression Nothing) (roleIdentification2Step <$> syntacticObject)
+      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (\stp -> addContextualVariablesToExpression stp Nothing (stateSpec2stateKind $ transition2stateSpec transition)) (roleIdentification2Step <$> syntacticObject)
         -- Make a QueryFunctionDescription of a function that computes the object.
       (compiledObject :: Maybe QueryFunctionDescription) <-
         withFrame
-          (traverse (compileExpression currentDomain) syntacticObjectWithEnvironment)
+          (traverse (compileExpression contextDomain) syntacticObjectWithEnvironment)
       -- subject is by default constructed as Enumerated but may well be an unqualified segmented name.
       -- Qualify first!
       qualifiedUsers <- collectRoles user
       states <- stateSpec2States (transition2stateSpec transition)
       -- Then compile the parts of the sentence, tacking each compiled part onto that sequence.
       -- The expressions in the Sentence are compiled with respect to the current context.
-      compiledMessage <- compileSentence currentDomain message qualifiedUsers states
-      modifyAllStates compiledMessage compiledObject qualifiedUsers states
+      compiledMessage <- compileSentence currentDomain message qualifiedUsers states (transition2stateSpec transition)
+      modifyAllStates compiledMessage compiledObject qualifiedUsers states currentDomain
       where
-          modifyAllStates :: Sentence.Sentence -> Maybe QueryFunctionDescription -> Array RoleType -> Array StateIdentifier -> PhaseThree Unit
-          modifyAllStates compiledMessage objectCalculation qualifiedUsers states = for_ states
+          modifyAllStates :: Sentence.Sentence -> Maybe QueryFunctionDescription -> Array RoleType -> Array StateIdentifier -> Domain -> PhaseThree Unit
+          modifyAllStates compiledMessage objectCalculation qualifiedUsers states currentDomain = for_ states
             \stateId -> modifyPartOfState
               start
               end
-              (\(sr@{notifyOnEntry, notifyOnExit, object}) -> do
+              (\(sr@{notifyOnEntry, notifyOnExit, object, query}) -> do
                 object' <- case object of
                   -- No object in the state? Replace it by the calculation we've computed here.
                   Nothing -> pure objectCalculation
                   -- Otherwise, just keep what we have.
                   Just _ -> pure object
+                -- Compile the query if we've not done it before.
+                query' <- case query of
+                  Q q -> pure $ Q q
+                  S stp -> do
+                    expressionWithEnvironment <- addContextualVariablesToExpression
+                      stp
+                      (roleIdentification2Step <$> syntacticObject)
+                      (stateSpec2stateKind $ transition2stateSpec transition)
+                    Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
                 case transition of
-                  AST.Entry _ -> pure $ sr {notifyOnEntry = EncodableMap $ addAll compiledMessage (unwrap notifyOnEntry) qualifiedUsers, object = object'}
-                  AST.Exit _ -> pure $ sr {notifyOnExit = EncodableMap $ addAll compiledMessage (unwrap notifyOnExit) qualifiedUsers, object = object'})
+                  AST.Entry _ -> pure $ sr {notifyOnEntry = EncodableMap $ addAll compiledMessage (unwrap notifyOnEntry) qualifiedUsers, object = object', query = query'}
+                  AST.Exit _ -> pure $ sr {notifyOnExit = EncodableMap $ addAll compiledMessage (unwrap notifyOnExit) qualifiedUsers, object = object', query = query'})
               stateId
 
-          compileSentence :: Domain -> Sentence.Sentence -> Array RoleType -> Array StateIdentifier -> PhaseThree Sentence.Sentence
-          compileSentence currentDomain (Sentence.Sentence parts) qualifiedUsers' states = Sentence.Sentence <$> traverse compilePart parts
+          compileSentence :: Domain -> Sentence.Sentence -> Array RoleType -> Array StateIdentifier -> StateSpecification -> PhaseThree Sentence.Sentence
+          compileSentence currentDomain (Sentence.Sentence parts) qualifiedUsers' states stateSpec = Sentence.Sentence <$> traverse compilePart parts
             where
               compilePart :: Sentence.SentencePart -> PhaseThree Sentence.SentencePart
               compilePart hr@(Sentence.HR _) = pure hr
               compilePart cp@(Sentence.CP (Q _)) = pure cp
               compilePart (Sentence.CP (S stp)) = do
-                expressionWithEnvironment <- addContextualVariablesToExpression stp (roleIdentification2Step <$> syntacticObject)
+                expressionWithEnvironment <- addContextualVariablesToExpression stp (roleIdentification2Step <$> syntacticObject) (stateSpec2stateKind stateSpec)
                 compiledPart <- withFrame (compileAndDistributeStep
                   currentDomain
                   expressionWithEnvironment
@@ -421,47 +425,59 @@ handlePostponedStateQualifiedParts = do
 
     -- Compiles and distributes all expressions in the automatic effect.
     handlePart (AST.AE (AST.AutomaticEffectE{subject, object: syntacticObject, transition, effect, start, end})) = do
-      currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType $ transition2stateSpec transition)
+      currentDomain <- statespec2Domain (transition2stateSpec transition)
+      contextDomain <- pure (CDOM $ ST $ stateSpec2ContextType (transition2stateSpec transition))
       -- Add "currentcontext" in a Let if it is used in the syntacticObject.
-      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (flip addContextualVariablesToExpression Nothing) (roleIdentification2Step <$> syntacticObject)
+      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (\stp -> addContextualVariablesToExpression stp Nothing (stateSpec2stateKind $ transition2stateSpec transition)) (roleIdentification2Step <$> syntacticObject)
         -- Make a QueryFunctionDescription of a function that computes the object.
       (compiledObject :: Maybe QueryFunctionDescription) <-
         withFrame
-          (traverse (compileExpression currentDomain) syntacticObjectWithEnvironment)
+          (traverse (compileExpression contextDomain) syntacticObjectWithEnvironment)
       -- subject is by default constructed as Enumerated but may well be an unqualified segmented name.
       -- Qualify first!
       qualifiedUsers <- collectRoles subject
       -- Compile the side effect. Will invert all expressions in the statements, too, including
       -- the object if it is referenced.
       states <- stateSpec2States (transition2stateSpec transition)
-      effectWithEnvironment <- addContextualVariablesToStatements effect (roleIdentification2Step <$> syntacticObject)
+      effectWithEnvironment <- addContextualVariablesToStatements effect (roleIdentification2Step <$> syntacticObject) (stateSpec2stateKind $ transition2stateSpec transition)
       (sideEffect :: QueryFunctionDescription) <- compileStatement
         states
         currentDomain
+        contextDomain
         compiledObject
         qualifiedUsers
         effectWithEnvironment
-      modifyAllStates compiledObject sideEffect qualifiedUsers states
+      modifyAllStates compiledObject sideEffect qualifiedUsers states currentDomain
       where
-        modifyAllStates :: Maybe QueryFunctionDescription -> QueryFunctionDescription -> Array RoleType -> Array StateIdentifier -> PhaseThree Unit
-        modifyAllStates objectCalculation sideEffect qualifiedUsers states = for_ states
+        modifyAllStates :: Maybe QueryFunctionDescription -> QueryFunctionDescription -> Array RoleType -> Array StateIdentifier -> Domain -> PhaseThree Unit
+        modifyAllStates objectCalculation sideEffect qualifiedUsers states currentDomain = for_ states
           (modifyPartOfState start end
-            \(sr@{automaticOnEntry, automaticOnExit, object}) -> do
+            \(sr@{automaticOnEntry, automaticOnExit, object, query}) -> do
               object' <- case object of
                 -- No object in the state? Replace it by the calculation we've computed here.
+                -- TODO. Hier zouden we de query kunnen berekenen; we hebben nog beschikking over de syntactische versie van het object.
                 Nothing -> pure objectCalculation
                 -- Otherwise, just keep what we have.
                 Just _ -> pure object
+                -- Compile the query if we've not done it before.
+              query' <- case query of
+                Q q -> pure $ Q q
+                S stp -> do
+                  expressionWithEnvironment <- addContextualVariablesToExpression
+                    stp
+                    (roleIdentification2Step <$> syntacticObject)
+                    (stateSpec2stateKind $ transition2stateSpec transition)
+                  Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
               case transition of
-                AST.Entry _ -> pure $ sr {automaticOnEntry = EncodableMap $ addAll sideEffect (unwrap automaticOnEntry) qualifiedUsers, object = object'}
-                AST.Exit _ -> pure $ sr {automaticOnExit = EncodableMap $ addAll sideEffect (unwrap automaticOnExit) qualifiedUsers, object = object'})
+                AST.Entry _ -> pure $ sr {automaticOnEntry = EncodableMap $ addAll sideEffect (unwrap automaticOnEntry) qualifiedUsers, object = object', query = query'}
+                AST.Exit _ -> pure $ sr {automaticOnExit = EncodableMap $ addAll sideEffect (unwrap automaticOnExit) qualifiedUsers, object = object', query = query'})
 
     handlePart (AST.R (AST.RoleVerbE{subject, object, state, roleVerbs:rv, start})) = do
       currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
       -- Add, for all these users...
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
-      objectQfd <- objectToQueryFunctionDescription object currentDomain
+      objectQfd <- objectToQueryFunctionDescription object currentDomain state
       -- ... for these states only...
       states <- stateSpec2States state
       -- ... the role verbs.
@@ -472,12 +488,12 @@ handlePostponedStateQualifiedParts = do
           (modifyPerspective objectQfd start
             (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) states}))
 
-    handlePart (AST.AC (AST.ActionE{id, subject, object, state, effect, start})) = do
+    handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start})) = do
       currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
       -- Add, for all these users...
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
-      objectQfd <- objectToQueryFunctionDescription object currentDomain
+      objectQfd <- objectToQueryFunctionDescription syntacticObject currentDomain state
       -- ... for these states only...
       -- Note that the subjects in whose states we execute, do not need be the qualified users we give access to the Action:
       -- 'I can check your heart beat when you are at home' illustrates this independence.
@@ -485,12 +501,14 @@ handlePostponedStateQualifiedParts = do
       -- ... this action.
       -- (Compile the side effect. Will invert all expressions in the statements, too, including the
       -- object if it is referenced)
+      effectWithEnvironment <- addContextualVariablesToStatements effect (Just $ roleIdentification2Step syntacticObject) (stateSpec2stateKind state)
       (theAction :: QueryFunctionDescription) <- compileStatement
         states
         currentDomain
+        currentDomain
         (Just objectQfd)
         qualifiedUsers
-        effect
+        effectWithEnvironment
       modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states
       where
         -- Add the action for all users to their perspective on the object in all states.
@@ -511,7 +529,7 @@ handlePostponedStateQualifiedParts = do
       -- Add, for all these users...
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
-      objectQfd <- objectToQueryFunctionDescription object currentDomain
+      objectQfd <- objectToQueryFunctionDescription object currentDomain state
       propertyTypes <- constructPropertyVerbs propsOrView
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes (fromFoldable propertyVerbs)
       -- ... for these states only...
@@ -603,7 +621,11 @@ handlePostponedStateQualifiedParts = do
             modifyDF \drf@{states} -> drf {states = insert (unwrap stateId) state' states}
           else isRoleRootState stateId >>= if _
             then do
-              state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true")) (Rle (EnumeratedRoleType (unwrap stateId))) [])
+              rk <- unsafePartial $ roleKind stateId
+              state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true"))
+                (case rk of
+                  UserRole -> (Srole (EnumeratedRoleType (unwrap stateId)))
+                  _ -> (Orole (EnumeratedRoleType (unwrap stateId)))) [])
               modifyDF \drf@{states} -> drf {states = insert (unwrap stateId) state' states}
             else throwError $ StateDoesNotExist stateId start end
         Just (State sr) -> do
@@ -617,6 +639,9 @@ handlePostponedStateQualifiedParts = do
 
         isRoleRootState :: StateIdentifier -> PhaseThree Boolean
         isRoleRootState (StateIdentifier s) = State.gets _.dfr >>= pure <<< isJust <<< lookup s <<< _.enumeratedRoles
+
+        roleKind :: Partial => StateIdentifier -> PhaseThree RoleKind
+        roleKind (StateIdentifier s) = State.gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
 
 invertPerspectiveObjects :: PhaseThree Unit
 invertPerspectiveObjects = do
@@ -651,61 +676,6 @@ invertPerspectiveObjects = do
         explicitSet2RelevantProperties Empty = Properties []
         explicitSet2RelevantProperties (PSet ps) = Properties ps
 
--- | For each State, compile the query, the object (if any) and the SideEffects.
--- | All names are qualified in the process. Notice that all other names are qualified, by now:
--- |  * object
--- |  * binding of role definitions
--- |  * references of properties (in views)
--- |  * references to views
--- |  * the type of value that is returned from a computed role
--- | This means we can look for the qualified version of a local name using the functions in
--- | Perspectives.Types.ObjectGetters, as long as we make sure the model under construction is in the DomainCache.
-compileStates :: PhaseThree Unit
-compileStates = do
-  df@{_id} <- lift $ State.gets _.dfr
-  withDomeinFile
-    _id
-    (DomeinFile df)
-    (compileStates' df)
-  where
-    compileStates' :: DomeinFileRecord -> PhaseThree Unit
-    compileStates' {states, enumeratedRoles} = do
-      compStates <- traverse compileState states
-      modifyDF \dfr -> dfr {states = compStates}
-      where
-        compileState :: State -> PhaseThree State
-        compileState s@(State{stateFulObject}) = case stateFulObject of
-          Cnt context -> compileContextState context s
-          Rle role -> compileRoleState role s
-
-        compileRoleState :: EnumeratedRoleType -> State -> PhaseThree State
-        compileRoleState roleType state@(State ar@{id:stateIdentifier, query, notifyOnEntry, notifyOnExit, automaticOnEntry, automaticOnExit}) = do
-          currentDomain <- pure (RDOM $ ST roleType)
-          queryDescription <- case query of
-            Q d -> pure d
-            -- We have to do this for all user role types in the notifyOnEntry, notifyOnExit, automaticOnEntry
-            -- and automaticOnExit members.
-            S stp -> do
-              -- A State query only has to return the ContextInstance or RoleInstance that the state query is executed on.
-              expressionWithEnvironment <- addContextualVariablesToExpression stp Nothing
-              compileAndDistributeStep currentDomain expressionWithEnvironment [] [stateIdentifier]
-          pure $ State ar { query = Q queryDescription }
-
-        compileContextState :: ContextType -> State -> PhaseThree State
-        compileContextState context state@(State ar@{id:stateIdentifier, query, object, notifyOnEntry, notifyOnExit, automaticOnEntry, automaticOnExit}) = withFrame $ do
-          currentDomain <- pure (CDOM $ ST context)
-          queryDescription <- case query of
-            Q d -> pure d
-            -- We have to do this for all user role types in the notifyOnEntry, notifyOnExit, automaticOnEntry
-            -- and automaticOnExit members.
-            S stp -> do
-              -- A State query only has to return the ContextInstance or RoleInstance that the state query is executed on.
-              expressionWithEnvironment <- addContextualVariablesToExpression stp Nothing
-              -- The empty list of user types implies deltas are not distributed; however, the inverted queries
-              -- computed are used to trigger state change.
-              compileAndDistributeStep currentDomain expressionWithEnvironment [] [stateIdentifier]
-          pure $ State ar { query = Q queryDescription }
-
 transition2stateSpec :: StateTransitionE -> StateSpecification
 transition2stateSpec (Entry s) = s
 transition2stateSpec (Exit s) = s
@@ -716,3 +686,20 @@ stateSpec2ContextType (SubjectState (ExplicitRole c _ _) _) = c
 stateSpec2ContextType (SubjectState (ImplicitRole c _) _) = c
 stateSpec2ContextType (ObjectState (ExplicitRole c _ _) _) = c
 stateSpec2ContextType (ObjectState (ImplicitRole c _) _) = c
+
+-- A ContextState is mapped to a CDOM.
+-- A SubjectState and ObjectState are determined from their RoleIdentification.
+-- We turn the RoleIdentification in a step, compile that with CompileStep and take its Range.
+statespec2Domain :: Partial => StateSpecification -> PhaseThree Domain
+statespec2Domain (ContextState ctype _) = pure $ CDOM (ST ctype)
+statespec2Domain (SubjectState roleIdentification _) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
+statespec2Domain (ObjectState roleIdentification ctype) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
+
+roleIdentification2Step :: RoleIdentification -> Step
+roleIdentification2Step (ExplicitRole ctxt (ENR (EnumeratedRoleType rt)) pos) = Simple $ ArcIdentifier pos rt
+roleIdentification2Step (ExplicitRole ctxt (CR (CalculatedRoleType rt)) pos) = Simple $ ArcIdentifier pos rt
+roleIdentification2Step (ImplicitRole ctxt stp) = stp
+
+roleIdentification2Context :: RoleIdentification -> ContextType
+roleIdentification2Context (ExplicitRole ctxt _ _) = ctxt
+roleIdentification2Context (ImplicitRole ctxt _) = ctxt

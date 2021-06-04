@@ -237,8 +237,10 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       pure (EnumeratedRole $ roleUnderConstruction {indexedRole = Just (RoleInstance expandedIndexedName)})
 
     -- ROLESTATE
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{_id, context}) (ROLESTATE s@(StateE{id:stateId})) = do
-      state@(State{id:ident}) <- traverseStateE (Rle _id) s
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId})) = do
+      state@(State{id:ident}) <- traverseStateE (case kind of
+        UserRole -> Srole _id
+        _ -> Orole _id) s
       modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
       pure (EnumeratedRole $ roleUnderConstruction {rootState = Just ident})
 
