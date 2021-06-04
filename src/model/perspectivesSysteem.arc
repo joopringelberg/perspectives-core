@@ -53,7 +53,7 @@ domain System
           do for User
             -- After removing the object, we can no longer find the name, so bind it first.
             letA
-              model <- object >> binding >> context >> contextType >> modelname
+              --model <- binding >> context >> contextType >> modelname
             in
               remove object
               -- Until we've got sound and complete cascade delete, do not remove the model.
@@ -64,7 +64,7 @@ domain System
         -- Create an entry in IndexedContexts if its model has been taken in use.
         on entry
           do for User
-            bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
+            bind binding >> context >> IndexedContext >> binding to IndexedContexts
 
     context PendingInvitations = callExternal cdb:PendingInvitations() returns sys:Invitation$External
 
