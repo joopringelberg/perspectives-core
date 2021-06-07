@@ -147,7 +147,7 @@ contextTypeModelName' :: ContextType ~~> Value
 contextTypeModelName' (ContextType rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
 
 rootState :: ContextType ~~~> StateIdentifier
-rootState = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< singleton <<< _.rootState <<< unwrap)
+rootState = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< maybe [] singleton <<< _.rootState <<< unwrap)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON STATE

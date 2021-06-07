@@ -112,10 +112,13 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       qualifiedIndexedName <- expandNamespace indexedName
       pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
 
-    handleParts (Context contextUnderConstruction@({_id})) (STATE s@(StateE{id:stateId})) = do
+    handleParts c@(Context contextUnderConstruction@({_id})) (STATE s@(StateE{id:stateId})) = do
       state@(State{id:ident}) <- traverseStateE (Cnt _id) s
       modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
-      pure $ Context contextUnderConstruction {rootState = ident}
+      -- If this state is the context root state, we could register it as such with the context.
+      -- However, if not, we should register it with its parent and that need not be available.
+      -- Hence, we postpone registering the state to PhaseThree.
+      pure c
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = LN.over
@@ -237,12 +240,15 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       pure (EnumeratedRole $ roleUnderConstruction {indexedRole = Just (RoleInstance expandedIndexedName)})
 
     -- ROLESTATE
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId})) = do
+    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId})) = do
       state@(State{id:ident}) <- traverseStateE (case kind of
         UserRole -> Srole _id
         _ -> Orole _id) s
       modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
-      pure (EnumeratedRole $ roleUnderConstruction {rootState = Just ident})
+      -- If this state is the role root state, we could register it as such with the role.
+      -- However, if not, we should register it with its parent and that need not be available.
+      -- Hence, we postpone registering the state to PhaseThree.
+      pure e
 
     -- We we add roleName as another disjunct of a sum type.
     -- Notice that we treat roles as units here; not as collections of properties!

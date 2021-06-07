@@ -144,14 +144,17 @@ runStates t = do
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          state <- lift2 (ctxt ##>> contextType >=> liftToInstanceLevel rootState)
-          -- Provide a new frame for the current context variable binding.
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap ctxt]
-          -- Error boundary.
-          catchError (enteringState ctxt myType state)
-            \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+          mstate <- lift2 (ctxt ##> contextType >=> liftToInstanceLevel rootState)
+          case mstate of
+            Nothing -> pure unit
+            Just state -> do
+              -- Provide a new frame for the current context variable binding.
+              oldFrame <- lift2 pushFrame
+              lift2 $ addBinding "currentcontext" [unwrap ctxt]
+              -- Error boundary.
+              catchError (enteringState ctxt myType state)
+                \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
+              lift2 $ restoreFrame oldFrame
   -- Exit the rootState of contexts that are deleted.
   for_ contextsToBeRemoved
     \ctxt -> do
@@ -159,14 +162,17 @@ runStates t = do
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          state <- lift2 (ctxt ##>> contextType >=> liftToInstanceLevel rootState)
-          -- Provide a new frame for the current context variable binding.
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap ctxt]
-          -- Error boundary.
-          catchError (exitingState ctxt myType state)
-            \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+          mstate <- lift2 (ctxt ##> contextType >=> liftToInstanceLevel rootState)
+          case mstate of
+            Nothing -> pure unit
+            Just state -> do
+              -- Provide a new frame for the current context variable binding.
+              oldFrame <- lift2 pushFrame
+              lift2 $ addBinding "currentcontext" [unwrap ctxt]
+              -- Error boundary.
+              catchError (exitingState ctxt myType state)
+                \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
+              lift2 $ restoreFrame oldFrame
   -- Enter the rootState of roles that are created.
   for_ createdRoles
     \rid -> do
@@ -175,13 +181,16 @@ runStates t = do
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          state <- lift2 (rid ##>> roleType >=> liftToInstanceLevel roleRootState)
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap ctxt]
-          -- Error boundary.
-          catchError (enteringRoleState rid myType state)
-            \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+          mstate <- lift2 (rid ##> roleType >=> liftToInstanceLevel roleRootState)
+          case mstate of
+            Nothing -> pure unit
+            Just state -> do
+              oldFrame <- lift2 pushFrame
+              lift2 $ addBinding "currentcontext" [unwrap ctxt]
+              -- Error boundary.
+              catchError (enteringRoleState rid myType state)
+                \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
+              lift2 $ restoreFrame oldFrame
   -- Exit the rootState of roles that are removed.
   for_ rolesToBeRemoved
     \rid -> do
@@ -190,13 +199,16 @@ runStates t = do
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          state <- lift2 (rid ##>> roleType >=> liftToInstanceLevel roleRootState)
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap ctxt]
-          -- Error boundary.
-          catchError (exitingRoleState rid myType state)
-            \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+          mstate <- lift2 (rid ##> roleType >=> liftToInstanceLevel roleRootState)
+          case mstate of
+            Nothing -> pure unit
+            Just state -> do
+              oldFrame <- lift2 pushFrame
+              lift2 $ addBinding "currentcontext" [unwrap ctxt]
+              -- Error boundary.
+              catchError (exitingRoleState rid myType state)
+                \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
+              lift2 $ restoreFrame oldFrame
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure t

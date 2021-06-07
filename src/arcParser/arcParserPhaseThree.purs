@@ -49,7 +49,7 @@ import Perspectives.CoreTypes ((###=), MP)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
-import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), StateQualifiedPart(..), StateTransitionE(..), StateSpecification(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateSpecification(..), StateTransitionE(..))
@@ -70,6 +70,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole)
 import Perspectives.Representation.Class.Role (getRole, getRoleType, roleADT, Role(..))
+import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
@@ -78,8 +79,8 @@ import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as 
 import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
-import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=))
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, rootState, statesPerProperty)
+import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<#>), eq)
 
 phaseThree :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} postponedParts = do
@@ -101,6 +102,7 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       requalifyBindingsToCalculatedRoles
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
+      registerStates
       invertPerspectiveObjects
       )
     df
@@ -676,6 +678,30 @@ invertPerspectiveObjects = do
         explicitSet2RelevantProperties Universal = All
         explicitSet2RelevantProperties Empty = Properties []
         explicitSet2RelevantProperties (PSet ps) = Properties ps
+
+registerStates :: PhaseThree Unit
+registerStates = do
+  df@{contexts, enumeratedRoles, states} <- lift $ State.gets _.dfr
+  modifyDF \dfr -> dfr
+    { contexts =
+      -- Register a root state with all contexts that have one.
+        contexts <#> \c@(REP.Context ctxt@{_id}) -> if isJust $ lookup (unwrap _id) states
+          then (REP.Context ctxt {rootState = Just $ StateIdentifier (unwrap _id)})
+          else c
+    , enumeratedRoles =
+      -- Register a root state with all enumerated roles that have one.
+        enumeratedRoles <#> \e@(EnumeratedRole erole@{_id}) -> if isJust $ lookup (unwrap _id) states
+          then (EnumeratedRole erole {rootState = Just $ StateIdentifier (unwrap _id)})
+          else e
+    , states =
+      -- Register all substates with each state.
+        states <#> \(State sr@{id}) -> State $ sr { subStates = StateIdentifier <$> filter (isDirectSubstateOf $ unwrap id) (keys states)}
+    }
+  where
+    -- True, if sub adds a single segment to super.
+    isDirectSubstateOf ::String -> String -> Boolean
+    isDirectSubstateOf super sub = maybe false (eq sub) (deconstructNamespace super)
+
 
 transition2stateSpec :: StateTransitionE -> StateSpecification
 transition2stateSpec (Entry s) = s
