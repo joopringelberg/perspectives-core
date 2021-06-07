@@ -32,18 +32,19 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, filter, findIndex, foldr, fromFoldable, head, index, length, updateAt)
+import Data.Array (catMaybes, cons, filter, findIndex, foldr, fromFoldable, head, index, length, updateAt)
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
 import Data.List (List)
 import Data.Map (Map, empty, insert, lookup) as Map
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, insert, keys, lookup, unions, singleton)
+import Foreign.Object (Object, insert, keys, lookup, singleton, unions, values, union)
+import Foreign.Object (fromFoldable) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
@@ -79,7 +80,7 @@ import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as 
 import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, rootState, statesPerProperty)
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
 import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<#>), eq)
 
 phaseThree :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
@@ -102,6 +103,7 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       requalifyBindingsToCalculatedRoles
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
+      createMissingRootStates
       registerStates
       invertPerspectiveObjects
       )
@@ -679,6 +681,27 @@ invertPerspectiveObjects = do
         explicitSet2RelevantProperties Empty = Properties []
         explicitSet2RelevantProperties (PSet ps) = Properties ps
 
+createMissingRootStates :: PhaseThree Unit
+createMissingRootStates = do
+  df@{contexts, enumeratedRoles, states} <- lift $ State.gets _.dfr
+  (missingRootStates :: Object State) <- pure $ OBJ.fromFoldable $ catMaybes $ values states <#> \(State{id, stateFulObject}) -> case stateFulObject of
+    Cnt (ContextType ctype) -> if ctype `isDirectSuperStateOf` (unwrap id)
+      then if isNothing $ lookup ctype states
+        then Just $ Tuple ctype $ constructState (StateIdentifier ctype) (Simple (Value arcParserStartPosition PBool "true")) (Cnt $ ContextType ctype) []
+        else Nothing
+      else Nothing
+    Orole (EnumeratedRoleType rtype) -> if rtype `isDirectSuperStateOf` (unwrap id)
+      then if isNothing $ lookup rtype states
+        then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Simple (Value arcParserStartPosition PBool "true")) (Orole $ EnumeratedRoleType rtype) []
+        else Nothing
+      else Nothing
+    Srole (EnumeratedRoleType rtype) -> if rtype `isDirectSuperStateOf` (unwrap id)
+      then if isNothing $ lookup rtype states
+        then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Simple (Value arcParserStartPosition PBool "true")) (Orole $ EnumeratedRoleType rtype) []
+        else Nothing
+      else Nothing
+  modifyDF \dfr -> dfr {states = states `union` missingRootStates}
+
 registerStates :: PhaseThree Unit
 registerStates = do
   df@{contexts, enumeratedRoles, states} <- lift $ State.gets _.dfr
@@ -695,12 +718,18 @@ registerStates = do
           else e
     , states =
       -- Register all substates with each state.
-        states <#> \(State sr@{id}) -> State $ sr { subStates = StateIdentifier <$> filter (isDirectSubstateOf $ unwrap id) (keys states)}
+        states <#> \(State sr@{id}) -> State $ sr { subStates = StateIdentifier <$> filter (isDirectSuperStateOf $ unwrap id) (keys states)}
     }
-  where
-    -- True, if sub adds a single segment to super.
-    isDirectSubstateOf ::String -> String -> Boolean
-    isDirectSubstateOf super sub = maybe false (eq sub) (deconstructNamespace super)
+
+-- True, if sub adds a single segment to super.
+-- sub `isDirectSubstateOf` super
+-- model:System$PerspectivesSystem$Root `isDirectSubStateOf` model:System$PerspectivesSystem
+isDirectSubstateOf ::String -> String -> Boolean
+isDirectSubstateOf sub super = maybe false (eq super) (deconstructNamespace sub)
+-- sub `isDirectSuperStateOf` super
+-- model:System$PerspectivesSystem `isDirectSuperStateOf` model:System$PerspectivesSystem$Root
+isDirectSuperStateOf ::String -> String -> Boolean
+isDirectSuperStateOf = flip isDirectSubstateOf
 
 
 transition2stateSpec :: StateTransitionE -> StateSpecification
