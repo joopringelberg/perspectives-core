@@ -58,12 +58,12 @@ import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExp
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
-import Perspectives.Parsing.Arc.Position (ArcPosition(..), arcParserStartPosition)
+import Perspectives.Parsing.Arc.Position (ArcPosition, arcParserStartPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName)
 import Perspectives.Query.Kinked (setInvertedQueries)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription, range)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Query.StatementCompiler (compileStatement)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -75,9 +75,11 @@ import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
@@ -622,12 +624,12 @@ handlePostponedStateQualifiedParts = do
       case mstate of
         Nothing -> isContextRootState stateId >>= if _
           then do
-            state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true")) (Cnt (ContextType (unwrap stateId))) [])
+            state' <- State <$> modifyState (unwrap $ constructState stateId (Q $ trueCondition (CDOM $ ST (ContextType (unwrap stateId)))) (Cnt (ContextType (unwrap stateId))) [])
             modifyDF \drf@{states} -> drf {states = insert (unwrap stateId) state' states}
           else isRoleRootState stateId >>= if _
             then do
               rk <- unsafePartial $ roleKind stateId
-              state' <- State <$> modifyState (unwrap $ constructState stateId (Simple (Value (ArcPosition {column: 0, line: 0}) PBool "true"))
+              state' <- State <$> modifyState (unwrap $ constructState stateId (Q $ trueCondition (RDOM $ ST (EnumeratedRoleType (unwrap stateId))))
                 (case rk of
                   UserRole -> (Srole (EnumeratedRoleType (unwrap stateId)))
                   _ -> (Orole (EnumeratedRoleType (unwrap stateId)))) [])
@@ -687,17 +689,17 @@ createMissingRootStates = do
   (missingRootStates :: Object State) <- pure $ OBJ.fromFoldable $ catMaybes $ values states <#> \(State{id, stateFulObject}) -> case stateFulObject of
     Cnt (ContextType ctype) -> if ctype `isDirectSuperStateOf` (unwrap id)
       then if isNothing $ lookup ctype states
-        then Just $ Tuple ctype $ constructState (StateIdentifier ctype) (Simple (Value arcParserStartPosition PBool "true")) (Cnt $ ContextType ctype) []
+        then Just $ Tuple ctype $ constructState (StateIdentifier ctype) (Q $ trueCondition (CDOM $ ST (ContextType ctype))) (Cnt $ ContextType ctype) []
         else Nothing
       else Nothing
     Orole (EnumeratedRoleType rtype) -> if rtype `isDirectSuperStateOf` (unwrap id)
       then if isNothing $ lookup rtype states
-        then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Simple (Value arcParserStartPosition PBool "true")) (Orole $ EnumeratedRoleType rtype) []
+        then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Q $ trueCondition (RDOM $ ST (EnumeratedRoleType rtype))) (Orole $ EnumeratedRoleType rtype) []
         else Nothing
       else Nothing
     Srole (EnumeratedRoleType rtype) -> if rtype `isDirectSuperStateOf` (unwrap id)
       then if isNothing $ lookup rtype states
-        then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Simple (Value arcParserStartPosition PBool "true")) (Orole $ EnumeratedRoleType rtype) []
+        then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Q $ trueCondition (RDOM $ ST (EnumeratedRoleType rtype))) (Orole $ EnumeratedRoleType rtype) []
         else Nothing
       else Nothing
   modifyDF \dfr -> dfr {states = states `union` missingRootStates}
@@ -759,3 +761,7 @@ roleIdentification2Step (ImplicitRole ctxt stp) = stp
 roleIdentification2Context :: RoleIdentification -> ContextType
 roleIdentification2Context (ExplicitRole ctxt _ _) = ctxt
 roleIdentification2Context (ImplicitRole ctxt _) = ctxt
+
+-- A QueryFunctionDescription that will compile to const true.
+trueCondition :: Domain -> QueryFunctionDescription
+trueCondition dom = SQD dom (Constant PBool "true") (VDOM PBool Nothing) True True

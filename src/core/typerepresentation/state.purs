@@ -54,11 +54,11 @@ type StateRecord =
 	, subStates :: Array StateIdentifier
 	}
 
-constructState :: StateIdentifier -> Step -> StateFulObject -> Array StateIdentifier -> State
+constructState :: StateIdentifier -> Calculation -> StateFulObject -> Array StateIdentifier -> State
 constructState id condition stateFulObject subStates = State
 	{id: id
 	, stateFulObject
-	, query: S condition
+	, query: condition
 	, object: Nothing
 	, notifyOnEntry: EncodableMap empty
 	, notifyOnExit: EncodableMap empty

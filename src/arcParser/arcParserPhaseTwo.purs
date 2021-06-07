@@ -279,7 +279,7 @@ traverseStateE :: StateFulObject -> StateE -> PhaseTwo State
 traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = do
   subStateIds <- for subStates (toStateIdentifier <<< \(StateE{id:id'}) -> id')
   stateId <- toStateIdentifier id
-  state <- pure $ constructState stateId condition stateFulObect (ARR.fromFoldable subStateIds)
+  state <- pure $ constructState stateId (S condition) stateFulObect (ARR.fromFoldable subStateIds)
   -- Postpone all stateParts because there may be forward references to user and subject.
   parts <- traverse expandPrefix stateParts
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
