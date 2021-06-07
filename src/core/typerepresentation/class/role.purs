@@ -80,6 +80,7 @@ rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> 
         SQD _ _ (RDOM p) _ _ -> pure p
         UQD _ _ _ (RDOM p) _ _ -> pure p
         BQD _ _ _ _ (RDOM p) _ _ -> pure p
+        MQD _ _ _ (RDOM p) _ _ -> pure p
         otherwise -> empty
 
 -----------------------------------------------------------
@@ -360,6 +361,7 @@ rangeOfRoleCalculation = getRole >=> getCalculation >=> case _ of
     SQD _ _ (RDOM p) _ _ -> pure p
     UQD _ _ _ (RDOM p) _ _ -> pure p
     BQD _ _ _ _ (RDOM p) _ _ -> pure p
+    MQD _ _ _ (RDOM p) _ _ -> pure p
     otherwise -> empty -- NB: The Alt instance of Aff throws an error on empty!
 
 typeExcludingBinding :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)

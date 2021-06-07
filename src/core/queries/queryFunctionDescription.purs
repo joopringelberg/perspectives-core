@@ -112,6 +112,7 @@ instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where
   eq d1@(SQD _ _ _ _ _ ) d2@(SQD _ _ _ _ _ ) = genericEq d1 d2
   eq d1@(UQD _ _ _ _ _ _) d2@(UQD _ _ _ _ _ _) = genericEq d1 d2
   eq d1@(BQD _ _ _ _ _ _ _) d2@(BQD _ _ _ _ _ _ _) = genericEq d1 d2
+  eq d1@(MQD _ _ _ _ _ _ ) d2@(MQD _ _ _ _ _ _) = genericEq d1 d2
   eq _ _ = false
 
 instance encodeQueryFunctionDescription :: Encode QueryFunctionDescription where
