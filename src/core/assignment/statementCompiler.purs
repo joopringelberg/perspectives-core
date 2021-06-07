@@ -129,16 +129,12 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
         rle <- ensureRole subjects roleExpression
         pure $ UQD qualificationDomain QF.Remove rle qualificationDomain True True
       CreateRole {roleIdentifier, contextExpression, start, end} -> do
-        (cte :: QueryFunctionDescription) <- case contextExpression of
-          Nothing -> pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
-          (Just stp) -> ensureContext subjects stp
+        (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
         pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain True True
 
       CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
-        (cte :: QueryFunctionDescription) <- case contextExpression of
-          Nothing -> pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
-          (Just stp) -> ensureContext subjects stp
+        (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
         pure $ UQD currentDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte currentDomain True True
@@ -151,18 +147,15 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
 
       Move {roleExpression, contextExpression} -> do
         rle <- ensureRole subjects roleExpression
-        (cte :: QueryFunctionDescription) <- case contextExpression of
-          Nothing -> pure $ (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
-          (Just (stp :: Step)) -> ensureContext subjects stp >>= ensureFunctional stp
+        (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression >>= \qfd -> case contextExpression of
+          Nothing -> pure qfd
+          Just stp -> ensureFunctional stp qfd
         pure $ BQD currentDomain QF.Move rle cte currentDomain True True
-      Bind f@{bindingExpression, roleIdentifier, contextExpression} -> do
+      Bind f@{bindingExpression, roleIdentifier, contextExpression, start, end} -> do
         -- Bind <binding-expression> to <binderType> [in <context-expression>]. Check:
         -- bindingExpression should result in roles
         (bindings :: QueryFunctionDescription) <- ensureRole subjects bindingExpression
-        (cte :: QueryFunctionDescription) <- case contextExpression of
-          -- TODO. ALS het currentDomain een rol is, moeten we de context ervan nemen???
-          Nothing -> pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
-          (Just (stp :: Step)) -> ensureContext subjects stp
+        (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         -- binderType should be an EnumeratedRoleType (local name should resolve w.r.t. the contextExpression)
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
         -- If the roleIdentifier is functional, the bindings should be functional too.
@@ -205,11 +198,9 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
         pure $ BQD currentDomain QF.Unbind_ bindings binders currentDomain True True
 
       DeleteRole f@{roleIdentifier, contextExpression} -> do
-        (contextQfd :: QueryFunctionDescription) <- case contextExpression of
-          Nothing -> pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
-          (Just stp) -> ensureContext subjects stp
-        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier contextQfd f.start f.end
-        pure $ UQD currentDomain (QF.DeleteRole qualifiedRoleIdentifier) contextQfd currentDomain True True
+        (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
+        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
+        pure $ UQD currentDomain (QF.DeleteRole qualifiedRoleIdentifier) cte currentDomain True True
 
       DeleteProperty f@{propertyIdentifier, roleExpression, start, end} -> do
         (roleQfd :: QueryFunctionDescription) <- case roleExpression of
@@ -351,3 +342,14 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
           True -> pure qfd
           Unknown -> throwError $ MaybeNotFunctional (startOf stp) (endOf stp) stp
           False -> throwError $ NotFunctional (startOf stp) (endOf stp) stp
+
+        constructContextGetterDescription :: Partial => Maybe Step -> PhaseThree QueryFunctionDescription
+        constructContextGetterDescription contextExpression =
+          case contextExpression of
+            -- TODO. Pas dit toe in alle gevallen.
+            Nothing -> case currentDomain of
+              -- Apply the identity function if the current domain is a context;
+              CDOM _ -> pure (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
+              -- Apply the context function if it is a role!
+              RDOM _ -> pure (SQD currentDomain (QF.DataTypeGetter QF.ContextF) qualificationDomain True True)
+            (Just (stp :: Step)) -> ensureContext subjects stp

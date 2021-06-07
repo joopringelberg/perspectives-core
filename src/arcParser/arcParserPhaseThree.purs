@@ -489,7 +489,8 @@ handlePostponedStateQualifiedParts = do
             (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) states}))
 
     handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start})) = do
-      currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
+      currentDomain <- statespec2Domain state
+      contextDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
       -- Add, for all these users...
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
@@ -505,7 +506,7 @@ handlePostponedStateQualifiedParts = do
       (theAction :: QueryFunctionDescription) <- compileStatement
         states
         currentDomain
-        currentDomain
+        contextDomain
         (Just objectQfd)
         qualifiedUsers
         effectWithEnvironment
