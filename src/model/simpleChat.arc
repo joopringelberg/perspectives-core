@@ -19,6 +19,7 @@ domain SimpleChat
     user Chatter (mandatory) filledBy sys:PerspectivesSystem$User
       aspect sys:RootContext$RootUser
       perspective on Chats
+        all roleverbs
       perspective on Chats >> binding >> context >> Initiator
         only (Create, Fill)
 
@@ -40,6 +41,7 @@ domain SimpleChat
       perspective on Partner
       perspective on Initiator
       perspective on extern
+        props
 
     user Partner filledBy sys:PerspectivesSystem$User
       aspect sys:Invitation$Invitee

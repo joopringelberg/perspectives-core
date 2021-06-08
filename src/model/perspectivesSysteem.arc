@@ -33,6 +33,8 @@ domain System
       indexed sys:Me
       view VolledigeNaam (Voornaam, Achternaam)
       perspective on User
+        all roleverbs
+        props
       perspective on ModelsInUse
       perspective on IndexedContextOfModel
       perspective on RootUsers
@@ -51,13 +53,7 @@ domain System
         -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
         on entry
           do for User
-            -- After removing the object, we can no longer find the name, so bind it first.
-            letA
-              --model <- binding >> context >> contextType >> modelname
-            in
-              remove object
-              -- Until we've got sound and complete cascade delete, do not remove the model.
-              -- callEffect cdb:RemoveModelFromLocalStore (model)
+            remove object
 
     context ModelsInUse (relational) filledBy Model
       state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
