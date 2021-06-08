@@ -47,7 +47,7 @@ import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
-import Perspectives.Representation.ADT (ADT(..), leavesInADT)
+import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialisesADT)
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView)
@@ -291,8 +291,8 @@ specialisesRoleType :: RoleType -> (RoleType ~~~> Value)
 specialisesRoleType t1 t2 = lift do
   t1' <- typeIncludingAspects t1
   t2' <- typeIncludingAspects t2
-  r <- t1' `greaterThanOrEqualTo` t2'
-  pure $ Value $ show r
+  -- r <- t1' `greaterThanOrEqualTo` t2'
+  pure $ Value $ show $ unwrap (t1' `equalsOrSpecialisesADT` t2')
 
 specialisesRoleType_ :: RoleType -> (RoleType -> MonadPerspectives Boolean)
 specialisesRoleType_ t1 t2 = do
