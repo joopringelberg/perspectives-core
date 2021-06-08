@@ -61,7 +61,7 @@ import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), to
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (aspectsClosure)
+import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, ($), (<$>), (<<<), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
@@ -80,10 +80,10 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
       -- The path passes through the roleInstance of the Delta.
       -- This means that the query, when re-run from the context, might yield a different result then before the
       -- mutation described by the Delta.
-    contextCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_context))
+    contextCalculations <- lift2 (roleType ###= (roleAspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_context))
     (for contextCalculations \iq -> handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq) >>= pure <<< join
   users2 <- do
-    roleCalculations <- lift2 (roleType ###= (aspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_role))
+    roleCalculations <- lift2 (roleType ###= (roleAspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_role))
       -- Find all InvertedQueryResults, starting from the new role instance of the Delta.
       -- We do not start on the context because the cardinality of the role getting step is larger than one and
       -- we want to make sure that the new binding is in the path for the users.

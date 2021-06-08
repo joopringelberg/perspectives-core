@@ -57,7 +57,7 @@ import Perspectives.SerializableNonEmptyArray (singleton)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
-import Perspectives.Types.ObjectGetters (aspectsClosure)
+import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (class Show, Unit, bind, discard, flip, identity, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -630,7 +630,7 @@ context contextRole = withRoleCounting context' where
       (Just ids) -> FO.insert rname (AR.insert id ids) map
 
   collectAlias :: RolName -> StateT (FO.Object String) (ParserT String ContextRoleParserMonad) Unit
-  collectAlias rolname = (lift $ lift $ lift $ lift ((EnumeratedRoleType rolname) ###= aspectsClosure)) >>=
+  collectAlias rolname = (lift $ lift $ lift $ lift ((EnumeratedRoleType rolname) ###= roleAspectsClosure)) >>=
     \aspects -> void $ modify \aliases -> foldl (\als aspect -> FO.insert (unwrap aspect) rolname als) aliases aspects
 
   prototypeDeclaration :: IP (Maybe ID)

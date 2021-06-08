@@ -25,7 +25,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (head, sort)
+import Data.Array (head, null, sort)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
@@ -34,7 +34,7 @@ import Effect.Aff.AVar (new)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), liftToInstanceLevel, (##>), (##>>))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), liftToInstanceLevel, (##>), (##>>), (##=))
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
@@ -57,7 +57,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), Enum
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
-import Perspectives.Types.ObjectGetters (roleRootState, rootState)
+import Perspectives.Types.ObjectGetters (roleRootStates, contextRootStates)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
 
 -----------------------------------------------------------
@@ -144,15 +144,15 @@ runStates t = do
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          mstate <- lift2 (ctxt ##> contextType >=> liftToInstanceLevel rootState)
-          case mstate of
-            Nothing -> pure unit
-            Just state -> do
+          states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+          if null states
+            then pure unit
+            else do
               -- Provide a new frame for the current context variable binding.
               oldFrame <- lift2 pushFrame
               lift2 $ addBinding "currentcontext" [unwrap ctxt]
               -- Error boundary.
-              catchError (enteringState ctxt myType state)
+              catchError (for_ states (enteringState ctxt myType))
                 \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
               lift2 $ restoreFrame oldFrame
   -- Exit the rootState of contexts that are deleted.
@@ -162,15 +162,15 @@ runStates t = do
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          mstate <- lift2 (ctxt ##> contextType >=> liftToInstanceLevel rootState)
-          case mstate of
-            Nothing -> pure unit
-            Just state -> do
+          states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+          if null states
+            then pure unit
+            else do
               -- Provide a new frame for the current context variable binding.
               oldFrame <- lift2 pushFrame
               lift2 $ addBinding "currentcontext" [unwrap ctxt]
               -- Error boundary.
-              catchError (exitingState ctxt myType state)
+              catchError (for_ states (exitingState ctxt myType))
                 \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
               lift2 $ restoreFrame oldFrame
   -- Enter the rootState of roles that are created.
@@ -181,14 +181,14 @@ runStates t = do
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          mstate <- lift2 (rid ##> roleType >=> liftToInstanceLevel roleRootState)
-          case mstate of
-            Nothing -> pure unit
-            Just state -> do
+          states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+          if null states
+            then pure unit
+            else do
               oldFrame <- lift2 pushFrame
               lift2 $ addBinding "currentcontext" [unwrap ctxt]
               -- Error boundary.
-              catchError (enteringRoleState rid myType state)
+              catchError (for_ states (enteringRoleState rid myType))
                 \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
               lift2 $ restoreFrame oldFrame
   -- Exit the rootState of roles that are removed.
@@ -199,14 +199,14 @@ runStates t = do
       case mmyType of
         Nothing -> pure unit
         Just myType -> do
-          mstate <- lift2 (rid ##> roleType >=> liftToInstanceLevel roleRootState)
-          case mstate of
-            Nothing -> pure unit
-            Just state -> do
+          states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+          if null states
+            then pure unit
+            else do
               oldFrame <- lift2 pushFrame
               lift2 $ addBinding "currentcontext" [unwrap ctxt]
               -- Error boundary.
-              catchError (exitingRoleState rid myType state)
+              catchError (for_ states (exitingRoleState rid myType))
                 \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
               lift2 $ restoreFrame oldFrame
   nt <- lift AA.get
@@ -220,7 +220,8 @@ runStates t = do
       case head contextInstances of
         Nothing -> pure []
         Just contextInstance -> do
-          state <- lift2 (contextInstance ##>> contextType >=> liftToInstanceLevel rootState)
+          -- Neem aspecten hier ook mee!
+          states <- lift2 (contextInstance ##= contextType >=> liftToInstanceLevel contextRootStates)
           for contextInstances \cid -> do
             -- Note that the user may play different roles in the various context instances.
             (mmyType :: Maybe RoleType) <- lift2 (cid ##> getMyType)
@@ -232,14 +233,15 @@ runStates t = do
                   case mmguest of
                     -- If the Guest role is not filled, don't execute bots on its behalf!
                     Nothing -> pure []
-                    otherwise -> pure [ContextStateEvaluation state cid (CR myType)]
-                else pure [ContextStateEvaluation state cid (CR myType)]
-              Just (ENR myType) -> pure [ContextStateEvaluation state cid (ENR myType)]
+                    otherwise -> pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
+                else pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
+              Just (ENR myType) -> pure $ (\state -> ContextStateEvaluation state cid (ENR myType)) <$> states
     computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
       case head roleInstances of
         Nothing -> pure []
         Just roleInstance -> do
-          state <- lift2 (roleInstance ##>> roleType >=> liftToInstanceLevel roleRootState)
+          -- Neem aspecten hier ook mee!
+          states <- lift2 (roleInstance ##= roleType >=> liftToInstanceLevel roleRootStates)
           for roleInstances \rid -> do
             (mmyType :: Maybe RoleType) <- lift2 (rid ##> context >=> getMyType)
             case mmyType of
@@ -249,9 +251,9 @@ runStates t = do
                   (mmguest :: Maybe RoleInstance) <- lift2 (rid ##> context >=> getCalculatedRoleInstances myType)
                   case mmguest of
                     Nothing -> pure []
-                    otherwise -> pure [RoleStateEvaluation state rid (CR myType)]
-                else pure [RoleStateEvaluation state rid (CR myType)]
-              Just (ENR myType) -> pure [RoleStateEvaluation state rid (ENR myType)]
+                    otherwise -> pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
+                else pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
+              Just (ENR myType) -> pure $ (\state -> RoleStateEvaluation state rid (ENR myType)) <$> states
 
     isGuestRole :: CalculatedRoleType -> Boolean
     isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"

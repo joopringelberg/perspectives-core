@@ -48,7 +48,7 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
-import Perspectives.Representation.Class.Context (allContextTypes)
+import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView)
 import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeExcludingBinding, typeIncludingAspects, typeIncludingAspectsBinding)
@@ -70,6 +70,10 @@ isUnlinked_ et = getEnumeratedRole et >>= pure <<< _.unlinked <<< unwrap
 
 roleRootState :: EnumeratedRoleType ~~~> StateIdentifier
 roleRootState = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MonadPerspectives EnumeratedRole) >=> pure <<< maybe [] singleton <<< _.rootState <<< unwrap)
+
+-- | The transitive closure over Aspects of roleRootState.
+roleRootStates :: EnumeratedRoleType ~~~> StateIdentifier
+roleRootStates = roleAspectsClosure >=> roleRootState
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -146,8 +150,12 @@ contextTypeModelName (ContextType rid) = maybe empty (pure <<< Value) (deconstru
 contextTypeModelName' :: ContextType ~~> Value
 contextTypeModelName' (ContextType rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
 
-rootState :: ContextType ~~~> StateIdentifier
-rootState = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< maybe [] singleton <<< _.rootState <<< unwrap)
+contextRootState :: ContextType ~~~> StateIdentifier
+contextRootState = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< maybe [] singleton <<< _.rootState <<< unwrap)
+
+-- | The transitive closure over Aspects of rootState.
+contextRootStates :: ContextType ~~~> StateIdentifier
+contextRootStates = contextAspectsClosure >=> contextRootState
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON STATE
@@ -199,23 +207,29 @@ propertiesOfRole s =
 aspectsOfRole :: EnumeratedRoleType ~~~> EnumeratedRoleType
 aspectsOfRole = ArrayT <<< (getPerspectType >=> roleAspects)
 
-aspectsClosure :: EnumeratedRoleType ~~~> EnumeratedRoleType
-aspectsClosure = closure_ aspectsOfRole
+roleAspectsClosure :: EnumeratedRoleType ~~~> EnumeratedRoleType
+roleAspectsClosure = closure_ aspectsOfRole
+
+aspectsOfContext :: ContextType ~~~> ContextType
+aspectsOfContext = ArrayT <<< (getPerspectType >=> pure <<< contextAspects)
+
+contextAspectsClosure :: ContextType ~~~> ContextType
+contextAspectsClosure = closure_ aspectsOfContext
 
 roleTypeAspectsClosure :: RoleType ~~~> RoleType
-roleTypeAspectsClosure (ENR r) = ENR <$> aspectsClosure r
+roleTypeAspectsClosure (ENR r) = ENR <$> roleAspectsClosure r
 roleTypeAspectsClosure (CR r) = pure $ CR r
 
 -- aspect `hasAspect` roleType
 -- roleType ##>>> hasAspect aspect
 hasAspect :: EnumeratedRoleType -> (EnumeratedRoleType ~~~> Boolean)
 hasAspect aspect roleType = ArrayT do
-  aspects <- roleType ###= aspectsClosure
+  aspects <- roleType ###= roleAspectsClosure
   pure [isJust $ findIndex ((==) aspect) aspects]
 
 hasAspectWithLocalName :: String -> (EnumeratedRoleType ~~~> Boolean)
 hasAspectWithLocalName localAspectName roleType = ArrayT do
-  aspects <- roleType ###= aspectsClosure
+  aspects <- roleType ###= roleAspectsClosure
   pure [isJust $ findIndex (test (unsafeRegex (localAspectName <> "$") noFlags)) (unwrap <$> aspects)]
 
 ----------------------------------------------------------------------------------------
@@ -378,7 +392,7 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
       -- Find for the subject (including its aspects) a perspective
       --    * whose object adt includes a leaf that is the object roleType or one of its aspects, AND
       --    * that supports at least one of the requested RoleVerbs.
-      (allObjects :: Array EnumeratedRoleType) <- roleType ###= aspectsClosure
+      (allObjects :: Array EnumeratedRoleType) <- roleType ###= roleAspectsClosure
       isJust <$> findPerspective subjectType
         (\perspective@(Perspective{roleVerbs}) -> (not $ null $ intersect allObjects (leavesInADT $ objectOfPerspective perspective)) && (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs))
 
@@ -472,7 +486,7 @@ isPerspectiveOnRoleAndAspects p t = typeIncludingAspectsBinding t >>= pure <<< i
 ------- FUNCTIONS FOR PERSPECTIVES
 ----------------------------------------------------------------------------------------
 perspectivesClosure :: EnumeratedRoleType ~~~> Perspective
-perspectivesClosure = aspectsClosure >=> perspectivesOfRole
+perspectivesClosure = roleAspectsClosure >=> perspectivesOfRole
 
 -- isAutomatic :: ActionType ~~~> Boolean
 -- isAutomatic at = ArrayT (getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)

@@ -44,7 +44,7 @@ import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), 
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
-import Perspectives.Types.ObjectGetters (aspectsClosure)
+import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Prelude (flip, identity, pure, show, ($), (+), (/), (<<<), (<>), bind, not, eq)
 
 -- CONTEXT
@@ -122,7 +122,7 @@ _aliases' = _Newtype <<< _aliases
 addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> MonadPerspectives PerspectContext
 addContext_rolInContext ct@(PerspectContext cr@{aliases,rolInContext}) r@(EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
   Nothing -> do
-    aspects <- r ###= aspectsClosure
+    aspects <- r ###= roleAspectsClosure
     pure $ PerspectContext cr
       { rolInContext = insert rolName [rolId] rolInContext
       , aliases = foldl (\als aspect -> insert (unwrap aspect) rolName als) aliases aspects
@@ -145,7 +145,7 @@ type Modifier = Array RoleInstance -> Array RoleInstance
 modifyContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Modifier -> MonadPerspectives PerspectContext
 modifyContext_rolInContext ct@(PerspectContext cr@{rolInContext, aliases}) r@(EnumeratedRoleType rolName) f = case view (_roleInstances' r) ct of
   Nothing -> do
-    aspects <- r ###= aspectsClosure
+    aspects <- r ###= roleAspectsClosure
     pure $ PerspectContext cr
       { rolInContext = insert rolName (f []) rolInContext
       , aliases = foldl (\als aspect -> insert (unwrap aspect) rolName als) aliases aspects
