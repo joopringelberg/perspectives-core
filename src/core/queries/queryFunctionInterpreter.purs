@@ -123,6 +123,8 @@ interpret (UQD _ (UnaryCombinator NotF) f1 _ _ _) a = ArrayT do
 -- BQD
 -----------------------------------------------------------
 interpret (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (Constant _ _) _ _ _) _ _ _) a = interpret f2 a
+interpret (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (DataTypeGetter IdentityF) _ _ _) _ _ _) a = interpret f1 a
+interpret (BQD _ (BinaryCombinator ComposeF) f1@(SQD _ (DataTypeGetter IdentityF) _ _ _) f2 _ _ _) a = interpret f2 a
 interpret (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) a =
   (interpret f1 >=> interpret f2) a
 interpret (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) a = ArrayT do
