@@ -33,7 +33,7 @@ import Perspectives.CoreTypes (MonadPerspectives, (##>>), (###>>))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Representation.Class.Role (adtOfRoleAndBinding, getRole)
+import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAndBinding, getRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.Perspective (isPerspectiveOnADT, perspectiveSupportsRoleVerb)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, RoleType(..))
@@ -88,7 +88,7 @@ roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleTyp
     where
       hasPerspectiveWithVerb :: RoleType -> RoleType -> MonadPerspectives Boolean
       hasPerspectiveWithVerb subjectType authorizedRoleType = do
-        adtOfAuthorizedRoleType <- getRole authorizedRoleType >>= adtOfRoleAndBinding
+        adtOfAuthorizedRoleType <- getRole authorizedRoleType >>= adtOfRole
         isJust <$> findPerspective subjectType
           \perspective -> perspectiveSupportsRoleVerb perspective verb' &&
             unsafePartial (perspective `isPerspectiveOnADT` adtOfAuthorizedRoleType)
