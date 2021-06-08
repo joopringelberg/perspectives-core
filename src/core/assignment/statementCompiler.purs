@@ -74,10 +74,10 @@ compileStatement ::
   Array RoleType ->
   Statements ->
   PhaseThree QueryFunctionDescription
-compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalculation' userRoleTypes statements =
+compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalculation userRoleTypes statements =
   case statements of
     -- Compile a series of Assignments into a QueryDescription.
-    Statements assignments -> sequenceOfAssignments userRoleTypes (reverse assignments) mobjectCalculation'
+    Statements assignments -> sequenceOfAssignments userRoleTypes (reverse assignments)
       -- Compile the LetStep into a QueryDescription.
     Let letstep -> do
       let_ <- compileLetStep letstep
@@ -88,11 +88,11 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
   compileLetStep (LetStep {bindings, assignments}) = withFrame
     case uncons bindings of
       -- no bindings at all. Just the body. This will probably never occur as the parser breaks on it.
-      Nothing -> sequenceOfAssignments userRoleTypes assignments mobjectCalculation'
+      Nothing -> sequenceOfAssignments userRoleTypes assignments
       (Just {head: bnd, tail}) -> do
         -- compileVarBinding also adds a variable binding to the compile time environment.
         head_ <- compileVarBinding bnd
-        makeSequence <$> foldM addVarBindingToSequence head_ tail <*> sequenceOfAssignments userRoleTypes assignments mobjectCalculation'
+        makeSequence <$> foldM addVarBindingToSequence head_ tail <*> sequenceOfAssignments userRoleTypes assignments
     where
       -- Inverts the result as well.
       compileVarBinding :: VarBinding -> PhaseThree QueryFunctionDescription
@@ -107,24 +107,24 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
 
   -- This will return a QueryFunctionDescription that describes either a single assignment, or
   -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
-  sequenceOfAssignments :: Array RoleType -> Array Assignment -> Maybe QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-  sequenceOfAssignments subjects assignments objectCalculation = case uncons assignments of
+  sequenceOfAssignments :: Array RoleType -> Array Assignment -> PhaseThree QueryFunctionDescription
+  sequenceOfAssignments subjects assignments = case uncons assignments of
     Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
     (Just {head, tail}) -> do
-      head_ <- describeAssignmentStatement subjects head objectCalculation
+      head_ <- describeAssignmentStatement subjects head
       foldM addAssignmentToSequence head_ tail
     where
       -- Returns a BQD with QueryFunction (BinaryCombinator SequenceF)
       addAssignmentToSequence :: QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription
-      addAssignmentToSequence seq v = makeSequence <$> pure seq <*> (describeAssignmentStatement subjects v objectCalculation)
+      addAssignmentToSequence seq v = makeSequence <$> pure seq <*> (describeAssignmentStatement subjects v)
 
   -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
   -- The assignment functions arbitrarily return the currentContext. Hence,
   -- we declare the functions to be both functional and mandatory.
   -- All inverted queries that need be created are created in this function.
   -- TODO: Controleer of de assignment operators wel corresponderen met de toegekende Verbs.
-  describeAssignmentStatement :: Array RoleType -> Assignment -> Maybe QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-  describeAssignmentStatement subjects ass mobjectCalculation = case ass of
+  describeAssignmentStatement :: Array RoleType -> Assignment -> PhaseThree QueryFunctionDescription
+  describeAssignmentStatement subjects ass = case ass of
       Remove {roleExpression} -> do
         rle <- ensureRole subjects roleExpression
         pure $ UQD qualificationDomain QF.Remove rle qualificationDomain True True

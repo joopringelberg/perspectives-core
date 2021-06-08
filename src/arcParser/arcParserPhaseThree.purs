@@ -359,7 +359,7 @@ handlePostponedStateQualifiedParts = do
     -- This function leaves the compile time environment as it is.
     objectToQueryFunctionDescription :: RoleIdentification -> Domain -> StateSpecification -> PhaseThree QueryFunctionDescription
     objectToQueryFunctionDescription syntacticObject currentDomain stateSpec = do
-      (syntacticObjectWithEnvironment :: Step) <- addContextualVariablesToExpression (roleIdentification2Step syntacticObject) Nothing (stateSpec2stateKind stateSpec)
+      (syntacticObjectWithEnvironment :: Step) <- addContextualVariablesToExpression (adaptRoleStepToDomain currentDomain $ roleIdentification2Step syntacticObject) Nothing (stateSpec2stateKind stateSpec)
         -- Make a QueryFunctionDescription of a function that computes the object.
       withFrame
         (compileExpression currentDomain syntacticObjectWithEnvironment)
@@ -374,11 +374,11 @@ handlePostponedStateQualifiedParts = do
       contextDomain <- pure (CDOM $ ST $ stateSpec2ContextType (transition2stateSpec transition))
       currentDomain <- statespec2Domain (transition2stateSpec transition)
       -- Add "currentcontext" in a Let if it is used in the syntacticObject.
-      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (\stp -> addContextualVariablesToExpression stp Nothing (stateSpec2stateKind $ transition2stateSpec transition)) (roleIdentification2Step <$> syntacticObject)
+      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (\stp -> addContextualVariablesToExpression stp Nothing (stateSpec2stateKind $ transition2stateSpec transition)) (adaptRoleStepToDomain currentDomain <<< roleIdentification2Step <$> syntacticObject)
         -- Make a QueryFunctionDescription of a function that computes the object.
       (compiledObject :: Maybe QueryFunctionDescription) <-
         withFrame
-          (traverse (compileExpression contextDomain) syntacticObjectWithEnvironment)
+          (traverse (compileExpression currentDomain) syntacticObjectWithEnvironment)
       -- subject is by default constructed as Enumerated but may well be an unqualified segmented name.
       -- Qualify first!
       qualifiedUsers <- collectRoles user
@@ -434,11 +434,13 @@ handlePostponedStateQualifiedParts = do
       currentDomain <- statespec2Domain (transition2stateSpec transition)
       contextDomain <- pure (CDOM $ ST $ stateSpec2ContextType (transition2stateSpec transition))
       -- Add "currentcontext" in a Let if it is used in the syntacticObject.
-      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (\stp -> addContextualVariablesToExpression stp Nothing (stateSpec2stateKind $ transition2stateSpec transition)) (roleIdentification2Step <$> syntacticObject)
+      -- If the syntacticObject is merely the role type name that complies with the current domain,
+      -- we replace the expression with the Identity step.
+      (syntacticObjectWithEnvironment :: Maybe Step) <- traverse (\stp -> addContextualVariablesToExpression stp Nothing (stateSpec2stateKind $ transition2stateSpec transition)) (adaptRoleStepToDomain currentDomain <<< roleIdentification2Step <$> syntacticObject)
         -- Make a QueryFunctionDescription of a function that computes the object.
       (compiledObject :: Maybe QueryFunctionDescription) <-
         withFrame
-          (traverse (compileExpression contextDomain) syntacticObjectWithEnvironment)
+          (traverse (compileExpression currentDomain) syntacticObjectWithEnvironment)
       -- subject is by default constructed as Enumerated but may well be an unqualified segmented name.
       -- Qualify first!
       qualifiedUsers <- collectRoles subject
@@ -455,6 +457,7 @@ handlePostponedStateQualifiedParts = do
         effectWithEnvironment
       modifyAllStates compiledObject sideEffect qualifiedUsers states currentDomain
       where
+
         modifyAllStates :: Maybe QueryFunctionDescription -> QueryFunctionDescription -> Array RoleType -> Array StateIdentifier -> Domain -> PhaseThree Unit
         modifyAllStates objectCalculation sideEffect qualifiedUsers states currentDomain = for_ states
           (modifyPartOfState start end
@@ -765,3 +768,11 @@ roleIdentification2Context (ImplicitRole ctxt _) = ctxt
 -- A QueryFunctionDescription that will compile to const true.
 trueCondition :: Domain -> QueryFunctionDescription
 trueCondition dom = SQD dom (Constant PBool "true") (VDOM PBool Nothing) True True
+
+-- | The function roleIdentification2Step produces a simple ArcIdentifier step for Explicit roles.
+-- | When we want to construct a QueryFunctionDescription that retrieves that role from the role itself,
+-- | the identity function suffices. With a Context domain we should construct a role getter.
+adaptRoleStepToDomain :: Domain -> Step -> Step
+adaptRoleStepToDomain (CDOM _) stp = stp
+adaptRoleStepToDomain (RDOM _) (Simple (ArcIdentifier pos _)) = Simple $ Identity pos
+adaptRoleStepToDomain _ stp = stp
