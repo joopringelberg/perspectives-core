@@ -26,14 +26,13 @@ domain SimpleChat
   case Chat
     aspect sys:Invitation
     aspect cht:WithText
+    state NotBound = (exists Partner) and not exists extern >> binder Chats
+      on entry
+        do for Partner
+          bind extern to Chats in cht:MyChats
     external
       aspect sys:Invitation$External
       property Title (String)
-      state NotBound = not exists binder Chats
-        on entry
-          do for Partner
-            bind object to Chats in cht:MyChats
-      --property WithPartner = You >> Voornaam
 
     user Initiator (mandatory) filledBy Chatter
       aspect sys:Invitation$Inviter

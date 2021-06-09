@@ -126,6 +126,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
     f :: Array PerspectRol -> PerspectContext -> Boolean -> MonadPerspectivesTransaction Unit
     f roles pe unlinked = do
       changedContext <- if not unlinked
+        -- Add the new instance only when the role type is enumerated in the context; hence not for unlinked role types.
         then lift2 (modifyContext_rolInContext pe rolName (flip union (identifier <$> roles)))
         else pure pe
       -- PERSISTENCE
