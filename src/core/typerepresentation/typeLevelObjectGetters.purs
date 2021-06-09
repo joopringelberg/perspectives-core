@@ -298,7 +298,7 @@ specialisesRoleType_ :: RoleType -> (RoleType -> MonadPerspectives Boolean)
 specialisesRoleType_ t1 t2 = do
   t1' <- typeIncludingAspects t1
   t2' <- typeIncludingAspects t2
-  t1' `greaterThanOrEqualTo` t2'
+  pure $ unwrap (t1' `equalsOrSpecialisesADT` t2')
 
 roleTypeModelName :: RoleType ~~~> Value
 roleTypeModelName rt = maybe empty (pure <<< Value) (deconstructModelName (roletype2string rt))
