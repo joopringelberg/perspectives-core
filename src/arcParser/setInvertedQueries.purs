@@ -65,14 +65,17 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
   -- add to onRoleDelta_binder of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
   QF.DataTypeGetterWithParameter QF.GetRoleBindersF enr -> modifyDF \dfr@{enumeratedRoles} -> let
     roleName = unwrap $ unsafePartial $ domain2RoleType dom
-    in case lookup roleName  enumeratedRoles of
-      Nothing -> addInvertedQueryForDomain roleName
-        -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
-        -- the binding. We skip the binding because its cardinality is larger than one.
-        (InvertedQuery {description: removeFirstBackwardsStep qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
-        OnRoleDelta_binder
-        dfr
-      Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en (removeFirstBackwardsStep qWithAK)) enumeratedRoles}
+    oneStepLess = removeFirstBackwardsStep qWithAK
+    in case oneStepLess of
+      ZQ Nothing Nothing -> dfr
+      _ -> case lookup roleName enumeratedRoles of
+        Nothing -> addInvertedQueryForDomain roleName
+          -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
+          -- the binding. We skip the binding because its cardinality is larger than one.
+          (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
+          OnRoleDelta_binder
+          dfr
+        Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en oneStepLess) enumeratedRoles}
 
   -- add to onRoleDelta_binding of the role that we apply `binding` to (the domain of the step; the role that binds).
   QF.DataTypeGetter QF.BindingF -> modifyDF \dfr@{enumeratedRoles} -> case dom of
@@ -87,14 +90,18 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
         Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en qWithAK) enumeratedRoles}
 
   QF.RolGetter roleType -> case roleType of
-    ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> case lookup roleName enumeratedRoles of
-      Nothing -> addInvertedQueryForDomain roleName
-        -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
-        -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
-        (InvertedQuery {description: removeFirstBackwardsStep qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
-        OnContextDelta_role
-        dfr
-      Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_role en (removeFirstBackwardsStep qWithAK)) enumeratedRoles}
+    ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> let
+        oneStepLess = removeFirstBackwardsStep qWithAK
+      in case oneStepLess of
+        ZQ Nothing Nothing -> dfr
+        _ -> case lookup roleName enumeratedRoles of
+          Nothing -> addInvertedQueryForDomain roleName
+            -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
+            -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
+            (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
+            OnContextDelta_role
+            dfr
+          Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_role en (oneStepLess)) enumeratedRoles}
     CR _ -> throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
 
   QF.DataTypeGetter QF.ContextF -> modifyDF \dfr@{enumeratedRoles} -> let
