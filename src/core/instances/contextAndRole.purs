@@ -157,7 +157,11 @@ context_states (PerspectContext{states}) = states
 
 -- | Add the state identifier as the last one in the Array (the Array represents the path from the rootstate).
 pushContext_state :: PerspectContext -> StateIdentifier -> PerspectContext
-pushContext_state (PerspectContext cr) stateId = PerspectContext cr {states = Arr.snoc cr.states stateId}
+pushContext_state (PerspectContext cr@{states}) stateId = PerspectContext cr {states =
+  case Arr.elemIndex stateId states of
+    Nothing -> Arr.snoc cr.states stateId
+    Just _ -> states
+  }
 
 -- | Remove the last state but only if it equals the given state.
 popContext_state :: PerspectContext -> StateIdentifier -> PerspectContext
@@ -322,7 +326,11 @@ rol_states (PerspectRol{states}) = states
 
 -- | Add the state identifier as the last one in the Array (the Array represents the path from the rootstate).
 pushRol_state :: PerspectRol -> StateIdentifier -> PerspectRol
-pushRol_state (PerspectRol cr) stateId = PerspectRol cr {states = Arr.snoc cr.states stateId}
+pushRol_state (PerspectRol cr@{states}) stateId = PerspectRol cr {states =
+  case Arr.elemIndex stateId states of
+    Nothing -> Arr.snoc cr.states stateId
+    Just _ -> states
+  }
 
 -- | Remove the last state but only if it equals the given state.
 popRol_state :: PerspectRol -> StateIdentifier -> PerspectRol
