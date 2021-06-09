@@ -100,7 +100,9 @@ evaluateContextState contextId userRoleType stateId = do
   mactive <- getActiveSubstate stateId contextId
   case mactive of
     Nothing -> findSatisfiedSubstate stateId contextId >>= case _ of
-      Nothing -> pure unit
+      Nothing -> conditionSatisfied contextId stateId >>= if _
+        then pure unit
+        else exitingState contextId userRoleType stateId
       Just sub -> enteringState contextId userRoleType sub
     Just sub -> conditionSatisfied contextId stateId >>= if _
       then evaluateContextState contextId userRoleType sub

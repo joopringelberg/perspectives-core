@@ -95,7 +95,9 @@ evaluateRoleState roleId userRoleType stateId = do
   mactive <- getActiveSubstate stateId roleId
   case mactive of
     Nothing -> findSatisfiedSubstate stateId roleId >>= case _ of
-      Nothing -> pure unit
+      Nothing -> conditionSatisfied roleId stateId >>= if _
+        then pure unit
+        else exitingRoleState roleId userRoleType stateId
       Just sub -> enteringRoleState roleId userRoleType sub
     Just sub -> conditionSatisfied roleId stateId >>= if _
       then evaluateRoleState roleId userRoleType sub
