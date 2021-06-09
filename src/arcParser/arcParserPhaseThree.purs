@@ -53,7 +53,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileReco
 import Perspectives.Identifiers (Namespace, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), StateQualifiedPart(..), StateTransitionE(..), StateSpecification(..)) as AST
-import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateKind(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression, addContextualVariablesToStatements, stateSpec2stateKind)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
@@ -106,6 +106,7 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
       createMissingRootStates
+      compileStateQueries
       registerStates
       invertPerspectiveObjects
       )
@@ -707,6 +708,26 @@ createMissingRootStates = do
       else Nothing
   modifyDF \dfr -> dfr {states = states `union` missingRootStates}
 
+-- | Compile any state queries that are not yet compiled. These will be queries of states without any
+-- | automatic action or notification.
+compileStateQueries :: PhaseThree Unit
+compileStateQueries = do
+  df@{states} <- lift $ State.gets _.dfr
+  states' <- for states ensureStateQueryCompiled
+  modifyDF \dfr -> dfr { states = states' }
+  where
+    ensureStateQueryCompiled :: State -> PhaseThree State
+    ensureStateQueryCompiled s@(State sr@{id, query, stateFulObject}) = case query of
+      Q _ -> pure s
+      S stp -> do
+        compiledQuery <- do
+          expressionWithEnvironment <- addContextualVariablesToExpression
+            stp
+            Nothing
+            (stateFulObject2StateKind stateFulObject)
+          Q <$> compileAndDistributeStep (stateFulObject2Domain stateFulObject) expressionWithEnvironment [] [id]
+        pure $ State sr { query = compiledQuery }
+
 registerStates :: PhaseThree Unit
 registerStates = do
   df@{contexts, enumeratedRoles, states} <- lift $ State.gets _.dfr
@@ -776,3 +797,13 @@ adaptRoleStepToDomain :: Domain -> Step -> Step
 adaptRoleStepToDomain (CDOM _) stp = stp
 adaptRoleStepToDomain (RDOM _) (Simple (ArcIdentifier pos _)) = Simple $ Identity pos
 adaptRoleStepToDomain _ stp = stp
+
+stateFulObject2StateKind :: StateFulObject -> StateKind
+stateFulObject2StateKind (Cnt _) = CState
+stateFulObject2StateKind (Orole _) = OState
+stateFulObject2StateKind (Srole _) = SState
+
+stateFulObject2Domain :: StateFulObject -> Domain
+stateFulObject2Domain (Cnt ctxt) = CDOM (ST ctxt)
+stateFulObject2Domain (Orole rle) = RDOM (ST rle)
+stateFulObject2Domain (Srole rle) = RDOM (ST rle)
