@@ -35,7 +35,8 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, traverse)
-import Foreign.Object (insert, lookup)
+import Data.Tuple (Tuple(..))
+import Foreign.Object (insert, lookup, union, fromFoldable)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, isQualifiedWithDomein)
@@ -56,7 +57,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.State (State(..), StateFulObject(..), constructState)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.View (View(..)) as VIEW
-import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=), (<$>))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
@@ -112,9 +113,10 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       qualifiedIndexedName <- expandNamespace indexedName
       pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
 
-    handleParts c@(Context contextUnderConstruction@({_id})) (STATE s@(StateE{id:stateId})) = do
+    handleParts c@(Context contextUnderConstruction@({_id})) (STATE s@(StateE{id:stateId, subStates})) = do
       state@(State{id:ident}) <- traverseStateE (Cnt _id) s
-      modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
+      substates <- for subStates (traverseStateE (Cnt _id))
+      modifyDF (\domeinFile -> addStatesToDomeinFile (cons state (ARR.fromFoldable substates)) domeinFile)
       -- If this state is the context root state, we could register it as such with the context.
       -- However, if not, we should register it with its parent and that need not be available.
       -- Hence, we postpone registering the state to PhaseThree.
@@ -240,11 +242,13 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       pure (EnumeratedRole $ roleUnderConstruction {indexedRole = Just (RoleInstance expandedIndexedName)})
 
     -- ROLESTATE
-    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId})) = do
-      state@(State{id:ident}) <- traverseStateE (case kind of
+    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId, subStates})) = do
+      stateKind <- pure (case kind of
         UserRole -> Srole _id
-        _ -> Orole _id) s
-      modifyDF (\domeinFile -> addStateToDomeinFile state domeinFile)
+        _ -> Orole _id)
+      state@(State{id:ident}) <- traverseStateE stateKind s
+      substates <- for subStates (traverseStateE stateKind)
+      modifyDF (\domeinFile -> addStatesToDomeinFile (cons state (ARR.fromFoldable substates)) domeinFile)
       -- If this state is the role root state, we could register it as such with the role.
       -- However, if not, we should register it with its parent and that need not be available.
       -- Hence, we postpone registering the state to PhaseThree.
@@ -298,8 +302,10 @@ traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = d
       Just segments -> pure $ StateIdentifier (roletype2string rt <> "$" <> segments)
     toStateIdentifier _ = throwError (Custom "Programming error: State should be specified with a ContextState, or an ExplicitRole.")
 
-addStateToDomeinFile :: State -> DomeinFileRecord -> DomeinFileRecord
-addStateToDomeinFile state@(State{id}) dfr@{states} = dfr {states = insert (unwrap id) state states}
+addStatesToDomeinFile :: Array State -> DomeinFileRecord -> DomeinFileRecord
+-- addStatesToDomeinFile state@(State{id}) dfr@{states} = dfr {states = insert (unwrap id) state states}
+addStatesToDomeinFile extraStates dfr@{states} = dfr { states =
+  states `union` (fromFoldable $ (\s@(State{id}) -> Tuple (unwrap id) s) <$> extraStates) }
 
 getState :: StateIdentifier -> PhaseTwo (Maybe State)
 getState id = gets _.dfr >>= \{states} -> pure $ lookup (unwrap id) states
