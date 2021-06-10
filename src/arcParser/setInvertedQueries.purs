@@ -65,13 +65,14 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
   -- add to onRoleDelta_binder of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
   QF.DataTypeGetterWithParameter QF.GetRoleBindersF enr -> modifyDF \dfr@{enumeratedRoles} -> let
     roleName = unwrap $ unsafePartial $ domain2RoleType dom
+    -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
+    -- the binding. We skip the binding because its cardinality is larger than one.
     oneStepLess = removeFirstBackwardsStep qWithAK
     in case oneStepLess of
-      ZQ Nothing Nothing -> dfr
+      -- WARNING. This may not be correct
+      ZQ Nothing _ -> dfr
       _ -> case lookup roleName enumeratedRoles of
         Nothing -> addInvertedQueryForDomain roleName
-          -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
-          -- the binding. We skip the binding because its cardinality is larger than one.
           (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
           OnRoleDelta_binder
           dfr
@@ -91,13 +92,13 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
 
   QF.RolGetter roleType -> case roleType of
     ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> let
+        -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
+        -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
         oneStepLess = removeFirstBackwardsStep qWithAK
       in case oneStepLess of
-        ZQ Nothing Nothing -> dfr
+        ZQ Nothing _ -> dfr
         _ -> case lookup roleName enumeratedRoles of
           Nothing -> addInvertedQueryForDomain roleName
-            -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
-            -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
             (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
             OnContextDelta_role
             dfr
