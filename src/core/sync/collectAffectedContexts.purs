@@ -23,7 +23,7 @@
 module Perspectives.CollectAffectedContexts where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
-import Control.Monad.Error.Class (try)
+import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Reader (lift)
 import Control.Monad.Writer (runWriterT)
 import Data.Array (cons, filterA, head, intersect, nub, null, union)
@@ -38,6 +38,7 @@ import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Exception (error)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (isDefaultContextDelta)
@@ -49,9 +50,10 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, contextType, getActiveRoleAndContextStates, getActiveStates_, getRoleBinders, notIsMe)
+import Perspectives.Instances.ObjectGetters (binding, contextType, getActiveRoleAndContextStates, getActiveRoleStates_, getActiveStates_, getRoleBinders, notIsMe)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
-import Perspectives.InvertedQuery (InvertedQuery(..), backwards, forwards, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
+import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
@@ -111,8 +113,17 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
       addInvertedQueryResult $ RoleStateQuery affectedRoles
       pure []
 
+    -- TODO. Dit is gebouwd op de veronderstelling dat backwardsCompiled type RoleInstance ~~> ContextInstance heeft.
+    -- Maar het kan ook RoleInstance ~~> RoleInstance zijn!
     usersWithAnActivePerspective :: MonadPerspectivesTransaction (Array RoleInstance)
-    usersWithAnActivePerspective = do
+    usersWithAnActivePerspective = if unsafePartial $ backwardsQueryResultsInRole iq
+      then fromRoleResults
+      else if unsafePartial $ backwardsQueryResultsInContext iq
+        then fromContextResults
+          else throwError (error "Programming error in handleBackwardQuery.usersWithAnActivePerspective")
+
+    fromContextResults :: MonadPerspectivesTransaction (Array RoleInstance)
+    fromContextResults = do
       (invertedQueryResults :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
       -- Return users only for those contexts that are in one of the permissable states.
       allowed <- filterA
@@ -122,6 +133,18 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
         -- Remove 'me'
         -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
         lift2 (join <$> traverse (\userType -> (ci ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+
+    fromRoleResults :: MonadPerspectivesTransaction (Array RoleInstance)
+    fromRoleResults = do
+      (invertedQueryResults :: Array RoleInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance)
+      -- Return users only for those contexts that are in one of the permissable states.
+      (allowed :: Array RoleInstance) <- filterA
+        (\rid -> (lift2 $ getActiveRoleStates_ rid) >>= pure <<< not <<< null <<< intersect states)
+        invertedQueryResults
+      join <$> for allowed \ri -> do
+        -- Remove 'me'
+        -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
+        lift2 (join <$> traverse (\userType -> (ri ##= OG.context >=> getRoleInstances userType) >>= filterA notIsMe) userTypes)
 
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
 addInvertedQueryResult result = lift $ AA.modify \(Transaction r@{invertedQueryResults}) -> Transaction (r {invertedQueryResults = union [result] invertedQueryResults})

@@ -93,12 +93,12 @@ getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
 
 getActiveStates :: ContextInstance ~~> StateIdentifier
 getActiveStates ci = ArrayT $ (try $ lift $ getContextMember IP.states ci) >>=
-  handlePerspectContextError' "states" []
+  handlePerspectContextError' "getActiveStates" []
     \states -> (tell $ ArrayWithoutDoubles [State ci]) *> pure states
 
 getActiveStates_ :: ContextInstance -> MonadPerspectives (Array StateIdentifier)
 getActiveStates_ ci = (try $ getContextMember IP.states ci) >>=
-  handlePerspectContextError' "states" [] pure <<< identity
+  handlePerspectContextError' "getActiveStates_" [] pure <<< identity
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE
@@ -317,12 +317,12 @@ siblings rid = ArrayT $ (lift $ try $ getPerspectRol rid) >>=
 
 getActiveRoleStates :: RoleInstance ~~> StateIdentifier
 getActiveRoleStates ri = ArrayT $ (try $ lift $ getRolMember (_.states <<< unwrap) ri) >>=
-  handlePerspectContextError' "states" []
+  handlePerspectContextError' "getActiveRoleStates" []
     \states -> (tell $ ArrayWithoutDoubles [RoleState ri]) *> pure states
 
 getActiveRoleStates_ :: RoleInstance -> MonadPerspectives (Array StateIdentifier)
 getActiveRoleStates_ ci = (try $ getRolMember (_.states <<< unwrap) ci) >>=
-  handlePerspectContextError' "states" [] pure <<< identity
+  handlePerspectContextError' "getActiveRoleStates_" [] pure <<< identity
 
 getActiveRoleAndContextStates :: RoleInstance ~~> StateIdentifier
 getActiveRoleAndContextStates = conjunction getActiveRoleStates (context >=> getActiveStates)

@@ -173,7 +173,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (StateDoesNotExist stateId start end) = "(StateDoesNotExist) The state '" <> show stateId <> "' is not modelled (between " <> show start <> " and " <> show end <> ")."
 
   show (RolErrorBoundary boundaryName err) = "(RolErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"
-  show (ContextErrorBoundary boundaryName err) = "(ContextErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"
+  show (ContextErrorBoundary boundaryName err) = "(ContextErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectContext (" <> err <> ")"
   show (DomeinFileErrorBoundary boundaryName err) = "(DomeinFileErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for DomeinFile (" <> err <> ")"
   show (ApiErrorBoundary m) = "(ApiErrorBoundary) An error occurred while processing an API request: " <> show m
   show (RuleErrorBoundary ruleName m) = "(RuleErrorBoundary) An error occurred while running rule " <> ruleName <> ": " <> show m

@@ -115,6 +115,12 @@ shouldResultInRoleStateQuery :: Partial => InvertedQuery -> Boolean
 shouldResultInRoleStateQuery (InvertedQuery{description, users}) = null users &&
   (isRoleDomain $ range $ fromJust $ backwards description)
 
+backwardsQueryResultsInRole ::  Partial => InvertedQuery -> Boolean
+backwardsQueryResultsInRole (InvertedQuery{description}) = (isRoleDomain $ range $ fromJust $ backwards description)
+
+backwardsQueryResultsInContext ::  Partial => InvertedQuery -> Boolean
+backwardsQueryResultsInContext (InvertedQuery{description}) = (isContextDomain $ range $ fromJust $ backwards description)
+
 shouldResultInPerspectiveObject :: InvertedQuery -> Boolean
 shouldResultInPerspectiveObject (InvertedQuery{users}) = not $ null users
 
