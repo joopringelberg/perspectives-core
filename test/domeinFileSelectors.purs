@@ -22,7 +22,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.ExplicitSet (ExplicitSet, subsetPSet)
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..), subsetPSet)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), objectOfPerspective) as Perspective
 import Perspectives.Representation.Range (Range) as Range
 import Perspectives.Representation.State (State(..))
@@ -116,7 +116,7 @@ enumeratedPropertyHasRange r (EnumeratedProperty{range}) = if range == r
 -- (ExplicitSet PropertyType) haveVerbs (Array PropertyVerb)
 -- eg: Universal `haveVerbs` [Consult]
 haveVerbs :: (ExplicitSet PropertyType) -> (Array PropertyVerb) -> (Array Perspective.PropertyVerbs) -> Test
-haveVerbs props verbs pvArr = case find (\(Perspective.PropertyVerbs propset verbarr) -> propset `subsetPSet` props && (fromFoldable verbarr) `subset` (fromFoldable verbs)) pvArr of
+haveVerbs props verbs pvArr = case find (\(Perspective.PropertyVerbs propset verbSet) -> propset `subsetPSet` props && verbSet `subsetPSet` (PSet verbs)) pvArr of
   Nothing -> failure ("Expected '" <> show pvArr <> "' for '" <> show props <> "'.")
   Just _ -> pure unit
 

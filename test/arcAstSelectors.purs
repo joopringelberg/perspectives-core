@@ -2,6 +2,7 @@ module Test.Parsing.ArcAstSelectors where
 
 import Prelude
 
+import Data.Array (fromFoldable) as ARR
 import Data.List (List(..), filter, find, findIndex, fromFoldable, null)
 import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff (Aff, throwError, error)
@@ -9,6 +10,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyVerbE(..), PropsOrView, RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), RoleKind(..), roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerbList) as Verbs
 
@@ -211,7 +213,7 @@ ensurePropertyVerbsForPropsOrView propVerbs pOrv sp = ensurePropertyVerbsForProp
   where
     ensurePropertyVerbsForPropsOrView' :: List Verbs.PropertyVerb -> Aff Unit
     ensurePropertyVerbsForPropsOrView' propVerbs' = case find (case _ of
-      (P (PropertyVerbE {propertyVerbs, propsOrView})) -> propVerbs' == propertyVerbs && pOrv == propsOrView
+      (P (PropertyVerbE {propertyVerbs, propsOrView})) -> (PSet $ ARR.fromFoldable propVerbs') == propertyVerbs && pOrv == propsOrView
       _ -> false
       ) sp of
         Just _ -> pure unit
