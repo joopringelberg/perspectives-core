@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars, 2020
+-- Copyright Joop Ringelberg and Cor Baars, 2020, 2021 -15
 -- A model to maintain AMQP Broker Services.
 domain BrokerServices
   use sys for model:System
@@ -63,7 +63,7 @@ domain BrokerServices
             bind extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
       state NoAccountHolder = not exists AccountHolder
         on entry
-          do for Guest
+          do for BrokerContract$Guest
             createRole AccountHolder
     external
       aspect sys:Invitation$External
