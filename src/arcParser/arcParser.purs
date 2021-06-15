@@ -432,6 +432,7 @@ perspectivePart :: IP (List StateQualifiedPart)
 perspectivePart = do
   (Tuple first second) <- twoReservedWords
   case first, second of
+    "defaults", _ -> roleAndPropertyDefaults
     "view", _ -> singleton <<< P <$> propertyVerbs
     "props", _ -> singleton <<< P <$> propertyVerbs
     "verbs", _ -> singleton <<< P <$> propertyVerbs
@@ -469,8 +470,10 @@ inState = do
     statePart = do
       (Tuple first second) <- twoReservedWords
       case first, second of
+        "defaults", _ -> roleAndPropertyDefaults
         "view", _ -> singleton <<< P <$> propertyVerbs
         "props", _ -> singleton <<< P <$> propertyVerbs
+        "verbs", _ -> singleton <<< P <$> propertyVerbs
         "only", _ -> singleton <<< R <$> roleVerbs
         "except", _ -> singleton <<< R <$> roleVerbs
         "all", "roleverbs" -> singleton <<< R <$> roleVerbs
@@ -615,6 +618,22 @@ notificationE = do
         "Alert" -> pure Alert
         _ -> fail "Not a notification level"
 
+roleAndPropertyDefaults :: IP (List StateQualifiedPart)
+roleAndPropertyDefaults = do
+  reserved "defaults"
+  -- subject and object must be present.
+  {subject, object, state} <- getArcParserState
+  case subject, object of
+    Just s, Just o -> do
+      start <- getPosition
+      end <- getPosition
+      pure $ (R (RoleVerbE {subject: s, object: o, state, roleVerbs: All, start, end}) :
+        P (PropertyVerbE {subject: s, object: o, state, propertyVerbs: allPropertyVerbs, propsOrView: AllProperties, start, end}) :
+          Nil)
+    Nothing, Nothing -> fail "User role and object of perspective must be given"
+    Nothing, (Just _) -> fail "User role must be given"
+    (Just _), Nothing -> fail "Object of perspective must be given"
+
 -- | roleVerbs =
 -- |	only ( <RoleVerb> {, <roleVerb>}+ )
 -- |	|
@@ -707,11 +726,11 @@ propertyVerbs = basedOnView <|> basedOnProps
     lotsOfVerbs :: IP (List PropertyVerb)
     lotsOfVerbs = token.parens (propertyVerb `sepBy` token.symbol ",")
 
-    allPropertyVerbs :: List PropertyVerb
-    allPropertyVerbs = (Consult : (RemovePropertyValue : (DeleteProperty : (AddPropertyValue : (SetPropertyValue : Nil)))))
-
     lotsOfProperties :: IP (List String)
     lotsOfProperties = token.parens (arcIdentifier `sepBy` token.symbol ",")
+
+allPropertyVerbs :: List PropertyVerb
+allPropertyVerbs = (Consult : (RemovePropertyValue : (DeleteProperty : (AddPropertyValue : (SetPropertyValue : Nil)))))
 
 propertyVerb :: IP PropertyVerb
 propertyVerb = do

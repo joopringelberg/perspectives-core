@@ -104,6 +104,7 @@ perspectDef = LanguageDef
                   , "all"
                   , "only"
                   , "except"
+                  , "defaults"
 
                   -- States
                   , "in"
