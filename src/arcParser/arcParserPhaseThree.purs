@@ -542,7 +542,7 @@ handlePostponedStateQualifiedParts = do
       -- ... to their perspective on this object...
       objectQfd <- objectToQueryFunctionDescription object currentDomain state
       propertyTypes <- collectPropertyTypes propsOrView
-      (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes (fromFoldable propertyVerbs)
+      (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes propertyVerbs
       -- ... for these states only...
       states <- stateSpec2States state
       -- ... the action.

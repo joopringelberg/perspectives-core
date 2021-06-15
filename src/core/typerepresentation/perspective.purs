@@ -22,7 +22,7 @@
 
 module Perspectives.Representation.Perspective where
 
-import Data.Array (difference, elemIndex, findIndex, null)
+import Data.Array (difference, findIndex, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
@@ -84,7 +84,7 @@ perspectiveSupportsPropertyForVerb (Perspective {propertyVerbs}) property verb =
     find :: List (Array PropertyVerbs) -> Boolean
     find pvs = isJust $ LST.findIndex
       (\(pva :: Array PropertyVerbs) -> isJust $ findIndex
-        (\(PropertyVerbs pset pverbs) -> isElementOf property pset && (isJust $ elemIndex verb pverbs))
+        (\(PropertyVerbs pset pverbs) -> isElementOf property pset && (isElementOf verb pverbs))
         pva)
       pvs
 
@@ -126,7 +126,7 @@ perspectiveSupportsOneOfRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.
 -- PROPERTYVERBS
 -----------------------------------------------------------
 -- NOTE: we might replace (ExplicitSet PropertyType) with RelevantProperties.
-data PropertyVerbs = PropertyVerbs (ExplicitSet PropertyType) (Array PropertyVerb)
+data PropertyVerbs = PropertyVerbs (ExplicitSet PropertyType) (ExplicitSet PropertyVerb)
 derive instance genericPropertyVerbs :: Generic PropertyVerbs _
 instance showPropertyVerbs :: Show PropertyVerbs where show = genericShow
 derive instance eqPropertyVerbs :: Eq PropertyVerbs

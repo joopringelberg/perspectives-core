@@ -41,6 +41,7 @@ import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Context (ContextKind(..))
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
@@ -628,7 +629,7 @@ roleAndPropertyDefaults = do
       start <- getPosition
       end <- getPosition
       pure $ (R (RoleVerbE {subject: s, object: o, state, roleVerbs: All, start, end}) :
-        P (PropertyVerbE {subject: s, object: o, state, propertyVerbs: allPropertyVerbs, propsOrView: AllProperties, start, end}) :
+        P (PropertyVerbE {subject: s, object: o, state, propertyVerbs: Universal, propsOrView: AllProperties, start, end}) :
           Nil)
     Nothing, Nothing -> fail "User role and object of perspective must be given"
     Nothing, (Just _) -> fail "User role must be given"
@@ -700,7 +701,7 @@ propertyVerbs = basedOnView <|> basedOnProps
           -- view <ArcIdentifier> [: (<PropertyVerb+)]
           start <- getPosition
           view <- reserved "view" *> (View <$> arcIdentifier)
-          (pv :: List PropertyVerb) <- option allPropertyVerbs lotsOfVerbs
+          (pv :: ExplicitSet PropertyVerb) <- option Universal lotsOfVerbs
           end <- getPosition
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
         _, _ -> fail "User role and object of perspective must be given"
@@ -718,13 +719,13 @@ propertyVerbs = basedOnView <|> basedOnProps
           -- props (<ArcIdentifier>) [: (<PropertyVerb+)]
           start <- getPosition
           props <- option AllProperties (reserved "props" *> (Properties <$> lotsOfProperties))
-          (pv :: List PropertyVerb) <- option allPropertyVerbs (reserved "verbs" *> lotsOfVerbs)
+          (pv :: ExplicitSet PropertyVerb) <- option Universal (reserved "verbs" *> lotsOfVerbs)
           end <- getPosition
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: props, start, end}
         _, _ -> fail "User role and object of perspective must be given"
 
-    lotsOfVerbs :: IP (List PropertyVerb)
-    lotsOfVerbs = token.parens (propertyVerb `sepBy` token.symbol ",")
+    lotsOfVerbs :: IP (ExplicitSet PropertyVerb)
+    lotsOfVerbs = PSet <<< fromFoldable <$> token.parens (propertyVerb `sepBy` token.symbol ",")
 
     lotsOfProperties :: IP (List String)
     lotsOfProperties = token.parens (arcIdentifier `sepBy` token.symbol ",")

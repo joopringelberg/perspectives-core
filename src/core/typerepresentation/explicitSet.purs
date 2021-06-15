@@ -52,6 +52,11 @@ instance showExplicitSet :: Show a => Show (ExplicitSet a) where
 instance encodeExplicitSet :: Encode a => Encode (ExplicitSet a) where encode = genericEncode defaultOptions
 instance decodeExplicitSet :: Decode a => Decode (ExplicitSet a) where decode = genericDecode defaultOptions
 
+instance functorExplicitSet :: Functor ExplicitSet where
+  map f Universal = Universal
+  map f Empty = Empty
+  map f (PSet as) = PSet (f <$> as)
+
 -----------------------------------------------------------
 -- FUNCTIONS ON EXPLICITSET
 -----------------------------------------------------------

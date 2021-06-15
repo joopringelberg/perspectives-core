@@ -33,6 +33,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Statements)
 import Perspectives.Representation.Context (ContextKind)
+import Perspectives.Representation.ExplicitSet (ExplicitSet)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.Sentence (Sentence)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleKind, RoleType)
@@ -141,7 +142,7 @@ newtype PropertyVerbE = PropertyVerbE
   { subject :: RoleIdentification
   , object :: RoleIdentification
   , state :: StateSpecification
-  , propertyVerbs :: List PropertyVerb
+  , propertyVerbs :: ExplicitSet PropertyVerb
   , propsOrView :: PropsOrView
   , start :: ArcPosition
   , end :: ArcPosition

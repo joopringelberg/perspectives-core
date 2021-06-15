@@ -26,9 +26,9 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (map, (<|>), empty)
-import Data.Array (concat, cons, elemIndex, filter, findIndex, fold, foldl, foldr, fromFoldable, intersect, null, singleton)
+import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, foldr, fromFoldable, intersect, null, singleton)
 import Data.FoldableWithIndex (foldWithIndexM)
-import Data.Map (Map, values, empty, lookup, insert, keys) as Map
+import Data.Map (Map, empty, lookup, insert, keys) as Map
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
@@ -45,13 +45,12 @@ import Perspectives.Error.Boundaries (handleDomeinFileError')
 import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments)
 import Perspectives.Instances.Combinators (closure_, conjunction)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
-import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialisesADT)
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView)
-import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, greaterThanOrEqualTo, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeExcludingBinding, typeIncludingAspects, typeIncludingAspectsBinding)
+import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeExcludingBinding, typeIncludingAspects, typeIncludingAspectsBinding)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -258,24 +257,24 @@ perspectiveOnRoleType userRoleType objectRoleType = (lift $ getRole objectRoleTy
 -- | Notice that only RelevantProperties are returned. In case of All, this symbolically
 -- | also represents properties of Aspects and the binding hierarchy, but does not make them explicit.
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-relevantPropertiesForObjectRole :: Partial => RoleType -> RoleType -> MonadPerspectives RelevantProperties
-relevantPropertiesForObjectRole objectRole userRole' = do
-  (perspectives :: Array Perspective) <- objectRole ###= perspectiveOnRoleType userRole'
-  pure $ fold (concat (e <$> perspectives))
-    where
-      e :: Perspective -> Array RelevantProperties
-      e (Perspective{propertyVerbs}) = let
-        (lpvs :: Array PropertyVerbs) = concat $ fromFoldable (Map.values (unwrap propertyVerbs))
-        in concat (map f lpvs)
-      f :: PropertyVerbs -> Array RelevantProperties
-      f (PropertyVerbs pset verbs) = map
-        (\verb -> let
-          (props :: RelevantProperties) = case pset of
-            Universal -> All
-            Empty -> Properties []
-            PSet ps -> Properties ps
-          in props)
-        (verbs :: Array PropertyVerb)
+-- relevantPropertiesForObjectRole :: Partial => RoleType -> RoleType -> MonadPerspectives RelevantProperties
+-- relevantPropertiesForObjectRole objectRole userRole' = do
+--   (perspectives :: Array Perspective) <- objectRole ###= perspectiveOnRoleType userRole'
+--   pure $ fold (concat (e <$> perspectives))
+--     where
+--       e :: Perspective -> Array RelevantProperties
+--       e (Perspective{propertyVerbs}) = let
+--         (lpvs :: Array PropertyVerbs) = concat $ fromFoldable (Map.values (unwrap propertyVerbs))
+--         in concat (map f lpvs)
+--       f :: PropertyVerbs -> ExplicitSet RelevantProperties
+--       f (PropertyVerbs pset verbs) = map
+--         (\verb -> let
+--           (props :: RelevantProperties) = case pset of
+--             Universal -> All
+--             Empty -> Properties []
+--             PSet ps -> Properties ps
+--           in props)
+--         (verbs :: ExplicitSet PropertyVerb)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ROLETYPES
