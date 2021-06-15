@@ -32,7 +32,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, cons, filter, findIndex, foldr, fromFoldable, head, index, length, updateAt)
+import Data.Array (catMaybes, cons, filter, findIndex, foldr, fromFoldable, head, index, length, updateAt, elemIndex)
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
@@ -83,7 +83,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
-import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<#>), eq)
+import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<#>), eq, (&&))
 
 phaseThree :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} postponedParts = do
@@ -691,17 +691,17 @@ createMissingRootStates :: PhaseThree Unit
 createMissingRootStates = do
   df@{contexts, enumeratedRoles, states} <- lift $ State.gets _.dfr
   (missingRootStates :: Object State) <- pure $ OBJ.fromFoldable $ catMaybes $ values states <#> \(State{id, stateFulObject}) -> case stateFulObject of
-    Cnt (ContextType ctype) -> if ctype `isDirectSuperStateOf` (unwrap id)
+    Cnt (ContextType ctype) -> if isDirectSuperStateOf (keys enumeratedRoles) ctype (unwrap id)
       then if isNothing $ lookup ctype states
         then Just $ Tuple ctype $ constructState (StateIdentifier ctype) (Q $ trueCondition (CDOM $ ST (ContextType ctype))) (Cnt $ ContextType ctype) []
         else Nothing
       else Nothing
-    Orole (EnumeratedRoleType rtype) -> if rtype `isDirectSuperStateOf` (unwrap id)
+    Orole (EnumeratedRoleType rtype) -> if isDirectSuperStateOf (keys enumeratedRoles) rtype (unwrap id)
       then if isNothing $ lookup rtype states
         then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Q $ trueCondition (RDOM $ ST (EnumeratedRoleType rtype))) (Orole $ EnumeratedRoleType rtype) []
         else Nothing
       else Nothing
-    Srole (EnumeratedRoleType rtype) -> if rtype `isDirectSuperStateOf` (unwrap id)
+    Srole (EnumeratedRoleType rtype) -> if isDirectSuperStateOf (keys enumeratedRoles) rtype (unwrap id)
       then if isNothing $ lookup rtype states
         then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Q $ trueCondition (RDOM $ ST (EnumeratedRoleType rtype))) (Orole $ EnumeratedRoleType rtype) []
         else Nothing
@@ -744,18 +744,20 @@ registerStates = do
           else e
     , states =
       -- Register all substates with each state.
-        states <#> \(State sr@{id}) -> State $ sr { subStates = StateIdentifier <$> filter (isDirectSuperStateOf $ unwrap id) (keys states)}
+        states <#> \(State sr@{id}) -> State $ sr { subStates = StateIdentifier <$> filter (isDirectSuperStateOf (keys enumeratedRoles) $ unwrap id) (keys states)}
     }
 
 -- True, if sub adds a single segment to super.
 -- sub `isDirectSubstateOf` super
 -- model:System$PerspectivesSystem$Root `isDirectSubStateOf` model:System$PerspectivesSystem
-isDirectSubstateOf ::String -> String -> Boolean
-isDirectSubstateOf sub super = maybe false (eq super) (deconstructNamespace sub)
+-- TODO. Root states van rollen worden geïnterpreteerd als named substates van de context!
+-- De additionele eis is dus dat de sub geen rol is. Omdat alleen EnumeratedRoles states hebben, kunnen we ons daartoe beperken.
+isDirectSubstateOf :: Array String -> String -> String -> Boolean
+isDirectSubstateOf enumeratedRoleNames sub super = maybe false (\ns -> ns `eq` super && (isNothing $ elemIndex sub enumeratedRoleNames)) (deconstructNamespace sub)
 -- sub `isDirectSuperStateOf` super
 -- model:System$PerspectivesSystem `isDirectSuperStateOf` model:System$PerspectivesSystem$Root
-isDirectSuperStateOf ::String -> String -> Boolean
-isDirectSuperStateOf = flip isDirectSubstateOf
+isDirectSuperStateOf :: Array String -> String -> String -> Boolean
+isDirectSuperStateOf enumeratedRoleNames super sub = isDirectSubstateOf enumeratedRoleNames sub super
 
 
 transition2stateSpec :: StateTransitionE -> StateSpecification

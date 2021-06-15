@@ -53,7 +53,6 @@ import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..)
 import Perspectives.Instances.ObjectGetters (binding, contextType, getActiveRoleAndContextStates, getActiveRoleStates_, getActiveStates_, getRoleBinders, notIsMe)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
-import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
@@ -113,8 +112,6 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
       addInvertedQueryResult $ RoleStateQuery affectedRoles
       pure []
 
-    -- TODO. Dit is gebouwd op de veronderstelling dat backwardsCompiled type RoleInstance ~~> ContextInstance heeft.
-    -- Maar het kan ook RoleInstance ~~> RoleInstance zijn!
     usersWithAnActivePerspective :: MonadPerspectivesTransaction (Array RoleInstance)
     usersWithAnActivePerspective = if unsafePartial $ backwardsQueryResultsInRole iq
       then fromRoleResults
