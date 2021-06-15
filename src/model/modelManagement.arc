@@ -28,20 +28,23 @@ domain ModelManagement
       perspective on Repository
 
   case ManagedModel
-    state UploadToRepository = extern >> (ArcOK and CrlOK)
+    state UploadToRepository = extern >> (ArcOK and CrlOK and SourcesChanged)
       on entry
         do for Author
           callEffect p:UploadToRepository( extern >> ArcSource, extern >> CrlSource, Repository >> Url )
+          SourcesChanged = false for extern
     external
       state Root = true
         state ProcessArc = (exists ArcSource) and not exists ArcFeedback
           on entry
             do for Author
               ArcFeedback = callExternal p:ParseAndCompileArc( ArcSource ) returns String
+              SourcesChanged = true
         state ProcessCrl = (exists CrlSource) and not exists CrlFeedback
           on entry
             do for Author
               CrlFeedback = callExternal p:ParseAndCompileCrl( CrlSource ) returns String
+              SourcesChanged = true
       property ArcUrl (mandatory, String)
       property ArcSource (mandatory, String)
       property ArcFeedback (mandatory, String)
@@ -50,6 +53,7 @@ domain ModelManagement
       property CrlSource (mandatory, String)
       property CrlFeedback (mandatory, String)
       property CrlOK = CrlFeedback == "OK"
+      property SourcesChanged (Boolean)
       property Name = context >> ModelDescription >> Name
 
       view Paths (ArcUrl, CrlUrl)
@@ -61,10 +65,6 @@ domain ModelManagement
 
     user Author (mandatory) filledBy Manager
       perspective on extern
-        props --(Consult)
-        --Create (Paths)
-        --Change (Paths)
-        --Delete (Feedback)
 
       perspective on ModelDescription
       perspective on Repository
