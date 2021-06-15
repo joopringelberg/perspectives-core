@@ -41,6 +41,7 @@ import Data.Newtype (alaF, over, unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
@@ -92,6 +93,7 @@ compileState stateId = do
 -- | Put an error boundary around this function.
 evaluateRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 evaluateRoleState roleId userRoleType stateId = do
+  log ("Evaluating role state " <> unwrap stateId <> " for role " <> unwrap roleId)
   mactive <- getActiveSubstate stateId roleId
   case mactive of
     Nothing -> findSatisfiedSubstate stateId roleId >>= case _ of
@@ -114,6 +116,7 @@ evaluateRoleState roleId userRoleType stateId = do
 -- | Ensure that the current context is available in the environment before applying this function!
 enteringRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 enteringRoleState roleId userRoleType stateId = do
+  log ("Entering role state " <> unwrap stateId <> " for role " <> unwrap roleId)
   -- Add the state identifier to the path of states in the role instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveRoleState stateId roleId
@@ -148,6 +151,7 @@ enteringRoleState roleId userRoleType stateId = do
 -- | Ensure that the current context is available in the environment before applying this function!
 exitingRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 exitingRoleState roleId userRoleType stateId = do
+  log ("Exiting role state " <> unwrap stateId <> " for role " <> unwrap roleId)
   -- Recur. We do this first, because we have to exit the deepest nested substate first.
   getActiveSubstate stateId roleId >>= void <<< traverse (exitingRoleState roleId userRoleType)
   -- Add the state identifier to the path of states in the context instance, triggering query updates

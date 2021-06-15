@@ -41,6 +41,7 @@ import Data.Newtype (alaF, over, unwrap)
 import Data.Traversable (for_, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
@@ -97,11 +98,12 @@ compileState stateId = do
 -- | Put an error boundary around this function.
 evaluateContextState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 evaluateContextState contextId userRoleType stateId = do
+  log ("Evaluating context state " <> unwrap stateId <> " for context " <> unwrap contextId)
   mactive <- getActiveSubstate stateId contextId
   case mactive of
     Nothing -> findSatisfiedSubstate stateId contextId >>= case _ of
       Nothing -> conditionSatisfied contextId stateId >>= if _
-        then pure unit
+        then log ("Deepest active state reached for context state " <> unwrap stateId <> " for context " <> unwrap contextId <> " (no action required).")
         else exitingState contextId userRoleType stateId
       Just sub -> enteringState contextId userRoleType sub
     Just sub -> conditionSatisfied contextId stateId >>= if _
@@ -119,6 +121,7 @@ evaluateContextState contextId userRoleType stateId = do
 -- | Ensure that the current context is available in the environment before applying this function!
 enteringState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 enteringState contextId userRoleType stateId = do
+  log ("Entering context state " <> unwrap stateId <> " for context " <> unwrap contextId)
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveContextState stateId contextId
@@ -164,7 +167,7 @@ enteringState contextId userRoleType stateId = do
 -- | Ensure that the current context is available in the environment before applying this function!
 exitingState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 exitingState contextId userRoleType stateId = do
-  -- Recur. We do this first, because we have to exit the deepest nested substate first.
+  log ("Exiting context state " <> unwrap stateId <> " for context " <> unwrap contextId)  -- Recur. We do this first, because we have to exit the deepest nested substate first.
   getActiveSubstate stateId contextId >>= void <<< traverse (exitingState contextId userRoleType)
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
