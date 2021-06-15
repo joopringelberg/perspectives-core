@@ -541,7 +541,7 @@ handlePostponedStateQualifiedParts = do
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
       objectQfd <- objectToQueryFunctionDescription object currentDomain state
-      propertyTypes <- constructPropertyVerbs propsOrView
+      propertyTypes <- collectPropertyTypes propsOrView
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes (fromFoldable propertyVerbs)
       -- ... for these states only...
       states <- stateSpec2States state
@@ -560,14 +560,14 @@ handlePostponedStateQualifiedParts = do
               (unwrap pverbs)
               states)})
 
-        constructPropertyVerbs :: AST.PropsOrView -> PhaseThree (ExplicitSet PropertyType)
-        constructPropertyVerbs AST.AllProperties = pure Universal
-        constructPropertyVerbs (AST.Properties ps) =
+        collectPropertyTypes :: AST.PropsOrView -> PhaseThree (ExplicitSet PropertyType)
+        collectPropertyTypes AST.AllProperties = pure Universal
+        collectPropertyTypes (AST.Properties ps) =
           -- The (partial) names for properties used here may be defined outside
           -- of the model (due to role filling). Hence we postpone looking up their
           -- real referents to phase three. Here we assume an Enumerated PropertyType.
           pure $ PSet (ENP <<< EnumeratedPropertyType <$> (fromFoldable ps))
-        constructPropertyVerbs (AST.View view) = do
+        collectPropertyTypes (AST.View view) = do
           (views :: Object View) <- getsDF _.views
           -- As we have postponed handling these parse tree fragments after
           -- handling all others, there can be no forward references.

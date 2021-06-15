@@ -434,6 +434,7 @@ perspectivePart = do
   case first, second of
     "view", _ -> singleton <<< P <$> propertyVerbs
     "props", _ -> singleton <<< P <$> propertyVerbs
+    "verbs", _ -> singleton <<< P <$> propertyVerbs
     "only", _ -> singleton <<< R <$> roleVerbs
     "except", _ -> singleton <<< R <$> roleVerbs
     "all", "roleverbs" -> singleton <<< R <$> roleVerbs
@@ -443,7 +444,7 @@ perspectivePart = do
     "action", _ -> actionE
     "perspective", "on" -> perspectiveOn
     "perspective", "of" -> perspectiveOf
-    _, _ -> fail "Expected: view, props, only, except, all, in, on, action, perspective"
+    _, _ -> fail "Expected: view, props, verbs, only, except, all, in, on, action, perspective"
 
 inState :: IP (List StateQualifiedPart)
 inState = do
@@ -669,6 +670,8 @@ roleVerb = do
 propertyVerbs :: IP PropertyVerbE
 propertyVerbs = basedOnView <|> basedOnProps
   where
+    -- view SomeView              -- all properties in SomeView, all verbs
+    -- view SomeView (Consult)    -- all properties in SomeView, verb Consult
     basedOnView :: IP PropertyVerbE
     basedOnView = do
       -- subject and object must be present.
@@ -682,6 +685,11 @@ propertyVerbs = basedOnView <|> basedOnProps
           end <- getPosition
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
         _, _ -> fail "User role and object of perspective must be given"
+
+    -- props                         -- all properties, all verbs
+    -- props (Title)                 -- property Title, all verbs
+    -- props (Title) verbs (Consult) -- property Title, verb Consult
+    -- props verbs (Consult)         -- all properties, verb Consult
     basedOnProps :: IP PropertyVerbE
     basedOnProps = do
       -- subject and object must be present.
@@ -690,17 +698,17 @@ propertyVerbs = basedOnView <|> basedOnProps
         Just s, Just o -> do
           -- props (<ArcIdentifier>) [: (<PropertyVerb+)]
           start <- getPosition
-          view <- reserved "props" *> option AllProperties (Properties <$> lotsOfProperties)
-          (pv :: List PropertyVerb) <- option allPropertyVerbs lotsOfVerbs
+          props <- option AllProperties (reserved "props" *> (Properties <$> lotsOfProperties))
+          (pv :: List PropertyVerb) <- option allPropertyVerbs (reserved "verbs" *> lotsOfVerbs)
           end <- getPosition
-          pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
+          pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: props, start, end}
         _, _ -> fail "User role and object of perspective must be given"
 
     lotsOfVerbs :: IP (List PropertyVerb)
     lotsOfVerbs = token.parens (propertyVerb `sepBy` token.symbol ",")
 
     allPropertyVerbs :: List PropertyVerb
-    allPropertyVerbs = (RemovePropertyValue : (DeleteProperty : (AddPropertyValue : (SetPropertyValue : Nil))))
+    allPropertyVerbs = (Consult : (RemovePropertyValue : (DeleteProperty : (AddPropertyValue : (SetPropertyValue : Nil)))))
 
     lotsOfProperties :: IP (List String)
     lotsOfProperties = token.parens (arcIdentifier `sepBy` token.symbol ",")

@@ -92,6 +92,7 @@ perspectDef = LanguageDef
                   , "String"
                   , "DateTime"
                   , "Boolean"
+                  , "verbs"
 
                   -- Perspectives
                   , "perspective"
