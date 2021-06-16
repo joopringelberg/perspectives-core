@@ -33,11 +33,13 @@ domain System
       indexed sys:Me
       view VolledigeNaam (Voornaam, Achternaam)
       perspective on User
-        all roleverbs
-        props
+        defaults
       perspective on ModelsInUse
+        defaults
       perspective on IndexedContextOfModel
+        defaults
       perspective on RootUsers
+        defaults
 
     context IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
 

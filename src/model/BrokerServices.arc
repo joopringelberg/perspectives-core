@@ -25,7 +25,9 @@ domain BrokerServices
 
     user Guest = sys:Me
       perspective on ManagedBrokers
+        defaults
       perspective on Contracts
+        view BrokerContract$External$ForAccountHolder (Consult)
 
   -- A Managed service.
   case BrokerService
@@ -44,12 +46,15 @@ domain BrokerServices
       view Admin (RegistryTopic, GuestRolePassword)
 
       perspective on Accounts
+        defaults
       perspective on Administrator
+        defaults
       perspective on extern
+        defaults
 
     user Guest = sys:Me
       perspective on Administrator
-        only (Fill)
+        only (Fill, Create)
 
     context Accounts filledBy BrokerContract
 
@@ -88,8 +93,10 @@ domain BrokerServices
       view ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, Achternaam)
 
       perspective on extern
-        view AccountHolder$ForAccountHolder
+        view External$ForAccountHolder (Consult)
       perspective on AccountHolder
+        all roleverbs
+        view AccountHolder$ForAccountHolder (Consult)
 
     user Administrator filledBy bs:BrokerService$Administrator
       aspect sys:Invitation$Inviter
@@ -97,8 +104,10 @@ domain BrokerServices
       view Confirmation (ConfirmationCode)
 
       perspective on AccountHolder
+        view AccountHolder$ForAdministrator
       perspective on extern
+        view External$ForAdministrator
 
     user Guest = sys:Me
       perspective on Administrator
-        only (Fill)
+        only (Fill, Create)

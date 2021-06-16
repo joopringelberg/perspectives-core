@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars 2019, 2020
+-- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021
 domain SimpleChat
   use sys for model:System
   use cdb for model:Couchdb
@@ -38,9 +38,10 @@ domain SimpleChat
       aspect sys:Invitation$Inviter
       aspect cht:WithText$TextWriter
       perspective on Partner
+        defaults
       perspective on Initiator
+        defaults
       perspective on extern
-        props
 
     user Partner filledBy sys:PerspectivesSystem$User
       aspect sys:Invitation$Invitee
