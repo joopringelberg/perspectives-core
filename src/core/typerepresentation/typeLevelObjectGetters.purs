@@ -50,16 +50,16 @@ import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialise
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView)
-import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeExcludingBinding, typeIncludingAspects, typeIncludingAspectsBinding)
+import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, perspectiveSupportsPropertyForVerb)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (Unit, bind, eq, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
+import Prelude (Unit, bind, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -243,7 +243,7 @@ perspectivesOfRole rt = ArrayT (getEnumeratedRole rt >>= unwrap >>> _.perspectiv
 perspectiveOnADT :: Partial => RoleType -> (ADT EnumeratedRoleType) ~~~> Perspective
 perspectiveOnADT userRoleType adt = ArrayT do
   (ps :: Array Perspective) <- perspectivesOfRoleType userRoleType
-  pure $ filter (objectOfPerspective >>> eq adt) ps
+  pure $ filter (flip isPerspectiveOnADT adt) ps
 
 -- | <UserRole> `perspectiveOnRoleType` <ObjectRole> gives the perspectives (at most one)
 -- | of the UserRole on the ObjectRole.
@@ -393,22 +393,7 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
       --    * that supports at least one of the requested RoleVerbs.
       (allObjects :: Array EnumeratedRoleType) <- roleType ###= roleAspectsClosure
       isJust <$> findPerspective subjectType
-        (\perspective@(Perspective{roleVerbs}) -> (not $ null $ intersect allObjects (leavesInADT $ objectOfPerspective perspective)) && (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs))
-
--- | In a Context type, find all enumerated local user roles that have a perspective on a given RoleType.
--- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-localEnumeratedRolesWithPerspectiveOnRole :: Partial => RoleType -> ContextType ~~~> RoleType
-localEnumeratedRolesWithPerspectiveOnRole rt = COMB.filter enumeratedUserRole
-  (\ur -> do
-    adt <- lift $ typeExcludingBinding rt
-    roleIsInPerspectiveOfUser adt ur
-    )
-  where
-  -- | <RoleType> `roleIsInPerspectiveOfLocalUser` <userRole>
-  -- | True iff the userRole or one of its aspects has a Perspective with RoleType as object.
-  roleIsInPerspectiveOfUser :: ADT EnumeratedRoleType -> RoleType ~~~> Boolean
-  roleIsInPerspectiveOfUser adt userRole' = ArrayT (singleton <<< isJust <$> findPerspective userRole'
-    (\perspective -> isPerspectiveOnADT perspective adt))
+        (\perspective@(Perspective{roleVerbs}) -> pure ((not $ null $ intersect allObjects (leavesInADT $ objectOfPerspective perspective)) && (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs)))
 
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A PROPERTYTYPE
@@ -417,7 +402,7 @@ hasPerspectiveOnProperty :: RoleType -> EnumeratedPropertyType ~~~> Boolean
 hasPerspectiveOnProperty subjectType property = ArrayT do
   singleton <<< isJust <$> findPerspective
     subjectType
-    \perspective -> perspectiveSupportsProperty perspective (ENP property)
+    \perspective -> pure $ perspectiveSupportsProperty perspective (ENP property)
 
 -- | <RoleType> `propertyIsInPerspectiveOf` <userRole>
 propertyIsInPerspectiveOf :: EnumeratedPropertyType -> RoleType ~~~> Boolean
@@ -428,7 +413,7 @@ propertyIsInPerspectiveOf = flip hasPerspectiveOnProperty
 ----------------------------------------------------------------------------------------
 -- | Returns just the first perspective for the given (user) RoleType (including its
 -- | aspects in the search) that complies with the criterium, or Nothing.
-findPerspective :: RoleType -> (Perspective -> Boolean) -> MonadPerspectives (Maybe Perspective)
+findPerspective :: RoleType -> (Perspective -> MonadPerspectives Boolean) -> MonadPerspectives (Maybe Perspective)
 findPerspective subjectType criterium = execStateT f Nothing
   where
     f :: StateT (Maybe Perspective) MonadPerspectives Unit
@@ -441,9 +426,13 @@ findPerspective subjectType criterium = execStateT f Nothing
             -- Search in the perspectives of userRole'
             perspectives <- lift $ perspectivesOfRoleType userRole'
             for_ perspectives
-              \perspective -> if criterium perspective
+              \perspective -> (lift $ criterium perspective) >>= if _
                 then put (Just perspective)
                 else pure unit
+            -- for_ perspectives
+            --   \perspective -> if criterium perspective
+            --     then put (Just perspective)
+            --     else pure unit
     hasBeenFound :: StateT (Maybe Perspective) MonadPerspectives Boolean
     hasBeenFound = get >>= pure <<< isJust
 
@@ -456,8 +445,8 @@ hasPerspectiveOnPropertyWithVerb subjectType roleType property verb = do
   adt <- getEnumeratedRole roleType >>= roleADT
   isJust <$> findPerspective
     subjectType
-    \perspective -> perspective `isPerspectiveOnADT` adt &&
-      perspectiveSupportsPropertyForVerb perspective (ENP property) verb
+    -- The test is: is `property` included in the collection of properties of the perspective object?
+    (allProperties <<< objectOfPerspective >=> pure <<< isJust <<< elemIndex (ENP property))
 
 -- perspectiveSupportsProperty
 rolesWithPerspectiveOnProperty :: PropertyType -> ContextType ~~~> RoleType
@@ -466,21 +455,8 @@ rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiv
     -- voor de user of één van zijn aspecten.
     propertyIsInPerspectiveOfUser :: PropertyType -> RoleType ~~~> Boolean
     propertyIsInPerspectiveOfUser property userRole' = lift $ isJust <$> findPerspective userRole'
-      (flip perspectiveSupportsProperty property)
+      (pure <<< (flip perspectiveSupportsProperty property))
 
--- | The object of the perspective (first argument) must cover the RoleType in the sense
--- | that its EnumeratedRoleTypes form a superset of those of the role type
--- | (second argument), *not including* its binding or aspects.
--- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-isPerspectiveOnRole :: Partial => Perspective -> RoleType -> MonadPerspectives Boolean
-isPerspectiveOnRole p t = typeExcludingBinding t >>= pure <<< isPerspectiveOnADT p
-
--- | The object of the perspective (first argument) must cover the RoleType in the sense
--- | that its EnumeratedRoleTypes form a superset of those of the role type
--- | (second argument), *including* its binding or aspects.
--- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-isPerspectiveOnRoleAndAspects :: Partial => Perspective -> RoleType -> MonadPerspectives Boolean
-isPerspectiveOnRoleAndAspects p t = typeIncludingAspectsBinding t >>= pure <<< isPerspectiveOnADT p
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR PERSPECTIVES
 ----------------------------------------------------------------------------------------

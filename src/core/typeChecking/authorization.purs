@@ -33,7 +33,7 @@ import Perspectives.CoreTypes (MonadPerspectives, (##>>), (###>>))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAndBinding, getRole)
+import Perspectives.Representation.Class.Role (adtOfRole, getRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.Perspective (isPerspectiveOnADT, perspectiveSupportsRoleVerb)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, RoleType(..))
@@ -47,9 +47,9 @@ hasBeenFound :: Found Boolean
 hasBeenFound = get
 
 -- | True iff the user role represented by the SubjectOfAction argument has a perspective
--- | on the role type that includes an Action
--- |  * with a view that holds the property,
--- |  * and the given Verb.
+-- | on the role type (in any state) with PropertyVerbs
+-- |  * whose properties include the property,
+-- |  * whose verbs include the given Verb.
 roleHasPerspectiveOnPropertyWithVerb :: SubjectOfAction -> RoleInstance -> EnumeratedPropertyType -> PropertyVerb -> MonadPerspectives (Either PerspectivesError Boolean)
 roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
   (subjectType :: RoleType) <- typeOfSubjectOfAction subject
@@ -90,5 +90,5 @@ roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleTyp
       hasPerspectiveWithVerb subjectType authorizedRoleType = do
         adtOfAuthorizedRoleType <- getRole authorizedRoleType >>= adtOfRole
         isJust <$> findPerspective subjectType
-          \perspective -> perspectiveSupportsRoleVerb perspective verb' &&
-            unsafePartial (perspective `isPerspectiveOnADT` adtOfAuthorizedRoleType)
+          \perspective -> pure (perspectiveSupportsRoleVerb perspective verb' &&
+            unsafePartial (perspective `isPerspectiveOnADT` adtOfAuthorizedRoleType))

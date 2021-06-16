@@ -260,7 +260,6 @@ externalRoleOfADT = reduce (getContext >=> pure <<< ST <<< externalRole)
 -----------------------------------------------------------
 -- | The binding of an ADT.
 bindingOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
--- TODO: handle CalculatedRole.
 bindingOfADT = reduce (getEnumeratedRole >=> binding)
 
 -----------------------------------------------------------

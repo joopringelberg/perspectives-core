@@ -213,6 +213,11 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
 --------------------------------------------------------------------------------------------------
 ---- ENUMERATEDTYPESINADT
 --------------------------------------------------------------------------------------------------
+-- | As class Reducible is defined in terms of a Monad, we use Identity.
+-- | Part of the semantics is captured by these two rules:
+-- | SUM (PROD A B) (PROD B C) --> [B]
+-- | PROD A B -> [A, B]
+-- | intuitively, the leaves are just the nodes in the ADT tree that occur on any path.
 leavesInADT :: forall a. Eq a => ADT a -> Array a
 leavesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Array a))
 

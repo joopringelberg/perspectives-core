@@ -101,7 +101,9 @@ perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ valu
       pvs
 
 -- | The object of the perspective must cover the given ADT in the sense that its
--- | EnumeratedRoleTypes form a superset of those of the ADT.
+-- | EnumeratedRoleTypes form a superset of those of the ADT, those nodes being
+-- | the types that occur on each path through the ADT tree (the 'union' of the paths, as it were).
+-- | <perspective> `isPerspectiveOnADT` <adt>
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 isPerspectiveOnADT :: Partial => Perspective -> ADT EnumeratedRoleType -> Boolean
 isPerspectiveOnADT p adt = null (leavesInADT adt `difference` (leavesInADT $ objectOfPerspective p))
