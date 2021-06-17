@@ -163,13 +163,9 @@ pushContext_state (PerspectContext cr@{states}) stateId = PerspectContext cr {st
     Just _ -> states
   }
 
--- | Remove the last state but only if it equals the given state.
+-- | Remove the last state.
 popContext_state :: PerspectContext -> StateIdentifier -> PerspectContext
-popContext_state (PerspectContext cr) stateId = case Arr.unsnoc cr.states of
-  Nothing -> PerspectContext cr
-  Just {init, last} -> if eq stateId last
-    then PerspectContext cr {states = init}
-    else PerspectContext cr
+popContext_state (PerspectContext cr) stateId = PerspectContext cr { states = Arr.delete stateId cr.states}
 
 defaultContextRecord :: ContextRecord
 defaultContextRecord =
