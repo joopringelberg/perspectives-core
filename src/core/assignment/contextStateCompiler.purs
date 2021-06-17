@@ -62,7 +62,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (specialisesRoleType_, subStates_)
+import Perspectives.Types.ObjectGetters (subStates_)
 
 compileState :: StateIdentifier -> MP CompiledContextState
 compileState stateId = do
@@ -198,17 +198,28 @@ exitingState contextId userRoleType stateId = do
   objects <- case objectGetter of
     Nothing -> pure []
     Just getter -> lift2 (contextId ##= getter)
-  -- Run automatic actions in the current Transaction.
-  forWithIndex_ automaticOnExit \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    -- Run for each object.
-    then if isJust objectGetter
-      then for_ objects \object -> do
-        oldFrame <- lift2 pushFrame
-        lift2 $ addBinding "object" [unwrap object]
-        updater contextId
-        lift2 $ restoreFrame oldFrame
-      else updater contextId
-    else pure unit
+  -- Run automatic actions in the current Transaction, but only if
+  -- the end user fills the allowedUser role in this context.
+  -- NOTE that the userRoleType is computed prior to executing the transaction.
+  -- It may happen that during the transaction, the end user is put into another role (too).
+  -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
+  -- fills the allowdUser RoleType.
+  forWithIndex_ automaticOnExit \(allowedUser :: RoleType) updater -> do
+    me <- lift2 getUserIdentifier
+    bools <- lift2 (contextId ##= getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
+    if ala Conj foldMap bools
+      -- Run for each object.
+  -- -- Run automatic actions in the current Transaction.
+  -- forWithIndex_ automaticOnExit \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
+      -- Run for each object.
+      then if isJust objectGetter
+        then for_ objects \object -> do
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "object" [unwrap object]
+          updater contextId
+          lift2 $ restoreFrame oldFrame
+        else updater contextId
+      else pure unit
   State {notifyOnExit} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnExit) of
     Nothing -> pure unit
