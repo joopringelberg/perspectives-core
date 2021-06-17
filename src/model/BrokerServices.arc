@@ -66,9 +66,9 @@ domain BrokerServices
         on entry
           do for BrokerContract$Guest
             bind extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
-      state NoAccountHolder = not exists AccountHolder
+      state NoAccountHolder = (exists Administrator) and (not exists AccountHolder)
         on entry
-          do for BrokerContract$Guest
+          do for BrokerContract$Administrator
             createRole AccountHolder
     external
       aspect sys:Invitation$External
@@ -104,6 +104,7 @@ domain BrokerServices
       view Confirmation (ConfirmationCode)
 
       perspective on AccountHolder
+        all roleverbs
         view AccountHolder$ForAdministrator
       perspective on extern
         view External$ForAdministrator
