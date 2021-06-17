@@ -37,8 +37,8 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (alaF, over, unwrap)
-import Data.Traversable (traverse)
+import Data.Newtype (ala, alaF, over, unwrap)
+import Data.Traversable (for_)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Class.Console (log)
@@ -49,18 +49,18 @@ import Perspectives.Assignment.StateCache (CompiledRoleState, cacheCompiledRoleS
 import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
-import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery)
+import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.ObjectGetters (getActiveRoleStates_)
-import Perspectives.Names (getMySystem)
+import Perspectives.Instances.ObjectGetters (boundByRole, context, getActiveRoleStates_)
+import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
-import Perspectives.Query.UnsafeCompiler (role2propertyValue)
+import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2propertyValue)
 import Perspectives.Representation.Class.PersistentType (getState)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (specialisesRoleType_, subStates_)
+import Perspectives.Types.ObjectGetters (subStates_)
 import Perspectives.Utilities (findM)
 
 compileState :: StateIdentifier -> MP CompiledRoleState
@@ -90,26 +90,30 @@ compileState stateId = do
       updater a
       lift $ modify (over Transaction \t -> t {authoringRole = originalRole})
 
+-- | This function is applied without knowing whether state condition is valid.
 -- | Put an error boundary around this function.
 evaluateRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 evaluateRoleState roleId userRoleType stateId = do
   log ("Evaluating role state " <> unwrap stateId <> " for role " <> unwrap roleId)
-  mactive <- getActiveSubstate stateId roleId
-  case mactive of
-    Nothing -> findSatisfiedSubstate stateId roleId >>= case _ of
-      Nothing -> conditionSatisfied roleId stateId >>= if _
-        then pure unit
-        else exitingRoleState roleId userRoleType stateId
-      Just sub -> enteringRoleState roleId userRoleType sub
-    Just sub -> conditionSatisfied roleId stateId >>= if _
-      then evaluateRoleState roleId userRoleType sub
-      else do
-        exitingRoleState roleId userRoleType sub
-        findSatisfiedSubstate stateId roleId >>= (void <<< traverse (enteringRoleState roleId userRoleType))
+  roleIsInState <- conditionSatisfied roleId stateId
+  if roleIsInState
+    then do
+      roleWasInState <- lift2 $ isActive stateId roleId
+      if roleWasInState
+        then do
+          subStates <- lift2 $ subStates_ stateId
+          for_ subStates (evaluateRoleState roleId userRoleType)
+        else enteringRoleState roleId userRoleType stateId
+    else do
+      roleWasInState <- lift2 $ isActive stateId roleId
+      if roleWasInState
+        then exitingRoleState roleId userRoleType stateId
+        else pure unit
 
+-- | This function is only called (and should only be called) on states whose condition is valid.
 -- | On entering a state, we register that state with the role instance and trigger client query updates.
 -- | We run all automatic actions and create notifications.
--- | Finally, we look for the substate whose query returns true and apply `enteringRoleState` to it.
+-- | Finally, we look for the substate whose query returns true and apply `enteringState` to it.
 -- | Invariant: the state is not registered as active but its query evaluates to true.
 -- |
 -- | Put an error boundary around this function.
@@ -121,10 +125,18 @@ enteringRoleState roleId userRoleType stateId = do
   -- just before running the current Transaction is finished.
   setActiveRoleState stateId roleId
   {automaticOnEntry} <- getCompiledState stateId
-  -- Run automatic actions in the current Transaction.
-  forWithIndex_ automaticOnEntry \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    then updater roleId
-    else pure unit
+  -- Run automatic actions in the current Transaction, but only if
+  -- the end user fills the allowedUser role in this context.
+  -- NOTE that the userRoleType is computed prior to executing the transaction.
+  -- It may happen that during the transaction, the end user is put into another role (too).
+  -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
+  -- fills the allowdUser RoleType.
+  forWithIndex_ automaticOnEntry \(allowedUser :: RoleType) updater -> do
+    me <- lift2 getUserIdentifier
+    bools <- lift2 (roleId ##= context >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
+    if ala Conj foldMap bools
+      then updater roleId
+      else pure unit
   State {notifyOnEntry} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnEntry) of
     Nothing -> pure unit
@@ -140,8 +152,12 @@ enteringRoleState roleId userRoleType stateId = do
           -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
           , binding: Just $ unwrap roleId})
   -- Recur.
-  findSatisfiedSubstate stateId roleId >>= void <<< traverse (enteringRoleState roleId userRoleType)
+  subStates <- lift2 $ subStates_ stateId
+  for_ subStates (evaluateRoleState roleId userRoleType)
 
+-- | This function is only called on states that the role was in before. Moreover, it (the role) is no longer in
+-- | the parent state of this state, hence we should exit it. We do not check the condition.
+-- |
 -- | On exiting a state, we de-register that state with the role instance and trigger client query updates.
 -- | We run all automatic actions and create notifications.
 -- | Finally, we find the substate that is still active (if any) and apply `exitingRoleState` to it.
@@ -153,15 +169,28 @@ exitingRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspect
 exitingRoleState roleId userRoleType stateId = do
   log ("Exiting role state " <> unwrap stateId <> " for role " <> unwrap roleId)
   -- Recur. We do this first, because we have to exit the deepest nested substate first.
-  getActiveSubstate stateId roleId >>= void <<< traverse (exitingRoleState roleId userRoleType)
+  subStates <- lift2 $ subStates_ stateId
+  for_ subStates \subStateId -> do
+    roleWasInSubState <- lift2 $ isActive subStateId roleId
+    if roleWasInSubState
+      then exitingRoleState roleId userRoleType subStateId
+      else pure unit
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
   setInActiveRoleState stateId roleId
   {automaticOnExit} <- getCompiledState stateId
-  -- Run automatic actions in the current Transaction.
-  forWithIndex_ automaticOnExit \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-    then updater roleId
-    else pure unit
+  -- Run automatic actions in the current Transaction, but only if
+  -- the end user fills the allowedUser role in this context.
+  -- NOTE that the userRoleType is computed prior to executing the transaction.
+  -- It may happen that during the transaction, the end user is put into another role (too).
+  -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
+  -- fills the allowdUser RoleType.
+  forWithIndex_ automaticOnExit \(allowedUser :: RoleType) updater -> do
+    me <- lift2 getUserIdentifier
+    bools <- lift2 (roleId ##= context >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
+    if ala Conj foldMap bools
+      then updater roleId
+      else pure unit
   State {notifyOnExit} <- lift2 $ getState stateId
   case lookup userRoleType (unwrap notifyOnExit) of
     Nothing -> pure unit

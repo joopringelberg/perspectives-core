@@ -209,9 +209,6 @@ exitingState contextId userRoleType stateId = do
     bools <- lift2 (contextId ##= getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
     if ala Conj foldMap bools
       -- Run for each object.
-  -- -- Run automatic actions in the current Transaction.
-  -- forWithIndex_ automaticOnExit \allowedUser updater ->  (lift2 $ specialisesRoleType_ userRoleType allowedUser) >>= if _
-      -- Run for each object.
       then if isJust objectGetter
         then for_ objects \object -> do
           oldFrame <- lift2 pushFrame
