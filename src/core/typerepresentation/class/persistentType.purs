@@ -64,6 +64,10 @@ getPerspectType id = do
     Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> show id <> "'.")
     (Just ns) -> retrieveFromDomein id ns
 
+tryGetPerspectType :: forall v i. PersistentType v i => i -> MonadPerspectives (Maybe v)
+tryGetPerspectType id = catchError ((getPerspectType id) >>= (pure <<< Just))
+  \_ -> pure Nothing
+
 getEnumeratedRole :: EnumeratedRoleType -> MP EnumeratedRole
 getEnumeratedRole = getPerspectType
 
@@ -84,6 +88,9 @@ getView = getPerspectType
 
 getState :: StateIdentifier -> MP State
 getState = getPerspectType
+
+tryGetState :: StateIdentifier -> MP (Maybe State)
+tryGetState = tryGetPerspectType
 
 typeExists :: forall v i. PersistentType v i => i -> MP Boolean
 typeExists id = catchError (((getPerspectType id) :: MP v) >>= pure <<< const true) \e -> pure false

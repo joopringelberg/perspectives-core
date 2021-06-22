@@ -49,7 +49,7 @@ import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialisesADT)
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
-import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView)
+import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView, tryGetState)
 import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
@@ -160,7 +160,7 @@ contextRootStates = contextAspectsClosure >=> contextRootState
 ------- FUNCTIONS OPERATING DIRECTLY ON STATE
 ----------------------------------------------------------------------------------------
 subStates_ :: StateIdentifier -> MonadPerspectives (Array StateIdentifier)
-subStates_ = getState >=> pure <<< _.subStates <<< unwrap
+subStates_ = tryGetState >=> pure <<< (maybe [] _.subStates <<< map unwrap)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S
