@@ -25,46 +25,53 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Reader (lift)
-import Control.Monad.Writer (runWriterT)
-import Data.Array (cons, filterA, head, intersect, nub, null, union)
+import Data.Array (filterA, foldM, head, nub, singleton, union)
 import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
-import Data.FoldableWithIndex (foldrWithIndex)
+import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
+import Data.List.NonEmpty (foldM) as LNE
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (for, for_, traverse)
-import Data.Tuple (Tuple(..))
+import Data.Traversable (for, for_, traverse, traverse_)
+import Data.Tuple (Tuple(..), snd)
 import Effect.Exception (error)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependency)
 import Perspectives.ContextAndRole (isDefaultContextDelta)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, WithAssumptions, runMonadPerspectivesQuery, (###=), (##=), (##>>), (##>))
+import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, execMonadPerspectivesQuery, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addDelta)
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, contextType, getActiveRoleAndContextStates, getActiveRoleStates_, getActiveStates_, getRoleBinders, notIsMe)
+import Perspectives.Instances.ObjectGetters (binding, contextIsInState, contextType, getRoleBinders, notIsMe, roleIsInState)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
+import Perspectives.Query.Interpreter (interpret)
+import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier, getState)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
+import Perspectives.Representation.State (StateFulObject(..))
+import Perspectives.Representation.State (StateFulObject(..), State(..)) as State
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), toArray)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
-import Prelude (Unit, bind, const, discard, join, map, not, pure, unit, ($), (<$>), (<<<), (==), (>=>), (>>=))
+import Perspectives.Utilities (findM)
+import Prelude (Unit, bind, const, discard, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -81,10 +88,10 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
       -- The path passes through the roleInstance of the Delta.
       -- This means that the query, when re-run from the context, might yield a different result then before the
       -- mutation described by the Delta.
-    contextCalculations <- lift2 (roleType ###= (roleAspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_context))
+    contextCalculations <- lift2 (roleType ###= (roleAspectsClosure >=> ArrayT <<< compileBothFor _onContextDelta_context))
     (for contextCalculations \iq -> handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq) >>= pure <<< join
   users2 <- do
-    roleCalculations <- lift2 (roleType ###= (roleAspectsClosure >=> ArrayT <<< compileDescriptions _onContextDelta_role))
+    roleCalculations <- lift2 (roleType ###= (roleAspectsClosure >=> ArrayT <<< compileBothFor _onContextDelta_role))
       -- Find all InvertedQueryResults, starting from the new role instance of the Delta.
       -- We do not start on the context because the cardinality of the role getting step is larger than one and
       -- we want to make sure that the new binding is in the path for the users.
@@ -92,56 +99,96 @@ usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
       handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq) >>= pure <<< join
   pure $ nub $ union users1 users2
 
-handleBackwardQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array RoleInstance)
-handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:userTypes, states}) = do
+type ContextWithUsers = Tuple ContextInstance (Array RoleInstance)
+
+-----------------------------------------------------------
+-- HANDLEBACKWARDQUERY
+-----------------------------------------------------------
+-- | Treats state-transition-triggering inverted queries different from inverted queries created from perspectives
+-- | and expressions in statements (implicit perspectives).
+-- | For the former, we create InvertedQueryResult-s (either ContextStateQuery or RoleStateQuery) that are further
+-- | evaluated when running the transaction. Eventually, these will lead to state transitions and automatic actions etc.
+-- | These InvertedQueryResults are added to the transaction, as a side effect of evaluating handleBackwardQuery.
+-- |
+-- | The latter case results in no side effect in the transaction but merely returns context instances and user roles.
+-- | The user role instances have a perspective on roles in their context.
+-- | Perspectives are conditional on states (valid in some states and not in others). The users we return are guaranteed
+-- | to have at least one valid perspective, even in the case of object state.
+handleBackwardQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array ContextWithUsers)
+handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:userTypes, states, forwardsCompiled}) = do
   if unsafePartial shouldResultInContextStateQuery iq
     then createContextStateQuery
     else if unsafePartial shouldResultInRoleStateQuery iq
       then createRoleStateQuery
       else usersWithAnActivePerspective
   where
-    createContextStateQuery :: MonadPerspectivesTransaction (Array RoleInstance)
+    createContextStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createContextStateQuery = do
       (invertedQueryResults :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
       addInvertedQueryResult $ ContextStateQuery invertedQueryResults
       pure []
 
-    createRoleStateQuery :: MonadPerspectivesTransaction (Array RoleInstance)
+    createRoleStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createRoleStateQuery = do
       (affectedRoles :: Array RoleInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance)
       addInvertedQueryResult $ RoleStateQuery affectedRoles
       pure []
 
-    usersWithAnActivePerspective :: MonadPerspectivesTransaction (Array RoleInstance)
+    -- TODO. Het lijkt me dat hier alleen nog maar queries langskomen die een context resultaat opleveren?!
+    usersWithAnActivePerspective :: MonadPerspectivesTransaction (Array ContextWithUsers)
     usersWithAnActivePerspective = if unsafePartial $ backwardsQueryResultsInRole iq
-      then fromRoleResults
+      -- then fromRoleResults
+      then throwError (error "Programming error in handleBackwardQuery.usersWithAnActivePerspective: query should not result\
+      \in a role.")
       else if unsafePartial $ backwardsQueryResultsInContext iq
         then fromContextResults
-          else throwError (error "Programming error in handleBackwardQuery.usersWithAnActivePerspective")
+          else throwError (error "Programming error in handleBackwardQuery.usersWithAnActivePerspective: query should result\
+          \in context.")
 
-    fromContextResults :: MonadPerspectivesTransaction (Array RoleInstance)
+    fromContextResults :: MonadPerspectivesTransaction (Array ContextWithUsers)
     fromContextResults = do
       (invertedQueryResults :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
-      -- Return users only for those contexts that are in one of the permissable states.
-      allowed <- filterA
-        (\cid -> (lift2 $ getActiveStates_ cid) >>= pure <<< not <<< null <<< intersect states)
-        invertedQueryResults
-      join <$> for allowed \ci -> do
-        -- Remove 'me'
-        -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
-        lift2 (join <$> traverse (\userType -> (ci ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+      foldM computeUsersFromContext [] invertedQueryResults
 
-    fromRoleResults :: MonadPerspectivesTransaction (Array RoleInstance)
-    fromRoleResults = do
-      (invertedQueryResults :: Array RoleInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance)
-      -- Return users only for those contexts that are in one of the permissable states.
-      (allowed :: Array RoleInstance) <- filterA
-        (\rid -> (lift2 $ getActiveRoleStates_ rid) >>= pure <<< not <<< null <<< intersect states)
-        invertedQueryResults
-      join <$> for allowed \ri -> do
-        -- Remove 'me'
-        -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
-        lift2 (join <$> traverse (\userType -> (ri ##= OG.context >=> getRoleInstances userType) >>= filterA notIsMe) userTypes)
+      where
+        -- The currently inefficient version accumulates users from each state examined.
+        -- The efficient version stops as soon as a context type state is valid.
+        computeUsersFromContext :: Array ContextWithUsers -> ContextInstance -> MonadPerspectivesTransaction (Array ContextWithUsers)
+        computeUsersFromContext accumulatedUsers cid = foldM (computeUsersFromState cid) [] states
+
+        computeUsersFromState :: ContextInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
+        computeUsersFromState cid accumulatedUsers stateId = do
+          State.State{stateFulObject} <- lift2 $ getState stateId
+          case stateFulObject of
+            -- If the state's StateFulObject is a context type (Cnt), and the context is in that state, obtain all user role instances from the context (and we're done)
+            State.Cnt _ -> (lift2 $ contextIsInState stateId cid) >>= if _
+              then lift2 $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+              else pure []
+            -- If the state's StateFulObject is a subject type (Srole), then obtain the user role instances from the context and pass on all that are in that state.
+            State.Srole rtype -> lift2 $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA (roleIsInState stateId) >>= filterA notIsMe) userTypes)
+            -- Construct an Array of object roles. If there is no forwards computation, it is just the roleInstance.
+            -- Otherwise run the forwards computation on the roleInstance.
+            -- Only if any of the object roles is in the required state, obtain the user role instances from the context and return them.
+            State.Orole rtype -> do
+              objects <- case forwardsCompiled of
+                Nothing -> pure [roleInstance]
+                Just f -> lift2 (roleInstance ##= unsafeCoerce f)
+              lift2 (findM (roleIsInState stateId) objects) >>= \mObject -> if isJust mObject
+                then lift2 $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+                else pure []
+
+    -- TODO. Waarschijnlijk wordt deze functie nooit geevalueerd.
+    -- fromRoleResults :: MonadPerspectivesTransaction (Array ContextWithUsers)
+    -- fromRoleResults = do
+    --   (invertedQueryResults :: Array RoleInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance)
+    --   -- Return users only for those roles that are in one of the permissable states.
+    --   (allowed :: Array RoleInstance) <- filterA
+    --     (\rid -> (lift2 $ getActiveRoleStates_ rid) >>= pure <<< not <<< null <<< intersect states)
+    --     invertedQueryResults
+    --   join <$> for allowed \ri -> do
+    --     -- Remove 'me'
+    --     -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
+    --     lift2 (join <$> traverse (\userType -> (ri ##= OG.context >=> getRoleInstances userType) >>= filterA notIsMe) userTypes)
 
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
 addInvertedQueryResult result = lift $ AA.modify \(Transaction r@{invertedQueryResults}) -> Transaction (r {invertedQueryResults = union [result] invertedQueryResults})
@@ -150,18 +197,16 @@ addInvertedQueryResult result = lift $ AA.modify \(Transaction r@{invertedQueryR
 -- OBSERVINGCONTEXTS
 -----------------------------------------------------------
 -- | Computes an InvertedQueryResult for the given RoleInstance and its type.
-
 -- | Just collect and add to the Transaction all contexts that have a role with
 -- | a perspective on the RoleType in the context instance.
--- | Guarantees RULE TRIGGERING.
--- TODO. Wordt alleen gebruikt door saveContextInstance.
--- Ik vermoed dat het hier om onEntry gaat.
--- Misschien moeten we dat niet op deze manier doen.
+-- | Guarantees RULE TRIGGERING by adding InvertedQueryResults to the transaction.
+-- | This function is used in the singular circumstance of contexts and roles that are read
+-- | from file. We want to trigger state changes for each of its roles.
 addRoleObservingContexts :: ContextInstance -> EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction Unit
 addRoleObservingContexts id roleType roleInstance = do
-  contextCalculations <- lift2 $ compileDescriptions _onContextDelta_context roleType
+  contextCalculations <- lift2 $ compileBothFor _onContextDelta_context roleType
   for_ contextCalculations (handleBackwardQuery roleInstance)
-  roleCalculations <- lift2 $ compileDescriptions _onContextDelta_role roleType
+  roleCalculations <- lift2 $ compileBothFor _onContextDelta_role roleType
   for_ roleCalculations (handleBackwardQuery roleInstance)
 
 -----------------------------------------------------------
@@ -178,22 +223,27 @@ addRoleObservingContexts id roleType roleInstance = do
 aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction (Array RoleInstance)
 aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
   binderType <- lift2 (id ##>> OG.roleType)
-  bindingCalculations <- lift2 $ compileDescriptions_ _onRoleDelta_binding binderType true
+  bindingCalculations <- lift2 $ compileBothFor _onRoleDelta_binding binderType
   users1 <- join <$> (for bindingCalculations
     -- Find all affected contexts, starting from the binder (id) instance of the Delta.
     (\iq -> (handleBackwardQuery id iq) >>= runForwardsComputation id iq))
+  -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually bind something:
   users2 <- case binding of
     Just bnd -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
-      binderCalculations <- lift2 $ compileDescriptions_ _onRoleDelta_binder bindingType true
+      binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder bindingType
       (for binderCalculations
         (\iq -> (handleBackwardQuery id iq) >>= runForwardsComputation bnd iq)) >>= pure <<< join
     Nothing -> pure []
+  -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually overwrite something:
   users3 <- case oldBinding of
     Just bnd | deltaType == SetBinding -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
-      binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binder bindingType
-      join <$> for binderCalculations (handleBackwardQuery bnd)
+      binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder bindingType
+      -- We deal here just with the case that we destroy a binding; not with the case that we add one.
+      -- Hence, no forward computation. `handleBackwardQuery` just passes on users that have at least one
+      -- valid perspective, even if the condition is object state.
+      join <$> map snd <<< join <$> for binderCalculations (handleBackwardQuery bnd)
     otherwise -> pure []
   pure (nub $ union users1 (union users2 users3))
 
@@ -202,56 +252,133 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
 runForwardsComputation ::
   RoleInstance ->
   InvertedQuery ->
-  (Array RoleInstance) ->
+  (Array ContextWithUsers) ->
   MonadPerspectivesTransaction (Array RoleInstance)
-runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled, statesPerProperty}) users = do
-  case forwardsCompiled of
-    Nothing -> if isNothing (forwards description)
-      then do
-        -- Collect those PropertyTypes in statesPerProperty whose states contain an active state.
-        activeStates <- lift2 (roleInstance ##= getActiveRoleAndContextStates)
-        (arrayOfProperties :: Array PropertyType) <- pure $ foldrWithIndex
-          (\prop propStates props -> if null $ intersect propStates activeStates
-            then props
-            else cons prop props)
-          []
-          (unwrap statesPerProperty)
-        Tuple _ assumptions' <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
-          getter <- lift $ lift $ getterFromPropertyType prop
-          getter roleInstance
-        rtype <- lift2 (roleInstance ##>> OG.roleType)
-        -- log $ "Running propertyGetters for InvertedQuery without forward part\n" <>
-        --   "\n\t for properties: " <> intercalate "\n\t\t" (show <$> arrayOfProperties) <>
-        --   "\n\t on role instance: " <> show roleInstance <> " having type " <> show rtype <>
-        --   "\n\t results in: " <> intercalate "\n\t\t" (show <$> unwrap assumptions') <>
-        --   "\n\tfor users: " <> show users
-        for_ (unwrap assumptions') (createDeltasFromAssumption users)
-      else pure unit
-    Just f -> do
-      -- Apply the forwards query to the same role instance as the backwards query.
-      (Tuple instances assumptions :: WithAssumptions RoleInstance) <- lift2 (runMonadPerspectivesQuery roleInstance (unsafeCoerce f))
-      -- Now create and push Deltas for each of the assumptions. These Delta's are valid for all users.
-      for_ (unwrap assumptions) (createDeltasFromAssumption users)
-      -- Then, for each separate user type, run all property getters in a single query for each value returned from the main query. The Assumptions thus gathered apply to that single user type.
-      -- TODO. We verzamelen hier alles in één grote Transactie en splitsen hem dan later weer uit. Dat kan veel beter.
-        -- Collect those PropertyTypes in statesPerProperty whose states contain an active state.
-      activeStates <- lift2 (roleInstance ##= getActiveRoleAndContextStates)
-      arrayOfProperties <- pure $ foldrWithIndex
-        (\prop propStates props -> if null $ intersect propStates activeStates
-          then props
-          else cons prop props)
-        []
-        (unwrap statesPerProperty)
-      Tuple _ (assumptions' :: ArrayWithoutDoubles InformedAssumption) <- lift2 $ runWriterT $runArrayT $ for_ arrayOfProperties \prop -> do
-        getter <- lift $ lift $ getterFromPropertyType prop
-        for_ instances getter
-      -- log $ "Running forward part of Inverted Query" <>
-      --   "\n\t with result type: " <> show (range <$> forwards description) <>
-      --   "\n\t results in: " <> intercalate "\n\t\t" (show <$> unwrap assumptions') <>
-      --   "\n\tfor users: " <> show users
-      for_ (unwrap assumptions') (createDeltasFromAssumption users)
-  pure users
+runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled, statesPerProperty, states}) cwus = do
+  case forwards description of
+    Nothing -> do
+      -- This case arises for example for a perspective on an EnumeratedRoleType in the same context.
+      -- Such a perspective will have properties (no sense in providing a perspective with just role verbs,
+      -- because instances of such a role cannot be shown).
+      -- For each property, get its value from the role instance, if the state condition is met.
+      forWithIndex_ (unwrap statesPerProperty)
+        (\prop propStates -> for_ propStates
+          -- For each state that provides a perspective on the property,
+          \stateIdentifier -> do
+            State.State{stateFulObject} <- lift2 $ getState stateIdentifier
+            -- if the stateful object...
+            case stateFulObject of
+              -- ... is the current context, then if it is in that state,
+              Cnt _ -> for_ cwus
+                \(Tuple cid users) -> (lift2 $ contextIsInState stateIdentifier cid) >>= if _
+                  -- then create deltas for all resources visited while retrieving
+                  -- the property, for all users;
+                  then lift2 (getterFromPropertyType prop)
+                    >>= lift2 <<< (execMonadPerspectivesQuery roleInstance)
+                    >>= void <<< (traverse (createDeltasFromAssumption users))
+                  else pure unit
+              -- ... is the subject role, for each user that is that state,
+              Srole _ -> for_ cwus
+                \(Tuple cid users) -> lift2 (filterA (roleIsInState stateIdentifier) users) >>=
+                  \sanctionedUsers ->
+                    -- create deltas for all resources while retrieving the property;
+                    lift2 (getterFromPropertyType prop)
+                      >>= lift2 <<< (execMonadPerspectivesQuery roleInstance)
+                      >>= void <<< (traverse (createDeltasFromAssumption sanctionedUsers))
+              -- ... is the object role, then if it is in that state,
+              Orole _ -> lift2 (roleIsInState stateIdentifier roleInstance) >>= if _
+                -- create deltas for all resources visited by the query while
+                -- retrieving the property, for all users;
+                then lift2 (getterFromPropertyType prop)
+                  >>= lift2 <<< (execMonadPerspectivesQuery roleInstance)
+                  >>= void <<< (traverse (createDeltasFromAssumption (join $ snd <$> cwus)))
+                else pure unit
+        )
+    -- These are all other cases, where there still is some path to walk to the
+    -- role (and its binding) that carries the properties.
+    Just fw -> do
+      currentContext <- lift2 (roleInstance ##>> OG.context)
+      -- Run the query interpreter on the same role instance as the backwards query,
+      -- resulting in all the paths that lead up to a role result.
+      (rinstances :: Array (DependencyPath)) <- lift2 ((singletonPath (C currentContext)) ##= interpret fw)
+      -- There can be zero or multiple state-valid perspectives on the results for each result, context and user.
+      -- We analyse each of the possibilities and accumulate the results in the transaction, filtering out doubles when adding.
+      for_ states
+        \stateIdentifier -> do
+          State.State{stateFulObject} <- lift2 $ getState stateIdentifier
+          case stateFulObject of
+            -- if the context is in that state,
+            Cnt _ -> for_ cwus
+              \(Tuple cid users) -> (lift2 $ contextIsInState stateIdentifier cid) >>= if _
+                -- then create deltas for all resources visited by the query (as reflected in
+                -- the assumptions), for all users;
+                then for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
+                else pure unit
+            -- otherwise, for each user that is that state,
+            Srole _ -> for_ cwus
+              \(Tuple cid users) -> lift2 (filterA (roleIsInState stateIdentifier) users) >>=
+                \sanctionedUsers ->
+                  -- create deltas for all resources visited by the query (as reflected in
+                  -- the assumptions);
+                  for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency sanctionedUsers) Nothing)
+            -- otherwise, for all paths that end in a role that is in that state,
+            Orole _ -> (filterA
+              (\{head} -> case head of
+                R rid -> lift2 (roleIsInState stateIdentifier rid)
+                otherwise -> throwError (error ("runForwardsComputation hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
+              rinstances)
+                -- then create deltas for all resources visited by the query (as reflected in
+                -- the assumptions), for all users;
+                >>= pure <<< join <<< (map allPaths)
+                >>= traverse_ (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
 
+      -- For each property, get its value from the role instances found by the query interpreter,
+      -- if the state condition is met. This is similar but not equal to the treatment
+      -- of the case above where there was no forwards query.
+      forWithIndex_ (unwrap statesPerProperty)
+        (\prop propStates -> for_ propStates
+          -- For each state that provides a perspective on the property,
+          \stateIdentifier -> do
+            State.State{stateFulObject} <- lift2 $ getState stateIdentifier
+            -- if the stateful object...
+            case stateFulObject of
+              -- ... is the current context, then if it is in that state,
+              Cnt _ -> for_ cwus
+                \(Tuple cid users) -> (lift2 $ contextIsInState stateIdentifier cid) >>= if _
+                  -- then run the interpreter on the property computation and the head of the dependency paths
+                  -- and create deltas for all users
+                  then for_ (_.head <$> rinstances)
+                    \(dep :: Dependency) -> do
+                      (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
+                      for_ (join (allPaths <$> vals)) (LNE.foldM (serialiseDependency users) Nothing)
+                  else pure unit
+              -- ... is the subject role, collect each user that is that state,
+              Srole _ -> for_ cwus
+                \(Tuple cid users) -> lift2 (filterA (roleIsInState stateIdentifier) users) >>=
+                  \sanctionedUsers ->
+                    -- run the interpreter on the property computation and the head of the dependency paths
+                    -- and create deltas for all collected users
+                    for_ (_.head <$> rinstances)
+                      \(dep :: Dependency) -> do
+                        (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
+                        for_ (join (allPaths <$> vals)) (LNE.foldM (serialiseDependency sanctionedUsers) Nothing)
+              -- ... is the object role, then for all paths that end in a role that is in that state,
+              Orole _ -> (filterA
+                (\{head} -> case head of
+                  R rid -> lift2 (roleIsInState stateIdentifier rid)
+                  otherwise -> throwError (error ("runForwardsComputation hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
+                rinstances)
+                  >>= pure <<< map _.head
+                  -- run the interpreter on the property computation and the head of the dependency path
+                  -- and create deltas for all users
+                  >>= traverse_
+                    \(dep :: Dependency) -> do
+                      (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
+                      for_ (join (allPaths <$> vals)) (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
+        )
+  pure $ join $ snd <$> cwus
+
+-- Add deltas for all the users.
 createDeltasFromAssumption :: Array RoleInstance -> InformedAssumption -> MonadPerspectivesTransaction Unit
 createDeltasFromAssumption users (RoleAssumption ctxt roleTypeId) = do
   instances <- lift2 (ctxt ##= getRoleInstances (ENR roleTypeId))
@@ -347,11 +474,16 @@ magic ctxt roleInstances rtype users =  do
                         else pure unit
 
 -- | Adds users for SYNCHRONISATION, guarantees RULE TRIGGERING.
+-- The role instance is the current object; so if a perspective is conditional on object state, we can check
+-- this role instance.
 aisInPropertyDelta :: RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction (Array RoleInstance)
 aisInPropertyDelta id property = do
   calculations <- lift2 $ compileDescriptions' property
-  users <- join <$> for calculations (handleBackwardQuery id)
-  lift $ lift $ filterA notIsMe (nub users)
+  -- `handleBackwardQuery` just passes on users that have at least one
+  -- valid perspective, even if the condition is object state.
+  (cwu :: Array ContextWithUsers) <- join <$> for calculations (handleBackwardQuery id)
+  --
+  lift2 $ filterA notIsMe (nub $ join $ snd <$> cwu)
   where
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Array InvertedQuery)
     compileDescriptions' rt@(EnumeratedPropertyType ert) =  do
@@ -365,7 +497,7 @@ aisInPropertyDelta id property = do
             if areCompiled calculations
               then pure calculations
               else do
-                compiledCalculations <- traverse compileBackwards calculations
+                compiledCalculations <- traverse compileBoth calculations
                 -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
                 modifyDomeinFileInCache (over (onPropertyDelta rt) (const compiledCalculations)) modelName
                 pure compiledCalculations
@@ -377,16 +509,21 @@ aisInPropertyDelta id property = do
 -- | onRoleDelta_binding, onContextDelta_role or onContextDelta_context, and an EnumeratedRoleType, compileBackwards the
 -- | description in the AffectedContextCalculations.
 -- | Compiles the `inverse` queries; not the forwards part.
-compileDescriptions :: CalculationsLens -> EnumeratedRoleType -> MonadPerspectives (Array InvertedQuery)
-compileDescriptions onX rt = compileDescriptions_ onX rt false
+compileBackwardFor :: CalculationsLens -> EnumeratedRoleType -> MonadPerspectives (Array InvertedQuery)
+compileBackwardFor onX rt = compileDescriptions_ onX rt false
 
+compileBothFor :: CalculationsLens -> EnumeratedRoleType -> MonadPerspectives (Array InvertedQuery)
+compileBothFor onX rt = compileDescriptions_ onX rt false
+
+-- | Compiles the backward part of the description and stores it in backwardsCompiled.
+-- | If the argument bound to `forward` is true, then the forward part is compiled, too.
 compileDescriptions_ :: CalculationsLens -> EnumeratedRoleType -> Boolean -> MonadPerspectives (Array InvertedQuery)
 compileDescriptions_ onX rt@(EnumeratedRoleType ert) forward = do
   modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
   (try $ retrieveDomeinFile modelName) >>=
     handleDomeinFileError' "compileDescriptions_" []
     \(df :: DomeinFile) -> do
-      -- Get the AffectedContextCalculations in onContextDelta_context.
+      -- Get the InvertedQueries in onContextDelta_context.
       (calculations :: Array InvertedQuery) <- pure $ unsafePartial $ fromJust $ preview (onDelta rt) df
       -- Compile the descriptions.
       if forward
@@ -418,8 +555,7 @@ compileForwards ac@(InvertedQuery iqr@{description, forwardsCompiled}) = case fo
   Just c -> pure ac
   Nothing -> do
     c <- traverse getHiddenFunction (forwards description)
-    -- TODO. je hoeft hier geen unsafeCoerce te mappen, denk ik.
-    pure $ InvertedQuery iqr {forwardsCompiled = (map unsafeCoerce c)}
+    pure $ InvertedQuery iqr {forwardsCompiled = c}
 
 compileBackwards :: InvertedQuery -> MP InvertedQuery
 compileBackwards ac@(InvertedQuery iqr@{description, backwardsCompiled}) = case backwardsCompiled of

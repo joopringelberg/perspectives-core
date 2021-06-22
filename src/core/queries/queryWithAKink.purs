@@ -183,14 +183,31 @@ setInvertedQueries users statesPerProperty roleStates qfd = do
   -- log ("setInvertedQueries:" <> "\n users =" <> show users <> "\n states = " <> show roleStates <> "\n statesPerProperty = " <> showTree statesPerProperty <> "\n qfd = " <> show qfd)
   (zqs :: (Array QueryWithAKink)) <- invert qfd
   for_ zqs \qwk@(ZQ backward forward) -> do
+    -- What is confusing about what follows is that it just seems to handle the first step of an inverted query.
+    -- What about the steps that follow?
+    -- Reflect that we have generated *separate inverted queries* for all these steps, each 'kinking' the original query
+    -- at a different position.
+    -- So if the original query was:
+    --    s1 >> s2 >> s3
+    -- we generate:
+    --    backwards (forwards)
+    --    ^s1 (s2 >> s3)          and for this we store an InvertedQuery with s1
+    --    ^s2 >> ^s1 (s3)         and for this we store an InvertedQuery with s2
+    --    ^s3 >> ^s2 >> ^s1 ()    and for this we store an InvertedQuery with s3
+
+    -- Handle two cases of the backward query:
+    --  * SQD >> (...), i.e. when the backward part is a composition (whose first step is not a composition, that would be an error!).
+    --  * SQD, i.e. when the backward part is just a single step.
     case backward of
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
-      -- Assuming an SQD otherwise
-      -- (Just b) -> unsafePartial $ setPathForStep b b usersAndProps
+      -- TODO. Doubleert dit niet met de case hieronder, voor setInvertedQueriesForUserAndRole?
       (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk  users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
       Nothing -> pure unit
+    -- Handle the endpoint of the original query when it ends in a Role. There are two cases:
+    -- a Perspective Object, where the perspective may have properties;
+    -- an expression in a statement with a Property value.
     case forward, backward, domain <$> backward of
       Nothing, Just bw, Just (RDOM role) ->
         void $ setInvertedQueriesForUserAndRole users role statesPerProperty true qwk

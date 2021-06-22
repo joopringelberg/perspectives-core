@@ -38,12 +38,13 @@ import Data.Foldable (for_)
 import Data.Map (Map, filterKeys, values)
 import Data.Map (lookup) as Map
 import Data.Map.Internal (keys)
-import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala, unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (lookup, insert) as OBJ
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
@@ -178,7 +179,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
                 , backwardsCompiled: Nothing
                 , forwardsCompiled: Nothing
                 , users
-                , states
+                , states: unsafePartial $ fromJust $ Map.lookup prop statesPerProperty
                 , statesPerProperty: EncodableMap statesPerProperty
                 })
               OnPropertyDelta
@@ -188,7 +189,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
               , users
-              , states
+              , states: unsafePartial $ fromJust $ Map.lookup prop statesPerProperty
               , statesPerProperty: EncodableMap statesPerProperty
               }) onPropertyDelta}) enumeratedProperties}
         pure unit

@@ -24,8 +24,8 @@ module Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries where
 
 import Control.Monad.Except (throwError)
 import Data.Array (union)
-import Data.Map (Map)
-import Data.Maybe (Maybe(..))
+import Data.Map (Map, lookup) as Map
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
@@ -49,13 +49,13 @@ setPathForStep :: Partial =>
   QueryWithAKink ->
   Array RoleType ->
   Array StateIdentifier ->
-  Map PropertyType (Array StateIdentifier) ->
+  Map.Map PropertyType (Array StateIdentifier) ->
   PhaseThree Unit
 setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = case qf of
   QF.Value2Role pt -> case pt of
     ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
       Nothing -> addInvertedQueryForDomain (unwrap p)
-        (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
+        (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states: unsafePartial $ fromJust $ Map.lookup (ENP p) statesPerProperty})
         OnPropertyDelta
         dfr
       Just ep -> dfr {enumeratedProperties = insert (unwrap p) (addPathToProperty ep qWithAK) enumeratedProperties}
@@ -73,7 +73,7 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
       ZQ Nothing _ -> dfr
       _ -> case lookup roleName enumeratedRoles of
         Nothing -> addInvertedQueryForDomain roleName
-          (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
+          (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states})
           OnRoleDelta_binder
           dfr
         Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en oneStepLess) enumeratedRoles}
@@ -85,7 +85,7 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
       roleName = unwrap $ unsafePartial $ domain2RoleType dom
       in case lookup roleName  enumeratedRoles of
         Nothing -> addInvertedQueryForDomain roleName
-          (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
+          (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states})
           OnRoleDelta_binding
           dfr
         Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en qWithAK) enumeratedRoles}
@@ -99,7 +99,7 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
         ZQ Nothing _ -> dfr
         _ -> case lookup roleName enumeratedRoles of
           Nothing -> addInvertedQueryForDomain roleName
-            (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
+            (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states})
             OnContextDelta_role
             dfr
           Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_role en (oneStepLess)) enumeratedRoles}
@@ -109,7 +109,7 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
     roleName = unwrap $ unsafePartial $ domain2RoleType dom
     in case lookup roleName  enumeratedRoles of
       Nothing -> addInvertedQueryForDomain roleName
-        (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})
+        (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states})
         OnContextDelta_context
         dfr
       Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_context en qWithAK) enumeratedRoles}
@@ -133,20 +133,27 @@ setPathForStep (SQD dom qf ran _ _) qWithAK users states statesPerProperty = cas
   _ -> throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
 
   where
+    -- TODO. Hier kunnen we statesPerProperty beperken tot de onderhavige EnumeratedProperty!
     addPathToProperty :: EnumeratedProperty -> QueryWithAKink -> EnumeratedProperty
-    addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = union onPropertyDelta [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})]}
+    addPathToProperty (EnumeratedProperty propRecord@{_id, onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = union onPropertyDelta [(InvertedQuery
+      { description: inverseQuery
+      , backwardsCompiled: Nothing
+      , forwardsCompiled: Nothing
+      , users
+      , statesPerProperty: EncodableMap statesPerProperty
+      , states: unsafePartial $ fromJust $ Map.lookup (ENP _id) statesPerProperty})]}
 
     addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = union onRoleDelta_binder [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})] }
+    addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = union onRoleDelta_binder [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states})] }
 
     addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = union onRoleDelta_binding [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})]}
+    addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = union onRoleDelta_binding [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states})]}
 
     addPathToOnContextDelta_context :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = union onContextDelta_context [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})]}
+    addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = union onContextDelta_context [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states})]}
 
     addPathToOnContextDelta_role :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = union onContextDelta_role [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, states, statesPerProperty: EncodableMap statesPerProperty})]}
+    addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = union onContextDelta_role [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states})]}
 
 --------------------------------------------------------------------------------------------------------------
 ---- REMOVE FIRST BACKWARDS STEP

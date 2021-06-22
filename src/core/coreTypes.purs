@@ -309,6 +309,17 @@ runMonadPerspectivesQueryToObject id tog = evalMonadPerspectivesQuery id tog >>=
 
 infix 0 runMonadPerspectivesQueryToObject as ##>>
 
+-----------------------------------------------------------
+-- EXEC TRACKINGOBJECTSGETTER TO GET AN ARRAY INFORMEDASSUMPTIONS
+-----------------------------------------------------------
+-- | Apply a TrackingObjectsGetter to an argument to obtain the informedAssumptions that underly it.
+execMonadPerspectivesQuery :: forall s o.
+  s
+  -> (s ~~> o)
+  -> (MonadPerspectives (Array InformedAssumption))
+execMonadPerspectivesQuery a f = do
+    (Tuple result assumptions) <- runMonadPerspectivesQuery a f
+    pure (unwrap assumptions)
 
 -----------------------------------------------------------
 -- COMPOSE INSTANCE LEVEL AND TYPE LEVEL GETTERS

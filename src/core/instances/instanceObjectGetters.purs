@@ -26,9 +26,9 @@ import Control.Alt ((<|>))
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)
-import Data.Array (findIndex, foldMap, head, index, null, singleton)
+import Data.Array (elemIndex, findIndex, foldMap, head, index, null, singleton)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap, ala)
 import Data.String.Regex (test)
@@ -99,6 +99,9 @@ getActiveStates ci = ArrayT $ (try $ lift $ getContextMember IP.states ci) >>=
 getActiveStates_ :: ContextInstance -> MonadPerspectives (Array StateIdentifier)
 getActiveStates_ ci = (try $ getContextMember IP.states ci) >>=
   handlePerspectContextError' "getActiveStates_" [] pure <<< identity
+
+contextIsInState :: StateIdentifier -> ContextInstance -> MonadPerspectives Boolean
+contextIsInState stateId ci = getActiveStates_ ci >>= pure <<< isJust <<< elemIndex stateId
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE
@@ -324,8 +327,8 @@ getActiveRoleStates_ :: RoleInstance -> MonadPerspectives (Array StateIdentifier
 getActiveRoleStates_ ci = (try $ getRolMember (_.states <<< unwrap) ci) >>=
   handlePerspectContextError' "getActiveRoleStates_" [] pure <<< identity
 
-getActiveRoleAndContextStates :: RoleInstance ~~> StateIdentifier
-getActiveRoleAndContextStates = conjunction getActiveRoleStates (context >=> getActiveStates)
+roleIsInState :: StateIdentifier -> RoleInstance -> MonadPerspectives Boolean
+roleIsInState stateId ri = getActiveRoleStates_ ri >>= pure <<< isJust <<< elemIndex stateId
 
 -- | Returns the name of the model that defines the role type as a String Value.
 roleModelName :: RoleInstance ~~> Value

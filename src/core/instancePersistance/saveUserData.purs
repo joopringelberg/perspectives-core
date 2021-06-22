@@ -90,7 +90,9 @@ import Prelude (Unit, bind, discard, eq, join, pure, unit, void, ($), (<>), (>>=
 -- | PERSISTENCE
 -- | QUERY UPDATES
 -- | RULE TRIGGERING
--- | but nothing else.
+-- | but nothing else. It is only used by loadAndSaveCrlFile. This means that we only deal with
+-- | contexts that have been created from a source file, freshly as it were, fully equipped with
+-- | roles.
 saveContextInstance :: Updater ContextInstance
 saveContextInstance id = do
   (ctxt :: PerspectContext) <- lift2 $ saveEntiteit id
