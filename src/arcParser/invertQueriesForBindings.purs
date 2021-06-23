@@ -38,18 +38,17 @@ import Data.Foldable (for_)
 import Data.Map (Map, filterKeys, values)
 import Data.Map (lookup) as Map
 import Data.Map.Internal (keys)
-import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
+import Data.Maybe (Maybe(..), isJust, isNothing, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala, unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (lookup, insert) as OBJ
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery)
-import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep)
+import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep, makeComposition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, functional)
 import Perspectives.Representation.ADT (ADT(..))
@@ -78,11 +77,6 @@ setInvertedQueriesForUserAndRole ::
   Boolean ->
   QueryWithAKink ->
   PhaseThree Boolean
--- Wat doe ik met statesPerProperty?
---  * alle values verzamelen
---  * alle PropertyTypes eruit halen.
---  * de states van een PropertyType aflezen.
---  * de map filteren.
 setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOnThisRole qWithAkink = do
   if perspectiveOnThisRole
     -- Add qWithAkink in onContextDelta_context of role.
@@ -108,7 +102,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
     -- That will be just all states in the map.
     -- Don't do it on the root of the telescope (not if perspectiveOnThisRole).
     -- Do it when a property resides on the telescope below the current level.
-    -- Do it when a property resices on the current level.
+    -- Do it when a property resides on the current level.
     then do
       addToOnRoleDelta qWithAkink role (concat $ fromFoldable $ values statesPerProperty)
       pure true
@@ -141,30 +135,36 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
             onContextDelta_context }) roles}
 
     addToOnRoleDelta :: QueryWithAKink -> EnumeratedRoleType -> Array StateIdentifier -> PhaseThree Unit
-    addToOnRoleDelta qwk (EnumeratedRoleType roleId) states = modifyDF
-      \df@{enumeratedRoles:roles} ->
-        -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
-        -- the binding. We skip the binding because its cardinality is larger than one.
-        case OBJ.lookup roleId roles of
-          Nothing -> addInvertedQueryForDomain roleId
-            (InvertedQuery
-              { description: removeFirstBackwardsStep qwk
+    addToOnRoleDelta qwk (EnumeratedRoleType roleId) states = let
+      -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
+      -- the binding. We skip the binding because its cardinality is larger than one.
+      -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
+      -- for that by prepending it with the inversal of the first backward step.
+      -- That will be a binding step.
+      description = removeFirstBackwardsStep qwk
+        (\dom' ran' man' -> SQD ran' (DataTypeGetter BindingF) dom' True man')
+      in modifyDF
+        \df@{enumeratedRoles:roles} ->
+          case OBJ.lookup roleId roles of
+            Nothing -> addInvertedQueryForDomain roleId
+              (InvertedQuery
+                { description
+                , backwardsCompiled: Nothing
+                , forwardsCompiled: Nothing
+                , users
+                , states
+                , statesPerProperty: EncodableMap statesPerProperty
+                })
+              OnRoleDelta_binder
+              df
+            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery
+              { description
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
               , users
               , states
               , statesPerProperty: EncodableMap statesPerProperty
-              })
-            OnRoleDelta_binder
-            df
-          Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery
-            { description: removeFirstBackwardsStep qwk
-            , backwardsCompiled: Nothing
-            , forwardsCompiled: Nothing
-            , users
-            , states
-            , statesPerProperty: EncodableMap statesPerProperty
-            }) onRoleDelta_binder}) roles}
+              }) onRoleDelta_binder}) roles}
 
     addToProperties :: QueryWithAKink -> PropertyType -> Array StateIdentifier -> PhaseThree Unit
     addToProperties qwk@(ZQ backwards forwards) prop states = case prop of
@@ -179,7 +179,9 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
                 , backwardsCompiled: Nothing
                 , forwardsCompiled: Nothing
                 , users
-                , states: unsafePartial $ fromJust $ Map.lookup prop statesPerProperty
+                -- NOTE. Mag het voorkomen dat de property niet in de map zit?
+                -- En wat betekent een InvertedQuery zonder states?
+                , states: maybe [] identity (Map.lookup prop statesPerProperty)
                 , statesPerProperty: EncodableMap statesPerProperty
                 })
               OnPropertyDelta
@@ -189,7 +191,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
               , users
-              , states: unsafePartial $ fromJust $ Map.lookup prop statesPerProperty
+              , states: maybe [] identity (Map.lookup prop statesPerProperty)
               , statesPerProperty: EncodableMap statesPerProperty
               }) onPropertyDelta}) enumeratedProperties}
         pure unit
@@ -239,13 +241,3 @@ setInvertedQueriesForUserAndRole users _ props perspectiveOnThisRole invertedQ =
 isRelevant :: PropertyType -> RelevantProperties -> Boolean
 isRelevant t All = true
 isRelevant t (Properties set) = isJust $ elemIndex t set
-
-makeComposition :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
-makeComposition left right = BQD
-  (domain left)
-  (BinaryCombinator ComposeF)
-  left
-  right
-  (range right)
-  (and (functional left) (functional right))
-  (or (functional left) (functional right))

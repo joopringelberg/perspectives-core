@@ -301,10 +301,9 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
     -- These are all other cases, where there still is some path to walk to the
     -- role (and its binding) that carries the properties.
     Just fw -> do
-      currentContext <- lift2 (roleInstance ##>> OG.context)
       -- Run the query interpreter on the same role instance as the backwards query,
       -- resulting in all the paths that lead up to a role result.
-      (rinstances :: Array (DependencyPath)) <- lift2 ((singletonPath (C currentContext)) ##= interpret fw)
+      (rinstances :: Array (DependencyPath)) <- lift2 ((singletonPath (R roleInstance)) ##= interpret fw)
       -- There can be zero or multiple state-valid perspectives on the results for each result, context and user.
       -- We analyse each of the possibilities and accumulate the results in the transaction, filtering out doubles when adding.
       for_ states

@@ -114,10 +114,11 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
         then do
           -- The inversion of left yielded just a single QueryWithAKink_.
           zippedQueries <- invert_ r
-          -- Append the steps found in that single QueryWithAKink_ to the end
-          -- of each series of steps resulting from inverting the right.
-          -- TODO. Why do we add (ZQ_ l_ (Just q))?
-          pure $ cons (ZQ_ l_ (Just q))
+          -- Add the kinked query consisting of the first (inverted) step as the left part
+          -- and the (not inverted) rest of the steps as the right part.
+          pure $ cons (ZQ_ l_ (Just r))
+            -- Append the steps found in that single QueryWithAKink_ to the end
+            -- of each series of steps resulting from inverting the right.
             (map (\(ZQ_ r_ q') -> ZQ_ (r_ <> l_) q') zippedQueries)
         -- TODO. In het algemene geval kan de linkerkant wel degelijk meerdere
         -- resultaten opleveren: denk aan een CalculatedRole met een join.
@@ -196,13 +197,13 @@ setInvertedQueries users statesPerProperty roleStates qfd = do
     --    ^s3 >> ^s2 >> ^s1 ()    and for this we store an InvertedQuery with s3
 
     -- Handle two cases of the backward query:
-    --  * SQD >> (...), i.e. when the backward part is a composition (whose first step is not a composition, that would be an error!).
-    --  * SQD, i.e. when the backward part is just a single step.
+    --  * SQD >> (...), i.e. when the backward part is a composition (whose first step is not a composition, that would be an error!). Set the InvertedQuery with respect to the first step of backward.
+    --  * SQD, i.e. when the backward part is just a single step. Set the InvertedQuery for that step.
     case backward of
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
       -- TODO. Doubleert dit niet met de case hieronder, voor setInvertedQueriesForUserAndRole?
-      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk  users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
+      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
       (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
       Nothing -> pure unit
     -- Handle the endpoint of the original query when it ends in a Role. There are two cases:
