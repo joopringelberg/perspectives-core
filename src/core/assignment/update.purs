@@ -62,7 +62,7 @@ import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding_, roleType)
+import Perspectives.Instances.ObjectGetters (binding_, contextType, roleType)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.ADT (ADT(..))
@@ -70,7 +70,7 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, Enum
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
-import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -475,6 +475,12 @@ setActiveContextState stateId contextId = (lift2 $ try $ getPerspectContext cont
         (lift2 $ findContextStateRequests contextId) >>= addCorrelationIdentifiersToTransactie
 
 -----------------------------------------------------------
+-- SETDEFAULTCONTEXTROOTSTATE
+-----------------------------------------------------------
+setDefaultContextRootState :: ContextInstance -> MonadPerspectivesTransaction Unit
+setDefaultContextRootState cid = (lift2 (cid ##>> contextType)) >>= \ctype -> setActiveContextState (StateIdentifier (unwrap ctype)) cid
+
+-----------------------------------------------------------
 -- SETINACTIVECONTEXTSTATE
 -----------------------------------------------------------
 -- | Remove the state identifier from the array of state identifiers in the context instance.
@@ -513,6 +519,12 @@ setActiveRoleState stateId roleId = (lift2 $ try $ getPerspectRol roleId) >>=
       \(pe :: PerspectRol) -> do
         cacheAndSave roleId $ pushRol_state pe stateId
         (lift2 $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
+
+-----------------------------------------------------------
+-- SETDEFAULTROLEROOTSTATE
+-----------------------------------------------------------
+setDefaultRoleRootState :: RoleInstance -> MonadPerspectivesTransaction Unit
+setDefaultRoleRootState rid = (lift2 (rid ##>> roleType)) >>= \rtype -> setActiveRoleState (StateIdentifier (unwrap rtype)) rid
 
 -----------------------------------------------------------
 -- SETINACTIVEROLESTATE
