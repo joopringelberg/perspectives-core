@@ -172,7 +172,9 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
         computeUsersFromState :: ContextInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
         computeUsersFromState cid accumulatedUsers stateId = (lift2 $ tryGetState stateId) >>=
           case _ of
-            Nothing -> pure []
+            -- No state means: an undefined root state.
+            -- But in that situation, there are no conditions at all, so we just compute the users from the context.
+            Nothing -> lift2 $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
             Just (State.State{stateFulObject}) ->
               case stateFulObject of
                 -- If the state's StateFulObject is a context type (Cnt), and the context is in that state, obtain all user role instances from the context (and we're done)
@@ -214,7 +216,11 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
         computeUsersFromState :: RoleInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
         computeUsersFromState rid accumulatedUsers stateId = (lift2 $ tryGetState stateId) >>=
           case _ of
-            Nothing -> pure []
+            -- If there is no state, we assume we deal with an undefined root state, meaning there are no conditions at all.
+            -- We then compute the users from the context of the role instance
+            Nothing -> do
+              cid <- lift2 (rid ##>> OG.context)
+              singleton <<< Tuple cid <$> lift2 (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
             Just (State.State{stateFulObject}) ->
               case stateFulObject of
                 State.Cnt _ -> throwError (error $ "fromRoleResults.computeUsersFromState: context states should not occur.")
