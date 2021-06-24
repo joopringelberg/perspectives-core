@@ -444,7 +444,8 @@ handlePostponedStateQualifiedParts = do
           (traverse (compileExpression currentDomain) syntacticObjectWithEnvironment)
       -- subject is by default constructed as Enumerated but may well be an unqualified segmented name.
       -- Qualify first!
-      qualifiedUsers <- collectRoles subject
+      -- These qualifiedUsers will end up in InvertedQueries.
+      (qualifiedUsers :: Array RoleType) <- collectRoles subject
       -- Compile the side effect. Will invert all expressions in the statements, too, including
       -- the object if it is referenced.
       states <- stateSpec2States (transition2stateSpec transition)

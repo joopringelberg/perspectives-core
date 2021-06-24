@@ -122,33 +122,45 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
       then createRoleStateQuery
       else usersWithAnActivePerspective
   where
+    -- | The InvertedQuery is based on a Context state condition.
+    -- | This function adds, as a side effect, an InvertedQueryResult to the current transaction.
     createContextStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createContextStateQuery = do
       (invertedQueryResults :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
       addInvertedQueryResult $ ContextStateQuery invertedQueryResults
       pure []
 
+    -- | The InvertedQuery is based on a Role state condition.
+    -- | This function adds, as a side effect, an InvertedQueryResult to the current transaction.
     createRoleStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createRoleStateQuery = do
       (affectedRoles :: Array RoleInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance)
       addInvertedQueryResult $ RoleStateQuery affectedRoles
       pure []
 
-    -- TODO. Het lijkt me dat hier alleen nog maar queries langskomen die een context resultaat opleveren?!
+    -- | The InvertedQuery is based on an explicit or implicit perspective.
+    -- | This function has no side effect but returns, bundled in their respective contexts, users with
+    -- | a valid perspective on a role (and properties) in their context.
+    -- | They will receive Deltas that describe the change that triggered this InvertedQuery in the first place.
     usersWithAnActivePerspective :: MonadPerspectivesTransaction (Array ContextWithUsers)
     usersWithAnActivePerspective = if unsafePartial $ backwardsQueryResultsInRole iq
-      -- then fromRoleResults
-      then throwError (error "Programming error in handleBackwardQuery.usersWithAnActivePerspective: query should not result\
-      \in a role.")
+      then fromRoleResults
       else if unsafePartial $ backwardsQueryResultsInContext iq
         then fromContextResults
           else throwError (error "Programming error in handleBackwardQuery.usersWithAnActivePerspective: query should result\
-          \in context.")
+          \in a role or a context.")
 
+    -- | The inverted query (its backward part) always leads to a context instance.
+    -- | These InvertedQueries have been derived from explicit Perspectives, or from
+    -- | 'implicit Perspectives' resulting from expressions in context state (so that the resource the expression is
+    -- | applied to is a context instance). A context state condition is an example; another is expression that are in
+    -- | scope of an "in context state" clause.
+    -- | The object of such a perspective is computed from the context that the user having the perspective is in.
+    -- | Hence, it inversion leads back to that context.
     fromContextResults :: MonadPerspectivesTransaction (Array ContextWithUsers)
     fromContextResults = do
-      (invertedQueryResults :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
-      foldM computeUsersFromContext [] invertedQueryResults
+      (contextsWithPerspectiveHolders :: Array ContextInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance)
+      foldM computeUsersFromContext [] contextsWithPerspectiveHolders
 
       where
         -- The currently inefficient version accumulates users from each state examined.
@@ -156,9 +168,10 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
         computeUsersFromContext :: Array ContextWithUsers -> ContextInstance -> MonadPerspectivesTransaction (Array ContextWithUsers)
         computeUsersFromContext accumulatedUsers cid = foldM (computeUsersFromState cid) [] states
 
+        -- | As explicit Perspectives may be conditional on each type of state, we have to consider them all.
         computeUsersFromState :: ContextInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
-        computeUsersFromState cid accumulatedUsers stateId = do
-          (lift2 $ tryGetState stateId) >>= case _ of
+        computeUsersFromState cid accumulatedUsers stateId = (lift2 $ tryGetState stateId) >>=
+          case _ of
             Nothing -> pure []
             Just (State.State{stateFulObject}) ->
               case stateFulObject of
@@ -179,18 +192,43 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
                     then lift2 $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
                     else pure []
 
-    -- TODO. Waarschijnlijk wordt deze functie nooit geevalueerd.
-    -- fromRoleResults :: MonadPerspectivesTransaction (Array ContextWithUsers)
-    -- fromRoleResults = do
-    --   (invertedQueryResults :: Array RoleInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance)
-    --   -- Return users only for those roles that are in one of the permissable states.
-    --   (allowed :: Array RoleInstance) <- filterA
-    --     (\rid -> (lift2 $ getActiveRoleStates_ rid) >>= pure <<< not <<< null <<< intersect states)
-    --     invertedQueryResults
-    --   join <$> for allowed \ri -> do
-    --     -- Remove 'me'
-    --     -- If a role cannot be found, we remove it, erring on the safe side (notIsMe has an internal error boundary).
-    --     lift2 (join <$> traverse (\userType -> (ri ##= OG.context >=> getRoleInstances userType) >>= filterA notIsMe) userTypes)
+    -- | The inverted query (its backward part) always leads to a role instance.
+    -- | These InvertedQueries have been derived from 'implicit Perspectives', that is: expressions in statements
+    -- | in AutomaticActions, Actions or Notifications.
+    -- | These expressions are applied to a resource that depends on the current state of the lexical position of
+    -- | the "do", "action" or "notify" clauses. This can either be a context instance, a user role instance
+    -- | (in the case of subject state) or another role instance (in the case of object state).
+    -- | Hence, it inversion leads back to that resource.
+    -- | However, the context state case is handled in `fromContextResults`, so we only have to consider object and
+    -- | subject state.
+    fromRoleResults :: MonadPerspectivesTransaction (Array ContextWithUsers)
+    fromRoleResults = do
+      (rolesExpressionsAreAppliedTo :: Array RoleInstance) <- lift2 (roleInstance ##= (unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance)
+      foldM computeUsersFromRole [] rolesExpressionsAreAppliedTo
+
+      where
+        computeUsersFromRole :: Array ContextWithUsers -> RoleInstance -> MonadPerspectivesTransaction (Array ContextWithUsers)
+        computeUsersFromRole accumulatedUsers rid = foldM (computeUsersFromState rid) [] states
+
+        -- | We only have to consider Srole and Orole cases.
+        computeUsersFromState :: RoleInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
+        computeUsersFromState rid accumulatedUsers stateId = (lift2 $ tryGetState stateId) >>=
+          case _ of
+            Nothing -> pure []
+            Just (State.State{stateFulObject}) ->
+              case stateFulObject of
+                State.Cnt _ -> throwError (error $ "fromRoleResults.computeUsersFromState: context states should not occur.")
+                -- The role we've been lead back to is a user role. Check whether it is in the required state.
+                State.Srole _ -> (lift2 $ roleIsInState stateId rid) >>= if _
+                  then lift2 (rid ##>> OG.context) >>= \cid -> pure $ [Tuple cid [rid]]
+                  else pure []
+                -- The role we've been lead back to is an object role. If it is in the required state,
+                -- compute the users having a perspective from its context.
+                State.Orole _ -> (lift2 $ roleIsInState stateId rid) >>= if _
+                  then do
+                    cid <- lift2 (rid ##>> OG.context)
+                    singleton <<< Tuple cid <$> lift2 (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+                  else pure []
 
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
 addInvertedQueryResult result = lift $ AA.modify \(Transaction r@{invertedQueryResults}) -> Transaction (r {invertedQueryResults = union [result] invertedQueryResults})

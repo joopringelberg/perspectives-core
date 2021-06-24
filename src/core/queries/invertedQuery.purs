@@ -54,6 +54,7 @@ newtype InvertedQuery = InvertedQuery
   { description :: QueryWithAKink
   , backwardsCompiled :: (Maybe HiddenFunction)
   , forwardsCompiled :: (Maybe HiddenFunction)
+  -- TODO dit kan er maar één zijn.
   , users :: Array RoleType
   -- Yield PerspectiveObject InvertedQueryResult data only in one of these states:
   , states :: Array StateIdentifier
