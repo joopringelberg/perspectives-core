@@ -28,8 +28,8 @@ module Perspectives.HiddenFunction where
 
 import Prelude
 
-import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
+import Foreign.NullOrUndefined (null)
 import Unsafe.Coerce (unsafeCoerce)
 
 foreign import data HiddenFunction :: Type
@@ -41,7 +41,8 @@ instance eqHiddenFunction :: Eq HiddenFunction where
   eq _ _ = true
 
 instance encodeHiddenFunction :: Encode HiddenFunction where
-  encode _ = unsafeToForeign "HiddenFunction"
+  encode _ = null
 
+-- As we never read a HiddenFunction, this does not matter.
 instance decodeHiddenFunction :: Decode HiddenFunction where
   decode _ = unsafeCoerce unit
