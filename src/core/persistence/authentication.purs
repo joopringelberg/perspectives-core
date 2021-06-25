@@ -25,40 +25,36 @@ module Perspectives.Persistence.Authentication
 
 where
 
+import Perspectives.Persistence.State
+import Perspectives.Persistence.Types
 import Prelude
 
 import Affjax as AJ
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))
-import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Except (catchJust)
 import Data.Argonaut (fromObject)
 import Data.Array (elemIndex)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Data.String.Regex (Regex, test)
-import Data.String.Regex.Flags (noFlags)
-import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
-import Effect.Aff (error, throwError)
+import Effect.Aff (Error, error, throwError)
 import Effect.Aff.Class (liftAff)
 import Foreign.Object (fromFoldable)
-import Perspectives.Persistence.Types
-import Perspectives.Persistence.State
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
 -- AUTHENTICATION
 -- See: http://127.0.0.1:5984/_utils/docs/api/server/authn.html#api-auth-cookie
 -----------------------------------------------------------
-authenticationErrorRegEx :: Regex
-authenticationErrorRegEx = unsafeRegex "UNAUTHORIZED" noFlags
+
+foreign import isUnauthorized :: Error -> Boolean
 
 ensureAuthentication :: forall f a. MonadPouchdb f a -> MonadPouchdb f a
 ensureAuthentication a = catchJust
-  (\e -> if test authenticationErrorRegEx (show e) then Just true else Nothing)
+  (\e -> if isUnauthorized e then Just true else Nothing)
   a
   \_ -> requestAuthentication *> a
 
