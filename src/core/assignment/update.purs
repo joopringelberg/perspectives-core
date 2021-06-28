@@ -146,7 +146,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
       -- Notice that even though we compute the users for a single given RoleInstance, we can use that result
       -- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
       -- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
-      users <- usersWithPerspectiveOnRoleInstance contextId rolName (identifier $ unsafePartial $ fromJust $ ARR.head roles)
+      users <- usersWithPerspectiveOnRoleInstance rolName (identifier $ unsafePartial $ fromJust $ ARR.head roles)
       -- SYNCHRONISATION
       subject <- getSubject
       author <- getAuthor
@@ -183,7 +183,7 @@ removeRoleInstancesFromContext :: ContextInstance -> EnumeratedRoleType -> (Upda
 removeRoleInstancesFromContext contextId rolName rolInstances = do
   -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
   -- the transaction, too.
-  users <- usersWithPerspectiveOnRoleInstance contextId rolName (head rolInstances)
+  users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances)
   subject <- getSubject
 -- SYNCHRONISATION
   author <- getAuthor
@@ -254,7 +254,7 @@ moveRoleInstancesToAnotherContext originContextId destinationContextId rolName r
 --           (lift2 $ findRoleRequests originContextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
 --       -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
 --       -- the transaction, too.
---       users <- usersWithPerspectiveOnRoleInstance originContextId rolName (head rolInstances)
+--       users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances)
 --       -- SYNCHRONISATION
 --       addContextDelta $ ContextDelta
 --             { id : originContextId

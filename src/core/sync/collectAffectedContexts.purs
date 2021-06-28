@@ -82,9 +82,8 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | on a path to the object).
 -- | As a side effect, Deltas are added to the transaction for the continuation of the path beyond the given role
 -- | instance.
--- TODO. Het eerste argument wordt niet gebruikt.
-usersWithPerspectiveOnRoleInstance ::  ContextInstance -> EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
-usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
+usersWithPerspectiveOnRoleInstance ::  EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+usersWithPerspectiveOnRoleInstance roleType roleInstance = do
   users1 <- do
       -- Find all InvertedQueryResults, starting from the role instance of the Delta (provided as third argument to this function).
       -- Each context is the start of a path through instance space that corresponds to a query expression in type space.

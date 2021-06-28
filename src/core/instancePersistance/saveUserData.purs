@@ -182,7 +182,7 @@ removeContextInstance id authorizedRole = do
         Just rid -> do
           -- Also adds contexts that 'have a vantage point' on the removed roleInstances
           -- in the context, for RULE TRIGGERING (adds them as AffectedContexts).
-          users <- lift $ usersWithPerspectiveOnRoleInstance id roleType rid
+          users <- lift $ usersWithPerspectiveOnRoleInstance roleType rid
           tell users
           -- Add correlation identifiers for outstanding Api requests, in order to update
           -- their query results, for QUERY UPDATES.
