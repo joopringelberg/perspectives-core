@@ -90,16 +90,17 @@ equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}
 -- | If the new query specifies the same users, we add its states;
 -- | if it specifies the same states, we add its users.
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
-addInvertedQuery q@(InvertedQuery{users, states}) qs = case findIndex (equalDescriptions q) qs of
-  Nothing -> cons q qs
-  Just i -> case unsafePartial $ fromJust $ index qs i of
-    InvertedQuery{users:users1, states:states1} -> if ((length $ (union users users1)) == length users)
-      then unsafePartial $ fromJust $ modifyAt i (\(InvertedQuery qr) -> InvertedQuery $ qr {states = union states states1}) qs
-      else if ((length $ (union states states1)) == length states)
-        then unsafePartial $ fromJust $ modifyAt i (\(InvertedQuery qr) -> InvertedQuery $ qr {users = union users users1}) qs
-        else qs
+addInvertedQuery q qs = cons q qs
 
-  -- Just i -> unsafePartial $ fromJust $ modifyAt i (addUserTypes usersAndProps) qs
+-- TODO. Dit voegt InvertedQueries samen die apart moeten blijven.
+-- addInvertedQuery q@(InvertedQuery{users, states}) qs = case findIndex (equalDescriptions q) qs of
+--   Nothing -> cons q qs
+--   Just i -> case unsafePartial $ fromJust $ index qs i of
+--     InvertedQuery{users:users1, states:states1} -> if ((length $ (union users users1)) == length users)
+--       then unsafePartial $ fromJust $ modifyAt i (\(InvertedQuery qr) -> InvertedQuery $ qr {states = union states states1}) qs
+--       else if ((length $ (union states states1)) == length states)
+--         then unsafePartial $ fromJust $ modifyAt i (\(InvertedQuery qr) -> InvertedQuery $ qr {users = union users users1}) qs
+--         else qs
 
 isStateQuery :: InvertedQuery -> Boolean
 isStateQuery (InvertedQuery{users}) = null users

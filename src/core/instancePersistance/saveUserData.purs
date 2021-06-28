@@ -367,6 +367,8 @@ setBinding_ roleId (newBindingId :: RoleInstance) msignedDelta = (lift2 $ try $ 
           , roleWillBeRemoved: false
           , subject
           }
+        -- Adds deltas for paths beyond the nodes involved in the binding,
+        -- for queries that use the binder- or binding step.
         users <- aisInRoleDelta delta
         author <- getAuthor
         signedDelta <-  case msignedDelta of

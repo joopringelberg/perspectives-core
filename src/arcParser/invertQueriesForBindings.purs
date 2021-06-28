@@ -65,7 +65,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 -- | construct and distribute InvertedQueries that ensure that this User is notified of changes to the role,
 -- | its binding and its properties, recursively.
 
--- | If the role, or its binding, adds properties that are in the RelevantProperties
+-- | If the role, or its binding, adds properties that are in the Map PropertyType (Array StateIdentifier)
 -- | provided as third argument, store an InvertedQuery for each of them on the
 -- | PropertyType.
 -- | If the binding adds properties, store an InvertedQuery in onRoleDelta_binder of the role.
@@ -104,7 +104,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
     -- Do it when a property resides on the telescope below the current level.
     -- Do it when a property resides on the current level.
     then do
-      addToOnRoleDelta qWithAkink role (concat $ fromFoldable $ values statesPerProperty)
+      addToOnRoleDeltaBinder qWithAkink role (concat $ fromFoldable $ values statesPerProperty)
       pure true
     else pure false
 
@@ -134,10 +134,11 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
               })
             onContextDelta_context }) roles}
 
-    addToOnRoleDelta :: QueryWithAKink -> EnumeratedRoleType -> Array StateIdentifier -> PhaseThree Unit
-    addToOnRoleDelta qwk (EnumeratedRoleType roleId) states = let
-      -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
-      -- the binding. We skip the binding because its cardinality is larger than one.
+    addToOnRoleDeltaBinder :: QueryWithAKink -> EnumeratedRoleType -> Array StateIdentifier -> PhaseThree Unit
+    addToOnRoleDeltaBinder qwk (EnumeratedRoleType roleId) states = let
+      -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
+      -- the binder. We skip the binder step because its cardinality is larger than one, causing a fan-out while
+      -- we know (when working from a RoleBindingDelta) what path to follow.
       -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
       -- for that by prepending it with the inversal of the first backward step.
       -- That will be a binding step.
@@ -170,6 +171,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
     addToProperties qwk@(ZQ backwards forwards) prop states = case prop of
       ENP pr@(EnumeratedPropertyType p) -> do
         backwards' <- lift2 $ traverse (prependValue2Role (ENP pr)) backwards
+        -- the forwards part is never used in runtime!
         forwards' <- lift2 $ traverse (postPendProp (ENP pr)) forwards
         modifyDF \df@{enumeratedProperties} -> do
           case OBJ.lookup p enumeratedProperties of

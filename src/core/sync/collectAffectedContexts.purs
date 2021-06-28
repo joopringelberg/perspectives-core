@@ -51,7 +51,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, contextIsInState, contextType, getRoleBinders, notIsMe, roleIsInState)
+import Perspectives.Instances.ObjectGetters (binding, contextIsInState, contextType, getRoleBinders, makeChainGetter, notIsMe, roleIsInState)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
@@ -77,9 +77,12 @@ import Unsafe.Coerce (unsafeCoerce)
 -----------------------------------------------------------
 -- USERSWITHPERSPECTIVEONROLEINSTANCE
 -----------------------------------------------------------
--- Notice that even though we compute the users for a single given RoleInstance, we can use that result
--- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
--- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
+-- | This function returns all users that have a perspective in some context on a role type such that the
+-- | given role instance is used for the computation of the perspective object (it may be that object itself or be
+-- | on a path to the object).
+-- | As a side effect, Deltas are added to the transaction for the continuation of the path beyond the given role
+-- | instance.
+-- TODO. Het eerste argument wordt niet gebruikt.
 usersWithPerspectiveOnRoleInstance ::  ContextInstance -> EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
 usersWithPerspectiveOnRoleInstance id roleType roleInstance = do
   users1 <- do
@@ -261,25 +264,27 @@ addRoleObservingContexts id roleType roleInstance = do
 -- | Computes the AffectedContexts and adds them to the Transaction.
 -- | Adds the users that should receive it, to the Delta.
 -- | Adds users for SYNCHRONISATION, guarantees RULE TRIGGERING.
+-- | Adds deltas for paths beyond the nodes involved in the binding,
+-- | for queries that use the binder- or binding step.
 -- | A binding represents two types of step: `binding` and `binder <TypeOfBinder>`
 -- | This function finds all queries recorded on the types of the roles represented
 -- | by id, the new binding and the old binding, that have such steps.
 -- Implementation note: because we accept 'dangling' roles (roles with no context) we catch
 -- errors when computing affected contexts.
 aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction (Array RoleInstance)
-aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
-  binderType <- lift2 (id ##>> OG.roleType)
+aisInRoleDelta (RoleBindingDelta dr@{id:binder, binding, oldBinding, deltaType}) = do
+  binderType <- lift2 (binder ##>> OG.roleType)
   bindingCalculations <- lift2 $ compileBothFor _onRoleDelta_binding binderType
   users1 <- join <$> (for bindingCalculations
-    -- Find all affected contexts, starting from the binder (id) instance of the Delta.
-    (\iq -> (handleBackwardQuery id iq) >>= runForwardsComputation id iq))
+    -- Find all affected contexts, starting from the binder instance of the Delta.
+    (\iq -> (handleBackwardQuery binder iq) >>= runForwardsComputation binder iq))
   -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually bind something:
   users2 <- case binding of
     Just bnd -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
       binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder bindingType
       (for binderCalculations
-        (\iq -> (handleBackwardQuery id iq) >>= runForwardsComputation bnd iq)) >>= pure <<< join
+        (\iq -> (handleBackwardQuery binder iq) >>= runForwardsComputation bnd iq)) >>= pure <<< join
     Nothing -> pure []
   -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually overwrite something:
   users3 <- case oldBinding of
@@ -293,8 +298,10 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
     otherwise -> pure []
   pure (nub $ union users1 (union users2 users3))
 
--- RunForwardsComputation only uses the users provided to push deltas.
--- This should not be done for the own user!
+-- | Runs the forward part of the QueryWithAKink. That is part of the original query. Assumptions collected
+-- | during evaluation are turned into Deltas for peers with a perspective and collected in the current transaction.
+-- | These peers are provided as user role instances grouped together with their context.
+-- | The System User is excluded (no deltas generated for him).
 runForwardsComputation ::
   RoleInstance ->
   InvertedQuery ->
@@ -308,39 +315,42 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
       -- because instances of such a role cannot be shown).
       -- For each property, get its value from the role instance, if the state condition is met.
       forWithIndex_ (unwrap statesPerProperty)
-        (\prop propStates -> for_ propStates
-          -- For each state that provides a perspective on the property,
-          \stateIdentifier ->
-            (lift2 $ tryGetState stateIdentifier) >>= case _ of
-              Nothing -> pure unit
-              Just (State.State{stateFulObject}) ->
-                -- if the stateful object...
-                case stateFulObject of
-                  -- ... is the current context, then if it is in that state,
-                  Cnt _ -> for_ cwus
-                    \(Tuple cid users) -> (lift2 $ contextIsInState stateIdentifier cid) >>= if _
-                      -- then create deltas for all resources visited while retrieving
-                      -- the property, for all users;
-                      then lift2 (getterFromPropertyType prop)
-                        >>= lift2 <<< (execMonadPerspectivesQuery roleInstance)
-                        >>= void <<< (traverse (createDeltasFromAssumption users))
+        (\prop propStates -> do
+          propGetter <- lift2 (makeChainGetter <$> (getterFromPropertyType prop))
+          for_ propStates
+            -- For each state that provides a perspective on the property,
+            \stateIdentifier ->
+              (lift2 $ tryGetState stateIdentifier) >>= case _ of
+                -- If we deal with a roleInstance of a type for which no state has been defined,
+                -- we should carry on as if the state condition was satisfied.
+                Nothing -> for_ cwus
+                  \(Tuple cid users) -> void $ lift2 (execMonadPerspectivesQuery roleInstance propGetter)
+                    >>= (traverse (createDeltasFromAssumption users))
+                Just (State.State{stateFulObject}) ->
+                  -- if the stateful object...
+                  case stateFulObject of
+                    -- ... is the current context, then if it is in that state,
+                    Cnt _ -> for_ cwus
+                      \(Tuple cid users) -> (lift2 $ contextIsInState stateIdentifier cid) >>= if _
+                        -- then create deltas for all resources visited while retrieving
+                        -- the property, for all users;
+                        then  void $ lift2 (execMonadPerspectivesQuery roleInstance propGetter)
+                          >>= (traverse (createDeltasFromAssumption users))
+                        else pure unit
+                    -- ... is the subject role, for each user that is that state,
+                    Srole _ -> for_ cwus
+                      \(Tuple cid users) -> lift2 (filterA (roleIsInState stateIdentifier) users) >>=
+                        \sanctionedUsers ->
+                          -- create deltas for all resources while retrieving the property;
+                           void $ lift2 (execMonadPerspectivesQuery roleInstance propGetter)
+                            >>= (traverse (createDeltasFromAssumption sanctionedUsers))
+                    -- ... is the object role, then if it is in that state,
+                    Orole _ -> lift2 (roleIsInState stateIdentifier roleInstance) >>= if _
+                      -- create deltas for all resources visited by the query while
+                      -- retrieving the property, for all users;
+                      then void $ lift2 (execMonadPerspectivesQuery roleInstance propGetter)
+                        >>= (traverse (createDeltasFromAssumption (join $ snd <$> cwus)))
                       else pure unit
-                  -- ... is the subject role, for each user that is that state,
-                  Srole _ -> for_ cwus
-                    \(Tuple cid users) -> lift2 (filterA (roleIsInState stateIdentifier) users) >>=
-                      \sanctionedUsers ->
-                        -- create deltas for all resources while retrieving the property;
-                        lift2 (getterFromPropertyType prop)
-                          >>= lift2 <<< (execMonadPerspectivesQuery roleInstance)
-                          >>= void <<< (traverse (createDeltasFromAssumption sanctionedUsers))
-                  -- ... is the object role, then if it is in that state,
-                  Orole _ -> lift2 (roleIsInState stateIdentifier roleInstance) >>= if _
-                    -- create deltas for all resources visited by the query while
-                    -- retrieving the property, for all users;
-                    then lift2 (getterFromPropertyType prop)
-                      >>= lift2 <<< (execMonadPerspectivesQuery roleInstance)
-                      >>= void <<< (traverse (createDeltasFromAssumption (join $ snd <$> cwus)))
-                    else pure unit
         )
     -- These are all other cases, where there still is some path to walk to the
     -- role (and its binding) that carries the properties.
@@ -352,7 +362,9 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
       -- We analyse each of the possibilities and accumulate the results in the transaction, filtering out doubles when adding.
       for_ states
         \stateIdentifier -> (lift2 $ tryGetState stateIdentifier) >>= case _ of
-          Nothing -> pure unit
+          -- If we deal with a roleInstance of a type for which no state has been defined,
+          -- we should carry on as if the state condition was satisfied.
+          Nothing -> for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
           Just (State.State{stateFulObject}) ->
             case stateFulObject of
               -- if the context is in that state,
@@ -360,7 +372,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                 \(Tuple cid users) -> (lift2 $ contextIsInState stateIdentifier cid) >>= if _
                   -- then create deltas for all resources visited by the query (as reflected in
                   -- the assumptions), for all users;
-                  then for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
+                  then for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency users) Nothing)
                   else pure unit
               -- otherwise, for each user that is that state,
               Srole _ -> for_ cwus
@@ -387,7 +399,9 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
         (\prop propStates -> for_ propStates
           -- For each state that provides a perspective on the property,
           \stateIdentifier -> (lift2 $ tryGetState stateIdentifier) >>= case _ of
-            Nothing -> pure unit
+            -- If we deal with a roleInstance of a type for which no state has been defined,
+            -- we should carry on as if the state condition was satisfied.
+            Nothing -> for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
             Just (State.State{stateFulObject}) ->
               -- if the stateful object...
               case stateFulObject of
@@ -427,7 +441,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
         )
   pure $ join $ snd <$> cwus
 
--- Add deltas for all the users.
+-- | Add deltas for all the users to the current transaction, from the given assumption.
 createDeltasFromAssumption :: Array RoleInstance -> InformedAssumption -> MonadPerspectivesTransaction Unit
 createDeltasFromAssumption users (RoleAssumption ctxt roleTypeId) = do
   instances <- lift2 (ctxt ##= getRoleInstances (ENR roleTypeId))
@@ -525,6 +539,7 @@ magic ctxt roleInstances rtype users =  do
 -- | Adds users for SYNCHRONISATION, guarantees RULE TRIGGERING.
 -- The role instance is the current object; so if a perspective is conditional on object state, we can check
 -- this role instance.
+-- Note we don't evaluate any forward part; it is not needed, so it may be Nothing.
 aisInPropertyDelta :: RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction (Array RoleInstance)
 aisInPropertyDelta id property = do
   calculations <- lift2 $ compileDescriptions' property

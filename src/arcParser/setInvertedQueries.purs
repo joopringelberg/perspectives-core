@@ -77,8 +77,9 @@ setPathForStep (SQD dom qf ran fun man) qWithAK users states statesPerProperty =
 
   -- add to onRoleDelta_binder of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
   QF.DataTypeGetterWithParameter QF.GetRoleBindersF enr -> modifyDF \dfr@{enumeratedRoles} -> let
-    -- We remove the first step of the backwards path, because we apply it (runtime) not to the binder, but to
-    -- the binding. We skip the binding because its cardinality is larger than one.
+    -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
+    -- the binder. We skip the binding step because its cardinality is larger than one. It would cause a fan-out
+    -- while we know, when applying the inverted query when handling a RoleBindingDelta, the exact path to follow.
     -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
     -- for that by prepending it with the inversal of the first backward step.
     -- That will be a binding step.

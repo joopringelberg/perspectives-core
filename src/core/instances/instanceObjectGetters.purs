@@ -43,7 +43,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
-import Perspectives.Instances.Combinators (conjunction)
+import Perspectives.Instances.Combinators (conjunction, disjunction)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -200,6 +200,19 @@ getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>
             Nothing -> pure []
             Just b -> runArrayT $ getPropertyFromTelescope pn b
         (Just p) -> pure p
+
+makeChainGetter :: (RoleInstance ~~> Value) -> (RoleInstance ~~> Value)
+-- A beautiful definition that will not terminate:
+-- makeChainGetter getter = disjunction getter (makeChainGetter (binding >=> getter))
+makeChainGetter getter r = ArrayT do
+  results <- runArrayT $ getter r
+  if null results
+    then do
+      bnd <- runArrayT $ binding r
+      case head bnd of
+        Nothing -> pure []
+        Just b -> runArrayT $ makeChainGetter getter b
+    else pure results
 
 -- | Turn a function that returns strings into one that returns Booleans.
 makeBoolean :: forall a. (a ~~> Value) -> (a ~~> Boolean)

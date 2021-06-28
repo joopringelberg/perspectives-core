@@ -109,7 +109,7 @@ liftToMPT = lift <<< lift
 
 serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> RoleType -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor_ cid userId userType =
-  -- All Roletypes the user may see in this context, expressed as Calculations.
+  -- All Roletypes the user may see in this context, expressed as Perspectives.
    (liftToMPT (userType ###= perspectivesClosure_) >>= traverse_ (serialisePerspectiveForUser cid [userId]))
 
 -- | Add Deltas to the transaction for the given users, to provide them with a complete

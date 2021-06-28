@@ -141,6 +141,11 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
 
       -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
       -- the transaction, too.
+      -- Also performs SYNCHRONISATION for paths that lie beyond the roleInstance provided to usersWithPerspectiveOnRoleInstance.
+      -- NOTE: for SYNC to be complete, we should run it on all roles!!!
+      -- Notice that even though we compute the users for a single given RoleInstance, we can use that result
+      -- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
+      -- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
       users <- usersWithPerspectiveOnRoleInstance contextId rolName (identifier $ unsafePartial $ fromJust $ ARR.head roles)
       -- SYNCHRONISATION
       subject <- getSubject
