@@ -27,7 +27,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile)
 import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP, withSystem)
-import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, test, testSkip, testOnly)
 import Test.Unit.Assert (assert)
 
 testDirectory :: String
@@ -96,7 +96,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
 
-  test "upload model:SimpleChat to repository from files" $ runP do
+  testOnly "upload model:SimpleChat to repository from files" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
@@ -116,7 +116,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Parsing") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Parsing: " <> show errs) false
 
-  test "upload model:ModelManagement to repository from files (without testuser)" $ runP do
+  testOnly "upload model:ModelManagement to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
@@ -130,7 +130,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:ModelManagement") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:ModelManagement: " <> show errs) false
 
-  test "upload model:BrokerServices to repository from files (without testuser)" $ runP do
+  testOnly "upload model:BrokerServices to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
