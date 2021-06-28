@@ -137,9 +137,11 @@ domain System
 
     user Invitee (mandatory) filledBy Guest
       perspective on Inviter
+        defaults
       perspective on extern
         view ForInvitee (Consult)
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
       perspective on Invitee
+        defaults

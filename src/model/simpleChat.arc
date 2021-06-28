@@ -42,6 +42,7 @@ domain SimpleChat
       perspective on Initiator
         defaults
       perspective on extern
+        defaults
 
     user Partner filledBy sys:PerspectivesSystem$User
       aspect sys:Invitation$Invitee
@@ -49,7 +50,9 @@ domain SimpleChat
       perspective on extern
         props (Consult)
       perspective on Initiator
+        defaults
       perspective on Partner
+        defaults
 
     thing PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
 
