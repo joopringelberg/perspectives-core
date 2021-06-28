@@ -33,7 +33,7 @@ module Perspectives.Parsing.Arc.InvertQueriesForBindings where
 
 import Prelude
 
-import Data.Array (concat, elemIndex, foldMap, fromFoldable, intersect, length)
+import Data.Array (concat, elemIndex, foldMap, fromFoldable, intersect, length, nub)
 import Data.Foldable (for_)
 import Data.Map (Map, filterKeys, values)
 import Data.Map (lookup) as Map
@@ -80,7 +80,7 @@ setInvertedQueriesForUserAndRole ::
 setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOnThisRole qWithAkink = do
   if perspectiveOnThisRole
     -- Add qWithAkink in onContextDelta_context of role.
-    then addToOnContextDelta qWithAkink role (concat $ fromFoldable $ values statesPerProperty)
+    then addToOnContextDelta qWithAkink role (nub $ concat $ fromFoldable $ values statesPerProperty)
     else pure unit
   (propsOfRole :: Array PropertyType) <- lift2 $ RL.allLocallyRepresentedProperties (ST role)
   propertiesOnThisLevel <- pure $ intersect (fromFoldable $ keys statesPerProperty) propsOfRole
@@ -104,7 +104,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
     -- Do it when a property resides on the telescope below the current level.
     -- Do it when a property resides on the current level.
     then do
-      addToOnRoleDeltaBinder qWithAkink role (concat $ fromFoldable $ values statesPerProperty)
+      addToOnRoleDeltaBinder qWithAkink role (nub $ concat $ fromFoldable $ values statesPerProperty)
       pure true
     else pure false
 

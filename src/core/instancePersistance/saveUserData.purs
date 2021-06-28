@@ -174,7 +174,6 @@ removeContextInstance id authorizedRole = do
     -- No need to take care of SYNCHRONISATION for individual role instances.
     -- The receiving PDR will recompute the role instances to remove.
     -- Takes care of RULE TRIGGERING and QUERY UPDATES.
-    -- TODO. Maak hier een set van om dubbele te vermijden.
     remove :: EnumeratedRoleType -> Array RoleInstance -> WriterT (Array RoleInstance) MonadPerspectivesTransaction Unit
     remove roleType instances' =
       case head instances' of

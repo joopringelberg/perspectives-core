@@ -466,7 +466,6 @@ handlePostponedStateQualifiedParts = do
             \(sr@{automaticOnEntry, automaticOnExit, object, query}) -> do
               object' <- case object of
                 -- No object in the state? Replace it by the calculation we've computed here.
-                -- TODO. Hier zouden we de query kunnen berekenen; we hebben nog beschikking over de syntactische versie van het object.
                 Nothing -> pure objectCalculation
                 -- Otherwise, just keep what we have.
                 Just _ -> pure object
@@ -588,7 +587,6 @@ handlePostponedStateQualifiedParts = do
           EnumeratedRole er@{perspectives} <- getsDF (unsafePartial fromJust <<< lookup r <<< _.enumeratedRoles)
           mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
           perspective <- case mi of
-            -- TODO. Invert objectQfd hier.
             Nothing -> pure $ Perspective
               { object: objectQfd
               , roleVerbs: EncodableMap Map.empty
@@ -607,7 +605,6 @@ handlePostponedStateQualifiedParts = do
           CalculatedRole er@{perspectives} <- getsDF (unsafePartial fromJust <<< lookup r <<< _.calculatedRoles)
           mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
           perspective <- case mi of
-            -- TODO. Invert objectQfd hier.
             Nothing -> pure $ Perspective
               { object: objectQfd
               , roleVerbs: EncodableMap Map.empty
@@ -751,10 +748,11 @@ registerStates = do
 -- True, if sub adds a single segment to super.
 -- sub `isDirectSubstateOf` super
 -- model:System$PerspectivesSystem$Root `isDirectSubStateOf` model:System$PerspectivesSystem
--- TODO. Root states van rollen worden geïnterpreteerd als named substates van de context!
--- De additionele eis is dus dat de sub geen rol is. Omdat alleen EnumeratedRoles states hebben, kunnen we ons daartoe beperken.
 isDirectSubstateOf :: Array String -> String -> String -> Boolean
 isDirectSubstateOf enumeratedRoleNames sub super = maybe false (\ns -> ns `eq` super && (isNothing $ elemIndex sub enumeratedRoleNames)) (deconstructNamespace sub)
+-- The requirement that `sub` is not an EnumeratedRoleType, prevents root states of roles to
+-- be interpreted as named substates of contexts.
+
 -- sub `isDirectSuperStateOf` super
 -- model:System$PerspectivesSystem `isDirectSuperStateOf` model:System$PerspectivesSystem$Root
 isDirectSuperStateOf :: Array String -> String -> String -> Boolean

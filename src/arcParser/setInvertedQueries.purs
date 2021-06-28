@@ -23,14 +23,12 @@
 module Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries where
 
 import Control.Monad.Except (throwError)
-import Data.Array (union)
+import Data.Array (nub, union)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
-import Effect.Exception (error)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..))
@@ -39,14 +37,13 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (domain2RoleType)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Role (contextOfADT)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, or)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
-import Prelude (Unit, bind, flip, identity, pure, show, unit, ($), (<>), (>>=))
+import Prelude (Unit, flip, identity, pure, unit, ($), (<$>))
 
 setPathForStep :: Partial =>
   QueryFunctionDescription ->
