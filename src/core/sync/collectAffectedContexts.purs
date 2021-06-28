@@ -313,6 +313,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
       -- This case arises for example for a perspective on an EnumeratedRoleType in the same context.
       -- Such a perspective will have properties (no sense in providing a perspective with just role verbs,
       -- because instances of such a role cannot be shown).
+      -- Another case that the roleInstance has just been added as a binding to a role a user has a perspective on.
       -- For each property, get its value from the role instance, if the state condition is met.
       forWithIndex_ (unwrap statesPerProperty)
         (\prop propStates -> do

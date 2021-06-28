@@ -50,7 +50,7 @@ import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDo
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep, makeComposition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, lift2)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, functional)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
@@ -58,7 +58,7 @@ import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, 
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, and, or)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType)
 
 -- | For a User RoleType, and an ADT EnumeratedRoleType that represents the Object of a Perspective,
@@ -139,11 +139,10 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
       -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
       -- the binder. We skip the binder step because its cardinality is larger than one, causing a fan-out while
       -- we know (when working from a RoleBindingDelta) what path to follow.
-      -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
-      -- for that by prepending it with the inversal of the first backward step.
-      -- That will be a binding step.
-      description = removeFirstBackwardsStep qwk
-        (\dom' ran' man' -> SQD ran' (DataTypeGetter BindingF) dom' True man')
+      -- The forward part will never be applied for this InvertedQuery.
+      -- This is because the function `runForwardsComputation` is applied to the binding and will collect all properties
+      -- dynamically from it (relying on makeChainGetter), if there is no forwards part.
+      description = removeFirstBackwardsStep qwk (\_ _ _ -> Nothing)
       in modifyDF
         \df@{enumeratedRoles:roles} ->
           case OBJ.lookup roleId roles of

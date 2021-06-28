@@ -46,7 +46,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, or)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
-import Prelude (Unit, identity, pure, unit, ($), bind, (<>), show, (>>=))
+import Prelude (Unit, bind, flip, identity, pure, show, unit, ($), (<>), (>>=))
 
 setPathForStep :: Partial =>
   QueryFunctionDescription ->
@@ -80,11 +80,9 @@ setPathForStep (SQD dom qf ran fun man) qWithAK users states statesPerProperty =
     -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
     -- the binder. We skip the binding step because its cardinality is larger than one. It would cause a fan-out
     -- while we know, when applying the inverted query when handling a RoleBindingDelta, the exact path to follow.
-    -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
-    -- for that by prepending it with the inversal of the first backward step.
-    -- That will be a binding step.
-    oneStepLess = removeFirstBackwardsStep qWithAK
-      (\dom' ran' man' -> SQD ran' (QF.DataTypeGetter BindingF) dom' True man')
+    -- The function `aisInRoleDelta` applies the forward part to the binding (not the binder).
+    -- Hence we don't have to adapt the forward part.
+    oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
     roleName = unwrap $ unsafePartial $ domain2RoleType dom
     in case oneStepLess of
         -- WARNING. This may not be correct
@@ -113,10 +111,11 @@ setPathForStep (SQD dom qf ran fun man) qWithAK users states statesPerProperty =
       -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
       -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
       -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
-      -- for that by prepending it with the inversal of the first backward step.
+      -- for that by prepending it with the inversal of the first backward step - which is, by construction, a
+      -- `context` step.
       contextStep = SQD ran (QF.DataTypeGetter ContextF) dom True man
       oneStepLess = removeFirstBackwardsStep qWithAK
-        (\dom' ran' man' -> SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
+        (\dom' ran' man' -> Just $ SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
       in case oneStepLess of
         ZQ Nothing _ -> dfr
         _ -> case lookup roleName enumeratedRoles of
@@ -181,31 +180,29 @@ setPathForStep (SQD dom qf ran fun man) qWithAK users states statesPerProperty =
 ------------------------------------------------------------------------------------------
 removeFirstBackwardsStep :: QueryWithAKink ->
   -- A function from domain and range of the step to prepend, and whether it is mandatory.
-  (Domain -> Range -> ThreeValuedLogic -> QueryFunctionDescription) ->
+  (Domain -> Range -> ThreeValuedLogic -> Maybe QueryFunctionDescription) ->
   QueryWithAKink
 removeFirstBackwardsStep q@(ZQ backward forward) originalStepF = case backward, forward of
   (Just (BQD _ (BinaryCombinator ComposeF) firstBackwardStep qfd2 _ _ _)), (Just forward') -> ZQ
       (Just qfd2)
       -- The domain and range of the new forward step are those of the first backward step switched.
       -- We keep its mandatory status.
-      (Just $ makeComposition
-        (originalStepF (range firstBackwardStep) (domain firstBackwardStep) (mandatory firstBackwardStep))
-        forward')
+      (Just $ maybe forward' (flip makeComposition forward') (originalStepF (range firstBackwardStep) (domain firstBackwardStep) (mandatory firstBackwardStep)))
   (Just (BQD _ (BinaryCombinator ComposeF) firstBackwardStep qfd2 _ _ _)), Nothing -> ZQ
       (Just qfd2)
       -- The domain and range of the new forward step are those of the first backward step switched.
       -- We keep its mandatory status.
-      (Just (originalStepF (range firstBackwardStep) (domain firstBackwardStep) (mandatory firstBackwardStep)))
+      (originalStepF (range firstBackwardStep) (domain firstBackwardStep) (mandatory firstBackwardStep))
   (Just i@(SQD dom _ ran fun man)), (Just forward') -> (ZQ
       Nothing
       -- The domain and range of the new forward step are those of the first backward step switched.
       -- We keep its mandatory status.
-      (Just $ makeComposition (originalStepF ran dom man) forward'))
+      (Just $ maybe forward' (flip makeComposition forward') (originalStepF ran dom man)))
   (Just i@(SQD dom _ ran fun man)), Nothing -> (ZQ
       Nothing
       -- The domain and range of the new forward step are those of the first backward step switched.
       -- We keep its mandatory status.
-      (Just (originalStepF ran dom man)))
+      (originalStepF ran dom man))
   _, _ -> q
 
 makeComposition :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
