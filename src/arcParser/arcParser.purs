@@ -53,23 +53,56 @@ import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
 import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 
+-- | SEMI-BNF NOTATION
+-- | We use a syntax to describe the grammar of the Perspectives Language that is derived from BNF:
+-- |
+-- | <production> -> refers to a production rule.
+-- | [...] -> whatever is between brackets, zero or one time (optional)
+-- | <production>* -> zero or more times the production.
+-- | <production>+ -> one or more times the production.
+-- |
+-- | Grouping constructs:
+-- | {...} -> whatever is between brackets, exactly once.
+-- | {...}* -> whatever is between brackets, zero or more times
+-- | {...}+ -> whatever is between brackets, one or more times
+-- | {<p> | <q>} -> <p> or <q> (grouped for convenience or to disambiguate)
+-- |
+-- | (<p> <q>) -> <p> and <q> between parentheses, i.e. the parenthesis are part of the production.
+-- | NOTE: parenthesis have no special meaning in this grammar syntax. Hence '(' and ')' are perfectly ordinary parts of a production.
+-- |
+-- | <p> | <q> -> <p> or alternatively <q>
+-- |
+-- | '{' -> the literal character "{"
+-- |
+-- | state -> the literal keyword "state". We don't write keywords between double quotes.
+-- |
+-- | NOTE: double quotes have no special meaning in this grammar syntax. Hence " is a perfectly ordinary part of a production.
+
+
+-- | context =
+-- | 	<contextKind> <ident>
+-- | 		use <lowercaseName> for <ident>
+-- | 		indexed <ident>
+-- | 		aspect <ident>+
+-- | 		state <state>
+-- | 		{<context> | <role>}+
 contextE :: IP ContextPart
 contextE = withPos do
-  -- log "contextE"
+  -- | log "contextE"
   knd <- contextKind
   pos <- getPosition
   uname <- arcIdentifier
-  -- ook hier geldt: als op de volgende regel en geïndenteerd, dan moet de deelparser slagen en het hele blok consumeren.
+  -- | ook hier geldt: als op de volgende regel en geïndenteerd, dan moet de deelparser slagen en het hele blok consumeren.
   isIndented' <- isIndented
   isNextLine' <- isNextLine
   elements <- if isIndented' && isNextLine'
     then inSubContext uname
       (getCurrentContext >>= \subContext ->
         withArcParserState (ContextState subContext Nothing)
-            -- The state identifier is fully qualified.
-            -- The parser starts with StateIdentifier ""
-            -- `domain` results in StateIdentifier model:<ModelName>
-            -- Each context results in: StateIdentifier model:ModelName$<ContextName>
+            -- | The state identifier is fully qualified.
+            -- | The parser starts with StateIdentifier ""
+            -- | `domain` results in StateIdentifier model:<ModelName>
+            -- | Each context results in: StateIdentifier model:ModelName$<ContextName>
             (withPos do
               uses <- many $ checkIndent *> useE
               ind <- option Nil $ checkIndent *> contextIndexedE
@@ -82,7 +115,7 @@ contextE = withPos do
                 else entireBlock contextPart
               pure $ ind <> states <> (uses <> aspects <> rolesAndContexts)))
     else pure Nil
-  -- Notice: uname is unqualified.
+  -- | Notice: uname is unqualified.
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos}
 
   where
@@ -162,9 +195,24 @@ domain = do
     (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
     otherwise -> fail "Domain must be a context"
 
--- Either fails with consumed=false if the input stream does not start with "user",
--- or fails with consumed=true,
--- or succeeds with consumed=true.
+--------------------------------------------------------------------------------------------------
+-- ROLE
+--------------------------------------------------------------------------------------------------
+-- | role = <calculatedRole> | <enumeratedRole> | <externalRole>
+-- |
+-- | calculatedRole =
+-- | 	<roleKind> <ident> = <expression>
+-- | 		<rolePart>*
+-- |
+-- | enumeratedRole =
+-- | 	<roleKind> <ident> [(roleAttribute [, roleAttribute])] [filledBy <ident>]
+-- | 		<rolePart>*
+-- |
+-- | roleKind = user | thing | context | external
+
+-- | Either fails with consumed=false if the input stream does not start with "user",
+-- | or fails with consumed=true,
+-- | or succeeds with consumed=true.
 userRoleE :: IP ContextPart
 userRoleE = protectSubject $ withEntireBlock
   (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
@@ -176,13 +224,13 @@ userRoleE = protectSubject $ withEntireBlock
       pos <- getPosition
       kind <- reserved "user" *> pure UserRole
       uname <- arcIdentifier
-      -- We've added the role name to the state before running userRoleE.
+      -- | We've added the role name to the state before running userRoleE.
       ct@(ContextType ctxt) <- getCurrentContext
       isCalculated <- option false (lookAhead (reserved "=") *> pure true)
       if isCalculated
         then setSubject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
         else setSubject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
-      -- userRoleE cannot fail in the last line.
+      -- | userRoleE cannot fail in the last line.
       ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
 thingRoleE :: IP ContextPart
@@ -215,7 +263,7 @@ contextRoleE = protectObject $ withEntireBlock
       kind <- reserved "context" *> pure ContextRole
       uname <- arcIdentifier
       ct@(ContextType ctxt) <- getCurrentContext
-      -- Het is niet noodzakelijk een EnumeratedRole!
+      -- | Het is niet noodzakelijk een EnumeratedRole!
       isCalculated <- option false (lookAhead (reserved "=") *> pure true)
       if isCalculated
         then setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
@@ -247,16 +295,16 @@ enumeratedRole_ uname knd pos = do
   filledBy' <- filledBy
   pure {uname, knd, pos, parts: attributes <> filledBy'}
   where
-    -- We cannot use token.commaSep or sebBy to separate the role attributes;
-    -- it will cause looping as long as it is used
-    -- both in userRoleE and thingRoleE. I do not understand why.
+    -- | We cannot use token.commaSep or sebBy to separate the role attributes;
+    -- | it will cause looping as long as it is used
+    -- | both in userRoleE and thingRoleE. I do not understand why.
     roleAttributes :: IP (List RolePart)
     roleAttributes = token.parens (((mandatory <|> functional <|> unlinked) <?> "mandatory, functional, unlinked.") `sepBy` token.symbol ",")
 
     mandatory :: IP RolePart
     mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute true)))
 
-    -- Roles are by default functional.
+    -- | Roles are by default functional.
     functional :: IP RolePart
     functional = (reserved "relational" *> (pure (FunctionalAttribute false)))
 
@@ -270,6 +318,17 @@ filledBy = (option Nil $
   (reserved "filledBy" *> token.commaSep arcIdentifier >>= pure <<< map FilledByAttribute)
   )
 
+-- | rolePart =
+-- | 	<perspectiveOn> |
+-- | 	<perspectiveOf> |
+-- | 	<inState> |
+-- | 	<onEntry> |
+-- | 	<onExit> |
+-- | 	<state> |
+-- | 	<aspect> |
+-- | 	<indexed> |
+-- | 	<property> |
+-- | 	<view>
 rolePart :: IP RolePart
 rolePart = do
   (Tuple first second) <- twoReservedWords
@@ -315,7 +374,7 @@ propertyE = do
         , range: Nothing
         , propertyParts: Cons (Calculation' calc) Nil, pos: pos}
 
-    -- This parser always succeeds, either with or without consuming part of the input stream.
+    -- | This parser always succeeds, either with or without consuming part of the input stream.
     enumeratedProperty :: ArcPosition -> String -> IP RolePart
     enumeratedProperty pos uname = do
       attributes <- option Nil propertyAttributes
@@ -338,7 +397,7 @@ propertyE = do
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
 
-          -- Properties are by default functional.
+          -- | Properties are by default functional.
           functional :: IP PropertyPart
           functional = (reserved "relational" *> (pure (FunctionalAttribute' false)))
 
@@ -355,30 +414,37 @@ viewE = do
   refs <- sameOrIndented *> (token.parens (token.commaSep1 arcIdentifier))
   pure $ VE $ ViewE {id: uname, viewParts: refs, pos: pos}
 
--- | Nothing `appendSegment` s = Just s
--- | Just m `appendSegment` s = Just m$s
+-- Nothing `appendSegment` s = Just s
+-- Just m `appendSegment` s = Just m$s
 appendSegment :: Maybe String -> String -> Maybe String
 appendSegment Nothing s = Just s
 appendSegment (Just m) s = Just (m <> "$" <> s)
 
 addSubState :: StateSpecification -> String -> StateSpecification
--- append the local substate name to the segments we (maybe) already have.
+-- | append the local substate name to the segments we (maybe) already have.
 addSubState (ContextState (ContextType cid) s) localSubStateName = ContextState
   (ContextType cid)
   (s `appendSegment` localSubStateName)
--- append the local substate name to the segments we maybe already have.
+-- | append the local substate name to the segments we maybe already have.
 addSubState (SubjectState roleIdent s) localSubStateName = SubjectState roleIdent (s `appendSegment` localSubStateName)
 addSubState (ObjectState roleIdent s) localSubStateName = ObjectState roleIdent (s `appendSegment` localSubStateName)
 
+-- | state =
+-- | 	state <ident> = <expression>
+-- | 		<state>*
+-- | 		<onEntry>
+-- | 		<onExit>
+-- | 		<perspectiveOn>
+-- | 		<perspectiveOf>
 stateE :: IP StateE
 stateE = withPos do
   id <- reserved "state" *> token.identifier
-  -- Can be ContextState, SubjectState and ObjectState.
+  -- | Can be ContextState, SubjectState and ObjectState.
   {state} <- getArcParserState
   withArcParserState (state `addSubState` id)
     do
-      -- In IP, defined as an IntendParser on top of StateT ArcParserState Identity, we now have a
-      -- new ArcParserState object with member 'state' being StateIdentifier "{previousStateIdentifier}$id".
+      -- | In IP, defined as an IntendParser on top of StateT ArcParserState Identity, we now have a
+      -- | new ArcParserState object with member 'state' being StateIdentifier "{previousStateIdentifier}$id".
       condition <- sameOrIndented *> reserved "=" *> step
       allParts <- concat <$> nestedBlock statePart
       stateParts <- pure $ filter (case _ of
@@ -403,6 +469,10 @@ stateE = withPos do
 
 -- We need to use `try` because this parser will consume "perspective" from the
 -- expression "perspective of".
+-- | perspectiveOn =
+-- | 	perspective on <expression>
+-- | 		<roleVerbs>
+-- | 		<perspectivePart>*
 perspectiveOn :: IP (List StateQualifiedPart)
 perspectiveOn = try $ withPos do
   pos <- getPosition
@@ -416,6 +486,9 @@ perspectiveOn = try $ withPos do
     -- if perspectivePart fails, perspectiveOn succeeds.
     -- option Nil (indented' *> (concat <$> entireBlock perspectivePart))
 
+-- | perspectiveOf =
+-- | 	perspective of <ident>
+-- | 		<perspectivePart>*
 -- We need to use `try` because this parser will consume "perspective" from the
 -- expression "perspective of".
 perspectiveOf :: IP (List StateQualifiedPart)
@@ -429,6 +502,16 @@ perspectiveOf = try $ withPos do
     setSubject (ExplicitRole ctxt (ENR $ EnumeratedRoleType subject) pos)
     concat <$> nestedBlock perspectivePart
 
+-- | perspectivePart =
+-- | 	defaults
+-- | 	<propertyVerbs> |
+-- | 	<roleVerbs> |
+-- | 	<inState> |
+-- | 	<onEntry> |
+-- | 	<onExit> |
+-- | 	<action> |
+-- | 	<perspectiveOn> |
+-- | 	<perspectiveOf>
 perspectivePart :: IP (List StateQualifiedPart)
 perspectivePart = do
   (Tuple first second) <- twoReservedWords
@@ -448,6 +531,14 @@ perspectivePart = do
     "perspective", "of" -> perspectiveOf
     _, _ -> fail "Expected: view, props, verbs, only, except, all, in, on, action, perspective"
 
+-- | inState =
+-- | 	in state <ident> [of {subject | object | context} state]
+-- | 		defaults
+-- | 		<propertyVerbs>
+-- | 		<roleVerbs>
+-- | 		<perspectiveOn>
+-- | 		<perspectiveOf>
+-- | 		<action>
 inState :: IP (List StateQualifiedPart)
 inState = do
   stateId <- inStateKeywords *> arcIdentifier
@@ -498,9 +589,9 @@ perspectiveOfKeywords = reserved "perspective" *> reserved "of" *> pure "perspec
 perspectiveOnKeywords :: IP String
 perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> pure "perspectiveOn"
 
--- | Parses
--- |    on entry
--- |    on entry: <stateName>
+-- | onEntry =
+-- |  on entry [of {subject | object | context} state <ident>]
+-- |		{<notification> | <automaticEffect>}*
 onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do
   void $ onEntryKeywords
@@ -538,6 +629,9 @@ contextState = reserved "context" *> reserved "state" *> do
   msubState <- optionMaybe arcIdentifier
   pure $ ContextState currentContext msubState
 
+-- | onExit =
+-- | 	on exit [ of {subject | object | context} state <ident>]
+-- | 		{<notification> | <automaticEffect>}*
 onExitE :: IP (List StateQualifiedPart)
 onExitE = do
   void $ onExitKeywords
@@ -556,6 +650,14 @@ stateTransitionPart = do
     "notify" -> notificationE
     _ -> fail "Expected: do, notify"
 
+-- | automaticEffect =
+-- | 	do
+-- | 		<statement>*
+-- | 		|
+-- | 		letA
+-- | 			{<lowercaseName> <- <expression>}*
+-- | 		in
+-- | 			<statement>*
 automaticEffectE :: IP (List StateQualifiedPart)
 automaticEffectE = do
   start <- getPosition
@@ -587,6 +689,11 @@ automaticEffectE = do
           _, _ -> fail "State transition inside state transition is not allowed"
     else pure Nil
 
+-- | notification =
+-- |  notify [<ident>] sentence
+-- | sentence = " { <charString> | '{' <expression> '}' }* "
+-- |
+-- | charString = a string of any character that is not { or ".
 notificationE :: IP (List StateQualifiedPart)
 notificationE = do
   start <- getPosition
@@ -604,8 +711,8 @@ notificationE = do
       _, Nothing, Nothing -> fail "A state transition is required"
       _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
     Just ident -> case onEntry, onExit of
-      -- We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
-      -- is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
+      -- | We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
+      -- | is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
       Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start, transition, message, object, start, end}
       Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start, transition, message, object, start, end}
       Nothing, Nothing -> fail "A state transition is required"
@@ -643,7 +750,7 @@ roleAndPropertyDefaults = do
 -- |  all roleverbs
 roleVerbs :: IP RoleVerbE
 roleVerbs = do
-  -- subject and object must be present.
+  -- | subject and object must be present.
   {subject, object, state} <- getArcParserState
   case subject, object of
     Just s, Just o -> do
@@ -685,20 +792,22 @@ roleVerb = do
     "Move" -> pure Move
     _ -> fail "Not a role verb"
 
--- view <ArcIdentifier> [: (<PropertyVerb+)]
--- props (<ArcIdentifier>) [: (<PropertyVerb+)]
+-- | propertyVerbs =
+-- | 	view <ident> [ ( <propertyVerb>{, <propertyVerb>}+ )]
+-- | 	|
+-- | 	props [(<ident> {, <ident>}+) ] [ verbs ( <propertyVerb>{, <propertyVerb>}+ )]
 propertyVerbs :: IP PropertyVerbE
 propertyVerbs = basedOnView <|> basedOnProps
   where
-    -- view SomeView              -- all properties in SomeView, all verbs
-    -- view SomeView (Consult)    -- all properties in SomeView, verb Consult
+    -- view SomeView              all properties in SomeView, all verbs
+    -- view SomeView (Consult)    all properties in SomeView, verb Consult
     basedOnView :: IP PropertyVerbE
     basedOnView = do
-      -- subject and object must be present.
+      -- | subject and object must be present.
       {subject, object, state} <- getArcParserState
       case subject, object of
         Just s, Just o -> do
-          -- view <ArcIdentifier> [: (<PropertyVerb+)]
+          -- | view <ArcIdentifier> [: (<PropertyVerb+)]
           start <- getPosition
           view <- reserved "view" *> (View <$> arcIdentifier)
           (pv :: ExplicitSet PropertyVerb) <- option Universal lotsOfVerbs
@@ -706,17 +815,17 @@ propertyVerbs = basedOnView <|> basedOnProps
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
         _, _ -> fail "User role and object of perspective must be given"
 
-    -- props                         -- all properties, all verbs
-    -- props (Title)                 -- property Title, all verbs
-    -- props (Title) verbs (Consult) -- property Title, verb Consult
-    -- props verbs (Consult)         -- all properties, verb Consult
+    -- props                         all properties, all verbs
+    -- props (Title)                 property Title, all verbs
+    -- props (Title) verbs (Consult) property Title, verb Consult
+    -- props verbs (Consult)         all properties, verb Consult
     basedOnProps :: IP PropertyVerbE
     basedOnProps = do
-      -- subject and object must be present.
+      -- | subject and object must be present.
       {subject, object, state} <- getArcParserState
       case subject, object of
         Just s, Just o -> do
-          -- props (<ArcIdentifier>) [: (<PropertyVerb+)]
+          -- | props (<ArcIdentifier>) [: (<PropertyVerb+)]
           start <- getPosition
           props <- option AllProperties (reserved "props" *> (Properties <$> lotsOfProperties))
           (pv :: ExplicitSet PropertyVerb) <- option Universal (reserved "verbs" *> lotsOfVerbs)
@@ -744,6 +853,14 @@ propertyVerb = do
     "Consult" -> pure Consult
     _ -> fail "Not a property verb"
 
+-- | action =
+-- | 	action <ident>
+-- | 		<statement>*
+-- | 		|
+-- | 		letA
+-- | 			{<lowercaseName> <- <expression>}*
+-- | 		in
+-- | 			<statement>*
 actionE :: IP (List StateQualifiedPart)
 actionE = do
   start <- getPosition
@@ -776,7 +893,7 @@ sentenceE = do
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name
 
--- | This parser always succeeds with a string.
--- | If no reserved word is found, restores the parser state (uses try internally).
+-- This parser always succeeds with a string.
+-- If no reserved word is found, restores the parser state (uses try internally).
 scanIdentifier :: IP String
 scanIdentifier = option "" (lookAhead reservedIdentifier)
