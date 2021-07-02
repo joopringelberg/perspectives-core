@@ -27,7 +27,7 @@
 
 module Perspectives.Query.UnsafeCompiler where
 
-import Control.Alt (void, (<|>))
+import Control.Alt (map, void, (<|>))
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
@@ -48,10 +48,10 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
-import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, wrapLogicalOperator)
+import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, some, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, binds, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, getUnlinkedRoleInstances, makeBoolean, roleModelName, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, binds, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getProperty, getRoleBinders, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseInt, value2Int)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
@@ -70,7 +70,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextTypeModelName', roleTypeModelName', specialisesRoleType)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||))
 import Unsafe.Coerce (unsafeCoerce)
@@ -468,6 +468,7 @@ getCalculatedRoleInstances rt@(CalculatedRoleType ident) c = case lookupRoleGett
   Nothing -> do
     (p :: CalculatedRole) <- lift $ lift $ getPerspectType rt
     f <- (lift $ lift $ RC.calculation p) >>= lift <<< lift <<< compileFunction
+    -- TODO. Cache de functie!
     (unsafeCoerce f) c
 
 -- | Construct a function to compute instances of a ContextType from an instance of a Context.
@@ -596,3 +597,15 @@ getDynamicPropertyGetterFromLocalName ln adt = do
           (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd'
           getter <- lift $ lift $ getDynamicPropertyGetterFromLocalName ln (ST bndType)
           getter bnd'
+
+-- | If the user has no role, return the role with the Aspect "model:System$Invitation$Guest".
+getMyType :: ContextInstance ~~> RoleType
+getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
+  <|>
+  ((contextType >=> Combinators.filter (liftToInstanceLevel calculatedUserRole) (computesMe ctxt)) ctxt)
+
+computesMe :: ContextInstance -> RoleType ~~> Boolean
+computesMe ctxt rt = some (getRoleInstances rt >=> lift <<< lift <<< isMe) ctxt
+
+-- computesMe :: RoleType -> ContextInstance ~~> Boolean
+-- computesMe cr = some (getRoleInstances cr >=> lift <<< lift <<< isMe)

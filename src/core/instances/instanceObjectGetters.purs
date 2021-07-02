@@ -38,19 +38,17 @@ import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
-import Perspectives.Instances.Combinators (conjunction, disjunction)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
-import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -84,12 +82,6 @@ getMe ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
     \c -> do
       tell $ ArrayWithoutDoubles [Me ctxt (context_me c)]
       pure $ maybe [] singleton (context_me c)
-
--- | If the user has no role, return the role with the Aspect "model:System$Invitation$Guest".
-getMyType :: ContextInstance ~~> RoleType
-getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
-  <|>
-  (contextType >=> liftToInstanceLevel (lookForUnqualifiedRoleType "Guest")) ctxt
 
 getActiveStates :: ContextInstance ~~> StateIdentifier
 getActiveStates ci = ArrayT $ (try $ lift $ getContextMember IP.states ci) >>=
@@ -307,19 +299,19 @@ boundByRole bnd' role = ArrayT $
         Nothing -> pure [false]
         Just b -> runArrayT $ boundByRole bnd' b
 
-subjectForContextInstance :: ContextInstance -> MonadPerspectivesTransaction SubjectOfAction
-subjectForContextInstance contextId = do
-  msubject <- lift $ lift (contextId ##> getMe)
-  lift $ lift $ case msubject of
-    Nothing -> UserType <$> (contextId ##>> getMyType)
-    Just me -> pure $ UserInstance me
-
-subjectForRoleInstance :: RoleInstance -> MonadPerspectivesTransaction SubjectOfAction
-subjectForRoleInstance roleId = do
-  msubject <- lift $ lift (roleId ##> context >=> getMe)
-  lift $ lift $ case msubject of
-    Nothing -> UserType <$> (roleId ##>> context >=> getMyType)
-    Just me -> pure $ UserInstance me
+-- subjectForContextInstance :: ContextInstance -> MonadPerspectivesTransaction SubjectOfAction
+-- subjectForContextInstance contextId = do
+--   msubject <- lift $ lift (contextId ##> getMe)
+--   lift $ lift $ case msubject of
+--     Nothing -> UserType <$> (contextId ##>> getMyType)
+--     Just me -> pure $ UserInstance me
+--
+-- subjectForRoleInstance :: RoleInstance -> MonadPerspectivesTransaction SubjectOfAction
+-- subjectForRoleInstance roleId = do
+--   msubject <- lift $ lift (roleId ##> context >=> getMe)
+--   lift $ lift $ case msubject of
+--     Nothing -> UserType <$> (roleId ##>> context >=> getMyType)
+--     Just me -> pure $ UserInstance me
 
 typeOfSubjectOfAction :: SubjectOfAction -> MonadPerspectives RoleType
 typeOfSubjectOfAction (UserInstance r) = (r ##>> roleType) >>= pure <<< ENR

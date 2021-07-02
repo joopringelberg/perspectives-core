@@ -49,7 +49,7 @@ import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialisesADT)
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
-import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getState, getView, tryGetState)
+import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
 import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
@@ -125,6 +125,14 @@ enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspe
     isEnumerated :: RoleType -> Boolean
     isEnumerated (ENR _) = true
     isEnumerated (CR _) = false
+
+-- | Returns User RoleTypes that are guaranteed to be Calculated.
+calculatedUserRole :: ContextType ~~~> RoleType
+calculatedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< filter isCalculated <<< ContextClass.userRole)
+  where
+    isCalculated :: RoleType -> Boolean
+    isCalculated (ENR _) = false
+    isCalculated (CR _) = true
 
 -- | Returns all Enumerated role types in the context
 allEnumeratedRoles :: ContextType ~~~> EnumeratedRoleType
