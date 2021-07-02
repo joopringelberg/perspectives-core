@@ -32,15 +32,14 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, findIndex, index, length, modifyAt, null, union)
+import Data.Array (cons, null, union)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe, fromJust)
 import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, isContextDomain, isRoleDomain, range)
@@ -59,6 +58,7 @@ newtype InvertedQuery = InvertedQuery
   -- Yield PerspectiveObject InvertedQueryResult data only in one of these states:
   , states :: Array StateIdentifier
   , statesPerProperty :: EncodableMap PropertyType (Array StateIdentifier)
+  , selfOnly :: Boolean
 }
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _

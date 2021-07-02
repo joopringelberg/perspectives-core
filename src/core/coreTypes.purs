@@ -32,7 +32,6 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
-import Data.Ordering (Ordering(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, throwError)
 import Effect.Aff.AVar (AVar)
@@ -49,9 +48,9 @@ import Perspectives.Instances.Environment (Environment)
 import Perspectives.Persistence.API (PouchdbState)
 import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType, EnumeratedRoleType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction)
-import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
+import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -138,18 +137,18 @@ instance showInformedAssumption :: Show InformedAssumption where
 -- ASSIGNMENT (RULE) DEPENDENCYTRACKING
 -----------------------------------------------------------
 -- | An ActionInstance represents the applicability of an Action to the instance of a Context.
-data ActionInstance = ActionInstance ContextInstance ActionType
-
-instance eqActionInstance :: Eq ActionInstance where
-  eq (ActionInstance c1 a1) (ActionInstance c2 a2) = eq c1 c2 && eq a1 a2
-
-instance showActionInstance :: Show ActionInstance where
-  show (ActionInstance c1 a1) = "ActionInstance( " <> show c1 <> ", " <> show a1 <> " )"
-
-instance ordActionInstance :: Ord ActionInstance where
-  compare (ActionInstance c1 a1) (ActionInstance c2 a2) = case compare c1 c2 of
-    EQ -> compare a1 a2
-    otherwise -> otherwise
+-- data ActionInstance = ActionInstance ContextInstance ActionType
+--
+-- instance eqActionInstance :: Eq ActionInstance where
+--   eq (ActionInstance c1 a1) (ActionInstance c2 a2) = eq c1 c2 && eq a1 a2
+--
+-- instance showActionInstance :: Show ActionInstance where
+--   show (ActionInstance c1 a1) = "ActionInstance( " <> show c1 <> ", " <> show a1 <> " )"
+--
+-- instance ordActionInstance :: Ord ActionInstance where
+--   compare (ActionInstance c1 a1) (ActionInstance c2 a2) = case compare c1 c2 of
+--     EQ -> compare a1 a2
+--     otherwise -> otherwise
 
 
 -- | Actions should be re-run as the Assumptions underlying their computation change.

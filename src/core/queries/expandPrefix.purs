@@ -23,7 +23,7 @@
 module Perspectives.Query.ExpandPrefix where
 
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), RoleIdentification(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), RoleIdentification(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetStep(..), Statements(..))
@@ -143,6 +143,11 @@ instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPa
     object' <- expandPrefix object
     state' <- expandPrefix state
     pure (AC (ActionE r {subject = subject', object = object', state = state'}))
+  expandPrefix (SO (SelfOnly r@{subject, object, state})) = do
+    subject' <- expandPrefix subject
+    object' <- expandPrefix object
+    state' <- expandPrefix state
+    pure (SO (SelfOnly r {subject = subject', object = object', state = state'}))
   expandPrefix (N (NotificationE r@{user, transition, message, object})) = do
     user' <- expandPrefix user
     transition' <- expandPrefix transition

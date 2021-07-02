@@ -30,7 +30,7 @@ import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
@@ -529,6 +529,7 @@ perspectivePart = do
     "action", _ -> actionE
     "perspective", "on" -> perspectiveOn
     "perspective", "of" -> perspectiveOf
+    "selfonly", _ -> singleton <<< SO <$> selfOnly
     _, _ -> fail "Expected: view, props, verbs, only, except, all, in, on, action, perspective"
 
 -- | inState =
@@ -791,6 +792,20 @@ roleVerb = do
     "RemoveFiller" -> pure RemoveFiller
     "Move" -> pure Move
     _ -> fail "Not a role verb"
+
+selfOnly :: IP SelfOnly
+selfOnly = do
+  reserved "selfonly"
+  -- | subject and object must be present.
+  {subject, object, state} <- getArcParserState
+  case subject, object of
+    Just s, Just o -> do
+      start <- getPosition
+      end <- getPosition
+      pure $ SelfOnly {subject: s, object: o, state, start, end}
+    Nothing, Nothing -> fail "User role and object of perspective must be given"
+    Nothing, (Just _) -> fail "User role must be given"
+    (Just _), Nothing -> fail "Object of perspective must be given"
 
 -- | propertyVerbs =
 -- | 	view <ident> [ ( <propertyVerb>{, <propertyVerb>}+ )]

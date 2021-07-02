@@ -245,8 +245,11 @@ compileAndDistributeStep dom stp users stateIdentifiers = do
   (statesPerProperty :: Map PropertyType (Array StateIdentifier)) <- pure case propertyOfRange descr of
     Nothing -> empty
     Just p -> singleton p stateIdentifiers
-  setInvertedQueries users statesPerProperty stateIdentifiers descr
+  setInvertedQueries users statesPerProperty stateIdentifiers descr notSelfOnly
   pure descr
+  where
+    notSelfOnly :: Boolean
+    notSelfOnly = false
 
 
 ------------------------------------------------------------------------------------

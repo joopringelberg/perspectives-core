@@ -51,6 +51,7 @@ type PerspectiveRecord =
   , roleVerbs :: EncodableMap StateIdentifier RoleVerbList
 	, propertyVerbs :: EncodableMap StateIdentifier (Array PropertyVerbs)
 	, actions :: EncodableMap StateIdentifier (Object QueryFunctionDescription)
+  , selfOnly :: Boolean
   }
 
 derive instance genericRepPerspective :: Generic Perspective _

@@ -117,6 +117,7 @@ data StateQualifiedPart =
   R RoleVerbE |
   P PropertyVerbE |
   AC ActionE |
+  SO SelfOnly |
   N NotificationE |
   AE AutomaticEffectE |
   SUBSTATE StateE
@@ -158,6 +159,18 @@ newtype ActionE = ActionE
   , object :: RoleIdentification
   , state :: StateSpecification
   , effect :: Statements
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
+
+--------------------------------------------------------------------------------
+---- SELFONLY
+--------------------------------------------------------------------------------
+-- Ends up in Perspective, identified by subject and object.
+newtype SelfOnly = SelfOnly
+  { subject :: RoleIdentification
+  , object :: RoleIdentification
+  , state :: StateSpecification
   , start :: ArcPosition
   , end :: ArcPosition
   }
@@ -274,6 +287,9 @@ instance showRoleVerbE :: Show RoleVerbE where show = genericShow
 
 derive instance genericPropertyVerbE :: Generic PropertyVerbE _
 instance showPropertyVerbE :: Show PropertyVerbE where show = genericShow
+
+derive instance genericSelfOnly :: Generic SelfOnly _
+instance showSelfOnly :: Show SelfOnly where show = genericShow
 
 derive instance genericPropertyE :: Generic PropertyE _
 instance showPropertyE :: Show PropertyE where show = genericShow

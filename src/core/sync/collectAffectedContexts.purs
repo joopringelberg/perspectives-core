@@ -33,7 +33,7 @@ import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty (foldM) as LNE
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse, traverse_)
@@ -43,7 +43,7 @@ import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependency)
 import Perspectives.ContextAndRole (isDefaultContextDelta)
-import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, execMonadPerspectivesQuery, (###=), (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, execMonadPerspectivesQuery, runMonadPerspectivesQuery, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addDelta)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
@@ -91,7 +91,11 @@ usersWithPerspectiveOnRoleInstance roleType roleInstance = do
       -- This means that the query, when re-run from the context, might yield a different result then before the
       -- mutation described by the Delta.
     contextCalculations <- lift2 (roleType ###= (roleAspectsClosure >=> ArrayT <<< compileBothFor _onContextDelta_context))
-    (for contextCalculations \iq -> handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq) >>= pure <<< join
+    -- TODO.
+    -- If iq has the selfOnly modifier, we must apply a new algorithm to the roleInstance and the roleInstance.
+    (for contextCalculations \iq -> if isForSelfOnly iq
+      then handleSelfOnlyQuery iq roleInstance roleInstance
+      else handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq) >>= pure <<< join
   users2 <- do
     roleCalculations <- lift2 (roleType ###= (roleAspectsClosure >=> ArrayT <<< compileBothFor _onContextDelta_role))
       -- Find all InvertedQueryResults, starting from the new role instance of the Delta.
@@ -103,6 +107,47 @@ usersWithPerspectiveOnRoleInstance roleType roleInstance = do
 
 type ContextWithUsers = Tuple ContextInstance (Array RoleInstance)
 
+-- | Handle InvertedQueryies with the selfOnly modifier.
+handleSelfOnlyQuery :: InvertedQuery -> RoleInstance -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+handleSelfOnlyQuery (InvertedQuery{backwardsCompiled, forwardsCompiled, description}) argForBackwardsQuery argForForwardsQuery = do
+  peers <- computePeers
+  -- Compute backwards and collect assumptions.
+  case backwardsCompiled of
+    Nothing -> pure unit
+    Just bw -> do
+      (Tuple _ assumptions) <- lift2 $ runMonadPerspectivesQuery argForBackwardsQuery (unsafeCoerce bw)
+      -- Turn assumptions into deltas for the peers.
+      for_ (unwrap assumptions) (createDeltasFromAssumption peers)
+  -- Return peers
+  pure peers
+  where
+    -- Interpret the forwards part. For each DependencyPath, the result is a RoleInstance that is a peer.
+    -- Send dependencies in that path to that peer.
+    computePeers :: MonadPerspectivesTransaction (Array RoleInstance)
+    computePeers = if isNothing forwardsCompiled
+      then pure [argForBackwardsQuery]
+      else case forwards description of
+        Nothing -> pure []
+        Just fw -> do
+          (peersAndPaths :: Array (DependencyPath)) <- lift2 ((singletonPath (R argForForwardsQuery)) ##= interpret fw)
+          -- Add Deltas
+          for peersAndPaths
+            -- Each DependencyPath result is a peer.
+            \path -> do
+              peer <- pure $ unsafePartial roleAtHead path
+              for_
+                -- Serialise the ordered dependencies in all paths walked to compute that peer, for that peer only.
+                (allPaths path)
+                (LNE.foldM (serialiseDependency [peer]) Nothing)
+              -- Return all peers.
+              pure peer
+
+    roleAtHead :: Partial => DependencyPath -> RoleInstance
+    roleAtHead {head} = case head of
+      R r -> r
+
+isForSelfOnly :: InvertedQuery -> Boolean
+isForSelfOnly (InvertedQuery{selfOnly}) = selfOnly
 -----------------------------------------------------------
 -- HANDLEBACKWARDQUERY
 -----------------------------------------------------------
@@ -283,7 +328,11 @@ aisInRoleDelta (RoleBindingDelta dr@{id:binder, binding, oldBinding, deltaType})
       bindingType <- lift2 (bnd ##>> OG.roleType)
       binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder bindingType
       (for binderCalculations
-        (\iq -> (handleBackwardQuery binder iq) >>= runForwardsComputation bnd iq)) >>= pure <<< join
+        -- TODO.
+        -- If iq has the selfOnly modifier, we must apply a new algorithm to the binder and the binding.
+        (\iq -> if isForSelfOnly iq
+          then handleSelfOnlyQuery iq binder bnd
+          else (handleBackwardQuery binder iq) >>= runForwardsComputation bnd iq)) >>= pure <<< join
     Nothing -> pure []
   -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually overwrite something:
   users3 <- case oldBinding of

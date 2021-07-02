@@ -52,7 +52,7 @@ import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCac
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.Identifiers (Namespace, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.InvertedQuery (RelevantProperties(..))
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), StateQualifiedPart(..), StateTransitionE(..), StateSpecification(..)) as AST
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateKind(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression, addContextualVariablesToStatements, stateSpec2stateKind)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
@@ -498,6 +498,22 @@ handlePostponedStateQualifiedParts = do
           (modifyPerspective objectQfd start
             (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) states}))
 
+    handlePart (AST.SO (AST.SelfOnly{subject, object, state, start})) = do
+      currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
+      -- Set, for all these users...
+      qualifiedUsers <- collectRoles subject
+      -- ... to their perspective on this object...
+      objectQfd <- objectToQueryFunctionDescription object currentDomain state
+      -- ... for these states only...
+      states <- stateSpec2States state
+      -- ... the selfOnly member to true.
+      modifyAllSubjectPerspectives qualifiedUsers objectQfd states
+      where
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives qualifiedUsers objectQfd states = for_ qualifiedUsers
+          (modifyPerspective objectQfd start
+            (\(Perspective pr) -> Perspective pr {selfOnly = true}))
+
     handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start})) = do
       currentDomain <- statespec2Domain state
       contextDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
@@ -592,6 +608,7 @@ handlePostponedStateQualifiedParts = do
               , roleVerbs: EncodableMap Map.empty
               , propertyVerbs: EncodableMap Map.empty
               , actions: EncodableMap Map.empty
+              , selfOnly: false
               }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
           modifyDF \dfr@{enumeratedRoles} -> dfr {enumeratedRoles = insert
@@ -610,6 +627,7 @@ handlePostponedStateQualifiedParts = do
               , roleVerbs: EncodableMap Map.empty
               , propertyVerbs: EncodableMap Map.empty
               , actions: EncodableMap Map.empty
+              , selfOnly: false
               }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
           modifyDF \dfr@{calculatedRoles} -> dfr {calculatedRoles = insert
@@ -674,11 +692,11 @@ invertPerspectiveObjects = do
         perspectivesInCalculatedRole (CalculatedRole{_id, perspectives}) = for_ perspectives (addInvertedQueriesForPerspectiveObject (CR _id))
 
         addInvertedQueriesForPerspectiveObject :: RoleType -> Perspective -> PhaseThree Unit
-        addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs}) = do
+        addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs, selfOnly}) = do
           -- Sets the inverted queries directly in the EnumeratedRoles and Properties in the
           -- DomeinFile we keep in PhaseTwoState.
           sPerProp <- lift2 $ statesPerProperty p
-          setInvertedQueries [roleType] sPerProp (roleStates p) object
+          setInvertedQueries [roleType] sPerProp (roleStates p) object selfOnly
 
         explicitSet2RelevantProperties :: ExplicitSet PropertyType -> RelevantProperties
         explicitSet2RelevantProperties Universal = All

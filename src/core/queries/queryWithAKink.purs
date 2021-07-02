@@ -179,8 +179,9 @@ setInvertedQueries ::
   Map PropertyType (Array StateIdentifier) ->
   Array StateIdentifier ->
   QueryFunctionDescription ->
+  Boolean ->
   PhaseThree Unit
-setInvertedQueries users statesPerProperty roleStates qfd = do
+setInvertedQueries users statesPerProperty roleStates qfd selfOnly = do
   -- log ("setInvertedQueries:" <> "\n users =" <> show users <> "\n states = " <> show roleStates <> "\n statesPerProperty = " <> showTree statesPerProperty <> "\n qfd = " <> show qfd)
   (zqs :: (Array QueryWithAKink)) <- invert qfd
   for_ zqs \qwk@(ZQ backward forward) -> do
@@ -200,10 +201,10 @@ setInvertedQueries users statesPerProperty roleStates qfd = do
     --  * SQD >> (...), i.e. when the backward part is a composition (whose first step is not a composition, that would be an error!). Set the InvertedQuery with respect to the first step of backward.
     --  * SQD, i.e. when the backward part is just a single step. Set the InvertedQuery for that step.
     case backward of
-      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
+      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty selfOnly
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
       -- TODO. Doubleert dit niet met de case hieronder, voor setInvertedQueriesForUserAndRole?
-      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty
+      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty selfOnly
       (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
       Nothing -> pure unit
     -- Handle the endpoint of the original query when it ends in a Role. There are two cases:
@@ -211,5 +212,5 @@ setInvertedQueries users statesPerProperty roleStates qfd = do
     -- an expression in a statement with a Property value.
     case forward, backward, domain <$> backward of
       Nothing, Just bw, Just (RDOM role) ->
-        void $ setInvertedQueriesForUserAndRole users role statesPerProperty true qwk
+        void $ setInvertedQueriesForUserAndRole users role statesPerProperty true qwk selfOnly
       _, _, _ -> pure unit
