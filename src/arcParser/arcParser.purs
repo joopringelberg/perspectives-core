@@ -530,7 +530,7 @@ perspectivePart = do
     "perspective", "on" -> perspectiveOn
     "perspective", "of" -> perspectiveOf
     "selfonly", _ -> singleton <<< SO <$> selfOnly
-    _, _ -> fail "Expected: view, props, verbs, only, except, all, in, on, action, perspective"
+    _, _ -> fail "Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly"
 
 -- | inState =
 -- | 	in state <ident> [of {subject | object | context} state]

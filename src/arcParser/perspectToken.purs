@@ -99,7 +99,6 @@ perspectDef = LanguageDef
                   , "SubjectViewRef"
                   , "ObjectViewRef"
                   , "IndirectObjectViewRef"
-                  , "selfonly"
                   ]
                 , caseSensitive:   true
                 }
