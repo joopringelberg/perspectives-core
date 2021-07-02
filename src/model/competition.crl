@@ -1,0 +1,17 @@
+UserData
+
+import model:System as sys
+import model:Competition as com
+
+com:Model usr:CompetitionModel
+  extern sys:RootContext$External$Name = "Sports Competition Management"
+  extern sys:Model$External$Description = "Manage simple sports competitions with sub-competitions and teams."
+  extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:Competition"
+  extern $ModelIdentification = "model:Competition"
+  sys:Model$IndexedContext =>
+    com:CompetitionApp com:TheCompetition
+      extern sys:RootContext$External$Name = "Sports Competition Management"
+      $Manager(com:CompetitionManager) -> sys:Me
+    sys:Model$IndexedContext$Name = "Competition$TheCompetition"
+  sys:Model$IndexedRole -> com:CompetitionManager
+    $Name = "Competition$CompetitionManager"
