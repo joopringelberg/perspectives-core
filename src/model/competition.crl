@@ -14,4 +14,4 @@ com:Model usr:CompetitionModel
       $Manager(com:CompetitionManager) -> sys:Me
     sys:Model$IndexedContext$Name = "Competition$TheCompetition"
   sys:Model$IndexedRole -> com:CompetitionManager
-    $Name = "Competition$CompetitionManager"
+    sys:Model$IndexedRole$Name = "Competition$CompetitionManager"

@@ -61,6 +61,11 @@ domain Competition
     context Teams (relational) filledBy Team
 
   case Team
+    state NoCaptain = not exists Captain
+      on entry
+        do for Manager
+          createRole Captain
+
     external
       property Name (String)
     user Manager = com:CompetitionManager
