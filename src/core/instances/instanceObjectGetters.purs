@@ -193,6 +193,8 @@ getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>
             Just b -> runArrayT $ getPropertyFromTelescope pn b
         (Just p) -> pure p
 
+-- | From a Property value getter, create a function that tries to find a value for the property
+-- | on the role or its binding, recursively.
 makeChainGetter :: (RoleInstance ~~> Value) -> (RoleInstance ~~> Value)
 -- A beautiful definition that will not terminate:
 -- makeChainGetter getter = disjunction getter (makeChainGetter (binding >=> getter))
@@ -212,6 +214,7 @@ makeBoolean f = f >>> map (((==) "true") <<< unwrap)
 
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r, including AspectProperties.
 -- | E.g. getUnqualifiedProperty "voornaam"
+-- | NOTE: only adds an Assumption if a property value with a matching name can be found.
 getUnqualifiedProperty :: LocalName -> (RoleInstance ~~> Value)
 getUnqualifiedProperty ln r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
   handlePerspectRolError' "getUnqualifiedProperty" []

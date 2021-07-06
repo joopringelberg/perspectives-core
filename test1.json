@@ -1,235 +1,380 @@
 {
-  "_id": "model:User$dev2$User(Year_2021)June(Day 28)T(Hour 12)(Minute 37)(Second 39)(Millisecond 193)",
-  "_rev": "1-034c767d0de4406680ac2101eb979807",
   "contents": {
-    "transaction": {
-      "contents": {
-        "timeStamp": 1624881661407,
-        "deltas": [
-          {
+    "timeStamp": 1625342727784,
+    "deltas": [
+      {
+        "contents": {
+          "encryptedDelta": {
             "contents": {
-              "encryptedDelta": {
+              "subject": {
                 "contents": {
-                  "subject": {
-                    "contents": "model:User$dev1$User",
-                    "tag": "UserInstance"
-                  },
-                  "roleType": "model:System$PerspectivesSystem$External",
-                  "roleInstances": [
-                    "model:User$dev1_External"
-                  ],
-                  "id": "model:User$dev1",
-                  "deltaType": {
-                    "tag": "ConstructExternalRole"
-                  },
-                  "authorizedRole": null
+                  "contents": "model:Competition$SubCompetition$Manager",
+                  "tag": "CR"
                 },
-                "tag": "UniverseRoleDelta"
+                "tag": "UserType"
               },
-              "author": "model:User$dev1$User"
+              "roleType": "model:Competition$Team$External",
+              "roleInstances": [
+                "model:User$cb0547bb6_4873_4f77_a85d_a8958abe0802_External"
+              ],
+              "id": "model:User$cb0547bb6_4873_4f77_a85d_a8958abe0802",
+              "deltaType": {
+                "tag": "ConstructExternalRole"
+              },
+              "authorizedRole": {
+                "contents": "model:Competition$SubCompetition$Teams",
+                "tag": "ENR"
+              }
             },
-            "tag": "SignedDelta"
+            "tag": "UniverseRoleDelta"
           },
-          {
-            "contents": {
-              "encryptedDelta": {
-                "contents": {
-                  "subject": {
-                    "contents": "model:User$dev1$User",
-                    "tag": "UserInstance"
-                  },
-                  "id": "model:User$dev1",
-                  "deltaType": {
-                    "tag": "ConstructEmptyContext"
-                  },
-                  "contextType": "model:System$PerspectivesSystem"
-                },
-                "tag": "UniverseContextDelta"
-              },
-              "author": "model:User$dev1$User"
-            },
-            "tag": "SignedDelta"
-          },
-          {
-            "contents": {
-              "encryptedDelta": {
-                "contents": {
-                  "subject": {
-                    "contents": "model:User$dev1$User",
-                    "tag": "UserInstance"
-                  },
-                  "roleType": "model:System$PerspectivesSystem$User",
-                  "roleInstances": [
-                    "model:User$dev1$User"
-                  ],
-                  "id": "model:User$dev1",
-                  "deltaType": {
-                    "tag": "ConstructEmptyRole"
-                  },
-                  "authorizedRole": null
-                },
-                "tag": "UniverseRoleDelta"
-              },
-              "author": "model:User$dev1$User"
-            },
-            "tag": "SignedDelta"
-          },
-          {
-            "contents": {
-              "encryptedDelta": {
-                "contents": {
-                  "subject": {
-                    "contents": "model:User$dev1$User",
-                    "tag": "UserInstance"
-                  },
-                  "roleType": "model:System$PerspectivesSystem$User",
-                  "roleInstances": [
-                    "model:User$dev1$User"
-                  ],
-                  "id": "model:User$dev1",
-                  "destinationContext": null,
-                  "deltaType": {
-                    "tag": "AddRoleInstancesToContext"
-                  }
-                },
-                "tag": "ContextDelta"
-              },
-              "author": "model:User$dev1$User"
-            },
-            "tag": "SignedDelta"
-          },
-          {
-            "contents": {
-              "encryptedDelta": {
-                "contents": {
-                  "values": [
-                    "Last name"
-                  ],
-                  "subject": {
-                    "contents": "model:User$dev1$User",
-                    "tag": "UserInstance"
-                  },
-                  "property": "model:System$PerspectivesSystem$User$Achternaam",
-                  "id": "model:User$dev1$User",
-                  "deltaType": {
-                    "tag": "AddProperty"
-                  }
-                },
-                "tag": "RolePropertyDelta"
-              },
-              "author": "model:User$dev1$User"
-            },
-            "tag": "SignedDelta"
-          },
-          {
-            "contents": {
-              "encryptedDelta": {
-                "contents": {
-                  "values": [
-                    "First name"
-                  ],
-                  "subject": {
-                    "contents": "model:User$dev1$User",
-                    "tag": "UserInstance"
-                  },
-                  "property": "model:System$PerspectivesSystem$User$Voornaam",
-                  "id": "model:User$dev1$User",
-                  "deltaType": {
-                    "tag": "AddProperty"
-                  }
-                },
-                "tag": "RolePropertyDelta"
-              },
-              "author": "model:User$dev1$User"
-            },
-            "tag": "SignedDelta"
-          },
-          {
-            "contents": {
-              "encryptedDelta": {
-                "contents": {
-                  "subject": {
-                    "contents": {
-                      "contents": "model:System$Invitation$Guest",
-                      "tag": "CR"
-                    },
-                    "tag": "UserType"
-                  },
-                  "roleType": "model:SimpleChat$Chat$Partner",
-                  "roleInstances": [
-                    "model:User$c0ced2d69_88a9_4e57_a346_82f039d224c6$Partner_0000"
-                  ],
-                  "id": "model:User$c0ced2d69_88a9_4e57_a346_82f039d224c6",
-                  "deltaType": {
-                    "tag": "ConstructEmptyRole"
-                  },
-                  "authorizedRole": null
-                },
-                "tag": "UniverseRoleDelta"
-              },
-              "author": "model:User$dev1$User"
-            },
-            "tag": "SignedDelta"
-          },
-          {
-            "contents": {
-              "encryptedDelta": {
-                "contents": {
-                  "subject": {
-                    "contents": {
-                      "contents": "model:System$Invitation$Guest",
-                      "tag": "CR"
-                    },
-                    "tag": "UserType"
-                  },
-                  "roleType": "model:SimpleChat$Chat$Partner",
-                  "roleInstances": [
-                    "model:User$c0ced2d69_88a9_4e57_a346_82f039d224c6$Partner_0000"
-                  ],
-                  "id": "model:User$c0ced2d69_88a9_4e57_a346_82f039d224c6",
-                  "destinationContext": null,
-                  "deltaType": {
-                    "tag": "AddRoleInstancesToContext"
-                  }
-                },
-                "tag": "ContextDelta"
-              },
-              "author": "model:User$dev1$User"
-            },
-            "tag": "SignedDelta"
-          },
-          {
-            "contents": {
-              "encryptedDelta": {
-                "contents": {
-                  "subject": {
-                    "contents": {
-                      "contents": "model:System$Invitation$Guest",
-                      "tag": "CR"
-                    },
-                    "tag": "UserType"
-                  },
-                  "roleWillBeRemoved": false,
-                  "oldBinding": null,
-                  "id": "model:User$c0ced2d69_88a9_4e57_a346_82f039d224c6$Partner_0000",
-                  "deltaType": {
-                    "tag": "SetBinding"
-                  },
-                  "binding": "model:User$dev1$User"
-                },
-                "tag": "RoleBindingDelta"
-              },
-              "author": "model:User$dev1$User"
-            },
-            "tag": "SignedDelta"
-          }
-        ],
-        "author": "model:User$dev1$User"
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
       },
-      "tag": "TransactionForPeer"
-    },
-    "receiver": "model:User$dev2$User",
-    "_id": "model:User$dev2$User(Year_2021)June(Day 28)T(Hour 12)(Minute 37)(Second 39)(Millisecond 193)"
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$SubCompetition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "id": "model:User$cb0547bb6_4873_4f77_a85d_a8958abe0802",
+              "deltaType": {
+                "tag": "ConstructEmptyContext"
+              },
+              "contextType": "model:Competition$Team"
+            },
+            "tag": "UniverseContextDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$CompetitionApp$Manager",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:Competition$Team$Captain",
+              "roleInstances": [
+                "model:User$cb0547bb6_4873_4f77_a85d_a8958abe0802$Captain_0000"
+              ],
+              "id": "model:User$cb0547bb6_4873_4f77_a85d_a8958abe0802",
+              "deltaType": {
+                "tag": "ConstructEmptyRole"
+              },
+              "authorizedRole": null
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$Competition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:Competition$SubCompetition$External",
+              "roleInstances": [
+                "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5_External"
+              ],
+              "id": "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5",
+              "deltaType": {
+                "tag": "ConstructExternalRole"
+              },
+              "authorizedRole": {
+                "contents": "model:Competition$Competition$SubCompetitions",
+                "tag": "ENR"
+              }
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$Competition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "id": "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5",
+              "deltaType": {
+                "tag": "ConstructEmptyContext"
+              },
+              "contextType": "model:Competition$SubCompetition"
+            },
+            "tag": "UniverseContextDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$SubCompetition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:Competition$SubCompetition$Teams",
+              "roleInstances": [
+                "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5$Teams_0001"
+              ],
+              "id": "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5",
+              "deltaType": {
+                "tag": "ConstructEmptyRole"
+              },
+              "authorizedRole": null
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$SubCompetition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:Competition$SubCompetition$Teams",
+              "roleInstances": [
+                "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5$Teams_0001"
+              ],
+              "id": "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5",
+              "destinationContext": null,
+              "deltaType": {
+                "tag": "AddRoleInstancesToContext"
+              }
+            },
+            "tag": "ContextDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$SubCompetition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleWillBeRemoved": false,
+              "oldBinding": null,
+              "id": "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5$Teams_0001",
+              "deltaType": {
+                "tag": "SetBinding"
+              },
+              "binding": "model:User$cb0547bb6_4873_4f77_a85d_a8958abe0802_External"
+            },
+            "tag": "RoleBindingDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$CompetitionApp$Manager",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:Competition$Competition$External",
+              "roleInstances": [
+                "model:User$c98c1fd1e_d6be_4c49_91e5_fb902bffaa47_External"
+              ],
+              "id": "model:User$c98c1fd1e_d6be_4c49_91e5_fb902bffaa47",
+              "deltaType": {
+                "tag": "ConstructExternalRole"
+              },
+              "authorizedRole": {
+                "contents": "model:Competition$CompetitionApp$Competitions",
+                "tag": "ENR"
+              }
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$CompetitionApp$Manager",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "id": "model:User$c98c1fd1e_d6be_4c49_91e5_fb902bffaa47",
+              "deltaType": {
+                "tag": "ConstructEmptyContext"
+              },
+              "contextType": "model:Competition$Competition"
+            },
+            "tag": "UniverseContextDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$Competition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:Competition$Competition$SubCompetitions",
+              "roleInstances": [
+                "model:User$c98c1fd1e_d6be_4c49_91e5_fb902bffaa47$SubCompetitions_0000"
+              ],
+              "id": "model:User$c98c1fd1e_d6be_4c49_91e5_fb902bffaa47",
+              "deltaType": {
+                "tag": "ConstructEmptyRole"
+              },
+              "authorizedRole": null
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$Competition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:Competition$Competition$SubCompetitions",
+              "roleInstances": [
+                "model:User$c98c1fd1e_d6be_4c49_91e5_fb902bffaa47$SubCompetitions_0000"
+              ],
+              "id": "model:User$c98c1fd1e_d6be_4c49_91e5_fb902bffaa47",
+              "destinationContext": null,
+              "deltaType": {
+                "tag": "AddRoleInstancesToContext"
+              }
+            },
+            "tag": "ContextDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$Competition$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleWillBeRemoved": false,
+              "oldBinding": null,
+              "id": "model:User$c98c1fd1e_d6be_4c49_91e5_fb902bffaa47$SubCompetitions_0000",
+              "deltaType": {
+                "tag": "SetBinding"
+              },
+              "binding": "model:User$c0dfe6b91_1cd7_4b53_be27_c288a082f3a5_External"
+            },
+            "tag": "RoleBindingDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:Competition$CompetitionApp$Manager",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:Competition$Team$Captain",
+              "roleInstances": [
+                "model:User$cb0547bb6_4873_4f77_a85d_a8958abe0802$Captain_0000"
+              ],
+              "id": "model:User$cb0547bb6_4873_4f77_a85d_a8958abe0802",
+              "destinationContext": null,
+              "deltaType": {
+                "tag": "AddRoleInstancesToContext"
+              }
+            },
+            "tag": "ContextDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      }
+    ],
+    "author": "model:User$prod1$User"
   },
-  "tag": "OutgoingTransaction"
+  "tag": "TransactionForPeer"
 }

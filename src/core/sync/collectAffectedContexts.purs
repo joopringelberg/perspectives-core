@@ -325,8 +325,9 @@ aisInRoleDelta (RoleBindingDelta dr@{id:binder, binding, oldBinding, deltaType})
   -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually bind something:
   users2 <- case binding of
     Just bnd -> do
-      bindingType <- lift2 (bnd ##>> OG.roleType)
-      binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder bindingType
+      -- We've stored the relevant InvertedQueries with the type of the binder,
+      -- so we execute them on any binding that is a specialisation of (or equal to) the required binding type.
+      binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder binderType
       (for binderCalculations
         -- TODO.
         -- If iq has the selfOnly modifier, we must apply a new algorithm to the binder and the binding.
@@ -337,8 +338,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id:binder, binding, oldBinding, deltaType})
   -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually overwrite something:
   users3 <- case oldBinding of
     Just bnd | deltaType == SetBinding -> do
-      bindingType <- lift2 (bnd ##>> OG.roleType)
-      binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder bindingType
+      binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder binderType
       -- We deal here just with the case that we destroy a binding; not with the case that we add one.
       -- Hence, no forward computation. `handleBackwardQuery` just passes on users that have at least one
       -- valid perspective, even if the condition is object state.
@@ -626,7 +626,7 @@ compileBackwardFor :: CalculationsLens -> EnumeratedRoleType -> MonadPerspective
 compileBackwardFor onX rt = compileDescriptions_ onX rt false
 
 compileBothFor :: CalculationsLens -> EnumeratedRoleType -> MonadPerspectives (Array InvertedQuery)
-compileBothFor onX rt = compileDescriptions_ onX rt false
+compileBothFor onX rt = compileDescriptions_ onX rt true
 
 -- | Compiles the backward part of the description and stores it in backwardsCompiled.
 -- | If the argument bound to `forward` is true, then the forward part is compiled, too.

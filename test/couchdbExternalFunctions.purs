@@ -130,6 +130,19 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:ModelManagement") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:ModelManagement: " <> show errs) false
 
+  testOnly "upload model:Competition to repository from files (without testuser)" $ runP do
+    addAllExternalFunctions
+    _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    errs <- loadCompileAndCacheArcFile "competition" modelDirectory
+    if null errs
+      then do
+        pure unit
+        cdburl <- developmentRepository
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Competition") cdburl)
+      else liftAff $ assert ("There are instance- or model errors for model:Competition: " <> show errs) false
+
   testOnly "upload model:BrokerServices to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory

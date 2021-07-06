@@ -81,8 +81,11 @@ setPathForStep (SQD dom qf ran fun man) qWithAK users states statesPerProperty s
     -- while we know, when applying the inverted query when handling a RoleBindingDelta, the exact path to follow.
     -- The function `aisInRoleDelta` applies the forward part to the binding (not the binder).
     -- Hence we don't have to adapt the forward part.
+    -- We add the inverted query to the **BINDING ROLE**, not the bound role. This has two reasons:
+    --  * the bound role may well be in another model, leading to an InvertedQuery for another domain;
+    --  * if runtime a role is bound that is a specialisation of the required role, it will still trigger the inverted query.
     oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
-    roleName = unwrap $ unsafePartial $ domain2RoleType dom
+    roleName = unwrap $ unsafePartial $ domain2RoleType ran
     in case oneStepLess of
         -- WARNING. This may not be correct
         ZQ Nothing _ -> dfr
