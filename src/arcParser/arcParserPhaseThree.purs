@@ -46,6 +46,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions, values, union)
 import Foreign.Object (fromFoldable) as OBJ
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ContextRoleParser (localPropertyName)
 import Perspectives.CoreTypes ((###=), MP)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
@@ -63,7 +64,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName)
 import Perspectives.Query.Kinked (setInvertedQueries)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), range)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain2roleType, range)
 import Perspectives.Query.StatementCompiler (compileStatement)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -82,8 +83,8 @@ import Perspectives.Representation.State (State(..), StateFulObject(..), StateRe
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
-import Prelude (class Ord, Unit, append, bind, discard, flip, join, map, pure, unit, void, ($), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<#>), eq, (&&))
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
+import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<#>), (<$>), (<*), (<<<), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} postponedParts = do
@@ -236,7 +237,7 @@ qualifyPropertyReferences = do
             else do
               (candidates :: Array PropertyType) <- lift2 (erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
               case head candidates of
-                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType) erole
+                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType) (unwrap erole)
                 (Just t) | length candidates == 1 -> pure t
                 otherwise -> throwError $ NotUniquelyIdentifying pos (propertytype2string propType) (map propertytype2string candidates)
 
@@ -576,18 +577,29 @@ handlePostponedStateQualifiedParts = do
               (unwrap pverbs)
               states)})
 
+        -- We lookup the qualified name of these properties here, for the object of the perspective.
         collectPropertyTypes :: AST.PropsOrView -> PhaseThree (ExplicitSet PropertyType)
         collectPropertyTypes AST.AllProperties = pure Universal
-        collectPropertyTypes (AST.Properties ps) =
+        collectPropertyTypes (AST.Properties ps) = do
           -- The (partial) names for properties used here may be defined outside
-          -- of the model (due to role filling). Hence we postpone looking up their
-          -- real referents to phase three. Here we assume an Enumerated PropertyType.
-          pure $ PSet (ENP <<< EnumeratedPropertyType <$> (fromFoldable ps))
+          -- of the model (due to role filling). So we use functions that rely on the
+          -- model cache and hence we need the current model to be in that cache, too (which it is, here).
+          roleADT <- roleIdentification2rangeADT object
+          PSet <$> for (fromFoldable ps)
+            \localPropertyName -> do
+              candidates <- lift2 (roleADT ###= lookForUnqualifiedPropertyType localPropertyName)
+              case head candidates of
+                Nothing -> throwError $ UnknownProperty start localPropertyName (show roleADT)
+                (Just t) | length candidates == 1 -> pure t
+                _ -> throwError $ NotUniquelyIdentifying start localPropertyName (propertytype2string <$> candidates)
+
+
+          -- pure $ PSet (ENP <<< EnumeratedPropertyType <$> (fromFoldable ps))
         collectPropertyTypes (AST.View view) = do
           (views :: Object View) <- getsDF _.views
           -- As we have postponed handling these parse tree fragments after
           -- handling all others, there can be no forward references.
-          -- Notice that the property references may not be fully qualified!
+          -- The property references in Views are, by now, qualified.
           candidates <- pure $ filter (flip endsWithSegments view) (keys views)
           case length candidates of
             0 -> throwError $ UnknownView start view
@@ -795,6 +807,11 @@ statespec2Domain :: Partial => StateSpecification -> PhaseThree Domain
 statespec2Domain (ContextState ctype _) = pure $ CDOM (ST ctype)
 statespec2Domain (SubjectState roleIdentification _) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
 statespec2Domain (ObjectState roleIdentification ctype) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
+
+roleIdentification2rangeADT :: RoleIdentification -> PhaseThree (ADT EnumeratedRoleType)
+roleIdentification2rangeADT roleIdentification = unsafePartial domain2roleType <<< range <$> compileStep
+  (CDOM (ST (roleIdentification2Context roleIdentification)))
+  (roleIdentification2Step roleIdentification)
 
 roleIdentification2Step :: RoleIdentification -> Step
 roleIdentification2Step (ExplicitRole ctxt (ENR (EnumeratedRoleType rt)) pos) = Simple $ ArcIdentifier pos rt

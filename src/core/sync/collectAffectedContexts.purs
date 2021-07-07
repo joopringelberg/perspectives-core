@@ -329,8 +329,6 @@ aisInRoleDelta (RoleBindingDelta dr@{id:binder, binding, oldBinding, deltaType})
       -- so we execute them on any binding that is a specialisation of (or equal to) the required binding type.
       binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder binderType
       (for binderCalculations
-        -- TODO.
-        -- If iq has the selfOnly modifier, we must apply a new algorithm to the binder and the binding.
         (\iq -> if isForSelfOnly iq
           then handleSelfOnlyQuery iq binder bnd
           else (handleBackwardQuery binder iq) >>= runForwardsComputation bnd iq)) >>= pure <<< join

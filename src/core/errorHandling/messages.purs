@@ -63,7 +63,7 @@ data PerspectivesError
     | RoleMissingInContext ArcPosition String String
     | UnknownContext ArcPosition String
     | UnknownRole ArcPosition String
-    | UnknownProperty ArcPosition String EnumeratedRoleType
+    | UnknownProperty ArcPosition String String
     | UnknownView ArcPosition String
     | NotUniquelyIdentifying ArcPosition String (Array String)
     | UnknownElementaryQueryStep
@@ -125,7 +125,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotWellFormedName pos name) = "(NotWellFormedName) The name '" <> name <> "' is not well-formed (it cannot be expanded to a fully qualified name): " <> show pos
   show (RoleMissingInContext pos localRoleName ctxt) = "(RoleMissingInContext) The local role name '" <> localRoleName <> "' cannot be found in the context: '" <> ctxt <> "', at: " <> show pos
   show (UnknownRole pos qname) = "(UnknownRole) The role '" <> qname <> "' is not defined, at: " <> show pos
-  show (UnknownProperty pos qname roleType) = "(UnknownProperty) The property '" <> qname <> "' is not defined for role '" <> show roleType <> "', at: " <> show pos
+  show (UnknownProperty pos qname roleType) = "(UnknownProperty) The property '" <> qname <> "' is not defined for role '" <> roleType <> "', at: " <> show pos
   show (UnknownContext pos qname) = "(UnknownContext) The context '" <> qname <> "' is not defined, at: " <> show pos
   show (UnknownView pos qname) = "(UnknownView) The view '" <> qname <> "' is not defined, at: " <> show pos
   show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos
