@@ -97,7 +97,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
   mapBelowThisLevel <- pure (filterKeys (isNothing <<< (flip elemIndex) propertiesOnThisLevel) statesPerProperty)
   bindingCarriesProperty <- (lift2 $ addBindingStep b qWithAkink) >>= \qwk -> setInvertedQueriesForUserAndRole users b mapBelowThisLevel false qwk selfOnly
   -- After processing the binding telescope:
-  if (bindingCarriesProperty || length propertiesOnThisLevel > 0) && not perspectiveOnThisRole
+  if (bindingCarriesProperty || length propertiesOnThisLevel > 0)
     -- Now set an inverted query on this level of the telescope, for all states for
     -- properties on this level and below.
     -- That will be just all states in the map.
