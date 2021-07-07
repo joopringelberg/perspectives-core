@@ -48,7 +48,7 @@ domain SimpleChat
       aspect sys:Invitation$Invitee
       aspect cht:WithText$TextWriter
       perspective on extern
-        props (Consult)
+        verbs (Consult)
       perspective on Initiator
         defaults
       perspective on Partner
