@@ -95,7 +95,8 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
   -- recursive call, where we just pass the submap with properties that do not reside
   -- on this level, and the states in that map.
   mapBelowThisLevel <- pure (filterKeys (isNothing <<< (flip elemIndex) propertiesOnThisLevel) statesPerProperty)
-  bindingCarriesProperty <- (lift2 $ addBindingStep b qWithAkink) >>= \qwk -> setInvertedQueriesForUserAndRole users b mapBelowThisLevel false qwk selfOnly
+  queryWithBindingStep <- lift2 $ addBindingStep b qWithAkink
+  bindingCarriesProperty <- setInvertedQueriesForUserAndRole users b mapBelowThisLevel false queryWithBindingStep selfOnly
   -- After processing the binding telescope:
   if (bindingCarriesProperty || length propertiesOnThisLevel > 0)
     -- Now set an inverted query on this level of the telescope, for all states for
@@ -105,7 +106,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
     -- Do it when a property resides on the telescope below the current level.
     -- Do it when a property resides on the current level.
     then do
-      addToOnRoleDeltaBinder qWithAkink role (nub $ concat $ fromFoldable $ values statesPerProperty)
+      addToOnRoleDeltaBinder queryWithBindingStep role (nub $ concat $ fromFoldable $ values statesPerProperty)
       pure true
     else pure false
 
