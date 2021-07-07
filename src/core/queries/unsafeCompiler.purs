@@ -563,18 +563,14 @@ getDynamicPropertyGetter p adt = do
   allProps <- allLocallyRepresentedProperties adt
   if (isJust $ elemIndex pt allProps)
     then getterFromPropertyType pt
-    else pure f
+    else pure (binding >=> f)
 
   where
     f :: (RoleInstance ~~> Value)
-    f roleInstance = do
-      bnd <- lift $ lift $ binding_ roleInstance
-      case bnd of
-        Nothing -> empty
-        Just bnd' -> do
-          (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd'
-          getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)
-          getter bnd'
+    f bnd = do
+      (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd
+      getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)
+      getter bnd
 
 -- | From a string that represents part of the name of either a Calculated or an Enumerated property,
 -- | for a given abstract datatype of roles, retrieve the values from a role instance.
