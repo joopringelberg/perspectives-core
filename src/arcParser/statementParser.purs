@@ -44,7 +44,7 @@ assignment = isPropertyAssignment >>= if _
 
 roleAssignment :: IP Assignment
 roleAssignment = do
-  keyword <- lookAhead reservedIdentifier <?> "Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, or callEffect"
+  keyword <- lookAhead reservedIdentifier <?> "Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, createContext, createContext_ or callEffect"
   case keyword of
     "remove" -> removal
     "createRole" -> roleCreation
@@ -55,6 +55,8 @@ roleAssignment = do
     "unbind_" -> unbind_
     "delete" -> roleDeletion
     "callEffect" -> callEffect
+    "createContext" -> createContext
+    "createContext_" -> createContext_
     s -> fail ("Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, or callEffect but found '" <> s <> "'.")
 
 removal :: IP Assignment
@@ -86,7 +88,7 @@ createContext = do
 createContext_ :: IP Assignment
 createContext_ = do
   start <- getPosition
-  contextTypeIdentifier <- reserved "createContext" *> arcIdentifier
+  contextTypeIdentifier <- reserved "createContext_" *> arcIdentifier
   roleExpression <- reserved "bound" *> reserved "to" *> step
   end <- getPosition
   pure $ CreateContext_ {start, end, contextTypeIdentifier, roleExpression}

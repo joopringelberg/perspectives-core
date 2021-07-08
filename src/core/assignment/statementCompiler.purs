@@ -30,18 +30,18 @@ import Control.Monad.Except (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, filterA, foldM, head, length, null, reverse, uncons)
 import Data.Char.Unicode (toLower)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
-import Foreign.Object (Object, values)
+import Foreign.Object (Object, keys, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###>), (###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
+import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame)
@@ -60,8 +60,8 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedContextType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=))
+import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
+import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=), (<<<), (>))
 
 -- The user RoleType is necessary for setting inverted queries.
 -- The domain should be a CDOM.
@@ -135,14 +135,13 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
 
       CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
-        qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
+        qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
         pure $ UQD currentDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte currentDomain True True
 
       CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
-        cte <- pure $ (SQD qualificationDomain (QF.DataTypeGetter QF.IdentityF) qualificationDomain True True)
         roleQfd <- ensureRole subjects roleExpression
-        qualifiedContextTypeIdentifier <- qualifyContextTypeWithRespectTo contextTypeIdentifier cte start end
+        qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
         pure $ UQD currentDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd currentDomain True True
 
       Move {roleExpression, contextExpression} -> do
@@ -278,16 +277,16 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
             Just (CR ct') -> throwError $ CannotCreateCalculatedRole ct' start end
             otherwise -> throwError $ ContextHasNoRole ct roleIdentifier
 
-        qualifyContextTypeWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree ContextType
-        qualifyContextTypeWithRespectTo contextIdentifier contextFunctionDescription start end = do
-          (ct :: ADT ContextType) <- case range contextFunctionDescription of
-            (CDOM ct') -> pure ct'
-            otherwise -> throwError $ NotAContextDomain contextFunctionDescription otherwise start end
-          mrt <- lift2 (ct ###> lookForUnqualifiedContextType contextIdentifier)
-          case mrt of
-            Just ctype -> pure ctype
-            -- TODO specialiseer de foutmelding!
-            otherwise -> throwError $ CannotFindContextType start end contextIdentifier
+        -- Either the identifier is qualified, or we qualify it with respect to the model.
+        qualifyContextType :: String -> ArcPosition -> ArcPosition -> PhaseThree ContextType
+        qualifyContextType contextIdentifier start end = if isQualifiedWithDomein contextIdentifier
+          then pure $ ContextType contextIdentifier
+          else do
+            ctxts <- getsDF (keys <<< _.contexts)
+            case filter (areLastSegmentsOf contextIdentifier) ctxts of
+              toomany | length toomany > 1 -> throwError $ NotUniquelyIdentifying start contextIdentifier toomany
+              justone | length justone == 1 -> pure $ ContextType $ unsafePartial fromJust $ head justone
+              none -> throwError $ CannotFindContextType start end contextIdentifier
 
         qualifyPropertyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedPropertyType
         qualifyPropertyWithRespectTo propertyIdentifier roleQfdunctionDescription start end = do

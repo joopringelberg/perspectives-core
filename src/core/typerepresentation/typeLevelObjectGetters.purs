@@ -103,8 +103,8 @@ lookForRoleOfADT criterium rname adt =  ArrayT (allRoles adt >>= pure <<< filter
 ----------------------------------------------------------------------------------------
 -- | Returns all qualified context types whose names end with the given input.
 -- | Candidates are retrieved from the nested contexts of the given ADT ContextType, closed under Aspect.
-lookForUnqualifiedContextType :: String -> ADT ContextType ~~~> ContextType
-lookForUnqualifiedContextType s c = ArrayT (allContextTypes c >>= pure <<< filter ((areLastSegmentsOf s) <<< unwrap))
+lookForUnqualifiedSubContextType :: String -> ADT ContextType ~~~> ContextType
+lookForUnqualifiedSubContextType s c = ArrayT (allContextTypes c >>= pure <<< filter ((areLastSegmentsOf s) <<< unwrap))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON CONTEXT TYPE
