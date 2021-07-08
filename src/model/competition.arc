@@ -29,11 +29,17 @@ domain Competition
     context Competitions (relational) filledBy Competition
 
   case Competition
+    state NotBound = not exists extern >> binder Competitions
+      on entry
+        do for Captains
+          bind extern to Competitions in com:TheCompetition
     external
       property Name (String)
-    -- The Manager can manage the Competition. Each system user is manager in his own Competition!
-    -- The manager role is constructed in the .crl file.
-    user Manager = com:CompetitionManager
+    -- The Manager can manage the Competition. But the end user cannot be the Manager of a competition
+    -- if he is also a Captain in a Team. This is a weak way of ensuring that one cannot manage a competition
+    -- created by another.
+    user Manager = filter com:CompetitionManager with not exists currentcontext >> Captains
+    -- if not exists Captains then com:CompetitionManager
       perspective on SubCompetitions
         defaults
       perspective on Captains
@@ -50,6 +56,8 @@ domain Competition
         selfonly
       perspective on Manager
         props (Achternaam) verbs (Consult)
+      perspective on extern
+        props (Name) verbs (Consult)
 
   case SubCompetition
     external

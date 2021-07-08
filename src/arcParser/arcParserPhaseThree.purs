@@ -46,7 +46,6 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions, values, union)
 import Foreign.Object (fromFoldable) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextRoleParser (localPropertyName)
 import Perspectives.CoreTypes ((###=), MP)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
@@ -81,10 +80,10 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (State(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
-import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<#>), (<$>), (<*), (<<<), (==), (>=>), (>>=))
+import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<#>), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>))
 
 phaseThree :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} postponedParts = do
@@ -317,8 +316,11 @@ handlePostponedStateQualifiedParts = do
 
     -- | Qualifies incomplete names and changes RoleType constructor to CalculatedRoleType if necessary.
     collectRoles :: RoleIdentification -> PhaseThree (Array RoleType)
-    collectRoles (ExplicitRole _ rt pos) = do
-      r <- (\a -> [a]) <$> qualifyLocalRoleName pos (roletype2string rt)
+    collectRoles (ExplicitRole ctxt rt pos) = do
+      maximallyQualifiedName <- if isQualifiedWithDomein (roletype2string rt)
+        then pure (roletype2string rt)
+        else pure ((unwrap ctxt) <> "$" <> (roletype2string rt))
+      r <- (\a -> [a]) <$> qualifyLocalRoleName pos maximallyQualifiedName
       pure r
     collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd ->
       case range qfd of
