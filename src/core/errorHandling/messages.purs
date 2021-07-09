@@ -79,7 +79,7 @@ data PerspectivesError
     | IncompatibleComposition ArcPosition Range Domain
     | TypesCannotBeCompared ArcPosition Range Range
     | NotABoolean ArcPosition
-    | WrongTypeForOperator ArcPosition (Array RAN.Range)
+    | WrongTypeForOperator ArcPosition (Array RAN.Range) Domain
     | MissingValueForAssignment ArcPosition ArcPosition
     | ArgumentMustBeSequenceFunction ArcPosition
     | UnknownVariable ArcPosition String
@@ -146,7 +146,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (IncompatibleComposition pos left right) = "(IncompatibleComposition) The result of the left operand (" <> show left <> ") and the argument of the right operand (" <> show right <> ") are incompatible."
   show (TypesCannotBeCompared pos left right) = "(TypesCannotBeCompared) The result of the left operand (" <> show left <> ") and of the right operand (" <> show right <> ") are incompatible in: " <> show pos
   show (NotABoolean pos) = "(NotABoolean) The expression starting at " <> show pos <> " does not result in a boolean value."
-  show (WrongTypeForOperator pos allowedOps) = "(WrongTypeForOperator) This operator requires its arguments to be (one of): " <> show allowedOps
+  show (WrongTypeForOperator pos allowedOps dom) = "(WrongTypeForOperator) This operator requires its arguments to be (one of): " <> show allowedOps <> ", but was given: " <> show dom <> ", at position " <> show pos
   show (MissingValueForAssignment start end) = "(MissingValueForAssignment) This assignment statement needs a value expression on the right: from " <> show start <> " to " <> show end
   show (ArgumentMustBeSequenceFunction pos) = "(ArgumentMustBeSequenceFunction) The right operand of '>>=' must be a monoidal function such as sum, product, minimum, or maximum, at: " <> show pos
   show (UnknownVariable pos varName) = "(UnknownVariable) The variable '" <> varName <> "' is not known at position: " <> show pos

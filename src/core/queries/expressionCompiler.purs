@@ -518,33 +518,36 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         -- >>= is parsed as the operator Sequence.
         -- "sum", "product", "minimum", "maximum" and "count" are parsed as SequenceFunction
         -- step >>= f is parsed as the BinaryStep we're dealing here with now.
-        Sequence pos -> case f2 of
-          -- f2 results from the expression that follows `>>=` (must have been: "sum", "product", etc.).
-          -- This was parsed as `SequenceFunction f` and is now compiled as `UnaryCombinator f` in an SQD.
-          -- Notice by the domain and range that we assume functions that are Monoids.
-          -- Notice the strangeness of compiling a binary expression into an SQD description.
-          SQD dom (QF.UnaryCombinator fname) _ _ _-> case fname of
-            -- we can count anything and the result is a number.
-            CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) (VDOM PNumber Nothing) True True
-            -- We have interpretations of AddF, SubtractF for numbers and strings only.
-            -- For MinimumF and MaximumF we have interpretations for numbers and strings and booleans and dates.
-            -- For AndF and OrF we have an interpretation for Booleans only.
-            -- We also require that the VDOM should have an EnumeratedPropertyType.
-            AddF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-            SubtractF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-            MinimumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-            MaximumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-            AndF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-            OrF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+        Sequence pos -> do
+          -- We must compile right again, because in a >>= construction, what is produced on the left is offered to the right.
+          f2' <- compileStep (range f1) right
+          case f2' of
+            -- f2 results from the expression that follows `>>=` (must have been: "sum", "product", etc.).
+            -- This was parsed as `SequenceFunction f` and is now compiled as `UnaryCombinator f` in an SQD.
+            -- Notice by the domain and range that we assume functions that are Monoids.
+            -- Notice the strangeness of compiling a binary expression into an SQD description.
+            SQD dom (QF.UnaryCombinator fname) _ _ _-> case fname of
+              -- we can count anything and the result is a number.
+              CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) (VDOM PNumber Nothing) True True
+              -- We have interpretations of AddF, SubtractF for numbers and strings only.
+              -- For MinimumF and MaximumF we have interpretations for numbers and strings and booleans and dates.
+              -- For AndF and OrF we have an interpretation for Booleans only.
+              -- We also require that the VDOM should have an EnumeratedPropertyType.
+              AddF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+              SubtractF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+              MinimumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+              MaximumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+              AndF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+              OrF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+              _ -> throwError $ ArgumentMustBeSequenceFunction pos
             _ -> throwError $ ArgumentMustBeSequenceFunction pos
-          _ -> throwError $ ArgumentMustBeSequenceFunction pos
 
   where
     ensureDomainIsRange :: Domain -> Array Range -> ArcPosition -> FD -> FD
-    ensureDomainIsRange (VDOM r p) allowedRangeConstructors pos fd = if (isJust $ elemIndex r allowedRangeConstructors) && (isJust p)
+    ensureDomainIsRange d@(VDOM r p) allowedRangeConstructors pos fd = if (isJust $ elemIndex r allowedRangeConstructors) && (isJust p)
       then fd
-      else throwError $ WrongTypeForOperator pos allowedRangeConstructors
-    ensureDomainIsRange _ allowedRangeConstructors pos _ = throwError $ WrongTypeForOperator pos allowedRangeConstructors
+      else throwError $ WrongTypeForOperator pos allowedRangeConstructors d
+    ensureDomainIsRange d allowedRangeConstructors pos _ = throwError $ WrongTypeForOperator pos allowedRangeConstructors d
 
     comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> FunctionName -> PhaseThree QueryFunctionDescription
     comparison pos left' right' functionName = do
@@ -557,10 +560,10 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
       -- Both ranges must be equal, both sides must be functional.
-      (VDOM rc1 _), (VDOM rc2 _) | rc1 == rc2 ->
+      d1@(VDOM rc1 _), (VDOM rc2 _) | rc1 == rc2 ->
         if  allowed rc1 && allowed rc2  && (pessimistic $ functional left') && (pessimistic $ functional right')
           then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
-          else throwError $ WrongTypeForOperator pos allowedRangeConstructors
+          else throwError $ WrongTypeForOperator pos allowedRangeConstructors d1
       l, r -> throwError $ TypesCannotBeCompared pos l r
       where
         allowed :: Range -> Boolean

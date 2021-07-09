@@ -364,7 +364,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
   makeTest "compileBinaryStep: make a binary operation with `and` on Number."
     "domain Test\n  thing Role1 (mandatory)\n    property Prop1 (mandatory, Number)\n    property Prop2 (mandatory, Number)\n    property Prop3 = Prop1 and Prop2\n    \n"
     (\e -> case e of
-      (WrongTypeForOperator _ _) -> pure unit
+      (WrongTypeForOperator _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)
 
