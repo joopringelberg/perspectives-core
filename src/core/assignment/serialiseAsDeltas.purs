@@ -48,16 +48,14 @@ import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
-import Perspectives.Query.QueryTypes (domain2roleType, range)
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
-import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (perspectivesClosure_)
+import Perspectives.Types.ObjectGetters (perspectivesClosure_, propertiesInPerspective)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -115,19 +113,13 @@ serialisedAsDeltasFor_ cid userId userType =
 -- | Add Deltas to the transaction for the given users, to provide them with a complete
 -- | account of the perspective on the context instance.
 serialisePerspectiveForUser :: ContextInstance -> Array RoleInstance -> Perspective -> MonadPerspectivesTransaction Unit
-serialisePerspectiveForUser cid users (Perspective{object}) = do
+serialisePerspectiveForUser cid users p@(Perspective{object, propertyVerbs}) = do
   -- All instances of this RoleType the user may see in this context.
   (rinstances :: Array (DependencyPath)) <- liftToMPT ((singletonPath (C cid)) ##= interpret object)
   -- Serialise all the dependencies.
   for_ (join (allPaths <$> rinstances)) (foldM (serialiseDependency users) Nothing)
   -- All PropertyTypes on this RoleType the user may see.
-  -- TODO. Hier worden ALLE property typen meegenomen; maar we zouden alleen
-  -- de properties van het perspectief mogen gebruiken!
-  (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ allProperties (unsafePartial domain2roleType $ range object)
-  -- (rProps :: RelevantProperties) <- liftToMPT $ propsForObjectRole rt userType
-  -- (visiblePropertyTypes :: Array PropertyType) <- case rProps of
-  --   All -> liftToMPT (getRole rt >>= adtOfRole >>= allProperties)
-  --   Properties props -> pure props
+  (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ propertiesInPerspective p
   -- Compute all values and serialise the dependencies.
   for_ visiblePropertyTypes
     \pt -> do

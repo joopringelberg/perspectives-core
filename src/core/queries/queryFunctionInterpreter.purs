@@ -41,25 +41,24 @@ import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available', not')
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, getUnlinkedRoleInstances, roleModelName, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, getUnlinkedRoleInstances, roleModelName, roleType)
 import Perspectives.Instances.Values (bool2Value, value2Date, value2Int)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (lookup, mapNumericOperator, orderFunction, performNumericOperation')
-import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (calculation) as PC
 import Perspectives.Representation.Class.Property (getProperType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, calculation)
+import Perspectives.Representation.Class.Role (calculation)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', enumeratedRolePropertyTypes_, roleTypeModelName', specialisesRoleType)
 import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -330,7 +329,8 @@ interpret qfd a = case a.head of
     -- RoleInstance
     -----------------------------------------------------------
     dep@(R rid) -> case qfd of
-      (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) -> getDynamicPropertyGetter pt roleAdt rid >>= \(leadingDependencies :: DependencyPath) -> do
+      -- TODO. We moeten hier niet de ADT van het domein nemen. We passen immers toe op de dependency. We moeten dus een ADT opstellen voor de dependency!
+      (SQD _ (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) -> getDynamicPropertyGetter pt rid >>= \(leadingDependencies :: DependencyPath) -> do
         -- the leadingDependencies end with (R rid). Append the mainPath of a to the mainPath of leadingDependencies
         -- and add all supportingPaths of a to those of leadingDependencies.
         pure $ a #>> leadingDependencies
@@ -387,10 +387,11 @@ toString {head} = case head of
 -- | From a string that represents either a Calculated or an Enumerated property,
 -- | for a given abstract datatype of roles, retrieve the values from a role instance.
 -- | Returns a DependencyPath with (R roleId) as the last dependency in the mainPath, (V "SomeProperty" "value") as its head.
-getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> RoleInstance ~~> DependencyPath
-getDynamicPropertyGetter p adt rid = do
+getDynamicPropertyGetter :: String -> RoleInstance ~~> DependencyPath
+getDynamicPropertyGetter p rid = do
+  rt <- roleType rid
   (pt :: PropertyType) <- lift2MPQ $ getProperType p
-  allProps <- lift2MPQ $ allLocallyRepresentedProperties adt
+  allProps <- lift2MPQ $ enumeratedRolePropertyTypes_ rt
   if (isJust $ elemIndex pt allProps)
     then getterFromPropertyType pt rid
     else f rid
@@ -401,9 +402,7 @@ getDynamicPropertyGetter p adt rid = do
       (bnd :: Maybe RoleInstance) <- lift2MPQ $ binding_ roleInstance
       case bnd of
         Nothing -> empty
-        Just bnd' -> do
-          (bndType :: EnumeratedRoleType) <- lift2MPQ $ roleType_ bnd'
-          (flip snocOnMainPath (R roleInstance)) <$> getDynamicPropertyGetter p (ST bndType) bnd'
+        Just bnd' -> (flip snocOnMainPath (R roleInstance)) <$> getDynamicPropertyGetter p bnd'
 
 -- | From a PropertyType, retrieve or construct a function to get values for that Property from a Role instance.
 -- | Returns a List with (R roleId) as its last dependency, (V "SomeProperty" "value") as its first dependency.

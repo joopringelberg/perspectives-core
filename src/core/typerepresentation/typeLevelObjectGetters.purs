@@ -52,7 +52,7 @@ import Perspectives.Representation.Class.Context (contextRole, roleInContext, us
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
 import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty)
@@ -73,6 +73,9 @@ roleRootState = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MonadPersp
 -- | The transitive closure over Aspects of roleRootState.
 roleRootStates :: EnumeratedRoleType ~~~> StateIdentifier
 roleRootStates = roleAspectsClosure >=> roleRootState
+
+enumeratedRolePropertyTypes_ :: EnumeratedRoleType -> MonadPerspectives (Array PropertyType)
+enumeratedRolePropertyTypes_ = getEnumeratedRole >=> \(EnumeratedRole{properties}) -> pure properties
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -171,7 +174,7 @@ subStates_ :: StateIdentifier -> MonadPerspectives (Array StateIdentifier)
 subStates_ = tryGetState >=> pure <<< (maybe [] _.subStates <<< map unwrap)
 
 ----------------------------------------------------------------------------------------
-------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S
+------- FUNCTIONS TO FIND A PROPERTYTYPE WORKING FROM STRINGS OR ADT'S
 ----------------------------------------------------------------------------------------
 -- | Look for a Property on a given EnumeratedRoleType (including its own aspects - not
 -- | recursively - and its own binding - not recursively), using a criterium.
@@ -496,7 +499,7 @@ statesPerProperty (Perspective{propertyVerbs, object}) = foldWithIndexM f Map.em
       Array PropertyVerbs ->
       MonadPerspectives (Map.Map PropertyType (Array StateIdentifier))
     f stateId cum pvArr = do
-      (r1 :: Array (Array PropertyType)) <- traverse propertyVerbs2PropertyArray pvArr
+      (r1 :: Array (Array PropertyType)) <- traverse (propertyVerbs2PropertyArray object) pvArr
       pure $ foldr (\prop cum' ->
         case Map.lookup prop cum' of
           Nothing -> Map.insert prop [stateId] cum'
@@ -504,11 +507,20 @@ statesPerProperty (Perspective{propertyVerbs, object}) = foldWithIndexM f Map.em
         cum
         (concat r1)
 
-    propertyVerbs2PropertyArray :: PropertyVerbs -> MonadPerspectives (Array PropertyType)
-    propertyVerbs2PropertyArray (PropertyVerbs pset _) = case pset of
-      Universal -> allProperties (unsafePartial roleRange object)
-      Empty -> pure []
-      PSet props -> pure props
+propertiesInPerspective :: Perspective -> MonadPerspectives (Array PropertyType)
+propertiesInPerspective (Perspective{propertyVerbs, object}) = foldWithIndexM f [] (unwrap propertyVerbs)
+  where
+    f :: StateIdentifier ->
+      Array PropertyType ->
+      Array PropertyVerbs ->
+      MonadPerspectives (Array PropertyType)
+    f stateId cum pvArr = concat <$> traverse (propertyVerbs2PropertyArray object) pvArr
+
+propertyVerbs2PropertyArray :: QueryFunctionDescription -> PropertyVerbs -> MonadPerspectives (Array PropertyType)
+propertyVerbs2PropertyArray object (PropertyVerbs pset _) = case pset of
+  Universal -> allProperties (unsafePartial roleRange object)
+  Empty -> pure []
+  PSet props -> pure props
 
 roleStates :: Perspective -> Array StateIdentifier
 roleStates (Perspective {roleVerbs}) = fromFoldable $ Map.keys (unwrap roleVerbs)
