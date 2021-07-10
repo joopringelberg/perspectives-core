@@ -742,21 +742,29 @@ createMissingRootStates = do
 -- | automatic action or notification.
 compileStateQueries :: PhaseThree Unit
 compileStateQueries = do
-  df@{states} <- lift $ State.gets _.dfr
-  states' <- for states ensureStateQueryCompiled
-  modifyDF \dfr -> dfr { states = states' }
+  df@{_id} <- lift $ State.gets _.dfr
+  -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (compileStateQueries' df)
   where
-    ensureStateQueryCompiled :: State -> PhaseThree State
-    ensureStateQueryCompiled s@(State sr@{id, query, stateFulObject}) = case query of
-      Q _ -> pure s
-      S stp -> do
-        compiledQuery <- do
-          expressionWithEnvironment <- addContextualVariablesToExpression
-            stp
-            Nothing
-            (stateFulObject2StateKind stateFulObject)
-          Q <$> compileAndDistributeStep (stateFulObject2Domain stateFulObject) expressionWithEnvironment [] [id]
-        pure $ State sr { query = compiledQuery }
+    compileStateQueries' :: DomeinFileRecord -> PhaseThree Unit
+    compileStateQueries' df@{states} = do
+      states' <- for states ensureStateQueryCompiled
+      modifyDF \dfr -> dfr { states = states' }
+      where
+        ensureStateQueryCompiled :: State -> PhaseThree State
+        ensureStateQueryCompiled s@(State sr@{id, query, stateFulObject}) = case query of
+          Q _ -> pure s
+          S stp -> do
+            compiledQuery <- do
+              expressionWithEnvironment <- addContextualVariablesToExpression
+                stp
+                Nothing
+                (stateFulObject2StateKind stateFulObject)
+              Q <$> compileAndDistributeStep (stateFulObject2Domain stateFulObject) expressionWithEnvironment [] [id]
+            pure $ State sr { query = compiledQuery }
 
 registerStates :: PhaseThree Unit
 registerStates = do
