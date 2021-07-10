@@ -517,9 +517,9 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 
         -- >>= is parsed as the operator Sequence.
         -- "sum", "product", "minimum", "maximum" and "count" are parsed as SequenceFunction
-        -- step >>= f is parsed as the BinaryStep we're dealing here with now.
+        -- step >>= f is parsed as the BinaryStep we're dealing here with now, where `step` is the left and `f` the right operand.
         Sequence pos -> do
-          -- We must compile right again, because in a >>= construction, what is produced on the left is offered to the right.
+          -- We must compile right again, because in a >>= construction, what is produced on the left is offered to the right as domain, whereas above we compiled the right step with the same domain as the left step.
           f2' <- compileStep (range f1) right
           case f2' of
             -- f2 results from the expression that follows `>>=` (must have been: "sum", "product", etc.).
@@ -528,17 +528,17 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
             -- Notice the strangeness of compiling a binary expression into an SQD description.
             SQD dom (QF.UnaryCombinator fname) _ _ _-> case fname of
               -- we can count anything and the result is a number.
-              CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) (VDOM PNumber Nothing) True True
+              CountF -> pure $ SQD dom (QF.DataTypeGetter fname) (VDOM PNumber Nothing) True True
               -- We have interpretations of AddF, SubtractF for numbers and strings only.
               -- For MinimumF and MaximumF we have interpretations for numbers and strings and booleans and dates.
               -- For AndF and OrF we have an interpretation for Booleans only.
               -- We also require that the VDOM should have an EnumeratedPropertyType.
-              AddF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+              AddF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
               SubtractF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-              MinimumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-              MaximumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-              AndF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-              OrF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+              MinimumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
+              MaximumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
+              AndF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
+              OrF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
               _ -> throwError $ ArgumentMustBeSequenceFunction pos
             _ -> throwError $ ArgumentMustBeSequenceFunction pos
 
