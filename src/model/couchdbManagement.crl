@@ -1,0 +1,15 @@
+UserData
+
+import model:System as sys
+import model:CouchdbManagement as cm
+
+cm:Model usr:CouchdbManagementModel
+  extern sys:RootContext$External$Name = "Couchdb management"
+  extern sys:Model$External$Description = "Manage a Couchdb server with accounts and repositories."
+  extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:CouchdbManagement"
+  extern sys:Model$External$ModelIdentification = "model:CouchdbManagement"
+  sys:Model$IndexedContext =>
+    cm:CouchdbManagementApp cm:MyCouchdbApp
+      extern sys:RootContext$External$Name = "Couchdb management"
+      $Manager -> sys:Me
+    sys:Model$IndexedContext$Name = "CouchdbManagement$MyCouchdbApp"

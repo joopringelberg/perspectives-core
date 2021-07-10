@@ -132,6 +132,9 @@ pendingInvitations _ = ArrayT do
   -- tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)]
   (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/pendingInvitations" (Nothing :: Maybe Unit)
 
+updateModel :: Array RoleInstance -> MonadPerspectivesTransaction Unit
+updateModel arrWithVersion = pure unit
+
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
 -- | Load the dependencies first.
 -- | Load the acompanying instances, too.
@@ -399,4 +402,5 @@ externalFunctions =
   , Tuple "model:Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
   , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
   , Tuple "model:Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
+  , Tuple "model:Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 0}
 ]
