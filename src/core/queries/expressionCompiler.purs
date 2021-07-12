@@ -61,7 +61,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
-import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
+import Perspectives.Representation.Class.Role (adtIsFunctional, binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
@@ -412,7 +412,11 @@ compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
         otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
   pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateRoleF (unwrap qroleType)) (RDOM (ST qroleType)) True True
 
-compileSimpleStep currentDomain (Identity _) = pure $ SQD currentDomain (QF.DataTypeGetter IdentityF) currentDomain Unknown True
+compileSimpleStep currentDomain (Identity _) = do
+  isFunctional <- case currentDomain of
+    RDOM r -> (lift $ lift $ adtIsFunctional r) >>= if _ then pure True else pure False
+    _ -> pure Unknown
+  pure $ SQD currentDomain (QF.DataTypeGetter IdentityF) currentDomain isFunctional True
 
 compileSimpleStep currentDomain s@(Modelname _) = case currentDomain of
   VDOM _ Nothing -> throwError $ NoPropertyTypeWithValue (startOf (Simple s)) (endOf (Simple s))

@@ -24,7 +24,8 @@ module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, (<|>))
-import Data.Array (cons, null, (:))
+import Data.Array (cons, foldMap, null, (:))
+import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
 import Data.Traversable (traverse)
@@ -157,6 +158,18 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
 -----------------------------------------------------------
 -- FUNCTIONS OF ADT
 -----------------------------------------------------------
+-- | Note that this function cannot be implemented using `reduce`, as we treat SUM's and PROD's
+-- | both with logical and.
+adtIsFunctional :: ADT EnumeratedRoleType -> MP Boolean
+adtIsFunctional (ST r) = getEnumeratedRole r >>= \(EnumeratedRole{functional}) -> pure functional
+adtIsFunctional (SUM adts) = do
+    (bools :: Array Boolean) <- traverse adtIsFunctional adts
+    pure $ unwrap $ foldMap Conj bools
+adtIsFunctional (PROD adts) = do
+    (bools :: Array Boolean) <- traverse adtIsFunctional adts
+    pure $ unwrap $ foldMap Conj bools
+adtIsFunctional EMPTY = pure false
+adtIsFunctional UNIVERSAL = pure false
 
 --------------------------------------------------------------------------------------------------
 ---- PROPERTYSET
