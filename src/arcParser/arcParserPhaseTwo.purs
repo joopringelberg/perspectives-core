@@ -71,6 +71,7 @@ traverseDomain c ns = do
 -- | and insert it into a DomeinFileRecord.
 traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
 traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
+  -- TODO. Controleer op dubbele definities.
   context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
   withNamespaces
     contextParts
@@ -167,6 +168,7 @@ traverseRoleE r ns = if isCalculatedRole r
 
 traverseEnumeratedRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
+  -- TODO. Controleer op dubbele definities.
   role <- pure (defaultEnumeratedRole (ns <> "$" <> id) id kindOfRole ns pos)
   traverseEnumeratedRoleE_ role roleParts
 
@@ -283,7 +285,8 @@ traverseStateE :: StateFulObject -> StateE -> PhaseTwo State
 traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = do
   subStateIds <- for subStates (toStateIdentifier <<< \(StateE{id:id'}) -> id')
   stateId <- toStateIdentifier id
-  state <- pure $ constructState stateId (S condition) stateFulObect (ARR.fromFoldable subStateIds)
+  expandedCondition <- expandPrefix condition
+  state <- pure $ constructState stateId (S expandedCondition) stateFulObect (ARR.fromFoldable subStateIds)
   -- Postpone all stateParts because there may be forward references to user and subject.
   parts <- traverse expandPrefix stateParts
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
@@ -305,6 +308,7 @@ traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = d
 addStatesToDomeinFile :: Array State -> DomeinFileRecord -> DomeinFileRecord
 -- addStatesToDomeinFile state@(State{id}) dfr@{states} = dfr {states = insert (unwrap id) state states}
 addStatesToDomeinFile extraStates dfr@{states} = dfr { states =
+  -- TODO. Controleer op dubbele definities.
   states `union` (fromFoldable $ (\s@(State{id}) -> Tuple (unwrap id) s) <$> extraStates) }
 
 getState :: StateIdentifier -> PhaseTwo (Maybe State)
@@ -314,6 +318,7 @@ getState id = gets _.dfr >>= \{states} -> pure $ lookup (unwrap id) states
 -- DomeinFileRecord.
 traverseViewE :: ViewE -> Namespace -> PhaseTwo ViewType
 traverseViewE (ViewE {id, viewParts, pos}) ns = do
+  -- TODO. Controleer op dubbele definities.
   viewName <- pure (ns <> "$" <> id)
   (expandedPropertyReferences :: Array PropertyType) <- traverse qualifyProperty (ARR.fromFoldable viewParts)
   view <- pure $ VIEW.View
@@ -347,6 +352,7 @@ addRoleToDomeinFile (C r@(CalculatedRole{_id})) domeinFile = LN.over
 -- | Traverse a RoleE that results in an CalculatedRole.
 traverseCalculatedRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
+  -- TODO. Controleer op dubbele definities.
   role <- pure (defaultCalculatedRole (ns <> "$" <> id) id kindOfRole ns pos)
   role' <- traverseCalculatedRoleE_ role roleParts
   modifyDF (\domeinFile -> addRoleToDomeinFile role' domeinFile)
@@ -389,6 +395,7 @@ traversePropertyE r ns = if isCalculatedProperty r
 
 traverseEnumeratedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
 traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
+  -- TODO. Controleer op dubbele definities.
   property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns (case range of
     Nothing -> PString
     Just r -> r) pos
@@ -410,6 +417,7 @@ traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
 -- | Traverse a PropertyE that results in an CalculatedProperty.
 traverseCalculatedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
 traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
+  -- TODO. Controleer op dubbele definities.
   (CalculatedProperty property@{calculation}) <- pure $ defaultCalculatedProperty (ns <> "$" <> id) id ns pos
   calculation' <- case head propertyParts of
     -- TODO: fish out the actually parsed calculation and use that!
