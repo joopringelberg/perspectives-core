@@ -41,36 +41,45 @@ domain CouchdbManagement
               -- For the implementer: notice that this effect is called with
               -- a context role instance!
               callEffect cdb:UpdateModel()
+              PerformUpdate = false
           on exit
             do for LocalUser
               CurrentVersion = LastVersion
-              PerformUpdate = false
       property PerformUpdate (Boolean)
       property CurrentVersion (String)
 
+  -- TODO. Add a Guest who can request an Account.
+  -- This case should be in public space.
   case CouchdbServer
     external
       property Url (mandatory, String)
       property Name (mandatory, String)
 
+    -- This role should be in private space.
     user Admin filledBy sys:PerspectivesSystem$User
       perspective on Accounts
         defaults
       perspective on Repositories
         defaults
 
+    -- This role should be in private space.
     user Accounts filledBy sys:PerspectivesSystem$User
       perspective on Accounts
         defaults
         selfonly
-      perspective on Repositories
+      perspective on filter Repositories with IsPublic
         verbs (Consult)
 
+    -- This role should be in public space.
     context Repositories filledBy Repository
 
   -- This could be a public context (stored in publicly available space,
   -- albeit behind passwords).
   case Repository
+    state IAmNotAnAccount = not exists Accounts
+    external
+      -- Only public repositories will be visible to Accounts of CouchdbServers.
+      property IsPublic (mandatory, Boolean)
     user Admin filledBy CouchdbServer$Admin
       perspective on Accounts
         defaults
@@ -85,11 +94,35 @@ domain CouchdbManagement
     -- This allows us to create a screen to browse through Accounts without
     -- loading them all at once.
     user Accounts (unlinked) filledBy CouchdbServer$Accounts
-      perspective on AvailableModels
-        verbs (Consult)
+      property IsAccepted (Boolean)
+      property IsRejected (Boolean)
+      state Root = true
+        state Waiting = not IsRejected and not IsAccepted
+        state Rejected = IsRejected
+        state Accepted = IsAccepted
+          -- An account that is accepted has a perspective on available models.
+          perspective on AvailableModels
+            verbs (Consult)
+          perspective on Accounts
+            only (RemoveFiller)
+            verbs (Consult)
+            selfonly
+
+    -- Role Guest is available so a user with a Couchdb Account can request
+    -- a Repository account.
+    -- Because CouchdbServer$Accounts is selfonly, there will only ever be one
+    -- instance of Guest for any sys:Me.
+    user Guest = extern >> binder Repositories >> context >> Accounts
+      -- Guest can request an Account as long as he does not have one.
       perspective on Accounts
-        verbs (Consult)
-        selfonly
+        in state IAmNotAnAccount of context
+          only (Create, Fill)
+        in state Waiting of object
+          -- Guest can see he is not yet rejected, but not accepted either.
+          props (IsRejected) verbs (Consult)
+        in state Rejected of object
+          -- Guest can see his request for an account is rejected.
+          props (IsRejected) verbs (Consult)
 
     -- This role should be stored in private space.
     user Authors filledBy CouchdbServer$Accounts

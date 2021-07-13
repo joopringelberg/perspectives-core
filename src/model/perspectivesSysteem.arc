@@ -48,6 +48,7 @@ domain System
     context Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
 
     context Modellen = filter callExternal cdb:Models() returns sys:Model$External with not IsLibrary
+      view ModelPresentation (Description, Name)
 
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context IndexedContexts (relational) filledBy sys:RootContext
@@ -58,11 +59,19 @@ domain System
             remove object
 
     context ModelsInUse (relational) filledBy Model
-      state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
-        -- Create an entry in IndexedContexts if its model has been taken in use.
-        on entry
-          do for User
-            bind binding >> context >> IndexedContext >> binding to IndexedContexts
+      property PerformUpdate (Boolean)
+      state Root = true
+        state Update = PerformUpdate
+          on entry
+            do for User
+              callEffect cdb:UpdateModel()
+              PerformUpdate = false
+        state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
+          -- Create an entry in IndexedContexts if its model has been taken in use.
+          on entry
+            do for User
+              bind binding >> context >> IndexedContext >> binding to IndexedContexts
+      view ModelInUsePresentation (Description, Name, PerformUpdate)
 
     context PendingInvitations = callExternal cdb:PendingInvitations() returns sys:Invitation$External
 

@@ -280,7 +280,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   (Just (View{propertyReferences})) -> case elemIndex (ENP $ EnumeratedPropertyType "Datum") propertyReferences of
                     Nothing -> assert "There should be an unqualified PropertyType 'Datum' in 'model:MyTestDomain$Feest$ViewOpFeest'" true
                     (Just pr) -> do
-                      candidates <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) ((EnumeratedRoleType "model:MyTestDomain$Feest") ###= (lookForUnqualifiedPropertyType_ "Datum"))
+                      candidates <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) ((ENR $ EnumeratedRoleType "model:MyTestDomain$Feest") ###= (lookForUnqualifiedPropertyType_ "Datum"))
                       case head candidates of
                         Nothing -> assert "We should be able to find the qualified version of 'Datum'" false
                         (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum")))  | length candidates == 1 -> assert "" true
