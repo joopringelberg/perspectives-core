@@ -181,11 +181,11 @@ subStates_ = tryGetState >=> pure <<< (maybe [] _.subStates <<< map unwrap)
 lookForPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
 lookForPropertyType_ s i = (lift $ getRole (ENR i)) >>= lift <<< adtOfRoleAspectsBinding >>= lookForProperty (propertytype2string >>> ((==) s))
 
--- | Look for an unqualified Property on a given EnumeratedRoleType
+-- | Look for an unqualified Property on a given RoleType
 -- | (recursing on aspects and on the binding of Enumerated Roles), using a criterium.
-lookForUnqualifiedPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
-lookForUnqualifiedPropertyType_ s i = lookForProperty (propertytype2string >>> areLastSegmentsOf s) (ST i)
--- lookForUnqualifiedPropertyType_ s i = (lift $ getRole (ENR i)) >>= lift <<< adtOfRoleAspectsBinding >>= lookForProperty (propertytype2string >>> areLastSegmentsOf s)
+lookForUnqualifiedPropertyType_ :: String -> (RoleType ~~~> PropertyType)
+lookForUnqualifiedPropertyType_ s (ENR i) = lookForProperty (propertytype2string >>> areLastSegmentsOf s) (ST i)
+lookForUnqualifiedPropertyType_ s (CR i) = (lift $ getCalculatedRole i) >>= lift <<< roleADT >>= lookForProperty (propertytype2string >>> areLastSegmentsOf s)
 
 -- | Look for a Property on a given ADT, using a qualified name (recursing on aspects
 -- | and on the binding of Enumerated Roles).
@@ -327,18 +327,24 @@ localRoleSpecialisation localAspectName = COMB.filter allEnumeratedRoles (hasAsp
 propertiesOfView :: ViewType ~~~> PropertyType
 propertiesOfView = ArrayT <<< (getPerspectType >=> pure <<< propertyReferences)
 
-lookForUnqualifiedViewType_ :: String -> (EnumeratedRoleType ~~~> ViewType)
-lookForUnqualifiedViewType_ s i = (lift $ getRole (ENR i)) >>= lift <<< adtOfRoleAspectsBinding >>= lookForView (unwrap >>> areLastSegmentsOf s)
-
-lookForUnqualifiedViewType :: String -> (ADT EnumeratedRoleType ~~~> ViewType)
+lookForUnqualifiedViewType :: String -> (RoleType ~~~> ViewType)
 lookForUnqualifiedViewType s = lookForView (unwrap >>> areLastSegmentsOf s)
 
-lookForView :: (ViewType -> Boolean) -> ADT EnumeratedRoleType ~~~> ViewType
-lookForView criterium = COMB.filter' (ArrayT <<< allViews) criterium
+lookForView :: (ViewType -> Boolean) -> RoleType ~~~> ViewType
+lookForView criterium = COMB.filter' viewsOfRoleType criterium
 
 -- | If no view is specified, all properties can be accessed.
 hasProperty :: PropertyType -> ViewType ~~~> Boolean
 hasProperty p = lift <<< getView >=> pure <<< isJust <<< elemIndex p <<< propertyReferences
+
+-- | All views of either a CalculatedRole or an EnumeratedRole. This includes Views defined
+-- | locally on a CalculatedRole.
+viewsOfRoleType :: RoleType ~~~> ViewType
+viewsOfRoleType (ENR rt) = ArrayT (getEnumeratedRole rt >>= roleADT >>= allViews)
+viewsOfRoleType (CR rt) = ArrayT do
+  localViews <- getCalculatedRole rt >>= pure <<< _.views <<< unwrap
+  otherViews <- getCalculatedRole rt >>= roleADT >>= allViews
+  pure (localViews <> otherViews)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO QUALIFY ROLES AND CONTEXTS

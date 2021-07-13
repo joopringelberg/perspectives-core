@@ -225,8 +225,8 @@ qualifyPropertyReferences = do
           qprops <- traverse (qualifyProperty role pos) propertyReferences
           pure $ View $ vr {propertyReferences = qprops}
 
-        qualifyProperty :: EnumeratedRoleType -> ArcPosition -> PropertyType -> PhaseThree PropertyType
-        qualifyProperty erole pos propType = do
+        qualifyProperty :: RoleType -> ArcPosition -> PropertyType -> PhaseThree PropertyType
+        qualifyProperty rtype pos propType = do
           if isQualifiedWithDomein (propertytype2string propType)
             -- The modeller has provided a qualified property. He cannot say whether it is Calculated, or Enumerated,
             -- however. If it is Calculated, change now.
@@ -234,9 +234,9 @@ qualifyPropertyReferences = do
               then pure $ CP $ CalculatedPropertyType (propertytype2string propType)
               else pure propType
             else do
-              (candidates :: Array PropertyType) <- lift2 (erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
+              (candidates :: Array PropertyType) <- lift2 (rtype ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
               case head candidates of
-                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType) (unwrap erole)
+                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType) (roletype2string rtype)
                 (Just t) | length candidates == 1 -> pure t
                 otherwise -> throwError $ NotUniquelyIdentifying pos (propertytype2string propType) (map propertytype2string candidates)
 

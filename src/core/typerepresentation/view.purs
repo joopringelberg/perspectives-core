@@ -27,17 +27,17 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Couchdb.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, ViewType)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, ViewType)
 import Prelude (class Eq, class Ord, class Show, compare, (<<<), (==))
 
 -----------------------------------------------------------
 -- VIEW TYPE CLASS
 -----------------------------------------------------------
 class ViewClass r where
-  role :: r -> EnumeratedRoleType
+  role :: r -> RoleType
   propertyReferences :: r -> Array PropertyType
 
 instance calculatedPropertyViewClass :: ViewClass View where
@@ -56,7 +56,7 @@ type ViewRecord =
 
   -- TODO: maak er een NonEmpty Array van.
   , propertyReferences :: Array PropertyType
-  , role :: EnumeratedRoleType
+  , role :: RoleType
 
   , pos :: ArcPosition
   }

@@ -202,7 +202,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 
     -- VIEW
     handleParts roleName (EnumeratedRole roleUnderConstruction@{views}) (VE pe) = do
-      viewType <- traverseViewE pe roleName
+      viewType <- traverseViewE pe (ENR rn)
       pure (EnumeratedRole $ roleUnderConstruction {views = cons viewType views})
 
     -- FUNCTIONALATTRIBUTE
@@ -316,17 +316,17 @@ getState id = gets _.dfr >>= \{states} -> pure $ lookup (unwrap id) states
 
 -- Traverse the members of ViewE to construct a new View type and insert it into the
 -- DomeinFileRecord.
-traverseViewE :: ViewE -> Namespace -> PhaseTwo ViewType
-traverseViewE (ViewE {id, viewParts, pos}) ns = do
+traverseViewE :: ViewE -> RoleType -> PhaseTwo ViewType
+traverseViewE (ViewE {id, viewParts, pos}) rtype = do
   -- TODO. Controleer op dubbele definities.
-  viewName <- pure (ns <> "$" <> id)
+  viewName <- pure (roletype2string rtype <> "$" <> id)
   (expandedPropertyReferences :: Array PropertyType) <- traverse qualifyProperty (ARR.fromFoldable viewParts)
   view <- pure $ VIEW.View
     { _id: ViewType viewName
     , _rev: Nothing
     , displayName: id
     , propertyReferences: expandedPropertyReferences
-    , role: EnumeratedRoleType ns
+    , role: rtype
     , pos: pos}
   modifyDF (\(df@{views}) -> df {views = insert viewName view views})
   pure (ViewType viewName)
@@ -378,6 +378,11 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
       parts <- traverse expandPrefix stateQualifiedParts
       void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
       pure crole
+
+    -- VIEW
+    handleParts (CalculatedRole roleUnderConstruction@{views}) (VE pe) = do
+      viewType <- traverseViewE pe (CR roleName)
+      pure (CalculatedRole $ roleUnderConstruction {views = cons viewType views})
 
     handleParts crole p = throwError $ Custom ("Cannot handle part '" <> show p <> "' in PhaseTwo in a CalculatedRole: " <> show roleName)
 

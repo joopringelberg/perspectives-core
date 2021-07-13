@@ -34,7 +34,7 @@ import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Perspective (Perspective)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleKind)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==), ($))
 
 -----------------------------------------------------------
@@ -51,6 +51,8 @@ type CalculatedRoleRecord =
   , calculation :: Calculation
   , context :: ContextType
 
+  , views :: Array ViewType
+
   , perspectives :: Array Perspective
 
   , pos :: ArcPosition
@@ -65,6 +67,8 @@ defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
 
   , calculation: S $ Simple $ Identity $ ArcPosition{column: 0, line: 0}
   , context: ContextType context
+
+  , views: []
 
   , perspectives: []
 

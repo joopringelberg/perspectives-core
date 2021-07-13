@@ -266,9 +266,12 @@ contextRoleE = protectObject $ withEntireBlock
       -- | Het is niet noodzakelijk een EnumeratedRole!
       isCalculated <- option false (lookAhead (reserved "=") *> pure true)
       if isCalculated
-        then setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
-        else setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
-      ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
+        then do
+          setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
+          (calculatedRole_  uname kind pos)
+        else do
+          setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
+          (enumeratedRole_ uname kind pos)
 
 externalRoleE :: IP ContextPart
 externalRoleE = protectObject $ withEntireBlock

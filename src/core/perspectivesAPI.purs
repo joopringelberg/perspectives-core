@@ -226,8 +226,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         props <- runArrayT $ propertiesOfRole subject
         sendResponse (Result corrId (propertytype2string <$> props)) setter
       else do
-        adt <- rangeOfRoleCalculation' subject
-        views <- runArrayT $ lookForUnqualifiedViewType predicate adt
+        views <- getRoleType subject >>= runArrayT <<< lookForUnqualifiedViewType predicate
         case head views of
           Nothing -> sendResponse (Error corrId ("View '" <> predicate <> "' is not available for role '" <> subject <> "'.")) setter
           -- NOTE: we arbitrarily take the first matching View.
@@ -397,6 +396,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
   where
     setter = (mkApiEffect reactStateSetter)
 
+    -- The identifier in the ContextType must be fully qualified.
     withLocalName :: String -> ContextType -> (RoleType -> MonadPerspectives Unit) -> MonadPerspectives Unit
     withLocalName localRoleName contextType effect = do
       qrolNames <- runArrayT $ lookForUnqualifiedRoleType localRoleName contextType
