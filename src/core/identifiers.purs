@@ -24,9 +24,10 @@ module Perspectives.Identifiers
 
 where
 import Control.Monad.Error.Class (class MonadThrow)
+import Data.Array (intercalate, null, uncons)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.String (Pattern(..), Replacement(..), indexOf, replaceAll, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), replaceAll, split, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -271,6 +272,7 @@ endsWithSegments whole part = (whole == part) || (isJust $ stripSuffix (Pattern 
 -- | "Second" `areLastSegmentsOf` "model:Model$First$Second$Third" == false
 areLastSegmentsOf :: String -> String -> Boolean
 areLastSegmentsOf = flip endsWithSegments
+
 -----------------------------------------------------------
 -- REGEX MATCHING HELPER FUNCTIONS
 -----------------------------------------------------------
@@ -283,3 +285,33 @@ getSecondMatch :: Regex -> String -> Maybe String
 getSecondMatch regex s = case match regex s of
   (Just (matches :: NonEmptyArray (Maybe String))) -> maybe Nothing identity (index matches 2)
   _ -> Nothing
+
+-----------------------------------------------------------
+-- CONCATENATE SEGMENTS
+-----------------------------------------------------------
+-- | The first argument (left) should be a qualfied name.
+-- | The second argument may be a series of segments.
+-- | Both are concatenated, guaranteeing that segments that are both
+-- | the tail of the left part and the head of the right part, only occur once.
+concatenateSegments :: String -> String -> String
+concatenateSegments left right = run (split (Pattern "$") left) (split (Pattern "$") right) ""
+  where
+    run :: Array String -> Array String -> String -> String
+    run leftParts rightParts result = case uncons leftParts of
+      Nothing -> if null rightParts
+        -- Nothing to append, we're done.
+        then result
+        -- We've completely included the left side in the result, just add the right part.
+        else result <> "$" <> intercalate "$" rightParts
+      Just {head, tail} -> case uncons rightParts of
+        -- We've completely included the right side in the result.
+        -- We'd expect the left side to be included, too, but apparantly not.
+        -- This is an unusual case, following this pattern: abdc bd
+        Nothing -> result <> "$" <> intercalate "$" leftParts
+        Just {head:rightHead, tail:rightTail} -> if head == rightHead
+          -- Overlap. Append the overlapping segment to the result, drop it from both sides.
+          then run tail rightTail (result <> "$" <> head)
+          -- Append the next segment from left, continue with all parts from right.
+          else if result == ""
+            then run tail rightParts head
+            else run tail rightParts (result <> "$" <> head)
