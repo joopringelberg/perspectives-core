@@ -201,6 +201,8 @@ tryFetchEntiteit id = do
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveEntiteit id = saveEntiteit' id Nothing
 
+-- | Save the given entity to the database and puts it, with a correct (new) revision,
+-- | in the cache, assuming the current revision of the entiteit equals that in the database.
 saveEntiteit_ :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
 saveEntiteit_ entId entiteit = saveEntiteit' entId (Just entiteit)
 
@@ -213,11 +215,6 @@ saveEntiteit' entId mentiteit = ensureAuthentication $ do
       Nothing -> throwError $ error ("saveEntiteit' needs either an entity as parameter, or a locally stored resource for " <>  unwrap entId)
       Just e -> pure e
     Just e -> pure e
-  revParam <- pure case mentityFromCache of
-    Nothing -> ""
-    Just e -> case rev e of
-      Nothing -> ""
-      Just rev -> "?rev=" <> rev
   dbName <- dbLocalName entId
   (rev :: Revision_) <- addDocument dbName entiteit (unwrap entId)
   entiteit' <- pure (changeRevision rev entiteit)

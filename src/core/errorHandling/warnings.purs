@@ -20,26 +20,14 @@
 
 -- END LICENSE
 
-module Perspectives.ErrorLogging where
+module Perspectives.Warning where
 
 import Prelude
 
-import Data.Maybe (Maybe)
-import Effect (Effect)
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Class.Console (log)
-import Effect.Exception (Error)
-import Perspectives.Parsing.Messages (PerspectivesError)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Warning (PerspectivesWarning)
+data PerspectivesWarning =
+    ModelLacksModelId String
+  | ModelLacksUrl String
 
-logError :: forall m. MonadEffect m => Error -> Effect Unit
-logError = liftEffect <<< log <<< show
-
-logPerspectivesError :: forall m. MonadEffect m => PerspectivesError -> m Unit
-logPerspectivesError = liftEffect <<< log <<< show
-
--- TODO. Create a system of warnings to be shared with the modelling user.
--- For now, we just log the warning on screen.
-warnModeller :: forall m. MonadEffect m => Maybe RoleInstance -> PerspectivesWarning -> m Unit
-warnModeller mModeller warning = liftEffect $ log $ show warning
+instance showPerspectivesWarning :: Show PerspectivesWarning where
+  show (ModelLacksModelId dfid) = "(ModelLacksModelId) The model '" <> dfid <> "' lacks a value for the property ModelIdentification on its Model instance."
+  show (ModelLacksUrl dfid) = "(ModelLacksUrl) The model '" <> dfid <> "' lacks a value for the property Url on its Model instance."

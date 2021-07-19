@@ -22,7 +22,6 @@
 
 module Perspectives.Instances.ObjectGetters where
 
-import Control.Alt ((<|>))
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)

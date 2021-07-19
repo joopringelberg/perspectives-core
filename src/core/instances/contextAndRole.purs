@@ -295,13 +295,14 @@ rol_gevuldeRol  (PerspectRol{gevuldeRollen}) rn = maybe [] identity (lookup (unw
 
 -- | The first argument is the role instance that receives a new inverse link to a role that binds it.
 -- | The third argument represents the role instance that binds the role of the first argument.
+-- | This operation is idempotent.
 addRol_gevuldeRollen :: PerspectRol -> EnumeratedRoleType -> RoleInstance -> PerspectRol
 addRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
   case lookup (unwrap rolName) gevuldeRollen of
     Nothing -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) [rolID] gevuldeRollen}
     (Just roles) -> do
       case Arr.elemIndex rolID roles of
-        Nothing -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) (Arr.snoc roles rolID) gevuldeRollen}
+        Nothing -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) (Arr.union [rolID] roles) gevuldeRollen}
         otherwise -> ct
 
 removeRol_gevuldeRollen :: PerspectRol -> EnumeratedRoleType -> RoleInstance -> PerspectRol
