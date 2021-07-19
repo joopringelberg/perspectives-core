@@ -3,7 +3,6 @@ UserData
 import model:System as sys
 
 sys:PerspectivesSystem sys:MySystem
-	extern $ModelOphaalTeller = 0
 	extern sys:RootContext$External$Name = "Mijn Systeem"
 	$User(sys:Me) => ()
 		$Voornaam = "First name"

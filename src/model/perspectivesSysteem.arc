@@ -20,7 +20,6 @@ domain System
 
     external
       aspect sys:RootContext$External
-      property ModelOphaalTeller (mandatory, Number)
       property ConnectedToAMQPBroker (Boolean)
       property CardClipBoard (String)
 
@@ -47,9 +46,11 @@ domain System
 
     context Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
 
+    -- This will become obsolete when we start using model:CouchdbManagement.
     context Modellen = filter callExternal cdb:Models() returns sys:Model$External with not IsLibrary
       view ModelPresentation (Description, Name)
 
+    -- This will become obsolete when we start using model:CouchdbManagement.
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context IndexedContexts (relational) filledBy sys:RootContext
       state Dangles = not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
@@ -58,13 +59,14 @@ domain System
           do for User
             remove object
 
+    -- This will become obsolete when we start using model:CouchdbManagement.
     context ModelsInUse (relational) filledBy Model
       property PerformUpdate (Boolean)
       state Root = true
         state Update = PerformUpdate
           on entry
             do for User
-              callEffect cdb:UpdateModel()
+              callEffect cdb:UpdateModel( Url, ModelIdentification )
               PerformUpdate = false
         state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
           -- Create an entry in IndexedContexts if its model has been taken in use.
@@ -108,6 +110,7 @@ domain System
     user Me = filter (Initiator either ConnectedPartner) with binds sys:Me
     user You = filter (Initiator either ConnectedPartner) with not binds sys:Me
 
+  -- This will become obsolete when we start using model:CouchdbManagement.
   case Model
     aspect sys:RootContext
     external
