@@ -179,6 +179,13 @@ fetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 fetchEntiteit id = ensureAuthentication $ catchError
   do
     v <- representInternally id
+    -- TODO.
+    -- Neem de prefix van de id (het deel vóór de $).
+    -- als dat "model:User" is, neem dan de dbLocalName van id.
+    -- anders is het de symbolische naam van een storage location. Zoek in PerspectivesState de bijbehorende
+    -- locatie (URL) van die storage op.
+    -- Pas ensureAuthentication aan: geef de symbolische naam van de storage mee.
+    -- Pas ensureAuthentication pas toe als de symbolische naam bekend is.
     dbName <- dbLocalName id
     doc <- getDocument dbName (unwrap id)
     lift $ put doc v

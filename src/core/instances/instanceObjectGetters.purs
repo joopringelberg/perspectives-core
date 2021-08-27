@@ -75,6 +75,8 @@ contextType :: ContextInstance ~~> ContextType
 contextType cid  = ArrayT $ (lift $ try $ getContextMember (\c -> [context_pspType c]) cid) >>=
   handlePerspectRolError' "contextType" [] (pure <<< identity)
 
+-- TODO. Fix the issue that an unlinked role does not show up for
+-- a public context. 
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
   handlePerspectContextError' "getMe" []

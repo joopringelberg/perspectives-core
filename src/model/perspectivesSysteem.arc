@@ -35,6 +35,7 @@ domain System
         defaults
       perspective on ModelsInUse
         defaults
+      perspective on IndexedContexts
       perspective on IndexedContextOfModel
         defaults
       perspective on RootUsers
@@ -50,7 +51,6 @@ domain System
     context Modellen = filter callExternal cdb:Models() returns sys:Model$External with not IsLibrary
       view ModelPresentation (Description, Name)
 
-    -- This will become obsolete when we start using model:CouchdbManagement.
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context IndexedContexts (relational) filledBy sys:RootContext
       state Dangles = not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse

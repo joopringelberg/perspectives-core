@@ -594,7 +594,10 @@ getDynamicPropertyGetterFromLocalName ln adt = do
           getter <- lift $ lift $ getDynamicPropertyGetterFromLocalName ln (ST bndType)
           getter bnd'
 
--- | If the user has no role, return the role with the Aspect "model:System$Invitation$Guest".
+-- | Preferrably returns the value of the type of 'me' of the context instance: 
+-- | this will be the enumerated role instance that is filled (ultimately) with sys:Me.
+-- | Otherwise returns all Calculated roles that are ultimately filled with sys:Me.
+-- | The Guest and Visitor conventions tap in here.
 getMyType :: ContextInstance ~~> RoleType
 getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
   <|>
