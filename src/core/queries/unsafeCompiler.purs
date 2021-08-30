@@ -70,7 +70,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', roleTypeModelName', specialisesRoleType)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', isUnlinked_, roleTypeModelName', specialisesRoleType)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||))
 import Unsafe.Coerce (unsafeCoerce)
@@ -594,17 +594,23 @@ getDynamicPropertyGetterFromLocalName ln adt = do
           getter <- lift $ lift $ getDynamicPropertyGetterFromLocalName ln (ST bndType)
           getter bnd'
 
--- | Preferrably returns the value of the type of 'me' of the context instance: 
+-- | Preferrably returns the value of the type of 'me' of the context instance:
 -- | this will be the enumerated role instance that is filled (ultimately) with sys:Me.
 -- | Otherwise returns all Calculated roles that are ultimately filled with sys:Me.
 -- | The Guest and Visitor conventions tap in here.
 getMyType :: ContextInstance ~~> RoleType
 getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
   <|>
+  findMeInUnlinkedRoles ctxt
+  <|>
   ((contextType >=> (liftToInstanceLevel contextAspectsClosure) >=> Combinators.filter (liftToInstanceLevel calculatedUserRole) (computesMe ctxt)) ctxt)
+  where
+    computesMe :: ContextInstance -> RoleType ~~> Boolean
+    computesMe ctxt' rt = some (getRoleInstances rt >=> lift <<< lift <<< isMe) ctxt'
 
-computesMe :: ContextInstance -> RoleType ~~> Boolean
-computesMe ctxt rt = some (getRoleInstances rt >=> lift <<< lift <<< isMe) ctxt
-
--- computesMe :: RoleType -> ContextInstance ~~> Boolean
--- computesMe cr = some (getRoleInstances cr >=> lift <<< lift <<< isMe)
+    findMeInUnlinkedRoles :: ContextInstance ~~> RoleType
+    findMeInUnlinkedRoles = Combinators.filter (Combinators.filter (contextType >=> liftToInstanceLevel calculatedUserRole) isUnlinked) (computesMe ctxt)
+      where
+        isUnlinked :: RoleType ~~> Boolean
+        isUnlinked (ENR rt) = lift $ lift $ isUnlinked_ rt
+        isUnlinked (CR _) = pure false
