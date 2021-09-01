@@ -9,12 +9,24 @@
 domain BodiesWithAccounts
   use sys for model:System
 
+  user WithCredentials
+    property UserName (String)
+    property Password (String)
+
   case Body
 
-    -- Admin has a full perspective on Accounts.
+    -- Admin can always create and fill Accounts and see the UserName.
     user Admin filledBy CouchdbServer$Admin
+      aspect WithCredentials
       perspective on Accounts
-        defaults
+        including (Create, Fill)
+        props (UserName) verbs (SetPropertyValue)
+
+        -- We limit visibility of the Password to the situation that it
+        -- does not exist.
+        -- When Accounts reset their password, Admin is duly not informed.
+        in state NoPassword of object
+          props (Password) verbs (SetPropertyValue)
 
     -- Role Guest is available so any user can request an Account.
     -- Guest is superceded by Accounts as soon as it exists.
@@ -34,8 +46,10 @@ domain BodiesWithAccounts
     -- loading all references at once with the context.
     -- Specialisation may restrict their fillers.
     user Accounts (unlinked)
+      aspect WithCredentials
       property IsAccepted (Boolean)
       property IsRejected (Boolean)
+      property PasswordReset (Boolean)
       state Root = true
         -- Use this state to inform the applicant that his case is in
         -- consideration.
@@ -64,3 +78,9 @@ domain BodiesWithAccounts
             only (RemoveFiller)
             verbs (Consult)
             selfonly
+
+        -- Use this state to allow the Admin to set the password.
+        state NoPassword = not exists Password
+
+        -- Use this state to make Accounts reset their password.
+        state ResetPassword = not PasswordReset

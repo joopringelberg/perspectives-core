@@ -30,6 +30,7 @@ import Control.Monad.State (State, StateT, execState, execStateT, get, modify, p
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
 import Data.Array (cons, delete, head)
+import Data.Array as ARR
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -48,7 +49,7 @@ import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, rol_binding, rol_gevuldeRollen, rol_id, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=))
-import Perspectives.Couchdb (DeleteCouchdbDocument(..), DocWithAttachmentInfo(..))
+import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
@@ -65,6 +66,9 @@ import Perspectives.Models (modelsInUse) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
+import Perspectives.Persistence.API (createDatabase, deleteDatabase) as PAPI
+import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
+import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, getPerspectRol, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.PerspectivesState (publicRepository)
@@ -474,6 +478,85 @@ removeModelFromLocalStore rs _ = case head rs of
 scheduleDomeinFileRemoval :: DomeinFileId -> MonadPerspectivesTransaction Unit
 scheduleDomeinFileRemoval id = lift $ AMA.modify (over Transaction \t@{modelsToBeRemoved} -> t {modelsToBeRemoved = cons id modelsToBeRemoved})
 
+type Url = String
+-- | The RoleInstance is an instance of CouchdbServer$Repositories.
+-- | Fails silently if either the url or the name is missing.
+-- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
+createDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+createDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
+  -- NOTE: misschien moet er een slash tussen
+  Just databaseUrl, Just databaseName -> lift2 $ PAPI.createDatabase (databaseUrl <> databaseName)
+  _, _ -> pure unit
+
+-- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
+deleteDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+deleteDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
+  -- NOTE: misschien moet er een slash tussen
+  Just databaseUrl, Just databaseName -> lift2 $ PAPI.deleteDatabase (databaseUrl <> databaseName)
+  _, _ -> pure unit
+
+-- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
+replicateContinuously :: Array Url -> Array String -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+replicateContinuously databaseUrls names sources targets _ = case head databaseUrls, head sources, head names, head targets of
+  Just databaseUrl, Just name, Just source, Just target -> lift2 $ CDB.replicateContinuously
+    databaseUrl
+    name
+    source
+    target
+    Nothing
+  _, _, _, _ -> pure unit
+
+-- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
+endReplication :: Array Url -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+endReplication databaseUrls sources targets _ = case head databaseUrls, head sources, head targets of
+  Just databaseUrl, Just source, Just target -> void $ lift2 $ CDB.endReplication databaseUrl source target
+  _, _, _ -> pure unit
+
+type UserName = String
+type Password = String
+
+-- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts.
+createUser :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
+createUser databaseUrls userNames passwords _ = case head databaseUrls, head userNames, head passwords of
+  Just databaseurl, Just userName, Just password -> lift2 $ CDB.createUser databaseurl userName password []
+  _, _, _ -> pure unit
+
+-- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts.
+deleteUser :: Array Url -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
+deleteUser databaseUrls userNames _ = case head databaseUrls, head userNames of
+  Just databaseurl, Just userName -> lift2 $ void $ CDB.deleteUser databaseurl userName
+  _, _ -> pure unit
+
+-- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+updateSecurityDocument :: (String -> SecurityDocument -> SecurityDocument) -> Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
+updateSecurityDocument updater databaseUrls databaseNames userNames _ = case head databaseUrls, head databaseNames, head userNames of
+  Just databaseUrl, Just databaseName, Just userName -> lift2 $ do
+    sdoc <- CDB.ensureSecurityDocument databaseUrl databaseName
+    setSecurityDocument databaseUrl databaseName (updater userName sdoc)
+  _, _, _ -> pure unit
+
+-- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+makeAdminOfDb :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
+makeAdminOfDb = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {admins = {names: ARR.union [userName] r.admins.names, roles: r.admins.roles}}
+
+-- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+removeAsAdminFromDb :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
+removeAsAdminFromDb = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {admins = {names: ARR.delete userName r.admins.names, roles: r.admins.roles}}
+
+-- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+makeMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
+makeMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {members = {names: ARR.union [userName] r.members.names, roles: r.admins.roles}}
+
+-- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+removeAsMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
+removeAsMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {members = {names: ARR.delete userName r.members.names, roles: r.admins.roles}}
+
+-- | The RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts
+resetPassword :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
+resetPassword databaseUrls userNames passwords _ = case head databaseUrls, head userNames, head passwords of
+  Just databaseUrl, Just userName, Just password -> lift2 $ CDB.setPassword databaseUrl userName password
+  _, _, _ -> pure unit
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -486,4 +569,16 @@ externalFunctions =
   , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
   , Tuple "model:Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
   , Tuple "model:Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
-]
+  , Tuple "model:Couchdb$CreateDatabase" {func: unsafeCoerce createDatabase, nArgs: 2}
+  , Tuple "model:Couchdb$DeleteDatabase" {func: unsafeCoerce deleteDatabase, nArgs: 2}
+  , Tuple "model:Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 4}
+  , Tuple "model:Couchdb$EndReplication" {func: unsafeCoerce replicateContinuously, nArgs: 3}
+  , Tuple "model:Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}
+  , Tuple "model:Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2}
+  , Tuple "model:Couchdb$MakeAdminOfDb" {func: unsafeCoerce makeAdminOfDb, nArgs: 3}
+  , Tuple "model:Couchdb$RemoveAsAdminFromDb" {func: unsafeCoerce removeAsAdminFromDb, nArgs: 3}
+  , Tuple "model:Couchdb$MakeMemberOf" {func: unsafeCoerce makeMemberOf, nArgs: 3}
+  , Tuple "model:Couchdb$MakeMemberOf" {func: unsafeCoerce makeMemberOf, nArgs: 3}
+  , Tuple "model:Couchdb$RemoveAsMemberOf" {func: unsafeCoerce removeAsMemberOf, nArgs: 3}
+  , Tuple "model:Couchdb$ResetPassword" {func: unsafeCoerce resetPassword, nArgs: 3}
+  ]
