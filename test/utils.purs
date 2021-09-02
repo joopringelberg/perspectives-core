@@ -20,13 +20,13 @@ import Perspectives.RunPerspectives (runPerspectives)
 import Test.Unit.Assert as Assert
 
 couchdbHost :: String
-couchdbHost = "http://127.0.0.1"
+couchdbHost = "https://127.0.0.1"
 
 couchdbPort :: Int
-couchdbPort = 5984
+couchdbPort = 6984
 
 runP_ :: forall a. String -> MonadPerspectives a -> Aff a
-runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort "http://127.0.0.1:5984/repository"
+runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort "https://127.0.0.1:6984/repository"
 -- "http://joopringelberg.nl/cbd/repository"
 
 runP :: forall a. MonadPerspectives a -> Aff a
