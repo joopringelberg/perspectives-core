@@ -138,11 +138,12 @@ instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPa
     object' <- expandPrefix object
     state' <- expandPrefix state
     pure (P (PropertyVerbE r {subject = subject', object = object', state = state'}))
-  expandPrefix (AC (ActionE r@{subject, object, state})) = do
+  expandPrefix (AC (ActionE r@{subject, object, state, effect})) = do
     subject' <- expandPrefix subject
     object' <- expandPrefix object
     state' <- expandPrefix state
-    pure (AC (ActionE r {subject = subject', object = object', state = state'}))
+    effect' <- expandPrefix effect
+    pure (AC (ActionE r {subject = subject', object = object', state = state', effect = effect'}))
   expandPrefix (SO (SelfOnly r@{subject, object, state})) = do
     subject' <- expandPrefix subject
     object' <- expandPrefix object
