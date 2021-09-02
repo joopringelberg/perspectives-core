@@ -13,7 +13,3 @@ cm:Model usr:CouchdbManagementModel
       extern sys:RootContext$External$Name = "Couchdb management"
       $Manager -> sys:Me
     sys:Model$IndexedContext$Name = "CouchdbManagement$MyCouchdbApp"
-  sys:Model$IndexedContext =>
-    cm:LocalModelsOverview cm:MyModels
-      extern sys:RootContext$External$Name = "Models in this installation"
-    sys:Model$IndexedContext$Name = "CouchdbManagement$MyModels"

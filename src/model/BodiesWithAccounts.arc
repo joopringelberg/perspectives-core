@@ -8,6 +8,7 @@
 
 domain BodiesWithAccounts
   use sys for model:System
+  use bwa for model:BodiesWithAccounts
 
   user WithCredentials
     property UserName (String)
@@ -16,10 +17,10 @@ domain BodiesWithAccounts
   case Body
 
     -- Admin can always create and fill Accounts and see the UserName.
-    user Admin filledBy CouchdbServer$Admin
-      aspect WithCredentials
+    user Admin
+      aspect bwa:WithCredentials
       perspective on Accounts
-        including (Create, Fill)
+        only (Create, Fill)
         props (UserName) verbs (SetPropertyValue)
 
         -- We limit visibility of the Password to the situation that it
@@ -46,7 +47,7 @@ domain BodiesWithAccounts
     -- loading all references at once with the context.
     -- Specialisation may restrict their fillers.
     user Accounts (unlinked)
-      aspect WithCredentials
+      aspect bwa:WithCredentials
       property IsAccepted (Boolean)
       property IsRejected (Boolean)
       property PasswordReset (Boolean)
@@ -57,16 +58,16 @@ domain BodiesWithAccounts
           perspective on Accounts
             -- Account can see he is not yet rejected,
             -- but not accepted either.
-            props (IsRejected, isAccepted) verbs (Consult)
-            selfOnly
+            props (IsRejected, IsAccepted) verbs (Consult)
+            selfonly
 
         -- Use this state to inform the applicant that he will not become
         -- a member.
         state Rejected = IsRejected
           perspective on Accounts
             -- Guest can see his request for an account is rejected.
-            props (IsRejected, isAccepted) verbs (Consult)
-            selfOnly
+            props (IsRejected, IsAccepted) verbs (Consult)
+            selfonly
 
         -- Use this state to provide perspectives on the various
         -- things that are hidden for non-members.

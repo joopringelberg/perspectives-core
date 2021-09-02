@@ -105,6 +105,27 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Parsing") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Parsing: " <> show errs) false
 
+  test "upload model:BodiesWithAccounts to repository from files (without testuser)" $ runP do
+    addAllExternalFunctions
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    errs <- loadCompileAndCacheArcFile "bodiesWithAccounts" modelDirectory
+    if null errs
+      then do
+        cdburl <- developmentRepository
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:BodiesWithAccounts") cdburl)
+      else liftAff $ assert ("There are instance- or model errors for model:BodiesWithAccounts: " <> show errs) false
+
+  testOnly "upload model:Models to repository from files (without testuser)" $ runP do
+    addAllExternalFunctions
+    _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    errs <- loadCompileAndCacheArcFile "models" modelDirectory
+    if null errs
+      then do
+        cdburl <- developmentRepository
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Models") cdburl)
+      else liftAff $ assert ("There are instance- or model errors for model:Models: " <> show errs) false
+
   test "upload model:ModelManagement to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
@@ -217,7 +238,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     liftAff $ assert "Just testing" true
 
   -- Run account "test" with password "geheim"
-  testOnly "createUser" $ runP do
+  test "createUser" $ runP do
     void $ runMonadPerspectivesTransaction $ catchError
       (createUser ["https://localhost:6984/"] ["pipo1"] ["geheim"] (RoleInstance "ignored"))
       (\e -> logShow e)

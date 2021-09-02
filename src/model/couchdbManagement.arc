@@ -5,7 +5,14 @@ domain CouchdbManagement
   use mod for model:Models
   use acc for model:BodiesWithAccounts
   use cdb for model:Couchdb
-  use utl for model:Utils
+  use utl for model:Utilities
+
+  -- The model description case.
+  -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
+  case Model
+    aspect sys:Model
+    external
+      aspect sys:Model$External
 
   -- The INDEXED context cm:MyCouchdbApp, that is the starting point containing all CouchdbServers.
   case CouchdbManagementApp
@@ -13,6 +20,7 @@ domain CouchdbManagement
     aspect sys:RootContext
     external
       aspect sys:RootContext$External
+      
     -- Every user manages his own CouchdbServers.
     -- This manager is not necessarily the admin of a Couchdb installation!
     user Manager = sys:Me

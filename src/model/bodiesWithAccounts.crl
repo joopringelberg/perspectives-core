@@ -1,0 +1,9 @@
+UserData
+
+import model:System as sys
+
+sys:Model usr:BodiesWithAccountsModel
+  extern $Name = "Bodies with Accounts"
+  extern $Description = "A pattern for bodies such as organisations that have accounts."
+  extern $Url = "http://127.0.0.1:5984/repository/model:BodiesWithAccounts"
+  extern $ModelIdentification = "model:BodiesWithAccounts"

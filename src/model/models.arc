@@ -4,7 +4,14 @@ domain Models
   use cdb for model:Couchdb
   use mod for model:Models
 
-  -- The INDEXED context mod:MyModels, a case holding all models available in this installation.
+  -- The model description case.
+  -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
+  case Model
+    aspect sys:Model
+    external
+      aspect sys:Model$External
+
+  -- The INDEXED context mod:ModelsOverview, a case holding all models available in this installation.
   case ModelsOverview
     indexed mod:MyModels
     aspect sys:RootContext
@@ -26,9 +33,8 @@ domain Models
           on exit
             do for LocalUser
               CurrentVersion = LastVersion
-      external
-        property PerformUpdate (Boolean)
-        property CurrentVersion (String)
+      property PerformUpdate (Boolean)
+      property CurrentVersion (String)
 
   -- The PUBLIC context type ModelDescription allows for a description of a model from the outside (not needing the model itself).
   case ModelDescription
@@ -52,25 +58,26 @@ domain Models
       property Url (mandatory, String)
 
     -- This role should be stored in public space.
-    user Author filledBy Repository$Authors
+    user Author filledBy sys:PerspectivesSystem$User
       --storage public
       perspective on Versions
         defaults
       perspective on extern
         defaults
+
     user Guest = sys:Me
       perspective on Versions
         verbs (Consult)
-      perspective on extern
+      perspective on context >> extern
         action Boot
-          -- Create the indexed context:
-          createContext mod:CouchdbManagementApp bound to IndexedContext in sys:MySystem
-          -- Add the indexed name:
-          Name = "model:CouchdbManagement$MyCouchdbApp" for sys:MySystem >> filter IndexedContext with binding >> context == mod:MyCouchdbApp
-          -- Add the model description to MyModels:
-          bind https://cw.perspect.it/CouchdbManagement to LocalModels in mod:MyModels
+      		-- Create the indexed context:
+      		createContext ModelsOverview bound to IndexedContexts in sys:MySystem
 
-          -- Generate an instance of mod:CouchdbManagementApp, with a generated name, and bind it:
-          createContext_ mod:CouchdbManagementApp bound to filter IndexedContext with Name == "CouchdbManagement$MyCouchdbApp"
-          -- Generate an instance of mod:ModelsOverview, with a generated name, and bind it:
-          createContext_ mod:ModelsOverview bound to filter IndexedContext with Name == "CouchdbManagement$MyModels"
+      		-- Add the indexed name:
+      		Name = "model://perspect.it/Models$MyModels" for sys:MySystem >> filter IndexedContexts with binding >> context >> contextType == ModelsOverview
+
+      		-- Add the model description to MyModels:
+          -- TODO: gebruik de uitgecommentarieerde regel zodra we URLs als identifiers herkennen.
+          -- Voor nu gebruiken we het type in plaats van de beschrijving.
+      		--bind https://cw.perspect.it/SimpleChat to LocalModels
+          --bind mod:Models to LocalModels in mod:MyModels
