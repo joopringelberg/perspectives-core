@@ -2,8 +2,9 @@ module Test.Extern.Couchdb where
 
 import Prelude
 
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Free (Free)
+import Control.Monad.Reader (runReaderT)
 import Control.Monad.Writer (runWriterT)
 import Data.Array (elemIndex, length, null)
 import Data.Maybe (Maybe(..), isJust)
@@ -16,7 +17,7 @@ import Perspectives.Couchdb (designDocumentViews)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
-import Perspectives.Extern.Couchdb (addModelToLocalStore, models, uploadToRepository)
+import Perspectives.Extern.Couchdb (addModelToLocalStore, createDatabase, createUser, models, uploadToRepository)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Persistence.API (tryGetDocument)
 import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
@@ -26,8 +27,8 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile)
-import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP, withSystem)
-import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, test, testSkip, testOnly)
+import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP, withSystem, runMonadPerspectivesTransaction)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testSkip, testOnly)
 import Test.Unit.Assert (assert)
 
 testDirectory :: String
@@ -104,7 +105,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Parsing") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Parsing: " <> show errs) false
 
-  testOnly "upload model:ModelManagement to repository from files (without testuser)" $ runP do
+  test "upload model:ModelManagement to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
@@ -205,3 +206,19 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 --     logShow users
 --     liftAff $ assert "There should be two users" (length users == 2)
 -- )
+
+  -- Run account "test" with password "geheim"
+  -- PROBLEMEN: de test slaagt, maar een database wordt niet gemaakt.
+  -- log statement in createDatabaseImpl vuurt.
+  test "createDatabase" $ runP do
+    void $ runMonadPerspectivesTransaction $ catchError
+      (createDatabase ["https://localhost:6984/"] ["testdb"] (RoleInstance "ignored"))
+      (\e -> logShow e)
+    liftAff $ assert "Just testing" true
+
+  -- Run account "test" with password "geheim"
+  testOnly "createUser" $ runP do
+    void $ runMonadPerspectivesTransaction $ catchError
+      (createUser ["https://localhost:6984/"] ["pipo1"] ["geheim"] (RoleInstance "ignored"))
+      (\e -> logShow e)
+    liftAff $ assert "Just testing" true
