@@ -20,21 +20,24 @@
 
 -- END LICENSE
 
--- | This module doubles information in Perspectives.External.CoreModules.
--- | However, we need `isExternalCoreModule` in Perspectives.Parsing.Arc.PhaseThree.
--- | If we'd import it from Perspectives.External.CoreModules, there would be a module cycle
--- | because of the external module Perspectives.Extern.Parsing, that imports PhaseThree via
--- | Perspectives.TypePersistence.LoadArc.
+-- | This module defines External Core functions for model:Couchdb.
 
-module Perspectives.External.CoreModuleList
+module Perspectives.Extern.Utilities where
 
-where
+import Data.Tuple (Tuple(..))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction)
+import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Prelude (pure)
+import Unsafe.Coerce (unsafeCoerce)
 
-import Data.Array (elemIndex)
-import Data.Maybe (isJust)
+-- TODO: verander naar echte gegenereerde identifiers.
+genSym :: RoleInstance -> MonadPerspectivesTransaction String
+genSym _ = pure "geheim"
 
-coreModules :: Array String
-coreModules = [ "model:Couchdb", "model:Serialise", "model:Parsing", "model:Utilities" ]
-
-isExternalCoreModule :: String -> Boolean
-isExternalCoreModule n = isJust (elemIndex n coreModules)
+-- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
+-- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
+externalFunctions :: Array (Tuple String HiddenFunctionDescription)
+externalFunctions =
+  [ Tuple "model:Utilities$GenSym" {func: unsafeCoerce genSym, nArgs: 0}
+  ]
