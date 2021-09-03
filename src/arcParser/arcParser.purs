@@ -888,7 +888,11 @@ actionE = do
     Nothing, _ -> fail "User role is not specified"
     _, Nothing -> fail "object of perspective must be given"
     Just s, Just o -> do
-      effect <- Statements <$> fromFoldable <$> block1 assignment <|> Let <$> letWithAssignment
+      kw <- option "" (lookAhead reservedIdentifier)
+      effect <- if kw == "letA"
+        then Let <$> letWithAssignment
+        else Statements <$> fromFoldable <$> block1 assignment
+      -- effect <- Statements <$> fromFoldable <$> block1 assignment <|> Let <$> letWithAssignment
       end <- getPosition
       pure $ singleton $ AC $ ActionE {id, subject: s, object: o, state, effect, start, end}
 

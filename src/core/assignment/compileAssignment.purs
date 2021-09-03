@@ -35,7 +35,7 @@ import Data.Array.NonEmpty (fromArray, head)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
@@ -44,7 +44,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (##=), (##>), (##>>))
 import Perspectives.Error.Boundaries (handlePerspectRolError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
@@ -254,6 +254,13 @@ compileAssignment (UQD _ (BindVariable varName) f1 _ _ _) = do
     lift $ lift $ addBinding varName (unsafeCoerce v)
     pure unit
 
+compileAssignment (UQD _ (BindResultFromCreatingAssignment varName) f1 _ _ _) = do
+  f1' <- compileCreatingAssignments f1
+  pure \contextId -> do
+    v <- f1' contextId
+    lift $ lift $ addBinding varName (unsafeCoerce v)
+    pure unit
+
 compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (unsafeCoerce compileFunction) args
@@ -284,3 +291,29 @@ compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _)
 
 -- Catchall, remove when all cases have been covered.
 compileAssignment otherwise = throwError (error ("Found unknown case for compileAssignment: " <> show otherwise))
+
+compileCreatingAssignments :: QueryFunctionDescription -> MP (ContextInstance -> MonadPerspectivesTransaction (Array String))
+compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
+  pure \(contextId :: ContextInstance) -> do
+    ctxts <- lift2 (contextId ##= contextGetter)
+    for ctxts \ctxt -> do
+      -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
+      g <- liftEffect guid
+      newContext <- runExceptT $ constructContext (Just $ ENR qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
+        { id = "model:User$c" <> (show g)
+        , ctype = unwrap qualifiedContextTypeIdentifier
+        })
+      unsafePartial (unwrap <<< fromJust) <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap contextId) (RolSerialization
+        { id: Nothing
+        , properties: PropertySerialization empty
+        , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
+  pure \contextId -> do
+    ctxts <- lift2 (contextId ##= contextGetter)
+    for ctxts \ctxt -> do
+      roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+      -- No need to handle retrieval errors as we've just created the role.
+      pure (unwrap roleIdentifier)
+compileCreatingAssignments qfd = pure \ci -> pure [""]

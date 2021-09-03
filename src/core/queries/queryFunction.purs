@@ -196,6 +196,7 @@ data QueryFunction
   | ForeignPropertyGetter String
   | VariableLookup VariableName
   | BindVariable VariableName
+  | BindResultFromCreatingAssignment VariableName
   | AssignmentOperator FunctionName
   | WithFrame
 

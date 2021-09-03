@@ -39,7 +39,9 @@ import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 data Statements = Let LetStep | Statements (Array Assignment)
 
-newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, assignments :: Array Assignment}
+newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array LetABinding, assignments :: Array Assignment}
+
+data LetABinding = Expr VarBinding | Stat String Assignment
 
 data AssignmentOperator =
   Set ArcPosition
@@ -112,6 +114,18 @@ instance decodeLetStep :: Decode LetStep where
   decode q = genericDecode defaultOptions q
 instance prettyPrintLetStep :: PrettyPrint LetStep where
   prettyPrint' t (LetStep {bindings, assignments}) = "LetStep\n" <> intercalate (t <> "\n") (prettyPrint' (t <> "  ") <$> bindings) <> "\n" <> t <> "in\n" <> intercalate (t <> "\n") (prettyPrint' (t <> "  ") <$> assignments)
+
+derive instance genericLetABinding :: Generic LetABinding _
+instance showLetABinding :: Show LetABinding where show = genericShow
+instance eqLetABinding :: Eq LetABinding where eq = genericEq
+derive instance ordLetABinding :: Ord LetABinding
+instance encodeLetABinding :: Encode LetABinding where
+  encode q = genericEncode defaultOptions q
+instance decodeLetABinding :: Decode LetABinding where
+  decode q = genericDecode defaultOptions q
+instance prettyPrintLetABinding :: PrettyPrint LetABinding where
+  prettyPrint' t (Expr e) = "Expr " <> prettyPrint' t e
+  prettyPrint' t (Stat varname s) = "Stat " <> varname <> " " <> prettyPrint' t s
 
 derive instance genericAssignment :: Generic Assignment _
 instance showAssignment :: Show Assignment where show = genericShow

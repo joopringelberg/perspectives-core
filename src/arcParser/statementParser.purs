@@ -27,10 +27,11 @@ import Data.Array (fromFoldable)
 import Data.List (List(..))
 import Data.Maybe (isJust)
 import Data.Tuple (Tuple(..))
-import Perspectives.Parsing.Arc.Expression (binding, step)
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved)
+import Perspectives.Parsing.Arc.Expression (step)
+import Perspectives.Parsing.Arc.Expression.AST (VarBinding(..))
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reserved)
 import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, nestedBlock)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..), LetABinding(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>), (<*>))
 import Text.Parsing.Indent (withPos)
@@ -213,10 +214,20 @@ callEffect = do
 letWithAssignment :: IP LetStep
 letWithAssignment = withPos do
   start <- getPosition
-  bindings <- reserved "letA" *> nestedBlock binding
+  bindings <- reserved "letA" *> nestedBlock letABinding
   assignments <- reserved "in" *> nestedBlock assignment
   end <- getPosition
   pure $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
+
+letABinding :: IP LetABinding
+letABinding = do
+  varName <- (lowerCaseName <* token.reservedOp "<-") <?> "lower case name followed by <-"
+  keyword <- option "" (lookAhead reservedIdentifier)
+  case keyword of
+    "createContext" -> Stat <$> pure varName <*> createContext
+    "createRole" -> Stat <$> pure varName <*> roleCreation
+    _ -> Expr <$> (VarBinding <$> pure varName <*> step)
+
 
 -- | Looking ahead, find at least one reserved identifier, two if possible.
 -- | If only one is found, returns Tuple <theword> "".

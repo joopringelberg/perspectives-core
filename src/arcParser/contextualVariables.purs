@@ -38,7 +38,7 @@ import Perspectives.Parsing.Arc.AST (StateKind(..), StateSpecification(..))
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetStep(..), Statements(..), endOfAssignment, startOfAssignment)
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..), endOfAssignment, startOfAssignment)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Prelude (class Monad, Unit, bind, discard, pure, unit, void, ($), (<$>), (<>), (==), (||), (>))
 
@@ -77,7 +77,11 @@ statementContainsVariableReference varName (Let (LetStep{bindings, assignments})
   ala Disj foldMap (assignmentContainsReference varName <$> assignments)
   ||
   ala Disj foldMap
-    (catMaybes $ (\(VarBinding n stp) -> if varName == n then Nothing else Just (stepContainsVariableReference varName stp)) <$> bindings)
+    (catMaybes $ recur <$> bindings)
+  where
+    recur :: LetABinding -> Maybe Boolean
+    recur (Expr (VarBinding n stp)) = if varName == n then Nothing else Just (stepContainsVariableReference varName stp)
+    recur (Stat n assignment) = if varName == n then Nothing else Just $ assignmentContainsReference varName assignment
 
 statementContainsVariableReference varName (Statements stats) =
   ala Disj foldMap (assignmentContainsReference varName <$> stats)
@@ -199,12 +203,16 @@ addContextualVariablesToStatements :: forall m. MonadError PerspectivesError m =
 addContextualVariablesToStatements stmts mobject stateKind = case stmts of
   Let (LetStep r@{bindings, assignments}) -> do
     extraBindings <- collectBindings do
-      for_ bindings \(VarBinding _ stp) -> do
-        addCurrentContextForStep stp stateKind
-        addObjectForStep stp mobject stateKind
+      for_ bindings \b -> case b of
+        (Expr (VarBinding _ stp)) -> do
+          addCurrentContextForStep stp stateKind
+          addObjectForStep stp mobject stateKind
+        (Stat _ assignment) -> do
+          addCurrentContext (Statements [assignment])
+          addObject (Statements [assignment])
       addCurrentContext stmts
       addObject stmts
-    pure $ Let (LetStep r {bindings = extraBindings <> bindings})
+    pure $ Let (LetStep r {bindings = (Expr <$> extraBindings) <> bindings})
   Statements stmtArray -> do
     bindings <- collectBindings do
       addCurrentContext stmts
@@ -213,7 +221,7 @@ addContextualVariablesToStatements stmts mobject stateKind = case stmts of
       then pure $ Let (LetStep
         { start: unsafePartial $ startOfStatements stmts
         , end: unsafePartial $ endOfStatements stmts
-        , bindings
+        , bindings: Expr <$> bindings
         , assignments: stmtArray
         })
       else pure stmts

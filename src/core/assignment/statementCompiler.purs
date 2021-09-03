@@ -46,7 +46,7 @@ import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Statements(..))
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (addVarBindingToSequence, compileAndDistributeStep, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, mandatory, range)
@@ -62,6 +62,11 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
 import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=), (<<<), (>))
+
+------------------------------------------------------------------------------------
+------ MONAD TYPE FOR DESCRIPTIONCOMPILER
+------------------------------------------------------------------------------------
+type FD = PhaseThree QueryFunctionDescription
 
 -- The user RoleType is necessary for setting inverted queries.
 -- The domain should be a CDOM.
@@ -95,8 +100,8 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
         makeSequence <$> foldM addVarBindingToSequence head_ tail <*> sequenceOfAssignments userRoleTypes assignments
     where
       -- Inverts the result as well.
-      compileVarBinding :: VarBinding -> PhaseThree QueryFunctionDescription
-      compileVarBinding (VarBinding varName step) = do
+      compileVarBinding :: LetABinding -> PhaseThree QueryFunctionDescription
+      compileVarBinding (Expr (VarBinding varName step)) = do
           step_ <- compileAndDistributeStep
             currentDomain
             step
@@ -104,6 +109,16 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
             stateIdentifiers
           addBinding varName step_
           pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) (functional step_) (mandatory step_)
+      compileVarBinding (Stat varName ass) = do
+        assignmentDescription <- describeAssignmentStatement userRoleTypes ass
+        -- Add the binding to the compile time environment.
+        addBinding varName assignmentDescription
+        pure $ UQD currentDomain (QF.BindResultFromCreatingAssignment varName) assignmentDescription (range assignmentDescription) (functional assignmentDescription) (mandatory assignmentDescription)
+
+      -- The range of a sequence equals that of its second term.
+      -- The fold is left associative: ((binding1 *> binding2) *> binding3). The compiler handles that ok.
+      addVarBindingToSequence :: QueryFunctionDescription -> LetABinding -> FD
+      addVarBindingToSequence seq v = makeSequence <$> pure seq <*> (compileVarBinding v)
 
   -- This will return a QueryFunctionDescription that describes either a single assignment, or
   -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
@@ -131,13 +146,14 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
       CreateRole {roleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
-        pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain True True
+        -- Because we can use CreateRole in a binding in a letA, we return a meaningful range value.
+        pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM $ ST qualifiedRoleIdentifier) True True
 
       CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
-        pure $ UQD currentDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte currentDomain True True
+        pure $ UQD currentDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM $ ST qualifiedRoleIdentifier) True True
 
       CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
         roleQfd <- ensureRole subjects roleExpression

@@ -141,7 +141,6 @@ perspectDef = LanguageDef
                   , "boundBy"
                   , "available"
                   , "with"
-                  , "letE"
                   , "from"
                   , "role"
 

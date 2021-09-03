@@ -26,10 +26,10 @@ import Data.Traversable (traverse)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), RoleIdentification(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetStep(..), Statements(..))
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
-import Prelude (pure, (<$>), bind, ($), (>>=), flip, (<<<))
+import Prelude (pure, (<$>), bind, ($), (>>=), flip, (<<<), (<*>))
 
 class ContainsPrefixes s where
   expandPrefix :: s -> PhaseTwo s
@@ -66,6 +66,10 @@ instance containsPrefixesLetStep :: ContainsPrefixes LetStep where
     ebindings <- traverse expandPrefix bindings
     eassignments <- traverse expandPrefix assignments
     pure $ LetStep r {bindings = ebindings, assignments = eassignments}
+
+instance containsPrefixesLetABinding :: ContainsPrefixes LetABinding where
+  expandPrefix (Expr varbinding) = Expr <$> expandPrefix varbinding
+  expandPrefix (Stat varname assignment) = Stat <$> pure varname <*> expandPrefix assignment
 
 instance containsPrefixesPureLetStep :: ContainsPrefixes PureLetStep where
   expandPrefix (PureLetStep r@{bindings, body}) = do
