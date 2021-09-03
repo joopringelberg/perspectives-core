@@ -70,14 +70,14 @@ domain Models
         verbs (Consult)
       perspective on context >> extern
         action Boot
-      		-- Create the indexed context:
-      		createContext ModelsOverview bound to IndexedContexts in sys:MySystem
+          letA
+        		-- Create the indexed context:
+        		irole <- createContext ModelsOverview bound to IndexedContexts in sys:MySystem
+          in
+        		-- Add the indexed name:
+        		Name = "model://perspect.it/Models$MyModels" for irole
 
-      		-- Add the indexed name:
-      		Name = "model://perspect.it/Models$MyModels" for sys:MySystem >> filter IndexedContexts with binding >> context >> contextType == ModelsOverview
-
-      		-- Add the model description to MyModels:
-          -- TODO: gebruik de uitgecommentarieerde regel zodra we URLs als identifiers herkennen.
-          -- Voor nu gebruiken we het type in plaats van de beschrijving.
-      		--bind https://cw.perspect.it/SimpleChat to LocalModels
-          --bind mod:Models to LocalModels in mod:MyModels
+        		-- Add the model description to MyModels:
+            -- TODO: gebruik de uitgecommentarieerde regel zodra we URLs als identifiers herkennen.
+            -- Voor nu gebruiken we het type in plaats van de beschrijving.
+        		--bind https://cw.perspect.it/SimpleChat to LocalModels
