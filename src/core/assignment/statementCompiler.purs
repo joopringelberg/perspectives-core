@@ -48,7 +48,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, li
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.ExpressionCompiler (addVarBindingToSequence, compileAndDistributeStep, makeSequence)
+import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (identifier_)

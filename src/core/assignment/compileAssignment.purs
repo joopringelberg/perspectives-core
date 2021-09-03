@@ -316,4 +316,4 @@ compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contex
       roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
       -- No need to handle retrieval errors as we've just created the role.
       pure (unwrap roleIdentifier)
-compileCreatingAssignments qfd = pure \ci -> pure [""]
+compileCreatingAssignments qfd = pure \ci -> pure []
