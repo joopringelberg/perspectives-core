@@ -20,7 +20,7 @@ domain CouchdbManagement
     aspect sys:RootContext
     external
       aspect sys:RootContext$External
-      
+
     -- Every user manages his own CouchdbServers.
     -- This manager is not necessarily the admin of a Couchdb installation!
     user Manager = sys:Me
@@ -80,27 +80,28 @@ domain CouchdbManagement
     user Accounts (unlinked) filledBy sys:PerspectivesSystem$User
       aspect acc:Body$Accounts
 
-      state IsFilled = exists binding
-        on entry
-          do for Admin
-            letA
-                pw <- callExternal utl:GenSym returns String
-            in
-              callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
-              Password = pw
+      state Root = true
+        state IsFilled = exists binding
+          on entry
+            do for Admin
+              letA
+                  pw <- callExternal utl:GenSym returns String
+              in
+                callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
+                Password = pw
 
-      state Remove = ToBeRemoved
-        on entry
-          do for Admin
-            callEffect cdb:DeleteUser( context >> extern >> Url, binding )
-            remove currentrole
+        state Remove = ToBeRemoved
+          on entry
+            do for Admin
+              callEffect cdb:DeleteUser( context >> extern >> Url, binding )
+              remove currentrole
 
-      -- After CouchdbServer$Admin provides the first password, he no longer
-      -- has a perspective on it. The new value provided below is thus really private.
-      in state ResetPassword
-        on entry do
-          callEffect cdb:ResetPassword( context >> extern >> Url, Username, callExternal utl:GenSym returns String )
-          ResetPassword = true
+        -- After CouchdbServer$Admin provides the first password, he no longer
+        -- has a perspective on it. The new value provided below is thus really private.
+        in state ResetPassword
+          on entry do
+            callEffect cdb:ResetPassword( context >> extern >> Url, Username, callExternal utl:GenSym returns String )
+            ResetPassword = true
 
       property ToBeRemoved (Boolean)
       property PasswordReset (Boolean)
@@ -113,18 +114,19 @@ domain CouchdbManagement
     context Repositories filledBy Repository
       --storage public
       property ToBeRemoved (Boolean)
-      state IsNamed = exists Name
-        on entry
-          do for Admin
-            callEffect cdb:CreateDatabase( context >> extern >> Url, Name + "_read" )
-            callEffect cdb:CreateDatabase( context >> extern >> Url, Name + "_write" )
-            callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
-      state Remove = ToBeRemoved
-        on entry
-          do for Admin
-            callEffect cdb:EndReplication( context >> extern >> Url, context >> extern >> Url, Name + "_write", Name + "_read" )
-            callEffect cdb:DeleteDatabase( context >> extern >> Url, context >> extern >> Url, Name + "_read" )
-            callEffect cdb:DeleteDatabase( context >> extern >> Url, context >> extern >> Url, Name + "_write" )
+      state Root = true
+        state IsNamed = exists Name
+          on entry
+            do for Admin
+              callEffect cdb:CreateDatabase( context >> extern >> Url, Name + "_read" )
+              callEffect cdb:CreateDatabase( context >> extern >> Url, Name + "_write" )
+              callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
+        state Remove = ToBeRemoved
+          on entry
+            do for Admin
+              callEffect cdb:EndReplication( context >> extern >> Url, context >> extern >> Url, Name + "_write", Name + "_read" )
+              callEffect cdb:DeleteDatabase( context >> extern >> Url, context >> extern >> Url, Name + "_read" )
+              callEffect cdb:DeleteDatabase( context >> extern >> Url, context >> extern >> Url, Name + "_write" )
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -156,19 +158,20 @@ domain CouchdbManagement
     -- TODO. Is het mogelijk ook deze rol het aspect acc:Body$Accounts te geven?
     -- Guest kan dan kiezen of hij een Account wil, of een Author wil worden.
     user Authors filledBy CouchdbServer$Accounts, CouchdbServer$Admin
-      state IsFilled = exists binding
-        on entry
-          do for Admin
-            -- As only the PDR of a user with role Repository$Admin will execute this,
-            -- and Repository$Admin is a Db Admin, this will be allowed.
-            callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_write", binding >> Username )
-            callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> Username )
-      state Remove = ToBeRemoved
-        on entry
-          do for Admin
-            callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_write", binding >> Username)
-            callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> Username)
-            remove currentrole
+      state Root = true
+        state IsFilled = exists binding
+          on entry
+            do for Admin
+              -- As only the PDR of a user with role Repository$Admin will execute this,
+              -- and Repository$Admin is a Db Admin, this will be allowed.
+              callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_write", binding >> Username )
+              callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> Username )
+        state Remove = ToBeRemoved
+          on entry
+            do for Admin
+              callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_write", binding >> Username)
+              callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> Username)
+              remove currentrole
 
       -- Admin can set this to true to remove the Author from the Repository.
       -- By using this mechanism instead of directly removing the role,
@@ -186,21 +189,22 @@ domain CouchdbManagement
     -- through (Couchdb database) roles or by membership.
     user Accounts filledBy CouchdbServer$Accounts, CouchdbServer$Admin
       aspect acc:Body$Accounts
-      state IsFilled = exists binding
-        on entry
-          do for Admin
-            -- As only the PDR of a user with role Repository$Admin will execute this,
-            -- and Repository$Admin is a Db Admin, this will be allowed.
-            callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> Username )
-      state Remove = ToBeRemoved
-        on entry
-          do for Admin
-            callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> Username)
-            remove currentrole
-      in state Accepted
-        -- An account that is accepted has a perspective on available models.
-        perspective on AvailableModels
-          verbs (Consult)
+      state Root = true
+        state IsFilled = exists binding
+          on entry
+            do for Admin
+              -- As only the PDR of a user with role Repository$Admin will execute this,
+              -- and Repository$Admin is a Db Admin, this will be allowed.
+              callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> Username )
+        state Remove = ToBeRemoved
+          on entry
+            do for Admin
+              callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> Username)
+              remove currentrole
+        in state Accepted
+          -- An account that is accepted has a perspective on available models.
+          perspective on AvailableModels
+            verbs (Consult)
 
     -- Note that the aspect acc:Body introduces a Guest role
     -- with a perspective that allows it to create an Account.

@@ -60,6 +60,10 @@ domain Models
     -- This role should be stored in public space.
     user Author filledBy sys:PerspectivesSystem$User
       --storage public
+      state Test = true
+        on entry
+          do
+            bind sys:Me to Author
       perspective on Versions
         defaults
       perspective on extern
@@ -68,16 +72,17 @@ domain Models
     user Guest = sys:Me
       perspective on Versions
         verbs (Consult)
-      perspective on context >> extern
+      perspective on extern
+        defaults
         action Boot
           letA
         		-- Create the indexed context:
         		irole <- createContext ModelsOverview bound to IndexedContexts in sys:MySystem
           in
         		-- Add the indexed name:
-        		Name = "model://perspect.it/Models$MyModels" for irole
-
+            Name = "model://perspect.it/Models$MyModels" for irole
         		-- Add the model description to MyModels:
             -- TODO: gebruik de uitgecommentarieerde regel zodra we URLs als identifiers herkennen.
             -- Voor nu gebruiken we het type in plaats van de beschrijving.
         		--bind https://cw.perspect.it/SimpleChat to LocalModels
+            bind sys:Me to Author
