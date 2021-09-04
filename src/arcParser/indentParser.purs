@@ -31,12 +31,13 @@ import Data.Either (Either)
 import Data.List (List(..), many, singleton, some)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
+import Data.String (Pattern(..), indexOf)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
 import Perspectives.Parsing.Arc.AST (RoleIdentification, StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..))
-import Prelude (class Monad, Unit, bind, discard, flip, not, pure, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (==), (>), (>>=), (||))
+import Prelude (class Monad, Unit, bind, discard, flip, not, pure, show, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (==), (>), (>>=), (||))
 import Record (get, set) as Record
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
@@ -318,3 +319,10 @@ nextLine = do
     pos <- getPosition
     s   <- get'
     if sourceLine pos > sourceLine s then pure unit else (eof <|> fail "not on the next line")
+
+containsTab :: IP Boolean
+containsTab = do
+  input <- gets \(ParseState input _ _) -> input
+  case indexOf (Pattern "\t") input of
+    Nothing -> pure true
+    Just pos -> fail $ "Tab found at string position " <> (show pos) <> ". Remove all tabs as they confuse the index computation, leading to errors in parsing your model."
