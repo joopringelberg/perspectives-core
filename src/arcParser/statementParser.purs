@@ -36,7 +36,7 @@ import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>), (<*>))
 import Text.Parsing.Indent (withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (lookAhead, manyTill, option, optionMaybe, (<?>))
+import Text.Parsing.Parser.Combinators (lookAhead, manyTill, option, optionMaybe, try, (<?>))
 
 assignment :: IP Assignment
 assignment = isPropertyAssignment >>= if _
@@ -212,7 +212,7 @@ callEffect = do
 
 -- | A let with assignments: letA <binding>+ in <assignment>+.
 letWithAssignment :: IP LetStep
-letWithAssignment = withPos do
+letWithAssignment = try $ withPos do
   start <- getPosition
   bindings <- reserved "letA" *> nestedBlock letABinding
   assignments <- reserved "in" *> nestedBlock assignment

@@ -533,7 +533,7 @@ perspectivePart = do
     "perspective", "on" -> perspectiveOn
     "perspective", "of" -> perspectiveOf
     "selfonly", _ -> singleton <<< SO <$> selfOnly
-    _, _ -> fail "Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly"
+    one, two -> fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly, but found: '" <> one <> "' and '" <> two <> "'.")
 
 -- | inState =
 -- | 	in state <ident> [of {subject | object | context} state]
@@ -891,8 +891,7 @@ actionE = do
       kw <- option "" (lookAhead reservedIdentifier)
       effect <- if kw == "letA"
         then Let <$> letWithAssignment
-        else Statements <$> fromFoldable <$> block1 assignment
-      -- effect <- Statements <$> fromFoldable <$> block1 assignment <|> Let <$> letWithAssignment
+        else Statements <$> fromFoldable <$> entireBlock1 assignment
       end <- getPosition
       pure $ singleton $ AC $ ActionE {id, subject: s, object: o, state, effect, start, end}
 
