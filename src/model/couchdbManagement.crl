@@ -11,5 +11,4 @@ cm:Model usr:CouchdbManagementModel
   sys:Model$IndexedContext =>
     cm:CouchdbManagementApp cm:MyCouchdbApp
       extern sys:RootContext$External$Name = "Couchdb management"
-      $Manager -> sys:Me
     sys:Model$IndexedContext$Name = "CouchdbManagement$MyCouchdbApp"

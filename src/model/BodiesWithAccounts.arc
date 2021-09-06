@@ -14,6 +14,13 @@ domain BodiesWithAccounts
     property UserName (String)
     property Password (String)
 
+  -- The model description case.
+  -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
+  case Model
+    aspect sys:Model
+    external
+      aspect sys:Model$External
+
   case Body
 
     -- Admin can always create and fill Accounts and see the UserName.
