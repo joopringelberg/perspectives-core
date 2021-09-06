@@ -245,8 +245,11 @@ addContextualVariablesToStatements stmts mobject stateKind = case stmts of
         CState -> case mobject of
           Nothing -> throwError (MissingObject (unsafePartial $ startOfStatements stmts') (unsafePartial $ endOfStatements stmts'))
           Just obj -> void $ addBinding (VarBinding "currentobject" obj)
+        -- In subject state, we consider the subject to be the object, too, unless otherwise specified.
+        -- Hence we use Identity.
         SState -> case mobject of
-          Nothing -> throwError (MissingObject (unsafePartial $ startOfStatements stmts') (unsafePartial $ endOfStatements stmts'))
+          Nothing -> void $ addBinding (VarBinding "currentobject" (Simple $ Identity (unsafePartial $ startOfStatements stmts')))
+          -- Nothing -> throwError (MissingObject (unsafePartial $ startOfStatements stmts') (unsafePartial $ endOfStatements stmts'))
           Just obj -> void $ addBinding (VarBinding "currentobject" obj)
         OState -> void $ addBinding (VarBinding "currentobject" (Simple $ Identity (unsafePartial $ startOfStatements stmts')))
       else pure unit

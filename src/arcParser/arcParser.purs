@@ -231,10 +231,10 @@ userRoleE = protectSubject $ withEntireBlock
       if isCalculated
         then do
           setSubject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
-          setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
+          -- setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
         else do
           setSubject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
-          setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
+          -- setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
       -- | userRoleE cannot fail in the last line.
       ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
 
