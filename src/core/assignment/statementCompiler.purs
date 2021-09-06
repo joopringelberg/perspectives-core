@@ -313,7 +313,7 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
           case mrt of
             Just (ENP et) -> pure et
             Just (CP ct') -> throwError $ CannotCreateCalculatedProperty ct' start end
-            otherwise -> throwError $ RoleHasNoProperty rt propertyIdentifier
+            otherwise -> throwError $ RoleHasNoProperty rt propertyIdentifier start end
 
         -- | If the name is unqualified, look for an EnumeratedRole with matching local name in the Domain.
         -- | Then, we check whether a candidate's binding type equals the second argument, or is less specialised. In other words: whether the candidate could bind it (the second argument).

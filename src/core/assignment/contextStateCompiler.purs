@@ -147,7 +147,7 @@ enteringState contextId userRoleType stateId = do
         if isJust objectGetter
           then for_ objects \object -> do
             oldFrame <- lift2 pushFrame
-            lift2 $ addBinding "object" [unwrap object]
+            lift2 $ addBinding "currentobject" [unwrap object]
             updater contextId
             lift2 $ restoreFrame oldFrame
           -- Note we do not push an empty set of values for object, like we did for rules.
@@ -212,7 +212,7 @@ exitingState contextId userRoleType stateId = do
       then if isJust objectGetter
         then for_ objects \object -> do
           oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "object" [unwrap object]
+          lift2 $ addBinding "currentobject" [unwrap object]
           updater contextId
           lift2 $ restoreFrame oldFrame
         else updater contextId

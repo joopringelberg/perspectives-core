@@ -69,7 +69,7 @@ data PerspectivesError
     | UnknownElementaryQueryStep
     | IncompatibleQueryArgument ArcPosition Domain Step
     | ContextHasNoRole (ADT ContextType) String
-    | RoleHasNoProperty (ADT EnumeratedRoleType) String
+    | RoleHasNoProperty (ADT EnumeratedRoleType) String ArcPosition ArcPosition
     | UniversalRoleHasNoParts
     | RoleHasNoBinding ArcPosition (ADT EnumeratedRoleType)
     | RoleCannotHaveBinding ArcPosition ArcPosition String
@@ -136,7 +136,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here)."
-  show (RoleHasNoProperty rtype qn) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "'."
+  show (RoleHasNoProperty rtype qn start end) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "' (between " <> show start <> " and " <> show end <> ")."
   show UniversalRoleHasNoParts = "(UniversalRoleHasNoParts) 'NoBinding' gives no access to properties, aspects, binding, etc."
   show (RoleHasNoBinding pos rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding " <> show pos
   show (RoleCannotHaveBinding start end roletype) = "(RoleCannotHaveBinding) Bot Roles and External Roles cannot have a binding. " <> roletype <> ", from " <> show start <> " to " <> show end

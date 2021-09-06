@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
--- | Functions in this module add the contextual variables "currentcontext" and "object"
+-- | Functions in this module add the contextual variables "currentcontext" and "currentobject"
 -- | to the lexical representation of expressions and statements, if they contain a
 -- | reference to them.
 
@@ -154,7 +154,7 @@ addBinding vb = modify (union [vb])
 addContextualVariablesToExpression :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> StateKind -> m Step
 addContextualVariablesToExpression stp mobject stateKind = case stp of
   (PureLet (PureLetStep r@{bindings})) -> do
-    -- TODO. Let op: we zouden óók in de bindings zelf moeten zoeken naar verwijzingen naar "object" en "currentcontext".
+    -- TODO. Let op: we zouden óók in de bindings zelf moeten zoeken naar verwijzingen naar "currentobject" en "currentcontext".
     extraBindings <- collectBindings do
       for_ bindings \(VarBinding _ stp') -> do
         addCurrentContextForStep stp' stateKind
@@ -185,15 +185,15 @@ addCurrentContextForStep stp stateKind = if stepContainsVariableReference "curre
   else pure unit
 
 addObjectForStep :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> StateKind -> CollectingBindings m Unit
-addObjectForStep stp mobject stateKind = if stepContainsVariableReference "object" stp
+addObjectForStep stp mobject stateKind = if stepContainsVariableReference "currentobject" stp
   then case stateKind of
     CState -> case mobject of
       Nothing -> throwError (MissingObject (unsafePartial $ startOf stp) (unsafePartial $ endOf stp))
-      Just obj -> void $ addBinding (VarBinding "object" obj)
+      Just obj -> void $ addBinding (VarBinding "currentobject" obj)
     SState -> case mobject of
       Nothing -> throwError (MissingObject (unsafePartial $ startOf stp) (unsafePartial $ endOf stp))
-      Just obj -> void $ addBinding (VarBinding "object" obj)
-    OState -> void $ addBinding (VarBinding "object" (Simple $ Identity (unsafePartial $ startOf stp)))
+      Just obj -> void $ addBinding (VarBinding "currentobject" obj)
+    OState -> void $ addBinding (VarBinding "currentobject" (Simple $ Identity (unsafePartial $ startOf stp)))
   else pure unit
 
 --------------------------------------------------------------------------
@@ -240,15 +240,15 @@ addContextualVariablesToStatements stmts mobject stateKind = case stmts of
     -- For object state, `object` is bound to the role instance that the expression is applied to.
     -- For subject state, `object` is bound to objects computed with mobject.
     addObject :: Statements -> CollectingBindings m Unit
-    addObject stmts' = if statementContainsVariableReference "object" stmts'
+    addObject stmts' = if statementContainsVariableReference "currentobject" stmts'
       then case stateKind of
         CState -> case mobject of
           Nothing -> throwError (MissingObject (unsafePartial $ startOfStatements stmts') (unsafePartial $ endOfStatements stmts'))
-          Just obj -> void $ addBinding (VarBinding "object" obj)
+          Just obj -> void $ addBinding (VarBinding "currentobject" obj)
         SState -> case mobject of
           Nothing -> throwError (MissingObject (unsafePartial $ startOfStatements stmts') (unsafePartial $ endOfStatements stmts'))
-          Just obj -> void $ addBinding (VarBinding "object" obj)
-        OState -> void $ addBinding (VarBinding "object" (Simple $ Identity (unsafePartial $ startOfStatements stmts')))
+          Just obj -> void $ addBinding (VarBinding "currentobject" obj)
+        OState -> void $ addBinding (VarBinding "currentobject" (Simple $ Identity (unsafePartial $ startOfStatements stmts')))
       else pure unit
 
     startOfStatements :: Partial => Statements -> ArcPosition

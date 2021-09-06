@@ -202,7 +202,7 @@ makePropertyGetter currentDomain pt = do
 -- | Saves it in the DomainCache.
 compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> PhaseThree QT.Range
 compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role}) = withFrame do
-  -- We add the role as the variable "object"
+  -- We add the role as the variable "currentobject"
   kindOfRole <- unsafePartial $ roleKind role
   expressionWithEnvironment <- addContextualVariablesToExpression step (Just $ Simple $ Identity (startOf step))
     case kindOfRole of
@@ -299,7 +299,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
               then  lift2 $ runArrayT $ lookForPropertyType ident r
               else lift2 $ runArrayT $ lookForUnqualifiedPropertyType ident r
             case uncons pts of
-              Nothing -> throwError $ RoleHasNoProperty r ident
+              Nothing -> throwError $ RoleHasNoProperty r ident pos pos
               Just {head:pt, tail} -> if null tail
                 then makePropertyGetter currentDomain pt
                 else throwError $ NotUniquelyIdentifying pos ident (show <$> pts)

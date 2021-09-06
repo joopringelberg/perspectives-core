@@ -96,7 +96,7 @@ compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType
 
 compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
   (cp :: CalculatedProperty) <- getPerspectType pt
-  -- TODO moeten we hier de currentrole pushen?
+  -- TODO moeten we hier de currentobject pushen?
   PC.calculation cp >>= compileFunction
 
 compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ unsafeCoerce externalRole
@@ -524,14 +524,14 @@ getPropertyFunction p = do
 --     <|>
 --     do
 --       (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType ident)
---       unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentRole)
+--       unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentObject)
 --       )
 
 -- TODO: opruimen!
-pushCurrentRole :: (String ~~> String) -> (String ~~> String)
-pushCurrentRole f roleId = do
-  -- save contextId in it under the name currentrole
-  lift $ lift (addBinding "currentrole" [roleId])
+pushCurrentObject :: (String ~~> String) -> (String ~~> String)
+pushCurrentObject f roleId = do
+  -- save contextId in it under the name currentobject
+  lift $ lift (addBinding "currentobject" [roleId])
   -- apply f to roleId
   f roleId
 
@@ -547,7 +547,7 @@ getterFromPropertyType (CP cp@(CalculatedPropertyType id)) = case lookupProperty
     p <- getPerspectType cp
     functional <- PC.functional p
     mandatory <- PC.mandatory p
-    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentRole)
+    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentObject)
     void $ pure $ propertyGetterCacheInsert id getter functional mandatory
     pure getter
   Just g -> pure g

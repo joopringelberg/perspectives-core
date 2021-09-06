@@ -413,7 +413,7 @@ getterFromPropertyType (CP cp@(CalculatedPropertyType id)) roleId =
     lift <<< lift <<< PC.calculation >>=
       \calc -> do
         old <- lift $ lift $ pushFrame
-        lift $ lift (addBinding "currentrole" [unwrap roleId])
+        lift $ lift (addBinding "currentobject" [unwrap roleId])
         r <- interpret calc (singletonPath (R roleId))
         lift $ lift $ restoreFrame old
         pure r
