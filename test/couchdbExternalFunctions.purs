@@ -85,6 +85,14 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Couchdb") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Couchdb: " <> show errs) false
 
+  test "upload model:Utilities to repository from files" $ runP do
+    errs <- loadCompileAndCacheArcFile "utilities" modelDirectory
+    if null errs
+      then do
+        cdburl <- developmentRepository
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Utilities") cdburl)
+      else liftAff $ assert ("There are instance- or model errors for model:Utilities: " <> show errs) false
+
   test "upload model:System to repository from files" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
@@ -115,7 +123,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:BodiesWithAccounts") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:BodiesWithAccounts: " <> show errs) false
 
-  testOnly "upload model:Models to repository from files (without testuser)" $ runP do
+  test "upload model:Models to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
@@ -178,10 +186,13 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Competition") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Competition: " <> show errs) false
 
-  test "upload model:CouchdbManagement to repository from files (without testuser)" $ runP do
+  testOnly "upload model:CouchdbManagement to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile "utilities" modelDirectory
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    _ <- loadCompileAndCacheArcFile "models" modelDirectory
+    _ <- loadCompileAndCacheArcFile "bodiesWithAccounts" modelDirectory
     errs <- loadCompileAndCacheArcFile "couchdbManagement" modelDirectory
     if null errs
       then do

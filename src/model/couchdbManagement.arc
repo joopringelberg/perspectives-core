@@ -51,7 +51,7 @@ domain CouchdbManagement
             do
               callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
               callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
-              --remove currentrole -- LET OP: weet niet of dit werkt voor calculated role.
+              remove currentobject
         state IsFilled = exists binding
           on entry
             do
@@ -96,7 +96,7 @@ domain CouchdbManagement
           on entry
             do for Admin
               callEffect cdb:DeleteUser( context >> extern >> Url, binding )
-              --remove currentrole
+              --remove currentobject
 
         -- After CouchdbServer$Admin provides the first password, he no longer
         -- has a perspective on it. The new value provided below is thus really private.
@@ -104,7 +104,7 @@ domain CouchdbManagement
           on entry
             do
               callEffect cdb:ResetPassword( context >> extern >> Url, UserName, callExternal utl:GenSym() returns String )
-              PasswordReset = true
+              PasswordReset = true for currentobject
 
       property ToBeRemoved (Boolean)
       -- TODO: add a condition that allows an Account to see non-public repositories
@@ -174,7 +174,7 @@ domain CouchdbManagement
             do for Admin
               callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_write", binding >> UserName)
               callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
-              --remove currentrole
+              remove currentobject
 
       -- Admin can set this to true to remove the Author from the Repository.
       -- By using this mechanism instead of directly removing the role,
@@ -204,7 +204,7 @@ domain CouchdbManagement
           on entry
             do for Admin
               callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
-              --remove currentrole
+              remove currentobject
       in state Accepted
           -- An account that is accepted has a perspective on available models.
           perspective on AvailableModels
