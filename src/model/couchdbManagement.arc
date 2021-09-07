@@ -28,6 +28,10 @@ domain CouchdbManagement
         defaults
 
     context CouchdbServers filledBy CouchdbServer
+      state NoAdmin = not exists binding >> context >> Admin
+        on entry
+          do for Manager
+            bind context >> Manager to Admin in binding >> context
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -90,7 +94,7 @@ domain CouchdbManagement
                   pw <- callExternal utl:GenSym() returns String
               in
                 callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
-                Password = pw
+                Password = pw for currentobject
 
         state Remove = ToBeRemoved
           on entry
