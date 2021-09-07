@@ -213,6 +213,7 @@ addModelToLocalStore' url = do
       -- Add replacements to PerspectivesState for the new indexed names introduced in this model,
       -- unless we find existing ones left over from a previous installation of the model.
       (iroles :: Object RoleInstance) <- for indexedRoles (\iRole -> do
+        -- iRole is the *indexed name* (not the unique name).
         (mexistingReplacement :: Maybe RoleInstance) <- lift $ lift $ lookupIndexedRole (unwrap iRole)
         case mexistingReplacement of
           Just existingReplacement -> pure $ Tuple (unwrap iRole) existingReplacement
@@ -327,13 +328,16 @@ addModelToLocalStore' url = do
             ))
             contextInstances
 
-          -- TODO Geef voorkeur aan nieuwe versies.
           -- Save context instances, but prefer a version left over from a previous installation.
-          forWithIndex_ cis \(i :: String) a -> do
+          forWithIndex_ cis \(i :: String) newVersion -> do
             -- We *must* get the revision from the database. On doing an update, the context will be put into
             -- cache by the CRL parser. It then has no revision.
-            oldCtxt <- lift $ lift $ tryFetchEntiteit (ContextInstance i)
-            lift2 $ saveEntiteit_ (ContextInstance i) $ changeRevision (maybe Nothing rev oldCtxt) a
+            moldCtxt <- lift $ lift $ tryFetchEntiteit (ContextInstance i)
+            case moldCtxt of
+              Nothing -> lift2 $ saveEntiteit_ (ContextInstance i) newVersion
+              Just oldCtxt  -> do
+                void $ lift2 $ cacheEntity (ContextInstance i) oldCtxt
+                pure oldCtxt
 
       -- Distribute the SeparateInvertedQueries over the other domains.
       forWithIndex_ invertedQueriesInOtherDomains
