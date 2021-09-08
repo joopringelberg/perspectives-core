@@ -43,7 +43,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MP, MPQ, MonadPerspectives, Assumption, liftToInstanceLevel, (##=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, liftToInstanceLevel, (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -258,13 +258,13 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [AndF, OrF] = do
   (f1' :: String ~~> Value) <- unsafeCoerce $ compileFunction f1
   (f2' :: String ~~> Value) <- unsafeCoerce $ compileFunction f2
-  pure \c -> (unsafeCoerce (logicalOperation (unsafePartial $ mapLogicalOperator g) f1' f2') c)
+  pure (unsafeCoerce (logicalOperation (unsafePartial $ mapLogicalOperator g) f1' f2'))
 
 -- Add and subtract for numbers and strings. Divide and multiply just for numbers.
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
-  pure $ performNumericOperation g ran f1' f2' (unsafeCoerce $ unsafePartial $ mapNumericOperator g ran)
+  pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapNumericOperator g ran)
 
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
@@ -383,49 +383,49 @@ performNumericOperation ::
   Range ->
   (String ~~> String) ->
   (String ~~> String) ->
-  (String -> String -> String) ->
+  (String -> String ~~> String) ->
   (String ~~> String)
 performNumericOperation g ran a b f c = ArrayT do
   (as :: Array String) <- runArrayT (a c)
   (bs :: Array String) <- runArrayT (b c)
-  pure $ performNumericOperation' g ran as bs f
+  (performNumericOperation' g ran f) as bs
 
 performNumericOperation' ::
   FunctionName ->
   Range ->
+  (String -> String ~~> String) ->
   Array String ->
-  Array String ->
-  (String -> String -> String) -> (Array String)
-performNumericOperation' g ran as bs f = do
+  Array String -> (WriterT (ArrayWithoutDoubles InformedAssumption) MonadPerspectives) (Array String)
+performNumericOperation' g ran f as bs = do
   case head as, head bs of
     Just a1, Just b1 -> do
-      [f a1 b1]
+      runArrayT $ f a1 b1
     Nothing, Just b1 -> case g of
       -- Just return fr2
-      AddF -> [b1]
+      AddF -> pure [b1]
       -- Subtract the second value from the first means: negate it, when a number.
       SubtractF -> case ran of
-        VDOM RAN.PNumber _ -> [ show (0 - (unsafeCoerce value2Int b1)) ]
-        otherwise -> []
-      otherwise -> []
+        VDOM RAN.PNumber _ -> (\x -> [show (0 - x)]) <$> parseInt b1
+        otherwise -> pure []
+      otherwise -> pure []
     Just a1, Nothing -> case g of
-      AddF -> [a1]
-      SubtractF -> [a1]
-      otherwise -> []
-    _, _ -> []
+      AddF -> pure [a1]
+      SubtractF -> pure [a1]
+      otherwise -> pure []
+    _, _ -> pure []
 
-mapNumericOperator :: Partial => FunctionName -> Domain -> (Value -> Value ~~> Value)
+mapNumericOperator :: Partial => FunctionName -> Domain -> (String -> String ~~> String)
 mapNumericOperator AddF (VDOM RAN.PNumber _) = wrapNumericOperator (+)
-mapNumericOperator AddF (VDOM RAN.PString _) = \(Value s1) (Value s2) -> pure (Value $ s1 <> s2)
+mapNumericOperator AddF (VDOM RAN.PString _) = \s1 s2 -> pure (s1 <> s2)
 mapNumericOperator SubtractF (VDOM RAN.PNumber _) = wrapNumericOperator (-)
-mapNumericOperator SubtractF (VDOM RAN.PString _) = \v1@(Value s1) (Value s2) -> case (Pattern s1) `stripSuffix` s2 of
-  Nothing -> pure v1
-  Just r -> pure $ Value r
+mapNumericOperator SubtractF (VDOM RAN.PString _) = \s1 s2 -> case (Pattern s1) `stripSuffix` s2 of
+  Nothing -> pure s1
+  Just r -> pure r
 mapNumericOperator DivideF (VDOM RAN.PNumber _) = wrapNumericOperator (/)
 mapNumericOperator MultiplyF (VDOM RAN.PNumber _) = wrapNumericOperator (*)
 
-wrapNumericOperator :: (Int -> Int -> Int) -> (Value -> Value ~~> Value)
-wrapNumericOperator g (Value p) (Value q) = (Value <<< show) <$> (g <$> (lift $ parseInt p) <*> (lift $ parseInt q))
+wrapNumericOperator :: (Int -> Int -> Int) -> (String -> String ~~> String)
+wrapNumericOperator g p q = show <$> (g <$> (parseInt p) <*> (parseInt q))
 
 ---------------------------------------------------------------------------------------------------
 -- CONSTRUCT ROLE- AND PROPERTYVALUE GETTERS

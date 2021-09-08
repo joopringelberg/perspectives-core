@@ -220,10 +220,13 @@ interpret (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g [A
   fr2 <- runArrayT (interpret f1 a)
   case head fr1, head fr2 of
     Just fr1h, Just fr2h -> do
-      (result :: Array String) <- pure (performNumericOperation' g ran
+      (result :: Array String) <- (performNumericOperation'
+        g
+        ran
+        (unsafePartial mapNumericOperator g ran)
         [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
         [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
-        (unsafeCoerce (unsafePartial mapNumericOperator) g ran))
+        )
       pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
         , mainPath: Nothing
         , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
