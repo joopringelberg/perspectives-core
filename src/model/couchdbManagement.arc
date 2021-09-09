@@ -49,23 +49,9 @@ domain CouchdbManagement
     user Admin filledBy sys:PerspectivesSystem$User
       -- As Admin, has full perspective on Accounts.
       aspect acc:Body$Admin
-      state Root = true
-        state Remove = ToBeRemoved
-          on entry
-            do
-              callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
-              callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
-              remove currentobject
-        state IsFilled = exists binding
-          on entry
-            do
-              -- Only the CouchdbServer$Admin has a Create and Fill perspective on
-              -- Repository$Admin. So when this state arises, we can be sure that
-              -- the current user is, indeed, a CouchdbServer$Admin.
-              -- Hence the PDR will authenticate with Server Admin credentials.
-              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
-              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
-      property ToBeRemoved (Boolean)
+
+      -- TODO. Remove this as soon as we do not need the view anymore for the GUI.
+      view AdminProps (UserName, Password)
 
       perspective on Repositories
         defaults
@@ -77,6 +63,9 @@ domain CouchdbManagement
       -- The credentials for being a database admin have to be entered;
       -- there is no way to create a database admin through InPlace.
       perspective on Admin
+        view AdminProps verbs (SetPropertyValue, Consult)
+
+      perspective on extern
         defaults
 
     -- Note that the aspect acc:Body introduces a Guest role
@@ -124,15 +113,15 @@ domain CouchdbManagement
         state IsNamed = exists Name
           on entry
             do for Admin
-              callEffect cdb:CreateDatabase( context >> extern >> Url, Name + "_read" )
-              callEffect cdb:CreateDatabase( context >> extern >> Url, Name + "_write" )
+              callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_read" )
+              callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_write" )
               callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
         state Remove = ToBeRemoved
           on entry
             do for Admin
               callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
-              callEffect cdb:DeleteDatabase( context >> extern >> Url, Name + "_read" )
-              callEffect cdb:DeleteDatabase( context >> extern >> Url, Name + "_write" )
+              callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
+              callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -145,11 +134,31 @@ domain CouchdbManagement
       property Name (mandatory, String)
       property Url (mandatory, String)
 
+    -- We need the ServerAdmin in this context in order to configure the local Admin.
+    user ServerAdmin = extern >> binder Repositories >> context >> Admin
+
     user Admin filledBy CouchdbServer$Accounts, CouchdbServer$Admin
       -- As Admin, has a full perspective on Accounts.
       -- Should also be able to give them read access to the repo,
       -- and to retract that again.
       aspect acc:Body$Admin
+      state Root = true
+        state IsFilled = (exists binding) and exists context >> extern >> Url
+          on entry
+            do for ServerAdmin
+              -- Only the CouchdbServer$Admin has a Create and Fill perspective on
+              -- Repository$Admin. So when this state arises, we can be sure that
+              -- the current user is, indeed, a CouchdbServer$Admin.
+              -- Hence the PDR will authenticate with Server Admin credentials.
+              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
+              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
+        state Remove = ToBeRemoved
+          on entry
+            do for ServerAdmin
+              callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
+              callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
+              remove currentobject
+      property ToBeRemoved (Boolean)
 
       -- The admin can also create an Author and give him/her the right to add and
       -- remove models to the repo.
