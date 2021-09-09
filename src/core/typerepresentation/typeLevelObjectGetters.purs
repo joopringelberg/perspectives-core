@@ -74,6 +74,7 @@ roleRootState = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MonadPersp
 roleRootStates :: EnumeratedRoleType ~~~> StateIdentifier
 roleRootStates = roleAspectsClosure >=> roleRootState
 
+-- | The locally defined properties (i.e. excluding Aspect properties).
 enumeratedRolePropertyTypes_ :: EnumeratedRoleType -> MonadPerspectives (Array PropertyType)
 enumeratedRolePropertyTypes_ = getEnumeratedRole >=> \(EnumeratedRole{properties}) -> pure properties
 

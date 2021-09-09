@@ -23,26 +23,29 @@
 module Perspectives.Query.Kinked where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (catMaybes, concat, cons, foldr, fromFoldable, intercalate, null, uncons, union, unsnoc)
+import Control.Monad.Trans.Class (lift)
+import Data.Array (catMaybes, concat, cons, elemIndex, foldr, fromFoldable, intercalate, null, uncons, union, unsnoc)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Map (Map, values)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (MP)
 import Perspectives.InvertedQuery (QueryWithAKink(..))
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
-import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setPathForStep)
+import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (makeComposition, setPathForStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (compose, inversionIsFunctional, inversionIsMandatory, invertFunction)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, replaceDomain)
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
-import Perspectives.Representation.Class.Role (getCalculation, getRole)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, getCalculation, getRole)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
 import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -161,6 +164,33 @@ invert_ q@(SQD dom (VariableLookup varName) _ _ _) = do
     Nothing -> pure []
     Just qfd | qfd == q -> pure []
     Just qfd -> invert_ qfd
+
+invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man) = do
+  (hasProp :: Boolean) <- lift $ lift $ roleHasProperty roleAdt
+  if hasProp
+    then do
+      minvertedF <- pure $ invertFunction dom f ran
+      case minvertedF of
+        Nothing -> pure []
+        Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f))] Nothing]
+    else ((lift $ lift (expandPropertyQuery roleAdt)) >>= invert_)
+
+  where
+
+    expandPropertyQuery :: ADT EnumeratedRoleType -> MP QueryFunctionDescription
+    expandPropertyQuery adt = do
+      hasProp <- roleHasProperty adt
+      if hasProp
+        then pure (SQD (RDOM adt) (PropertyGetter prop) ran fun man)
+        else makeComposition <$> makeBinding adt <*> (bindingOfADT adt >>= expandPropertyQuery)
+
+    roleHasProperty :: ADT EnumeratedRoleType -> MP Boolean
+    roleHasProperty adt = allLocallyRepresentedProperties adt >>= pure <<< isJust <<< (elemIndex prop)
+
+    makeBinding :: ADT EnumeratedRoleType -> MP QueryFunctionDescription
+    makeBinding adt = do
+      b <- bindingOfADT adt
+      pure (SQD (RDOM adt) (DataTypeGetter BindingF) (RDOM b) True False)
 
 invert_ (SQD dom f ran _ _) = do
   minvertedF <- pure $ invertFunction dom f ran
