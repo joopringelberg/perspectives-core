@@ -30,6 +30,8 @@ module Perspectives.Persistence.CouchdbFunctions
 , deleteUser
 , ensureSecurityDocument
 , setPassword
+, createDatabase
+, deleteDatabase
 )
 
 where
@@ -48,6 +50,7 @@ import Data.Argonaut (fromObject, fromString, fromArray, Json)
 import Data.Array (find)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
+import Data.Map (insert, fromFoldable) as MAP
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.String (toLower)
@@ -60,7 +63,7 @@ import Foreign.Class (decode)
 import Foreign.Generic (decodeJSON)
 import Foreign.JSON (parseJSON)
 import Foreign.Object (fromFoldable, singleton)
-import Perspectives.Couchdb (ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted)
+import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted')
 import Perspectives.Persistence.Authentication (defaultPerspectRequest, ensureAuthentication)
 import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
 import Perspectives.Persistence.Types (DatabaseName, Url, MonadPouchdb)
@@ -74,7 +77,9 @@ import Simple.JSON (writeJSON)
 -- |  - retrieveDocumentVersion
 -- |  - version
 -- | These functions are not exported.
--- |
+-- | To complete a suite of functions to manipulate databases in Couchdb,
+-- | we add createDatabase and addDatabase, too. This is mainly for use in model:Couchdb
+-- | where we offer a functions to handle couchdb installations through Perspectives.
 
 -----------------------------------------------------------
 -- SET SECURITY DOCUMENT
@@ -239,3 +244,35 @@ version headers =  case find (\rh -> toLower (name rh) == "etag") headers of
   (Just h) -> case runExcept $ decodeJSON (value h) of
     Left e -> pure Nothing
     Right v -> pure $ Just v
+
+-----------------------------------------------------------
+-- CREATEDATABASE
+-----------------------------------------------------------
+-- Database names must comply to rules given in https://docs.couchdb.org/en/stable/api/database/common.html#db
+createDatabase :: forall f. DatabaseName -> MonadPouchdb f Unit
+createDatabase databaseUrl = ensureAuthentication do
+  rq <- defaultPerspectRequest
+  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = databaseUrl}
+  -- (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put' (base <> dbname) (Nothing :: Maybe String)
+  liftAff $ onAccepted' createStatusCodes res.status [201] "createDatabase" $ pure unit
+  where
+    createStatusCodes = MAP.insert 412 "Precondition failed. Database already exists."
+      databaseStatusCodes
+
+-----------------------------------------------------------
+-- DELETEDATABASE
+-----------------------------------------------------------
+deleteDatabase :: forall f. Url -> MonadPouchdb f Unit
+deleteDatabase databaseUrl = ensureAuthentication do
+  rq <- defaultPerspectRequest
+  res <- liftAff $ AJ.request $ rq {method = Left DELETE, url = databaseUrl}
+  -- liftAff $ AJ.put' (base <> dbname) (Nothing :: Maybe String)
+  liftAff $ onAccepted' deleteStatusCodes res.status [200] "deleteDatabase" $ pure unit
+  where
+    deleteStatusCodes = MAP.insert 412 "Precondition failed. Database does not exist."
+      databaseStatusCodes
+
+databaseStatusCodes :: CouchdbStatusCodes
+databaseStatusCodes = MAP.fromFoldable
+  [ Tuple 400 "Bad AJ.Request. Invalid database name."
+  , Tuple 401 "Unauthorized. CouchDB Server Administrator privileges required."]

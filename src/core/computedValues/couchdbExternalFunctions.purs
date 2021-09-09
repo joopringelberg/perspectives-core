@@ -66,8 +66,6 @@ import Perspectives.Models (modelsInUse) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
-import Perspectives.Persistence.API (createDatabase, deleteDatabase) as PAPI
-import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, getPerspectRol, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
@@ -486,27 +484,27 @@ type Url = String
 -- | The RoleInstance is an instance of CouchdbServer$Repositories.
 -- | Fails silently if either the url or the name is missing.
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
-createDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
-createDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
+createCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+createCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
-  Just databaseUrl, Just databaseName -> lift2 $ PAPI.createDatabase (databaseUrl <> databaseName)
+  Just databaseUrl, Just databaseName -> lift2 $ CDB.createDatabase (databaseUrl <> databaseName)
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
-deleteDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
-deleteDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
+deleteCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+deleteCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
-  Just databaseUrl, Just databaseName -> lift2 $ PAPI.deleteDatabase (databaseUrl <> databaseName)
+  Just databaseUrl, Just databaseName -> lift2 $ CDB.deleteDatabase (databaseUrl <> databaseName)
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 replicateContinuously :: Array Url -> Array String -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
-replicateContinuously databaseUrls names sources targets _ = case head databaseUrls, head sources, head names, head targets of
+replicateContinuously databaseUrls names sources targets _ = case head databaseUrls, head names, head sources, head targets of
   Just databaseUrl, Just name, Just source, Just target -> lift2 $ CDB.replicateContinuously
     databaseUrl
     name
-    source
-    target
+    (databaseUrl <> source)
+    (databaseUrl <> target)
     Nothing
   _, _, _, _ -> pure unit
 
@@ -536,7 +534,7 @@ updateSecurityDocument :: (String -> SecurityDocument -> SecurityDocument) -> Ar
 updateSecurityDocument updater databaseUrls databaseNames userNames _ = case head databaseUrls, head databaseNames, head userNames of
   Just databaseUrl, Just databaseName, Just userName -> lift2 $ do
     sdoc <- CDB.ensureSecurityDocument databaseUrl databaseName
-    setSecurityDocument databaseUrl databaseName (updater userName sdoc)
+    CDB.setSecurityDocument databaseUrl databaseName (updater userName sdoc)
   _, _, _ -> pure unit
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
@@ -573,8 +571,8 @@ externalFunctions =
   , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
   , Tuple "model:Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
   , Tuple "model:Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
-  , Tuple "model:Couchdb$CreateDatabase" {func: unsafeCoerce createDatabase, nArgs: 2}
-  , Tuple "model:Couchdb$DeleteDatabase" {func: unsafeCoerce deleteDatabase, nArgs: 2}
+  , Tuple "model:Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
+  , Tuple "model:Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
   , Tuple "model:Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 4}
   , Tuple "model:Couchdb$EndReplication" {func: unsafeCoerce replicateContinuously, nArgs: 3}
   , Tuple "model:Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}
