@@ -82,7 +82,7 @@ compileStatement ::
 compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalculation userRoleTypes statements =
   case statements of
     -- Compile a series of Assignments into a QueryDescription.
-    Statements assignments -> sequenceOfAssignments userRoleTypes (reverse assignments)
+    Statements assignments -> sequenceOfAssignments userRoleTypes assignments
       -- Compile the LetStep into a QueryDescription.
     Let letstep -> do
       let_ <- compileLetStep letstep
