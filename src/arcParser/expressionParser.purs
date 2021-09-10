@@ -59,7 +59,14 @@ step_ parenthesised = do
       right <- step
       end <- getPosition
       case right of
+        -- The right expression is binary: leftOfRight <op> rightOfRight.
         (Binary (BinaryStep {left: leftOfRight, operator:opOfRight, right: rightOfRight, end: endOfRight, parenthesised: protected})) -> if not protected && ((operatorPrecedence op) > (operatorPrecedence opOfRight))
+
+          -- Regrouping: the parse tree (a op1 (b op2 c)) becomes ((a op1 b) op2 c).
+          -- The expression was: "a op2 b op1 c"
+          -- (op1 = operator with precedence 1, op2 = operator with precedence 2)
+          -- The right expression is binary and not contained in parenthesis, and
+          -- the left operator has higher precedence (than (or equal to) the right operator).
           then pure $ Binary $ BinaryStep
             { start
             , end -- equals endOfRight.
@@ -68,7 +75,22 @@ step_ parenthesised = do
             , right: rightOfRight
             , parenthesised: false
           }
-          else pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised: parenthesised}
+
+          -- No regrouping.
+          -- The right expression is binary and is contained in parenthesis, OR
+          -- its operator is as precedent as (or more so then) that of the enclosing binary expression.
+          -- Hence, we maintain the right-association that is present in the parse tree: (a op (b op c)).
+          -- The expression is either:
+          --    "a opx (b opy c)"
+          -- (opx and opy have any precedence; precedence does not rule, parenthesis prevail), or:
+          --    "a op1 b op1 c"
+          -- (both operators have equal precedence but we adhere to right-associativity)
+          --    "a op1 b op2 c"
+          -- (op1 = operator with precedence 1, op2 = operator with precedence 2). The parse tree already respects
+          -- the operator precedences.
+          else pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}
+
+        -- The right expression is not binary. No regrouping.
         otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}
   where
     leftSide :: IP Step
@@ -193,26 +215,37 @@ operator =
   (Union <$> (getPosition <* token.reservedOp "either"))
   <|>
   (Intersection <$> (getPosition <* token.reservedOp "both"))
-  ) <?> ">>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>=, union"
+  <|>
+  (BindsOp <$> (getPosition <* token.reserved "binds"))
+  ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, either, both, binds"
 
 operatorPrecedence :: Operator -> Int
-operatorPrecedence (Compose _) = 8
-operatorPrecedence (Equals _) = 0
-operatorPrecedence (NotEquals _) = 0
-operatorPrecedence (LessThan _) = 1
-operatorPrecedence (LessThanEqual _) = 1
-operatorPrecedence (GreaterThan _) = 1
-operatorPrecedence (GreaterThanEqual _) = 1
-operatorPrecedence (LogicalAnd _) = 1
-operatorPrecedence (LogicalOr _) = 2
-operatorPrecedence (Add _) = 3
-operatorPrecedence (Subtract _) = 2
-operatorPrecedence (Divide _) = 4
-operatorPrecedence (Multiply _) = 5
-operatorPrecedence (Sequence _) = 8
-operatorPrecedence (Filter _) = 9
+operatorPrecedence (Compose _) = 9
+
 operatorPrecedence (Union _) = 8
-operatorPrecedence (Intersection _) = 7
+operatorPrecedence (Intersection _) = 8
+operatorPrecedence (Sequence _) = 7
+
+operatorPrecedence (Multiply _) = 6
+operatorPrecedence (Divide _) = 5
+
+operatorPrecedence (Add _) = 4
+operatorPrecedence (Subtract _) = 4
+
+operatorPrecedence (Equals _) = 3
+operatorPrecedence (NotEquals _) = 3
+operatorPrecedence (LessThan _) = 3
+operatorPrecedence (LessThanEqual _) = 3
+operatorPrecedence (GreaterThan _) = 3
+operatorPrecedence (GreaterThanEqual _) = 3
+operatorPrecedence (BindsOp _) = 3
+
+operatorPrecedence (LogicalAnd _) = 2
+operatorPrecedence (LogicalOr _) = 2
+
+-- not, exists, available, binds, boundBy 1
+
+operatorPrecedence (Filter _) = 0
 
 startOf :: Step -> ArcPosition
 startOf stp = case stp of

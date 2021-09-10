@@ -145,6 +145,7 @@ data Operator =
   | Sequence ArcPosition
   | Union ArcPosition
   | Intersection ArcPosition
+  | BindsOp ArcPosition
 
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
@@ -259,6 +260,7 @@ instance prettyPrintOperator :: PrettyPrint Operator where
   prettyPrint' t (Sequence _) = "Sequence"
   prettyPrint' t (Union _) = "Union"
   prettyPrint' t (Intersection _) = "Intersection"
+  prettyPrint' t (BindsOp _) = "Binds"
 
 derive instance genericComputationStep :: Generic ComputationStep _
 instance showComputationStep :: Show ComputationStep where show s = genericShow s

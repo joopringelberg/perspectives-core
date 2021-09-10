@@ -493,6 +493,16 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       case (range f1), (range f2) of
         (RDOM _), (RDOM _) -> pure $ BQD currentDomain (QF.BinaryCombinator IntersectionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
         _, _ -> throwError $ NotARoleDomain currentDomain (startOf left) (endOf right)
+    BindsOp pos -> do
+      f1 <- compileStep currentDomain left
+      f2 <- compileStep currentDomain right
+      if (pessimistic $ functional f1)
+        then if (pessimistic $ functional f2)
+          then case (range f1), (range f2) of
+            (RDOM _), (RDOM _) -> pure $ BQD currentDomain (QF.BinaryCombinator BindsF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) True (THREE.and (mandatory f1)(mandatory f2))
+            _, _ -> throwError $ NotARoleDomain currentDomain (startOf left) (endOf right)
+          else throwError (NotFunctional (startOf right) (endOf right) right)
+        else throwError (NotFunctional (startOf left) (endOf left) left)
 
     otherwise -> do
       f1 <- compileStep currentDomain left
@@ -518,6 +528,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Filter"
         Union _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Union"
         Intersection _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Intersection"
+        BindsOp _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: BindsOp"
 
         -- >>= is parsed as the operator Sequence.
         -- "sum", "product", "minimum", "maximum" and "count" are parsed as SequenceFunction

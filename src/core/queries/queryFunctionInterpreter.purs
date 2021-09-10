@@ -26,7 +26,7 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (empty, join, void)
-import Data.Array (elemIndex, null, union, unsafeIndex, head)
+import Data.Array (elemIndex, head, length, null, union, unsafeIndex)
 import Data.List (List(..))
 import Data.List.Types (List, NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -169,10 +169,27 @@ interpret (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) a = ArrayT do
       f2r <- runArrayT $ interpret f2 a
       pure $ f1r `union` f2r
     else pure f1r
+
 interpret (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) a = ArrayT do
   (l :: Array DependencyPath) <- runArrayT $ interpret f1 a
   (r :: Array DependencyPath) <- runArrayT $ interpret f2 a
   pure (l `union` r)
+
+interpret (BQD _ (BinaryCombinator BindsF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) a = ArrayT do
+  (bindingRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfBindingRoles a
+  (boundRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfBindingRoles a
+  -- bindingRoles and boundRoles must be functional.
+  case head bindingRoles, head boundRoles of
+    Just bindingRolesh, Just boundRolesh | length bindingRoles == 1 && length boundRoles == 1 ->
+      case bindingRolesh.head, boundRolesh.head of
+        R bindingRole, R boundRole -> do
+          result <- lift (boundRole ##>> (bindsRole bindingRole))
+          pure [{ head: (V "" (Value $ show result))
+                , mainPath: Nothing
+                , supportingPaths: allPaths bindingRolesh `union` allPaths boundRolesh
+                }]
+        _, _ -> throwError (error $ "'binds' expects two roles, but got: " <> show bindingRolesh.head <> " and " <> show boundRolesh.head)
+    _, _ -> throwError (error $ "'binds' expects a single role instance on both the left and right side")
 
 -- The compiler only allows f1 and f2 if they're functional.
 interpret (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [EqualsF, NotEqualsF] = ArrayT do

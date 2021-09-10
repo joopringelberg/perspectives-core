@@ -25,7 +25,6 @@ module Perspectives.Parsing.Arc.Position where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 
@@ -39,7 +38,8 @@ newtype ArcPosition = ArcPosition
   }
 
 derive instance genericArcPosition :: Generic ArcPosition _
-instance showArcPosition :: Show ArcPosition where show = genericShow
+instance showArcPosition :: Show ArcPosition where
+  show (ArcPosition {line, column}) = "line " <> show line <> ", column " <> show column
 
 -- | Because we want two expressions to be equal regardless of where in the text they
 -- | occur, we make all instances of ArcPosition equal to each other.

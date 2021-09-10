@@ -25,7 +25,7 @@ module Perspectives.Instances.ObjectGetters where
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)
-import Data.Array (elemIndex, findIndex, foldMap, head, index, null, singleton)
+import Data.Array (elemIndex, findIndex, foldMap, head, index, length, null, singleton)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
@@ -47,7 +47,7 @@ import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPer
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
-import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -76,7 +76,7 @@ contextType cid  = ArrayT $ (lift $ try $ getContextMember (\c -> [context_pspTy
   handlePerspectRolError' "contextType" [] (pure <<< identity)
 
 -- TODO. Fix the issue that an unlinked role does not show up for
--- a public context. 
+-- a public context.
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
   handlePerspectContextError' "getMe" []
@@ -268,6 +268,23 @@ boundBy sourceOfBoundRoles binder = ArrayT do
   if null bools
     then pure [Value $ show false]
     else pure [Value $ show $ ala Conj foldMap bools]
+
+boundByOperator :: (RoleInstance ~~> RoleInstance) ->
+  (RoleInstance ~~> RoleInstance) ->
+  (RoleInstance ~~> Value)
+boundByOperator sourceOfBoundRoles sourceOfBindingRoles originRole = ArrayT do
+  boundRoles <- (lift (originRole ##= sourceOfBoundRoles))
+  bindingRoles <- (lift (originRole ##= sourceOfBindingRoles))
+  case head boundRoles, head bindingRoles of
+    Just boundRole, Just bindingRole | length boundRoles == 1 && length bindingRoles == 1 -> do
+      result <- lift (boundRole ##>> bindsRole bindingRole)
+      pure [Value $ show result]
+    _, _ -> pure [Value $ show false]
+
+bindsOperator :: (RoleInstance ~~> RoleInstance) ->
+  (RoleInstance ~~> RoleInstance) ->
+  (RoleInstance ~~> Value)
+bindsOperator sourceOfBindingRoles sourceOfBoundRoles = boundByOperator sourceOfBoundRoles sourceOfBindingRoles
 
 -- role `bindsRole` bnd'
 bindsRole :: RoleInstance -> RoleInstance ~~> Boolean
