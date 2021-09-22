@@ -17,7 +17,8 @@ import Perspectives.Couchdb (designDocumentViews)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
-import Perspectives.Extern.Couchdb (addModelToLocalStore, createDatabase, createUser, models, uploadToRepository)
+import Perspectives.Extern.Couchdb (addModelToLocalStore, createUser, models, uploadToRepository)
+import Perspectives.Persistence.CouchdbFunctions (createDatabase)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Persistence.API (tryGetDocument)
 import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
@@ -92,6 +93,14 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         cdburl <- developmentRepository
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Utilities") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Utilities: " <> show errs) false
+
+  testOnly "upload model:TestStandardVars to repository from files" $ runP do
+    errs <- loadCompileAndCacheArcFile "testStandardVars" modelDirectory
+    if null errs
+      then do
+        cdburl <- developmentRepository
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestStandardVars") cdburl)
+      else liftAff $ assert ("There are instance- or model errors for model:TestStandardVars: " <> show errs) false
 
   test "upload model:System to repository from files" $ runP do
     addAllExternalFunctions
@@ -186,7 +195,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Competition") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Competition: " <> show errs) false
 
-  testOnly "upload model:CouchdbManagement to repository from files (without testuser)" $ runP do
+  test "upload model:CouchdbManagement to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "utilities" modelDirectory
@@ -242,11 +251,11 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
   -- Run account "test" with password "geheim"
   -- PROBLEMEN: de test slaagt, maar een database wordt niet gemaakt.
   -- log statement in createDatabaseImpl vuurt.
-  test "createDatabase" $ runP do
-    void $ runMonadPerspectivesTransaction $ catchError
-      (createDatabase ["https://localhost:6984/"] ["testdb"] (RoleInstance "ignored"))
-      (\e -> logShow e)
-    liftAff $ assert "Just testing" true
+  -- test "createDatabase" $ runP do
+  --   void $ runMonadPerspectivesTransaction $ catchError
+  --     (createDatabase ["https://localhost:6984/"] ["testdb"] (RoleInstance "ignored"))
+  --     (\e -> logShow e)
+  --   liftAff $ assert "Just testing" true
 
   -- Run account "test" with password "geheim"
   test "createUser" $ runP do

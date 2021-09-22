@@ -272,6 +272,10 @@ startOf stp = case stp of
     startOfSimple (RoleTypes p) = p
     startOfSimple (SpecialisesRoleType p _) = p
 
+    startOfSimple (TypeTimeOnlyContext p _) = p
+    startOfSimple (TypeTimeOnlyEnumeratedRole p _) = p
+    startOfSimple (TypeTimeOnlyCalculatedRole p _) = p
+
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
     startOfUnary (Binds p _) = p
@@ -302,6 +306,10 @@ endOf stp = case stp of
     endOfSimple (TypeOfContext (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}
     endOfSimple (RoleTypes (ArcPosition{line, column})) = ArcPosition{line, column: column + 9}
     endOfSimple (SpecialisesRoleType (ArcPosition{line, column}) ident) = ArcPosition{line, column: column + 19 + length ident}
+
+    endOfSimple (TypeTimeOnlyContext p _) = p
+    endOfSimple (TypeTimeOnlyEnumeratedRole p _) = p
+    endOfSimple (TypeTimeOnlyCalculatedRole p _) = p
 
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}

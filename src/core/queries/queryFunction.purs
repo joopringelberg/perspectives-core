@@ -178,6 +178,47 @@ isFunctionalFunction fn = case fn of
   RoleTypesF -> False
   SpecialisesRoleTypeF -> True
 
+-- | False if the function can return an empty result.
+isMandatoryFunction :: FunctionName -> ThreeValuedLogic
+isMandatoryFunction fn = case fn of
+  ContextF -> True
+  BindingF -> False
+  ExternalRoleF -> True
+  IdentityF -> True
+  ModelNameF -> True
+  SequenceF -> True
+  NotF -> True
+  ExistsF -> True
+  BindsF -> True
+  BoundByF -> True
+  FilterF -> False
+  ComposeF -> Unknown
+  UnionF -> False
+  IntersectionF -> False
+  CreateContextF -> True
+  CreateRoleF -> True
+  GetRoleBindersF -> False
+  GetRoleInstancesForContextFromDatabaseF -> False
+  EqualsF -> True
+  NotEqualsF -> True
+  LessThanF -> True
+  LessThanEqualF -> True
+  GreaterThanF -> True
+  GreaterThanEqualF -> True
+  AddF -> True
+  SubtractF -> True
+  DivideF -> True
+  MultiplyF -> True
+  AndF -> True
+  OrF -> True
+  CountF -> True
+  MinimumF -> True
+  MaximumF -> True
+  AvailableF -> True
+  TypeOfContextF -> True
+  RoleTypesF -> True
+  SpecialisesRoleTypeF -> True
+
 ---------------------------------------------------------------------------------------
 ---- QUERYFUNCTION
 ---------------------------------------------------------------------------------------
@@ -225,6 +266,10 @@ data QueryFunction
   | SetPropertyValue EnumeratedPropertyType
   | ExternalEffectFullFunction String
   | ForeignEffectFullFunction String
+
+  | TypeTimeOnlyContextF String
+  | TypeTimeOnlyEnumeratedRoleF String
+  | TypeTimeOnlyCalculatedRoleF String
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
 

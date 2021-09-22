@@ -28,11 +28,11 @@ module Perspectives.Parsing.Arc.ContextualVariables where
 
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.State (StateT, execStateT, modify)
-import Data.Array (catMaybes, foldMap, head, last, length, union)
+import Data.Array (catMaybes, filter, foldMap, head, last, length, null, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Monoid.Disj (Disj(..))
-import Data.Newtype (ala)
+import Data.Newtype (ala, unwrap)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.AST (StateKind(..), StateSpecification(..))
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
@@ -40,7 +40,8 @@ import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..), endOfAssignment, startOfAssignment)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Prelude (class Monad, Unit, bind, discard, pure, unit, void, ($), (<$>), (<>), (==), (||), (>))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), RoleType(..))
+import Prelude (class Monad, Unit, bind, discard, flip, pure, unit, void, ($), (<$>), (<>), (==), (>), (||))
 
 --------------------------------------------------------------------------
 --- VARIABLE REFERENCES IN EXPRESSIONS
@@ -150,15 +151,17 @@ addBinding vb = modify (union [vb])
 --------------------------------------------------------------------------
 --- ADD CONTEXTUAL VARIABLES TO AN EXPRESSION
 --------------------------------------------------------------------------
-
-addContextualVariablesToExpression :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> StateKind -> m Step
-addContextualVariablesToExpression stp mobject stateKind = case stp of
+-- | Implements the following invariant:
+-- | only adds currentobject if the expression is in the scope of
+-- | `perspective on` or `thing` or `context` or `external`
+addContextualVariablesToExpression :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> StateKind -> Maybe Step -> m Step
+addContextualVariablesToExpression stp mobject stateKind msubject = case stp of
   (PureLet (PureLetStep r@{bindings})) -> do
-    -- TODO. Let op: we zouden óók in de bindings zelf moeten zoeken naar verwijzingen naar "currentobject" en "currentcontext".
     extraBindings <- collectBindings do
       for_ bindings \(VarBinding _ stp') -> do
         addCurrentContextForStep stp' stateKind
         addObjectForStep stp' mobject stateKind
+        addSubjectForStep stp' msubject stateKind
       addCurrentContextForStep stp stateKind
       addObjectForStep stp mobject stateKind
     pure $ PureLet (PureLetStep r {bindings = extraBindings <> bindings})
@@ -166,6 +169,7 @@ addContextualVariablesToExpression stp mobject stateKind = case stp of
     bindings <- collectBindings do
       addCurrentContextForStep stp stateKind
       addObjectForStep stp mobject stateKind
+      addSubjectForStep stp msubject stateKind
     if length bindings > 0
       then pure $ PureLet (PureLetStep
         { start: startOf stp
@@ -184,32 +188,57 @@ addCurrentContextForStep stp stateKind = if stepContainsVariableReference "curre
     OState -> void $ addBinding (VarBinding "currentcontext" (Simple $ Context (unsafePartial $ startOf stp)))
   else pure unit
 
+-- | Implements the following invariant:
+-- | only adds currentobject if the expression is in the scope of
+-- | `perspective on` or `thing` or `context` or `external`
 addObjectForStep :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> StateKind -> CollectingBindings m Unit
 addObjectForStep stp mobject stateKind = if stepContainsVariableReference "currentobject" stp
   then case stateKind of
     CState -> case mobject of
-      Nothing -> throwError (MissingObject (unsafePartial $ startOf stp) (unsafePartial $ endOf stp))
+      -- Expression is not in the scope of `perspective on`.
+      Nothing -> throwError (CurrentObjectNotAllowed (startOf stp) (endOf stp))
       Just obj -> void $ addBinding (VarBinding "currentobject" obj)
     SState -> case mobject of
-      Nothing -> throwError (MissingObject (unsafePartial $ startOf stp) (unsafePartial $ endOf stp))
+      -- Expression is not in the context of `perspective on`.
+      Nothing -> throwError (CurrentObjectNotAllowed (startOf stp) (endOf stp))
       Just obj -> void $ addBinding (VarBinding "currentobject" obj)
+    -- expression is in the scope of `thing`, `context` or `external`.
     OState -> void $ addBinding (VarBinding "currentobject" (Simple $ Identity (unsafePartial $ startOf stp)))
   else pure unit
 
+addSubjectForStep :: forall m. MonadError PerspectivesError m => Step -> Maybe Step -> StateKind -> CollectingBindings m Unit
+addSubjectForStep stp msubject stateKind = if stepContainsVariableReference "currentsubject" stp
+  then case stateKind of
+    CState -> case msubject of
+      -- Expression is not in the scope of `perspective of` or `user`.
+      Nothing -> throwError (CurrentSubjectNotAllowed (startOf stp) (endOf stp))
+      Just obj -> void $ addBinding (VarBinding "currentsubject" obj)
+    OState -> case msubject of
+      -- Expression is not in the scope of `perspective of` or `user`.
+      Nothing -> throwError (CurrentSubjectNotAllowed (startOf stp) (endOf stp))
+      Just obj -> void $ addBinding (VarBinding "currentsubject" obj)
+    -- expression is in the scope of `thing`, `context` or `external`.
+    SState -> void $ addBinding (VarBinding "currentsubject" (Simple $ Identity (startOf stp)))
+  else pure unit
 --------------------------------------------------------------------------
 --- ADD CONTEXTUAL VARIABLES TO STATEMENTS
 --------------------------------------------------------------------------
-addContextualVariablesToStatements :: forall m. MonadError PerspectivesError m => Statements -> Maybe Step -> StateKind -> m Statements
-addContextualVariablesToStatements stmts mobject stateKind = case stmts of
+-- | Implements the following invariant:
+-- | only adds currentobject to expressions if they are in the scope of
+-- | `perspective on` or `thing` or `context` or `external`
+addContextualVariablesToStatements :: forall m. MonadError PerspectivesError m => Statements -> Maybe Step -> StateKind -> Maybe Step -> m Statements
+addContextualVariablesToStatements stmts mobject stateKind msubject = case stmts of
   Let (LetStep r@{bindings, assignments}) -> do
     extraBindings <- collectBindings do
       for_ bindings \b -> case b of
         (Expr (VarBinding _ stp)) -> do
           addCurrentContextForStep stp stateKind
           addObjectForStep stp mobject stateKind
+          addSubjectForStep stp msubject stateKind
         (Stat _ assignment) -> do
           addCurrentContext (Statements [assignment])
           addObject (Statements [assignment])
+          addSubject (Statements [assignment])
       addCurrentContext stmts
       addObject stmts
     pure $ Let (LetStep r {bindings = (Expr <$> extraBindings) <> bindings})
@@ -217,6 +246,7 @@ addContextualVariablesToStatements stmts mobject stateKind = case stmts of
     bindings <- collectBindings do
       addCurrentContext stmts
       addObject stmts
+      addSubject stmts
     if length bindings > 0
       then pure $ Let (LetStep
         { start: unsafePartial $ startOfStatements stmts
@@ -254,6 +284,21 @@ addContextualVariablesToStatements stmts mobject stateKind = case stmts of
         OState -> void $ addBinding (VarBinding "currentobject" (Simple $ Identity (unsafePartial $ startOfStatements stmts')))
       else pure unit
 
+    addSubject :: Statements -> CollectingBindings m Unit
+    addSubject stmts' = if statementContainsVariableReference "currentsubject" stmts'
+      then case stateKind of
+        CState -> case msubject of
+          Nothing -> throwError (MissingObject (unsafePartial $ startOfStatements stmts') (unsafePartial $ endOfStatements stmts'))
+          Just obj -> void $ addBinding (VarBinding "currentsubject" obj)
+        -- In subject state, we consider the subject to be the object, too, unless otherwise specified.
+        -- Hence we use Identity.
+        OState -> case msubject of
+          Nothing -> void $ addBinding (VarBinding "currentsubject" (Simple $ Identity (unsafePartial $ startOfStatements stmts')))
+          -- Nothing -> throwError (MissingObject (unsafePartial $ startOfStatements stmts') (unsafePartial $ endOfStatements stmts'))
+          Just obj -> void $ addBinding (VarBinding "currentsubject" obj)
+        SState -> void $ addBinding (VarBinding "currentsubject" (Simple $ Identity (unsafePartial $ startOfStatements stmts')))
+      else pure unit
+
     startOfStatements :: Partial => Statements -> ArcPosition
     startOfStatements (Let (LetStep{start})) = start
     startOfStatements (Statements stmtArray) = startOfAssignment (fromJust $ head stmtArray)
@@ -266,3 +311,60 @@ stateSpec2stateKind :: StateSpecification -> StateKind
 stateSpec2stateKind (ContextState _ _) = CState
 stateSpec2stateKind (SubjectState _ _) = SState
 stateSpec2stateKind (ObjectState _ _) = OState
+
+--------------------------------------------------------------------------
+--- CONSTRUCTING AND ADDING BINDINGS
+--------------------------------------------------------------------------
+type VarName = String
+makeIdentityStep :: VarName -> ArcPosition -> VarBinding
+makeIdentityStep varName pos = (VarBinding varName (Simple $ Identity pos))
+
+-- The resulting step will be compiled to a QueryFunctionDescription with function TypeTimeOnlyContextF,
+-- which the unsafeCompiler will ignore.
+makeTypeTimeOnlyContextStep :: VarName -> ContextType -> ArcPosition -> VarBinding
+makeTypeTimeOnlyContextStep varName ctype pos = (VarBinding varName (Simple $ TypeTimeOnlyContext pos (unwrap ctype)))
+
+-- The resulting step will be compiled to a QueryFunctionDescription with function TypeTimeOnlyRoleF,
+-- which the unsafeCompiler will ignore.
+makeTypeTimeOnlyRoleStep :: VarName -> RoleType -> ArcPosition -> VarBinding
+makeTypeTimeOnlyRoleStep varName (ENR (EnumeratedRoleType rtype)) pos = (VarBinding varName (Simple $ TypeTimeOnlyEnumeratedRole pos (rtype)))
+makeTypeTimeOnlyRoleStep varName (CR (CalculatedRoleType rtype)) pos = (VarBinding varName (Simple $ TypeTimeOnlyCalculatedRole pos (rtype)))
+
+addContextualBindingsToExpression :: Array VarBinding -> Step -> Step
+addContextualBindingsToExpression extraBindings step = let
+  necessaryBindings = filter (\(VarBinding varName _) -> stepContainsVariableReference varName step)
+    extraBindings
+  in
+  if null necessaryBindings
+    then step
+    else case step of
+      (PureLet (PureLetStep r@{bindings})) -> PureLet (PureLetStep r {bindings = extraBindings <> bindings})
+      _ -> PureLet (PureLetStep
+            { start: startOf step
+            , end: endOf step
+            , bindings: extraBindings
+            , body: step
+            })
+
+-- | We add the standard variables, regardless of whether they actually occur in one or more expressions.
+-- | This adds just a little overhead in type time and in runtime they will not occur (the unsafe compiler
+-- | removes them).
+addContextualBindingsToStatements :: Array VarBinding -> Statements -> Statements
+addContextualBindingsToStatements extraBindings stmts = case stmts of
+  Let (LetStep r@{bindings, assignments}) -> do
+    Let (LetStep r {bindings = (Expr <$> extraBindings) <> bindings})
+  Statements stmtArray -> do
+    Let (LetStep
+        { start: unsafePartial $ startOfStatements stmts
+        , end: unsafePartial $ endOfStatements stmts
+        , bindings: Expr <$> extraBindings
+        , assignments: stmtArray
+        })
+  where
+    startOfStatements :: Partial => Statements -> ArcPosition
+    startOfStatements (Let (LetStep{start})) = start
+    startOfStatements (Statements stmtArray) = startOfAssignment (fromJust $ head stmtArray)
+
+    endOfStatements :: Partial => Statements -> ArcPosition
+    endOfStatements (Let (LetStep{end})) = end
+    endOfStatements (Statements stmtArray) = endOfAssignment (fromJust $ last stmtArray)

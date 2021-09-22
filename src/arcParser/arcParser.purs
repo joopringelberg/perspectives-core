@@ -599,7 +599,7 @@ perspectiveOnKeywords :: IP String
 perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> pure "perspectiveOn"
 
 -- | onEntry =
--- |  on entry [of {subject | object | context} state <ident>]
+-- |  on entry [of {subject | object | context} state [<ident>]]
 -- |		{<notification> | <automaticEffect>}*
 onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do

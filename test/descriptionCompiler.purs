@@ -116,7 +116,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
   makeTest "compileSimpleStep: ArcIdentifier, missing Property."
     "domain Test\n  thing Role (mandatory)\n    property Prop1 = Prop2"
     (\e -> case e of
-      (RoleHasNoProperty _ _) -> pure unit
+      (RoleHasNoProperty _ _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no property Prop2" false)
 

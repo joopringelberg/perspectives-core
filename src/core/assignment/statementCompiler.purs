@@ -28,7 +28,7 @@ where
 
 import Control.Monad.Except (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, filterA, foldM, head, length, null, reverse, uncons)
+import Data.Array (filter, filterA, foldM, head, length, null, uncons)
 import Data.Char.Unicode (toLower)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
@@ -75,18 +75,17 @@ compileStatement ::
   Array StateIdentifier ->
   Domain ->
   Domain ->
-  Maybe QueryFunctionDescription ->
   Array RoleType ->
   Statements ->
   PhaseThree QueryFunctionDescription
-compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalculation userRoleTypes statements =
+compileStatement stateIdentifiers originDomain currentcontextDomain userRoleTypes statements =
   case statements of
     -- Compile a series of Assignments into a QueryDescription.
     Statements assignments -> sequenceOfAssignments userRoleTypes assignments
       -- Compile the LetStep into a QueryDescription.
     Let letstep -> do
       let_ <- compileLetStep letstep
-      pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
+      pure (UQD originDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
   where
 
   compileLetStep :: LetStep -> PhaseThree QueryFunctionDescription
@@ -103,17 +102,17 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
       compileVarBinding :: LetABinding -> PhaseThree QueryFunctionDescription
       compileVarBinding (Expr (VarBinding varName step)) = do
           step_ <- compileAndDistributeStep
-            currentDomain
+            originDomain
             step
             userRoleTypes
             stateIdentifiers
           addBinding varName step_
-          pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) (functional step_) (mandatory step_)
+          pure $ UQD originDomain (QF.BindVariable varName) step_ (range step_) (functional step_) (mandatory step_)
       compileVarBinding (Stat varName ass) = do
         assignmentDescription <- describeAssignmentStatement userRoleTypes ass
         -- Add the binding to the compile time environment.
         addBinding varName assignmentDescription
-        pure $ UQD currentDomain (QF.BindResultFromCreatingAssignment varName) assignmentDescription (range assignmentDescription) (functional assignmentDescription) (mandatory assignmentDescription)
+        pure $ UQD originDomain (QF.BindResultFromCreatingAssignment varName) assignmentDescription (range assignmentDescription) (functional assignmentDescription) (mandatory assignmentDescription)
 
       -- The range of a sequence equals that of its second term.
       -- The fold is left associative: ((binding1 *> binding2) *> binding3). The compiler handles that ok.
@@ -142,30 +141,30 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
   describeAssignmentStatement subjects ass = case ass of
       Remove {roleExpression} -> do
         rle <- ensureRole subjects roleExpression
-        pure $ UQD qualificationDomain QF.Remove rle qualificationDomain True True
+        pure $ UQD currentcontextDomain QF.Remove rle currentcontextDomain True True
       CreateRole {roleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
         -- Because we can use CreateRole in a binding in a letA, we return a meaningful range value.
-        pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM $ ST qualifiedRoleIdentifier) True True
+        pure $ UQD originDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM $ ST qualifiedRoleIdentifier) True True
 
       CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
-        pure $ UQD currentDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM $ ST qualifiedRoleIdentifier) True True
+        pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM $ ST qualifiedRoleIdentifier) True True
 
       CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
         roleQfd <- ensureRole subjects roleExpression
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
-        pure $ UQD currentDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd currentDomain True True
+        pure $ UQD originDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd originDomain True True
 
       Move {roleExpression, contextExpression} -> do
         rle <- ensureRole subjects roleExpression
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression >>= \qfd -> case contextExpression of
           Nothing -> pure qfd
           Just stp -> ensureFunctional stp qfd
-        pure $ BQD currentDomain QF.Move rle cte currentDomain True True
+        pure $ BQD originDomain QF.Move rle cte originDomain True True
       Bind f@{bindingExpression, roleIdentifier, contextExpression, start, end} -> do
         -- Bind <binding-expression> to <binderType> [in <context-expression>]. Check:
         -- bindingExpression should result in roles
@@ -187,7 +186,7 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
           lift2 $ possibleBinding `hasNotMorePropertiesThan` bindings'
         if qualifies
           -- Create a function description that describes the actual role creating and binding.
-          then pure $ BQD currentDomain (QF.Bind qualifiedRoleIdentifier) bindings cte currentDomain True True
+          then pure $ BQD originDomain (QF.Bind qualifiedRoleIdentifier) bindings cte originDomain True True
           else throwError $ RoleDoesNotBind f.start (ENR qualifiedRoleIdentifier) (unsafePartial $ domain2roleType (range bindings))
 
       Bind_ {bindingExpression, binderExpression} -> do
@@ -196,13 +195,13 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
         -- binderExpression should result in a functional role
         (binders :: QueryFunctionDescription) <- ensureRole subjects binderExpression >>= ensureFunctional binderExpression
         -- Now create a function description.
-        pure $ BQD currentDomain QF.Bind_ bindings binders currentDomain True True
+        pure $ BQD originDomain QF.Bind_ bindings binders originDomain True True
 
       Unbind f@{bindingExpression, roleIdentifier} -> do
         (bindings :: QueryFunctionDescription) <- ensureRole subjects  bindingExpression
         -- the type of the binder (indicated by roleIdentifier) should be an EnumeratedRoleType (local name should resolve w.r.t. the binders of the bindings). We try to resolve in the model and then filter candidates on whether they bind the bindings. If they don't, the expression has no meaning.
         (qualifiedRoleIdentifier :: Maybe EnumeratedRoleType) <- qualifyBinderType roleIdentifier (unsafePartial $ domain2roleType $ range bindings) f.start f.end
-        pure $ UQD currentDomain (QF.Unbind qualifiedRoleIdentifier) bindings currentDomain True True
+        pure $ UQD originDomain (QF.Unbind qualifiedRoleIdentifier) bindings originDomain True True
 
       Unbind_ {bindingExpression, binderExpression} -> do
         -- bindingExpression should result in a functional role
@@ -210,37 +209,32 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
         -- binderExpression should result in a functional role
         (binders :: QueryFunctionDescription) <- ensureRole subjects binderExpression >>= ensureFunctional binderExpression
         -- Now create a function description.
-        pure $ BQD currentDomain QF.Unbind_ bindings binders currentDomain True True
+        pure $ BQD originDomain QF.Unbind_ bindings binders originDomain True True
 
       DeleteRole f@{roleIdentifier, contextExpression} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
-        pure $ UQD currentDomain (QF.DeleteRole qualifiedRoleIdentifier) cte currentDomain True True
+        pure $ UQD originDomain (QF.DeleteRole qualifiedRoleIdentifier) cte originDomain True True
 
       DeleteProperty f@{propertyIdentifier, roleExpression, start, end} -> do
         (roleQfd :: QueryFunctionDescription) <- case roleExpression of
-          Nothing -> case mobjectCalculation of
-            Nothing -> throwError $ MissingRoleForPropertyAssignment start end
-            Just objectCalculation -> pure objectCalculation
-          -- delete property PropertyType from <roleExpression>
+          Nothing -> pure $ SQD originDomain (QF.DataTypeGetter QF.IdentityF) originDomain True True
           Just e -> ensureRole subjects e
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
-        pure $ UQD currentDomain (QF.DeleteProperty qualifiedProperty) roleQfd currentDomain True True
+        pure $ UQD originDomain (QF.DeleteProperty qualifiedProperty) roleQfd originDomain True True
 
       PropertyAssignment f@{propertyIdentifier, operator, valueExpression, roleExpression, start, end} -> do
         (roleQfd :: QueryFunctionDescription) <- case roleExpression of
-          Nothing -> case mobjectCalculation of
-            Nothing -> throwError $ MissingRoleForPropertyAssignment start end
-            Just objectCalculation -> pure objectCalculation
+          Nothing -> pure $ SQD originDomain (QF.DataTypeGetter QF.IdentityF) originDomain True True
           Just e -> do
-            qfd <- compileAndDistributeStep currentDomain e subjects stateIdentifiers
+            qfd <- compileAndDistributeStep originDomain e subjects stateIdentifiers
             case range qfd of
               (RDOM _) -> pure qfd
               otherwise -> throwError $ NotARoleDomain (range qfd) (startOf e) (endOf e)
 
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
         -- Compile the value expression to a QueryFunctionDescription. Its range must comply with the range of the qualifiedProperty. It is compiled relative to the current context; not relative to the object!
-        valueQfd <- compileAndDistributeStep currentDomain valueExpression subjects stateIdentifiers
+        valueQfd <- compileAndDistributeStep originDomain valueExpression subjects stateIdentifiers
         rangeOfProperty <- lift $ lift $ getEnumeratedProperty qualifiedProperty >>= PT.range
         fname <- case operator of
           Set _ -> pure $ QF.SetPropertyValue qualifiedProperty
@@ -250,7 +244,7 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
           (VDOM r _) | r == rangeOfProperty -> pure unit
           (VDOM r _) -> throwError $ WrongPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty r
           otherwise -> throwError $ NotAPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty
-        pure $ BQD currentDomain fname valueQfd roleQfd currentDomain True True
+        pure $ BQD originDomain fname valueQfd roleQfd originDomain True True
       ExternalEffect f@{start, end, effectName, arguments} -> do
         case (deconstructModelName effectName) of
           Nothing -> throwError (NotWellFormedName start effectName)
@@ -263,8 +257,8 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
                   then do
                     -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
                     -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
-                    compiledArguments <- traverse (\s -> compileAndDistributeStep currentDomain s subjects stateIdentifiers) arguments
-                    pure $ MQD currentDomain (QF.ExternalEffectFullFunction effectName) compiledArguments currentDomain Unknown Unknown
+                    compiledArguments <- traverse (\s -> compileAndDistributeStep originDomain s subjects stateIdentifiers) arguments
+                    pure $ MQD originDomain (QF.ExternalEffectFullFunction effectName) compiledArguments originDomain Unknown Unknown
                   else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
             -- TODO: behandel hier Foreign functions.
             else throwError (UnknownExternalFunction start end effectName)
@@ -338,7 +332,7 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
         ensureContext :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription
         ensureContext userTypes stp  = do
           -- An expression that results in a ContextInstance, in this state, for this usertype.
-          qfd <- compileAndDistributeStep currentDomain stp userTypes stateIdentifiers
+          qfd <- compileAndDistributeStep originDomain stp userTypes stateIdentifiers
           case range qfd of
             (CDOM _) -> pure qfd
             otherwise -> throwError $ NotAContextDomain qfd (range qfd) (startOf stp) (endOf stp)
@@ -347,7 +341,7 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
         ensureRole :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription
         ensureRole userTypes stp = do
           -- An expression that results in a RoleInstance, in this state, for this usertype.
-          qfd <- compileAndDistributeStep currentDomain stp userTypes stateIdentifiers
+          qfd <- compileAndDistributeStep originDomain stp userTypes stateIdentifiers
           case range qfd of
             (RDOM _) -> pure qfd
             otherwise -> throwError $ NotARoleDomain (range qfd) (startOf stp) (endOf stp)
@@ -362,9 +356,9 @@ compileStatement stateIdentifiers currentDomain qualificationDomain mobjectCalcu
         constructContextGetterDescription contextExpression =
           case contextExpression of
             -- TODO. Pas dit toe in alle gevallen.
-            Nothing -> case currentDomain of
+            Nothing -> case originDomain of
               -- Apply the identity function if the current domain is a context;
-              CDOM _ -> pure (SQD currentDomain (QF.DataTypeGetter QF.IdentityF) currentDomain True True)
+              CDOM _ -> pure (SQD originDomain (QF.DataTypeGetter QF.IdentityF) originDomain True True)
               -- Apply the context function if it is a role!
-              RDOM _ -> pure (SQD currentDomain (QF.DataTypeGetter QF.ContextF) qualificationDomain True True)
+              RDOM _ -> pure (SQD originDomain (QF.DataTypeGetter QF.ContextF) currentcontextDomain True True)
             (Just (stp :: Step)) -> ensureContext subjects stp

@@ -232,6 +232,8 @@ instance showRoleIdentification :: Show RoleIdentification where show = genericS
 --------------------------------------------------------------------------------
 type StateLocalName = String
 
+-- | A StateSpecification identifies a base which represents either a context- or role type,
+-- | and a path of segments that identify a substate of the (root state of) that type.
 data StateSpecification =
 	  ContextState ContextType (Maybe SegmentedPath)
 	| SubjectState RoleIdentification (Maybe SegmentedPath)

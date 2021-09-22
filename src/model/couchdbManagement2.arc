@@ -28,10 +28,6 @@ domain CouchdbManagement
         defaults
 
     context CouchdbServers filledBy CouchdbServer
-      state NoAdmin = not exists binding >> context >> CouchdbServer$Admin
-        on entry
-          do for Manager
-            bind context >> Manager to Admin in binding >> context
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -49,24 +45,42 @@ domain CouchdbManagement
     user Admin filledBy sys:PerspectivesSystem$User
       -- As Admin, has full perspective on Accounts.
       aspect acc:Body$Admin
-
-      -- TODO. Remove this as soon as we do not need the view anymore for the GUI.
-      view AdminProps (UserName, Password)
+      state Root = true
+        state Remove = ToBeRemoved
+          on entry
+            do
+              callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
+              callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
+              remove currentobject
+        state IsFilled = exists binding
+          on entry
+            do
+              -- Only the CouchdbServer$Admin has a Create and Fill perspective on
+              -- Repository$Admin. So when this state arises, we can be sure that
+              -- the current user is, indeed, a CouchdbServer$Admin.
+              -- Hence the PDR will authenticate with Server Admin credentials.
+              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
+              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
+      property ToBeRemoved (Boolean)
 
       perspective on Repositories
         defaults
 
       -- The Admin should be able to create and fill the Repository$Admin.
-      perspective on Repositories >> binding >> context >> Repository$Admin
+      perspective on Repositories >> binding >> context >> Admin
         defaults
 
       -- The credentials for being a database admin have to be entered;
       -- there is no way to create a database admin through InPlace.
-      perspective on CouchdbServer$Admin
-        view AdminProps verbs (SetPropertyValue, Consult)
-
-      perspective on extern
+      perspective on Admin
         defaults
+
+      -- Admin should not be able to modify this role, because
+      -- it would cause changes to be distributed to all Accounts, violating
+      -- privacy. Instead, Accounts create Storages.
+      -- However, we have the Storage$Admin role modify the remote Couchdb server.
+      perspective on Storages
+        -- TODO: Provide a perspective on relevant properties
 
     -- Note that the aspect acc:Body introduces a Guest role
     -- with a perspective that allows it to create an Account.
@@ -100,45 +114,42 @@ domain CouchdbManagement
               PasswordReset = true for currentobject
 
       property ToBeRemoved (Boolean)
-
       -- TODO: add a condition that allows an Account to see non-public repositories
       -- that he is Admin of.
-      perspective on filter Repositories with IsPublic or binding >> context >> Repository$Admin binds currentsubject
-        only (CreateAndFill)
+      perspective on filter Repositories with IsPublic
         verbs (Consult)
-        props (Name) verbs (SetPropertyValue)
-        action RequestRepository
+
+      -- Even though Accounts can create Storages, they cannot actually
+      -- create databases on the remote server, nor give themselves acces to
+      -- them.
+      perspective on Storages
+        defaults
+        action RequestStorage
           letA
-            myrepo <- createContext Repository bound to Repositories
-            measadmin <- createRole Admin in myrepo
+            store <- createContext Storage in Storages
           in
-            bind_ currentrole to measadmin
+            bind Party to currentrole in store -- KLOPT DIT WEL?
+
 
     -- This role should be in public space.
     context Repositories filledBy Repository
       --storage public
       property ToBeRemoved (Boolean)
       state Root = true
-        -- Note that as it stands, an Account can unconditionally create a new
-        -- Repository. Add a Boolean that represents the Admin's consent.
         state IsNamed = exists Name
           on entry
             do for Admin
-              callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_read" )
-              callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_write" )
+              callEffect cdb:CreateDatabase( context >> extern >> Url, Name + "_read" )
+              callEffect cdb:CreateDatabase( context >> extern >> Url, Name + "_write" )
               callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
-          -- Ad Admin may exist already if the Repository is created by Accounts.
-          state NoAdmin = not exists binding >> context >> Admin
-            on entry
-              do for Admin
-                createRole Admin in binding >> context
         state Remove = ToBeRemoved
           on entry
             do for Admin
               callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
-              callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
-              callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
-              remove binding >> context >> Admin
+              callEffect cdb:DeleteDatabase( context >> extern >> Url, Name + "_read" )
+              callEffect cdb:DeleteDatabase( context >> extern >> Url, Name + "_write" )
+
+    context Storages filledBy Storage
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -151,31 +162,11 @@ domain CouchdbManagement
       property Name (mandatory, String)
       property Url (mandatory, String)
 
-    -- We need the ServerAdmin in this context in order to configure the local Admin.
-    user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin
-
     user Admin filledBy CouchdbServer$Accounts, CouchdbServer$Admin
       -- As Admin, has a full perspective on Accounts.
       -- Should also be able to give them read access to the repo,
       -- and to retract that again.
       aspect acc:Body$Admin
-      state Root = true
-        state IsFilled = (exists binding) and exists context >> extern >> Url
-          on entry
-            do for ServerAdmin
-              -- Only the CouchdbServer$Admin has a Create and Fill perspective on
-              -- Repository$Admin. So when this state arises, we can be sure that
-              -- the current user is, indeed, a CouchdbServer$Admin.
-              -- Hence the PDR will authenticate with Server Admin credentials.
-              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
-              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
-        state Remove = ToBeRemoved
-          on entry
-            do for ServerAdmin
-              callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
-              callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
-              remove currentobject
-      property ToBeRemoved (Boolean)
 
       -- The admin can also create an Author and give him/her the right to add and
       -- remove models to the repo.
@@ -247,3 +238,23 @@ domain CouchdbManagement
     -- are stored in this Repository.
     context AvailableModels filledBy mod:ModelDescription
       --storage public
+
+  case Storage
+    state CreateStore = exists Name && not InUse && not Terminated
+      on entry
+        do for Admin
+          -- Create the store
+          InUse = true
+      state MakePrivate =
+    user Party filledBy CouchdbServer$Accounts
+      perspective on Store
+        all roleverbs
+        props (Name, Terminated, Private) verbs (SetPropertyValue, Consult)
+
+    user Admin = context >> extern >> binder Storages >> Admin
+
+    thing Store
+      property Name (String)
+      property InUse (Boolean)
+      property Terminated (Boolean)
+      property Private (Boolean)

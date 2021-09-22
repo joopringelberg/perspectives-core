@@ -150,9 +150,14 @@ setLabel l newValue = do
       -- log ("failing in setLabel with " <> reflectSymbol l)
       fail (reflectSymbol l <> " is already specified in the context")
 
+-- | Referring to the lexical analysis of the source text,
+-- | sets the current user (the user having a perspective).
+-- | 'subject' is a misnomer: it should be 'user', i.e. setUser.
 setSubject :: RoleIdentification -> IP Unit
 setSubject = setLabel (SProxy :: SProxy "subject")
 
+-- | Referring to the lexical analysis of the source text,
+-- | sets the current object (the object of the perspective).
 setObject :: RoleIdentification -> IP Unit
 setObject = setLabel (SProxy :: SProxy "object")
 

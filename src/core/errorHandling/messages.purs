@@ -97,6 +97,8 @@ data PerspectivesError
     | UnknownExternalFunction ArcPosition ArcPosition String
     | CannotFindContextType ArcPosition ArcPosition String
     | NoPropertyTypeWithValue ArcPosition ArcPosition
+    | CurrentObjectNotAllowed ArcPosition ArcPosition
+    | CurrentSubjectNotAllowed ArcPosition ArcPosition
 
     | UnauthorizedForProperty String RoleType EnumeratedRoleType EnumeratedPropertyType PropertyVerb
     | UnauthorizedForRole String RoleType RoleType (Array RoleVerb)
@@ -128,11 +130,11 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownProperty pos qname roleType) = "(UnknownProperty) The property '" <> qname <> "' is not defined for role '" <> roleType <> "', at: " <> show pos
   show (UnknownContext pos qname) = "(UnknownContext) The context '" <> qname <> "' is not defined, at: " <> show pos
   show (UnknownView pos qname) = "(UnknownView) The view '" <> qname <> "' is not defined, at: " <> show pos
-  show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos
+  show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos <> ", or choose a resource from another context."
   show (Custom s) = s
   show (ParserError message pos) = "(ParserError) " <> message <> show pos
   -- TODO: Als extra kunnen we de Constructors hieronder voorzien van ArcPosition.
-  show (MissingObject start end) = "(MissingObject) The expression contains a reference to the 'object' variable but there is no current object in scope (between " <> show start <> " and " <> show end <> ")"
+  show (MissingObject start end) = "(MissingObject) The expression contains a reference to the 'currentobject' variable but there is no current object in scope (between " <> show start <> " and " <> show end <> ")"
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here)."
@@ -164,6 +166,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownExternalFunction start end functionName) = "(UnknownExternalFunction) The external function name '" <> functionName <> "' is unknown, between " <> show start <> " and " <> show end
   show (CannotFindContextType start end ctype) = "(CannotFindContextType) The context type name '" <> ctype <> "' cannot be resolved, between " <> show start <> " and " <> show end
   show (NoPropertyTypeWithValue start end) = "(NoPropertyTypeWithValue) The property value computed by this expression is not associated with a Property Type (this throws up a problem in combination with, for example, `modelname`)"
+  show (CurrentObjectNotAllowed start end) = "(CurrentObjectNotAllowed) The variable `currentobject` is illegal in the expression between " <> show start <> " and " <> show end <> "."
+  show (CurrentSubjectNotAllowed start end) = "(CurrentSubjectNotAllowed) The variable `currentsubject` is illegal in the expression between " <> show start <> " and " <> show end <> "."
   show (UnauthorizedForProperty author userRole role property verb) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> "."
   show (UnauthorizedForRole author userRole role verbs) = "(UnauthorizedForRole) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes at least one of " <> show verbs
   show (UnauthorizedForContext author userRole contextType) = "(UnauthorizedForContext) User " <> author <> " in role " <> show userRole <> " has no perspective on context " <> show contextType

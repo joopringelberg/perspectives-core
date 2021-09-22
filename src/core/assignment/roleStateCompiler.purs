@@ -45,36 +45,45 @@ import Effect.Class.Console (log)
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.StateCache (CompiledRoleState, cacheCompiledRoleState, retrieveCompiledRoleState)
+import Perspectives.Assignment.StateCache (CompiledRoleState, CompiledAutomaticAction, cacheCompiledRoleState, retrieveCompiledRoleState)
 import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.ObjectGetters (boundByRole, context, getActiveRoleStates_)
+import Perspectives.Instances.ObjectGetters (boundByRole, getActiveRoleStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
-import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
-import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2propertyValue)
+import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2propertyValue)
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Representation.State (State(..))
+import Perspectives.Representation.State (AutomaticAction(..), State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (subStates_)
 import Perspectives.Utilities (findM)
 
-compileState :: StateIdentifier -> MP CompiledRoleState
+-- | This function has a Partial constraint because it only handles the AutomaticRoleAction case of AutomaticAction.
+-- | The function can be safely applied (with `unsafePartial`), however.
+compileState :: Partial => StateIdentifier -> MP CompiledRoleState
 compileState stateId = do
-    State {query, object, automaticOnEntry, automaticOnExit} <- getState stateId
-    (automaticOnEntry' :: Map RoleType (Updater RoleInstance)) <- traverseWithIndex
-      (\subject (effect :: QueryFunctionDescription) -> compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject)
+    State {id, query, automaticOnEntry, automaticOnExit} <- getState stateId
+    (automaticOnEntry' :: Map RoleType CompiledAutomaticAction) <- traverseWithIndex
+      (\subject (AutomaticRoleAction{currentContextCalculation, effect}) -> do
+        updater <- compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject
+        contextGetter <- role2context currentContextCalculation
+        pure {updater, contextGetter})
       (unwrap automaticOnEntry)
-    (automaticOnExit' :: Map RoleType (Updater RoleInstance)) <- traverseWithIndex
-      (\subject (effect :: QueryFunctionDescription) -> compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject)
+    (automaticOnExit' :: Map RoleType CompiledAutomaticAction) <- traverseWithIndex
+      (\subject (AutomaticRoleAction{currentContextCalculation, effect}) -> do
+        updater <- compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject
+        contextGetter <- role2context currentContextCalculation
+        pure {updater, contextGetter})
       (unwrap automaticOnExit)
     -- TODO notifyOnEntry, notifyOnExit.
 
     -- We postpone compiling substates until they're asked for.
+    -- TODO. Add a value for currentobject or currentsubject here in runtime. Maybe not here, but in runStates?
     (lhs :: (RoleInstance ~~> Value)) <- role2propertyValue $ unsafePartial case query of Q qfd -> qfd
     pure $ cacheCompiledRoleState stateId
       { query: lhs
@@ -131,9 +140,11 @@ enteringRoleState roleId userRoleType stateId = do
   -- It may happen that during the transaction, the end user is put into another role (too).
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
-  forWithIndex_ automaticOnEntry \(allowedUser :: RoleType) updater -> do
+  forWithIndex_ automaticOnEntry \(allowedUser :: RoleType) {updater, contextGetter} -> do
     me <- lift2 getUserIdentifier
-    bools <- lift2 (roleId ##= context >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
+    -- NOTE. Instead, we can calculate the `currentactor` and, if it exists,
+    -- put it in runtime evaluation state.
+    bools <- lift2 (roleId ##= contextGetter >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
     if ala Conj foldMap bools
       then updater roleId
       else pure unit
@@ -185,9 +196,9 @@ exitingRoleState roleId userRoleType stateId = do
   -- It may happen that during the transaction, the end user is put into another role (too).
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
-  forWithIndex_ automaticOnExit \(allowedUser :: RoleType) updater -> do
+  forWithIndex_ automaticOnExit \(allowedUser :: RoleType) {updater, contextGetter} -> do
     me <- lift2 getUserIdentifier
-    bools <- lift2 (roleId ##= context >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
+    bools <- lift2 (roleId ##= contextGetter >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
     if ala Conj foldMap bools
       then updater roleId
       else pure unit
@@ -218,7 +229,7 @@ conditionSatisfied roleId stateId = do
 
 getCompiledState :: StateIdentifier -> MonadPerspectivesTransaction CompiledRoleState
 getCompiledState stateId = case retrieveCompiledRoleState stateId of
-  Nothing -> lift2 $ compileState stateId
+  Nothing -> lift2 $ unsafePartial $ compileState stateId
   Just c -> pure c
 
 isActive :: StateIdentifier -> RoleInstance -> MonadPerspectives Boolean

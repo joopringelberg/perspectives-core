@@ -34,6 +34,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.State (effectOfAutomaticAction)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..))
 import Perspectives.Representation.View (View(..))
@@ -487,7 +488,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                 Left e -> assert ("PhaseThree error:" <> show e) false
                 Right correctedDFR -> do
                   ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-                    ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+                    ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
                       (case _ of
                         (BQD _ qf rle cte _ _ _) -> do
                           assert "The queryfunction should be move" (eq qf QF.Move )
@@ -518,7 +519,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                 Left e -> assert ("PhaseThree error:" <> show e) false
                 Right correctedDFR ->
                   ensureState "model:Test$Company$Gast$SomeState" correctedDFR >>=
-                    ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Company$Gast")) >>=
+                    ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Company$Gast")) >>= pure <<< effectOfAutomaticAction >>=
                       (case _ of
                         (BQD _ qf rle cte _ _ _) -> do
                           assert "The queryfunction should be move" (eq qf QF.Move )
@@ -533,7 +534,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     "domain Test\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          bind Gast to EreGast\n  user EreGast filledBy Gast"
     \correctedDFR ->
       ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
           case _ of
             (BQD _ qf bndg _ _ _ _) -> do
               assert "The queryfunction should be bind" (eq qf (Bind $ EnumeratedRoleType "model:Test$EreGast") )
@@ -572,7 +573,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     "domain Test\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          bind Gast to EreGast in AParty >> binding >> context\n  context AParty filledBy Party\n  case Party\n    user EreGast filledBy Gast\n"
     \correctedDFR ->
       ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
           case _ of
             (BQD _ qf bndg _ _ _ _) -> do
               assert "The queryfunction should be bind" (eq qf (Bind $ EnumeratedRoleType "model:Test$Party$EreGast") )
@@ -619,7 +620,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       \correctedDFR -> do
         -- logShow correctedDFR
         ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-          ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+          ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
             case _ of
               (BQD _ qf bndg _ _ _ _) -> do
                 assert "The queryfunction should be bind_" (eq qf Bind_ )
@@ -643,7 +644,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     \correctedDFR -> do
         -- logShow correctedDFR
         ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-          ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+          ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
             case _ of
               (UQD _ qf bndg _ _ _) -> do
                 assert "The queryfunction should be unbind" (case qf of
@@ -659,7 +660,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     "domain Test\n  user Gast (mandatory, relational)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          unbind Gast from EreGast\n  user EreGast (mandatory) filledBy Gast\n"
     \correctedDFR -> do
         ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-          ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+          ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
             case _ of
               (UQD _ qf bndg _ _ _) -> do
                 assert "The queryfunction should be unbind" (case qf of
@@ -692,7 +693,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     "domain Test\n  user Gast (mandatory, relational)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          delete role Gast\n"
     \correctedDFR -> do
         ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-          ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+          ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
             case _ of
               (UQD _ qf bndg _ _ _) -> do
                 assert "The queryfunction should be DeleteRole" (case qf of
@@ -708,7 +709,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     "domain Test\n  use: cdb for model:Couchdb\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          callEffect cdb:AddModelToLocalStore( AModel >> Name )\n  thing AModel\n    property Name (mandatory, String)\n"
     \correctedDFR -> do
       ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
           case _ of
             (UQD _ qf bndg _ _ _) -> do
               assert "The queryfunction should be DeleteProperty" (case qf of
@@ -740,7 +741,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     "domain Test\n  user Gast (mandatory, relational)\n    property Prop1 (mandatory, Number)\n    property Prop2 = Prop1\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          Prop1 =+ 10 for Gast\n"
     \correctedDFR -> do
       ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
           case _ of
             (BQD _ qf val role _ _ _) -> do
               assert "The queryfunction should be AddPropertyValue" (case qf of
@@ -776,7 +777,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     "domain Test\n  user Gast (mandatory, relational)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do \n          Prop2 =+ 10 for Organiser\n  user Organiser\n    property Prop2 (mandatory, Number)\n"
     \correctedDFR ->
       ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
           case _ of
             (BQD _ qf val role _ _ _) -> do
               assert "The queryfunction should be AddPropertyValue" (case qf of
@@ -795,7 +796,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
     "domain Test\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          callEffect cdb:AddModelToLocalStore( AModel >> Name )\n  thing AModel\n    property Name (mandatory, String)\n"
     \correctedDFR ->
       ensureState "model:Test$Gast$SomeState" correctedDFR >>=
-        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>=
+        ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAutomaticAction >>=
           case _ of
             (MQD _ qf args _ _ _) -> do
               assert "The queryfunction should be ExternalEffectFullFunction" (eq qf (ExternalEffectFullFunction "model:Couchdb$AddModelToLocalStore") )

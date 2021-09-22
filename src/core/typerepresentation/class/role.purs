@@ -168,7 +168,10 @@ adtIsFunctional (SUM adts) = do
 adtIsFunctional (PROD adts) = do
     (bools :: Array Boolean) <- traverse adtIsFunctional adts
     pure $ unwrap $ foldMap Conj bools
-adtIsFunctional EMPTY = pure false
+-- A role with no binding specified has binding EMPTY. roleAndBinding includes the
+-- binding type and then adtIsFunctional should compute True for an otherwise functional
+-- EnumeratedRole type.
+adtIsFunctional EMPTY = pure true
 adtIsFunctional UNIVERSAL = pure false
 
 --------------------------------------------------------------------------------------------------

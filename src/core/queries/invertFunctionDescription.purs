@@ -29,7 +29,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..), isFunctionalFunction, isMandatoryFunction)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Prelude (class Monoid, class Semigroup, ($), (<$>), (<>))
@@ -79,11 +79,63 @@ invertFunction dom qf ran = case qf of
     isExternalRole (RDOM (ST (EnumeratedRoleType n))) = n `endsWithSegments` "External"
     isExternalRole _ = false
 
-inversionIsFunctional :: QueryFunction -> ThreeValuedLogic
-inversionIsFunctional f = Unknown
+-- | Checks whether the QueryFunction returns just a single result.
+queryFunctionIsFunctional :: QueryFunction -> ThreeValuedLogic
+queryFunctionIsFunctional qf = case qf of
+  DataTypeGetter f -> isFunctionalFunction f
+  DataTypeGetterWithParameter f _ -> isFunctionalFunction f
+  -- NOTE: we can do better by looking up the property,
+  -- but that requires making this a monadic function.
+  PropertyGetter _ -> Unknown
+  Value2Role _ -> True
+  -- NOTE: we can do better by looking up the role.
+  RolGetter _ -> Unknown
+  ExternalCoreRoleGetter _ -> Unknown
+  ExternalCorePropertyGetter _ -> Unknown
+  ExternalCoreContextGetter _ -> Unknown
+  ForeignRoleGetter _ -> Unknown
+  ForeignPropertyGetter _ -> Unknown
+  VariableLookup _ -> Unknown
+  BindVariable _ -> Unknown
+  BindResultFromCreatingAssignment _ -> True
+  AssignmentOperator _ -> Unknown
+  WithFrame -> Unknown
+  TypeGetter _ -> Unknown
+  UnaryCombinator _ -> Unknown
+  BinaryCombinator _ -> Unknown
+  Constant _ _ -> True
+  RoleIndividual _ -> True
+  ContextIndividual _ -> True
+  _ -> Unknown
 
-inversionIsMandatory :: QueryFunction -> ThreeValuedLogic
-inversionIsMandatory f = Unknown
+-- | Checks whether the QueryFunction always returns a result.
+queryFunctionIsMandatory :: QueryFunction -> ThreeValuedLogic
+queryFunctionIsMandatory qf = case qf of
+  DataTypeGetter f -> isMandatoryFunction f
+  DataTypeGetterWithParameter f _ -> isMandatoryFunction f
+  -- NOTE: we can do better by looking up the property,
+  -- but that requires making this a monadic function.
+  PropertyGetter _ -> Unknown
+  Value2Role _ -> True
+  -- NOTE: we can do better by looking up the role.
+  RolGetter _ -> Unknown
+  ExternalCoreRoleGetter _ -> Unknown
+  ExternalCorePropertyGetter _ -> Unknown
+  ExternalCoreContextGetter _ -> Unknown
+  ForeignRoleGetter _ -> Unknown
+  ForeignPropertyGetter _ -> Unknown
+  VariableLookup _ -> Unknown
+  BindVariable _ -> Unknown
+  BindResultFromCreatingAssignment _ -> True
+  AssignmentOperator _ -> Unknown
+  WithFrame -> Unknown
+  TypeGetter _ -> Unknown
+  UnaryCombinator _ -> Unknown
+  BinaryCombinator _ -> Unknown
+  Constant _ _ -> True
+  RoleIndividual _ -> True
+  ContextIndividual _ -> True
+  _ -> Unknown
 
 domain2RoleType :: Partial => Domain -> EnumeratedRoleType
 domain2RoleType (RDOM (ST e)) = e

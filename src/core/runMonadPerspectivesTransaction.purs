@@ -134,7 +134,11 @@ runStates t = do
     RoleStateEvaluation stateId roleId roleType -> do
       cid <- lift2 (roleId ##>> context)
       oldFrame <- lift2 pushFrame
+      -- NOTE. This may not be necessary; we have no analysis in runtime whether these variables occur in
+      -- expressions in state.
       lift2 $ addBinding "currentcontext" [unwrap cid]
+      -- TODO. add binding for "currentobject" or "currentsubject"?!
+      -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
       catchError (evaluateRoleState roleId roleType stateId)
         \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
       lift2 $ restoreFrame oldFrame

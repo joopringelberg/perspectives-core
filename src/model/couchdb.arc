@@ -10,8 +10,8 @@ domain Couchdb
 --   , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
 --   , Tuple "model:Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
 --   , Tuple "model:Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
---   , Tuple "model:Couchdb$CreateDatabase" {func: unsafeCoerce createDatabase, nArgs: 2}
---   , Tuple "model:Couchdb$DeleteDatabase" {func: unsafeCoerce deleteDatabase, nArgs: 2}
+--   , Tuple "model:Couchdb$CreateDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
+--   , Tuple "model:Couchdb$DeleteDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
 --   , Tuple "model:Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 4}
 --   , Tuple "model:Couchdb$EndReplication" {func: unsafeCoerce replicateContinuously, nArgs: 3}
 --   , Tuple "model:Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}

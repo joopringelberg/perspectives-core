@@ -47,7 +47,7 @@ import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (StateKind(..))
-import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression, stepContainsVariableReference)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
@@ -61,7 +61,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
-import Perspectives.Representation.Class.Role (adtIsFunctional, binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
+import Perspectives.Representation.Class.Role (adtIsFunctional, binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
@@ -69,9 +69,9 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctional
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), roletype2string)
 import Perspectives.Types.ObjectGetters (isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
-import Prelude (bind, discard, eq, map, pure, show, void, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=), (<>))
+import Prelude (bind, discard, eq, map, pure, show, unit, void, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -123,7 +123,11 @@ makeRoleGetter currentDomain rt@(ENR et) = do
 compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT EnumeratedRoleType)
 compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole}) = withFrame do
   -- The expression that gives the role instances is always compiled wrt the context.
-  expressionWithEnvironment <- addContextualVariablesToExpression step Nothing CState
+  -- "currentobject" may not be used!
+  if (stepContainsVariableReference "currentobject" step)
+    then throwError (CurrentObjectNotAllowed (startOf step) (endOf step))
+    else pure unit
+  expressionWithEnvironment <- addContextualVariablesToExpression step Nothing CState Nothing
   compiledExpression <- compileExpression dom expressionWithEnvironment
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
@@ -151,6 +155,7 @@ qualifyReturnsClause pos qfd = pure qfd
 -- | or throws an error.
 -- | If the name happens to be fully qualified, we check whether it occurs in the model we're compiling or
 -- | in another known model.
+-- | Notice that this function can return both an Enumerated and a Calculated role type!
 qualifyLocalRoleName :: ArcPosition -> String -> PhaseThree RoleType
 qualifyLocalRoleName pos ident = do
   {enumeratedRoles, calculatedRoles} <- lift $ gets _.dfr
@@ -204,10 +209,18 @@ compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> PhaseThree QT.
 compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role}) = withFrame do
   -- We add the role as the variable "currentobject"
   kindOfRole <- unsafePartial $ roleKind role
-  expressionWithEnvironment <- addContextualVariablesToExpression step (Just $ Simple $ Identity (startOf step))
+  if kindOfRole == UserRole && stepContainsVariableReference "currentobject" step
+    then throwError (CurrentObjectNotAllowed (startOf step) (endOf step))
+    else pure unit
+  expressionWithEnvironment <- addContextualVariablesToExpression
+    step
+    (Just $ Simple $ Identity (startOf step))
     case kindOfRole of
       UserRole -> SState
       _ -> OState
+    case kindOfRole of
+      UserRole -> (Just $ Simple $ Identity (startOf step))
+      _ -> Nothing
   compiledExpression <- compileExpression dom expressionWithEnvironment
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
@@ -289,11 +302,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
               Nothing -> throwError $ ContextHasNoRole c ident
               Just {head, tail} -> if null tail
                 then makeRoleGetter currentDomain head
-                else do
-                  -- TODO. Is dit wat we willen? Een conjunctie (disjunctie?)
-                  -- van rollen wier lokale namen matchen?
-                  head' <- makeRoleGetter currentDomain head
-                  foldM (makeConjunction currentDomain) head' tail
+                else throwError (NotUniquelyIdentifying pos ident (roletype2string <$> rts))
           (RDOM r) -> do
             (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
               then  lift2 $ runArrayT $ lookForPropertyType ident r
@@ -376,6 +385,17 @@ compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
             otherwise -> throwError $ NotUniquelyIdentifying pos roleName (map unwrap qnames)
       pure $ SQD currentDomain (QF.DataTypeGetterWithParameter SpecialisesRoleTypeF (unwrap qRoleName)) (VDOM PBool Nothing) (isFunctionalFunction SpecialisesRoleTypeF) False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
+compileSimpleStep currentDomain (TypeTimeOnlyContext pos ctype) = pure $
+  SQD currentDomain (QF.TypeTimeOnlyContextF ctype) (CDOM (ST $ ContextType ctype)) True True
+
+compileSimpleStep currentDomain (TypeTimeOnlyEnumeratedRole pos rtype) = pure $
+  SQD currentDomain (QF.TypeTimeOnlyEnumeratedRoleF rtype) (RDOM (ST $ EnumeratedRoleType rtype)) True True
+
+compileSimpleStep currentDomain (TypeTimeOnlyCalculatedRole pos ctype) = do
+  -- Get the ADT for the calculated role.
+  adt <- lift $ lift $ getRoleADTFromString ctype
+  pure $ SQD currentDomain (QF.TypeTimeOnlyCalculatedRoleF ctype) (RDOM adt) True True
 
 compileSimpleStep currentDomain s@(Extern pos) = do
   case currentDomain of
@@ -617,7 +637,11 @@ compileVarBinding :: Domain -> VarBinding -> FD
 compileVarBinding currentDomain (VarBinding varName step) = do
   step_ <- compileStep currentDomain step
   addBinding varName step_
-  pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) (functional step_) (mandatory step_)
+  -- TODO. Misschien: als varName=="currentsubject", en step is niet Identity, maak er dan "filter <step> with binds sys:Me" van.
+  isF <- if varName == "currentsubject"
+    then pure True
+    else pure $ functional step_
+  pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) isF (mandatory step_)
 
 compileComputationStep :: Domain -> ComputationStep -> FD
 compileComputationStep currentDomain (ComputationStep {functionName, arguments, computedType, start, end}) =

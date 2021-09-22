@@ -30,14 +30,15 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Map (Map, values)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Traversable (for_, traverse)
+import Effect.Class.Console (logShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP)
-import Perspectives.InvertedQuery (QueryWithAKink(..))
+import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (makeComposition, setPathForStep)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.Inversion (compose, inversionIsFunctional, inversionIsMandatory, invertFunction)
+import Perspectives.Query.Inversion (compose, queryFunctionIsFunctional, queryFunctionIsMandatory, invertFunction)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, replaceDomain)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty)
@@ -47,7 +48,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
-import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=), (*>))
 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
@@ -62,6 +63,22 @@ instance showQueryWithAKink_ :: Show QueryWithAKink_ where
 
 instance prettyPrintQueryWithAKink_ :: PrettyPrint QueryWithAKink_ where
   prettyPrint' tab (ZQ_ qfds mqfd) = "QueryWithAKink_\n[" <> (intercalate (",\n" <> tab) (prettyPrint' (tab <> "  ") <$> qfds) <> "]\n" <> prettyPrint' (tab <> "  ") mqfd)
+
+--------------------------------------------------------------------------------------------------------------
+---- COMPLETEINVERSIONS
+--------------------------------------------------------------------------------------------------------------
+completeInversions :: QueryFunctionDescription -> PhaseThree (Array QueryFunctionDescription)
+completeInversions = invert >=> pure <<< catMaybes <<< map f
+  where
+    f :: QueryWithAKink -> Maybe QueryFunctionDescription
+    f qwk = if isCompleteInverse qwk then backwards qwk else Nothing
+
+    -- | Is the original query completely inversed? (as opposed to: is this a partial inversion).
+    isCompleteInverse :: QueryWithAKink -> Boolean
+    isCompleteInverse (ZQ _ Nothing) = true
+    isCompleteInverse _ = false
+
+
 --------------------------------------------------------------------------------------------------------------
 ---- INVERT
 --------------------------------------------------------------------------------------------------------------
@@ -71,6 +88,12 @@ instance prettyPrintQueryWithAKink_ :: PrettyPrint QueryWithAKink_ where
 -- | The result is a collection of all possible inverse paths, kinked at all possible stations.
 -- | As the domain of the original query can be either a ContextType, or an EnumeratedRoleType, the range of the
 -- | inverted parts can be a ContextType or an EnumeratedRoleType, too.
+-- |
+-- | FILTERS and LET (WithFrame)
+-- | Filters are completely ignored in the code below. On the type level, this does not matter as unfiltered queries
+-- | have the same type as filtered versions. Runtime, things will have impact on performance and sometimes on
+-- | semantics. See the text Filtering Inverted Queries.docx.
+
 invert :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink)
 invert = invert_ >=> traverse h >=> pure <<< catMaybes
   where
@@ -101,7 +124,7 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
   (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _) -> invert_ (BQD dom (BinaryCombinator ComposeF) qfd1 (BQD (range qfd1) (BinaryCombinator ComposeF) qfd2 r ran f m) ran f m)
 
   (BQD _ (BinaryCombinator BindsF) conj1 conj2 _ _ _) -> append <$>
-    invert_ (compose conj1 (replaceDomain r (range conj1))) <*> 
+    invert_ (compose conj1 (replaceDomain r (range conj1))) <*>
     invert_ (compose conj2 (replaceDomain r (range conj2)))
 
   qq@(SQD _ (VariableLookup varName) _ _ _) -> do
@@ -156,7 +179,7 @@ invert_ (UQD _ _ qfd _ _ _) = invert_ qfd
 invert_ (SQD dom (Constant _ _) ran _ _) = pure []
 
 invert_ (SQD dom (RolGetter rt) ran _ _) = case rt of
-  ENR _ -> pure [ZQ_ [(SQD ran (DataTypeGetter ContextF) dom (inversionIsFunctional (RolGetter rt)) (inversionIsMandatory (RolGetter rt)))] Nothing]
+  ENR _ -> pure [ZQ_ [(SQD ran (DataTypeGetter ContextF) dom True True)] Nothing]
   CR r -> (lift2 $ (getRole >=> getCalculation) rt) >>= invert_
 
 invert_ (SQD dom (PropertyGetter (CP prop)) ran _ _) = (lift2 $ (getCalculatedProperty >=> calculation) prop) >>= invert_
@@ -178,7 +201,7 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
       minvertedF <- pure $ invertFunction dom f ran
       case minvertedF of
         Nothing -> pure []
-        Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f))] Nothing]
+        Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom True True)] Nothing]
     else ((lift $ lift (expandPropertyQuery roleAdt)) >>= invert_)
 
   where
@@ -199,10 +222,10 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
       pure (SQD (RDOM adt) (DataTypeGetter BindingF) (RDOM b) True False)
 
 invert_ (SQD dom f ran _ _) = do
-  minvertedF <- pure $ invertFunction dom f ran
+  (minvertedF :: Maybe QueryFunction) <- pure $ invertFunction dom f ran
   case minvertedF of
     Nothing -> pure []
-    Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f))] Nothing]
+    Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom (queryFunctionIsFunctional invertedF) (queryFunctionIsMandatory f))] Nothing]
 
 -- Catchall.
 invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q)

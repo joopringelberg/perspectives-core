@@ -56,8 +56,8 @@ type RoleStateCache = GLStrMap CompiledRoleState
 type CompiledRoleState =
   { query :: (RoleInstance ~~> Value)
   , objectGetter :: Maybe (RoleInstance ~~> RoleInstance)
-  , automaticOnEntry :: Map RoleType (Updater RoleInstance)
-  , automaticOnExit :: Map RoleType (Updater RoleInstance)
+  , automaticOnEntry :: Map RoleType CompiledAutomaticAction
+  , automaticOnExit :: Map RoleType CompiledAutomaticAction
   }
 
 roleStateCache :: RoleStateCache
@@ -68,3 +68,5 @@ cacheCompiledRoleState a u = const u (poke roleStateCache (unwrap a) u)
 
 retrieveCompiledRoleState :: StateIdentifier -> (Maybe CompiledRoleState)
 retrieveCompiledRoleState a = peek roleStateCache (unwrap a)
+
+type CompiledAutomaticAction = {updater :: Updater RoleInstance, contextGetter :: RoleInstance ~~> ContextInstance}

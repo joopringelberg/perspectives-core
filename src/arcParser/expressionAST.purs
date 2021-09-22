@@ -112,6 +112,11 @@ data SimpleStep =
   | RoleTypes ArcPosition
   | SpecialisesRoleType ArcPosition String
 
+  -- These step types are used in Perspectives.Parsing.Arc.PhaseThree for the standard variables.
+  | TypeTimeOnlyContext ArcPosition String
+  | TypeTimeOnlyEnumeratedRole ArcPosition String
+  | TypeTimeOnlyCalculatedRole ArcPosition String
+
 data UnaryStep =
   LogicalNot ArcPosition Step
   | Exists ArcPosition Step
@@ -185,6 +190,9 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (RoleTypes _) = "RoleTypes"
   prettyPrint' t (TypeOfContext _) = "TypeOfContext"
   prettyPrint' t (SpecialisesRoleType _ s) = "SpecialisesRoleType " <> s
+  prettyPrint' t (TypeTimeOnlyContext _ s) = "TypeTimeOnlyContext " <> s
+  prettyPrint' t (TypeTimeOnlyEnumeratedRole _ s) = "TypeTimeOnlyEnumeratedRole " <> s
+  prettyPrint' t (TypeTimeOnlyCalculatedRole _ s) = "TypeTimeOnlyCalculatedRole " <> s
 
 derive instance genericBinaryStep :: Generic BinaryStep _
 instance showBinaryStep :: Show BinaryStep where show = genericShow

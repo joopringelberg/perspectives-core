@@ -55,24 +55,24 @@ import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (boundByRole, getActiveStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
-import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
+import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, getRoleInstances, roleFunctionFromQfd)
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.State (State(..))
+import Perspectives.Representation.State (AutomaticAction(..), State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (subStates_)
 
-compileState :: StateIdentifier -> MP CompiledContextState
+compileState :: Partial => StateIdentifier -> MP CompiledContextState
 compileState stateId = do
     State {query, object, automaticOnEntry, automaticOnExit} <- getState stateId
     (mobjectGetter :: Maybe (ContextInstance ~~> RoleInstance)) <- traverse roleFunctionFromQfd object
     (automaticOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\subject (effect :: QueryFunctionDescription) -> compileAssignment effect >>= pure <<< withAuthoringRole subject)
+      (\subject (AutomaticContextAction effect) -> compileAssignment effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnEntry)
     (automaticOnExit' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\subject (effect :: QueryFunctionDescription) ->
+      (\subject (AutomaticContextAction effect) ->
         compileAssignment effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnExit)
     -- TODO notifyOnEntry, notifyOnExit.
@@ -239,7 +239,7 @@ conditionSatisfied contextId stateId = do
 
 getCompiledState :: StateIdentifier -> MonadPerspectivesTransaction CompiledContextState
 getCompiledState stateId = case retrieveCompiledContextState stateId of
-  Nothing -> lift2 $ compileState stateId
+  Nothing -> lift2 $ unsafePartial compileState stateId
   Just c -> pure c
 
 isActive :: StateIdentifier -> ContextInstance -> MonadPerspectives Boolean

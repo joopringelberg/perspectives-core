@@ -25,7 +25,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), subsetPSet)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), objectOfPerspective) as Perspective
 import Perspectives.Representation.Range (Range) as Range
-import Perspectives.Representation.State (State(..))
+import Perspectives.Representation.State (AutomaticAction, State(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType, StateIdentifier(..))
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 import Test.Unit (Test)
@@ -159,10 +159,10 @@ ensureDescription :: Calculation -> Aff QueryFunctionDescription
 ensureDescription (Q qfd) = pure qfd
 ensureDescription _ = failure "The query of a state should have been compiled to a description."
 
-ensureOnEntry :: RoleType -> State -> Aff QueryFunctionDescription
+ensureOnEntry :: RoleType -> State -> Aff AutomaticAction
 ensureOnEntry rt (State{automaticOnEntry}) = case Map.lookup rt (unwrap automaticOnEntry) of
   Nothing -> failure ("No automatic on entry effect for " <> show rt)
-  Just effect -> pure effect
+  Just automaticAction -> pure automaticAction
 
 {-
 getERole :: DomeinFileRecord -> String -> Maybe EnumeratedRole
