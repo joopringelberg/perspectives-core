@@ -54,7 +54,7 @@ import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructName
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateKind(..), StateSpecification(..), StateTransitionE(..))
-import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
@@ -70,8 +70,8 @@ import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
-import Perspectives.Representation.Class.Role (Role(..), contextOfRepresentation, getRole, getRoleType, roleADT)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole)
+import Perspectives.Representation.Class.Role (Role(..), getRole, getRoleType, roleADT)
 import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -871,17 +871,15 @@ compileStateQueries = do
           compiledQuery <- case query of
             Q q -> pure $ Q q
             S stp -> do
-              currentContext <- case stateFulObject of
-                Cnt ctype -> pure ctype
-                Srole rtype -> lift2 ((getEnumeratedRole >=> pure <<< contextOfRepresentation) rtype)
-                Orole rtype -> lift2 ((getEnumeratedRole >=> pure <<< contextOfRepresentation) rtype)
+              -- currentContext <- case stateFulObject of
+              --   Cnt ctype -> pure ctype
+              --   Srole rtype -> lift2 ((getEnumeratedRole >=> pure <<< contextOfRepresentation) rtype)
+              --   Orole rtype -> lift2 ((getEnumeratedRole >=> pure <<< contextOfRepresentation) rtype)
               expressionWithEnvironment <- pure $ addContextualBindingsToExpression
                 [ (case stateFulObject of
                     Cnt _ -> makeIdentityStep "currentcontext" (startOf stp)
-                    Srole _ -> makeTypeTimeOnlyContextStep "currentcontext"
-                      currentContext (startOf stp)
-                    Orole _ -> makeTypeTimeOnlyContextStep "currentcontext"
-                      currentContext (startOf stp))
+                    Srole _ -> makeContextStep "currentcontext" (startOf stp)
+                    Orole _ -> makeContextStep "currentcontext" (startOf stp))
                 , makeIdentityStep "origin" (startOf stp)]
                 stp
               Q <$> compileAndDistributeStep

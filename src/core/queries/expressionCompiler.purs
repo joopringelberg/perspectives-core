@@ -46,8 +46,7 @@ import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCal
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (StateKind(..))
-import Perspectives.Parsing.Arc.ContextualVariables (addContextualVariablesToExpression, stepContainsVariableReference)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, makeContextStep, makeIdentityStep, stepContainsVariableReference)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
@@ -122,12 +121,11 @@ makeRoleGetter currentDomain rt@(ENR et) = do
 -- | Saves it in the DomainCache.
 compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT EnumeratedRoleType)
 compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole}) = withFrame do
-  -- The expression that gives the role instances is always compiled wrt the context.
-  -- "currentobject" may not be used!
-  if (stepContainsVariableReference "currentobject" step)
-    then throwError (CurrentObjectNotAllowed (startOf step) (endOf step))
-    else pure unit
-  expressionWithEnvironment <- addContextualVariablesToExpression step Nothing CState Nothing
+  expressionWithEnvironment <- pure $ addContextualBindingsToExpression
+    [ makeIdentityStep "currentcontext" (startOf step)
+    , makeIdentityStep "origin" (startOf step)
+    ]
+    step
   compiledExpression <- compileExpression dom expressionWithEnvironment
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
@@ -212,15 +210,11 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role}) = withFrame 
   if kindOfRole == UserRole && stepContainsVariableReference "currentobject" step
     then throwError (CurrentObjectNotAllowed (startOf step) (endOf step))
     else pure unit
-  expressionWithEnvironment <- addContextualVariablesToExpression
+  expressionWithEnvironment <- pure $ addContextualBindingsToExpression
+    [ makeContextStep "currentcontext" (startOf step)
+    , makeIdentityStep "origin" (startOf step)
+    ]
     step
-    (Just $ Simple $ Identity (startOf step))
-    case kindOfRole of
-      UserRole -> SState
-      _ -> OState
-    case kindOfRole of
-      UserRole -> (Just $ Simple $ Identity (startOf step))
-      _ -> Nothing
   compiledExpression <- compileExpression dom expressionWithEnvironment
   -- Save the result in DomeinCache.
   lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
