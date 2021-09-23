@@ -54,7 +54,7 @@ import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructName
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateKind(..), StateSpecification(..), StateTransitionE(..))
-import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, addContextualVariablesToExpression, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
@@ -65,13 +65,13 @@ import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileA
 import Perspectives.Query.Kinked (completeInversions, setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, mandatory, range, sumOfDomains)
 import Perspectives.Query.StatementCompiler (compileStatement)
-import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole)
-import Perspectives.Representation.Class.Role (getRole, getRoleType, roleADT, Role(..))
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
+import Perspectives.Representation.Class.Role (Role(..), contextOfRepresentation, getRole, getRoleType, roleADT)
 import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -866,21 +866,30 @@ compileStateQueries = do
       modifyDF \dfr -> dfr { states = states' }
       where
         ensureStateQueryCompiled :: State -> PhaseThree State
-        ensureStateQueryCompiled s@(State sr@{id, query, stateFulObject}) = case query of
-          Q _ -> pure s
-          S stp -> do
-            compiledQuery <-
-              -- `currentobject` is only allowed in the scope of `thing`, `context` or `external`.
-              case stateFulObject of
-                Orole _ -> do
-                  expressionWithEnvironment <- addContextualVariablesToExpression
-                    stp
-                    Nothing
-                    (stateFulObject2StateKind stateFulObject)
-                    Nothing
-                  Q <$> compileAndDistributeStep (stateFulObject2Domain stateFulObject) expressionWithEnvironment [] [id]
-                _ -> throwError (CurrentObjectNotAllowed (startOf stp) (endOf stp))
-            pure $ State sr { query = compiledQuery }
+        ensureStateQueryCompiled s@(State sr@{id, query, stateFulObject}) = do
+          -- Compile the query if we've not done it before.
+          compiledQuery <- case query of
+            Q q -> pure $ Q q
+            S stp -> do
+              currentContext <- case stateFulObject of
+                Cnt ctype -> pure ctype
+                Srole rtype -> lift2 ((getEnumeratedRole >=> pure <<< contextOfRepresentation) rtype)
+                Orole rtype -> lift2 ((getEnumeratedRole >=> pure <<< contextOfRepresentation) rtype)
+              expressionWithEnvironment <- pure $ addContextualBindingsToExpression
+                [ (case stateFulObject of
+                    Cnt _ -> makeIdentityStep "currentcontext" (startOf stp)
+                    Srole _ -> makeTypeTimeOnlyContextStep "currentcontext"
+                      currentContext (startOf stp)
+                    Orole _ -> makeTypeTimeOnlyContextStep "currentcontext"
+                      currentContext (startOf stp))
+                , makeIdentityStep "origin" (startOf stp)]
+                stp
+              Q <$> compileAndDistributeStep
+                (stateFulObject2Domain stateFulObject)
+                expressionWithEnvironment
+                []
+                [id]
+          pure $ State sr { query = compiledQuery }
 
 registerStates :: PhaseThree Unit
 registerStates = do
