@@ -11,8 +11,8 @@ domain TestStandardVars
       user U
         property Name (String)
         perspective on extern >> binder C2S >> context >> R1
-          on entry of object state
-            do
+          in object state
+            action MyAction
               SomeProperty = true
               Name = "Joop" for currentactor
               createRole R2 in currentcontext

@@ -7,11 +7,9 @@ import Prelude
 
 import Data.Array (filter, head)
 import Data.Foldable (find, for_)
-import Data.Map (showTree)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Data.Set (fromFoldable, subset)
 import Effect.Aff (Aff, throwError, error)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
@@ -19,13 +17,14 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFileRecord)
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, Range, range)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), subsetPSet)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), objectOfPerspective) as Perspective
 import Perspectives.Representation.Range (Range) as Range
-import Perspectives.Representation.State (AutomaticAction, State(..))
+import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType, StateIdentifier(..))
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 import Test.Unit (Test)
@@ -159,7 +158,7 @@ ensureDescription :: Calculation -> Aff QueryFunctionDescription
 ensureDescription (Q qfd) = pure qfd
 ensureDescription _ = failure "The query of a state should have been compiled to a description."
 
-ensureOnEntry :: RoleType -> State -> Aff AutomaticAction
+ensureOnEntry :: RoleType -> State -> Aff Action
 ensureOnEntry rt (State{automaticOnEntry}) = case Map.lookup rt (unwrap automaticOnEntry) of
   Nothing -> failure ("No automatic on entry effect for " <> show rt)
   Just automaticAction -> pure automaticAction

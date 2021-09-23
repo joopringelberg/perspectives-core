@@ -57,9 +57,10 @@ import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, getRoleInstances, roleFunctionFromQfd)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.State (AutomaticAction(..), State(..))
+import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (subStates_)
@@ -69,10 +70,10 @@ compileState stateId = do
     State {query, object, automaticOnEntry, automaticOnExit} <- getState stateId
     (mobjectGetter :: Maybe (ContextInstance ~~> RoleInstance)) <- traverse roleFunctionFromQfd object
     (automaticOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\subject (AutomaticContextAction effect) -> compileAssignment effect >>= pure <<< withAuthoringRole subject)
+      (\subject (ContextAction effect) -> compileAssignment effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnEntry)
     (automaticOnExit' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\subject (AutomaticContextAction effect) ->
+      (\subject (ContextAction effect) ->
         compileAssignment effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnExit)
     -- TODO notifyOnEntry, notifyOnExit.

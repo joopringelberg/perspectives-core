@@ -55,9 +55,10 @@ import Perspectives.Instances.ObjectGetters (boundByRole, getActiveRoleStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2propertyValue)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Representation.State (AutomaticAction(..), State(..))
+import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (subStates_)
@@ -69,13 +70,13 @@ compileState :: Partial => StateIdentifier -> MP CompiledRoleState
 compileState stateId = do
     State {id, query, automaticOnEntry, automaticOnExit} <- getState stateId
     (automaticOnEntry' :: Map RoleType CompiledAutomaticAction) <- traverseWithIndex
-      (\subject (AutomaticRoleAction{currentContextCalculation, effect}) -> do
+      (\subject (RoleAction{currentContextCalculation, effect}) -> do
         updater <- compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject
         contextGetter <- role2context currentContextCalculation
         pure {updater, contextGetter})
       (unwrap automaticOnEntry)
     (automaticOnExit' :: Map RoleType CompiledAutomaticAction) <- traverseWithIndex
-      (\subject (AutomaticRoleAction{currentContextCalculation, effect}) -> do
+      (\subject (RoleAction{currentContextCalculation, effect}) -> do
         updater <- compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject
         contextGetter <- role2context currentContextCalculation
         pure {updater, contextGetter})

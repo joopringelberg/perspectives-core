@@ -36,6 +36,7 @@ import Foreign.Object (Object)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, range)
 import Perspectives.Representation.ADT (ADT, leavesInADT)
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb, RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
@@ -50,7 +51,7 @@ type PerspectiveRecord =
   { object :: QueryFunctionDescription
   , roleVerbs :: EncodableMap StateIdentifier RoleVerbList
 	, propertyVerbs :: EncodableMap StateIdentifier (Array PropertyVerbs)
-	, actions :: EncodableMap StateIdentifier (Object QueryFunctionDescription)
+	, actions :: EncodableMap StateIdentifier (Object Action)
   , selfOnly :: Boolean
   }
 

@@ -34,6 +34,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription)
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Sentence (Sentence)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, StateIdentifier)
@@ -48,8 +49,8 @@ type StateRecord =
 	-- the key in these maps is the subject the effect or notification is for.
 	, notifyOnEntry :: EncodableMap RoleType Notification
 	, notifyOnExit :: EncodableMap RoleType Notification
-	, automaticOnEntry :: EncodableMap RoleType AutomaticAction
-	, automaticOnExit :: EncodableMap RoleType AutomaticAction
+	, automaticOnEntry :: EncodableMap RoleType Action
+	, automaticOnExit :: EncodableMap RoleType Action
 	, subStates :: Array StateIdentifier
 	}
 
@@ -107,19 +108,3 @@ instance showNotification :: Show Notification where show = genericShow
 instance eqNotification :: Eq Notification where eq = genericEq
 instance encodeNotification :: Encode Notification where encode = genericEncode defaultOptions
 instance decodeNotification :: Decode Notification where decode = genericDecode defaultOptions
-
-data AutomaticAction = AutomaticContextAction QueryFunctionDescription |
-  AutomaticRoleAction
-    { currentContextCalculation :: QueryFunctionDescription
-  	, effect :: QueryFunctionDescription
-  	}
-
-effectOfAutomaticAction :: AutomaticAction -> QueryFunctionDescription
-effectOfAutomaticAction (AutomaticContextAction effect) = effect
-effectOfAutomaticAction (AutomaticRoleAction action) = action.effect
-
-derive instance genericAutomaticAction :: Generic AutomaticAction _
-instance showAutomaticAction :: Show AutomaticAction where show = genericShow
-instance eqAutomaticAction :: Eq AutomaticAction where eq = genericEq
-instance encodeAutomaticAction :: Encode AutomaticAction where encode = genericEncode defaultOptions
-instance decodeAutomaticAction :: Decode AutomaticAction where decode = genericDecode defaultOptions

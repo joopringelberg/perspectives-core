@@ -54,7 +54,7 @@ import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructName
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateKind(..), StateSpecification(..), StateTransitionE(..))
-import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, addContextualVariablesToExpression, addContextualVariablesToStatements, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep, stateSpec2stateKind, stepContainsVariableReference)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, addContextualVariablesToExpression, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep, stateSpec2stateKind, stepContainsVariableReference)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
@@ -65,6 +65,7 @@ import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileA
 import Perspectives.Query.Kinked (completeInversions, setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, mandatory, range, sumOfDomains)
 import Perspectives.Query.StatementCompiler (compileStatement)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -78,7 +79,7 @@ import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(.
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
-import Perspectives.Representation.State (AutomaticAction(..), Notification(..), State(..), StateFulObject(..), StateRecord, constructState)
+import Perspectives.Representation.State (Notification(..), State(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
@@ -406,8 +407,8 @@ handlePostponedStateQualifiedParts = do
       -- currentactor -> It's type is the qualifiedUser computed above.
       -- All these VarBindings have a computation of type TypeTimeOnly, which instructs the unsafeCompiler to remove them.
       effectWithEnvironment <- pure $ addContextualBindingsToStatements
-        [ computeOrigin transition start
-        , computeCurrentContext transition start
+        [ computeOrigin (transition2stateSpec transition) start
+        , computeCurrentContext (transition2stateSpec transition) start
         , makeTypeTimeOnlyRoleStep "currentactor" (unsafePartial fromJust $ head qualifiedUsers) start
         ]
         effect
@@ -428,14 +429,14 @@ handlePostponedStateQualifiedParts = do
         SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
       modifyAllStates
         (case transition2stateSpec transition of
-          ContextState _ _ -> AutomaticContextAction sideEffect
-          otherwise -> AutomaticRoleAction {currentContextCalculation, effect: sideEffect})
+          ContextState _ _ -> ContextAction sideEffect
+          otherwise -> RoleAction {currentContextCalculation, effect: sideEffect})
         qualifiedUsers
         states
         originDomain
       where
 
-        modifyAllStates :: AutomaticAction -> Array RoleType -> Array StateIdentifier -> Domain -> PhaseThree Unit
+        modifyAllStates :: Action -> Array RoleType -> Array StateIdentifier -> Domain -> PhaseThree Unit
         modifyAllStates automaticAction qualifiedUsers states currentDomain = for_ states
           (modifyPartOfState start end
             \(sr@{automaticOnEntry, automaticOnExit, query}) -> do
@@ -453,8 +454,8 @@ handlePostponedStateQualifiedParts = do
                   --    * origin, to be derived from the RoleIdentification in either SubjectState or ObjectState,
                   --    * currentcontext = origin >> context but which can be read directly from the RoleIdentification.
                   expressionWithEnvironment <- pure $ addContextualBindingsToExpression
-                    [ computeCurrentContext transition start
-                    , computeOrigin transition start]
+                    [ computeCurrentContext (transition2stateSpec transition) start
+                    , computeOrigin (transition2stateSpec transition) start]
                     stp
                   Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
               case transition of
@@ -498,8 +499,8 @@ handlePostponedStateQualifiedParts = do
                   Q q -> pure $ Q q
                   S stp -> do
                     expressionWithEnvironment <- pure $ addContextualBindingsToExpression
-                      [ computeCurrentContext transition start
-                      , computeOrigin transition start]
+                      [ computeCurrentContext (transition2stateSpec transition) start
+                      , computeOrigin (transition2stateSpec transition) start]
                       stp
                     Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
                 case transition of
@@ -529,34 +530,69 @@ handlePostponedStateQualifiedParts = do
                 pure (Sentence.CP (Q compiledPart))
 
     handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start})) = do
-      currentDomain <- statespec2Domain state
-      contextDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
-      -- Add, for all these users...
-      qualifiedUsers <- collectRoles subject
-      -- ... to their perspective on this object...
-      objectQfd <- objectToQueryFunctionDescription syntacticObject contextDomain state (Just $ roleIdentification2Step subject)
-      -- ... for these states only...
-      -- Note that the subjects in whose states we execute, do not need be the qualified users we give access to the Action:
-      -- 'I can check your heart beat when you are at home' illustrates this independence.
-      states <- stateSpec2States state
-      -- ... this action.
-      -- (Compile the side effect. Will invert all expressions in the statements, too, including the
-      -- object if it is referenced)
-      effectWithEnvironment <- addContextualVariablesToStatements
+      -- `originDomain` is the type of the origin, expressed as Domain.
+      originDomain <- statespec2Domain state
+      -- `currentContextDomain` represents the current context, expressed as a Domain.
+      currentcontextDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
+      -- `subject` is the current subject of lexical analysis. It is represented by
+      -- an ExplicitRole data constructor.
+      -- The current subject is always a single role type, but it may be calculated
+      -- (and the range of the calculation may be a combination of many Enumerated role
+      -- types).
+      -- These qualifiedUsers will end up in InvertedQueries.
+      (qualifiedUsers :: Array RoleType) <- collectRoles subject
+      -- Each of the expressions in the statements is applied to the resource that changes state (the origin),
+      -- which can be a role instance or a context instance. Its type can be found from the transition.
+      -- origin -> is always included as an identity step.
+      -- currentcontext -> For ContextState, equals the origin. For SubjectState or
+      -- ObjectState, the role is represented with a RoleIdentification that contains
+      -- its current context.
+      -- currentactor -> It's type is the qualifiedUser computed above.
+      -- All these VarBindings have a computation of type TypeTimeOnly, which instructs the unsafeCompiler to remove them.
+      effectWithEnvironment <- pure $ addContextualBindingsToStatements
+        [ computeOrigin state start
+        , computeCurrentContext state start
+        , makeTypeTimeOnlyRoleStep "currentactor" (unsafePartial fromJust $ head qualifiedUsers) start
+        ]
         effect
-        (Just $ roleIdentification2Step syntacticObject)
-        (stateSpec2stateKind state)
-        (Just $ roleIdentification2Step subject)
+      states <- stateSpec2States state
       (theAction :: QueryFunctionDescription) <- compileStatement
         states
-        currentDomain
-        contextDomain
+        originDomain
+        currentcontextDomain
         qualifiedUsers
         effectWithEnvironment
-      modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states
+      -- Compute the currentcontext from the origin.
+      currentContextCalculation <- case state of
+        -- We do not actually use this result.
+        ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
+        ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
+        SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
+      -- `syntacticObject` represents the object of the perspective. It allows
+      -- for `currentcontext` and `origin`.
+      -- currentcontext == origin and this equals the argument that the
+      -- queryfunction is applied to, which is a context instance.
+      -- We can add both as an Identity step in a letE.
+      syntacticObjectWithEnvironment <- pure $ addContextualBindingsToExpression
+        [ makeIdentityStep "currentcontext" start
+        , makeIdentityStep "origin" start]
+        (roleIdentification2Step syntacticObject)
+      -- We must compile the perspective object with respect to its current context.
+      -- This is contained within the RoleIdentification that represents the object.
+      compiledObject <- withFrame
+        (compileExpression
+          (CDOM $ ST (roleIdentification2Context syntacticObject))
+          syntacticObjectWithEnvironment)
+      modifyAllSubjectPerspectives
+        qualifiedUsers
+        compiledObject
+        (case state of
+          ContextState _ _ -> ContextAction theAction
+          otherwise -> RoleAction {currentContextCalculation, effect: theAction})
+        states
       where
         -- Add the action for all users to their perspective on the object in all states.
-        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Action -> Array StateIdentifier -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states = for_ qualifiedUsers
           (modifyPerspective
             objectQfd
@@ -813,8 +849,8 @@ computeCurrentContextFromRoleIdentification roleIdentification pos = do
     makeUnion :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
     makeUnion f1 f2 = BQD (domain f1) (BinaryCombinator UnionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (and (mandatory f1)(mandatory f2))
 
-computeOrigin :: StateTransitionE -> ArcPosition -> VarBinding
-computeOrigin t pos = case (transition2stateSpec t) of
+computeOrigin :: StateSpecification -> ArcPosition -> VarBinding
+computeOrigin sp pos = case sp of
   ContextState _ _ -> makeIdentityStep "origin" pos
   SubjectState _ _ -> makeIdentityStep "origin" pos
   ObjectState _ _ -> makeIdentityStep "origin" pos
@@ -825,8 +861,8 @@ computeOrigin t pos = case (transition2stateSpec t) of
 -- QueryFunctionDescription for with the right range. It does not
 -- actually have to compute anything, since the unsafeCompiler will
 -- remove these VarBindings (the actual values are computed by the core).
-computeCurrentContext :: StateTransitionE -> ArcPosition -> VarBinding
-computeCurrentContext t pos = case (transition2stateSpec t) of
+computeCurrentContext :: StateSpecification -> ArcPosition -> VarBinding
+computeCurrentContext t pos = case t of
   ContextState _ _ -> makeIdentityStep "currentcontext" pos
   SubjectState roleIdentification _ -> makeTypeTimeOnlyContextStep "currentcontext"
     (roleIdentification2Context roleIdentification) pos
