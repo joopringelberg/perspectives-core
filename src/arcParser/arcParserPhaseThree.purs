@@ -54,7 +54,7 @@ import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructName
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateKind(..), StateSpecification(..), StateTransitionE(..))
-import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, addContextualVariablesToExpression, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep, stateSpec2stateKind, stepContainsVariableReference)
+import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, addContextualVariablesToExpression, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withFrame)
@@ -363,26 +363,6 @@ handlePostponedStateQualifiedParts = do
     addAll :: forall key value. Ord key => value -> Map.Map key value -> Array key -> Map.Map key value
     addAll value = foldr (\key map -> Map.insert key value map)
 
-    -- Compile the object of a StateQualifiedPart to a sequence of
-    -- a runtime variable binding of "currentcontext" (that can be referred in the
-    -- expression that defines the object) and the object expression itself.
-    -- This function leaves the compile time environment as it is.
-    -- `currentobject` may NOT occur in these expressions!
-    objectToQueryFunctionDescription :: RoleIdentification -> Domain -> StateSpecification -> Maybe Step -> PhaseThree QueryFunctionDescription
-    objectToQueryFunctionDescription syntacticObject currentDomain stateSpec msubject = do
-      step <- pure $ roleIdentification2Step syntacticObject
-      if stepContainsVariableReference "currentobject" step
-        then throwError (CurrentObjectNotAllowed (startOf step) (endOf step))
-        else pure unit
-      (syntacticObjectWithEnvironment :: Step) <- addContextualVariablesToExpression
-        (adaptRoleStepToDomain currentDomain $ roleIdentification2Step syntacticObject)
-        (Just step)
-        (stateSpec2stateKind stateSpec)
-        msubject
-        -- Make a QueryFunctionDescription of a function that computes the object.
-      withFrame
-        (compileExpression currentDomain syntacticObjectWithEnvironment)
-
     handlePart :: Partial => AST.StateQualifiedPart -> PhaseThree Unit
 
     -- Compiles and distributes all expressions in the automatic effect.
@@ -605,11 +585,10 @@ handlePostponedStateQualifiedParts = do
               states)})
 
     handlePart (AST.R (AST.RoleVerbE{subject, object, state, roleVerbs:rv, start})) = do
-      currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
       -- Add, for all these users...
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
-      objectQfd <- objectToQueryFunctionDescription object currentDomain state (Just $ roleIdentification2Step subject)
+      objectQfd <- roleIdentificationToQueryFunctionDescription object start
       -- ... for these states only...
       states <- stateSpec2States state
       -- ... the role verbs.
@@ -625,7 +604,7 @@ handlePostponedStateQualifiedParts = do
       -- Set, for all these users...
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
-      objectQfd <- objectToQueryFunctionDescription object currentDomain state (Just $ roleIdentification2Step subject)
+      objectQfd <- roleIdentificationToQueryFunctionDescription object start
       -- ... for these states only...
       states <- stateSpec2States state
       -- ... the selfOnly member to true.
@@ -637,11 +616,10 @@ handlePostponedStateQualifiedParts = do
             (\(Perspective pr) -> Perspective pr {selfOnly = true}))
 
     handlePart (AST.P (AST.PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start})) = do
-      currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
       -- Add, for all these users...
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
-      objectQfd <- objectToQueryFunctionDescription object currentDomain state (Just $ roleIdentification2Step subject)
+      objectQfd <- roleIdentificationToQueryFunctionDescription object start
       propertyTypes <- collectPropertyTypes propsOrView
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes propertyVerbs
       -- ... for these states only...
@@ -820,23 +798,24 @@ createMissingRootStates = do
       else Nothing
   modifyDF \dfr -> dfr {states = states `union` missingRootStates}
 
-computeCurrentContextFromRoleIdentification :: RoleIdentification -> ArcPosition -> PhaseThree QueryFunctionDescription
-computeCurrentContextFromRoleIdentification roleIdentification pos = do
-  -- `roleIdentification` represents the object of the perspective. It allows
-  -- for `currentcontext` and `origin`.
-  -- currentcontext == origin and this equals the argument that the
-  -- queryfunction is applied to, which is a context instance.
-  -- We can add both as an Identity step in a letE.
+-- Compile a RoleIdentification to a sequence of bindings for the standard
+-- variables `currentcontext` and `origin`.
+roleIdentificationToQueryFunctionDescription :: RoleIdentification -> ArcPosition -> PhaseThree QueryFunctionDescription
+roleIdentificationToQueryFunctionDescription roleIdentification pos = do
   syntacticObjectWithEnvironment <- pure $ addContextualBindingsToExpression
     [ makeIdentityStep "currentcontext" pos
     , makeIdentityStep "origin" pos]
     (roleIdentification2Step roleIdentification)
-  -- We must compile the perspective object with respect to its current context.
-  -- This is contained within the RoleIdentification that represents the object.
-  compiledObject <- withFrame
+    -- Make a QueryFunctionDescription of a function that computes the object.
+  withFrame
     (compileExpression
       (CDOM $ ST (roleIdentification2Context roleIdentification))
       syntacticObjectWithEnvironment)
+
+
+computeCurrentContextFromRoleIdentification :: RoleIdentification -> ArcPosition -> PhaseThree QueryFunctionDescription
+computeCurrentContextFromRoleIdentification roleIdentification pos = do
+  compiledObject <- roleIdentificationToQueryFunctionDescription roleIdentification pos
   -- NOTE that filters and WithFrame constructs are ignored in the inversion process.
   (contextCalculations :: (Array QueryFunctionDescription)) <- completeInversions compiledObject
   pure $ unsafePartial joinQfds contextCalculations
