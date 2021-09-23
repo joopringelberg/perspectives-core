@@ -488,6 +488,7 @@ perspectiveOn = try $ withPos do
   protectObject do
     ctxt <- getCurrentContext
     setObject (ImplicitRole ctxt stp)
+    -- TODO. Ik denk dat hier ook de state gezet moet worden.
     -- If 'perspectivePart' fails, nestedBlock will fail and thus perspectiveOn will fail.
     concat <$> nestedBlock perspectivePart
     -- In contrast, with the non-determinate expression outcommented below,
@@ -531,7 +532,7 @@ perspectivePart = do
     "only", _ -> singleton <<< R <$> roleVerbs
     "except", _ -> singleton <<< R <$> roleVerbs
     "all", "roleverbs" -> singleton <<< R <$> roleVerbs
-    "in", "state" -> inState
+    "in", _ -> inState
     "on", "entry" -> onEntryE
     "on", "exit" -> onExitE
     "action", _ -> actionE
@@ -541,7 +542,7 @@ perspectivePart = do
     one, two -> fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly, but found: '" <> one <> "' and '" <> two <> "'.")
 
 -- | inState =
--- | 	in state <ident> [of {subject | object | context} state]
+-- |  in [{subject | object | context}] state [<ident>]
 -- | 		defaults
 -- | 		<propertyVerbs>
 -- | 		<roleVerbs>
@@ -550,16 +551,18 @@ perspectivePart = do
 -- | 		<action>
 inState :: IP (List StateQualifiedPart)
 inState = do
-  stateId <- inStateKeywords *> arcIdentifier
-  mspecifier <- optionMaybe (reserved "of" *> (reserved' "subject" <|> reserved' "object" <|> reserved' "context"))
+  reserved "in"
+  mspecifier <- optionMaybe (reserved' "subject" <|> reserved' "object" <|> reserved' "context")
+  mstateId <- reserved "state" *> optionMaybe arcIdentifier
   currentState <- getCurrentState
-  stateSpec <- case mspecifier of
-    Nothing -> pure $ addSubState currentState stateId
-    Just "object" -> ObjectState <$> getObject <*> pure (Just stateId)
-    Just "subject" -> SubjectState <$> getSubject <*> pure (Just stateId)
-    Just "context" -> ContextState <$> getCurrentContext <*> pure (Just stateId)
+  stateSpec <- case mspecifier, mstateId of
+    Nothing, Just stateId -> pure $ addSubState currentState stateId
+    Nothing, Nothing -> pure currentState
+    Just "object", _ -> ObjectState <$> getObject <*> pure mstateId
+    Just "subject", _ -> SubjectState <$> getSubject <*> pure mstateId
+    Just "context", _ -> ContextState <$> getCurrentContext <*> pure mstateId
     -- This case will never occur.
-    _ -> fail "This will never occur"
+    _, _ -> fail "This will never occur"
   -- We can use withArcParserState here. It will concatenate the local
   -- state identifier to the state identifier provided by the surrounding context.
   -- The assumption being that we do not refer to states out of the context that the
