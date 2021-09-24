@@ -45,6 +45,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (##=), (##>), (##>>))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Error.Boundaries (handlePerspectRolError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
@@ -58,7 +59,7 @@ import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
-import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string)
+import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, typeTimeOnly)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
@@ -234,9 +235,19 @@ compileAssignment (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQf
 -- In the QueryCompiler, the components will be variable bindings.
 -- Here they will be assignments.
 compileAssignment (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
-  f1' <- compileAssignment f1
-  f2' <- compileAssignment f2
-  pure \c -> (f1' c *> f2' c)
+  if (typeTimeOnly f1)
+    -- Skip all VarBindings that were meant for the description compiler only.
+    -- These will be bindings that are added by the core in the StateCompilers.
+    then if (typeTimeOnly f2)
+      then pure \c -> ArrayT $ pure []
+      else compileAssignment f2
+    else do
+      if (typeTimeOnly f2)
+        then compileAssignment f1
+        else do
+          f1' <- compileAssignment f1
+          f2' <- compileAssignment f2
+          pure \c -> (f1' c *> f2' c)
 
 compileAssignment (UQD _ WithFrame f1 _ _ _) = do
   f1' <- compileAssignment f1

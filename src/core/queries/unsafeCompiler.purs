@@ -230,11 +230,16 @@ compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
   if (typeTimeOnly f1)
     -- Skip all VarBindings that were meant for the description compiler only.
     -- These will be bindings that are added by the core in the StateCompilers.
-    then compileFunction f2
+    then if (typeTimeOnly f2)
+      then pure \c -> ArrayT $ pure []
+      else compileFunction f2
     else do
-      f1' <- compileFunction f1
-      f2' <- compileFunction f2
-      pure \c -> (f1' c *> f2' c)
+      if (typeTimeOnly f2)
+        then compileFunction f1
+        else do
+          f1' <- compileFunction f1
+          f2' <- compileFunction f2
+          pure \c -> (f1' c *> f2' c)
 
 compileFunction (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
@@ -322,9 +327,9 @@ compileFunction qd = throwError (error $ "Cannot create a function out of '" <> 
 -- | for automatic actions, notifications and actions.
 typeTimeOnly :: QueryFunctionDescription -> Boolean
 typeTimeOnly (UQD _ (BindVariable _) f1 _ _ _) = case f1 of
-  SQD _ (TypeTimeOnlyContextF ctype) _ _ _ -> true
-  SQD _ (TypeTimeOnlyEnumeratedRoleF ctype) _ _ _ -> true
-  SQD _ (TypeTimeOnlyCalculatedRoleF ctype) _ _ _ -> true
+  SQD _ (TypeTimeOnlyContextF _) _ _ _ -> true
+  SQD _ (TypeTimeOnlyEnumeratedRoleF _) _ _ _ -> true
+  SQD _ (TypeTimeOnlyCalculatedRoleF _) _ _ _ -> true
   _ -> false
 typeTimeOnly _ = false
 ---------------------------------------------------------------------------------------------------
