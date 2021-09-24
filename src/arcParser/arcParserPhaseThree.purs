@@ -84,7 +84,8 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
-import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<#>), (<$>), (<*), (<<<), (==), (>=>), (>>=))
+import Perspectives.Utilities (prettyPrint)
+import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<#>), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>))
 
 phaseThree :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} postponedParts = do
@@ -818,12 +819,14 @@ computeCurrentContextFromRoleIdentification roleIdentification pos = do
   compiledObject <- roleIdentificationToQueryFunctionDescription roleIdentification pos
   -- NOTE that filters and WithFrame constructs are ignored in the inversion process.
   (contextCalculations :: (Array QueryFunctionDescription)) <- completeInversions compiledObject
-  pure $ unsafePartial joinQfds contextCalculations
+  case joinQfds contextCalculations of
+    Nothing -> throwError (Custom $ "It is not possible to compute the current context in position " <> show pos <> " (is `origin` an indexed role or context?). Change current state at this position, for example by using `in object|subject|context state`." <> " Information for programmers: " <> prettyPrint compiledObject)
+    Just result -> pure result
   where
-    joinQfds :: Partial => Array QueryFunctionDescription -> QueryFunctionDescription
+    joinQfds :: Array QueryFunctionDescription -> Maybe QueryFunctionDescription
     joinQfds contextCalculations = case uncons contextCalculations of
-      Just {head, tail} -> (foldl makeUnion head tail)
-      Nothing -> fromJust $ head contextCalculations
+      Just {head, tail} -> Just (foldl makeUnion head tail)
+      Nothing -> Nothing
 
     makeUnion :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
     makeUnion f1 f2 = BQD (domain f1) (BinaryCombinator UnionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (and (mandatory f1)(mandatory f2))

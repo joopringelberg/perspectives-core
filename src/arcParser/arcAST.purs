@@ -38,6 +38,7 @@ import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.Sentence (Sentence)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleKind, RoleType)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 --------------------------------------------------------------------------------
 ---- CONTEXT
@@ -226,6 +227,9 @@ data RoleIdentification =
 derive instance genericRoleIdentification :: Generic RoleIdentification _
 instance eqRoleIdentification :: Eq RoleIdentification where eq = genericEq
 instance showRoleIdentification :: Show RoleIdentification where show = genericShow
+instance prettyPrintRoleIdentification :: PrettyPrint RoleIdentification where
+  prettyPrint' tab (ExplicitRole ct rt pos) = tab <> "ExplicitRole " <> show ct <> " " <> show rt
+  prettyPrint' tab (ImplicitRole ct step) = tab <> "ImplicitRole " <> show ct <> "\n" <> (prettyPrint' (tab <> "  ") step)
 
 --------------------------------------------------------------------------------
 ---- STATESPECIFICATION
