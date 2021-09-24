@@ -43,7 +43,7 @@ domain Models
       property Name (mandatory, String)
       property ModelIdentification (mandatory, String)
       property LastVersion = (context >> Versions >> VersionNumber) >>= maximum
-      property LastVersionUrl = (filter context >> Versions with (VersionNumber == object >> LastVersion)) >> Url
+      property LastVersionUrl = (filter context >> Versions with (VersionNumber == origin >> LastVersion)) >> Url
 
     -- This role should be stored in public space.
     -- It needs no filler; we use it just for its properties.
@@ -74,15 +74,16 @@ domain Models
         verbs (Consult)
       perspective on extern
         defaults
-        action Boot
-          letA
-            -- Create the indexed context:
-            irole <- createContext ModelsOverview bound to IndexedContexts in sys:MySystem
-          in
-            -- Add the indexed name:
-            Name = "model://perspect.it/Models$MyModels" for irole
-            -- Add the model description to MyModels:
-            -- TODO: gebruik de uitgecommentarieerde regel zodra we URLs als identifiers herkennen.
-            -- Voor nu gebruiken we het type in plaats van de beschrijving.
-            --bind https://cw.perspect.it/SimpleChat to LocalModels
-            bind sys:Me to Author
+        in object state
+          action Boot
+            letA
+              -- Create the indexed context:
+              irole <- createContext ModelsOverview bound to IndexedContexts in sys:MySystem
+            in
+              -- Add the indexed name:
+              Name = "model://perspect.it/Models$MyModels" for irole
+              -- Add the model description to MyModels:
+              -- TODO: gebruik de uitgecommentarieerde regel zodra we URLs als identifiers herkennen.
+              -- Voor nu gebruiken we het type in plaats van de beschrijving.
+              --bind https://cw.perspect.it/SimpleChat to LocalModels
+              bind sys:Me to Author

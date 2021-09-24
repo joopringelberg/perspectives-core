@@ -57,7 +57,7 @@ domain System
         -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
         on entry
           do for User
-            remove object
+            remove origin
 
     -- This will become obsolete when we start using model:CouchdbManagement.
     context ModelsInUse (relational) filledBy Model
@@ -141,7 +141,7 @@ domain System
       state InviteUnconnectedUser = IWantToInviteAnUnconnectedUser and exists Message
         on entry
           do for Inviter
-            SerialisedInvitation = callExternal ser:SerialiseFor( filter object >> context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns String
+            SerialisedInvitation = callExternal ser:SerialiseFor( filter origin >> context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns String
 
       view ForInvitee (InviterLastName, Message)
 

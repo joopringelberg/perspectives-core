@@ -83,13 +83,13 @@ domain CouchdbManagement
                   pw <- callExternal utl:GenSym() returns String
               in
                 callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
-                Password = pw for currentobject
+                Password = pw
 
         state Remove = ToBeRemoved
           on entry
             do for Admin
               callEffect cdb:DeleteUser( context >> extern >> Url, binding )
-              --remove currentobject
+              remove origin
 
         -- After CouchdbServer$Admin provides the first password, he no longer
         -- has a perspective on it. The new value provided below is thus really private.
@@ -97,22 +97,22 @@ domain CouchdbManagement
           on entry
             do
               callEffect cdb:ResetPassword( context >> extern >> Url, UserName, callExternal utl:GenSym() returns String )
-              PasswordReset = true for currentobject
+              PasswordReset = true
 
       property ToBeRemoved (Boolean)
 
       -- TODO: add a condition that allows an Account to see non-public repositories
       -- that he is Admin of.
-      perspective on filter Repositories with IsPublic or binding >> context >> Repository$Admin binds currentsubject
+      perspective on filter Repositories with IsPublic or binding >> context >> Repository$Admin binds sys:Me
         only (CreateAndFill)
         verbs (Consult)
         props (Name) verbs (SetPropertyValue)
         action RequestRepository
           letA
             myrepo <- createContext Repository bound to Repositories
-            measadmin <- createRole Admin in myrepo
+            measadmin <- createRole Admin in myrepo >> context
           in
-            bind_ currentrole to measadmin
+            bind_ currentactor to measadmin
 
     -- This role should be in public space.
     context Repositories filledBy Repository
@@ -138,7 +138,7 @@ domain CouchdbManagement
               callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
               callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
               callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
-              remove binding >> context >> Admin
+              remove binding >> context >> Repository$Admin
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -174,7 +174,7 @@ domain CouchdbManagement
             do for ServerAdmin
               callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
               callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
-              remove currentobject
+              remove origin
       property ToBeRemoved (Boolean)
 
       -- The admin can also create an Author and give him/her the right to add and
@@ -204,7 +204,7 @@ domain CouchdbManagement
             do for Admin
               callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_write", binding >> UserName)
               callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
-              remove currentobject
+              remove origin
 
       -- Admin can set this to true to remove the Author from the Repository.
       -- By using this mechanism instead of directly removing the role,
@@ -234,7 +234,7 @@ domain CouchdbManagement
           on entry
             do for Admin
               callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
-              remove currentobject
+              remove origin
       in state Accepted
           -- An account that is accepted has a perspective on available models.
           perspective on AvailableModels
