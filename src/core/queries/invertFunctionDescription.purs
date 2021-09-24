@@ -63,6 +63,9 @@ invertFunction dom qf ran = case qf of
 
   DataTypeGetterWithParameter f _ -> case f of
     GetRoleBindersF -> Just $ DataTypeGetter BindingF
+    GetRoleInstancesForContextFromDatabaseF -> Just $ DataTypeGetter ContextF
+    SpecialisesRoleTypeF -> Nothing
+    CreateRoleF -> Just $ DataTypeGetter ContextF
     -- A lot of cases will never be seen in a regular query.
     _ -> Nothing
 
