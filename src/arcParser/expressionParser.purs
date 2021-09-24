@@ -59,8 +59,15 @@ step_ parenthesised = do
       right <- step
       end <- getPosition
       case right of
-        -- The right expression is binary: leftOfRight <op> rightOfRight.
-        (Binary (BinaryStep {left: leftOfRight, operator:opOfRight, right: rightOfRight, end: endOfRight, parenthesised: protected})) -> if not protected && ((operatorPrecedence op) > (operatorPrecedence opOfRight))
+        -- The right expression is binary: leftOfRight <opOfRight> rightOfRight.
+        (Binary (BinaryStep
+          { left: leftOfRight
+          , operator:opOfRight
+          , right: rightOfRight
+          , end: endOfRight
+          , parenthesised: protected})) -> if
+              not protected &&
+              ((operatorPrecedence op) > (operatorPrecedence opOfRight))
 
           -- Regrouping: the parse tree (a op1 (b op2 c)) becomes ((a op1 b) op2 c).
           -- The expression was: "a op2 b op1 c"

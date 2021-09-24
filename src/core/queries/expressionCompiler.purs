@@ -513,7 +513,14 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       if (pessimistic $ functional f1)
         then if (pessimistic $ functional f2)
           then case (range f1), (range f2) of
-            (RDOM _), (RDOM _) -> pure $ BQD currentDomain (QF.BinaryCombinator BindsF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) True (THREE.and (mandatory f1)(mandatory f2))
+            (RDOM _), (RDOM _) -> pure $ BQD
+              currentDomain
+              (QF.BinaryCombinator BindsF)
+              f1
+              f2
+              (VDOM PBool Nothing)
+              True
+              (THREE.and (mandatory f1)(mandatory f2))
             _, _ -> throwError $ NotARoleDomain currentDomain (startOf left) (endOf right)
           else throwError (NotFunctional (startOf right) (endOf right) right)
         else throwError (NotFunctional (startOf left) (endOf left) left)
