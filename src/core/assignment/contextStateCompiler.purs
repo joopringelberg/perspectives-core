@@ -45,7 +45,8 @@ import Effect.Class.Console (log)
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.StateCache (CompiledContextState, cacheCompiledContextState, retrieveCompiledContextState)
+import Perspectives.Assignment.SentenceCompiler (CompiledSentence, compileContextSentence)
+import Perspectives.Assignment.StateCache (CompiledContextState, CompiledNotification, cacheCompiledContextState, retrieveCompiledContextState)
 import Perspectives.Assignment.Update (setActiveContextState, setInActiveContextState, withAuthoringRole)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileAssignment (compileAssignment)
@@ -60,14 +61,14 @@ import Perspectives.Query.UnsafeCompiler (context2propertyValue, getRoleInstance
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.State (State(..))
+import Perspectives.Representation.State (Notification(..), State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (subStates_)
 
 compileState :: Partial => StateIdentifier -> MP CompiledContextState
 compileState stateId = do
-    State {query, object, automaticOnEntry, automaticOnExit} <- getState stateId
+    State {query, object, automaticOnEntry, automaticOnExit, notifyOnEntry, notifyOnExit} <- getState stateId
     (mobjectGetter :: Maybe (ContextInstance ~~> RoleInstance)) <- traverse roleFunctionFromQfd object
     (automaticOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
       (\subject (ContextAction effect) -> compileAssignment effect >>= pure <<< withAuthoringRole subject)
@@ -76,7 +77,16 @@ compileState stateId = do
       (\subject (ContextAction effect) ->
         compileAssignment effect >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnExit)
-    -- TODO notifyOnEntry, notifyOnExit.
+    (notifyOnEntry' :: Map RoleType (CompiledSentence ContextInstance)) <- traverseWithIndex
+      (\subject (ContextNotification sentence) -> do
+        compiledSentence <- compileContextSentence sentence
+        pure compiledSentence)
+      (unwrap notifyOnEntry)
+    (notifyOnExit' :: Map RoleType (CompiledSentence ContextInstance)) <- traverseWithIndex
+      (\subject (ContextNotification sentence) -> do
+        compiledSentence <- compileContextSentence sentence
+        pure compiledSentence)
+      (unwrap notifyOnExit)
 
     -- We postpone compiling substates until they're asked for.
     (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ unsafePartial case query of Q qfd -> qfd
@@ -85,6 +95,8 @@ compileState stateId = do
       , objectGetter: mobjectGetter
       , automaticOnEntry: automaticOnEntry'
       , automaticOnExit: automaticOnExit'
+      , notifyOnEntry: notifyOnEntry'
+      , notifyOnExit: notifyOnExit'
       }
   where
     withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
