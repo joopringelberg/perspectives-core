@@ -45,20 +45,23 @@ import Effect.Class.Console (log)
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.StateCache (CompiledRoleState, CompiledAutomaticAction, cacheCompiledRoleState, retrieveCompiledRoleState)
+import Perspectives.Assignment.SentenceCompiler (compileRoleSentence)
+import Perspectives.Assignment.StateCache (CompiledAutomaticAction, CompiledRoleState, CompiledNotification, cacheCompiledRoleState, retrieveCompiledRoleState)
 import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
-import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=))
+import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=), (##>>))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (boundByRole, getActiveRoleStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2propertyValue)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Representation.State (State(..))
+import Perspectives.Representation.State (Notification(..), State(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (subStates_)
@@ -68,7 +71,7 @@ import Perspectives.Utilities (findM)
 -- | The function can be safely applied (with `unsafePartial`), however.
 compileState :: Partial => StateIdentifier -> MP CompiledRoleState
 compileState stateId = do
-    State {id, query, automaticOnEntry, automaticOnExit} <- getState stateId
+    State {id, query, automaticOnEntry, automaticOnExit, notifyOnEntry, notifyOnExit} <- getState stateId
     (automaticOnEntry' :: Map RoleType CompiledAutomaticAction) <- traverseWithIndex
       (\subject (RoleAction{currentContextCalculation, effect}) -> do
         updater <- compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject
@@ -81,16 +84,28 @@ compileState stateId = do
         contextGetter <- role2context currentContextCalculation
         pure {updater, contextGetter})
       (unwrap automaticOnExit)
-    -- TODO notifyOnEntry, notifyOnExit.
+    (notifyOnEntry' :: Map RoleType CompiledNotification) <- traverseWithIndex
+      (\subject (RoleNotification{currentContextCalculation, sentence}) -> do
+        compiledSentence <- compileRoleSentence sentence
+        contextGetter <- role2context currentContextCalculation
+        pure {compiledSentence, contextGetter})
+      (unwrap notifyOnEntry)
+    (notifyOnExit' :: Map RoleType CompiledNotification) <- traverseWithIndex
+      (\subject (RoleNotification{currentContextCalculation, sentence}) -> do
+        compiledSentence <- compileRoleSentence sentence
+        contextGetter <- role2context currentContextCalculation
+        pure {compiledSentence, contextGetter})
+      (unwrap notifyOnExit)
 
     -- We postpone compiling substates until they're asked for.
-    -- TODO. Add a value for currentobject or currentsubject here in runtime. Maybe not here, but in runStates?
     (lhs :: (RoleInstance ~~> Value)) <- role2propertyValue $ unsafePartial case query of Q qfd -> qfd
     pure $ cacheCompiledRoleState stateId
       { query: lhs
       , objectGetter: Nothing
       , automaticOnEntry: automaticOnEntry'
       , automaticOnExit: automaticOnExit'
+      , notifyOnEntry: notifyOnEntry'
+      , notifyOnExit: notifyOnExit'
       }
   where
     withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
@@ -134,35 +149,50 @@ enteringRoleState roleId userRoleType stateId = do
   -- Add the state identifier to the path of states in the role instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveRoleState stateId roleId
-  {automaticOnEntry} <- getCompiledState stateId
+  {automaticOnEntry, notifyOnEntry} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction, but only if
   -- the end user fills the allowedUser role in this context.
   -- NOTE that the userRoleType is computed prior to executing the transaction.
   -- It may happen that during the transaction, the end user is put into another role (too).
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
+  me <- lift2 getUserIdentifier
+  mySystem <- lift2 $ getMySystem
   forWithIndex_ automaticOnEntry \(allowedUser :: RoleType) {updater, contextGetter} -> do
-    me <- lift2 getUserIdentifier
-    -- NOTE. Instead, we can calculate the `currentactor` and, if it exists,
-    -- put it in runtime evaluation state.
-    bools <- lift2 (roleId ##= contextGetter >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
+    currentcontext <- lift2 $ (roleId ##>> contextGetter)
+    currentactors <- lift2 $ (currentcontext ##= (getRoleInstances allowedUser))
+    bools <- lift2 $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
     if ala Conj foldMap bools
-      then updater roleId
+      then do
+          oldFrame <- lift2 $ pushFrame
+          lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
+          lift2 $ addBinding "origin" [unwrap roleId]
+          lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+          updater roleId
+          lift2 $ restoreFrame oldFrame
       else pure unit
-  State {notifyOnEntry} <- lift2 $ getState stateId
-  case lookup userRoleType (unwrap notifyOnEntry) of
-    Nothing -> pure unit
-    Just l -> do
-      mySystem <- lift2 $ getMySystem
-      void $ createAndAddRoleInstance
-        (EnumeratedRoleType "model:System$PerspectivesSystem$ContextNotification")
-        mySystem
-        (RolSerialization
-          { id: Nothing
-          , properties: PropertySerialization $ singleton "model:System$PerspectivesSystem$ContextNotification$Level"
-            [(show l)]
-          -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
-          , binding: Just $ unwrap roleId})
+  forWithIndex_ notifyOnEntry \(allowedUser :: RoleType) {compiledSentence, contextGetter} -> do
+    currentcontext <- lift2 $ (roleId ##>> contextGetter)
+    currentactors <- lift2 $ (currentcontext ##= (getRoleInstances allowedUser))
+    bools <- lift2 $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
+    if ala Conj foldMap bools
+      then do
+        oldFrame <- lift2 $ pushFrame
+        lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
+        lift2 $ addBinding "origin" [unwrap roleId]
+        lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+        sentenceText <- lift2 $ compiledSentence roleId
+        void $ createAndAddRoleInstance
+          (EnumeratedRoleType "model:System$PerspectivesSystem$ContextNotification")
+          mySystem
+          (RolSerialization
+            { id: Nothing
+            , properties: PropertySerialization $ singleton "model:System$PerspectivesSystem$ContextNotification$Level"
+              [sentenceText]
+            -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
+            , binding: Just $ unwrap roleId})
+        lift2 $ restoreFrame oldFrame
+      else pure unit
   -- Recur.
   subStates <- lift2 $ subStates_ stateId
   for_ subStates (evaluateRoleState roleId userRoleType)

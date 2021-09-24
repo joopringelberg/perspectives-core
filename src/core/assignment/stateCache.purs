@@ -25,6 +25,7 @@ module Perspectives.Assignment.StateCache where
 import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
+import Perspectives.Assignment.SentenceCompiler (CompiledSentence)
 import Perspectives.CoreTypes (Updater, type (~~>))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
@@ -38,6 +39,8 @@ type CompiledContextState =
   , objectGetter :: Maybe (ContextInstance ~~> RoleInstance)
   , automaticOnEntry :: Map RoleType (Updater ContextInstance)
   , automaticOnExit :: Map RoleType (Updater ContextInstance)
+  , notifyOnEntry :: Map RoleType (CompiledSentence ContextInstance)
+  , notifyOnExit :: Map RoleType (CompiledSentence ContextInstance)
   }
 
 -- | A global store of SupportedEffect-s
@@ -58,6 +61,8 @@ type CompiledRoleState =
   , objectGetter :: Maybe (RoleInstance ~~> RoleInstance)
   , automaticOnEntry :: Map RoleType CompiledAutomaticAction
   , automaticOnExit :: Map RoleType CompiledAutomaticAction
+  , notifyOnEntry :: Map RoleType CompiledNotification
+  , notifyOnExit :: Map RoleType CompiledNotification
   }
 
 roleStateCache :: RoleStateCache
@@ -70,3 +75,4 @@ retrieveCompiledRoleState :: StateIdentifier -> (Maybe CompiledRoleState)
 retrieveCompiledRoleState a = peek roleStateCache (unwrap a)
 
 type CompiledAutomaticAction = {updater :: Updater RoleInstance, contextGetter :: RoleInstance ~~> ContextInstance}
+type CompiledNotification = {compiledSentence :: (CompiledSentence RoleInstance), contextGetter :: RoleInstance ~~> ContextInstance}
