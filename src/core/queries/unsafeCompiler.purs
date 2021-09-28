@@ -464,7 +464,7 @@ getRoleFunction ::
   String -> MonadPerspectives (ContextInstance ~~> RoleInstance)
 getRoleFunction id = do
   ident <- expandDefaultNamespaces id
-  (unsafePartial $
+  (
     case lookupRoleGetterByName ident of
       Nothing -> empty
       (Just g) -> pure g

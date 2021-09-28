@@ -173,11 +173,11 @@ enteringState contextId userRoleType stateId = do
     Just l -> do
       mySystem <- lift2 $ getMySystem
       void $ createAndAddRoleInstance
-        (EnumeratedRoleType "model:System$PerspectivesSystem$ContextNotification")
+        (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
         mySystem
         (RolSerialization
           { id: Nothing
-          , properties: PropertySerialization $ singleton "model:System$PerspectivesSystem$ContextNotification$Level"
+          , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Notification"
             [(show l)]
           , binding: Just $ buitenRol (unwrap contextId)})
   -- Recur.
@@ -236,11 +236,11 @@ exitingState contextId userRoleType stateId = do
     Just l -> do
       mySystem <- lift2 $ getMySystem
       void $ createAndAddRoleInstance
-        (EnumeratedRoleType "model:System$PerspectivesSystem$ContextNotification")
+        (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
         mySystem
         (RolSerialization
           { id: Nothing
-          , properties: PropertySerialization $ singleton "model:System$PerspectivesSystem$ContextNotification$Level"
+          , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
             [(show l)]
           , binding: Just $ buitenRol (unwrap contextId)})
 

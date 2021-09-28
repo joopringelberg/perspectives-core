@@ -50,10 +50,10 @@ import Perspectives.Assignment.StateCache (CompiledAutomaticAction, CompiledRole
 import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
-import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=), (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.ObjectGetters (boundByRole, getActiveRoleStates_)
+import Perspectives.Instances.ObjectGetters (boundByRole, contextType, getActiveRoleStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -62,9 +62,9 @@ import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.State (Notification(..), State(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (subStates_)
+import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
 import Perspectives.Utilities (findM)
 
 -- | This function has a Partial constraint because it only handles the AutomaticRoleAction case of AutomaticAction.
@@ -181,13 +181,16 @@ enteringRoleState roleId userRoleType stateId = do
         lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
         lift2 $ addBinding "origin" [unwrap roleId]
         lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+        storeNotificationInContext <- lift2 (currentcontext ##>> (contextType >=> liftToInstanceLevel  (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
         sentenceText <- lift2 $ compiledSentence roleId
         void $ createAndAddRoleInstance
-          (EnumeratedRoleType "model:System$PerspectivesSystem$ContextNotification")
-          mySystem
+          (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
+          (if storeNotificationInContext
+            then (unwrap currentcontext)
+            else mySystem)
           (RolSerialization
             { id: Nothing
-            , properties: PropertySerialization $ singleton "model:System$PerspectivesSystem$ContextNotification$Level"
+            , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
               [sentenceText]
             -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
             , binding: Just $ unwrap roleId})
@@ -239,11 +242,11 @@ exitingRoleState roleId userRoleType stateId = do
     Just l -> do
       mySystem <- lift2 $ getMySystem
       void $ createAndAddRoleInstance
-        (EnumeratedRoleType "model:System$PerspectivesSystem$ContextNotification")
+        (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
         mySystem
         (RolSerialization
           { id: Nothing
-          , properties: PropertySerialization $ singleton "model:System$PerspectivesSystem$ContextNotification$Level"
+          , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
             [(show l)]
           -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
           , binding: Just $ unwrap roleId})

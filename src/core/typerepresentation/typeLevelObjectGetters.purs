@@ -238,6 +238,13 @@ hasAspect aspect roleType = ArrayT do
   aspects <- roleType ###= roleAspectsClosure
   pure [isJust $ findIndex ((==) aspect) aspects]
 
+-- aspect `hasContextAspect` contextType
+-- roleType ##>>> hasContextAspect aspect
+hasContextAspect :: ContextType -> (ContextType ~~~> Boolean)
+hasContextAspect aspect contextType = ArrayT do
+  aspects <- contextType ###= contextAspectsClosure
+  pure [isJust $ findIndex ((==) aspect) aspects]
+
 hasAspectWithLocalName :: String -> (EnumeratedRoleType ~~~> Boolean)
 hasAspectWithLocalName localAspectName roleType = ArrayT do
   aspects <- roleType ###= roleAspectsClosure
