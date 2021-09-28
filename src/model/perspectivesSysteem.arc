@@ -17,6 +17,7 @@ domain System
   case PerspectivesSystem
     indexed sys:MySystem
     aspect sys:RootContext
+    aspect sys:ContextWithNotification
 
     external
       aspect sys:RootContext$External
@@ -73,6 +74,8 @@ domain System
           on entry
             do for User
               bind binding >> context >> IndexedContext >> binding to IndexedContexts
+            notify User
+              "{ binding >> ModelIdentification }added!"
       view ModelInUsePresentation (Description, Name, PerformUpdate)
 
     context PendingInvitations = callExternal cdb:PendingInvitations() returns sys:Invitation$External
@@ -81,6 +84,14 @@ domain System
       -- Name is one of post, data, models.
       property Name (mandatory, String)
       property Identifier (mandatory, String)
+
+    -- A calculated role representing all available Notifications (from any context).
+    thing AllNotifications = callExternal cdb:RoleInstances( "model:System$ContextWithNotification$Notifications" ) returns sys:ContextWithNotification$Notifications
+
+  -- Use this as an aspect in contexts that should store their own notifications.
+  case ContextWithNotification
+    thing Notifications (relational)
+      property Message (String)
 
   case PhysicalContext
     user UserWithAddress
