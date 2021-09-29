@@ -57,6 +57,7 @@ import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryR
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
+import Perspectives.Query.QueryTypes (isRoleDomain, range)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, tryGetState)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
@@ -162,7 +163,7 @@ isForSelfOnly (InvertedQuery{selfOnly}) = selfOnly
 -- | Perspectives are conditional on states (valid in some states and not in others). The users we return are guaranteed
 -- | to have at least one valid perspective, even in the case of object state.
 handleBackwardQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array ContextWithUsers)
-handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:userTypes, states, forwardsCompiled}) = do
+handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompiled, users:userTypes, states, forwardsCompiled}) = do
   if unsafePartial shouldResultInContextStateQuery iq
     then createContextStateQuery
     else if unsafePartial shouldResultInRoleStateQuery iq
@@ -231,12 +232,12 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{backwardsCompiled, users:user
                 -- If the state's StateFulObject is a subject type (Srole), then obtain the user role instances from the context and pass on all that are in that state.
                 State.Srole rtype -> lift2 $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA (roleIsInState stateId) >>= filterA notIsMe) userTypes)
                 -- Construct an Array of object roles. If there is no forwards computation, it is just the roleInstance.
-                -- Otherwise run the forwards computation on the roleInstance.
+                -- If the forwards computation results in the object of the original, not inverted, query, run it on the roleInstance. NOTE: instead we use a weaker test: if it results in a role instance.
                 -- Only if any of the object roles is in the required state, obtain the user role instances from the context and return them.
                 State.Orole rtype -> do
-                  objects <- case forwardsCompiled of
-                    Nothing -> pure [roleInstance]
-                    Just f -> lift2 (roleInstance ##= unsafeCoerce f)
+                  objects <- case forwardsCompiled, isRoleDomain <<< range <$> (forwards description) of
+                    Just f, Just true -> lift2 (roleInstance ##= unsafeCoerce f)
+                    _, _ -> pure [roleInstance]
                   lift2 (findM (roleIsInState stateId) objects) >>= \mObject -> if isJust mObject
                     then lift2 $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
                     else pure []
@@ -432,7 +433,10 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
               Orole _ -> (filterA
                 (\{head} -> case head of
                   R rid -> lift2 (roleIsInState stateIdentifier rid)
-                  otherwise -> throwError (error ("runForwardsComputation hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
+                  -- If not a role domain, just return false. This will be a similar case to
+                  -- computeUsersFromState.computeUsersFromState, case Orole. For example forward queries resulting
+                  -- from inverted filtered queries end up in a Boolean, not in the object.
+                  otherwise -> pure false)
                 rinstances)
                   -- then create deltas for all resources visited by the query (as reflected in
                   -- the assumptions), for all users;
@@ -476,7 +480,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                 Orole _ -> (filterA
                   (\{head} -> case head of
                     R rid -> lift2 (roleIsInState stateIdentifier rid)
-                    otherwise -> throwError (error ("runForwardsComputation hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
+                    otherwise -> throwError (error ("runForwardsComputation (states per property) hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
                   rinstances)
                     >>= pure <<< map _.head
                     -- run the interpreter on the property computation and the head of the dependency path
