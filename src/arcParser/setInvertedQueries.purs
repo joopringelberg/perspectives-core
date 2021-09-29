@@ -115,9 +115,8 @@ setPathForStep (SQD dom qf ran fun man) qWithAK users states statesPerProperty s
       -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
       -- for that by prepending it with the inversal of the first backward step - which is, by construction, a
       -- `context` step.
-      contextStep = SQD ran (QF.DataTypeGetter ContextF) dom True man
       oneStepLess = removeFirstBackwardsStep qWithAK
-        (\dom' ran' man' -> Just $ SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
+        (\ran' dom' man' -> Just $ SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
       in case oneStepLess of
         ZQ Nothing _ -> dfr
         _ -> case lookup roleName enumeratedRoles of
