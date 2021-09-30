@@ -502,12 +502,7 @@ handlePostponedStateQualifiedParts = do
                   , makeTypeTimeOnlyRoleStep "notifieduser" (unsafePartial fromJust $ head qualifiedUsers') start
                   ]
                   stp
-                compiledPart <- withFrame (compileAndDistributeStep
-                  currentDomain
-                  expressionWithEnvironment
-                  qualifiedUsers'
-                  states
-                  )
+                compiledPart <- compileExpression currentDomain expressionWithEnvironment
                 pure (Sentence.CP (Q compiledPart))
 
     handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start})) = do

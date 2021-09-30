@@ -105,6 +105,7 @@ invert = invert_ >=> traverse h >=> pure <<< catMaybes
 -- | The QueryFunctionDescriptions in the Array of each QueryWithAKink_
 -- | are inversed wrt the orinal query.
 invert_ :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink_)
+-- NOTE moeten we hier niet iets met de args?
 invert_ (MQD dom (ExternalCoreRoleGetter f) args ran _ _) = pure $ [ZQ_ [SQD ran (ExternalCoreContextGetter "model:Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
 
 invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
@@ -252,19 +253,28 @@ setInvertedQueries users statesPerProperty roleStates qfd selfOnly = do
     -- we generate:
     --    backwards (forwards)
     --    ^s1 (s2 >> s3)          and for this we store an InvertedQuery with s1
-    --    ^s2 >> ^s1 (s3)         and for this we store an InvertedQuery with s2
-    --    ^s3 >> ^s2 >> ^s1 ()    and for this we store an InvertedQuery with s3
+    --    ^s1 << ^s2 (s3)         and for this we store an InvertedQuery with s2
+    --    ^s1 << ^s2 << ^s3 ()    and for this we store an InvertedQuery with s3
+    -- where x << y equals y >> x.
 
     -- Handle two cases of the backward query:
-    --  * SQD >> (...), i.e. when the backward part is a composition (whose first step is not a composition, that would be an error!). Set the InvertedQuery with respect to the first step of backward.
+    --  * (...) << SQD, i.e. when the backward part is a composition (whose first step is not a composition, that would be an error!). Set the InvertedQuery with respect to the first step of backward.
     --  * SQD, i.e. when the backward part is just a single step. Set the InvertedQuery for that step.
     case backward of
+      -- case (...) << SQD
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty selfOnly
+
+      -- This case does not have an SQD as the first step, which should not occur in an inverted query.
       (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
+
       -- TODO. Doubleert dit niet met de case hieronder, voor setInvertedQueriesForUserAndRole?
+      -- case SQD
       (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty selfOnly
+
       (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
+
       Nothing -> pure unit
+
     -- Handle the endpoint of the original query when it ends in a Role. There are two cases:
     -- a Perspective Object, where the perspective may have properties;
     -- an expression in a statement with a Property value.

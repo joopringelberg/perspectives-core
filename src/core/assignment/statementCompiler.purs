@@ -48,7 +48,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, li
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, makeSequence)
+import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (identifier_)
@@ -101,11 +101,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
       -- Inverts the result as well.
       compileVarBinding :: LetABinding -> PhaseThree QueryFunctionDescription
       compileVarBinding (Expr (VarBinding varName step)) = do
-          step_ <- compileAndDistributeStep
-            originDomain
-            step
-            userRoleTypes
-            stateIdentifiers
+          step_ <- compileExpression originDomain step
           addBinding varName step_
           pure $ UQD originDomain (QF.BindVariable varName) step_ (range step_) (functional step_) (mandatory step_)
       compileVarBinding (Stat varName ass) = do
@@ -227,14 +223,14 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         (roleQfd :: QueryFunctionDescription) <- case roleExpression of
           Nothing -> pure $ SQD originDomain (QF.DataTypeGetter QF.IdentityF) originDomain True True
           Just e -> do
-            qfd <- compileAndDistributeStep originDomain e subjects stateIdentifiers
+            qfd <- compileExpression originDomain e
             case range qfd of
               (RDOM _) -> pure qfd
               otherwise -> throwError $ NotARoleDomain (range qfd) (startOf e) (endOf e)
 
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
         -- Compile the value expression to a QueryFunctionDescription. Its range must comply with the range of the qualifiedProperty. It is compiled relative to the current context; not relative to the object!
-        valueQfd <- compileAndDistributeStep originDomain valueExpression subjects stateIdentifiers
+        valueQfd <- compileExpression originDomain valueExpression
         rangeOfProperty <- lift $ lift $ getEnumeratedProperty qualifiedProperty >>= PT.range
         fname <- case operator of
           Set _ -> pure $ QF.SetPropertyValue qualifiedProperty
@@ -257,7 +253,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                   then do
                     -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
                     -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
-                    compiledArguments <- traverse (\s -> compileAndDistributeStep originDomain s subjects stateIdentifiers) arguments
+                    compiledArguments <- traverse (\s -> compileExpression originDomain s) arguments
                     pure $ MQD originDomain (QF.ExternalEffectFullFunction effectName) compiledArguments originDomain Unknown Unknown
                   else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
             -- TODO: behandel hier Foreign functions.
@@ -332,7 +328,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         ensureContext :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription
         ensureContext userTypes stp  = do
           -- An expression that results in a ContextInstance, in this state, for this usertype.
-          qfd <- compileAndDistributeStep originDomain stp userTypes stateIdentifiers
+          qfd <- compileExpression originDomain stp
           case range qfd of
             (CDOM _) -> pure qfd
             otherwise -> throwError $ NotAContextDomain qfd (range qfd) (startOf stp) (endOf stp)
@@ -341,7 +337,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         ensureRole :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription
         ensureRole userTypes stp = do
           -- An expression that results in a RoleInstance, in this state, for this usertype.
-          qfd <- compileAndDistributeStep originDomain stp userTypes stateIdentifiers
+          qfd <- compileExpression originDomain stp
           case range qfd of
             (RDOM _) -> pure qfd
             otherwise -> throwError $ NotARoleDomain (range qfd) (startOf stp) (endOf stp)
