@@ -290,6 +290,10 @@ traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = d
   -- Postpone all stateParts because there may be forward references to user and subject.
   parts <- traverse expandPrefix stateParts
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
+  -- Traverse substates and add to DomeinFile.
+  substates <- for subStates (traverseStateE stateFulObect)
+  modifyDF (\domeinFile -> addStatesToDomeinFile (ARR.fromFoldable substates) domeinFile)
+
   pure state
   where
     -- NOTE that the StateIdentifiers constructed out of SubjectState need not be fully qualified.
