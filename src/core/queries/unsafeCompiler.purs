@@ -51,7 +51,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, some, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getProperty, getRoleBinders, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRoleBinders, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
@@ -70,7 +70,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', isUnlinked_, roleTypeModelName', specialisesRoleType)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', isUnlinked_, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||))
 import Unsafe.Coerce (unsafeCoerce)
@@ -627,18 +627,23 @@ getDynamicPropertyGetterFromLocalName ln adt = do
 -- | Otherwise returns all Calculated roles that are ultimately filled with sys:Me.
 -- | The Guest and Visitor conventions tap in here.
 getMyType :: ContextInstance ~~> RoleType
-getMyType ctxt = (getMe >=> map ENR <<< roleType) ctxt
+getMyType ctxt = getPreferredUserRoleType ctxt
+  <|>
+  (getMe >=> map ENR <<< roleType) ctxt
   <|>
   findMeInUnlinkedRoles ctxt
   <|>
   ((contextType >=> (liftToInstanceLevel contextAspectsClosure) >=> Combinators.filter (liftToInstanceLevel calculatedUserRole) (computesMe ctxt)) ctxt)
   where
-    computesMe :: ContextInstance -> RoleType ~~> Boolean
-    computesMe ctxt' rt = some (getRoleInstances rt >=> lift <<< lift <<< isMe) ctxt'
-
     findMeInUnlinkedRoles :: ContextInstance ~~> RoleType
     findMeInUnlinkedRoles = Combinators.filter (Combinators.filter (contextType >=> liftToInstanceLevel calculatedUserRole) isUnlinked) (computesMe ctxt)
       where
         isUnlinked :: RoleType ~~> Boolean
         isUnlinked (ENR rt) = lift $ lift $ isUnlinked_ rt
         isUnlinked (CR _) = pure false
+
+getAllMyRoleTypes :: ContextInstance ~~> RoleType
+getAllMyRoleTypes ctxt = ((contextType >=> (liftToInstanceLevel contextAspectsClosure) >=> Combinators.filter (liftToInstanceLevel userRole) (computesMe ctxt)) ctxt)
+
+computesMe :: ContextInstance -> RoleType ~~> Boolean
+computesMe ctxt' rt = some (getRoleInstances rt >=> lift <<< lift <<< isMe) ctxt'

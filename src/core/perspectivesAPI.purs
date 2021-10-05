@@ -47,10 +47,10 @@ import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (deleteProperty, setProperty)
+import Perspectives.Assignment.Update (deleteProperty, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>))
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -65,7 +65,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
-import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMyType, getRoleFunction, getRoleInstances)
+import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMyType, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT, reduce)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (calculation, getRoleType, kindOfRole, rangeOfRoleCalculation, roleADT)
@@ -240,6 +240,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case roleKind of
         ContextRole -> registerSupportedEffect corrId setter (map toRoleType_ <<< (binding >=> context >=> getMyType)) (RoleInstance subject)
         otherwise -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
+    -- `subject` is an external role instance. Returns all RoleTypes that sys:Me
+    -- ultimately fills an instance of in the corresponding context instance.
+    Api.GetAllMyRoleTypes -> do
+      allUserRoleTypes <- (RoleInstance subject) ##= (context >=> getAllMyRoleTypes)
+      sendResponse (Result corrId (roletype2string <$> allUserRoleTypes)) setter
     -- { request: "GetLocalRoleSpecialisation", subject: contextInstance, predicate: localAspectName}
     Api.GetLocalRoleSpecialisation -> registerSupportedEffect corrId setter (contextType >=> (liftToInstanceLevel $ localRoleSpecialisation predicate)) (ContextInstance subject)
     -- {request: "matchContextName", subject: name}
@@ -398,6 +403,18 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         void $ runMonadPerspectivesTransaction authoringRole (deleteProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate))
         sendResponse (Result corrId ["Ok"]) setter)
         (\e -> sendResponse (Error corrId (show e)) setter)
+    -- `subject` is an external role, object is a role type identifier (either
+    -- enumerated or calculated).
+    Api.SetPreferredUserRoleType -> catchError
+      (do
+        mroleType <- (RoleInstance subject) ##> (context >=> contextType >=> (liftToInstanceLevel $ lookForRoleType object))
+        case mroleType of
+          Nothing -> sendResponse (Error corrId ("Cannot find a role type with name '" <> object <> "' in the context of the external role '" <> subject <> "'.")) setter
+          Just roleType -> do
+            ctxt <- (RoleInstance subject) ##>> context
+            void $ runMonadPerspectivesTransaction authoringRole (setPreferredUserRoleType ctxt [roleType]))
+      \e -> sendResponse (Error corrId (show e)) setter
+
     Api.Unsubscribe -> unregisterSupportedEffect corrId
     Api.WrongRequest -> sendResponse (Error corrId subject) setter
     otherwise -> sendResponse (Error corrId ("Perspectives could not handle this request: '" <> (showRequestRecord r) <> "'")) (mkApiEffect reactStateSetter)

@@ -42,7 +42,7 @@ import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Prelude (flip, identity, pure, show, ($), (+), (/), (<<<), (<>), bind, not, eq)
@@ -100,6 +100,12 @@ context_me (PerspectContext{me}) = me
 
 changeContext_me :: PerspectContext -> Maybe RoleInstance -> PerspectContext
 changeContext_me (PerspectContext cr) me = PerspectContext cr {me = me}
+
+context_preferredUserRoleType :: PerspectContext -> Maybe RoleType
+context_preferredUserRoleType (PerspectContext {preferredUserRoleType}) = preferredUserRoleType
+
+changeContext_preferredUserRoleType :: PerspectContext -> Maybe RoleType -> PerspectContext
+changeContext_preferredUserRoleType (PerspectContext cr) mytype = PerspectContext cr {preferredUserRoleType = mytype}
 
 _roleInstances :: EnumeratedRoleType -> Traversal' PerspectContext (Array RoleInstance)
 _roleInstances (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t <<< _Just
@@ -177,6 +183,7 @@ defaultContextRecord =
   , rolInContext: empty
   , aliases: empty
   , me: Nothing
+  , preferredUserRoleType: Nothing
   , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord"}
   , states: []
   }

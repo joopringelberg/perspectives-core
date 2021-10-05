@@ -56,7 +56,7 @@ import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, lift2, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_id, rol_isMe, rol_states)
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_id, rol_isMe, rol_states)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
@@ -78,7 +78,26 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (isUnlinked_)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 
----------------------------------
+-----------------------------------------------------------
+-- UPDATE A CONTEXT (SET THE PREFERRED USER ROLE TYPE)
+-----------------------------------------------------------
+-- | Modifies the context instance by setting the value of preferredUserRoleType (a Maybe value!).
+-- | PERSISTENCE of the context instance.
+-- | SYNCHRONISATION (none, because this is a private value (it is indexed for every participant in the context)).
+-- | RULE TRIGGERING (STATE EVALUATION) (none, because there is no construct in the perspectives language for this member).
+-- | QUERY UPDATES
+-- | CURRENTUSER (none, because it cannot change by this operator).
+setPreferredUserRoleType :: ContextInstance -> (Updater (Array RoleType))
+setPreferredUserRoleType contextId userRoleTypes = (lift2 $ try $ getPerspectContext contextId) >>=
+  handlePerspectContextError "setPreferredUserRoleType"
+    \(pe :: PerspectContext) -> do
+      case ARR.head userRoleTypes of
+        -- PERSISTENCE
+        Nothing -> cacheAndSave contextId $ changeContext_preferredUserRoleType pe Nothing
+        Just ut -> cacheAndSave contextId $ changeContext_preferredUserRoleType pe (Just ut)
+      -- QUERY UPDATES.
+      (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+
 -----------------------------------------------------------
 -- UPDATE A CONTEXT (ADDING OR REMOVING ROLE INSTANCES)
 -----------------------------------------------------------

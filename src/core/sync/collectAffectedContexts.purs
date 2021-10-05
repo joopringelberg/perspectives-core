@@ -500,11 +500,8 @@ createDeltasFromAssumption users (RoleAssumption ctxt roleTypeId) = do
     Nothing -> pure unit
     Just instances' -> magic ctxt instances' roleTypeId users
 
-createDeltasFromAssumption users (Me ctxt mRoleInstance) = case mRoleInstance of
-  Nothing -> pure unit
-  Just me -> do
-    rtype <- lift2 (me ##>> OG.roleType)
-    magic ctxt (SerializableNonEmptyArray $ ANE.singleton me) rtype users
+-- The value of me of a context is indexed, and thus private. It never leads to a delta.
+createDeltasFromAssumption users (Me _) = pure unit
 
 createDeltasFromAssumption users (Binding roleInstance) = do
   mbnd <- lift2 (roleInstance ##> binding)

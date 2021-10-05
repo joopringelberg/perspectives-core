@@ -35,7 +35,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -81,8 +81,15 @@ getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
   handlePerspectContextError' "getMe" []
     \c -> do
-      tell $ ArrayWithoutDoubles [Me ctxt (context_me c)]
+      tell $ ArrayWithoutDoubles [Me ctxt]
       pure $ maybe [] singleton (context_me c)
+
+getPreferredUserRoleType :: ContextInstance ~~> RoleType
+getPreferredUserRoleType ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
+  handlePerspectRolError' "getPreferredUserRoleType" []
+    \c -> do
+      tell $ ArrayWithoutDoubles [Me ctxt]
+      pure $ maybe [] singleton (context_preferredUserRoleType c)
 
 getActiveStates :: ContextInstance ~~> StateIdentifier
 getActiveStates ci = ArrayT $ (try $ lift $ getContextMember IP.states ci) >>=

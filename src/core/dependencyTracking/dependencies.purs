@@ -208,7 +208,7 @@ deregisterDependency corrId (Tuple resource tpe) = queryAssumptionRegisterModify
 
 toAssumption :: InformedAssumption -> Assumption
 toAssumption (RoleAssumption ci rt) = assumption (unwrap ci) (unwrap rt)
-toAssumption (Me ci _) = assumption (unwrap ci) "model:System$Context$Me"
+toAssumption (Me ci) = assumption (unwrap ci) "model:System$Context$Me"
 toAssumption (Binding ri) = assumption (unwrap ri) "model:System$Role$binding"
 toAssumption (Binder ri rt) = assumption (unwrap ri) (unwrap rt)
 toAssumption (Property ri pt) = assumption (unwrap ri) (unwrap pt)
@@ -219,7 +219,7 @@ toAssumption (RoleState ri) = assumption (unwrap ri) "model:System$Role$State"
 
 canBeUntypedAssumption :: InformedAssumption -> Boolean
 canBeUntypedAssumption (RoleAssumption _ _) = true
-canBeUntypedAssumption (Me c _) = true
+canBeUntypedAssumption (Me c) = true
 canBeUntypedAssumption (Binding _) = true
 canBeUntypedAssumption (Binder _ _) = true
 canBeUntypedAssumption (Property _ _) = true

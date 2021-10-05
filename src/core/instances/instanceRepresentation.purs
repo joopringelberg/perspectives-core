@@ -33,7 +33,7 @@ import Foreign.Object (Object) as F
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Prelude (class Show, class Eq, (==), (<<<), eq, bind, pure)
 
@@ -66,6 +66,7 @@ type ContextRecord =
   , rolInContext :: F.Object (Array RoleInstance)
   , aliases :: F.Object String
   , me :: Maybe RoleInstance
+  , preferredUserRoleType :: Maybe RoleType
   , universeContextDelta :: SignedDelta
   , states :: Array StateIdentifier
   }
