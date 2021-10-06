@@ -45,6 +45,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, 
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
 import Prelude (Unit, flip, identity, pure, unit, ($))
 
+-- The first argument is the backward path of the second argument.
 setPathForStep :: Partial =>
   QueryFunctionDescription ->
   QueryWithAKink ->
@@ -86,15 +87,20 @@ setPathForStep (SQD dom qf ran fun man) qWithAK users states statesPerProperty s
     --  * if runtime a role is bound that is a specialisation of the required role, it will still trigger the inverted query.
     oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
     roleName = unwrap $ unsafePartial $ domain2RoleType ran
-    in case oneStepLess of
-        -- WARNING. This may not be correct
-        ZQ Nothing _ -> dfr
-        _ -> case lookup roleName enumeratedRoles of
-          Nothing -> addInvertedQueryForDomain roleName
-            (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-            OnRoleDelta_binder
-            dfr
-          Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en oneStepLess) enumeratedRoles}
+    invertedQuery = case oneStepLess of
+      -- Backward consisted of just a single step and that was GetRoleBindersF.
+      -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
+      -- is already the end result we want to obtain. Hence we do with the Identity function, where the domain and
+      -- range are the range of the backward step.
+      ZQ Nothing fwd -> ZQ (Just (SQD ran (QF.DataTypeGetter IdentityF) ran True True)) fwd
+      x -> x
+    in
+      case lookup roleName enumeratedRoles of
+        Nothing -> addInvertedQueryForDomain roleName
+          (InvertedQuery {description: invertedQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
+          OnRoleDelta_binder
+          dfr
+        Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en invertedQuery) enumeratedRoles}
 
   -- add to onRoleDelta_binding of the role that we apply `binding` to (the domain of the step; the role that binds).
   QF.DataTypeGetter QF.BindingF -> modifyDF \dfr@{enumeratedRoles} -> case dom of
