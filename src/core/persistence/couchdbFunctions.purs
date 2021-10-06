@@ -114,9 +114,8 @@ ensureSecurityDocument base db = do
           (Right securityDoc) -> pure securityDoc
     else do
       doc <- pure $ SecurityDocument
-        { _id: db <> "Security"
-        , admins: { names: [], roles: ["_admin"]}
-        , members: { names: [], roles: ["_admin"]}
+        { admins: { names: Just [], roles: ["_admin"]}
+        , members: { names: Just [], roles: ["_admin"]}
       }
       setSecurityDocument base db doc
       pure doc

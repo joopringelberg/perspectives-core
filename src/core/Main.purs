@@ -228,7 +228,7 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
             -- Now set the security document such that there is no role restriction for members.
             -- (only applies to Couchdb backends).
             void $ withCouchdbUrl \url -> setSecurityDocument url dbname
-                (SecurityDocument {_id: "_security", admins: {names: [], roles: ["_admin"]}, members: {names: [], roles: []}})
+                (SecurityDocument {admins: {names: Just [], roles: ["_admin"]}, members: {names: Just [], roles: []}})
 
       clearPostDatabase :: MonadPerspectives Unit
       clearPostDatabase = do
