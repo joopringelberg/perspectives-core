@@ -7,7 +7,7 @@ bs:Model usr:BrokerServiceModel
   extern sys:RootContext$External$Name = "Broker Services"
   extern sys:Model$External$Description = "Manage any number of broker services and contracts."
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:BrokerServices"
-  extern sys:Model$External$ModelIdentification = "model:BrokerService"
+  extern sys:Model$External$ModelIdentification = "model:BrokerServices"
   sys:Model$IndexedContext =>
     bs:BrokerServices bs:MyBrokers
       extern sys:RootContext$External$Name = "Broker Services"
