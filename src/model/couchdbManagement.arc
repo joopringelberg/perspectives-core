@@ -22,11 +22,15 @@ domain CouchdbManagement
       aspect sys:RootContext$External
 
     -- Every user manages his own CouchdbServers.
-    -- This manager is not necessarily the admin of a Couchdb installation!
+    -- This manager should be the Server admin of each CouchdbServer, in order
+    -- to create databases and members.
+    -- Becoming a Couchdb Server Admin should be managed outside Perspectives.
     user Manager = sys:Me
       perspective on CouchdbServers
         defaults
 
+    -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
+    -- filled with CouchdbManagementApp$Admin.
     context CouchdbServers filledBy CouchdbServer
       state NoAdmin = not exists binding >> context >> CouchdbServer$Admin
         on entry
@@ -35,8 +39,8 @@ domain CouchdbManagement
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
-  -- NOTE: a PerspectivesSystem$User can only fill either Admin, or Accounts!
-  -- The PDR looks for credentials in either role and should find just one pair.
+  -- NOTE: a PerspectivesSystem$User should only fill either Admin, or Accounts!
+  -- The PDR looks for credentials in either role and should find them just once.
   case CouchdbServer
     aspect acc:Body
     --storage public
@@ -46,7 +50,7 @@ domain CouchdbManagement
 
     -- This role should be in private space.
     -- Admin in Couchdb of a particular server.
-    user Admin filledBy sys:PerspectivesSystem$User
+    user Admin filledBy CouchdbManagementApp$Manager
       -- As Admin, has full perspective on Accounts.
       aspect acc:Body$Admin
 
@@ -60,8 +64,8 @@ domain CouchdbManagement
       perspective on Repositories >> binding >> context >> Repository$Admin
         defaults
 
-      -- The credentials for being a database admin have to be entered;
-      -- there is no way to create a database admin through InPlace.
+      -- The CouchdbServer$Admin has to be able to enter the credentials that
+      -- make him Server admin of the Couchdb installation.
       perspective on CouchdbServer$Admin
         view AdminProps verbs (SetPropertyValue, Consult)
 
@@ -83,6 +87,7 @@ domain CouchdbManagement
                   pw <- callExternal utl:GenSym() returns String
               in
                 callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
+                -- The Password property comes from the aspect acc:Body$Accounts.
                 Password = pw
 
         state Remove = ToBeRemoved
@@ -101,8 +106,7 @@ domain CouchdbManagement
 
       property ToBeRemoved (Boolean)
 
-      -- TODO: add a condition that allows an Account to see non-public repositories
-      -- that he is Admin of.
+      -- As an Account, one can see both public repositories and repositories managed by oneself (as Admin).
       perspective on filter Repositories with IsPublic or binding >> context >> Repository$Admin binds sys:Me
         only (CreateAndFill)
         verbs (Consult)
@@ -115,6 +119,9 @@ domain CouchdbManagement
             bind_ currentactor to measadmin
 
     -- This role should be in public space.
+    -- A Repositories instance comes complete with an (empty) Admin role.
+    -- Moreover, as a side effect, both a read- and write database are created
+    -- in Couchdb and the write database replicates to the read database.
     context Repositories filledBy Repository
       --storage public
       property ToBeRemoved (Boolean)
@@ -128,7 +135,7 @@ domain CouchdbManagement
               callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_write" )
               callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
           -- Ad Admin may exist already if the Repository is created by Accounts.
-          state NoAdmin = not exists binding >> context >> Admin
+          state NoAdmin = not exists binding >> context >> Repository$Admin
             on entry
               do for Admin
                 createRole Admin in binding >> context
@@ -149,7 +156,7 @@ domain CouchdbManagement
       -- Only public repositories will be visible to Accounts of CouchdbServers.
       property IsPublic (mandatory, Boolean)
       property Name (mandatory, String)
-      property Url (mandatory, String)
+      property Url = binder Repositories >> context >> extern >> Url + Name
 
     -- We need the ServerAdmin in this context in order to configure the local Admin.
     user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin
@@ -167,8 +174,11 @@ domain CouchdbManagement
               -- Repository$Admin. So when this state arises, we can be sure that
               -- the current user is, indeed, a CouchdbServer$Admin.
               -- Hence the PDR will authenticate with Server Admin credentials.
-              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
-              callEffect cdb:MakeAdminOfDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
+              letA
+                url <- context >> extern >> binder Repositories >> context >> extern >> Url
+              in
+                callEffect cdb:MakeAdminOfDb( url, context >> extern >> Name + "_write", UserName )
+                callEffect cdb:MakeAdminOfDb( url, context >> extern >> Name + "_read", UserName )
         state Remove = ToBeRemoved
           on entry
             do for ServerAdmin
@@ -180,7 +190,6 @@ domain CouchdbManagement
       -- The admin can also create an Author and give him/her the right to add and
       -- remove models to the repo.
       perspective on Authors
-        defaults
 
       -- The Admin can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
@@ -196,9 +205,12 @@ domain CouchdbManagement
           on entry
             do for Admin
               -- As only the PDR of a user with role Repository$Admin will execute this,
-              -- and Repository$Admin is a Db Admin, this will be allowed.
-              callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_write", binding >> UserName )
-              callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName )
+              -- and Repository$Admin is a Db Admin, this will be allowed in Couchdb.
+              letA
+                url <- context >> extern >> binder Repositories >> context >> extern >> Url
+              in
+                callEffect cdb:MakeMemberOf( url, context >> extern >> Name + "_write", binding >> UserName )
+                callEffect cdb:MakeMemberOf( url, context >> extern >> Name + "_read", binding >> UserName )
         state Remove = ToBeRemoved
           on entry
             do for Admin
@@ -210,6 +222,8 @@ domain CouchdbManagement
       -- By using this mechanism instead of directly removing the role,
       -- we can remove the Author from the write-db.
       property ToBeRemoved (Boolean)
+
+      view AuthorForAdmin (Voornaam, Achternaam, ToBeRemoved)
 
       -- The Authors can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
