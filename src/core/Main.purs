@@ -169,7 +169,6 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
       logPerspectivesError $ Custom $ "Created an account " <> usr
       callback true
 
-
 -- | This is for development only! Assumes the user identifier equals the user name.
 resetAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
 resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler

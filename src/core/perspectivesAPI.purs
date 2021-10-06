@@ -25,6 +25,7 @@ module Perspectives.Api where
 -- import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 import Control.Coroutine (Consumer, Producer, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (Step(..), produce', Emitter)
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
@@ -32,7 +33,7 @@ import Control.Plus ((<|>))
 import Data.Array (elemIndex, head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
@@ -78,7 +79,7 @@ import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, remo
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
-import Prelude (Unit, bind, discard, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -251,6 +252,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.MatchContextName -> do
       matches <- matchIndexedContextNames subject
       sendResponse (Result corrId [encodeJSON matches]) setter
+    Api.GetCouchdbUrl -> do
+      url <- gets \s -> maybe "" identity s.userInfo.couchdbUrl
+      sendResponse (Result corrId [url]) setter
     Api.GetUserIdentifier -> do
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
