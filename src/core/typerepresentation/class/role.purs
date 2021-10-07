@@ -53,6 +53,7 @@ import Prelude (class Show, bind, flip, pure, show, ($), (<$>), (<<<), (<>), (>=
 -----------------------------------------------------------
 class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, i -> r where
   kindOfRole :: r -> RoleKind
+  displayName :: r -> String
   roleAspects :: r -> MonadPerspectives (Array EnumeratedRoleType)
   context :: r -> MP (ADT ContextType)
   contextOfRepresentation :: r -> ContextType
@@ -89,6 +90,7 @@ rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> 
 -----------------------------------------------------------
 instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
+  displayName r = (unwrap r).displayName
   roleAspects = rangeOfCalculatedRole >=> roleAspectsOfADT
   context r = (rangeOfCalculatedRole >=> contextOfADT >=> \adt -> pure $ product [ST (unwrap r).context, adt]) r
   contextOfRepresentation r = (unwrap r).context
@@ -117,6 +119,7 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
 -----------------------------------------------------------
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
+  displayName r = (unwrap r).displayName
   roleAspects r = pure $ _.roleAspects $ unwrap r
   context r = pure $ ST $ contextOfRepresentation r
   contextOfRepresentation r = (unwrap r).context

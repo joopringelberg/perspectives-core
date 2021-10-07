@@ -48,7 +48,10 @@ import Prelude (class Eq, class Show, ($), (&&))
 newtype Perspective = Perspective PerspectiveRecord
 
 type PerspectiveRecord =
-  { object :: QueryFunctionDescription
+  { id :: String
+  , object :: QueryFunctionDescription
+  , displayName :: String
+  , isEnumerated :: Boolean
   , roleVerbs :: EncodableMap StateIdentifier RoleVerbList
 	, propertyVerbs :: EncodableMap StateIdentifier (Array PropertyVerbs)
 	, actions :: EncodableMap StateIdentifier (Object Action)

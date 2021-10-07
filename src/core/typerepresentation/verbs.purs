@@ -78,6 +78,8 @@ instance eqPropertyVerb :: Eq PropertyVerb where
 instance ordPropertyVerb :: Ord PropertyVerb where
   compare pv1 pv2 = compare (show pv1) (show pv2)
 
+allPropertyVerbs :: Array PropertyVerb
+allPropertyVerbs = [Consult, RemovePropertyValue, DeleteProperty, AddPropertyValue, SetPropertyValue]
 -----------------------------------------------------------
 -- ROLEVERBLIST
 -----------------------------------------------------------
@@ -98,6 +100,14 @@ hasAllVerbs :: Array RoleVerb -> RoleVerbList -> Boolean
 hasAllVerbs vs All = true
 hasAllVerbs vs (Including vl) = null $ difference vs vl
 hasAllVerbs vs (Excluding vl) = null $ intersect vs vl
+
+roleVerbList2Verbs :: RoleVerbList -> Array RoleVerb
+roleVerbList2Verbs All = allVerbs
+roleVerbList2Verbs (Excluding excluded) = difference allVerbs excluded
+roleVerbList2Verbs (Including v) = v
+
+allVerbs :: Array RoleVerb
+allVerbs = [Remove, Delete, Create, CreateAndFill, Fill, Unbind, RemoveFiller, Move]
 
 hasOneOfTheVerbs :: Array RoleVerb -> RoleVerbList -> Boolean
 hasOneOfTheVerbs vs All = true

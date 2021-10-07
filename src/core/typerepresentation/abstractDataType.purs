@@ -33,7 +33,7 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (find, intersect, length, singleton, uncons, union)
+import Data.Array (find, intercalate, intersect, length, singleton, uncons, union)
 import Data.Array.Partial (head) as AP
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
@@ -49,7 +49,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, flip, map, pure, show, ($), (<<<), (<>), (==), (>>>))
+import Prelude (class Eq, class Monad, class Show, bind, flip, map, pure, show, ($), (<<<), (<>), (==), (>>>), (<$>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
@@ -180,6 +180,13 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
     pure $ unwrap $ foldMap Disj bools
   reduce f EMPTY = pure false
   reduce f UNIVERSAL = pure true
+
+instance reducibleToString :: Reducible EnumeratedRoleType String where
+  reduce f (ST a) = f a
+  reduce f (SUM adts) = intercalate ", " <$> traverse (reduce f) adts
+  reduce f (PROD adts) = intercalate "+" <$> traverse (reduce f) adts
+  reduce f EMPTY = pure ""
+  reduce f UNIVERSAL = pure ""
 
 -- | Reduce an `ADT a` with `forall a b m. Monad m => f :: a -> m (Array b)`
 -- | `reduce f` then has type `forall a b m. Monad m => ADT a -> m (Array b)`

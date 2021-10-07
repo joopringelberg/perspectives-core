@@ -46,7 +46,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions, values, union)
 import Foreign.Object (fromFoldable) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes ((###=), MP)
+import Perspectives.CoreTypes (MP, MonadPerspectives, (###=))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
@@ -70,8 +70,8 @@ import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole)
-import Perspectives.Representation.Class.Role (Role(..), getRole, getRoleType, roleADT)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
+import Perspectives.Representation.Class.Role (Role(..), displayName, getRole, getRoleType, roleADT)
 import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -572,6 +572,7 @@ handlePostponedStateQualifiedParts = do
         modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states = for_ qualifiedUsers
           (modifyPerspective
             objectQfd
+            syntacticObject
             start
             \(Perspective pr@{actions}) -> Perspective $ pr {actions = EncodableMap (foldr
               (\stateId actionsMap -> case Map.lookup stateId actionsMap of
@@ -592,7 +593,7 @@ handlePostponedStateQualifiedParts = do
       where
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd states = for_ qualifiedUsers
-          (modifyPerspective objectQfd start
+          (modifyPerspective objectQfd object start
             (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) states}))
 
     handlePart (AST.SO (AST.SelfOnly{subject, object, state, start})) = do
@@ -608,7 +609,7 @@ handlePostponedStateQualifiedParts = do
       where
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd states = for_ qualifiedUsers
-          (modifyPerspective objectQfd start
+          (modifyPerspective objectQfd object start
             (\(Perspective pr) -> Perspective pr {selfOnly = true}))
 
     handlePart (AST.P (AST.PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start})) = do
@@ -627,6 +628,7 @@ handlePostponedStateQualifiedParts = do
         modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' states = for_ qualifiedUsers
           (modifyPerspective
             objectQfd
+            object
             start
             \(Perspective pr@{propertyVerbs:pverbs}) -> Perspective $ pr {propertyVerbs = EncodableMap (foldr
               (\stateId pverbsMap -> case Map.lookup stateId pverbsMap of
@@ -666,20 +668,28 @@ handlePostponedStateQualifiedParts = do
             _ -> throwError $ NotUniquelyIdentifying start view candidates
 
     -- Apply, for this user, the modifier to his perspective on the object (and create a perspective if necessary).
-    modifyPerspective :: QueryFunctionDescription -> ArcPosition -> (Perspective -> Perspective) -> RoleType -> PhaseThree Unit
-    modifyPerspective objectQfd start modifier userRole =
+    modifyPerspective :: QueryFunctionDescription -> RoleIdentification -> ArcPosition -> (Perspective -> Perspective) -> RoleType -> PhaseThree Unit
+    modifyPerspective objectQfd roleSpec start modifier userRole =
       case userRole of
         ENR (EnumeratedRoleType r) -> do
           EnumeratedRole er@{perspectives} <- getsDF (unsafePartial fromJust <<< lookup r <<< _.enumeratedRoles)
           mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
           perspective <- case mi of
-            Nothing -> pure $ Perspective
-              { object: objectQfd
-              , roleVerbs: EncodableMap Map.empty
-              , propertyVerbs: EncodableMap Map.empty
-              , actions: EncodableMap Map.empty
-              , selfOnly: false
-              }
+            Nothing -> do
+              mroleName <- lift2 $ roleIdentification2displayName roleSpec
+              displayName <- case mroleName of
+                Just roleName -> pure roleName
+                Nothing -> lift2 $ reduce (getEnumeratedRole >=> pure <<< _.displayName <<< unwrap) (unsafePartial domain2roleType $ range objectQfd)
+              pure $ Perspective
+                { id: (roletype2string userRole) <> "_" <> show (length perspectives)
+                , object: objectQfd
+                , isEnumerated: (roleIdentificationIsEnumerated roleSpec)
+                , displayName
+                , roleVerbs: EncodableMap Map.empty
+                , propertyVerbs: EncodableMap Map.empty
+                , actions: EncodableMap Map.empty
+                , selfOnly: false
+                }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
           modifyDF \dfr@{enumeratedRoles} -> dfr {enumeratedRoles = insert
             r
@@ -692,13 +702,21 @@ handlePostponedStateQualifiedParts = do
           CalculatedRole er@{perspectives} <- getsDF (unsafePartial fromJust <<< lookup r <<< _.calculatedRoles)
           mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
           perspective <- case mi of
-            Nothing -> pure $ Perspective
-              { object: objectQfd
-              , roleVerbs: EncodableMap Map.empty
-              , propertyVerbs: EncodableMap Map.empty
-              , actions: EncodableMap Map.empty
-              , selfOnly: false
-              }
+            Nothing -> do
+              mroleName <- lift2 $ roleIdentification2displayName roleSpec
+              displayName <- case mroleName of
+                Just roleName -> pure roleName
+                Nothing -> lift2 $ reduce (getEnumeratedRole >=> pure <<< _.displayName <<< unwrap) (unsafePartial domain2roleType $ range objectQfd)
+              pure $ Perspective
+                { id: (roletype2string userRole) <> "_" <> show (length perspectives)
+                , object: objectQfd
+                , isEnumerated: (roleIdentificationIsEnumerated roleSpec)
+                , displayName
+                , roleVerbs: EncodableMap Map.empty
+                , propertyVerbs: EncodableMap Map.empty
+                , actions: EncodableMap Map.empty
+                , selfOnly: false
+                }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
           modifyDF \dfr@{calculatedRoles} -> dfr {calculatedRoles = insert
             r
@@ -955,12 +973,21 @@ roleIdentification2Step (ExplicitRole ctxt (ENR (EnumeratedRoleType rt)) pos) = 
 roleIdentification2Step (ExplicitRole ctxt (CR (CalculatedRoleType rt)) pos) = Simple $ ArcIdentifier pos rt
 roleIdentification2Step (ImplicitRole ctxt stp) = stp
 
+roleIdentificationIsEnumerated :: RoleIdentification -> Boolean
+roleIdentificationIsEnumerated (ExplicitRole _ (ENR _) _) = true
+roleIdentificationIsEnumerated _ = false
+
 -- | Returns the current context for the RoleIdentification.
 -- | This is, for the lexical position of the current subject or object (for which the
 -- | RoleIdentification was constructed), the current context.
 roleIdentification2Context :: RoleIdentification -> ContextType
 roleIdentification2Context (ExplicitRole ctxt _ _) = ctxt
 roleIdentification2Context (ImplicitRole ctxt _) = ctxt
+
+roleIdentification2displayName :: RoleIdentification -> MonadPerspectives (Maybe String)
+roleIdentification2displayName (ImplicitRole _ _) = pure Nothing
+roleIdentification2displayName (ExplicitRole _ (ENR rt) _) = getEnumeratedRole rt >>= pure <<< Just <<< displayName
+roleIdentification2displayName (ExplicitRole _ (CR rt) _) = getCalculatedRole rt >>= pure <<< Just <<< displayName
 
 -- A QueryFunctionDescription that will compile to const true.
 trueCondition :: Domain -> QueryFunctionDescription
