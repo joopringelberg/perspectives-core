@@ -65,6 +65,7 @@ import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
+import Perspectives.Queries.RolesAndProperties (getRolesWithProperties)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMyType, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT, reduce)
@@ -78,6 +79,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransac
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeRoleInstance, removeContextIfUnbound)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
+import Perspectives.TypePersistence.PerspectiveSerialisation (perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -258,6 +260,24 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetUserIdentifier -> do
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
+
+    -- { request: "GetPerspectives", subject: roleType, object: contextInstance }
+    Api.GetPerspectives -> do
+      userRoleType <- getRoleType subject
+      registerSupportedEffect
+        corrId
+        setter
+        (perspectivesForContextAndUser userRoleType)
+        (ContextInstance object)
+
+    -- { request: "GetRolesWithProperties", object: ContextInstance, predicate: roleType}
+    Api.GetRolesWithProperties ->
+      registerSupportedEffect
+        corrId
+        setter
+        (getRolesWithProperties predicate)
+        (ContextInstance object)
+
     -- {request: "CreateContext", subject: contextId, predicate: roleType, object: ContextType, contextDescription: contextDescription, authoringRole: myroletype}
     -- roleType may be a local name.
     -- The context type given in object must be described in a locally installed model.

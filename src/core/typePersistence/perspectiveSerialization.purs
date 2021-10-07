@@ -23,28 +23,33 @@
 
 module Perspectives.TypePersistence.PerspectiveSerialisation where
 
+import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, concat, cons, findIndex, foldl, modifyAt, uncons, union)
 import Data.Map (lookup)
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst)
 import Foreign.Object (keys) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, type (~~>))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.Instances.ObjectGetters (getActiveStates_)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..)) as PROP
-import Perspectives.Representation.Class.Role (allProperties)
+import Perspectives.Representation.Class.Role (allProperties, perspectivesOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, allPropertyVerbs, roleVerbList2Verbs)
-import Prelude (flip, not, show, ($), (<$>), bind, pure, (<<<), eq)
+import Prelude (flip, not, show, ($), (<$>), bind, pure, (<<<), eq, (>=>))
+import Simple.JSON (writeJSON)
 
-type SerialisedPerspective =
+type SerialisedPerspective' =
   { id :: String
   , displayName :: String
   , isFunctional :: Boolean
@@ -65,7 +70,16 @@ type SerialisedProperty =
   , verbs :: Array (String)
   }
 
-serialisePerspective :: Array StateIdentifier -> Perspective -> MonadPerspectives SerialisedPerspective
+newtype SerialisedPerspective = SerialisedPerspective String
+derive instance newtypeSerialisedPerspective :: Newtype SerialisedPerspective _
+
+perspectivesForContextAndUser :: RoleType -> (ContextInstance ~~> SerialisedPerspective)
+perspectivesForContextAndUser userRoleType cid = ArrayT $ lift do
+  states <- getActiveStates_ cid
+  perspectives <- perspectivesOfRoleType userRoleType
+  traverse ((serialisePerspective states) >=> pure <<< SerialisedPerspective <<< writeJSON) perspectives
+
+serialisePerspective :: Array StateIdentifier -> Perspective -> MonadPerspectives SerialisedPerspective'
 serialisePerspective states p@(Perspective {id, object, isEnumerated, displayName, roleVerbs, propertyVerbs, actions}) = do
   properties <- serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> states))
   pure { id
