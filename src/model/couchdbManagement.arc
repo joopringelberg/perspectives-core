@@ -214,9 +214,12 @@ domain CouchdbManagement
         state Remove = ToBeRemoved
           on entry
             do for Admin
-              callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_write", binding >> UserName)
-              callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
-              remove origin
+              letA
+                url <- context >> extern >> binder Repositories >> context >> extern >> Url
+              in
+                callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_write", binding >> UserName)
+                callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_read", binding >> UserName)
+                remove origin
 
       -- Admin can set this to true to remove the Author from the Repository.
       -- By using this mechanism instead of directly removing the role,
