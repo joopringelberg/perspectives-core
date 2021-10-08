@@ -264,11 +264,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- { request: "GetPerspectives", subject: roleType, object: contextInstance }
     Api.GetPerspectives -> do
       userRoleType <- getRoleType subject
-      registerSupportedEffect
-        corrId
-        setter
-        (perspectivesForContextAndUser userRoleType)
-        (ContextInstance object)
+      subjectGetter <- getRoleFunction subject
+      muserRoleInstance <- (ContextInstance object) ##> subjectGetter
+      case muserRoleInstance of
+        Nothing -> sendResponse (Error corrId ("There is no user role instance for role type '" <> subject <> "' in context instance '" <> object <> "'!")) setter
+        Just userRoleInstance -> registerSupportedEffect
+          corrId
+          setter
+          (perspectivesForContextAndUser userRoleInstance userRoleType)
+          (ContextInstance object)
 
     -- { request: "GetRolesWithProperties", object: ContextInstance, predicate: roleType}
     Api.GetRolesWithProperties ->

@@ -55,7 +55,7 @@ import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec, isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, stateSpec2StateIdentifier)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
@@ -508,7 +508,7 @@ perspectiveObjectQfd (Perspective{object}) = object
 statesPerProperty :: Perspective -> MonadPerspectives (Map.Map PropertyType (Array StateIdentifier))
 statesPerProperty (Perspective{propertyVerbs, object}) = foldWithIndexM f Map.empty (unwrap propertyVerbs)
   where
-    f :: StateIdentifier ->
+    f :: StateSpec ->
       Map.Map PropertyType (Array StateIdentifier) ->
       Array PropertyVerbs ->
       MonadPerspectives (Map.Map PropertyType (Array StateIdentifier))
@@ -516,19 +516,19 @@ statesPerProperty (Perspective{propertyVerbs, object}) = foldWithIndexM f Map.em
       (r1 :: Array (Array PropertyType)) <- traverse (propertyVerbs2PropertyArray object) pvArr
       pure $ foldr (\prop cum' ->
         case Map.lookup prop cum' of
-          Nothing -> Map.insert prop [stateId] cum'
-          Just states -> Map.insert prop (cons stateId states) cum')
+          Nothing -> Map.insert prop [stateSpec2StateIdentifier stateId] cum'
+          Just states -> Map.insert prop (cons (stateSpec2StateIdentifier stateId) states) cum')
         cum
         (concat r1)
 
 propertiesInPerspective :: Perspective -> MonadPerspectives (Array PropertyType)
 propertiesInPerspective (Perspective{propertyVerbs, object}) = foldWithIndexM f [] (unwrap propertyVerbs)
   where
-    f :: StateIdentifier ->
+    f :: StateSpec ->
       Array PropertyType ->
       Array PropertyVerbs ->
       MonadPerspectives (Array PropertyType)
-    f stateId cum pvArr = concat <$> traverse (propertyVerbs2PropertyArray object) pvArr
+    f _ cum pvArr = concat <$> traverse (propertyVerbs2PropertyArray object) pvArr
 
 propertyVerbs2PropertyArray :: QueryFunctionDescription -> PropertyVerbs -> MonadPerspectives (Array PropertyType)
 propertyVerbs2PropertyArray object (PropertyVerbs pset _) = case pset of
@@ -537,4 +537,4 @@ propertyVerbs2PropertyArray object (PropertyVerbs pset _) = case pset of
   PSet props -> pure props
 
 roleStates :: Perspective -> Array StateIdentifier
-roleStates (Perspective {roleVerbs}) = fromFoldable $ Map.keys (unwrap roleVerbs)
+roleStates (Perspective {roleVerbs}) = stateSpec2StateIdentifier <$> (fromFoldable $ Map.keys (unwrap roleVerbs))

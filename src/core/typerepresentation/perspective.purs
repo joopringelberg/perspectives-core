@@ -24,6 +24,7 @@ module Perspectives.Representation.Perspective where
 
 import Data.Array (difference, findIndex, null)
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.List (findIndex) as LST
@@ -40,7 +41,7 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb, RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
-import Prelude (class Eq, class Show, ($), (&&))
+import Prelude (class Eq, class Ord, class Show, ($), (&&))
 
 -----------------------------------------------------------
 -- PERSPECTIVE
@@ -52,9 +53,9 @@ type PerspectiveRecord =
   , object :: QueryFunctionDescription
   , displayName :: String
   , isEnumerated :: Boolean
-  , roleVerbs :: EncodableMap StateIdentifier RoleVerbList
-	, propertyVerbs :: EncodableMap StateIdentifier (Array PropertyVerbs)
-	, actions :: EncodableMap StateIdentifier (Object Action)
+  , roleVerbs :: EncodableMap StateSpec RoleVerbList
+	, propertyVerbs :: EncodableMap StateSpec (Array PropertyVerbs)
+	, actions :: EncodableMap StateSpec (Object Action)
   , selfOnly :: Boolean
   }
 
@@ -72,6 +73,23 @@ instance encodePerspective :: Encode Perspective where
 
 instance decodePerspective :: Decode Perspective where
   decode = genericDecode defaultOptions
+
+data StateSpec =
+  ContextState StateIdentifier
+  | SubjectState StateIdentifier
+  | ObjectState StateIdentifier
+
+derive instance genericStateSpec :: Generic StateSpec _
+instance showStateSpec :: Show StateSpec where show = genericShow
+derive instance eqStateSpec :: Eq StateSpec
+instance encodeStateSpec :: Encode StateSpec where encode = genericEncode defaultOptions
+instance decodeStateSpec :: Decode StateSpec where decode = genericDecode defaultOptions
+instance ordStateSpec :: Ord StateSpec where compare = genericCompare
+
+stateSpec2StateIdentifier :: StateSpec -> StateIdentifier
+stateSpec2StateIdentifier (ContextState s) = s
+stateSpec2StateIdentifier (SubjectState s) = s
+stateSpec2StateIdentifier (ObjectState s) = s
 
 -----------------------------------------------------------
 -- ACCESSORS

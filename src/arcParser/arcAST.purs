@@ -249,7 +249,6 @@ derive instance genericStateSpecification :: Generic StateSpecification _
 instance eqStateSpecification :: Eq StateSpecification where eq = genericEq
 instance showStateSpecification :: Show StateSpecification where show = genericShow
 
-data StateKind = CState | SState | OState
 --------------------------------------------------------------------------------
 ---- INSTANCES
 --------------------------------------------------------------------------------

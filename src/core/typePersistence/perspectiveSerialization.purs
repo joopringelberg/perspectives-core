@@ -34,19 +34,20 @@ import Foreign.Object (keys) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.Instances.ObjectGetters (getActiveStates_)
+import Perspectives.Instances.ObjectGetters (getActiveRoleStates_, getActiveStates_)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range)
+import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..)) as PROP
 import Perspectives.Representation.Class.Role (allProperties, perspectivesOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..))
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
 import Perspectives.Representation.Verbs (PropertyVerb, allPropertyVerbs, roleVerbList2Verbs)
-import Prelude (flip, not, show, ($), (<$>), bind, pure, (<<<), eq, (>=>))
+import Prelude (bind, eq, flip, map, not, pure, show, ($), (<$>), (<<<), (>=>), (<>))
 import Simple.JSON (writeJSON)
 
 type SerialisedPerspective' =
@@ -73,23 +74,24 @@ type SerialisedProperty =
 newtype SerialisedPerspective = SerialisedPerspective String
 derive instance newtypeSerialisedPerspective :: Newtype SerialisedPerspective _
 
-perspectivesForContextAndUser :: RoleType -> (ContextInstance ~~> SerialisedPerspective)
-perspectivesForContextAndUser userRoleType cid = ArrayT $ lift do
-  states <- getActiveStates_ cid
+perspectivesForContextAndUser :: RoleInstance -> RoleType -> (ContextInstance ~~> SerialisedPerspective)
+perspectivesForContextAndUser subject userRoleType cid = ArrayT $ lift do
+  contextStates <- map ContextState <$> getActiveStates_ cid
+  subjectStates <- map SubjectState <$> getActiveRoleStates_ subject
   perspectives <- perspectivesOfRoleType userRoleType
-  traverse ((serialisePerspective states) >=> pure <<< SerialisedPerspective <<< writeJSON) perspectives
+  traverse ((serialisePerspective contextStates subjectStates) >=> pure <<< SerialisedPerspective <<< writeJSON) perspectives
 
-serialisePerspective :: Array StateIdentifier -> Perspective -> MonadPerspectives SerialisedPerspective'
-serialisePerspective states p@(Perspective {id, object, isEnumerated, displayName, roleVerbs, propertyVerbs, actions}) = do
-  properties <- serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> states))
+serialisePerspective :: Array StateSpec -> Array StateSpec -> Perspective -> MonadPerspectives SerialisedPerspective'
+serialisePerspective contextStates subjectStates p@(Perspective {id, object, isEnumerated, displayName, roleVerbs, propertyVerbs, actions}) = do
+  properties <- serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> (contextStates <> subjectStates)))
   pure { id
     , displayName
     , isFunctional: pessimistic $ functional object
     , isMandatory: pessimistic $ mandatory object
     , isCalculated: not isEnumerated
-    , verbs: show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip lookup (unwrap roleVerbs)) <$> states))
+    , verbs: show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip lookup (unwrap roleVerbs)) <$> (contextStates <> subjectStates)))
     , properties
-    , actions: concat (OBJ.keys <$> (catMaybes $ (flip lookup (unwrap actions)) <$> states))
+    , actions: concat (OBJ.keys <$> (catMaybes $ (flip lookup (unwrap actions)) <$> contextStates))
     }
 
 serialiseProperties :: QueryFunctionDescription -> Array PropertyVerbs -> MonadPerspectives (Array SerialisedProperty)

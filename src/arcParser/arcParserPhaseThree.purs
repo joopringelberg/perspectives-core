@@ -53,7 +53,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileReco
 import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
-import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateKind(..), StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
@@ -75,7 +75,7 @@ import Perspectives.Representation.Class.Role (Role(..), displayName, getRole, g
 import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..))
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
@@ -350,7 +350,7 @@ handlePostponedStateQualifiedParts = do
       Just p ->  pure (StateIdentifier <<< flip append p <<< flip append "$" <<< roletype2string <$> roles)
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications that may occur in the SubjectState case.
-    stateSpec2States :: StateSpecification -> PhaseThree (Array StateIdentifier)
+    stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
       AST.ContextState ctx mpath -> pure [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx) <<< append "$") mpath))]
@@ -360,6 +360,12 @@ handlePostponedStateQualifiedParts = do
       AST.SubjectState ridentification mpath -> collectStates mpath ridentification
       -- Execute the effect for all subjects in all object states.
       AST.ObjectState ridentification mpath -> collectStates mpath ridentification
+
+    stateSpecificationToStateSpec :: AST.StateSpecification -> PhaseThree (Array StateSpec)
+    stateSpecificationToStateSpec spec = case spec of
+      AST.ContextState _ _ -> map ContextState <$> stateSpec2States spec
+      AST.SubjectState _ _ -> map SubjectState <$> stateSpec2States spec
+      AST.ObjectState _ _ -> map ObjectState <$> stateSpec2States spec
 
     addAll :: forall key value. Ord key => value -> Map.Map key value -> Array key -> Map.Map key value
     addAll value = foldr (\key map -> Map.insert key value map)
@@ -405,12 +411,12 @@ handlePostponedStateQualifiedParts = do
       -- Compute the currentcontext from the origin.
       currentContextCalculation <- case transition2stateSpec transition of
         -- We do not actually use this result.
-        ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
-        ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
-        SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
+        AST.ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
+        AST.ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
+        AST.SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
       modifyAllStates
         (case transition2stateSpec transition of
-          ContextState _ _ -> ContextAction sideEffect
+          AST.ContextState _ _ -> ContextAction sideEffect
           otherwise -> RoleAction {currentContextCalculation, effect: sideEffect})
         qualifiedUsers
         states
@@ -458,12 +464,12 @@ handlePostponedStateQualifiedParts = do
       -- The expressions in the Sentence are compiled with respect to the current context.
       compiledMessage <- compileSentence originDomain message qualifiedUsers states (transition2stateSpec transition)
       currentContextCalculation <- case transition2stateSpec transition of
-        ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
-        ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
-        SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
+        AST.ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
+        AST.ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
+        AST.SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
       modifyAllStates
         (case transition2stateSpec transition of
-          ContextState _ _ -> ContextNotification compiledMessage
+          AST.ContextState _ _ -> ContextNotification compiledMessage
           otherwise -> RoleNotification {currentContextCalculation, sentence: compiledMessage})
         qualifiedUsers
         states
@@ -489,7 +495,7 @@ handlePostponedStateQualifiedParts = do
                   AST.Exit _ -> pure $ sr {notifyOnExit = EncodableMap $ addAll notification (unwrap notifyOnExit) qualifiedUsers, query = query'})
               stateId
 
-          compileSentence :: Domain -> Sentence.Sentence -> Array RoleType -> Array StateIdentifier -> StateSpecification -> PhaseThree Sentence.Sentence
+          compileSentence :: Domain -> Sentence.Sentence -> Array RoleType -> Array StateIdentifier -> AST.StateSpecification -> PhaseThree Sentence.Sentence
           compileSentence currentDomain (Sentence.Sentence parts) qualifiedUsers' states stateSpec = Sentence.Sentence <$> traverse compilePart parts
             where
               compilePart :: Sentence.SentencePart -> PhaseThree Sentence.SentencePart
@@ -541,9 +547,9 @@ handlePostponedStateQualifiedParts = do
       -- Compute the currentcontext from the origin.
       currentContextCalculation <- case state of
         -- We do not actually use this result.
-        ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
-        ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
-        SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
+        AST.ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
+        AST.ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
+        AST.SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
       -- `syntacticObject` represents the object of the perspective. It allows
       -- for `currentcontext` and `origin`.
       -- currentcontext == origin and this equals the argument that the
@@ -559,16 +565,17 @@ handlePostponedStateQualifiedParts = do
         (compileExpression
           (CDOM $ ST (roleIdentification2Context syntacticObject))
           syntacticObjectWithEnvironment)
+      stateSpecs <- stateSpecificationToStateSpec state
       modifyAllSubjectPerspectives
         qualifiedUsers
         compiledObject
         (case state of
-          ContextState _ _ -> ContextAction theAction
+          AST.ContextState _ _ -> ContextAction theAction
           otherwise -> RoleAction {currentContextCalculation, effect: theAction})
-        states
+        stateSpecs
       where
         -- Add the action for all users to their perspective on the object in all states.
-        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Action -> Array StateIdentifier -> PhaseThree Unit
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Action -> Array StateSpec -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states = for_ qualifiedUsers
           (modifyPerspective
             objectQfd
@@ -587,30 +594,14 @@ handlePostponedStateQualifiedParts = do
       -- ... to their perspective on this object...
       objectQfd <- roleIdentificationToQueryFunctionDescription object start
       -- ... for these states only...
-      states <- stateSpec2States state
+      stateSpecs <- stateSpecificationToStateSpec state
       -- ... the role verbs.
-      modifyAllSubjectPerspectives qualifiedUsers objectQfd states
+      modifyAllSubjectPerspectives qualifiedUsers objectQfd stateSpecs
       where
-        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
-        modifyAllSubjectPerspectives qualifiedUsers objectQfd states = for_ qualifiedUsers
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateSpec -> PhaseThree Unit
+        modifyAllSubjectPerspectives qualifiedUsers objectQfd stateSpecs = for_ qualifiedUsers
           (modifyPerspective objectQfd object start
-            (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) states}))
-
-    handlePart (AST.SO (AST.SelfOnly{subject, object, state, start})) = do
-      currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
-      -- Set, for all these users...
-      qualifiedUsers <- collectRoles subject
-      -- ... to their perspective on this object...
-      objectQfd <- roleIdentificationToQueryFunctionDescription object start
-      -- ... for these states only...
-      states <- stateSpec2States state
-      -- ... the selfOnly member to true.
-      modifyAllSubjectPerspectives qualifiedUsers objectQfd states
-      where
-        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateIdentifier -> PhaseThree Unit
-        modifyAllSubjectPerspectives qualifiedUsers objectQfd states = for_ qualifiedUsers
-          (modifyPerspective objectQfd object start
-            (\(Perspective pr) -> Perspective pr {selfOnly = true}))
+            (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) stateSpecs}))
 
     handlePart (AST.P (AST.PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start})) = do
       -- Add, for all these users...
@@ -620,12 +611,12 @@ handlePostponedStateQualifiedParts = do
       propertyTypes <- collectPropertyTypes propsOrView
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes propertyVerbs
       -- ... for these states only...
-      states <- stateSpec2States state
+      stateSpecs <- stateSpecificationToStateSpec state
       -- ... the action.
-      modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' states
+      modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' stateSpecs
       where
-        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PropertyVerbs -> Array StateIdentifier -> PhaseThree Unit
-        modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' states = for_ qualifiedUsers
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PropertyVerbs -> Array StateSpec -> PhaseThree Unit
+        modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' stateSpecs = for_ qualifiedUsers
           (modifyPerspective
             objectQfd
             object
@@ -635,7 +626,7 @@ handlePostponedStateQualifiedParts = do
                 Nothing -> Map.insert stateId [propertyVerbs'] pverbsMap
                 Just propertyVerbsArray -> Map.insert stateId (cons propertyVerbs' propertyVerbsArray) pverbsMap)
               (unwrap pverbs)
-              states)})
+              stateSpecs)})
 
         -- We lookup the qualified name of these properties here, for the object of the perspective.
         collectPropertyTypes :: AST.PropsOrView -> PhaseThree (ExplicitSet PropertyType)
@@ -667,6 +658,20 @@ handlePostponedStateQualifiedParts = do
               Just (View {propertyReferences}) -> pure $ PSet propertyReferences
             _ -> throwError $ NotUniquelyIdentifying start view candidates
 
+    handlePart (AST.SO (AST.SelfOnly{subject, object, state, start})) = do
+      currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
+      -- Set, for all these users...
+      qualifiedUsers <- collectRoles subject
+      -- ... to their perspective on this object...
+      objectQfd <- roleIdentificationToQueryFunctionDescription object start
+      -- ... the selfOnly member to true.
+      modifyAllSubjectPerspectives qualifiedUsers objectQfd
+      where
+        modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PhaseThree Unit
+        modifyAllSubjectPerspectives qualifiedUsers objectQfd = for_ qualifiedUsers
+          (modifyPerspective objectQfd object start
+            (\(Perspective pr) -> Perspective pr {selfOnly = true}))
+
     -- Apply, for this user, the modifier to his perspective on the object (and create a perspective if necessary).
     modifyPerspective :: QueryFunctionDescription -> RoleIdentification -> ArcPosition -> (Perspective -> Perspective) -> RoleType -> PhaseThree Unit
     modifyPerspective objectQfd roleSpec start modifier userRole =
@@ -683,7 +688,7 @@ handlePostponedStateQualifiedParts = do
               pure $ Perspective
                 { id: (roletype2string userRole) <> "_" <> show (length perspectives)
                 , object: objectQfd
-                , isEnumerated: (roleIdentificationIsEnumerated roleSpec)
+                , isEnumerated: (isQFDofEnumeratedRole objectQfd)
                 , displayName
                 , roleVerbs: EncodableMap Map.empty
                 , propertyVerbs: EncodableMap Map.empty
@@ -710,7 +715,7 @@ handlePostponedStateQualifiedParts = do
               pure $ Perspective
                 { id: (roletype2string userRole) <> "_" <> show (length perspectives)
                 , object: objectQfd
-                , isEnumerated: (roleIdentificationIsEnumerated roleSpec)
+                , isEnumerated: (isQFDofEnumeratedRole objectQfd)
                 , displayName
                 , roleVerbs: EncodableMap Map.empty
                 , propertyVerbs: EncodableMap Map.empty
@@ -844,11 +849,11 @@ computeCurrentContextFromRoleIdentification roleIdentification pos = do
     makeUnion :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
     makeUnion f1 f2 = BQD (domain f1) (BinaryCombinator UnionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (and (mandatory f1)(mandatory f2))
 
-computeOrigin :: StateSpecification -> ArcPosition -> VarBinding
+computeOrigin :: AST.StateSpecification -> ArcPosition -> VarBinding
 computeOrigin sp pos = case sp of
-  ContextState _ _ -> makeIdentityStep "origin" pos
-  SubjectState _ _ -> makeIdentityStep "origin" pos
-  ObjectState _ _ -> makeIdentityStep "origin" pos
+  AST.ContextState _ _ -> makeIdentityStep "origin" pos
+  AST.SubjectState _ _ -> makeIdentityStep "origin" pos
+  AST.ObjectState _ _ -> makeIdentityStep "origin" pos
 
 -- The current context must be computed in runtime from the
 -- object that changes state. Here we must construct a VarBinding
@@ -856,12 +861,12 @@ computeOrigin sp pos = case sp of
 -- QueryFunctionDescription for with the right range. It does not
 -- actually have to compute anything, since the unsafeCompiler will
 -- remove these VarBindings (the actual values are computed by the core).
-computeCurrentContext :: StateSpecification -> ArcPosition -> VarBinding
+computeCurrentContext :: AST.StateSpecification -> ArcPosition -> VarBinding
 computeCurrentContext t pos = case t of
-  ContextState _ _ -> makeIdentityStep "currentcontext" pos
-  SubjectState roleIdentification _ -> makeTypeTimeOnlyContextStep "currentcontext"
+  AST.ContextState _ _ -> makeIdentityStep "currentcontext" pos
+  AST.SubjectState roleIdentification _ -> makeTypeTimeOnlyContextStep "currentcontext"
     (roleIdentification2Context roleIdentification) pos
-  ObjectState roleIdentification _ -> makeTypeTimeOnlyContextStep "currentcontext"
+  AST.ObjectState roleIdentification _ -> makeTypeTimeOnlyContextStep "currentcontext"
     (roleIdentification2Context roleIdentification) pos
 
 
@@ -938,27 +943,27 @@ isDirectSuperStateOf :: Array String -> String -> String -> Boolean
 isDirectSuperStateOf enumeratedRoleNames super sub = isDirectSubstateOf enumeratedRoleNames sub super
 
 
-transition2stateSpec :: StateTransitionE -> StateSpecification
+transition2stateSpec :: StateTransitionE -> AST.StateSpecification
 transition2stateSpec (Entry s) = s
 transition2stateSpec (Exit s) = s
 
 -- | Returns the ContextType that represents the current context for the
 -- | lexical position of the state.
-stateSpec2ContextType :: StateSpecification -> ContextType
-stateSpec2ContextType (ContextState c _) = c
-stateSpec2ContextType (SubjectState (ExplicitRole c _ _) _) = c
-stateSpec2ContextType (SubjectState (ImplicitRole c _) _) = c
-stateSpec2ContextType (ObjectState (ExplicitRole c _ _) _) = c
-stateSpec2ContextType (ObjectState (ImplicitRole c _) _) = c
+stateSpec2ContextType :: AST.StateSpecification -> ContextType
+stateSpec2ContextType (AST.ContextState c _) = c
+stateSpec2ContextType (AST.SubjectState (ExplicitRole c _ _) _) = c
+stateSpec2ContextType (AST.SubjectState (ImplicitRole c _) _) = c
+stateSpec2ContextType (AST.ObjectState (ExplicitRole c _ _) _) = c
+stateSpec2ContextType (AST.ObjectState (ImplicitRole c _) _) = c
 
 -- A ContextState is mapped to a CDOM.
 -- A SubjectState and ObjectState are determined from their RoleIdentification.
 -- We turn the RoleIdentification in a step, compile that with CompileStep and take its Range.
 -- | A domain that represents the type of the resource that changes state: the origin.
-statespec2Domain :: Partial => StateSpecification -> PhaseThree Domain
-statespec2Domain (ContextState ctype _) = pure $ CDOM (ST ctype)
-statespec2Domain (SubjectState roleIdentification _) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
-statespec2Domain (ObjectState roleIdentification ctype) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
+statespec2Domain :: Partial => AST.StateSpecification -> PhaseThree Domain
+statespec2Domain (AST.ContextState ctype _) = pure $ CDOM (ST ctype)
+statespec2Domain (AST.SubjectState roleIdentification _) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
+statespec2Domain (AST.ObjectState roleIdentification ctype) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
 
 roleIdentification2rangeADT :: RoleIdentification -> PhaseThree (ADT EnumeratedRoleType)
 roleIdentification2rangeADT roleIdentification = unsafePartial domain2roleType <<< range <$> compileStep
@@ -976,6 +981,13 @@ roleIdentification2Step (ImplicitRole ctxt stp) = stp
 roleIdentificationIsEnumerated :: RoleIdentification -> Boolean
 roleIdentificationIsEnumerated (ExplicitRole _ (ENR _) _) = true
 roleIdentificationIsEnumerated _ = false
+
+isQFDofEnumeratedRole :: QueryFunctionDescription -> Boolean
+isQFDofEnumeratedRole (SQD _ (DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF _) _ _ _) = true
+isQFDofEnumeratedRole (SQD _ (RolGetter rt) _ _ _) = case rt of
+  ENR _ -> true
+  CR _ -> false
+isQFDofEnumeratedRole _ = false
 
 -- | Returns the current context for the RoleIdentification.
 -- | This is, for the lexical position of the current subject or object (for which the
@@ -1000,11 +1012,6 @@ adaptRoleStepToDomain :: Domain -> Step -> Step
 adaptRoleStepToDomain (CDOM _) stp = stp
 -- adaptRoleStepToDomain (RDOM _) (Simple (ArcIdentifier pos _)) = Simple $ Identity pos
 adaptRoleStepToDomain _ stp = stp
-
-stateFulObject2StateKind :: StateFulObject -> StateKind
-stateFulObject2StateKind (Cnt _) = CState
-stateFulObject2StateKind (Orole _) = OState
-stateFulObject2StateKind (Srole _) = SState
 
 stateFulObject2Domain :: StateFulObject -> Domain
 stateFulObject2Domain (Cnt ctxt) = CDOM (ST ctxt)
