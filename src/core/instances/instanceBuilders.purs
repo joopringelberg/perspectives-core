@@ -69,7 +69,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
-import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..), externalRoleType)
@@ -195,6 +195,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
             , deltaType: ConstructEmptyContext
             , subject
           }}
+      , states = [StateIdentifier $ unwrap pspType]
       })
   lift $ lift2 $ void $ cacheEntity contextInstanceId contextInstance
   _ <- lift $ lift2 $ cacheEntity externalRole
@@ -213,6 +214,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
               , authorizedRole
               , deltaType: ConstructExternalRole
               , subject } }
+      , states = [StateIdentifier $ unwrap pspType]
       })
   lift $ addCreatedRoleToTransaction externalRole
   -- QUERY UPDATES

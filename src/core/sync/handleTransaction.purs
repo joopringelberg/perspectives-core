@@ -52,7 +52,7 @@ import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntite
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, setBinding)
@@ -136,6 +136,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
                 , pspType = contextType
                 , buitenRol = RoleInstance $ buitenRol $ unwrap id
                 , universeContextDelta = signedDelta
+                , states = [StateIdentifier $ unwrap contextType]
                 })
             lift2 $ void $ cacheEntity id contextInstance
             (lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
@@ -212,6 +213,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
                   , context = contextInstance
                   , occurrence = i
                   , universeRoleDelta = s
+                  , states = [StateIdentifier $ unwrap roleType]
                   })
             addCreatedRoleToTransaction rolInstanceId
             void $ lift2 $ cacheEntity rolInstanceId role

@@ -52,7 +52,7 @@ import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..), externalRoleType_)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier(..), externalRoleType_)
 import Perspectives.SerializableNonEmptyArray (singleton)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
@@ -439,6 +439,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
                     , deltaType: AddProperty
                     , subject: UserInstance $ RoleInstance me})))) <$> values)
                     )) <$> props
+          , states = [StateIdentifier $ show rname]
           })
 
       pure $ Tuple (show rname) rolId))
@@ -602,6 +603,7 @@ context contextRole = withRoleCounting context' where
                 , rolInContext = collect rolebindings
                 , aliases = aliases
                 , universeContextDelta = universeContextDelta
+                , states = [StateIdentifier $ show typeName]
               })
             universeRoleDelta <- deltaSignedByMe $ encodeJSON $ UniverseRoleDelta
               { subject: UserInstance $ RoleInstance me
@@ -620,6 +622,7 @@ context contextRole = withRoleCounting context' where
                 , binding = RoleInstance <<< buitenRol <$> prototype
                 , properties = FO.fromFoldable publicProps
                 , universeRoleDelta = universeRoleDelta
+                , states = [StateIdentifier $ externalRoleType_ $ show typeName]
                 })
             pure $ RoleInstance $ buitenRol (show instanceName)
   collect :: List (Tuple RolName RoleInstance) -> FO.Object (Array RoleInstance)
@@ -719,6 +722,7 @@ definition = do
       , universeRoleDelta = universeRoleDelta
       , contextDelta = contextDelta
       , bindingDelta = bindingDelta
+      , states = [StateIdentifier $ show prop]
       })
   pure rolId
 
