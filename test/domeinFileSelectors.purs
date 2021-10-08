@@ -23,6 +23,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), subsetPSet)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), objectOfPerspective) as Perspective
+import Perspectives.Representation.Perspective (StateSpec)
 import Perspectives.Representation.Range (Range) as Range
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType, StateIdentifier(..))
@@ -122,17 +123,17 @@ haveVerbs props verbs pvArr = case find (\(Perspective.PropertyVerbs propset ver
 --------------------------------------------------------------------------------
 ---- PERSPECTIVE
 --------------------------------------------------------------------------------
-ensurePropertyVerbsInState  :: String -> Perspective.Perspective -> Aff (Array Perspective.PropertyVerbs)
-ensurePropertyVerbsInState stateName (Perspective.Perspective{propertyVerbs}) = do
+ensurePropertyVerbsInState  :: StateSpec -> Perspective.Perspective -> Aff (Array Perspective.PropertyVerbs)
+ensurePropertyVerbsInState stateSpec (Perspective.Perspective{propertyVerbs}) = do
   -- log $ showTree (unwrap propertyVerbs)
-  case Map.lookup (StateIdentifier stateName) (unwrap propertyVerbs) of
-    Nothing -> failure ("There should be an entry in propertyVerbs for state '" <> stateName <> "'.")
+  case Map.lookup stateSpec (unwrap propertyVerbs) of
+    Nothing -> failure ("There should be an entry in propertyVerbs for state '" <> show stateSpec <> "'.")
     Just pv -> pure pv
 
-ensureRoleVerbsInState :: String -> Perspective.Perspective -> Aff RoleVerbList
-ensureRoleVerbsInState stateName (Perspective.Perspective {roleVerbs}) = case Map.lookup (StateIdentifier stateName) (unwrap roleVerbs) of
-  Nothing -> failure ("There should be an entry in roleVerbs for state '" <> stateName <> "'.")
-  Just rv -> pure rv
+-- ensureRoleVerbsInState :: String -> Perspective.Perspective -> Aff RoleVerbList
+-- ensureRoleVerbsInState stateName (Perspective.Perspective {roleVerbs}) = case Map.lookup (StateIdentifier stateName) (unwrap roleVerbs) of
+--   Nothing -> failure ("There should be an entry in roleVerbs for state '" <> stateName <> "'.")
+--   Just rv -> pure rv
 
 objectOfPerspective :: Perspective.Perspective -> Aff QueryFunctionDescription
 objectOfPerspective (Perspective.Perspective{object}) = pure object

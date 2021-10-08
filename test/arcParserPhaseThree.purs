@@ -27,15 +27,16 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (runPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), queryFunction, range)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Action (effectOfAction)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Role (allProperties)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
+import Perspectives.Representation.Perspective (StateSpec(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.Action (effectOfAction)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), propertytype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..))
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_)
@@ -315,7 +316,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               Right dfr ->
                 ensureERole "model:MyTestDomain$Guest" dfr >>=
                   ensurePerspectiveOn "model:MyTestDomain$Feest" >>=
-                    ensurePropertyVerbsInState "model:MyTestDomain$Guest" >>=
+                    ensurePropertyVerbsInState (SubjectState $ StateIdentifier "model:MyTestDomain$Guest") >>=
                       Universal `haveVerbs` [Consult]
 
 
@@ -390,7 +391,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 ensureERole "model:Test$Gast" correctedDFR >>=
                   ensurePerspectiveOn "model:Test$Party" >>=
-                    ensurePropertyVerbsInState "model:Test$Party$LateParty" >>=
+                    ensurePropertyVerbsInState (ObjectState $ StateIdentifier "model:Test$Party$LateParty") >>=
                       exists
 
   test "Automatic effect on entry (two assignments)" do
