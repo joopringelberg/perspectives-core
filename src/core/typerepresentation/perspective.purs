@@ -46,10 +46,14 @@ import Prelude (class Eq, class Ord, class Show, ($), (&&))
 -----------------------------------------------------------
 -- PERSPECTIVE
 -----------------------------------------------------------
+-- | As we do not treat Perspectives as entities that can be stored separately
+-- | as a type like Roles and Contexts, we have no need for a newtype identification.
+type PerspectiveId = String
+
 newtype Perspective = Perspective PerspectiveRecord
 
 type PerspectiveRecord =
-  { id :: String
+  { id :: PerspectiveId
   , object :: QueryFunctionDescription
   , displayName :: String
   , isEnumerated :: Boolean

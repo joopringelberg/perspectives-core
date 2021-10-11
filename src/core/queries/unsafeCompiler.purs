@@ -515,7 +515,7 @@ context2string qd = unsafeCoerce $ compileFunction qd
 role2context :: QueryFunctionDescription -> MP (RoleInstance ~~> ContextInstance)
 role2context qd = unsafeCoerce $ compileFunction qd
 
--- | Construct a function to compute Strings (not further typed) from an instance of a Context.
+-- | Construct a function to compute Strings (not further typed) from an instance of a Role.
 role2string :: QueryFunctionDescription -> MP (RoleInstance ~~> String)
 role2string qd = unsafeCoerce $ compileFunction qd
 

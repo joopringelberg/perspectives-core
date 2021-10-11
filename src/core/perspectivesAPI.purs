@@ -65,7 +65,6 @@ import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Queries.RolesAndProperties (getRolesWithProperties)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMyType, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT, reduce)
@@ -275,12 +274,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (ContextInstance object)
 
     -- { request: "GetRolesWithProperties", object: ContextInstance, predicate: roleType}
-    Api.GetRolesWithProperties ->
-      registerSupportedEffect
-        corrId
-        setter
-        (getRolesWithProperties predicate)
-        (ContextInstance object)
+    -- Api.GetRolesWithProperties ->
+    --   registerSupportedEffect
+    --     corrId
+    --     setter
+    --     (getRolesWithProperties predicate)
+    --     (ContextInstance object)
 
     -- {request: "CreateContext", subject: contextId, predicate: roleType, object: ContextType, contextDescription: contextDescription, authoringRole: myroletype}
     -- roleType may be a local name.
