@@ -32,7 +32,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (step)
-import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
@@ -487,7 +487,10 @@ perspectiveOn = try $ withPos do
   (stp :: Step) <- perspectiveOnKeywords *> step
   protectObject do
     ctxt <- getCurrentContext
-    setObject (ImplicitRole ctxt stp)
+    -- If the step is a simple arc identifier step, create an explicit role.
+    case stp of
+      Simple (ArcIdentifier ps ident) -> setObject (ExplicitRole ctxt (ENR $ EnumeratedRoleType ident) ps)
+      _ -> setObject (ImplicitRole ctxt stp)
     -- TODO. Ik denk dat hier ook de state gezet moet worden.
     -- If 'perspectivePart' fails, nestedBlock will fail and thus perspectiveOn will fail.
     concat <$> nestedBlock perspectivePart

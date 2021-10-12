@@ -71,7 +71,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
-import Perspectives.Representation.Class.Role (Role(..), displayName, getRole, getRoleType, roleADT)
+import Perspectives.Representation.Class.Role (Role(..), displayName, displayNameOfRoleType, getRole, getRoleType, roleADT)
 import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -319,6 +319,7 @@ handlePostponedStateQualifiedParts = do
     -- | Qualifies incomplete names and changes RoleType constructor to CalculatedRoleType if necessary.
     -- | The role type name (parameter `rt`) is always fully qualified, EXCEPT
     -- | for the current subject that holds in the body of `perspective of`.
+    -- TODO. Nu ook voor perspective on als een enkele identifier is gebruikt!
     collectRoles :: RoleIdentification -> PhaseThree (Array RoleType)
     -- A single role type will result from this case, but it may be a calculated role!
     collectRoles (ExplicitRole ctxt rt pos) = do
@@ -456,7 +457,7 @@ handlePostponedStateQualifiedParts = do
 
     -- Compiles and distributes all expressions in the message.
     -- See extensive comments in the case AutomaticEffectE.
-    handlePart (AST.N (AST.NotificationE{user, transition, message, object:syntacticObject, start, end})) = do
+    handlePart (AST.N (AST.NotificationE{user, transition, message, start, end})) = do
       originDomain <- statespec2Domain (transition2stateSpec transition)
       (qualifiedUsers :: Array RoleType) <- collectRoles user
       states <- stateSpec2States (transition2stateSpec transition)
@@ -674,15 +675,16 @@ handlePostponedStateQualifiedParts = do
 
     -- Apply, for this user, the modifier to his perspective on the object (and create a perspective if necessary).
     modifyPerspective :: QueryFunctionDescription -> RoleIdentification -> ArcPosition -> (Perspective -> Perspective) -> RoleType -> PhaseThree Unit
-    modifyPerspective objectQfd roleSpec start modifier userRole =
+    modifyPerspective objectQfd roleSpec start modifier userRole = do
+      (roleType :: Maybe RoleType) <- head <$> collectRoles roleSpec
+      mroleDisplayName <- lift2 $ traverse displayNameOfRoleType roleType
       case userRole of
         ENR (EnumeratedRoleType r) -> do
           EnumeratedRole er@{perspectives} <- getsDF (unsafePartial fromJust <<< lookup r <<< _.enumeratedRoles)
           mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
           perspective <- case mi of
             Nothing -> do
-              mroleName <- lift2 $ roleIdentification2displayName roleSpec
-              displayName <- case mroleName of
+              displayName <- case mroleDisplayName of
                 Just roleName -> pure roleName
                 Nothing -> lift2 $ reduce (getEnumeratedRole >=> pure <<< _.displayName <<< unwrap) (unsafePartial domain2roleType $ range objectQfd)
               pure $ Perspective
@@ -690,6 +692,7 @@ handlePostponedStateQualifiedParts = do
                 , object: objectQfd
                 , isEnumerated: (isQFDofEnumeratedRole objectQfd)
                 , displayName
+                , roleType
                 , roleVerbs: EncodableMap Map.empty
                 , propertyVerbs: EncodableMap Map.empty
                 , actions: EncodableMap Map.empty
@@ -708,8 +711,8 @@ handlePostponedStateQualifiedParts = do
           mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
           perspective <- case mi of
             Nothing -> do
-              mroleName <- lift2 $ roleIdentification2displayName roleSpec
-              displayName <- case mroleName of
+              -- mroleName <- lift2 $ roleIdentification2displayName roleSpec
+              displayName <- case mroleDisplayName of
                 Just roleName -> pure roleName
                 Nothing -> lift2 $ reduce (getEnumeratedRole >=> pure <<< _.displayName <<< unwrap) (unsafePartial domain2roleType $ range objectQfd)
               pure $ Perspective
@@ -717,6 +720,7 @@ handlePostponedStateQualifiedParts = do
                 , object: objectQfd
                 , isEnumerated: (isQFDofEnumeratedRole objectQfd)
                 , displayName
+                , roleType
                 , roleVerbs: EncodableMap Map.empty
                 , propertyVerbs: EncodableMap Map.empty
                 , actions: EncodableMap Map.empty
@@ -1000,6 +1004,11 @@ roleIdentification2displayName :: RoleIdentification -> MonadPerspectives (Maybe
 roleIdentification2displayName (ImplicitRole _ _) = pure Nothing
 roleIdentification2displayName (ExplicitRole _ (ENR rt) _) = getEnumeratedRole rt >>= pure <<< Just <<< displayName
 roleIdentification2displayName (ExplicitRole _ (CR rt) _) = getCalculatedRole rt >>= pure <<< Just <<< displayName
+
+roleIdentification2TypeName :: RoleIdentification -> (Maybe RoleType)
+roleIdentification2TypeName (ImplicitRole _ _) = Nothing
+roleIdentification2TypeName (ExplicitRole _ rt@(ENR _) _) = Just rt
+roleIdentification2TypeName (ExplicitRole _ rt@(CR _) _) = Just rt
 
 -- A QueryFunctionDescription that will compile to const true.
 trueCondition :: Domain -> QueryFunctionDescription

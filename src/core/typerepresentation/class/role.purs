@@ -425,6 +425,15 @@ contextOfRepresentationOfRole (CR c) = getPerspectType c >>= pure <<< ST <<< con
 perspectivesOfRoleType :: RoleType -> MonadPerspectives (Array Perspective)
 perspectivesOfRoleType (ENR e) = getPerspectType e >>= pure <<< perspectives
 perspectivesOfRoleType (CR c) = getPerspectType c >>= pure <<< perspectives
+
+roleKindOfRoleType :: RoleType -> MonadPerspectives RoleKind
+roleKindOfRoleType (ENR e) = getPerspectType e >>= pure <<< kindOfRole
+roleKindOfRoleType (CR c) = getPerspectType c >>= pure <<< kindOfRole
+
+displayNameOfRoleType :: RoleType -> MonadPerspectives String
+displayNameOfRoleType (ENR e) = getEnumeratedRole e >>= pure <<< displayName
+displayNameOfRoleType (CR e) = getCalculatedRole e >>= pure <<< displayName
+
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------

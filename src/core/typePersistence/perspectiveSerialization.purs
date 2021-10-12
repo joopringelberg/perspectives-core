@@ -41,12 +41,12 @@ import Perspectives.Query.UnsafeCompiler (context2role, getPropertyFunction)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..)) as PROP
-import Perspectives.Representation.Class.Role (allProperties, perspectivesOfRoleType)
+import Perspectives.Representation.Class.Role (allProperties, perspectivesOfRoleType, roleKindOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), PerspectiveId)
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleKind, RoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, allPropertyVerbs, roleVerbList2Verbs)
 import Prelude (bind, eq, flip, map, not, pure, show, ($), (<$>), (<<<), (>=>), (<>))
 import Simple.JSON (writeJSON)
@@ -57,8 +57,10 @@ type SerialisedPerspective' =
   , isFunctional :: Boolean
   , isMandatory :: Boolean
   , isCalculated :: Boolean
+  , roleType :: Maybe String
+  , roleKind :: Maybe RoleKind
   , verbs :: Array String
-  , properties :: Array SerialisedProperty
+  , properties :: Object SerialisedProperty
   , actions :: Array String
   , roleInstances :: Array RoleInstanceWithProperties
   }
@@ -106,16 +108,19 @@ serialisePerspective ::
   ContextInstance ->
   Perspective ->
   MonadPerspectives SerialisedPerspective'
-serialisePerspective contextStates subjectStates cid p@(Perspective {id, object, isEnumerated, displayName, roleVerbs, propertyVerbs, actions}) = do
+serialisePerspective contextStates subjectStates cid p@(Perspective {id, object, isEnumerated, displayName, roleType, roleVerbs, propertyVerbs, actions}) = do
   properties <- serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> (contextStates <> subjectStates)))
   roleInstances <- roleInstancesWithProperties properties cid p
+  roleKind <- traverse roleKindOfRoleType roleType
   pure { id
     , displayName
     , isFunctional: pessimistic $ functional object
     , isMandatory: pessimistic $ mandatory object
     , isCalculated: not isEnumerated
+    , roleType: roletype2string <$> roleType
+    , roleKind
     , verbs: show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip lookup (unwrap roleVerbs)) <$> (contextStates <> subjectStates)))
-    , properties
+    , properties: fromFoldable ((\prop@({id:propId}) -> Tuple propId prop) <$> properties)
     , actions: concat (OBJ.keys <$> (catMaybes $ (flip lookup (unwrap actions)) <$> contextStates))
     , roleInstances
     }
@@ -189,9 +194,6 @@ type ValuesWithVerbs =
   { values :: Array String
   , propertyVerbs :: Array String
   }
-
-newtype SerialisedRoleInstanceWithProperties = SerialisedRoleInstanceWithProperties String
-derive instance newtypeSerialisedRoleInstanceWithProperties :: Newtype SerialisedRoleInstanceWithProperties _
 
 type Intermediate =
   { id :: String              -- property id

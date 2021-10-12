@@ -29,7 +29,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.List (findIndex) as LST
 import Data.Map (values)
-import Data.Maybe (isJust)
+import Data.Maybe (Maybe, isJust)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -39,7 +39,7 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, rang
 import Perspectives.Representation.ADT (ADT, leavesInADT)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb, RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
 import Prelude (class Eq, class Ord, class Show, ($), (&&))
 
@@ -56,6 +56,7 @@ type PerspectiveRecord =
   { id :: PerspectiveId
   , object :: QueryFunctionDescription
   , displayName :: String
+  , roleType :: Maybe RoleType
   , isEnumerated :: Boolean
   , roleVerbs :: EncodableMap StateSpec RoleVerbList
 	, propertyVerbs :: EncodableMap StateSpec (Array PropertyVerbs)
