@@ -81,8 +81,8 @@ registerSupportedEffect corrId ef q arg = do
   _ <- pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
   -- then execute the SupportedEffect once
   apiEffectRunner unit
-  pure unit
   where
+    -- As an effect runner, needs an argument.
     apiEffectRunner :: Unit -> MP Unit
     apiEffectRunner _ = do
       exists <- entityExists arg

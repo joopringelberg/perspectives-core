@@ -24,6 +24,7 @@
 module Perspectives.TypePersistence.PerspectiveSerialisation where
 
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Writer (WriterT)
 import Data.Array (catMaybes, concat, cons, filter, findIndex, foldl, modifyAt, uncons, union)
 import Data.Map (lookup)
 import Data.Maybe (Maybe(..), fromJust)
@@ -33,9 +34,9 @@ import Data.Tuple (Tuple(..), fst)
 import Foreign.Object (Object, fromFoldable)
 import Foreign.Object (keys) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, type (~~>), (##=))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.Instances.ObjectGetters (getActiveRoleStates_, getActiveStates_)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, InformedAssumption, MonadPerspectives)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
@@ -83,23 +84,25 @@ type SerialisedProperty =
 newtype SerialisedPerspective = SerialisedPerspective String
 derive instance newtypeSerialisedPerspective :: Newtype SerialisedPerspective _
 
+type MonadPerspectivesQuery' =  WriterT (ArrayWithoutDoubles InformedAssumption) MonadPerspectives
+
 -- | Get the serialisation of the Role instance with
 perspectiveForContextAndUser ::
   RoleInstance ->           -- The user role instance
   RoleType ->               -- The user role type
   PerspectiveId ->          -- The String identifying the perspective for the user role type.
   (ContextInstance ~~> SerialisedPerspective)
-perspectiveForContextAndUser subject userRoleType perspectiveId cid = ArrayT $ lift do
-  contextStates <- map ContextState <$> getActiveStates_ cid
-  subjectStates <- map SubjectState <$> getActiveRoleStates_ subject
-  allPerspectives <- perspectivesOfRoleType userRoleType
+perspectiveForContextAndUser subject userRoleType perspectiveId cid = ArrayT do
+  contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
+  subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
+  allPerspectives <- lift$  perspectivesOfRoleType userRoleType
   traverse ((serialisePerspective contextStates subjectStates cid) >=> pure <<< SerialisedPerspective <<< writeJSON) (filter (eq perspectiveId <<< _.id <<< unwrap) allPerspectives)
 
 perspectivesForContextAndUser :: RoleInstance -> RoleType -> (ContextInstance ~~> SerialisedPerspective)
-perspectivesForContextAndUser subject userRoleType cid = ArrayT $ lift do
-  contextStates <- map ContextState <$> getActiveStates_ cid
-  subjectStates <- map SubjectState <$> getActiveRoleStates_ subject
-  perspectives <- perspectivesOfRoleType userRoleType
+perspectivesForContextAndUser subject userRoleType cid = ArrayT do
+  contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
+  subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
+  perspectives <- lift $ perspectivesOfRoleType userRoleType
   traverse ((serialisePerspective contextStates subjectStates cid) >=> pure <<< SerialisedPerspective <<< writeJSON) perspectives
 
 serialisePerspective ::
@@ -107,11 +110,11 @@ serialisePerspective ::
   Array StateSpec ->
   ContextInstance ->
   Perspective ->
-  MonadPerspectives SerialisedPerspective'
+  MonadPerspectivesQuery' SerialisedPerspective'
 serialisePerspective contextStates subjectStates cid p@(Perspective {id, object, isEnumerated, displayName, roleType, roleVerbs, propertyVerbs, actions}) = do
-  properties <- serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> (contextStates <> subjectStates)))
+  properties <- lift $ serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> (contextStates <> subjectStates)))
   roleInstances <- roleInstancesWithProperties properties cid p
-  roleKind <- traverse roleKindOfRoleType roleType
+  roleKind <- lift $ traverse roleKindOfRoleType roleType
   pure { id
     , displayName
     , isFunctional: pessimistic $ functional object
@@ -204,31 +207,31 @@ roleInstancesWithProperties ::
   (Array SerialisedProperty) ->
   ContextInstance ->
   Perspective ->
-  MonadPerspectives (Array RoleInstanceWithProperties)
+  MonadPerspectivesQuery' (Array RoleInstanceWithProperties)
 roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerbs}) = do
-  (roleGetter :: ContextInstance ~~> RoleInstance) <- context2role object
-  (roleInstances :: Array RoleInstance) <- cid ##= roleGetter
+  (roleGetter :: ContextInstance ~~> RoleInstance) <- lift $ context2role object
+  (roleInstances :: Array RoleInstance) <- runArrayT $ roleGetter cid
   -- propertyGetters <- pure []
   (propertyGetters :: Array Intermediate) <- for sps
     (\{id, verbs} -> do
-      getter <- getDynamicPropertyGetter id (unsafePartial roleRange object)
+      getter <- lift $ getDynamicPropertyGetter id (unsafePartial roleRange object)
       pure $ {id, getter, verbs})
   for roleInstances (roleInstanceWithProperties propertyGetters)
   where
     roleInstanceWithProperties ::
       Array Intermediate ->
       RoleInstance ->
-      MonadPerspectives RoleInstanceWithProperties
+      MonadPerspectivesQuery' RoleInstanceWithProperties
     roleInstanceWithProperties intermediates roleId = do
-      roleStates <- map ObjectState <$> getActiveRoleStates_ roleId
+      roleStates <- map ObjectState <$> (runArrayT $ getActiveRoleStates roleId)
       -- Compute additional RoleVerbs based on the state of the RoleInstance.
       objectStateBasedRoleVerbs <- pure $ show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip lookup (unwrap roleVerbs)) <$> roleStates))
       -- Compute additional PropertyVerb-Property combinations based on the state of the RoleInstance.
-      (objectStateBasedSerialisedProperties :: (Array SerialisedProperty)) <- serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> roleStates))
+      (objectStateBasedSerialisedProperties :: (Array SerialisedProperty)) <- lift $ serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> roleStates))
       extraIntermediates <- for
         objectStateBasedSerialisedProperties
         (\{id, verbs} -> do
-          getter <- getDynamicPropertyGetter id (unsafePartial roleRange object)
+          getter <- lift $ getDynamicPropertyGetter id (unsafePartial roleRange object)
           pure $ {id, getter, verbs})
       -- Add the extra SerialisedProperties to the Array we already had
       (allIntermediates :: Array Intermediate) <- pure $ foldl add intermediates extraIntermediates
@@ -236,7 +239,7 @@ roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerb
       -- Apply each propertygetter to the role instance.
       (valuesAndVerbs :: Array (Tuple String ValuesWithVerbs)) <- for allIntermediates
         \({id, getter, verbs}) -> do
-          vals <- (roleId ##= getter)
+          vals <- (runArrayT $ getter roleId)
           pure $ Tuple id
             { values: unwrap <$> vals
             , propertyVerbs: verbs}
