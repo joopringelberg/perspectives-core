@@ -36,8 +36,8 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~>), (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates_, getActiveStates_)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range)
-import Perspectives.Query.UnsafeCompiler (context2role, getPropertyFunction)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleRange)
+import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..)) as PROP
@@ -62,7 +62,7 @@ type SerialisedPerspective' =
   , verbs :: Array String
   , properties :: Object SerialisedProperty
   , actions :: Array String
-  , roleInstances :: Array RoleInstanceWithProperties
+  , roleInstances :: Object RoleInstanceWithProperties
   }
 
 -- | Notice that these SerialisedProperties are just those based on context- and subject
@@ -122,7 +122,7 @@ serialisePerspective contextStates subjectStates cid p@(Perspective {id, object,
     , verbs: show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip lookup (unwrap roleVerbs)) <$> (contextStates <> subjectStates)))
     , properties: fromFoldable ((\prop@({id:propId}) -> Tuple propId prop) <$> properties)
     , actions: concat (OBJ.keys <$> (catMaybes $ (flip lookup (unwrap actions)) <$> contextStates))
-    , roleInstances
+    , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
     }
 
 serialiseProperties :: QueryFunctionDescription -> Array PropertyVerbs -> MonadPerspectives (Array SerialisedProperty)
@@ -211,7 +211,7 @@ roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerb
   -- propertyGetters <- pure []
   (propertyGetters :: Array Intermediate) <- for sps
     (\{id, verbs} -> do
-      getter <- getPropertyFunction id
+      getter <- getDynamicPropertyGetter id (unsafePartial roleRange object)
       pure $ {id, getter, verbs})
   for roleInstances (roleInstanceWithProperties propertyGetters)
   where
@@ -228,7 +228,7 @@ roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerb
       extraIntermediates <- for
         objectStateBasedSerialisedProperties
         (\{id, verbs} -> do
-          getter <- getPropertyFunction id
+          getter <- getDynamicPropertyGetter id (unsafePartial roleRange object)
           pure $ {id, getter, verbs})
       -- Add the extra SerialisedProperties to the Array we already had
       (allIntermediates :: Array Intermediate) <- pure $ foldl add intermediates extraIntermediates
