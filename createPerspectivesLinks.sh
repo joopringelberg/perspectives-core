@@ -2,7 +2,7 @@
 
 # NOTE: this script should be adapted with each new tagged version!
 
-cd .psc-package/pv0.11.0/aff-sockets
+cd .psc-package/pv0.13.0/aff-sockets
 
 rm -Rf v2.2.0
 
@@ -16,9 +16,9 @@ ln -s ../../../../purescript-affjax pv9.1.0
 
 cd ../perpectives-apitypes
 
-rm -Rf v2.10.0
+rm -Rf v2.11.0
 
-ln -s ../../../../perspectives-apitypes v2.10.0
+ln -s ../../../../perspectives-apitypes v2.11.0
 
 cd ../avar-monadask/
 
@@ -28,9 +28,9 @@ ln -s ../../../../purescript-avar-monadask v2.1.0
 
 cd ../perspectives-couchdb/
 
-rm -Rf v2.8.3
+rm -Rf v2.8.4
 
-ln -s ../../../../perspectives-couchdb v2.8.3
+ln -s ../../../../perspectives-couchdb v2.8.4
 
 cd ../../..
 
