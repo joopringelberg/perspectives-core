@@ -46,7 +46,7 @@ import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, rol_binding, rol_gevuldeRollen, rol_id, rol_pspType, setRol_gevuldeRollen)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, rol_binding, rol_gevuldeRollen, rol_id, rol_isMe, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
@@ -257,7 +257,7 @@ addModelToLocalStore' url = do
           (cis :: Object PerspectContext) <- lift2 $ execStateT
             (forWithIndex_
               roleInstances'
-              (\i newRole -> do
+              (\i newRole' -> do
                 -- Fetch from the database, not cache.
                 (mrole :: Maybe PerspectRol) <- lift $ tryFetchEntiteit (RoleInstance i)
                 case mrole of
@@ -268,7 +268,9 @@ addModelToLocalStore' url = do
                   -- to readjust the inverse binding administration.
                   -- Also, the new version may not have a binding while the old version does.
                   -- This may trigger automatic effects as indeed it does for state NotInIndexedContexts.
+                  -- ME. This operation should preserve the value of `isMe`.
                   Just oldRole -> do
+                    newRole <- pure $ changeRol_isMe newRole' (rol_isMe oldRole)
                     case rol_binding newRole of
                       Nothing -> case rol_binding oldRole of
                         -- Neither the old nor the new version have a binding.
@@ -309,18 +311,18 @@ addModelToLocalStore' url = do
                     updatedRole <- lift $ getPerspectRol (RoleInstance i)
                     lift $ void $ saveEntiteit_ (rol_id newRole) (changeRevision (rev updatedRole) (setRol_gevuldeRollen newRole (rol_gevuldeRollen oldRole)))
 
-                  Nothing -> case rol_binding newRole of
-                    Nothing -> saveRoleInstance i newRole
+                  Nothing -> case rol_binding newRole' of
+                    Nothing -> saveRoleInstance i newRole'
                     Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
-                      then saveRoleInstance i newRole
+                      then saveRoleInstance i newRole'
                       else (lift $ try $ getPerspectEntiteit newBindingId) >>=
                         handlePerspectRolError
                           "addModelToLocalStore'"
                           -- set the inverse binding if not already there.
                           \newBinding -> do
-                            void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType newRole) (RoleInstance i))
+                            void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType newRole') (RoleInstance i))
                             void $ lift $ saveEntiteit newBindingId
-                            saveRoleInstance i newRole
+                            saveRoleInstance i newRole'
                             -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
                             -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
             ))
