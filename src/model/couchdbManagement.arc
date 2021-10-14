@@ -262,5 +262,5 @@ domain CouchdbManagement
 
     -- This role should be stored in public space. These are all models that
     -- are stored in this Repository.
-    context AvailableModels filledBy mod:ModelDescription
+    context AvailableModels (relational) filledBy mod:ModelDescription
       --storage public

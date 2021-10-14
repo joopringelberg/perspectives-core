@@ -37,6 +37,7 @@ domain System
       perspective on ModelsInUse
         defaults
       perspective on IndexedContexts
+        defaults
       perspective on IndexedContextOfModel
         defaults
       perspective on RootUsers
