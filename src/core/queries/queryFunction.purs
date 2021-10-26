@@ -290,5 +290,5 @@ instance decodeQueryFunction :: Decode QueryFunction where
 instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl = writeImpl <<< genericSumToVariant
 
-instance readForeightQueryFunction :: ReadForeign QueryFunction where
+instance readForeignQueryFunction :: ReadForeign QueryFunction where
   readImpl = map variantToGenericSum <<< readImpl

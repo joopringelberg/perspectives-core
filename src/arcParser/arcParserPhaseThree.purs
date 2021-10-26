@@ -348,7 +348,9 @@ handlePostponedStateQualifiedParts = do
     collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
     collectStates mpath r = collectRoles r >>= \roles -> case mpath of
       Nothing -> pure (StateIdentifier <<< roletype2string <$> roles)
-      Just p ->  pure (StateIdentifier <<< flip append p <<< flip append "$" <<< roletype2string <$> roles)
+      Just p -> if isQualifiedWithDomein p
+        then pure [StateIdentifier p]
+        else pure (StateIdentifier <<< flip append p <<< flip append "$" <<< roletype2string <$> roles)
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications that may occur in the SubjectState case.
     stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)

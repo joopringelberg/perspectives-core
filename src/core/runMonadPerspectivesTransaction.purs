@@ -231,7 +231,7 @@ runStates t = do
       case head contextInstances of
         Nothing -> pure []
         Just contextInstance -> do
-          -- Neem aspecten hier ook mee!
+          -- States includes root states of Aspects.
           states <- lift2 (contextInstance ##= contextType >=> liftToInstanceLevel contextRootStates)
           for contextInstances \cid -> do
             -- Note that the user may play different roles in the various context instances.

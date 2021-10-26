@@ -29,7 +29,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
-import Prelude (pure, (<$>), bind, ($), (>>=), flip, (<<<), (<*>))
+import Prelude (pure, (<$>), bind, ($), (>>=), (<<<), (<*>))
 
 class ContainsPrefixes s where
   expandPrefix :: s -> PhaseTwo s
@@ -173,8 +173,8 @@ instance containsPrefixesRoleIdentification :: ContainsPrefixes RoleIdentificati
 
 instance containsPrefixesStateSpecification :: ContainsPrefixes StateSpecification where
   expandPrefix c@(ContextState _ _) = pure c
-  expandPrefix (SubjectState rid spath) = expandPrefix rid >>= pure <<< flip SubjectState spath
-  expandPrefix (ObjectState rid spath) = expandPrefix rid >>= pure <<< flip ObjectState spath
+  expandPrefix (SubjectState rid spath) = SubjectState <$> expandPrefix rid <*> (traverse expandNamespace spath)
+  expandPrefix (ObjectState rid spath) = ObjectState <$> expandPrefix rid <*> (traverse expandNamespace spath)
 
 instance containsPrefixesStateTransitionE :: ContainsPrefixes StateTransitionE where
   expandPrefix (Entry s) = Entry <$> expandPrefix s
