@@ -89,7 +89,7 @@ domain BrokerServices
       property QueueName (mandatory, String)
       property ConfirmationCode (String)
 
-      view ForAdministrator (AccountName, AccountPassword, QueueName)
+      view ForAdministrator (AccountName, AccountPassword, QueueName, Achternaam, Voornaam)
       view ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, Achternaam)
 
       perspective on extern
@@ -105,10 +105,12 @@ domain BrokerServices
 
       perspective on AccountHolder
         all roleverbs
-        view AccountHolder$ForAdministrator
+        view AccountHolder$ForAdministrator (Consult)
       perspective on extern
-        view External$ForAdministrator
+        view External$ForAdministrator (Consult)
 
     user Guest = sys:Me
       perspective on Administrator
         only (Fill, Create)
+      perspective on AccountHolder
+        only (Fill)

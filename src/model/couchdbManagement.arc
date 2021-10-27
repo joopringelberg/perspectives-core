@@ -51,7 +51,7 @@ domain CouchdbManagement
     -- This role should be in private space.
     -- Admin in Couchdb of a particular server.
     user Admin filledBy CouchdbManagementApp$Manager
-      -- As Admin, has full perspective on Accounts.
+      -- As acc:Body$Admin, has full perspective on Accounts.
       aspect acc:Body$Admin
 
       -- TODO. Remove this as soon as we do not need the view anymore for the GUI.
@@ -96,13 +96,17 @@ domain CouchdbManagement
               callEffect cdb:DeleteUser( context >> extern >> Url, binding )
               remove origin
 
-        -- After CouchdbServer$Admin provides the first password, he no longer
-        -- has a perspective on it. The new value provided below is thus really private.
-        state ResetPassword = PasswordReset
+        state Resetpassword = PasswordReset
           on entry
             do
-              callEffect cdb:ResetPassword( context >> extern >> Url, UserName, callExternal utl:GenSym() returns String )
-              PasswordReset = true
+              -- After CouchdbServer$Admin provides the first password, he no longer
+              -- has a perspective on it. The new value provided below is thus really private.
+              letA
+                pw <- callExternal utl:GenSym() returns String
+              in
+                callEffect cdb:ResetPassword( context >> extern >> Url, UserName, pw )
+                PasswordReset = true
+                Password = pw
 
       property ToBeRemoved (Boolean)
 

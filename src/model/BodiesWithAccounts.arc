@@ -87,8 +87,10 @@ domain BodiesWithAccounts
             verbs (Consult)
             selfonly
 
-        -- Use this state to allow the Admin to set the password.
+        -- Specialise this state to allow the Admin to set the password.
+        -- (Copy it and give it a body)
         state NoPassword = not exists Password
 
-        -- Use this state to make Accounts reset their password.
+        -- Specialise this state to make Accounts reset their password.
+        -- (Copy it and give it a body)
         state ResetPassword = not PasswordReset
