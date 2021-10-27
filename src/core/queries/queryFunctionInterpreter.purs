@@ -48,17 +48,18 @@ import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFram
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (lookup, mapNumericOperator, orderFunction, performNumericOperation')
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (calculation) as PC
 import Perspectives.Representation.Class.Property (getProperType)
-import Perspectives.Representation.Class.Role (calculation)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, calculation)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', enumeratedRolePropertyTypes_, roleTypeModelName', specialisesRoleType)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
 import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -411,7 +412,7 @@ getDynamicPropertyGetter :: String -> RoleInstance ~~> DependencyPath
 getDynamicPropertyGetter p rid = do
   rt <- roleType rid
   (pt :: PropertyType) <- lift2MPQ $ getProperType p
-  allProps <- lift2MPQ $ enumeratedRolePropertyTypes_ rt
+  allProps <- lift2MPQ $ allLocallyRepresentedProperties (ST rt)
   if (isJust $ elemIndex pt allProps)
     then getterFromPropertyType pt rid
     else f rid

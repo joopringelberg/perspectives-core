@@ -131,6 +131,8 @@ addContext_rolInContext ct@(PerspectContext cr@{aliases,rolInContext}) r@(Enumer
     aspects <- r ###= roleAspectsClosure
     pure $ PerspectContext cr
       { rolInContext = insert rolName [rolId] rolInContext
+      -- Add all Aspects of the role as its aliases to the context.
+      -- Note this does too much work when there is more than one aspect.
       , aliases = foldl (\als aspect -> insert (unwrap aspect) rolName als) aliases aspects
       }
   Just roles -> pure $ PerspectContext cr {rolInContext = insert rolName (cons rolId roles) rolInContext}
