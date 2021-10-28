@@ -114,8 +114,10 @@ serialisedAsDeltasFor_ cid userId userType =
 -- | account of the perspective on the context instance.
 serialisePerspectiveForUser :: ContextInstance -> Array RoleInstance -> Perspective -> MonadPerspectivesTransaction Unit
 serialisePerspectiveForUser cid users p@(Perspective{object, propertyVerbs}) = do
-  -- All instances of this RoleType the user may see in this context.
+  -- All instances of this RoleType (object) the user may see in this context.
+  -- In general, these may be instances of several role types, as the perspective object is expressed as a query.
   (rinstances :: Array (DependencyPath)) <- liftToMPT ((singletonPath (C cid)) ##= interpret object)
+
   -- Serialise all the dependencies.
   for_ (join (allPaths <$> rinstances)) (foldM (serialiseDependency users) Nothing)
   -- All PropertyTypes on this RoleType the user may see.

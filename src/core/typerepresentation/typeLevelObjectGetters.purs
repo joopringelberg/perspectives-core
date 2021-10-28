@@ -29,6 +29,7 @@ import Control.Plus (map, (<|>), empty)
 import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, foldr, fromFoldable, intersect, null, singleton)
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Map (Map, empty, lookup, insert, keys) as Map
+import Data.Map (unionWith)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
@@ -36,8 +37,10 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for_, traverse)
 import Foreign.Object (keys) as OBJ
+import Foreign.Object (union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>), (###>>))
+import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -59,7 +62,7 @@ import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(.
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (Unit, bind, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
+import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -497,7 +500,7 @@ perspectivesClosure_ :: RoleType ~~~> Perspective
 perspectivesClosure_ (ENR t) = perspectivesClosure t
 perspectivesClosure_ t = perspectivesOfRole_ t
 
--- | For a user RoleType, get all Actions defined directly in perspectives of that RoleType
+-- | For a user RoleType, get all perspectives of that RoleType
 perspectivesOfRole_ :: RoleType ~~~> Perspective
 perspectivesOfRole_ (ENR erole) = ArrayT (getEnumeratedRole erole >>= pure <<< perspectives)
 perspectivesOfRole_ (CR crole) = ArrayT (getCalculatedRole crole >>= pure <<< perspectives)
@@ -538,3 +541,25 @@ propertyVerbs2PropertyArray object (PropertyVerbs pset _) = case pset of
 
 roleStates :: Perspective -> Array StateIdentifier
 roleStates (Perspective {roleVerbs}) = stateSpec2StateIdentifier <$> (fromFoldable $ Map.keys (unwrap roleVerbs))
+
+-- | perspectiveAspect `isAspectOfPerspective` perspective is true when
+-- | the range of the object of `perspective` equalsOrSpecialisesADT the range of the object of `perspectiveAspect`.
+-- | Notice the `equal` case!
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
+isAspectOfPerspective :: Partial => Perspective -> Perspective -> Boolean
+isAspectOfPerspective perspectiveAspect perspective = unwrap $ (objectOfPerspective perspective) `equalsOrSpecialisesADT` (objectOfPerspective perspectiveAspect)
+
+-- | `perspectiveAspect addedToPersective perspective` integreert perspectiveAspect in perspective.
+-- | roleVerbs, propertyVerbs and actions of perspectiveAspect are added to those of perspective.
+-- | If perspectiveAspect.selfOnly == true, perspective.selfOnly will be made true as well.
+-- | The values of isEnumerated must be equal.
+addPerspectiveTo :: Perspective -> Perspective -> Perspective
+addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Perspective perspective
+  { roleVerbs = EncodableMap $ unionWith append (unwrap perspectiveAspect.roleVerbs) (unwrap perspective.roleVerbs)
+  -- Note that we take a simple approach here, foregoing the opportunity to append to PropertyVerbs when their
+  -- PropertySets are equal.
+  , propertyVerbs = EncodableMap $ unionWith append (unwrap perspectiveAspect.propertyVerbs) (unwrap perspective.propertyVerbs)
+  -- Note that two Action maps with duplicate keys will lose actions when added to each other.
+  , actions = EncodableMap $ unionWith union (unwrap perspectiveAspect.actions) (unwrap perspective.actions)
+  , selfOnly = perspectiveAspect.selfOnly || perspective.selfOnly
+  }

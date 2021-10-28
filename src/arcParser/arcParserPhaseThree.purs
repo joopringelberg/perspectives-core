@@ -51,6 +51,7 @@ import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.Instances.Combinators (closure)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
@@ -71,7 +72,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
-import Perspectives.Representation.Class.Role (Role(..), displayName, displayNameOfRoleType, getRole, getRoleType, roleADT)
+import Perspectives.Representation.Class.Role (Role(..), displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT)
 import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -83,7 +84,7 @@ import Perspectives.Representation.State (Notification(..), State(..), StateFulO
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty)
+import Perspectives.Types.ObjectGetters (aspectsOfRole, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<#>), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>))
 
@@ -111,6 +112,7 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       compileStateQueries
       registerStates
       invertPerspectiveObjects
+      -- combinePerspectives
       )
     df
     indexedContexts
@@ -801,6 +803,32 @@ invertPerspectiveObjects = do
         explicitSet2RelevantProperties Universal = All
         explicitSet2RelevantProperties Empty = Properties []
         explicitSet2RelevantProperties (PSet ps) = Properties ps
+
+-- NOTE. This is unfinished work that would add an optimalisation.
+combinePerspectives :: PhaseThree Unit
+combinePerspectives = do
+  df@{_id} <- lift $ State.gets _.dfr
+  -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (combinePerspectives' df _id)
+  where
+    combinePerspectives' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
+    combinePerspectives' {enumeratedRoles, calculatedRoles} ns = do
+      es <- for enumeratedRoles combinePerspectivesOfEnumeratedRole
+      modifyDF \dfr -> dfr {enumeratedRoles = es}
+
+    combinePerspectivesOfEnumeratedRole :: EnumeratedRole -> PhaseThree EnumeratedRole
+    combinePerspectivesOfEnumeratedRole r = if kindOfRole r == UserRole
+      then do
+        -- All perspectives of the aspects of the role r.
+        aspectPerspectives <- lift2 (identifier r ###= ((closure aspectsOfRole) >=> perspectivesOfRole))
+        ownPerspectives <- pure $ perspectives r
+        -- For each ownPerspective O: add every perspective P in aspectPerspectives for which `P isAspectOfPerspective O`.
+        -- Overwrite the modified perspectives into r.
+        pure r
+      else pure r
 
 createMissingRootStates :: PhaseThree Unit
 createMissingRootStates = do

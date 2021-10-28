@@ -22,6 +22,8 @@
 
 module Perspectives.Representation.Verbs where
 
+import Data.Ordering
+
 import Data.Array (difference, elemIndex, intersect, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -29,7 +31,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (isJust, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Prelude (class Eq, class Ord, class Show, compare, not, show, ($))
+import Prelude (class Eq, class Ord, class Semigroup, class Show, compare, not, show, ($), (<>))
 
 -----------------------------------------------------------
 -- ROLEVERB
@@ -90,6 +92,23 @@ instance encodeRoleVerbList :: Encode RoleVerbList where encode = genericEncode 
 instance decodeRoleVerbList :: Decode RoleVerbList where decode = genericDecode defaultOptions
 instance showRoleVerbList :: Show RoleVerbList where show = genericShow
 derive instance eqRoleVerbList :: Eq RoleVerbList
+
+instance ordRoleVerbList :: Ord RoleVerbList where
+  compare All _ = GT
+  compare _ All = LT
+  compare l1 l2 = let
+      v1 = roleVerbList2Verbs l1
+      v2 = roleVerbList2Verbs l2
+    in
+      if null $ difference v1 v2
+        -- v1 subset v2
+        then LT
+        else if null $ difference v2 v1
+          then GT
+          else EQ
+
+instance semigroupRoleVerbList :: Semigroup RoleVerbList where
+  append l1 l2 = Including ((roleVerbList2Verbs l1) <> (roleVerbList2Verbs l2))
 
 hasVerb :: RoleVerb -> RoleVerbList -> Boolean
 hasVerb v All = true
