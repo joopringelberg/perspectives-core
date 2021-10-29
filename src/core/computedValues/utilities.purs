@@ -25,14 +25,14 @@
 module Perspectives.Extern.Utilities where
 
 import Data.Tuple (Tuple(..))
-import Perspectives.CoreTypes (MonadPerspectivesTransaction)
+import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Prelude (pure)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO: verander naar echte gegenereerde identifiers.
-genSym :: RoleInstance -> MonadPerspectivesTransaction String
+genSym :: RoleInstance -> MonadPerspectivesQuery String
 genSym _ = pure "geheim"
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
