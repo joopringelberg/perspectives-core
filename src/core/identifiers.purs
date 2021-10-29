@@ -238,6 +238,13 @@ isUserURI = test userUriRegEx
 isUserEntiteitID :: String -> Boolean
 isUserEntiteitID id = isUserURI id || isUserURI id
 
+-- | Matches all segments of the name (the string after the first "$")
+userNameRegEx :: Regex
+userNameRegEx = unsafeRegex "^model:User\\$(.*)\\$.*" noFlags
+
+deconstructUserName :: String -> Maybe String
+deconstructUserName = getFirstMatch userNameRegEx
+
 -----------------------------------------------------------
 -- ROLNAMES
 -----------------------------------------------------------

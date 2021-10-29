@@ -32,6 +32,7 @@ module Perspectives.Persistence.CouchdbFunctions
 , setPassword
 , createDatabase
 , deleteDatabase
+, user2couchdbuser
 )
 
 where
@@ -51,7 +52,7 @@ import Data.Array (find)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Map (insert, fromFoldable) as MAP
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.String (toLower)
 import Data.String.Base64 (btoa)
@@ -63,7 +64,9 @@ import Foreign.Class (decode)
 import Foreign.Generic (decodeJSON)
 import Foreign.JSON (parseJSON)
 import Foreign.Object (fromFoldable, singleton)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted')
+import Perspectives.Identifiers (deconstructUserName)
 import Perspectives.Persistence.Authentication (defaultPerspectRequest, ensureAuthentication)
 import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
 import Perspectives.Persistence.Types (DatabaseName, Url, MonadPouchdb)
@@ -167,11 +170,11 @@ createUser :: forall f. Url -> User -> Password -> Array Role -> MonadPouchdb f 
 createUser base user password roles = ensureAuthentication do
   rq <- defaultPerspectRequest
   (content :: Json) <- pure (fromObject (fromFoldable
-    [ Tuple "name" (fromString user)
+    [ Tuple "name" (fromString $ user2couchdbuser user)
     , Tuple "password" (fromString password)
     , Tuple "roles" (fromArray (fromString <$> roles))
     , Tuple "type" (fromString "user")]))
-  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user), content = Just $ RequestBody.json content}
+  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user ), content = Just $ RequestBody.json content}
   liftAff $ onAccepted res.status [200, 201] "createUser" $ pure unit
 
 type Role = String
@@ -180,7 +183,7 @@ type Role = String
 -- DELETE USER
 -----------------------------------------------------------
 deleteUser :: forall f. Url -> User -> MonadPouchdb f Boolean
-deleteUser base user = deleteDocument (base <> "_users/org.couchdb.user:" <> user) Nothing
+deleteUser base user = deleteDocument (base <> "_users/org.couchdb.user:" <> user2couchdbuser user) Nothing
 
 -----------------------------------------------------------
 -- SETPASSWORD
@@ -190,14 +193,14 @@ setPassword base user password = ensureAuthentication do
   rq <- defaultPerspectRequest
   (res :: Response (Either ResponseFormatError Json)) <- liftAff $ AJ.request $ rq
     { method = Left GET
-    , url = (base <> "_users/org.couchdb.user:" <> user)
+    , url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user)
     , responseFormat = ResponseFormat.json
     }
   if res.status == StatusCode 200
     then case res.body of
       Left e -> throwError $ error ("setPassword: error in response: " <> printResponseFormatError e)
       Right (result :: Json) -> do
-        res1 <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user), content = Just $ RequestBody.json (changePassword result password)}
+        res1 <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user), content = Just $ RequestBody.json (changePassword result password)}
         liftAff $ onAccepted res1.status [200, 201] "createUser" $ pure unit
     else throwError $ error ("setPassword: cannot retrieve user " <> user)
 
@@ -275,3 +278,10 @@ databaseStatusCodes :: CouchdbStatusCodes
 databaseStatusCodes = MAP.fromFoldable
   [ Tuple 400 "Bad AJ.Request. Invalid database name."
   , Tuple 401 "Unauthorized. CouchDB Server Administrator privileges required."]
+
+-----------------------------------------------------------
+-- user2couchdbuser
+-----------------------------------------------------------
+-- | Transforms a canonical user identification in Perspectives to an acceptable user name in Couchdb.
+user2couchdbuser :: String -> String
+user2couchdbuser = unsafePartial fromJust <<< deconstructUserName
