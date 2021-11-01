@@ -72,11 +72,16 @@ domain CouchdbManagement
       perspective on extern
         defaults
 
+      perspective on CouchdbServer$Accounts
+        only (CreateAndFill, Fill, Remove)
+        props (Voornaam, Achternaam) verbs (Consult)
+        props (ToBeRemoved) verbs (Consult, SetPropertyValue)
+
     -- Note that the aspect acc:Body introduces a Guest role
     -- with a perspective that allows it to create an Account.
 
     -- This role should be in private space.
-    user Accounts (unlinked) filledBy sys:PerspectivesSystem$User
+    user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       aspect acc:Body$Accounts
 
       state Root = true
@@ -89,6 +94,7 @@ domain CouchdbManagement
                 callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
                 -- The Password property comes from the aspect acc:Body$Accounts.
                 Password = pw
+                --IsAccepted = true
 
         state Remove = ToBeRemoved
           on entry
@@ -126,7 +132,7 @@ domain CouchdbManagement
     -- A Repositories instance comes complete with an (empty) Admin role.
     -- Moreover, as a side effect, both a read- and write database are created
     -- in Couchdb and the write database replicates to the read database.
-    context Repositories filledBy Repository
+    context Repositories (relational) filledBy Repository
       --storage public
       property ToBeRemoved (Boolean)
       state Root = true

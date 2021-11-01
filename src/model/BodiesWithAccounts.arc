@@ -84,7 +84,7 @@ domain BodiesWithAccounts
           -- a member, by removing himself from the role.
           perspective on Accounts
             only (RemoveFiller)
-            verbs (Consult)
+            props (IsAccepted, UserName, Password) verbs (Consult)
             selfonly
 
         -- Specialise this state to allow the Admin to set the password.

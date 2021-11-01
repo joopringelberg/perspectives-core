@@ -42,6 +42,10 @@ domain System
         defaults
       perspective on RootUsers
         defaults
+      perspective on Contacts
+        props (Voornaam, Achternaam) verbs (Consult)
+
+    user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
 
     context IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
 
