@@ -49,7 +49,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, flip, map, pure, show, ($), (<<<), (<>), (==), (>>>), (<$>))
+import Prelude (class Eq, class Monad, class Ord, class Show, bind, flip, map, pure, show, ($), (<$>), (<<<), (<>), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
@@ -77,6 +77,8 @@ instance encodeADT :: (Encode a) => Encode (ADT a) where
 
 instance decodeADT :: (Decode a) => Decode (ADT a) where
   decode q = genericDecode defaultOptions q
+
+derive instance ordADT :: Ord a => Ord (ADT a)
 
 -- | SUM with simplifications:
 -- | SUM [EMPTY, ..] = EMPTY

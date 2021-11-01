@@ -29,7 +29,7 @@ import Perspectives.Assignment.SentenceCompiler (CompiledSentence)
 import Perspectives.CoreTypes (Updater, type (~~>))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier)
 import Prelude (const, unit)
 
 type ContextStateCache = GLStrMap CompiledContextState
@@ -41,6 +41,7 @@ type CompiledContextState =
   , automaticOnExit :: Map RoleType (Updater ContextInstance)
   , notifyOnEntry :: Map RoleType (CompiledSentence ContextInstance)
   , notifyOnExit :: Map RoleType (CompiledSentence ContextInstance)
+  , perspectivesOnEntry :: Map RoleType (Array PropertyType)
   }
 
 -- | A global store of SupportedEffect-s
@@ -63,6 +64,7 @@ type CompiledRoleState =
   , automaticOnExit :: Map RoleType CompiledAutomaticAction
   , notifyOnEntry :: Map RoleType CompiledNotification
   , notifyOnExit :: Map RoleType CompiledNotification
+  , perspectivesOnEntry :: Map RoleType CompiledStateDependentPerspective
   }
 
 roleStateCache :: RoleStateCache
@@ -76,3 +78,4 @@ retrieveCompiledRoleState a = peek roleStateCache (unwrap a)
 
 type CompiledAutomaticAction = {updater :: Updater RoleInstance, contextGetter :: RoleInstance ~~> ContextInstance}
 type CompiledNotification = {compiledSentence :: (CompiledSentence RoleInstance), contextGetter :: RoleInstance ~~> ContextInstance}
+type CompiledStateDependentPerspective = {contextGetter :: RoleInstance ~~> ContextInstance, properties :: Array PropertyType}

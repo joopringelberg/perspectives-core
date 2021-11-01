@@ -34,6 +34,7 @@ import Control.Monad.Except (runExcept)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
+import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Disj (Disj(..))
@@ -126,6 +127,7 @@ instance decodeQueryFunctionDescription :: Decode QueryFunctionDescription where
 instance showQueryFunctionDescription :: Show QueryFunctionDescription where
   show q = genericShow q
 
+derive instance ordQueryFunctionDescription :: Ord QueryFunctionDescription 
 ---------------------------------------------------------------------------------------------------------------------
 ---- TRAVERSING
 ---------------------------------------------------------------------------------------------------------------------
@@ -271,6 +273,8 @@ instance encodeDomain :: Encode Domain where
 instance decodeDomain :: Decode Domain where
   -- decode = readImpl
   decode = genericDecode defaultOptions
+
+instance ordDomain :: Ord Domain where compare = genericCompare
 
 instance qfdPrettyPrint :: PrettyPrint QueryFunctionDescription where
   prettyPrint' tab (SQD dom qf ran man fun) = "SQD" <> newline

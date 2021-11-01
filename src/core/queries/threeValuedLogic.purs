@@ -57,6 +57,8 @@ instance decodeThreeValuedLogic :: Decode ThreeValuedLogic where
   decode = genericDecode defaultOptions
   -- decode = readImpl
 
+derive instance ordThreeValuedLogic :: Ord ThreeValuedLogic
+
 bool2threeValued :: Boolean -> ThreeValuedLogic
 bool2threeValued true = True
 bool2threeValued false = False

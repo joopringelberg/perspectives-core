@@ -37,7 +37,7 @@ import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Sentence (Sentence)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
 
 newtype State = State StateRecord
 
@@ -46,24 +46,39 @@ type StateRecord =
 	, stateFulObject :: StateFulObject
 	, query :: Calculation
 	, object :: Maybe QueryFunctionDescription
-	-- the key in these maps is the subject the effect or notification is for.
+	-- the key in these maps is the subject the effect or notification or perspective is for.
 	, notifyOnEntry :: EncodableMap RoleType Notification
 	, notifyOnExit :: EncodableMap RoleType Notification
 	, automaticOnEntry :: EncodableMap RoleType Action
 	, automaticOnExit :: EncodableMap RoleType Action
+  , perspectivesOnEntry :: EncodableMap RoleType StateDependentPerspective
 	, subStates :: Array StateIdentifier
 	}
+
+data StateDependentPerspective =
+  ContextPerspective (Array PropertyType) |
+  RolePerspective
+    { currentContextCalculation :: QueryFunctionDescription
+  	, properties :: Array PropertyType
+  	}
+
+derive instance genericStateDependentPerspective :: Generic StateDependentPerspective _
+instance showStateDependentPerspective :: Show StateDependentPerspective where show = genericShow
+instance eqStateDependentPerspective :: Eq StateDependentPerspective where eq = genericEq
+instance encodeStateDependentPerspective :: Encode StateDependentPerspective where encode = genericEncode defaultOptions
+instance decodeStateDependentPerspective :: Decode StateDependentPerspective where decode = genericDecode defaultOptions
 
 constructState :: StateIdentifier -> Calculation -> StateFulObject -> Array StateIdentifier -> State
 constructState id condition stateFulObject subStates = State
 	{id: id
 	, stateFulObject
 	, query: condition
-	, object: Nothing
+	, object: Nothing -- used to compute the objects in enteringState, to bind to "currentobject".
 	, notifyOnEntry: EncodableMap empty
 	, notifyOnExit: EncodableMap empty
 	, automaticOnEntry: EncodableMap empty
 	, automaticOnExit: EncodableMap empty
+	, perspectivesOnEntry: EncodableMap empty
 	, subStates
 	}
 derive instance newtypeState :: Newtype State _

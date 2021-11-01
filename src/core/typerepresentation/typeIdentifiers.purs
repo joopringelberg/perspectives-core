@@ -66,6 +66,7 @@ instance prettyPrintContextType :: PrettyPrint ContextType where
   prettyPrint' t = show
 derive newtype instance writeForeignContextType :: WriteForeign ContextType
 derive newtype instance readForeignContextType :: ReadForeign ContextType
+derive instance ordContextType :: Ord ContextType
 
 newtype EnumeratedRoleType = EnumeratedRoleType String
 derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRoleType _

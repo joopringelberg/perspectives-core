@@ -48,6 +48,7 @@ import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
@@ -114,16 +115,22 @@ serialisedAsDeltasFor_ cid userId userType =
 -- | account of the perspective on the context instance.
 serialisePerspectiveForUser :: ContextInstance -> Array RoleInstance -> Perspective -> MonadPerspectivesTransaction Unit
 serialisePerspectiveForUser cid users p@(Perspective{object, propertyVerbs}) = do
+  (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ propertiesInPerspective p
+  serialiseRoleInstancesAndProperties cid users object visiblePropertyTypes
+
+serialiseRoleInstancesAndProperties ::
+	ContextInstance ->	                 -- The context instance for which we serialise roles and properties.
+	Array RoleInstance ->		             -- User RoleTypes to serialise for.
+	QueryFunctionDescription ->          -- Find role instances with this description.
+	Array PropertyType ->		             -- PropertyTypes whose values on the role instances should be serialised.
+	MonadPerspectivesTransaction Unit
+serialiseRoleInstancesAndProperties cid users object properties = do
   -- All instances of this RoleType (object) the user may see in this context.
   -- In general, these may be instances of several role types, as the perspective object is expressed as a query.
   (rinstances :: Array (DependencyPath)) <- liftToMPT ((singletonPath (C cid)) ##= interpret object)
-
   -- Serialise all the dependencies.
   for_ (join (allPaths <$> rinstances)) (foldM (serialiseDependency users) Nothing)
-  -- All PropertyTypes on this RoleType the user may see.
-  (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ propertiesInPerspective p
-  -- Compute all values and serialise the dependencies.
-  for_ visiblePropertyTypes
+  for_ properties
     \pt -> do
       for_ (_.head <$> rinstances)
         \(dep :: Dependency) -> do

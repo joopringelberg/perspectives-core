@@ -189,6 +189,13 @@ not source id = ArrayT do
   (r :: Array Value) <- runArrayT $ source id
   map (Value <<< show) <$> not' r
 
+not_ :: forall m s. Monad m =>
+  (s -> ArrayT m Boolean) ->
+  (s -> ArrayT m Boolean)
+not_ source id = ArrayT do
+  (r :: Array Boolean) <- runArrayT $ source id
+  pure (HA.not <$> r)
+
 not' :: forall m. Monad m => Array Value -> m (Array Boolean)
 not' r = if null r
   then pure [true]

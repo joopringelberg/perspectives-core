@@ -46,13 +46,15 @@ import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SentenceCompiler (compileRoleSentence)
-import Perspectives.Assignment.StateCache (CompiledAutomaticAction, CompiledRoleState, CompiledNotification, cacheCompiledRoleState, retrieveCompiledRoleState)
+import Perspectives.Assignment.SerialiseAsDeltas (serialiseRoleInstancesAndProperties)
+import Perspectives.Assignment.StateCache (CompiledAutomaticAction, CompiledNotification, CompiledRoleState, CompiledStateDependentPerspective, cacheCompiledRoleState, retrieveCompiledRoleState)
 import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
+import Perspectives.Instances.Combinators (filter, not_) as COMB
 import Perspectives.Instances.ObjectGetters (boundByRole, contextType, getActiveRoleStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
@@ -61,17 +63,18 @@ import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2p
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Representation.State (Notification(..), State(..))
+import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
 import Perspectives.Utilities (findM)
 
--- | This function has a Partial constraint because it only handles the AutomaticRoleAction case of AutomaticAction.
+-- | This function has a Partial constraint because it only handles the AutomaticRoleAction case of AutomaticAction,
+-- | and idem of Notification and StateDependentPerspective.
 -- | The function can be safely applied (with `unsafePartial`), however.
 compileState :: Partial => StateIdentifier -> MP CompiledRoleState
 compileState stateId = do
-    State {id, query, automaticOnEntry, automaticOnExit, notifyOnEntry, notifyOnExit} <- getState stateId
+    State {id, query, automaticOnEntry, automaticOnExit, notifyOnEntry, notifyOnExit, perspectivesOnEntry} <- getState stateId
     (automaticOnEntry' :: Map RoleType CompiledAutomaticAction) <- traverseWithIndex
       (\subject (RoleAction{currentContextCalculation, effect}) -> do
         updater <- compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject
@@ -96,6 +99,11 @@ compileState stateId = do
         contextGetter <- role2context currentContextCalculation
         pure {compiledSentence, contextGetter})
       (unwrap notifyOnExit)
+    (perspectivesOnEntry' :: Map RoleType CompiledStateDependentPerspective) <- traverseWithIndex
+      (\subject (RolePerspective{currentContextCalculation, properties}) -> do
+        contextGetter <- role2context currentContextCalculation
+        pure {contextGetter, properties})
+      (unwrap perspectivesOnEntry)
 
     -- We postpone compiling substates until they're asked for.
     (lhs :: (RoleInstance ~~> Value)) <- role2propertyValue $ unsafePartial case query of Q qfd -> qfd
@@ -106,6 +114,7 @@ compileState stateId = do
       , automaticOnExit: automaticOnExit'
       , notifyOnEntry: notifyOnEntry'
       , notifyOnExit: notifyOnExit'
+      , perspectivesOnEntry: perspectivesOnEntry'
       }
   where
     withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
@@ -149,7 +158,7 @@ enteringRoleState roleId userRoleType stateId = do
   -- Add the state identifier to the path of states in the role instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveRoleState stateId roleId
-  {automaticOnEntry, notifyOnEntry} <- getCompiledState stateId
+  {automaticOnEntry, notifyOnEntry, perspectivesOnEntry} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction, but only if
   -- the end user fills the allowedUser role in this context.
   -- NOTE that the userRoleType is computed prior to executing the transaction.
@@ -196,6 +205,18 @@ enteringRoleState roleId userRoleType stateId = do
             , binding: Just $ unwrap roleId})
         lift2 $ restoreFrame oldFrame
       else pure unit
+  State {object} <- lift2 $ getState stateId
+  case object of
+    Nothing -> pure unit
+    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties} -> do
+      currentcontext <- lift2 $ (roleId ##>> contextGetter)
+      userInstances <- lift2 (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not_ (boundByRole (RoleInstance me))))
+      serialiseRoleInstancesAndProperties
+        currentcontext
+        userInstances
+        objectQfd
+        properties
+
   -- Recur.
   subStates <- lift2 $ subStates_ stateId
   for_ subStates (evaluateRoleState roleId userRoleType)

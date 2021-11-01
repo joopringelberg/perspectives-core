@@ -24,6 +24,7 @@ module Perspectives.Representation.QueryFunction where
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
+import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Foreign.Class (class Decode, class Encode)
@@ -292,3 +293,5 @@ instance writeForeignQueryFunction :: WriteForeign QueryFunction where
 
 instance readForeignQueryFunction :: ReadForeign QueryFunction where
   readImpl = map variantToGenericSum <<< readImpl
+
+instance ordQueryFunction :: Ord QueryFunction where compare = genericCompare
