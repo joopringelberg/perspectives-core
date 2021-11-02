@@ -36,7 +36,7 @@ import Data.Array (catMaybes, cons, elemIndex, filter, findIndex, foldM, foldl, 
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
-import Data.List (List)
+import Data.List (List, filterM, fromFoldable) as LIST
 import Data.Map (Map, empty, insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
 import Data.Newtype (unwrap)
@@ -72,7 +72,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
-import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT, roleTypeIsEnumerated)
+import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT)
 import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -88,14 +88,14 @@ import Perspectives.Types.ObjectGetters (aspectsOfRole, lookForUnqualifiedProper
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<#>), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>))
 
-phaseThree :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
+phaseThree :: DomeinFileRecord -> LIST.List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} postponedParts = do
   -- Store the DomeinFile in cache. If a prefix for the domain is defined in the file,
   -- phaseThree_ will try to retrieve it.
   void $ storeDomeinFileInCache _id (DomeinFile df)
   phaseThree_ df postponedParts <* removeDomeinFileFromCache _id
 
-phaseThree_ :: DomeinFileRecord -> List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
+phaseThree_ :: DomeinFileRecord -> LIST.List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree_ df@{_id, referredModels} postponedParts = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
   indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
@@ -348,7 +348,7 @@ handlePostponedStateQualifiedParts = do
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications.
     collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
-    collectStates mpath r = collectRoles r >>= pure <<< filter roleTypeIsEnumerated >>= \roles -> case mpath of
+    collectStates mpath r = collectRoles r >>= \roles -> case mpath of
       -- Alleen van EnumeratedRoleTypes!
       Nothing -> pure (StateIdentifier <<< roletype2string <$> roles)
       Just p -> if isQualifiedWithDomein p
@@ -641,12 +641,12 @@ handlePostponedStateQualifiedParts = do
       -- ... the action.
       modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' stateSpecs
       -- Add StateDependentPerspectives to the states.
-      states <- stateSpec2States state
+      -- We cannot modify states of Calculated Roles, as these do not exist.
+      states <- stateSpec2States state >>= LIST.filterM isCalculatedRoleState <<< LIST.fromFoldable
       properties <- case propertyTypes of
         Universal -> lift2 $ allProperties (unsafePartial domain2roleType $ range objectQfd)
         Empty -> pure []
         PSet as -> pure as
-      -- niet als het gaat om subject state van een Calculated Role Type!
       for_ states (modifyState properties qualifiedUsers objectQfd)
       where
         modifyState :: Array PropertyType -> Array RoleType -> QueryFunctionDescription -> StateIdentifier -> PhaseThree Unit
@@ -736,6 +736,10 @@ handlePostponedStateQualifiedParts = do
             1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
               Just (View {propertyReferences}) -> pure $ PSet propertyReferences
             _ -> throwError $ NotUniquelyIdentifying start view candidates
+
+        -- True, iff the identifier is that of a CalculatedRole
+        isCalculatedRoleState :: StateIdentifier -> PhaseThree Boolean
+        isCalculatedRoleState (StateIdentifier s) = State.gets _.dfr >>= pure <<< isJust <<< lookup s <<< _.calculatedRoles
 
     handlePart (AST.SO (AST.SelfOnly{subject, object, state, start})) = do
       currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
