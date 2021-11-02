@@ -33,7 +33,7 @@ domain BodiesWithAccounts
         -- We limit visibility of the Password to the situation that it
         -- does not exist.
         -- When Accounts reset their password, Admin is duly not informed.
-        in object state NoPassword
+        in object state Root$NoPassword
           props (Password) verbs (SetPropertyValue)
 
     -- Role Guest is available so any user can request an Account.

@@ -262,7 +262,7 @@ domain CouchdbManagement
             do for Admin
               callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
               remove origin
-      in state Accepted
+        state Accepted = IsAccepted
           -- An account that is accepted has a perspective on available models.
           perspective on AvailableModels
             verbs (Consult)
