@@ -306,6 +306,7 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
             , authorizedRole: Nothing
             , deltaType: ConstructEmptyRole
             , subject } }
+    , states = [StateIdentifier $ unwrap roleType]
     })
   void $ lift2 $ cacheEntity rolInstanceId role
   addCreatedRoleToTransaction rolInstanceId
