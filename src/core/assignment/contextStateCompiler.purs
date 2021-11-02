@@ -63,8 +63,8 @@ import Perspectives.Query.UnsafeCompiler (context2propertyValue, getRoleInstance
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.State (Notification(..), State(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType, StateIdentifier)
+import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (subStates_)
 
@@ -89,6 +89,9 @@ compileState stateId = do
         compiledSentence <- compileContextSentence sentence
         pure compiledSentence)
       (unwrap notifyOnExit)
+    (perspectivesOnEntry' :: Map RoleType (Array PropertyType)) <- traverseWithIndex
+      (\subject (ContextPerspective properties) -> pure properties)
+      (unwrap perspectivesOnEntry)
 
     -- We postpone compiling substates until they're asked for.
     (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ unsafePartial case query of Q qfd -> qfd
@@ -99,7 +102,7 @@ compileState stateId = do
       , automaticOnExit: automaticOnExit'
       , notifyOnEntry: notifyOnEntry'
       , notifyOnExit: notifyOnExit'
-      , perspectivesOnEntry: unwrap perspectivesOnEntry
+      , perspectivesOnEntry: perspectivesOnEntry'
       }
   where
     withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit

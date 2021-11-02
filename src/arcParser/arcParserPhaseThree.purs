@@ -72,7 +72,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
-import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT)
+import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT, roleTypeIsEnumerated)
 import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -348,7 +348,8 @@ handlePostponedStateQualifiedParts = do
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications.
     collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
-    collectStates mpath r = collectRoles r >>= \roles -> case mpath of
+    collectStates mpath r = collectRoles r >>= pure <<< filter roleTypeIsEnumerated >>= \roles -> case mpath of
+      -- Alleen van EnumeratedRoleTypes!
       Nothing -> pure (StateIdentifier <<< roletype2string <$> roles)
       Just p -> if isQualifiedWithDomein p
         then pure [StateIdentifier p]
@@ -645,26 +646,31 @@ handlePostponedStateQualifiedParts = do
         Universal -> lift2 $ allProperties (unsafePartial domain2roleType $ range objectQfd)
         Empty -> pure []
         PSet as -> pure as
+      -- niet als het gaat om subject state van een Calculated Role Type!
       for_ states (modifyState properties qualifiedUsers objectQfd)
       where
         modifyState :: Array PropertyType -> Array RoleType -> QueryFunctionDescription -> StateIdentifier -> PhaseThree Unit
         modifyState properties qualifiedUsers objectQfd stateId = do
           -- Compute the currentcontext from the origin.
-          currentContextCalculation <- case state of
-            -- We do not actually use this result.
+          ecurrentContextCalculation <- try case state of
             AST.ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
             AST.ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
             AST.SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
-          modifyPartOfState
-            start
-            end
-            (\(sr@{perspectivesOnEntry}) -> do
-              extendedPerspectives <- foldM (addStateDependentPerspectiveForUser currentContextCalculation) (unwrap perspectivesOnEntry) qualifiedUsers
-              pure $ sr
-                { perspectivesOnEntry = EncodableMap extendedPerspectives
-                , object = Just objectQfd
-                })
-            stateId
+          case ecurrentContextCalculation of
+            -- We probably cannot compute the current context from the roleIdentification, because it identifies
+            -- an indexed role.
+            Left _ -> pure unit
+            Right currentContextCalculation ->
+              modifyPartOfState
+                start
+                end
+                (\(sr@{perspectivesOnEntry}) -> do
+                  extendedPerspectives <- foldM (addStateDependentPerspectiveForUser currentContextCalculation) (unwrap perspectivesOnEntry) qualifiedUsers
+                  pure $ sr
+                    { perspectivesOnEntry = EncodableMap extendedPerspectives
+                    , object = Just objectQfd
+                    })
+                stateId
           where
             addStateDependentPerspectiveForUser ::
               QueryFunctionDescription ->
@@ -940,7 +946,7 @@ computeCurrentContextFromRoleIdentification roleIdentification pos = do
   -- NOTE that filters and WithFrame constructs are ignored in the inversion process.
   (contextCalculations :: (Array QueryFunctionDescription)) <- completeInversions compiledObject
   case joinQfds contextCalculations of
-    Nothing -> throwError (Custom $ "It is not possible to compute the current context in position " <> show pos <> " (is `origin` an indexed role or context?). Change current state at this position, for example by using `in object|subject|context state`." <> " Information for programmers: " <> prettyPrint compiledObject)
+    Nothing -> throwError (Custom $ "It is not possible to compute the current context in position " <> show pos <> " (is `origin` an indexed role or context?). Change current state at this position, for example by using `in object|subject|context state`." <> " Information for programmers: function computeCurrentContextFromRoleIdentification with compiledObject = " <> prettyPrint compiledObject)
     Just result -> pure result
   where
     joinQfds :: Array QueryFunctionDescription -> Maybe QueryFunctionDescription

@@ -434,6 +434,10 @@ displayNameOfRoleType :: RoleType -> MonadPerspectives String
 displayNameOfRoleType (ENR e) = getEnumeratedRole e >>= pure <<< displayName
 displayNameOfRoleType (CR e) = getCalculatedRole e >>= pure <<< displayName
 
+roleTypeIsEnumerated :: RoleType -> Boolean
+roleTypeIsEnumerated (ENR _) = true
+roleTypeIsEnumerated _ = false
+
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------
