@@ -28,11 +28,14 @@ domain ModelManagement
       perspective on Repository
 
   case ManagedModel
+    aspect sys:ContextWithNotification
     state UploadToRepository = extern >> (ArcOK and CrlOK and SourcesChanged)
       on entry
         do for Author
           callEffect p:UploadToRepository( extern >> ArcSource, extern >> CrlSource, Repository >> Url )
           SourcesChanged = false for extern
+        notify Author
+          "Model {ModelDescription >> ModelIdentification} has been uploaded to the repository {Repository >> Name}."
     external
       state Root = true
         state ProcessArc = (exists ArcSource) and not exists ArcFeedback
