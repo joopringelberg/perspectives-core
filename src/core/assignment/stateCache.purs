@@ -41,7 +41,7 @@ type CompiledContextState =
   , automaticOnExit :: Map RoleType (Updater ContextInstance)
   , notifyOnEntry :: Map RoleType (CompiledSentence ContextInstance)
   , notifyOnExit :: Map RoleType (CompiledSentence ContextInstance)
-  , perspectivesOnEntry :: Map RoleType (Array PropertyType)
+  , perspectivesOnEntry :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean}
   }
 
 -- | A global store of SupportedEffect-s
@@ -78,4 +78,8 @@ retrieveCompiledRoleState a = peek roleStateCache (unwrap a)
 
 type CompiledAutomaticAction = {updater :: Updater RoleInstance, contextGetter :: RoleInstance ~~> ContextInstance}
 type CompiledNotification = {compiledSentence :: (CompiledSentence RoleInstance), contextGetter :: RoleInstance ~~> ContextInstance}
-type CompiledStateDependentPerspective = {contextGetter :: RoleInstance ~~> ContextInstance, properties :: Array PropertyType}
+type CompiledStateDependentPerspective =
+  { contextGetter :: RoleInstance ~~> ContextInstance
+  , properties :: Array PropertyType
+  , selfOnly :: Boolean
+}

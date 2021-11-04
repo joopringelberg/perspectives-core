@@ -100,9 +100,9 @@ compileState stateId = do
         pure {compiledSentence, contextGetter})
       (unwrap notifyOnExit)
     (perspectivesOnEntry' :: Map RoleType CompiledStateDependentPerspective) <- traverseWithIndex
-      (\subject (RolePerspective{currentContextCalculation, properties}) -> do
+      (\subject (RolePerspective{currentContextCalculation, properties, selfOnly}) -> do
         contextGetter <- role2context currentContextCalculation
-        pure {contextGetter, properties})
+        pure {contextGetter, properties, selfOnly})
       (unwrap perspectivesOnEntry)
 
     -- We postpone compiling substates until they're asked for.
@@ -128,13 +128,13 @@ compileState stateId = do
 -- | Put an error boundary around this function.
 evaluateRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 evaluateRoleState roleId userRoleType stateId = do
-  log ("Evaluating role state " <> unwrap stateId <> " for role " <> unwrap roleId)
   roleIsInState <- conditionSatisfied roleId stateId
   if roleIsInState
     then do
       roleWasInState <- lift2 $ isActive stateId roleId
       if roleWasInState
         then do
+          log ("Already in role state " <> unwrap stateId <> ": " <> unwrap roleId)
           subStates <- lift2 $ subStates_ stateId
           for_ subStates (evaluateRoleState roleId userRoleType)
         else enteringRoleState roleId userRoleType stateId
@@ -208,7 +208,7 @@ enteringRoleState roleId userRoleType stateId = do
   State {object} <- lift2 $ getState stateId
   case object of
     Nothing -> pure unit
-    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties} -> do
+    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly} -> do
       currentcontext <- lift2 $ (roleId ##>> contextGetter)
       userInstances <- lift2 (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not_ (boundByRole (RoleInstance me))))
       serialiseRoleInstancesAndProperties
@@ -216,6 +216,7 @@ enteringRoleState roleId userRoleType stateId = do
         userInstances
         objectQfd
         properties
+        selfOnly
 
   -- Recur.
   subStates <- lift2 $ subStates_ stateId
@@ -276,6 +277,7 @@ exitingRoleState roleId userRoleType stateId = do
 findSatisfiedSubstate :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
 findSatisfiedSubstate stateId roleId = (lift2 $ subStates_ stateId) >>= findM (conditionSatisfied roleId)
 
+-- | Absence of a condition result is interpreted as false.
 conditionSatisfied :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Boolean
 conditionSatisfied roleId stateId = do
   compiledState <- getCompiledState stateId

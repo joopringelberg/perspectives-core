@@ -56,10 +56,14 @@ type StateRecord =
 	}
 
 data StateDependentPerspective =
-  ContextPerspective (Array PropertyType) |
+  ContextPerspective
+    { properties :: Array PropertyType
+    , selfOnly :: Boolean
+  } |
   RolePerspective
     { currentContextCalculation :: QueryFunctionDescription
   	, properties :: Array PropertyType
+    , selfOnly :: Boolean
   	}
 
 derive instance genericStateDependentPerspective :: Generic StateDependentPerspective _

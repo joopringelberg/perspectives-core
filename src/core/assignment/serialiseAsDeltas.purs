@@ -28,7 +28,7 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.Partial (head) as PA
 import Data.Foldable (for_, traverse_)
-import Data.List.NonEmpty (foldM)
+import Data.List.NonEmpty (NonEmptyList, foldM, head)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (new)
@@ -113,30 +113,52 @@ serialisedAsDeltasFor_ cid userId userType =
 
 -- | Add Deltas to the transaction for the given users, to provide them with a complete
 -- | account of the perspective on the context instance.
+-- TODO: handle selfOnly.
 serialisePerspectiveForUser :: ContextInstance -> Array RoleInstance -> Perspective -> MonadPerspectivesTransaction Unit
-serialisePerspectiveForUser cid users p@(Perspective{object, propertyVerbs}) = do
+serialisePerspectiveForUser cid users p@(Perspective{object, propertyVerbs, selfOnly}) = do
   (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ propertiesInPerspective p
-  serialiseRoleInstancesAndProperties cid users object visiblePropertyTypes
+  serialiseRoleInstancesAndProperties cid users object visiblePropertyTypes selfOnly
 
+-- TODO: handle selfOnly.
 serialiseRoleInstancesAndProperties ::
 	ContextInstance ->	                 -- The context instance for which we serialise roles and properties.
 	Array RoleInstance ->		             -- User RoleTypes to serialise for.
 	QueryFunctionDescription ->          -- Find role instances with this description.
 	Array PropertyType ->		             -- PropertyTypes whose values on the role instances should be serialised.
+  Boolean ->                           -- True iff the perspective is selfonly.
 	MonadPerspectivesTransaction Unit
-serialiseRoleInstancesAndProperties cid users object properties = do
+serialiseRoleInstancesAndProperties cid users object properties selfOnly = do
   -- All instances of this RoleType (object) the user may see in this context.
   -- In general, these may be instances of several role types, as the perspective object is expressed as a query.
   (rinstances :: Array (DependencyPath)) <- liftToMPT ((singletonPath (C cid)) ##= interpret object)
   -- Serialise all the dependencies.
-  for_ (join (allPaths <$> rinstances)) (foldM (serialiseDependency users) Nothing)
-  for_ properties
-    \pt -> do
-      for_ (_.head <$> rinstances)
-        \(dep :: Dependency) -> do
-          (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
-          for_ (join (allPaths <$> vals)) (foldM (serialiseDependency users) Nothing)
-  pure unit
+  -- If the perspective is selfOnly, then each of the users can only receive his own role and properties.
+  -- This means that the users and (the role instances in) rinstances should be the same collection.
+  -- in that case,
+  if selfOnly
+    then for_ (join (allPaths <$> rinstances))
+      \(dependencies :: NonEmptyList Dependency) -> do
+        void $ foldM (serialiseDependency
+          (unsafePartial case head dependencies of
+            R r -> [r]))
+          Nothing
+          dependencies
+        for_ properties
+          \pt -> for_ (_.head <$> rinstances)
+            \(dep ::Dependency) -> do
+            (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
+            for_ (join (allPaths <$> vals)) (foldM
+              (serialiseDependency
+                (unsafePartial case dep of
+                  R r -> [r]))
+                Nothing)
+    else do
+      for_ (join (allPaths <$> rinstances)) (foldM (serialiseDependency users) Nothing)
+      for_ properties
+        \pt -> for_ (_.head <$> rinstances)
+          \(dep :: Dependency) -> do
+            (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
+            for_ (join (allPaths <$> vals)) (foldM (serialiseDependency users) Nothing)
 
 getPropertyValues :: PropertyType -> DependencyPath ~~> DependencyPath
 getPropertyValues pt dep = do

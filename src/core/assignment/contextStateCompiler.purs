@@ -51,22 +51,23 @@ import Perspectives.Assignment.StateCache (CompiledContextState, cacheCompiledCo
 import Perspectives.Assignment.Update (setActiveContextState, setInActiveContextState, withAuthoringRole)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileAssignment (compileAssignment)
-import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectivesTransaction, Updater, WithAssumptions, MonadPerspectives, runMonadPerspectivesQuery, (##=))
+import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not_) as COMB
-import Perspectives.Instances.ObjectGetters (boundByRole, getActiveStates_)
+import Perspectives.Instances.ObjectGetters (boundByRole, contextType, getActiveStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, getRoleInstances, roleFunctionFromQfd)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.PersistentType (getState)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..), externalRole)
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (subStates_)
+import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
 
 compileState :: Partial => StateIdentifier -> MP CompiledContextState
 compileState stateId = do
@@ -89,8 +90,8 @@ compileState stateId = do
         compiledSentence <- compileContextSentence sentence
         pure compiledSentence)
       (unwrap notifyOnExit)
-    (perspectivesOnEntry' :: Map RoleType (Array PropertyType)) <- traverseWithIndex
-      (\subject (ContextPerspective properties) -> pure properties)
+    (perspectivesOnEntry' :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean }) <- traverseWithIndex
+      (\subject (ContextPerspective r) -> pure r)
       (unwrap perspectivesOnEntry)
 
     -- We postpone compiling substates until they're asked for.
@@ -117,13 +118,13 @@ compileState stateId = do
 -- | Put an error boundary around this function.
 evaluateContextState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 evaluateContextState contextId userRoleType stateId = do
-  log ("Evaluating context state " <> unwrap stateId <> " for context " <> unwrap contextId)
   contextIsInState <- conditionSatisfied contextId stateId
   if contextIsInState
     then do
       contextWasInState <- lift2 $ isActive stateId contextId
       if contextWasInState
         then do
+          log ("Already in context state " <> unwrap stateId <> ": " <> unwrap contextId)
           subStates <- lift2 $ subStates_ stateId
           for_ subStates (evaluateContextState contextId userRoleType)
         else enteringState contextId userRoleType stateId
@@ -147,7 +148,7 @@ enteringState contextId userRoleType stateId = do
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveContextState stateId contextId
-  {automaticOnEntry, objectGetter, perspectivesOnEntry} <- getCompiledState stateId
+  {automaticOnEntry, objectGetter, perspectivesOnEntry, notifyOnEntry} <- getCompiledState stateId
   objects <- case objectGetter of
     Nothing -> pure []
     Just getter -> lift2 (contextId ##= getter)
@@ -158,6 +159,7 @@ enteringState contextId userRoleType stateId = do
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
   me <- lift2 getUserIdentifier
+  mySystem <- lift2 $ getMySystem
   forWithIndex_ automaticOnEntry \(allowedUser :: RoleType) updater -> do
     bools <- lift2 (contextId ##= getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
     if ala Conj foldMap bools
@@ -173,30 +175,42 @@ enteringState contextId userRoleType stateId = do
           -- The modeller should not use the 'object' variable.
           else updater contextId
       else pure unit
-  -- TODO maak dit zoals in de RoleStateCompiler.
-  State {notifyOnEntry, object} <- lift2 $ getState stateId
-  case lookup userRoleType (unwrap notifyOnEntry) of
-    Nothing -> pure unit
-    Just l -> do
-      mySystem <- lift2 $ getMySystem
-      void $ createAndAddRoleInstance
-        (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
-        mySystem
-        (RolSerialization
-          { id: Nothing
-          , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Notification"
-            [(show l)]
-          , binding: Just $ buitenRol (unwrap contextId)})
-  -- TODO. We have a compiled version of the object, too.
+  forWithIndex_ notifyOnEntry \(allowedUser :: RoleType) compiledSentence -> do
+    currentactors <- lift2 $ (contextId ##= (getRoleInstances allowedUser))
+    bools <- lift2 $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
+    if ala Conj foldMap bools
+      then do
+        oldFrame <- lift2 $ pushFrame
+        lift2 $ addBinding "currentcontext" [(unwrap contextId)]
+        lift2 $ addBinding "origin" [unwrap contextId]
+        lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+        storeNotificationInContext <- lift2 (contextId ##>> (contextType >=> liftToInstanceLevel (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
+        sentenceText <- lift2 $ compiledSentence contextId
+        void $ createAndAddRoleInstance
+          (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
+          (if storeNotificationInContext
+            then (unwrap contextId)
+            else mySystem)
+          (RolSerialization
+            { id: Nothing
+            , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
+              [sentenceText]
+            -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
+            , binding: Just $ unwrap $ externalRole contextId})
+        lift2 $ restoreFrame oldFrame
+      else pure unit
+  -- NOTE. We have a compiled version of the object, too.
+  State {object} <- lift2 $ getState stateId
   case object of
     Nothing -> pure unit
-    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) props -> do
+    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {properties, selfOnly} -> do
       userInstances <- lift2 (contextId ##= COMB.filter (getRoleInstances allowedUser) (COMB.not_ (boundByRole (RoleInstance me))))
       serialiseRoleInstancesAndProperties
         contextId
         userInstances
         objectQfd
-        props
+        properties
+        selfOnly
 
   -- Recur.
   subStates <- lift2 $ subStates_ stateId
