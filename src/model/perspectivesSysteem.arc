@@ -74,6 +74,8 @@ domain System
             do for User
               callEffect cdb:UpdateModel( Url, ModelIdentification )
               PerformUpdate = false
+            notify User
+              "Model {ModelIdentification} has been updated."
         state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
           -- Create an entry in IndexedContexts if its model has been taken in use.
           on entry
