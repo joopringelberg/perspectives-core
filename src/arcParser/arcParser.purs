@@ -51,7 +51,7 @@ import Prelude (bind, discard, flip, not, pure, ($), (&&), (*>), (<$>), (<*>), (
 import Text.Parsing.Indent (checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
-import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
+import Text.Parsing.Parser.String (char, satisfy)
 
 -- | SEMI-BNF NOTATION
 -- | We use a syntax to describe the grammar of the Perspectives Language that is derived from BNF:
@@ -910,7 +910,7 @@ sentenceE :: IP Sentence
 sentenceE = do
   start <- getPosition
   parts <- between (char '"') (char '"') (many (sentencePart <|> exprPart))
-  _ <- whiteSpace
+  _ <- token.whiteSpace
   end <- getPosition
   pure $ Sentence (fromFoldable parts)
   where
