@@ -43,7 +43,8 @@ import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.ObjectGetters (bottom, getProperty, roleType_)
+import Perspectives.Instances.Combinators (filter)
+import Perspectives.Instances.ObjectGetters (bottom, getProperty, hasType, roleType_)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Url, addDocument)
 import Perspectives.Persistent (postDatabaseName)
@@ -51,7 +52,7 @@ import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
@@ -121,7 +122,7 @@ type TransactionPerUser = Object TransactionForPeer
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
 transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas}) = do
   execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do
-      sysUsers <- lift (unit ##= (\_ -> ArrayT (pure users)) >=> bottom)
+      sysUsers <- lift (unit ##= filter ((\_ -> ArrayT (pure users)) >=> bottom) (hasType (EnumeratedRoleType "model:System$PerspectivesSystem$User")) )
       addDeltaToCustomisedTransactie delta (nub sysUsers))
     empty
   where

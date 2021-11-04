@@ -47,7 +47,7 @@ import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPer
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
-import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&))
+import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&), eq)
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -243,6 +243,11 @@ roleType = ArrayT <<< lift <<< (getRolMember \r -> [rol_pspType r])
 
 roleType_ :: RoleInstance -> MP EnumeratedRoleType
 roleType_ = (getRolMember \r -> rol_pspType r)
+
+hasType :: EnumeratedRoleType -> RoleInstance ~~> Boolean
+hasType rt rid = ArrayT do
+  t <- lift $ getRolMember rol_pspType rid
+  pure $ [eq t rt]
 
 -- | All the roles that bind the role instance.
 allRoleBinders :: RoleInstance ~~> RoleInstance
