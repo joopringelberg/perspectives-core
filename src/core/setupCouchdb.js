@@ -33,5 +33,11 @@ exports.roleFromContextView = (function (doc)
    if (doc.contents.universeRoleDelta)
    {
      emit( [doc.contents.pspType, doc.contents.context], doc._id );
+     doc.contents.states.forEach(
+       function(stateId)
+       {
+         emit([stateId, doc.contents.context], doc._id);
+       }
+     );
    }
  }.toString())
