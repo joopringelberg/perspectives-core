@@ -23,6 +23,9 @@ domain BodiesWithAccounts
 
   case Body
 
+    user Test
+      property UserName (String)
+
     -- Admin can always create and fill Accounts and see the UserName.
     user Admin
       aspect bwa:WithCredentials
@@ -33,7 +36,7 @@ domain BodiesWithAccounts
         -- We limit visibility of the Password to the situation that it
         -- does not exist.
         -- When Accounts reset their password, Admin is duly not informed.
-        in object state Root$NoPassword
+        in object state IsFilled$NoPassword
           props (Password) verbs (SetPropertyValue)
 
     -- Role Guest is available so any user can request an Account.
@@ -58,7 +61,7 @@ domain BodiesWithAccounts
       property IsAccepted (Boolean)
       property IsRejected (Boolean)
       property PasswordReset (Boolean)
-      state Root = true
+      state IsFilled = exists binding
         -- Use this state to inform the applicant that his case is in
         -- consideration.
         state Waiting = not IsRejected and not IsAccepted

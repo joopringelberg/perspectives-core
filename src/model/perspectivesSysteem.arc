@@ -68,21 +68,20 @@ domain System
     -- This will become obsolete when we start using model:CouchdbManagement.
     context ModelsInUse (relational) filledBy Model
       property PerformUpdate (Boolean)
-      state Root = true
-        state Update = PerformUpdate
-          on entry
-            do for User
-              callEffect cdb:UpdateModel( Url, ModelIdentification )
-              PerformUpdate = false
-            notify User
-              "Model {ModelIdentification} has been updated."
-        state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
-          -- Create an entry in IndexedContexts if its model has been taken in use.
-          on entry
-            do for User
-              bind binding >> context >> IndexedContext >> binding to IndexedContexts
-            notify User
-              "{ binding >> ModelIdentification }added!"
+      state Update = PerformUpdate
+        on entry
+          do for User
+            callEffect cdb:UpdateModel( Url, ModelIdentification )
+            PerformUpdate = false
+          notify User
+            "Model {ModelIdentification} has been updated."
+      state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
+        -- Create an entry in IndexedContexts if its model has been taken in use.
+        on entry
+          do for User
+            bind binding >> context >> IndexedContext >> binding to IndexedContexts
+          notify User
+            "{ binding >> ModelIdentification }added!"
       view ModelInUsePresentation (Description, Name, PerformUpdate)
 
     context PendingInvitations = callExternal cdb:PendingInvitations() returns sys:Invitation$External

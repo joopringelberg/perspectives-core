@@ -61,15 +61,14 @@ domain BrokerServices
   -- The contract between an end user and a BrokerService.
   case BrokerContract
     aspect sys:Invitation
-    state Root = true
-      state NoAdministrator = not exists Administrator
-        on entry
-          do for BrokerContract$Guest
-            bind extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
-      state NoAccountHolder = (exists Administrator) and (not exists AccountHolder)
-        on entry
-          do for BrokerContract$Administrator
-            createRole AccountHolder
+    state NoAdministrator = not exists Administrator
+      on entry
+        do for BrokerContract$Guest
+          bind extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
+    state NoAccountHolder = (exists Administrator) and (not exists AccountHolder)
+      on entry
+        do for BrokerContract$Administrator
+          createRole AccountHolder
     external
       aspect sys:Invitation$External
       property Url = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url

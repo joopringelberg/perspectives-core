@@ -37,17 +37,16 @@ domain ModelManagement
         notify Author
           "Model {ModelDescription >> ModelIdentification} has been uploaded to the repository {Repository >> Name}."
     external
-      state Root = true
-        state ProcessArc = (exists ArcSource) and not exists ArcFeedback
-          on entry
-            do for Author
-              ArcFeedback = callExternal p:ParseAndCompileArc( ArcSource ) returns String
-              SourcesChanged = true
-        state ProcessCrl = (exists CrlSource) and not exists CrlFeedback
-          on entry
-            do for Author
-              CrlFeedback = callExternal p:ParseAndCompileCrl( CrlSource ) returns String
-              SourcesChanged = true
+      state ProcessArc = (exists ArcSource) and not exists ArcFeedback
+        on entry
+          do for Author
+            ArcFeedback = callExternal p:ParseAndCompileArc( ArcSource ) returns String
+            SourcesChanged = true
+      state ProcessCrl = (exists CrlSource) and not exists CrlFeedback
+        on entry
+          do for Author
+            CrlFeedback = callExternal p:ParseAndCompileCrl( CrlSource ) returns String
+            SourcesChanged = true
       property ArcUrl (mandatory, String)
       property ArcSource (mandatory, String)
       property ArcFeedback (mandatory, String)
