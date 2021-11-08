@@ -109,7 +109,7 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       requalifyBindingsToCalculatedRoles
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
-      createMissingRootStates
+      -- createMissingRootStates
       compileStateQueries
       registerStates
       invertPerspectiveObjects

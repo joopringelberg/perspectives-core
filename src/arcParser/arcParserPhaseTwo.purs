@@ -82,7 +82,6 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
           Nothing -> pure $ Cons (RE (RoleE{id: "External", kindOfRole: ExternalRole, roleParts: Nil, pos})) contextParts
           otherwise -> pure contextParts
       context' <- foldM handleParts context contextParts'
-      -- context' <- foldM handleParts context contextParts'
       modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
       pure context'
 
@@ -122,6 +121,9 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       -- However, if not, we should register it with its parent and that need not be available.
       -- Hence, we postpone registering the state to PhaseThree.
       pure c
+
+    -- We can safely ignore nested lists of StateQualifiedParts here, as they are already removed by the parser.
+    handleParts c (CSQP _) = pure c
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = LN.over

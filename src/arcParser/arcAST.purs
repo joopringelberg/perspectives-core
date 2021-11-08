@@ -59,7 +59,8 @@ data ContextPart =
   CE ContextE |
   PREFIX Prefix ModelName |
   ContextAspect String ArcPosition |
-  IndexedContext String ArcPosition
+  IndexedContext String ArcPosition |
+  CSQP (List StateQualifiedPart)
 
 --------------------------------------------------------------------------------
 ---- ROLE

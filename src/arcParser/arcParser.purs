@@ -95,7 +95,7 @@ contextE = withPos do
   -- | ook hier geldt: als op de volgende regel en geïndenteerd, dan moet de deelparser slagen en het hele blok consumeren.
   isIndented' <- isIndented
   isNextLine' <- isNextLine
-  elements <- if isIndented' && isNextLine'
+  contextParts <- if isIndented' && isNextLine'
     then inSubContext uname
       (getCurrentContext >>= \subContext ->
         withArcParserState (ContextState subContext Nothing)
@@ -107,16 +107,36 @@ contextE = withPos do
               uses <- many $ checkIndent *> useE
               ind <- option Nil $ checkIndent *> contextIndexedE
               aspects <- many $ checkIndent *> contextAspectE
-              states <- scanIdentifier >>= case _ of
-                "state" -> singleton <<< STATE <$> stateE
-                _ -> pure Nil
-              rolesAndContexts <- if null uses && null ind && null aspects && null states
+              otherContextParts <- if null uses && null ind && null aspects
                 then entireBlock1 contextPart
                 else entireBlock contextPart
-              pure $ ind <> states <> (uses <> aspects <> rolesAndContexts)))
+              -- The parts nested below `on entry` or `on exit`:
+              stateQualifiedParts <- pure $ filter (case _ of
+                CSQP _ -> true
+                _ -> false) otherContextParts
+              -- All substates
+              subStates <- pure $ (unsafePartial \(STATE s) -> s) <$> filter (case _ of
+                STATE _ -> true
+                _ -> false) otherContextParts
+              -- Nested contexts and roles.
+              rolesAndContexts <- pure $ filter (case _ of
+                CSQP _ -> false
+                STATE _ -> false
+                _ -> true) otherContextParts
+              -- The root state of this context. Every context has a root state; it may be empty.
+              state <- pure $ STATE $ StateE
+                { id: (ContextState subContext Nothing)
+                , condition: Simple $ Value pos PBool "true"
+                , stateParts: concat (map (unsafePartial \(CSQP l) -> l) stateQualifiedParts)
+                , subStates
+                }
+              pure $ (state : (ind <>
+                uses <>
+                aspects <>
+                rolesAndContexts))))
     else pure Nil
   -- | Notice: uname is unqualified.
-  pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos}
+  pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts, pos: pos}
 
   where
 
@@ -124,6 +144,7 @@ contextE = withPos do
     contextPart = do
       keyword <- scanIdentifier
       case keyword of
+        -- TODO voeg "state" en "on entry" en "on exit" toe.
         "domain" -> contextE
         "case" -> contextE
         "party" -> contextE
@@ -132,7 +153,13 @@ contextE = withPos do
         "user" -> explicitSubjectState >>= flip withArcParserState userRoleE
         "context" -> explicitObjectState >>= flip withArcParserState contextRoleE
         "external" -> externalRoleState >>= flip withArcParserState externalRoleE
-        _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external"
+        "state" -> STATE <$> stateE
+        _ -> do
+          (Tuple first second) <- twoReservedWords
+          case first, second of
+            "perspective", "on" -> CSQP <$> perspectiveOn
+            "perspective", "of" -> CSQP <$> perspectiveOf
+            _, _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external, state, on entry, on exit"
 
     explicitSubjectState :: IP StateSpecification
     explicitSubjectState = do
@@ -215,12 +242,22 @@ domain = do
 -- | or fails with consumed=true,
 -- | or succeeds with consumed=true.
 userRoleE :: IP ContextPart
-userRoleE = protectSubject $ withEntireBlock
-  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
-  user_
-  rolePart
+userRoleE = do
+  -- `state` will be a role state specification.
+  {state} <- getArcParserState
+  protectSubject $ withEntireBlock
+    (\{uname, knd, pos, parts, isEnumerated} elements -> RE $ RoleE
+      { id: uname
+      , kindOfRole: knd
+      , roleParts: if isEnumerated
+          then (createRoleState pos state elements) <> parts
+          else elements <> parts
+      , pos
+      })
+    user_
+    rolePart
   where
-    user_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    user_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
     user_ = do
       pos <- getPosition
       kind <- reserved "user" *> pure UserRole
@@ -231,20 +268,28 @@ userRoleE = protectSubject $ withEntireBlock
       if isCalculated
         then do
           setSubject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
-          -- setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
+          calculatedRole_ uname kind pos
         else do
           setSubject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
-          -- setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
-      -- | userRoleE cannot fail in the last line.
-      ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
+          enumeratedRole_ uname kind pos
 
 thingRoleE :: IP ContextPart
-thingRoleE = protectObject $ withEntireBlock
-  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
-  thing_
-  rolePart
+thingRoleE = do
+  -- `state` will be a role state specification.
+  {state} <- getArcParserState
+  protectObject $ withEntireBlock
+    (\{uname, knd, pos, parts, isEnumerated} elements -> RE $ RoleE
+      { id: uname
+      , kindOfRole: knd
+      , roleParts: if isEnumerated
+          then (createRoleState pos state elements) <> parts
+          else elements <> parts
+      , pos
+      })
+    thing_
+    rolePart
   where
-    thing_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    thing_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
     thing_ = do
       pos <- getPosition
       kind <- reserved "thing" *> pure RoleInContext
@@ -252,17 +297,30 @@ thingRoleE = protectObject $ withEntireBlock
       ct@(ContextType ctxt) <- getCurrentContext
       isCalculated <- option false (lookAhead (reserved "=") *> pure true)
       if isCalculated
-        then setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
-        else setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
-      ((calculatedRole_  uname kind pos) <|> (enumeratedRole_ uname kind pos))
+        then do
+          setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
+          calculatedRole_  uname kind pos
+        else do
+          setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
+          enumeratedRole_ uname kind pos
 
 contextRoleE :: IP ContextPart
-contextRoleE = protectObject $ withEntireBlock
-  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
-  context_
-  rolePart
+contextRoleE = do
+  -- `state` will be a role state specification.
+  {state} <- getArcParserState
+  protectObject $ withEntireBlock
+    (\{uname, knd, pos, parts, isEnumerated} elements -> RE $ RoleE
+      { id: uname
+      , kindOfRole: knd
+      , roleParts: if isEnumerated
+          then (createRoleState pos state elements) <> parts
+          else elements <> parts
+      , pos
+      })
+    context_
+    rolePart
   where
-    context_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    context_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
     context_ = do
       pos <- getPosition
       kind <- reserved "context" *> pure ContextRole
@@ -273,35 +331,43 @@ contextRoleE = protectObject $ withEntireBlock
       if isCalculated
         then do
           setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
-          (calculatedRole_  uname kind pos)
+          calculatedRole_  uname kind pos
         else do
           setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
-          (enumeratedRole_ uname kind pos)
+          enumeratedRole_ uname kind pos
 
 externalRoleE :: IP ContextPart
-externalRoleE = protectObject $ withEntireBlock
-  (\{uname, knd, pos, parts} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements <> parts, pos: pos})
-  external_
-  rolePart
+externalRoleE = do
+  -- `state` will be a role state specification.
+  {state} <- getArcParserState
+  protectObject $ withEntireBlock
+    (\{uname, knd, pos, parts} elements -> RE $ RoleE
+      { id: uname
+      , kindOfRole: knd
+      , roleParts: (createRoleState pos state elements) <> parts
+      , pos
+      })
+    external_
+    rolePart
   where
-    external_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    external_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
     external_ = do
       pos <- getPosition
       knd <- reserved "external" *> pure ExternalRole
       ct@(ContextType ctxt) <- getCurrentContext
       setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$External")) pos)
-      pure {uname: "External", knd, pos, parts: Nil}
+      pure {uname: "External", knd, pos, parts: Nil, isEnumerated: true}
 
-calculatedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+calculatedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
 calculatedRole_ uname knd pos = do
   calculation <- reserved "=" *> step >>= pure <<< Calculation
-  pure {uname, knd, pos, parts: Cons calculation Nil }
+  pure {uname, knd, pos, parts: Cons calculation Nil, isEnumerated: false}
 
-enumeratedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+enumeratedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
 enumeratedRole_ uname knd pos = do
   attributes <- option Nil roleAttributes
   filledBy' <- filledBy
-  pure {uname, knd, pos, parts: attributes <> filledBy'}
+  pure {uname, knd, pos, parts: attributes <> filledBy', isEnumerated: true}
   where
     -- | We cannot use token.commaSep or sebBy to separate the role attributes;
     -- | it will cause looping as long as it is used
@@ -352,6 +418,31 @@ rolePart = do
     "property", _ -> propertyE
     "view", _ -> viewE
     _, _ -> fail "Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view"
+
+-- | Combine the RolePart elements that result from "on entry", "on exit" and "state" into a root state for the role.
+-- | The elements we combine are: NotificationE, AutomaticEffectE and StateE.
+createRoleState :: ArcPosition -> StateSpecification -> List RolePart -> List RolePart
+createRoleState pos stateSpec roleParts = let
+  -- The parts nested below `on entry` or `on exit`:
+  stateQualifiedParts = filter (case _ of
+    SQP _ -> true
+    _ -> false) roleParts
+  -- All substates
+  subStates = (unsafePartial \(ROLESTATE s) -> s) <$> filter (case _ of
+    ROLESTATE _ -> true
+    _ -> false) roleParts
+  otherParts = filter (case _ of
+    SQP _ -> false
+    ROLESTATE _ -> false
+    _ -> true) roleParts
+  state = ROLESTATE $ StateE
+    { id: stateSpec
+    , condition: Simple $ Value pos PBool "true"
+    , stateParts: concat (map (unsafePartial \(SQP l) -> l) stateQualifiedParts)
+    , subStates
+    }
+  in
+    (state : otherParts)
 
 aspectE :: IP RolePart
 aspectE = do

@@ -115,7 +115,8 @@ compileAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) role
         })
       -- now bind it in the role instance.
       void $ setBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
-      handleNewPeer (RoleInstance newContextId)
+      -- TODO. Dit lijkt me complete onzin!
+      -- handleNewPeer (RoleInstance newContextId)
 
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
@@ -175,7 +176,7 @@ compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
       Just binding'' -> case binder' of
         Nothing -> pure []
         Just binder'' -> do
-          setBinding binder'' binding'' Nothing <* handleNewPeer binder''
+          setBinding binder'' binding'' Nothing -- <* handleNewPeer binder''
 
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
