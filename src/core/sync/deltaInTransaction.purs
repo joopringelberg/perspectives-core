@@ -34,6 +34,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
+-- | `users` will not always be model:System$PerspectivesSystem$User instances.
 newtype DeltaInTransaction = DeltaInTransaction {users :: Array RoleInstance, delta :: SignedDelta}
 
 derive instance genericRepDeltaInTransaction :: Generic DeltaInTransaction _

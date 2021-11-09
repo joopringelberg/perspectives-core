@@ -33,6 +33,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, foldMap, index, null)
+import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), isJust)
@@ -100,9 +101,9 @@ compileState stateId = do
         pure {compiledSentence, contextGetter})
       (unwrap notifyOnExit)
     (perspectivesOnEntry' :: Map RoleType CompiledStateDependentPerspective) <- traverseWithIndex
-      (\subject (RolePerspective{currentContextCalculation, properties, selfOnly}) -> do
+      (\subject (RolePerspective{currentContextCalculation, properties, selfOnly, isSelfPerspective}) -> do
         contextGetter <- role2context currentContextCalculation
-        pure {contextGetter, properties, selfOnly})
+        pure {contextGetter, properties, selfOnly, isSelfPerspective})
       (unwrap perspectivesOnEntry)
 
     -- We postpone compiling substates until they're asked for.
@@ -208,15 +209,18 @@ enteringRoleState roleId userRoleType stateId = do
   State {object} <- lift2 $ getState stateId
   case object of
     Nothing -> pure unit
-    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly} -> do
+    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly, isSelfPerspective} -> do
       currentcontext <- lift2 $ (roleId ##>> contextGetter)
       userInstances <- lift2 (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not_ (boundByRole (RoleInstance me))))
-      serialiseRoleInstancesAndProperties
-        currentcontext
-        userInstances
-        objectQfd
-        properties
-        selfOnly
+      case fromArray userInstances of
+        Nothing -> pure unit
+        Just u' -> serialiseRoleInstancesAndProperties
+          currentcontext
+          u'
+          objectQfd
+          properties
+          selfOnly
+          isSelfPerspective
 
   -- Recur.
   subStates <- lift2 $ subStates_ stateId

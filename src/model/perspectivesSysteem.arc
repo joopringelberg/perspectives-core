@@ -30,6 +30,9 @@ domain System
       property Achternaam (mandatory, relational, String)
       property Voornaam (mandatory, relational, String)
       property Channel = (binder Initiator either binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
+      -- User instances need not have a value for this property. It is used in the PDR to
+      -- ensure serialisation of the User role.
+      property Id (String)
       indexed sys:Me
       view VolledigeNaam (Voornaam, Achternaam)
       perspective on User

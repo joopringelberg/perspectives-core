@@ -34,7 +34,7 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for, traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MP, MPQ, liftToInstanceLevel, (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, MPQ, liftToInstanceLevel, (##>>), (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -60,7 +60,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
-import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||))
+import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||), (<#>))
 import Unsafe.Coerce (unsafeCoerce)
 
 lift2MPQ :: forall a. MP a -> MPQ a
@@ -428,7 +428,12 @@ getDynamicPropertyGetter p rid = do
 -- | From a PropertyType, retrieve or construct a function to get values for that Property from a Role instance.
 -- | Returns a List with (R roleId) as its last dependency, (V "SomeProperty" "value") as its first dependency.
 getterFromPropertyType :: PropertyType -> RoleInstance ~~> DependencyPath
-getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) roleId = (flip consOnMainPath (singletonPath $ R roleId)) <<< V id <$> getProperty ep roleId
+-- getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) roleId = (flip consOnMainPath (singletonPath $ R roleId)) <<< V id <$> getProperty ep roleId
+getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) roleId = ArrayT do
+  (vals :: Array Value) <- lift (roleId ##= getProperty ep)
+  case head vals of
+    Nothing -> pure $ [singletonPath $ R roleId]
+    otherwise -> pure ((V id <$> vals) <#> \dep -> consOnMainPath dep (singletonPath $ R roleId))
 getterFromPropertyType (CP cp@(CalculatedPropertyType id)) roleId =
   (lift $ lift $ getPerspectType cp) >>=
     lift <<< lift <<< PC.calculation >>=

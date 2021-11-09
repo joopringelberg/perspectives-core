@@ -119,6 +119,7 @@ type TransactionPerUser = Object TransactionForPeer
 
 -- | The Transaction holds Deltas and each Delta names user instances who should receive that Delta.
 -- | This function builds a custom version of the Transaction for each such user.
+-- | `users` in DeltaInTransaction will not always be model:System$PerspectivesSystem$User instances.
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
 transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas}) = do
   execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do

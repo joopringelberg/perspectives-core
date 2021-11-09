@@ -46,7 +46,7 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError')
 import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments)
-import Perspectives.Instances.Combinators (closure_, conjunction)
+import Perspectives.Instances.Combinators (closure_, conjunction, some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialisesADT)
@@ -59,7 +59,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec, isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, stateSpec2StateIdentifier)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier(..), propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
 import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
@@ -70,8 +70,9 @@ import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (<$>
 isUnlinked_ :: EnumeratedRoleType -> MonadPerspectives Boolean
 isUnlinked_ et = getEnumeratedRole et >>= pure <<< _.unlinked <<< unwrap
 
+-- | The state identifier of the root state of a role has the same string value as the role identifier.
 roleRootState :: EnumeratedRoleType ~~~> StateIdentifier
-roleRootState = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MonadPerspectives EnumeratedRole) >=> pure <<< maybe [] singleton <<< _.rootState <<< unwrap)
+roleRootState rtype = pure $ StateIdentifier $ unwrap rtype
 
 -- | The transitive closure over Aspects of roleRootState.
 roleRootStates :: EnumeratedRoleType ~~~> StateIdentifier
@@ -164,8 +165,9 @@ contextTypeModelName (ContextType rid) = maybe empty (pure <<< Value) (deconstru
 contextTypeModelName' :: ContextType ~~> Value
 contextTypeModelName' (ContextType rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
 
+-- | The state identifier of the root state of a role has the same string value as the role identifier.
 contextRootState :: ContextType ~~~> StateIdentifier
-contextRootState = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< maybe [] singleton <<< _.rootState <<< unwrap)
+contextRootState ctype = pure $ StateIdentifier $ unwrap ctype
 
 -- | The transitive closure over Aspects of rootState.
 contextRootStates :: ContextType ~~~> StateIdentifier
@@ -563,3 +565,11 @@ addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Per
   , actions = EncodableMap $ unionWith union (unwrap perspectiveAspect.actions) (unwrap perspective.actions)
   , selfOnly = perspectiveAspect.selfOnly || perspective.selfOnly
   }
+
+-- True, iff one of the types of the role instance is covered by the range of the QueryFunctionDescription.
+-- The function is partial because it should only be used on a QueryFunctionDescription whose range
+-- represents a role type.
+isPerspectiveOnSelf :: Partial => QueryFunctionDescription -> (RoleType ~~~> Boolean)
+isPerspectiveOnSelf qfd = some (
+  lift <<< typeIncludingAspects >=>
+  (\adt -> pure $ unwrap (roleRange qfd `equalsOrSpecialisesADT` adt)))

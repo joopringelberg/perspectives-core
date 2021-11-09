@@ -33,6 +33,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, foldMap, null)
+import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), isJust)
@@ -90,7 +91,7 @@ compileState stateId = do
         compiledSentence <- compileContextSentence sentence
         pure compiledSentence)
       (unwrap notifyOnExit)
-    (perspectivesOnEntry' :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean }) <- traverseWithIndex
+    (perspectivesOnEntry' :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean, isSelfPerspective :: Boolean }) <- traverseWithIndex
       (\subject (ContextPerspective r) -> pure r)
       (unwrap perspectivesOnEntry)
 
@@ -203,14 +204,17 @@ enteringState contextId userRoleType stateId = do
   State {object} <- lift2 $ getState stateId
   case object of
     Nothing -> pure unit
-    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {properties, selfOnly} -> do
+    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {properties, selfOnly, isSelfPerspective} -> do
       userInstances <- lift2 (contextId ##= COMB.filter (getRoleInstances allowedUser) (COMB.not_ (boundByRole (RoleInstance me))))
-      serialiseRoleInstancesAndProperties
-        contextId
-        userInstances
-        objectQfd
-        properties
-        selfOnly
+      case fromArray userInstances of
+        Nothing -> pure unit
+        Just u' -> serialiseRoleInstancesAndProperties
+          contextId
+          u'
+          objectQfd
+          properties
+          selfOnly
+          isSelfPerspective
 
   -- Recur.
   subStates <- lift2 $ subStates_ stateId

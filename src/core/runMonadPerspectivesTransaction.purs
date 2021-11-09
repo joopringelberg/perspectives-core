@@ -33,7 +33,6 @@ import Data.Traversable (for, traverse)
 import Effect.Aff.AVar (new)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.Update (setDefaultContextRootState, setDefaultRoleRootState)
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), liftToInstanceLevel, (##>), (##>>), (##=))
 import Perspectives.Deltas (distributeTransaction)
@@ -150,19 +149,13 @@ runStates t = do
         Nothing -> pure unit
         Just myType -> do
           states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
-          if null states
-            -- If no states are defined, we put the context instance in its root state.
-            -- Otherwise, an InvertedQuery that depends on the context being in its root state will
-            -- never give results.
-            then setDefaultContextRootState ctxt
-            else do
-              -- Provide a new frame for the current context variable binding.
-              oldFrame <- lift2 pushFrame
-              lift2 $ addBinding "currentcontext" [unwrap ctxt]
-              -- Error boundary.
-              catchError (for_ states (enteringState ctxt myType))
-                \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
-              lift2 $ restoreFrame oldFrame
+          -- Provide a new frame for the current context variable binding.
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          -- Error boundary.
+          catchError (for_ states (enteringState ctxt myType))
+            \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
   -- Exit the rootState of contexts that are deleted.
   for_ contextsToBeRemoved
     \ctxt -> do
@@ -190,18 +183,12 @@ runStates t = do
         Nothing -> pure unit
         Just myType -> do
           states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
-          if null states
-            -- If no states are defined, we put the role instance in its root state.
-            -- Otherwise, an InvertedQuery that depends on the role being in its root state will never
-            -- give results.
-            then setDefaultRoleRootState rid
-            else do
-              oldFrame <- lift2 pushFrame
-              lift2 $ addBinding "currentcontext" [unwrap ctxt]
-              -- Error boundary.
-              catchError (for_ states (enteringRoleState rid myType))
-                \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
-              lift2 $ restoreFrame oldFrame
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          -- Error boundary.
+          catchError (for_ states (enteringRoleState rid myType))
+            \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
   -- Exit the rootState of roles that are removed.
   for_ rolesToBeRemoved
     \rid -> do

@@ -309,7 +309,6 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         \(ContextInstance id) -> do
           -- now bind it in the role instance.
           void $ setBinding (RoleInstance subject) (RoleInstance $ buitenRol id) Nothing
-          handleNewPeer (RoleInstance subject)
           lift2 $ sendResponse (Result corrId [buitenRol id]) setter
     Api.ImportTransaction -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) TransactionForPeer) -> sendResponse (Error corrId (show e)) setter

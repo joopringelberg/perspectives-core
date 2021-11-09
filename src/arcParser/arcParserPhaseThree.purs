@@ -32,7 +32,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, cons, elemIndex, filter, findIndex, foldM, foldl, foldr, fromFoldable, head, index, length, uncons, updateAt, union)
+import Data.Array (cons, elemIndex, filter, findIndex, foldM, foldl, foldr, fromFoldable, head, index, length, uncons, updateAt, union)
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
@@ -44,10 +44,9 @@ import Data.String (Pattern(..), indexOf)
 import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, insert, keys, lookup, singleton, unions, values)
-import Foreign.Object (fromFoldable, union) as OBJ
+import Foreign.Object (Object, insert, keys, lookup, singleton, unions)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MP, MonadPerspectives, (###=))
+import Perspectives.CoreTypes (MP, MonadPerspectives, (###=), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
@@ -74,7 +73,6 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
 import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT)
-import Perspectives.Representation.Context (Context(..)) as REP
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..))
@@ -85,9 +83,9 @@ import Perspectives.Representation.State (Notification(..), State(..), StateDepe
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (aspectsOfRole, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
+import Perspectives.Types.ObjectGetters (aspectsOfRole, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<#>), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>))
+import Prelude (class Ord, Unit, append, bind, discard, eq, flip, join, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>))
 
 phaseThree :: DomeinFileRecord -> LIST.List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} postponedParts = do
@@ -109,9 +107,7 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       requalifyBindingsToCalculatedRoles
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
-      -- createMissingRootStates
       compileStateQueries
-      registerStates
       invertPerspectiveObjects
       -- combinePerspectives
       )
@@ -679,21 +675,22 @@ handlePostponedStateQualifiedParts = do
               Map.Map RoleType StateDependentPerspective ->
               RoleType ->
               PhaseThree (Map.Map RoleType StateDependentPerspective)
-            addStateDependentPerspectiveForUser currentContextCalculation perspectivesOnEntry qualifiedUser =
+            addStateDependentPerspectiveForUser currentContextCalculation perspectivesOnEntry qualifiedUser = do
+              isSelfPerspective <- (lift $ lift (qualifiedUser ###>> (unsafePartial isPerspectiveOnSelf objectQfd)))
               case Map.lookup qualifiedUser perspectivesOnEntry of
                 Nothing -> pure $ Map.insert
                   qualifiedUser
                   case state of
-                    AST.ContextState _ _ -> ContextPerspective {properties, selfOnly: false}
-                    otherwise -> RolePerspective {currentContextCalculation, properties, selfOnly: false}
+                    AST.ContextState _ _ -> ContextPerspective {properties, selfOnly: false, isSelfPerspective}
+                    otherwise -> RolePerspective {currentContextCalculation, properties, selfOnly: false, isSelfPerspective}
                   perspectivesOnEntry
                 Just (ContextPerspective props) -> pure $ Map.insert
                   qualifiedUser
-                  (ContextPerspective {properties, selfOnly: false})
+                  (ContextPerspective {properties, selfOnly: false, isSelfPerspective})
                   perspectivesOnEntry
                 Just (RolePerspective  {properties:props}) -> pure $ Map.insert
                   qualifiedUser
-                  (RolePerspective {currentContextCalculation, properties: union props properties, selfOnly: false})
+                  (RolePerspective {currentContextCalculation, properties: union props properties, selfOnly: false, isSelfPerspective})
                   perspectivesOnEntry
 
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PropertyVerbs -> Array StateSpec -> PhaseThree Unit
@@ -752,6 +749,7 @@ handlePostponedStateQualifiedParts = do
       states <- stateSpec2States state >>= LIST.filterM isEnumeratedRoleState <<< LIST.fromFoldable
       for_ states (setSelfOnly qualifiedUsers objectQfd)
       where
+        -- TODO: IMPLEMENT THIS FUNCTION SETSELFONLY!!
         -- Set the selfOnly property of the state dependent perspective.
         setSelfOnly :: Array RoleType -> QueryFunctionDescription -> StateIdentifier -> PhaseThree Unit
         setSelfOnly qualifiedUsers objectQfd stateId = pure unit
@@ -766,6 +764,7 @@ handlePostponedStateQualifiedParts = do
     modifyPerspective objectQfd roleSpec start modifier userRole = do
       (roleType :: Maybe RoleType) <- head <$> collectRoles roleSpec
       mroleDisplayName <- lift2 $ traverse displayNameOfRoleType roleType
+      isSelfPerspective <- (lift $ lift (userRole ###>> (unsafePartial isPerspectiveOnSelf objectQfd)))
       case userRole of
         ENR (EnumeratedRoleType r) -> do
           EnumeratedRole er@{perspectives} <- getsDF (unsafePartial fromJust <<< lookup r <<< _.enumeratedRoles)
@@ -785,6 +784,7 @@ handlePostponedStateQualifiedParts = do
                 , propertyVerbs: EncodableMap Map.empty
                 , actions: EncodableMap Map.empty
                 , selfOnly: false
+                , isSelfPerspective
                 }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
           modifyDF \dfr@{enumeratedRoles} -> dfr {enumeratedRoles = insert
@@ -813,6 +813,7 @@ handlePostponedStateQualifiedParts = do
                 , propertyVerbs: EncodableMap Map.empty
                 , actions: EncodableMap Map.empty
                 , selfOnly: false
+                , isSelfPerspective
                 }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
           modifyDF \dfr@{calculatedRoles} -> dfr {calculatedRoles = insert
@@ -914,27 +915,6 @@ combinePerspectives = do
         pure r
       else pure r
 
-createMissingRootStates :: PhaseThree Unit
-createMissingRootStates = do
-  df@{contexts, enumeratedRoles, states} <- lift $ State.gets _.dfr
-  (missingRootStates :: Object State) <- pure $ OBJ.fromFoldable $ catMaybes $ values states <#> \(State{id, stateFulObject}) -> case stateFulObject of
-    Cnt (ContextType ctype) -> if isDirectSuperStateOf (keys enumeratedRoles) ctype (unwrap id)
-      then if isNothing $ lookup ctype states
-        then Just $ Tuple ctype $ constructState (StateIdentifier ctype) (Q $ trueCondition (CDOM $ ST (ContextType ctype))) (Cnt $ ContextType ctype) []
-        else Nothing
-      else Nothing
-    Orole (EnumeratedRoleType rtype) -> if isDirectSuperStateOf (keys enumeratedRoles) rtype (unwrap id)
-      then if isNothing $ lookup rtype states
-        then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Q $ trueCondition (RDOM $ ST (EnumeratedRoleType rtype))) (Orole $ EnumeratedRoleType rtype) []
-        else Nothing
-      else Nothing
-    Srole (EnumeratedRoleType rtype) -> if isDirectSuperStateOf (keys enumeratedRoles) rtype (unwrap id)
-      then if isNothing $ lookup rtype states
-        then Just $ Tuple rtype $ constructState (StateIdentifier rtype) (Q $ trueCondition (RDOM $ ST (EnumeratedRoleType rtype))) (Orole $ EnumeratedRoleType rtype) []
-        else Nothing
-      else Nothing
-  modifyDF \dfr -> dfr {states = states `OBJ.union` missingRootStates}
-
 -- Compile a RoleIdentification to a sequence of bindings for the standard
 -- variables `currentcontext` and `origin`.
 roleIdentificationToQueryFunctionDescription :: RoleIdentification -> ArcPosition -> PhaseThree QueryFunctionDescription
@@ -1027,25 +1007,6 @@ compileStateQueries = do
                 []
                 [id]
           pure $ State sr { query = compiledQuery }
-
-registerStates :: PhaseThree Unit
-registerStates = do
-  df@{contexts, enumeratedRoles, states} <- lift $ State.gets _.dfr
-  modifyDF \dfr -> dfr
-    { contexts =
-      -- Register a root state with all contexts that have one.
-        contexts <#> \c@(REP.Context ctxt@{_id}) -> if isJust $ lookup (unwrap _id) states
-          then (REP.Context ctxt {rootState = Just $ StateIdentifier (unwrap _id)})
-          else c
-    , enumeratedRoles =
-      -- Register a root state with all enumerated roles that have one.
-        enumeratedRoles <#> \e@(EnumeratedRole erole@{_id}) -> if isJust $ lookup (unwrap _id) states
-          then (EnumeratedRole erole {rootState = Just $ StateIdentifier (unwrap _id)})
-          else e
-    , states =
-      -- Register all substates with each state.
-        states <#> \(State sr@{id}) -> State $ sr { subStates = StateIdentifier <$> filter (isDirectSuperStateOf (keys enumeratedRoles) $ unwrap id) (keys states)}
-    }
 
 -- True, if sub adds a single segment to super.
 -- sub `isDirectSubstateOf` super

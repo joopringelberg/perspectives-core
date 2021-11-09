@@ -43,7 +43,7 @@ import Control.Monad.Writer (WriterT, lift, runWriterT, tell)
 import Data.Array.NonEmpty (NonEmptyArray, singleton, toArray)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (forWithIndex)
@@ -52,7 +52,6 @@ import Foreign.Generic (encodeJSON)
 import Foreign.Object (isEmpty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (addRoleInstancesToContext, getAuthor, getSubject, setProperty)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (lift2)
@@ -72,13 +71,13 @@ import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedP
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
 import Perspectives.SaveUserData (setBinding)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, flip, not, pure, unit, void, ($), (&&), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, flip, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setBinding on each role.
@@ -252,17 +251,6 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
           rolInstanceId <- pure $ RoleInstance (unwrap contextInstanceId <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType)) <> "_" <> (rol_padOccurrence (getNextRolIndex rolInstances)))
           constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) rolInstanceId
         Just roleId -> constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) (RoleInstance roleId)
-
-      -- Serialise as Deltas if we bind to a user that is not me.
-      if (isJust binding && kindOfRole == UserRole && not isMe)
-          -- If the binding is a User that is not me,
-          -- serialise the context for that User.
-          -- We must do that before we generate Deltas that add a role to the context,
-          -- otherwise, on reconstructing from the Deltas, the peer'll try to add a rol to a
-          -- non-existing context!
-          -- We assume here that a User has just one role in the context (otherwise the serialisation is superfluous).
-          then contextInstanceId `serialisedAsDeltasFor` roleInstance
-          else pure unit
 
       -- Then add the new Role instance to the context. Takes care of SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
       addRoleInstancesToContext contextInstanceId roleType (singleton (Tuple roleInstance Nothing))

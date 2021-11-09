@@ -20,16 +20,25 @@
 
 -- END LICENSE
 
-module Perspectives.Assignment.SerialiseAsDeltas where
+module Perspectives.Assignment.SerialiseAsDeltas
+( serialisedAsDeltasFor
+, getPropertyValues
+, serialiseDependency
+, serialiseRoleInstancesAndProperties
+, serialisedAsDeltasForUserType
+)
+where
 
 import Control.Monad.AvarMonadAsk (get) as AMA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array.Partial (head) as PA
+import Data.Array (cons, head) as ARR
+import Data.Array.NonEmpty (NonEmptyArray, head, singleton) as NA
+import Data.Array.NonEmpty (toArray)
 import Data.Foldable (for_, traverse_)
 import Data.List.NonEmpty (NonEmptyList, foldM, head)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (new)
 import Effect.Class.Console (log)
@@ -38,32 +47,34 @@ import Foreign.Class (encode)
 import Foreign.Object (lookup)
 import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##>>), (###=), type (~~>), (##=))
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, MonadPerspectivesQuery, liftToInstanceLevel, (###=), (##=), (##>>), type (~~~>), (###>>))
 import Perspectives.Deltas (addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (bottom, roleType_)
+import Perspectives.Instances.Combinators (some)
+import Perspectives.Instances.ObjectGetters (roleType, roleType_)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
+import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialisesADT)
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
+import Perspectives.Representation.Class.Role (typeIncludingAspects)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (perspectivesClosure_, propertiesInPerspective)
+import Perspectives.Types.ObjectGetters (perspectivesClosure_, propertiesInPerspective, roleAspectsClosure)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor cid userId = do
   userType <- lift $ lift $  roleType_ userId
-  systemUser <- lift $ lift $ (userId ##>> bottom)
-  serialisedAsDeltasFor_ cid systemUser (ENR userType)
+  serialisedAsDeltasFor_ cid userId (ENR userType)
 
 -- | Construct a Transaction that represents a context for a particular user role.
 -- | Serialise the Transaction as a string.
@@ -95,7 +106,7 @@ serialisedAsDeltasForUserType cid userType = do
       >>= lift <<< createTransaction authoringRole
       >>= lift <<< new
       >>= runReaderT (runArrayT run)
-      >>= pure <<< unsafePartial PA.head
+      >>= pure <<< unsafePartial fromJust <<< ARR.head
         where
           run :: MonadPerspectivesTransaction Transaction
           run = do
@@ -106,59 +117,73 @@ serialisedAsDeltasForUserType cid userType = do
 liftToMPT :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 liftToMPT = lift <<< lift
 
+-- | The `userId` must be an instance of the `userType`, otherwise we cannot establish whether
+-- | a perspective is a self-perspective.
 serialisedAsDeltasFor_:: ContextInstance -> RoleInstance -> RoleType -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor_ cid userId userType =
   -- All Roletypes the user may see in this context, expressed as Perspectives.
-   (liftToMPT (userType ###= perspectivesClosure_) >>= traverse_ (serialisePerspectiveForUser cid [userId]))
+   (liftToMPT (userType ###= perspectivesClosure_) >>= traverse_ (serialisePerspectiveForUser cid (NA.singleton userId) userType))
 
--- | Add Deltas to the transaction for the given users, to provide them with a complete
--- | account of the perspective on the context instance.
--- TODO: handle selfOnly.
-serialisePerspectiveForUser :: ContextInstance -> Array RoleInstance -> Perspective -> MonadPerspectivesTransaction Unit
-serialisePerspectiveForUser cid users p@(Perspective{object, propertyVerbs, selfOnly}) = do
+-- | Add Deltas to the transaction of the peers ultimately filling the given user roles, to provide
+-- | them with a complete account of the perspective on the context instance.
+serialisePerspectiveForUser ::
+  ContextInstance ->
+  NA.NonEmptyArray RoleInstance ->
+  RoleType ->
+  Perspective ->
+  MonadPerspectivesTransaction Unit
+serialisePerspectiveForUser cid users userRoleType p@(Perspective{object, propertyVerbs, selfOnly, isSelfPerspective}) = do
   (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ propertiesInPerspective p
-  serialiseRoleInstancesAndProperties cid users object visiblePropertyTypes selfOnly
+  serialiseRoleInstancesAndProperties cid users object visiblePropertyTypes selfOnly isSelfPerspective
 
--- TODO: handle selfOnly.
+-- | MODEL DEPENDENCY IN THIS FUNCTION. The correct operation of this function depends on
+-- | model:System. The role model:System$PerspectivesSystem$User should have a property with
+-- | local name "Id". Instances need not have a value for that property.
 serialiseRoleInstancesAndProperties ::
 	ContextInstance ->	                 -- The context instance for which we serialise roles and properties.
-	Array RoleInstance ->		             -- User RoleTypes to serialise for.
+	NA.NonEmptyArray RoleInstance ->		 -- User Role instances to serialise for. These have a single type.
 	QueryFunctionDescription ->          -- Find role instances with this description.
 	Array PropertyType ->		             -- PropertyTypes whose values on the role instances should be serialised.
-  Boolean ->                           -- True iff the perspective is selfonly.
+  Boolean ->                           -- true iff the perspective is selfonly.
+  Boolean ->                           -- true iff the object of the perspective equals its subject.
 	MonadPerspectivesTransaction Unit
-serialiseRoleInstancesAndProperties cid users object properties selfOnly = do
+serialiseRoleInstancesAndProperties cid users object properties selfOnly isPerspectiveOnSelf = do
+  -- We know that object has a role range.
+  properties' <- if isPerspectiveOnSelf
+    then pure $ ARR.cons (ENP $ EnumeratedPropertyType "model:System$PerspectivesSystem$User$Id") properties
+    else pure properties
   -- All instances of this RoleType (object) the user may see in this context.
   -- In general, these may be instances of several role types, as the perspective object is expressed as a query.
   (rinstances :: Array (DependencyPath)) <- liftToMPT ((singletonPath (C cid)) ##= interpret object)
   -- Serialise all the dependencies.
   -- If the perspective is selfOnly, then each of the users can only receive his own role and properties.
   -- This means that the users and (the role instances in) rinstances should be the same collection.
-  -- in that case,
+  -- in that case, call serialiseDependency on a pair consisting of the instance (one of rinstances, each represented by a Dependency) and a user that is that same instance.
   if selfOnly
     then for_ (join (allPaths <$> rinstances))
       \(dependencies :: NonEmptyList Dependency) -> do
         void $ foldM (serialiseDependency
+          -- The head will be a user role because of selfOnly.
           (unsafePartial case head dependencies of
             R r -> [r]))
           Nothing
           dependencies
-        for_ properties
+        for_ properties'
           \pt -> for_ (_.head <$> rinstances)
             \(dep ::Dependency) -> do
-            (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
-            for_ (join (allPaths <$> vals)) (foldM
-              (serialiseDependency
-                (unsafePartial case dep of
-                  R r -> [r]))
-                Nothing)
+              (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
+              for_ (join (allPaths <$> vals)) (foldM
+                (serialiseDependency
+                  (unsafePartial case dep of
+                    R r -> [r]))
+                  Nothing)
     else do
-      for_ (join (allPaths <$> rinstances)) (foldM (serialiseDependency users) Nothing)
-      for_ properties
+      for_ (join (allPaths <$> rinstances)) (foldM (serialiseDependency $ toArray users) Nothing)
+      for_ properties'
         \pt -> for_ (_.head <$> rinstances)
           \(dep :: Dependency) -> do
             (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
-            for_ (join (allPaths <$> vals)) (foldM (serialiseDependency users) Nothing)
+            for_ (join (allPaths <$> vals)) (foldM (serialiseDependency $ toArray users) Nothing)
 
 getPropertyValues :: PropertyType -> DependencyPath ~~> DependencyPath
 getPropertyValues pt dep = do
@@ -166,6 +191,7 @@ getPropertyValues pt dep = do
   interpret calc dep
 
 -- Always returns the second argument in Maybe.
+-- | `users` will not always be model:System$PerspectivesSystem$User instances.
 serialiseDependency :: Array RoleInstance ->  Maybe Dependency -> Dependency -> MonadPerspectivesTransaction (Maybe Dependency)
 serialiseDependency users mprevious d = do
   case mprevious, d of

@@ -66,7 +66,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
-import Perspectives.SaveUserData (removeAllRoleInstances, handleNewPeer, removeRoleInstance, setBinding, removeBinding)
+import Perspectives.SaveUserData (handleNewPeer, removeAllRoleInstances, removeBinding, removeRoleInstance, setBinding)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Put an error boundary around this function.
@@ -116,7 +116,6 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifi
         })
       -- now bind it in the role instance.
       void $ setBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
-      -- handleNewPeer (RoleInstance newContextId)
 
 compileAssignmentFromRole (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
@@ -176,7 +175,7 @@ compileAssignmentFromRole (BQD _ QF.Bind_ binding binder _ _ _) = do
       Just binding'' -> case binder' of
         Nothing -> pure []
         Just binder'' -> do
-          setBinding binder'' binding'' Nothing -- <* handleNewPeer binder''
+          setBinding binder'' binding'' Nothing <* handleNewPeer binder''
 
 compileAssignmentFromRole (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (RoleInstance ~~> RoleInstance)) <- role2role bindings

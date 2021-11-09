@@ -41,7 +41,7 @@ type CompiledContextState =
   , automaticOnExit :: Map RoleType (Updater ContextInstance)
   , notifyOnEntry :: Map RoleType (CompiledSentence ContextInstance)
   , notifyOnExit :: Map RoleType (CompiledSentence ContextInstance)
-  , perspectivesOnEntry :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean}
+  , perspectivesOnEntry :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean, isSelfPerspective :: Boolean}
   }
 
 -- | A global store of SupportedEffect-s
@@ -82,4 +82,5 @@ type CompiledStateDependentPerspective =
   { contextGetter :: RoleInstance ~~> ContextInstance
   , properties :: Array PropertyType
   , selfOnly :: Boolean
+  , isSelfPerspective :: Boolean
 }
