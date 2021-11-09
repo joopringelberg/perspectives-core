@@ -175,12 +175,7 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
       Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
-      Right (pdbu :: PouchdbUser) -> do
-        (pouchdbUser :: PouchdbUser) <- pure
-          { systemIdentifier: pdbu.systemIdentifier
-          , password: pdbu.password
-          , couchdbUrl: pdbu.couchdbUrl
-          }
+      Right (pouchdbUser :: PouchdbUser) -> do
         state <- new $ newPerspectivesState pouchdbUser publicRepo
         runPerspectivesWithState
           (do
