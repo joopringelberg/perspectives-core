@@ -182,14 +182,14 @@ documentsInDatabase :: forall f. DatabaseName -> Boolean -> MonadPouchdb f Pouch
 documentsInDatabase dbName include_docs = withDatabase dbName
   \db -> catchError
     do
-      f <- lift $ fromEffectFnAff $ documentsInDatabaseImpl db {include_docs}
+      f <- lift $ fromEffectFnAff $ runEffectFnAff2 documentsInDatabaseImpl db {include_docs}
       case (read f) of
         Left e -> throwError $ error ("documentsInDatabase: error in decoding result: " <> show e)
         Right r -> pure r
     -- Convert the incoming message to a PouchError type.
     (handlePouchError "documentsInDatabase" dbName)
 
-foreign import documentsInDatabaseImpl :: PouchdbDatabase -> {include_docs :: Boolean} -> EffectFnAff Foreign
+foreign import documentsInDatabaseImpl :: EffectFn2 PouchdbDatabase {include_docs :: Boolean} Foreign
 
 type Rev = {rev :: String}
 type PouchdbAllDocs =

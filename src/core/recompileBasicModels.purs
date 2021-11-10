@@ -37,6 +37,7 @@ import Data.Traversable (for)
 import Effect (Effect)
 import Effect.Aff (Error, runAff, throwError, error)
 import Effect.Aff.AVar (new)
+import Effect.Class.Console (log)
 import Foreign (Foreign)
 import Foreign.Object (insert)
 import Perspectives.CoreTypes (MonadPerspectives, (##=))
@@ -112,6 +113,7 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
           Right df@(DomeinFile drf) -> lift $ lift do
+            log $  "Recompiled '" <> _id <> "' succesfully!"
             storeDomeinFileInCouchdbPreservingAttachments df
 
 newtype UninterpretedDomeinFile = UninterpretedDomeinFile
