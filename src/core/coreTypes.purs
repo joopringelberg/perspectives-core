@@ -303,7 +303,7 @@ infix 0 evalMonadPerspectivesQueryToMaybeObject as ##>
 runMonadPerspectivesQueryToObject :: forall s o. Newtype s String => s -> (s ~~> o) -> (MonadPerspectives) o
 runMonadPerspectivesQueryToObject id tog = evalMonadPerspectivesQuery id tog >>= \objects ->
   case head objects of
-  Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unwrap id) <> "'."
+  Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unwrap id) <> "' (look for `##>>`)."
   (Just obj) -> pure obj
 
 infix 0 runMonadPerspectivesQueryToObject as ##>>

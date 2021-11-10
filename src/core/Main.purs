@@ -19,7 +19,10 @@
 -- Full text of this license can be found in the LICENSE directory in the projects root.
 -- END LICENSE
 
-module Main where
+module Main
+
+where
+import Main.RecompileBasicModels as RBM
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
@@ -291,3 +294,6 @@ addIndexedNames = do
   contextInstances <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedContext"] (ContextInstance "")))
   iContexts <- indexedContexts_ contextInstances
   modify \ps -> ps {indexedRoles = iRoles, indexedContexts = iContexts}
+
+recompileBasicModels :: Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
+recompileBasicModels = RBM.recompileBasicModels
