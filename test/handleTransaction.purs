@@ -60,7 +60,7 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
       case mdbName of
         Just (Just (Value dbName)) -> do
           -- get the document name
-          transactionDocNames <- (map _.id) <<< _.rows <$> documentsInDatabase dbName
+          transactionDocNames <- (map _.id) <<< _.rows <$> documentsInDatabase dbName false
           case head transactionDocNames of
             Nothing -> liftAff $ assert "There should be a transaction document" false
             Just docName -> do

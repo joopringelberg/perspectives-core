@@ -81,8 +81,11 @@ loadAndCompileArcFile_ text = catchError
             case x' of
               (Left e) -> pure $ Left [e]
               (Right correctedDFR@{referredModels}) -> do
-                -- Remove the self-referral
-                pure $ Right $ DomeinFile correctedDFR {referredModels = delete (DomeinFileId _id) referredModels}
+                -- Remove the self-referral and add the source.
+                pure $ Right $ DomeinFile correctedDFR
+                  { referredModels = delete (DomeinFileId _id) referredModels
+                  , arc = text
+                  }
   \e -> pure $ Left [Custom (show e)]
 
 type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)

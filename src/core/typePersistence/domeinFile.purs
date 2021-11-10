@@ -64,6 +64,7 @@ type DomeinFileRecord =
   , views :: Object View
   , states :: Object PEState.State
   , crl :: String
+  , arc :: String
   -- These are instances of types in this model that have been declared 'indexed'.
   , indexedRoles :: Array RoleInstance
   , indexedContexts :: Array ContextInstance
@@ -161,6 +162,7 @@ defaultDomeinFileRecord =
   , views: empty
   , states: empty
   , crl: ""
+  , arc: ""
   , indexedRoles: []
   , indexedContexts: []
   , modelDescription: Nothing
