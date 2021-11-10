@@ -41,7 +41,7 @@ import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, Broker
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty, getRoleBinders)
 import Perspectives.Names (getMySystem, getUserIdentifier)
-import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, getDocument_)
+import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (brokerService, setBrokerService, setStompClient, stompClient)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
@@ -100,7 +100,7 @@ incomingPost = do
     sendOutgoingPost :: MonadPerspectives Unit
     sendOutgoingPost = do
       postDB <- postDatabaseName
-      (waitingTransactions :: Array String) <- documentsInDatabase postDB >>= _.rows >>> map _.id >>> pure
+      (waitingTransactions :: Array String) <- documentsInDatabase postDB excludeDocs >>= _.rows >>> map _.id >>> pure
       mstompClient <- stompClient
       case mstompClient of
         -- TODO. Order transactions to increasing timestamps (TransactionForPeer, timeStamp)

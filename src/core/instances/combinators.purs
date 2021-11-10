@@ -137,6 +137,13 @@ exists source id = ArrayT do
   r <- runArrayT $ source id
   pure $ [Value $ show $ HA.not $ null r]
 
+exists' :: forall m s o. Eq o => Monad m =>
+  (s -> ArrayT m o) ->
+  (s -> ArrayT m Boolean)
+exists' source id = ArrayT do
+  r <- runArrayT $ source id
+  pure $ [HA.not $ null r]
+
 every :: forall m s. Monad m =>
   (s -> ArrayT m Boolean) ->
   (s -> ArrayT m Boolean)
@@ -187,16 +194,16 @@ not :: forall m s. Monad m =>
   (s -> ArrayT m Value)
 not source id = ArrayT do
   (r :: Array Value) <- runArrayT $ source id
-  map (Value <<< show) <$> not' r
+  map (Value <<< show) <$> not_ r
 
-not_ :: forall m s. Monad m =>
+not' :: forall m s. Monad m =>
   (s -> ArrayT m Boolean) ->
   (s -> ArrayT m Boolean)
-not_ source id = ArrayT do
+not' source id = ArrayT do
   (r :: Array Boolean) <- runArrayT $ source id
   pure (HA.not <$> r)
 
-not' :: forall m. Monad m => Array Value -> m (Array Boolean)
-not' r = if null r
+not_ :: forall m. Monad m => Array Value -> m (Array Boolean)
+not_ r = if null r
   then pure [true]
   else pure $ ((==) (Value "false")) <$> r

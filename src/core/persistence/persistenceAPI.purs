@@ -172,23 +172,29 @@ foreign import databaseInfoImpl :: PouchdbDatabase -> EffectFnAff Foreign
 -----------------------------------------------------------
 -- DOCUMENTSINDATABASE
 -----------------------------------------------------------
-documentsInDatabase :: forall f. DatabaseName -> MonadPouchdb f PouchdbAllDocs
-documentsInDatabase dbName = withDatabase dbName
+includeDocs :: Boolean
+includeDocs = true
+
+excludeDocs :: Boolean
+excludeDocs = false
+
+documentsInDatabase :: forall f. DatabaseName -> Boolean -> MonadPouchdb f PouchdbAllDocs
+documentsInDatabase dbName include_docs = withDatabase dbName
   \db -> catchError
     do
-      f <- lift $ fromEffectFnAff $ documentsInDatabaseImpl db
+      f <- lift $ fromEffectFnAff $ documentsInDatabaseImpl db {include_docs}
       case (read f) of
         Left e -> throwError $ error ("documentsInDatabase: error in decoding result: " <> show e)
         Right r -> pure r
     -- Convert the incoming message to a PouchError type.
     (handlePouchError "documentsInDatabase" dbName)
 
-foreign import documentsInDatabaseImpl :: PouchdbDatabase -> EffectFnAff Foreign
+foreign import documentsInDatabaseImpl :: PouchdbDatabase -> {include_docs :: Boolean} -> EffectFnAff Foreign
 
 type Rev = {rev :: String}
 type PouchdbAllDocs =
   { offset :: Int
-  , rows :: Array { id :: String, value :: Rev}
+  , rows :: Array { id :: String, value :: Rev, doc :: Maybe Foreign}
   , total_rows :: Int
   , update_seq :: Maybe Int
   }
@@ -330,6 +336,15 @@ tryGetDocument_ dbName docName = withDatabase dbName
         Left e -> throwError $ error ("tryGetDocument_ : error in decoding result: " <> show e)
         Right result -> pure result
     (handleNotFound "tryGetDocument_" docName)
+
+-- | Similar to getDocument but without the requirement that the resulting document is an instance of Revision
+-- | or Decode.
+getDocument__ :: forall f. DatabaseName -> DocumentName -> MonadPouchdb f Foreign
+getDocument__ dbName docName = withDatabase dbName
+  \db -> do
+    catchError
+      (lift $ fromEffectFnAff $ runEffectFnAff2 getDocumentImpl db docName)
+      (handlePouchError "getDocument_" docName)
 
 foreign import getDocumentImpl :: EffectFn2
   PouchdbDatabase

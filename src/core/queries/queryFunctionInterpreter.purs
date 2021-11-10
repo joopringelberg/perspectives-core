@@ -39,7 +39,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
-import Perspectives.Instances.Combinators (available', not')
+import Perspectives.Instances.Combinators (available', not_)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, getUnlinkedRoleInstances, roleModelName, roleType)
 import Perspectives.Instances.Values (bool2Value, value2Date, value2Int)
@@ -116,7 +116,7 @@ interpret (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) a = ArrayT do
 interpret (UQD _ (UnaryCombinator NotF) f1 _ _ _) a = ArrayT do
   (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   -- The DescriptionCompiler ensures that we have only Value type heads.
-  result <- lift $ not' (Value <<< toString <$> r)
+  result <- lift $ not_ (Value <<< toString <$> r)
   pure $ [consOnMainPath (V "NotF" (Value $ show result)) a]
 
 -----------------------------------------------------------

@@ -96,9 +96,9 @@ exports.deleteDatabaseImpl = function ( database ) {
   };
 };
 
-exports.documentsInDatabaseImpl = function( database ) {
+exports.documentsInDatabaseImpl = function( database, options ) {
   return function (onError, onSuccess) {
-    database.allDocs( function(err, response)
+    database.allDocs( options, function(err, response)
       {
         if (err != null)
         {

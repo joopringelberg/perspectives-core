@@ -55,7 +55,7 @@ import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
-import Perspectives.Instances.Combinators (filter, not_) as COMB
+import Perspectives.Instances.Combinators (filter, not') as COMB
 import Perspectives.Instances.ObjectGetters (boundByRole, contextType, getActiveRoleStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
@@ -211,7 +211,7 @@ enteringRoleState roleId userRoleType stateId = do
     Nothing -> pure unit
     Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly, isSelfPerspective} -> do
       currentcontext <- lift2 $ (roleId ##>> contextGetter)
-      userInstances <- lift2 (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not_ (boundByRole (RoleInstance me))))
+      userInstances <- lift2 (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (boundByRole (RoleInstance me))))
       case fromArray userInstances of
         Nothing -> pure unit
         Just u' -> serialiseRoleInstancesAndProperties
