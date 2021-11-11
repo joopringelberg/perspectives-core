@@ -233,7 +233,9 @@ infix 1 runTypeLevelToObject as ###>>
 -----------------------------------------------------------
 -- | The QueryEnvironment accumulates Assumptions.
 
-type MonadPerspectivesQuery =  ArrayT (WriterT (ArrayWithoutDoubles InformedAssumption) MonadPerspectives)
+type AssumptionTracking = (WriterT (ArrayWithoutDoubles InformedAssumption) MonadPerspectives)
+
+type MonadPerspectivesQuery =  ArrayT AssumptionTracking
 
 type MPQ = MonadPerspectivesQuery
 

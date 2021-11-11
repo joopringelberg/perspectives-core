@@ -37,7 +37,7 @@ import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##=), (##>>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructModelName)
@@ -47,7 +47,7 @@ import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPer
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
-import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&), eq)
+import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&), eq, (<$>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -275,7 +275,7 @@ notIsMe = isMe >=> pure <<< not
 boundBy :: (RoleInstance ~~> RoleInstance) ->
   (RoleInstance ~~> Value)
 boundBy sourceOfBoundRoles binder = ArrayT do
-  (bools :: Array Boolean) <- lift (binder ##= sourceOfBoundRoles >=> bindsRole binder)
+  (bools :: Array Boolean) <- runArrayT $ (sourceOfBoundRoles >=> bindsRole binder) binder
   -- If there are no boundRoles, this function must return false.
   if null bools
     then pure [Value $ show false]
@@ -285,11 +285,11 @@ boundByOperator :: (RoleInstance ~~> RoleInstance) ->
   (RoleInstance ~~> RoleInstance) ->
   (RoleInstance ~~> Value)
 boundByOperator sourceOfBoundRoles sourceOfBindingRoles originRole = ArrayT do
-  boundRoles <- (lift (originRole ##= sourceOfBoundRoles))
-  bindingRoles <- (lift (originRole ##= sourceOfBindingRoles))
+  boundRoles <- runArrayT (sourceOfBoundRoles originRole)
+  bindingRoles <- runArrayT (sourceOfBindingRoles originRole)
   case head boundRoles, head bindingRoles of
     Just boundRole, Just bindingRole | length boundRoles == 1 && length bindingRoles == 1 -> do
-      result <- lift (boundRole ##>> bindsRole bindingRole)
+      result <- (unsafePartial fromJust <<< head) <$> (runArrayT $ (bindsRole bindingRole) boundRole)
       pure [Value $ show result]
     _, _ -> pure [Value $ show false]
 
@@ -315,7 +315,7 @@ bindsRole role bnd' = ArrayT $
 binds :: (RoleInstance ~~> RoleInstance) ->
   (RoleInstance ~~> Value)
 binds sourceOfBindingRoles bnd = ArrayT do
-  (bools :: Array Boolean) <- lift (bnd ##= sourceOfBindingRoles >=> boundByRole bnd)
+  (bools :: Array Boolean) <- runArrayT $ (sourceOfBindingRoles >=> boundByRole bnd) bnd
   -- If there are no bindingRoles, this function must return false.
   if null bools
     then pure [Value $ show false]

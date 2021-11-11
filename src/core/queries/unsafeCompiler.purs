@@ -43,7 +43,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, liftToInstanceLevel, (##=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, liftToInstanceLevel)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -149,7 +149,7 @@ compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafeCoerce $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions) <- traverse compileFunction args
   pure (\c -> do
-    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
+    (values :: Array (Array String)) <- lift $ traverse (\g -> runArrayT $ g c) argFunctions
     -- Notice that the number of parameters given ignores the default argument (context or role) that the function is applied to anyway.
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
       0 -> (unsafeCoerce f :: (String -> MPQ String)) c
@@ -178,7 +178,7 @@ compileFunction (MQD dom (ExternalCorePropertyGetter functionName) args _ _ _) =
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (String ~~> String)) <- traverse compileFunction args
   pure (\r -> do
-    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> r ##= g) argFunctions
+    (values :: Array (Array String)) <- lift $ traverse (\g -> runArrayT $ g r) argFunctions
     -- Notice that the number of parameters given ignores the default argument (context or role) that the function is applied to anyway.
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
       0 -> (unsafeCoerce f :: (String -> MPQ String)) r
@@ -362,8 +362,7 @@ compareFunction fname = case fname of
 ---------------------------------------------------------------------------------------------------
 addBinding_ :: forall a b. String -> (a ~~> b) -> a ~~> b
 addBinding_ varName computation ctxt  = ArrayT do
-  -- v <- computation ctxt
-  v <- lift (ctxt ##= computation)
+  (v :: Array b) <- runArrayT $ computation ctxt
   lift $ addBinding varName (unsafeCoerce v)
   pure v
 
