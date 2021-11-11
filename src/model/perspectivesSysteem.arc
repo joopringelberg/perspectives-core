@@ -23,6 +23,9 @@ domain System
       aspect sys:RootContext$External
       property ConnectedToAMQPBroker (Boolean)
       property CardClipBoard (String)
+      property ShowLibraries (Boolean)
+
+      view ShowLibraries (ShowLibraries)
 
     context TheTrustedCluster filledBy TrustedCluster
 
@@ -57,7 +60,10 @@ domain System
     context Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
 
     -- This will become obsolete when we start using model:CouchdbManagement.
-    context Modellen = filter callExternal cdb:Models() returns sys:Model$External with not IsLibrary
+    context Modellen = letE
+        showlibs <- extern >> ShowLibraries
+      in
+        filter callExternal cdb:Models() returns sys:Model$External with showlibs or (not IsLibrary)
       view ModelPresentation (Description, Name)
 
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
