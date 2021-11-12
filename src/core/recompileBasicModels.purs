@@ -27,38 +27,35 @@ module Main.RecompileBasicModels where
 -- | using this account, all models can be recompiled from the client.
 import Prelude
 
+import Control.Monad.State (execState)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, elemIndex, head, sort)
+import Control.Monad.Writer (WriterT, execWriterT, runWriterT, tell)
+import Data.Array (catMaybes, cons, difference, foldM, null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isJust)
-import Data.Newtype (unwrap)
+import Data.FoldableWithIndex (forWithIndex_)
+import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Effect.Aff (Error, runAff, throwError, error)
+import Effect.Aff (Error, error, runAff, throwError, try)
 import Effect.Aff.AVar (new)
 import Effect.Class.Console (log)
 import Foreign (Foreign)
-import Foreign.Object (insert)
-import Perspectives.CoreTypes (MonadPerspectives, (##=))
-import Perspectives.Couchdb.Revision (changeRevision)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
+import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (modelsDatabaseName)
+import Perspectives.Extern.Couchdb (addInvertedQuery, modelsDatabaseName)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
-import Perspectives.InstanceRepresentation (PerspectContext(..))
-import Perspectives.Instances.Combinators (conjunction, exists', filter, not')
-import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRoleBinders, getUnlinkedRoleInstances)
-import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (documentsInDatabase, includeDocs, retrieveDocumentVersion)
-import Perspectives.Persistence.State (getCouchdbBaseURL)
+import Perspectives.Persistence.API (documentsInDatabase, includeDocs)
 import Perspectives.Persistence.Types (Url, PouchdbUser, decodePouchdbUser')
-import Perspectives.Persistent (getPerspectContext, removeEntiteit, saveEntiteit_)
+import Perspectives.Persistent (getDomeinFile)
 import Perspectives.PerspectivesState (newPerspectivesState)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.TypePersistence.LoadArc (loadArcAndCrl')
@@ -92,7 +89,7 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
               Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
               Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
               Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
-            for_ (sort $ catMaybes uninterpretedDomeinFiles) recompileModel
+            executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel
           )
           state
   where
@@ -109,12 +106,69 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
       false
       (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
       do
+        log ("Recompiling " <> _id)
+        -- TODO. We moeten de inverse queries verwerken in de andere modellen!
         r <- lift $ lift $ loadArcAndCrl' contents.arc contents.crl
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
-          Right df@(DomeinFile drf) -> lift $ lift do
+          Right df@(DomeinFile drf@{invertedQueriesInOtherDomains}) -> lift $ lift do
             log $  "Recompiled '" <> _id <> "' succesfully!"
             storeDomeinFileInCouchdbPreservingAttachments df
+
+            -- Distribute the SeparateInvertedQueries over the other domains.
+            forWithIndex_ invertedQueriesInOtherDomains
+              \domainName queries -> do
+                (try $ getDomeinFile (DomeinFileId domainName)) >>=
+                  handleDomeinFileError "addModelToLocalStore'"
+                  \(DomeinFile dfr) -> do
+                    -- Here we must take care to preserve the screens.js attachment.
+                    (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+
+
+--------------------------------------------------------------------------------------------
+-- TOPOLOGICAL SORTING
+-- Even though we can sort UninterpretedDomeinFile-s using an instance of Ord where we judge
+-- two models to be equal if they don't use each other, the resulting order does not respect
+-- the basic requirement that a model should be to the right of its used models.
+-- The models form a directed graph.
+-- A topological sort (see e.g. https://www.interviewcake.com/concept/java/topological-sort) of such
+-- a graph produces the required order.
+-- There is a module Graph in Pursuit, but we cannot use it because our package set is too old.
+--------------------------------------------------------------------------------------------
+type ToSort = Array UninterpretedDomeinFile
+type SortedLabels = Array String
+type Skipped = Array UninterpretedDomeinFile
+
+executeInTopologicalOrder :: forall m. Monad m =>
+  ToSort ->
+  (UninterpretedDomeinFile -> m Unit) ->
+  m Unit
+executeInTopologicalOrder toSort action = void $ execWriterT (executeInTopologicalOrder' toSort [])
+  where
+    executeInTopologicalOrder' ::
+      ToSort ->
+      SortedLabels ->
+      WriterT Skipped m SortedLabels
+    executeInTopologicalOrder' toSort' sorted = do
+      Tuple sortedLabels skipped <- lift $ runWriterT (foldM executeInTopologicalOrder'' sorted toSort')
+      if null skipped
+        then pure sortedLabels
+        else executeInTopologicalOrder' skipped sortedLabels
+
+    executeInTopologicalOrder'' ::
+      SortedLabels ->
+      UninterpretedDomeinFile ->
+      WriterT Skipped m SortedLabels
+    executeInTopologicalOrder'' sortedLabels df@(UninterpretedDomeinFile{_id}) = if zeroInDegrees df
+      then do
+        lift $ action df
+        pure $ cons _id sortedLabels
+      else do
+        tell [df]
+        pure sortedLabels
+      where
+        zeroInDegrees :: UninterpretedDomeinFile -> Boolean
+        zeroInDegrees (UninterpretedDomeinFile{contents})= null $ contents.referredModels `difference` sortedLabels
 
 newtype UninterpretedDomeinFile = UninterpretedDomeinFile
   { _id :: String
@@ -129,73 +183,6 @@ newtype UninterpretedDomeinFile = UninterpretedDomeinFile
 instance readForeignUninterpretedDomeinFile :: ReadForeign UninterpretedDomeinFile where
   readImpl f = UninterpretedDomeinFile <$> (read' f)
 
-instance eqUninterpretedDomeinFile :: Eq UninterpretedDomeinFile where
-  eq (UninterpretedDomeinFile {_id:id1}) (UninterpretedDomeinFile {_id:id2}) = eq id1 id2
-
-instance ordUninterpretedDomeinFile :: Ord UninterpretedDomeinFile where
-  compare (UninterpretedDomeinFile {_id:id1, contents:c1}) (UninterpretedDomeinFile {_id:id2, contents:c2}) =
-    if isJust $ elemIndex id1 c2.referredModels
-      then LT
-      else if isJust $ elemIndex id2 c1.referredModels
-        then GT
-        else EQ
-
-recompileBasicModels' :: Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-recompileBasicModels' rawPouchdbUser publicRepo callback = void $ runAff handler
-  do
-    case decodePouchdbUser' rawPouchdbUser of
-      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
-      Right (pouchdbUser :: PouchdbUser) -> do
-        state <- new $ newPerspectivesState pouchdbUser publicRepo
-        runPerspectivesWithState
-          (do
-            addAllExternalFunctions
-            mySystem <- ContextInstance <$> getMySystem
-            modelsToKeep <- mySystem ##= filter
-              (getUnlinkedRoleInstances modelsInUse)
-              (exists' (conjunction (getRoleBinders modelDescription) (binding >=> (getRoleBinders modelDescription))))
-            modelsToRemove <- mySystem ##= filter
-              (getUnlinkedRoleInstances modelsInUse)
-              (not' (exists' (conjunction (getRoleBinders modelDescription) (binding >=> (getRoleBinders modelDescription)))))
-            PerspectContext r@{rolInContext} <- getPerspectContext mySystem
-            void $ saveEntiteit_ mySystem (PerspectContext r {rolInContext = insert (unwrap modelsInUse) modelsToKeep rolInContext})
-            for_ modelsToRemove removeEntiteit
-            modelsToRecompile <- mySystem ##=
-              ((getUnlinkedRoleInstances modelsInUse) >=>
-              (conjunction (getRoleBinders modelDescription) (binding >=> (getRoleBinders modelDescription))) >=>
-              context >=>
-              externalRole
-              )
-            for_ modelsToRecompile recompileModel
-            )
-          state
-  where
-    handler :: Either Error Unit -> Effect Unit
-    handler (Left e) = do
-      logPerspectivesError $ Custom $ "An error condition in recompileBasicModels: " <> (show e)
-      callback false
-    handler (Right e) = do
-      logPerspectivesError $ Custom $ "Basic models recompiled!"
-      callback true
-
-    -- RoleInstance is of type model:ModelManagement$ManagedModel$External.
-    recompileModel :: RoleInstance -> MonadPerspectives Unit
-    recompileModel rid = do
-      arcSources <- rid ##= getProperty (EnumeratedPropertyType "model:ModelManagement$ManagedModel$External$ArcSource")
-      crlSources <- rid ##= getProperty (EnumeratedPropertyType "model:ModelManagement$ManagedModel$External$CrlSource")
-      mcouchbaseUrl <- getCouchdbBaseURL
-      case head arcSources, head crlSources, mcouchbaseUrl of
-        Nothing, _, _ -> logPerspectivesError $ Custom $ "No Arc Source found!"
-        _, Nothing, _ -> logPerspectivesError $ Custom $ "No Crl Source found!"
-        _, _, Nothing -> logPerspectivesError $ Custom $ "No CouchdbUrl found!"
-        Just arcSource, Just crlSource, Just couchdbUrl -> void $ runMonadPerspectivesTransaction'
-          false
-          (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
-          do
-            r <- lift $ lift $ loadArcAndCrl' (unwrap arcSource) (unwrap crlSource)
-            case r of
-              Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
-              Right df@(DomeinFile drf@{_id}) -> lift $ lift do
-                modDb <- modelsDatabaseName
-                mrev <- retrieveDocumentVersion modDb _id
-                void $ saveEntiteit_ (DomeinFileId _id) (changeRevision mrev df)
+derive instance genericUninterpretedDomeinFile :: Generic UninterpretedDomeinFile _
+instance showUninterpretedDomeinFiles :: Show UninterpretedDomeinFile where
+  show (UninterpretedDomeinFile {_id, contents}) = _id <> " <- " <> show contents.referredModels
