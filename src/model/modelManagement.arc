@@ -25,6 +25,8 @@ domain ModelManagement
 
     user Manager filledBy sys:PerspectivesSystem$User
       perspective on Models
+        action RecompileAll
+          SourcesChanged = true for Models
       perspective on Repository
 
   case ManagedModel
