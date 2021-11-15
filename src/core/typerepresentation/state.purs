@@ -34,7 +34,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription)
-import Perspectives.Representation.Action (Action)
+import Perspectives.Representation.Action (AutomaticAction)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Sentence (Sentence)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
@@ -49,8 +49,8 @@ type StateRecord =
 	-- the key in these maps is the subject the effect or notification or perspective is for.
 	, notifyOnEntry :: EncodableMap RoleType Notification
 	, notifyOnExit :: EncodableMap RoleType Notification
-	, automaticOnEntry :: EncodableMap RoleType Action
-	, automaticOnExit :: EncodableMap RoleType Action
+	, automaticOnEntry :: EncodableMap RoleType AutomaticAction
+	, automaticOnExit :: EncodableMap RoleType AutomaticAction
   , perspectivesOnEntry :: EncodableMap RoleType StateDependentPerspective
 	, subStates :: Array StateIdentifier
 	}

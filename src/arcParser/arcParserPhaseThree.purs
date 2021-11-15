@@ -67,7 +67,7 @@ import Perspectives.Query.Kinked (completeInversions, setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, mandatory, range, sumOfDomains)
 import Perspectives.Query.StatementCompiler (compileStatement)
 import Perspectives.Representation.ADT (ADT(..), reduce)
-import Perspectives.Representation.Action (Action(..))
+import Perspectives.Representation.Action (AutomaticAction(..), Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
@@ -430,7 +430,7 @@ handlePostponedStateQualifiedParts = do
         objectQfd
       where
 
-        modifyAllStates :: Action -> Array RoleType -> Array StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> PhaseThree Unit
+        modifyAllStates :: AutomaticAction -> Array RoleType -> Array StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> PhaseThree Unit
         modifyAllStates automaticAction qualifiedUsers states currentDomain mobjectQfd = for_ states
           (modifyPartOfState start end
             \(sr@{automaticOnEntry, automaticOnExit, query}) -> do
@@ -535,8 +535,6 @@ handlePostponedStateQualifiedParts = do
                 pure (Sentence.CP (Q compiledPart))
 
     handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start})) = do
-      -- `originDomain` is the type of the origin, expressed as Domain.
-      originDomain <- statespec2Domain state
       -- `currentContextDomain` represents the current context, expressed as a Domain.
       currentcontextDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
       -- `subject` is the current subject of lexical analysis. It is represented by
@@ -546,33 +544,21 @@ handlePostponedStateQualifiedParts = do
       -- types).
       -- These qualifiedUsers will end up in InvertedQueries.
       (qualifiedUsers :: Array RoleType) <- collectRoles subject
-      -- Each of the expressions in the statements is applied to the resource that changes state (the origin),
-      -- which can be a role instance or a context instance. Its type can be found from the transition.
-      -- origin -> is always included as an identity step.
-      -- currentcontext -> For ContextState, equals the origin. For SubjectState or
-      -- ObjectState, the role is represented with a RoleIdentification that contains
-      -- its current context.
-      -- currentactor -> It's type is the qualifiedUser computed above.
-      -- All these VarBindings have a computation of type TypeTimeOnly, which instructs the unsafeCompiler to remove them.
+      -- Each of the expressons in the statements is applied to the object of the perspective, always a role
+      -- instance
+      -- We include the following standard variables:
+      --  origin -> is always included as an identity step, obviously provided as argument on executing the action.
+      --  currentcontext -> is provided on executing the action. Its type is computed from the RoleIdentification
+      --  that represents the object.
+      --  currentactor -> It's type is the qualifiedUser computed above.
+      -- The last two VarBindings have a computation of type TypeTimeOnly, which instructs the unsafeCompiler to remove them.
       effectWithEnvironment <- pure $ addContextualBindingsToStatements
-        [ computeOrigin state start
-        , computeCurrentContext state start
+        [ makeIdentityStep "origin" start
+        , makeTypeTimeOnlyContextStep "currentcontext" (roleIdentification2Context syntacticObject) start
         , makeTypeTimeOnlyRoleStep "currentactor" (unsafePartial fromJust $ head qualifiedUsers) start
         ]
         effect
       states <- stateSpec2States state
-      (theAction :: QueryFunctionDescription) <- compileStatement
-        states
-        originDomain
-        currentcontextDomain
-        qualifiedUsers
-        effectWithEnvironment
-      -- Compute the currentcontext from the origin.
-      currentContextCalculation <- case state of
-        -- We do not actually use this result.
-        AST.ContextState ct _ -> pure $ SQD (CDOM $ ST ct) (DataTypeGetter IdentityF) (CDOM $ ST ct) True True
-        AST.ObjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
-        AST.SubjectState roleIdentification _ -> computeCurrentContextFromRoleIdentification roleIdentification start
       -- `syntacticObject` represents the object of the perspective. It allows
       -- for `currentcontext` and `origin`.
       -- currentcontext == origin and this equals the argument that the
@@ -588,13 +574,20 @@ handlePostponedStateQualifiedParts = do
         (compileExpression
           (CDOM $ ST (roleIdentification2Context syntacticObject))
           syntacticObjectWithEnvironment)
+
+      -- The effect starts with the Perspective object, i.e. the syntacticObject.
+      (theAction :: QueryFunctionDescription) <- compileStatement
+        states
+        (range compiledObject)
+        currentcontextDomain
+        qualifiedUsers
+        effectWithEnvironment
+
       stateSpecs <- stateSpecificationToStateSpec state
       modifyAllSubjectPerspectives
         qualifiedUsers
         compiledObject
-        (case state of
-          AST.ContextState _ _ -> ContextAction theAction
-          otherwise -> RoleAction {currentContextCalculation, effect: theAction})
+        (Action theAction)
         stateSpecs
       where
         -- Add the action for all users to their perspective on the object in all states.

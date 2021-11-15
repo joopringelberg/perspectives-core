@@ -58,6 +58,7 @@ type SerialisedPerspective' =
   , isFunctional :: Boolean
   , isMandatory :: Boolean
   , isCalculated :: Boolean
+  -- The RoleType of the object of the Perspective.
   , roleType :: Maybe String
   , roleKind :: Maybe RoleKind
   , verbs :: Array String
@@ -125,7 +126,7 @@ serialisePerspective contextStates subjectStates cid p@(Perspective {id, object,
     , roleKind
     , verbs: show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip lookup (unwrap roleVerbs)) <$> (contextStates <> subjectStates)))
     , properties: fromFoldable ((\prop@({id:propId}) -> Tuple propId prop) <$> properties)
-    , actions: concat (OBJ.keys <$> (catMaybes $ (flip lookup (unwrap actions)) <$> contextStates))
+    , actions: concat (OBJ.keys <$> (catMaybes $ (flip lookup (unwrap actions)) <$> (contextStates <> subjectStates)))
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
     }
 
@@ -189,7 +190,9 @@ type RoleInstanceWithProperties =
   { roleId :: String
   , objectStateBasedRoleVerbs :: Array String
   , objectStateBasedSerialisedProperties :: Array SerialisedProperty
+  -- , objectStateBasedActions :: Array String
   , propertyValues :: Object ValuesWithVerbs
+  , actions :: Array String
   }
 
 -- | The verbs in this type contain both those based on context- and subject state,
@@ -209,7 +212,7 @@ roleInstancesWithProperties ::
   ContextInstance ->
   Perspective ->
   MonadPerspectivesQuery' (Array RoleInstanceWithProperties)
-roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerbs}) = do
+roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerbs, actions}) = do
   (roleGetter :: ContextInstance ~~> RoleInstance) <- lift $ context2role object
   (roleInstances :: Array RoleInstance) <- runArrayT $ roleGetter cid
   -- propertyGetters <- pure []
@@ -249,7 +252,7 @@ roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerb
         , objectStateBasedRoleVerbs
         , objectStateBasedSerialisedProperties
         , propertyValues: fromFoldable valuesAndVerbs
-      }
+        , actions: concat (OBJ.keys <$> (catMaybes $ (flip lookup (unwrap actions)) <$> roleStates))      }
     add :: Array Intermediate ->
       Intermediate ->
       Array Intermediate

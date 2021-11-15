@@ -29,15 +29,14 @@ import Control.Plus (map, (<|>), empty)
 import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, foldr, fromFoldable, intersect, null, singleton)
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Map (Map, empty, lookup, insert, keys) as Map
-import Data.Map (unionWith)
+import Data.Map (unionWith, values)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for_, traverse)
-import Foreign.Object (keys) as OBJ
-import Foreign.Object (union)
+import Foreign.Object (keys, lookup, union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
@@ -50,6 +49,7 @@ import Perspectives.Instances.Combinators (closure_, conjunction, some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialisesADT)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
@@ -562,7 +562,7 @@ addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Per
   -- PropertySets are equal.
   , propertyVerbs = EncodableMap $ unionWith append (unwrap perspectiveAspect.propertyVerbs) (unwrap perspective.propertyVerbs)
   -- Note that two Action maps with duplicate keys will lose actions when added to each other.
-  , actions = EncodableMap $ unionWith union (unwrap perspectiveAspect.actions) (unwrap perspective.actions)
+  , actions = EncodableMap $ unionWith OBJ.union (unwrap perspectiveAspect.actions) (unwrap perspective.actions)
   , selfOnly = perspectiveAspect.selfOnly || perspective.selfOnly
   }
 
@@ -573,3 +573,15 @@ isPerspectiveOnSelf :: Partial => QueryFunctionDescription -> (RoleType ~~~> Boo
 isPerspectiveOnSelf qfd = some (
   lift <<< typeIncludingAspects >=>
   (\adt -> pure $ unwrap (roleRange qfd `equalsOrSpecialisesADT` adt)))
+
+----------------------------------------------------------------------------------------
+------- FUNCTIONS FOR ACTIONS
+----------------------------------------------------------------------------------------
+type ActionName = String
+getAction :: ActionName -> Perspective -> Maybe Action
+getAction actionName (Perspective{actions}) = foldl
+  (\maction stateDepActions -> case maction of
+    Just action -> Just action
+    Nothing -> OBJ.lookup actionName stateDepActions)
+  Nothing
+  (values $ unwrap actions)

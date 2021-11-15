@@ -27,21 +27,30 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 
-data Action = ContextAction QueryFunctionDescription |
+data AutomaticAction = ContextAction QueryFunctionDescription |
   RoleAction
     { currentContextCalculation :: QueryFunctionDescription
   	, effect :: QueryFunctionDescription
   	}
 
-effectOfAction :: Action -> QueryFunctionDescription
+effectOfAction :: AutomaticAction -> QueryFunctionDescription
 effectOfAction (ContextAction effect) = effect
 effectOfAction (RoleAction action) = action.effect
 
+derive instance genericAutomaticAction :: Generic AutomaticAction _
+instance showAutomaticAction :: Show AutomaticAction where show = genericShow
+instance eqAutomaticAction :: Eq AutomaticAction where eq = genericEq
+instance encodeAutomaticAction :: Encode AutomaticAction where encode = genericEncode defaultOptions
+instance decodeAutomaticAction :: Decode AutomaticAction where decode = genericDecode defaultOptions
+
+newtype Action = Action QueryFunctionDescription
 derive instance genericAction :: Generic Action _
+derive instance newtypeAction :: Newtype Action _
 instance showAction :: Show Action where show = genericShow
 instance eqAction :: Eq Action where eq = genericEq
 instance encodeAction :: Encode Action where encode = genericEncode defaultOptions
