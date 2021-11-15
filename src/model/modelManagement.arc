@@ -16,9 +16,9 @@ domain ModelManagement
     external
       aspect sys:RootContext$External
 
-    context Models filledBy ManagedModel
+    context Models (relational) filledBy ManagedModel
 
-    thing Repository (mandatory)
+    thing Repository (mandatory, relational)
       property Name (mandatory, String)
       property Url (mandatory, String)
       property Description (String)
@@ -26,8 +26,12 @@ domain ModelManagement
     user Manager filledBy sys:PerspectivesSystem$User
       perspective on Models
         action RecompileAll
-          SourcesChanged = true for Models
+          SourcesChanged = true for context >> Models
+        only (CreateAndFill)
+        props (Name) verbs (Consult)
+        props (SourcesChanged) verbs (Consult, SetPropertyValue)
       perspective on Repository
+        defaults
 
   case ManagedModel
     aspect sys:ContextWithNotification
