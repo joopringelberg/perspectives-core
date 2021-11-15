@@ -48,7 +48,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
-import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, some, wrapLogicalOperator)
+import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, some, wrapLogicalOperator, filter)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRoleBinders, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
@@ -649,3 +649,6 @@ getAllMyRoleTypes ctxt = ((contextType >=> (liftToInstanceLevel contextAspectsCl
 
 computesMe :: ContextInstance -> RoleType ~~> Boolean
 computesMe ctxt' rt = some (getRoleInstances rt >=> lift <<< lift <<< isMe) ctxt'
+
+getMeInRoleAndContext :: RoleType -> ContextInstance ~~> RoleInstance
+getMeInRoleAndContext rt = filter (getRoleInstances rt) (lift <<< lift <<< isMe)

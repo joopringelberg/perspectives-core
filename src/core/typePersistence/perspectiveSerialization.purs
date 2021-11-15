@@ -190,7 +190,6 @@ type RoleInstanceWithProperties =
   { roleId :: String
   , objectStateBasedRoleVerbs :: Array String
   , objectStateBasedSerialisedProperties :: Array SerialisedProperty
-  -- , objectStateBasedActions :: Array String
   , propertyValues :: Object ValuesWithVerbs
   , actions :: Array String
   }

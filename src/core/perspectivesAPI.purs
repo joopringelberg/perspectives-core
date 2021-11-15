@@ -68,7 +68,7 @@ import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
-import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMyType, getRoleFunction, getRoleInstances)
+import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT, reduce)
 import Perspectives.Representation.Action (Action(..)) as ACTION
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getEnumeratedRole, getPerspectType)
@@ -445,21 +445,22 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- ...}
     Api.Action -> catchError
         (case read contextDescription of
-          Left err -> sendResponse (Error corrId ("Incorrectly formed description of Action on applying an action in context instance '" <> object <> "', for user role instance '" <> subject <> "' and object role instance '" <> predicate <> "'. Errors: " <> show err )) setter
+          Left err -> sendResponse (Error corrId ("Incorrectly formed description of Action on applying an action in context instance '" <> object <> "' and object role instance '" <> predicate <> "'. Errors: " <> show err )) setter
           Right ({perspectiveId, actionName} :: {perspectiveId :: String, actionName :: String}) -> do
             -- Find the action from the authoringRole, the perspective id, the Action name.
             maction <- (map $ getAction actionName) <$> (findPerspective authoringRole (\(Perspective{id})-> pure $ id `eq` perspectiveId))
-            case maction of
-              Just (Just (ACTION.Action action)) -> void $ runMonadPerspectivesTransaction authoringRole
+            mauthoringRoleInstance <- (ContextInstance object) ##> getMeInRoleAndContext authoringRole
+            case mauthoringRoleInstance, maction of
+              Just author, Just (Just (ACTION.Action action)) -> void $ runMonadPerspectivesTransaction authoringRole
                 do
                   oldFrame <- lift2 $ pushFrame
                   lift2 $ addBinding "currentcontext" [object]
                   lift2 $ addBinding "origin" [predicate]
-                  lift2 $ addBinding "currentactor" [subject]
+                  lift2 $ addBinding "currentactor" [unwrap author]
                   updater <- lift2 $ compileAssignmentFromRole action
                   updater (RoleInstance predicate)
                   lift2 $ restoreFrame oldFrame
-              _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show authoringRole <> "', perspectiveId '" <> perspectiveId <> "' and action name '" <> actionName <> "'.") setter
+              _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show authoringRole <> "', perspectiveId '" <> perspectiveId <> "' and action name '" <> actionName <> "'.") setter
             )
       (\e -> sendResponse (Error corrId (show e)) setter)
 
