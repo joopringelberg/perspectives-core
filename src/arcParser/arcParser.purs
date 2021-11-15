@@ -888,13 +888,13 @@ roleVerb :: IP RoleVerb
 roleVerb = do
   v <- token.identifier
   case v of
+    "RemoveFiller" -> pure RemoveFiller
     "Remove" -> pure Remove
     "Delete" -> pure Delete
-    "Create" -> pure Create
     "CreateAndFill" -> pure CreateAndFill
+    "Create" -> pure Create
     "Fill" -> pure Fill
     "Unbind" -> pure Unbind
-    "RemoveFiller" -> pure RemoveFiller
     "Move" -> pure Move
     _ -> fail "Not a role verb"
 
