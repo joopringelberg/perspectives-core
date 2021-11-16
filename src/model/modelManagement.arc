@@ -27,7 +27,7 @@ domain ModelManagement
       perspective on Models
         action RecompileAll
           SourcesChanged = true for context >> Models
-        only (CreateAndFill)
+        only (CreateAndFill, Remove)
         props (Name) verbs (Consult)
         props (SourcesChanged) verbs (Consult, SetPropertyValue)
       perspective on Repository
@@ -71,7 +71,7 @@ domain ModelManagement
 
     context ModelDescription filledBy sys:Model
 
-    user Author (mandatory) filledBy Manager
+    user Author = extern >> binder Models >> context >> Manager
       perspective on extern
 
       perspective on ModelDescription
