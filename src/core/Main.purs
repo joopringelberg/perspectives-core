@@ -181,22 +181,24 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
       Right (pouchdbUser :: PouchdbUser) -> do
         state <- new $ newPerspectivesState pouchdbUser publicRepo
         runPerspectivesWithState
-          (do
-            -- Get all Channels
-            getChannels <- getRoleFunction "sys:PerspectivesSystem$Channels"
-            system <- getMySystem
-            (channels :: Array ContextInstance) <- (ContextInstance system) ##= getChannels >=> context
-            -- End their replication
-            void $ withCouchdbUrl \url -> for_ channels (endChannelReplication url)
-            -- remove the databases
-            getChannelDbId <- getPropertyFunction "sys:Channel$External$ChannelDatabaseName"
-            for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDb <<< unwrap
-            clearUserDatabase
-            clearModelDatabase
-            clearPostDatabase
-            -- clear the caches, otherwise nothing happens.
-            resetCaches
-            setupUser)
+          (catchError do
+              -- Get all Channels
+              getChannels <- getRoleFunction "sys:PerspectivesSystem$Channels"
+              system <- getMySystem
+              (channels :: Array ContextInstance) <- (ContextInstance system) ##= getChannels >=> context
+              -- End their replication
+              void $ withCouchdbUrl \url -> for_ channels (endChannelReplication url)
+              -- remove the databases
+              getChannelDbId <- getPropertyFunction "sys:Channel$External$ChannelDatabaseName"
+              for_ channels \c -> (c ##>> externalRole >=> getChannelDbId) >>= deleteDb <<< unwrap
+            \e -> do
+              logPerspectivesError $ Custom $ "Could not delete channel databases because: " <> show e
+              clearUserDatabase
+              clearModelDatabase
+              clearPostDatabase
+              -- clear the caches, otherwise nothing happens.
+              resetCaches
+              setupUser)
           state
     where
 
