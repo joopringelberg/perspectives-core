@@ -36,20 +36,23 @@ import Foreign.Object (keys) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, InformedAssumption, MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
+import Perspectives.Representation.ADT (leavesInADT)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..)) as PROP
-import Perspectives.Representation.Class.Role (allProperties, perspectivesOfRoleType, roleKindOfRoleType)
+import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleKindOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), PerspectiveId)
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleKind, RoleType, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ContextType, PropertyType, RoleKind, RoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, allPropertyVerbs, roleVerbList2Verbs)
-import Prelude (bind, eq, flip, map, not, pure, show, ($), (<$>), (<<<), (>=>), (<>))
+import Prelude (bind, eq, flip, map, not, pure, show, ($), (<$>), (<<<), (>=>), (<>), (>>=))
 import Simple.JSON (writeJSON)
 
 type SerialisedPerspective' =
@@ -65,6 +68,7 @@ type SerialisedPerspective' =
   , properties :: Object SerialisedProperty
   , actions :: Array String
   , roleInstances :: Object RoleInstanceWithProperties
+  , contextTypesToCreate :: Array ContextType
   }
 
 -- | Notice that these SerialisedProperties are just those based on context- and subject
@@ -117,6 +121,12 @@ serialisePerspective contextStates subjectStates cid p@(Perspective {id, object,
   properties <- lift $ serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> (contextStates <> subjectStates)))
   roleInstances <- roleInstancesWithProperties properties cid p
   roleKind <- lift $ traverse roleKindOfRoleType roleType
+  -- If the binding of the ADT that is the range of the object QueryFunctionDescription, is an external role,
+  -- its context type may be created.
+  contextTypesToCreate <- (lift $ leavesInADT <$> bindingOfADT (unsafePartial domain2roleType (range object)))
+    >>= pure <<< (filter (isExternalRole <<< unwrap))
+    >>= lift <<< traverse getEnumeratedRole
+    >>= pure <<< map (_.context <<< unwrap)
   pure { id
     , displayName
     , isFunctional: pessimistic $ functional object
@@ -128,6 +138,7 @@ serialisePerspective contextStates subjectStates cid p@(Perspective {id, object,
     , properties: fromFoldable ((\prop@({id:propId}) -> Tuple propId prop) <$> properties)
     , actions: concat (OBJ.keys <$> (catMaybes $ (flip lookup (unwrap actions)) <$> (contextStates <> subjectStates)))
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
+    , contextTypesToCreate
     }
 
 serialiseProperties :: QueryFunctionDescription -> Array PropertyVerbs -> MonadPerspectives (Array SerialisedProperty)
