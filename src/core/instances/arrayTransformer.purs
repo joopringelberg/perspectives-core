@@ -73,8 +73,8 @@ instance applyArrayT :: Monad m => Apply (ArrayT m) where
 
 applyArrayT_ :: forall m a b. Monad m => ArrayT m (a -> b) -> ArrayT m a -> ArrayT m b
 applyArrayT_ (ArrayT mfs) (ArrayT mas) = ArrayT do
-  fs <- mfs
-  as <- mas
+  (fs :: Array (a -> b)) <- mfs
+  (as :: Array a) <- mas
   pure (fs <*> as)
 
 instance applicativeArrayT :: Monad m => Applicative (ArrayT m) where

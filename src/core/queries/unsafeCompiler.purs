@@ -48,7 +48,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
-import Perspectives.Instances.Combinators (available_, exists, logicalOperation, not, some, wrapLogicalOperator, filter)
+import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRoleBinders, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
@@ -239,7 +239,17 @@ compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
         else do
           f1' <- compileFunction f1
           f2' <- compileFunction f2
-          pure \c -> (f1' c *> f2' c)
+          -- While this seems an attractive implementation, it fails:
+          --    pure \c -> (f1' c *> f2' c)
+          -- This is because when the first computation doesn't give any value at all,
+          -- the entire computation does not give values.
+          -- The documentation of applySecond states:
+          -- "Combine two effectful actions, keeping only the result of the second."
+          -- However, that is misleading, to say the least.
+          pure \c -> ArrayT do
+            ignored <- runArrayT $ f1' c
+            results <- runArrayT $ f2' c
+            pure results
 
 compileFunction (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
@@ -270,10 +280,15 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
   -- Check for each new type added to Range in Perspectives.Representation.Range.
   pure $ order f1' f2' (unsafePartial $ orderFunction g)
 
-compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [AndF, OrF] = do
+compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | g `eq` AndF = do
   (f1' :: String ~~> Value) <- unsafeCoerce $ compileFunction f1
   (f2' :: String ~~> Value) <- unsafeCoerce $ compileFunction f2
-  pure (unsafeCoerce (logicalOperation (unsafePartial $ mapLogicalOperator g) f1' f2'))
+  pure (unsafeCoerce (logicalAnd f1' f2'))
+
+compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | g `eq` OrF = do
+  (f1' :: String ~~> Value) <- unsafeCoerce $ compileFunction f1
+  (f2' :: String ~~> Value) <- unsafeCoerce $ compileFunction f2
+  pure (unsafeCoerce (logicalOr f1' f2'))
 
 -- Add and subtract for numbers and strings. Divide and multiply just for numbers.
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = do
@@ -367,11 +382,11 @@ addBinding_ varName computation ctxt  = ArrayT do
   pure v
 
 withFrame_ :: forall a b. (a ~~> b) -> a ~~> b
-withFrame_ computation ctxt = do
-  old <- lift $ lift $ getVariableBindings
-  void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
-  r <- computation ctxt
-  void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = old}
+withFrame_ computation ctxt = ArrayT do
+  old <- lift $ getVariableBindings
+  void $ lift $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
+  r <- runArrayT $ computation ctxt
+  void $ lift $ modify \s@{variableBindings} -> s {variableBindings = old}
   pure r
 
 lookup :: String -> String ~~> String
@@ -395,10 +410,6 @@ orderFunction fname = case fname of
   LessThanEqualF -> (<=)
   GreaterThanF -> (>)
   GreaterThanEqualF -> (>=)
-
-mapLogicalOperator :: Partial => FunctionName -> (Value -> Value -> Value)
-mapLogicalOperator AndF = wrapLogicalOperator (&&)
-mapLogicalOperator OrF = wrapLogicalOperator (||)
 
 ------------------------------------------------------------------------------------
 -- NUMERIC OPERATIONS
