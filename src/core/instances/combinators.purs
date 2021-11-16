@@ -25,7 +25,7 @@ module Perspectives.Instances.Combinators where
 import Control.Monad.Error.Class (class MonadError)
 import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (guard, map)
-import Data.Array (cons, elemIndex, foldM, foldMap, null, union)
+import Data.Array (cons, elemIndex, filterA, foldM, foldMap, head, null, union)
 import Data.HeytingAlgebra (not, (&&)) as HA
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Conj (Conj(..))
@@ -35,7 +35,7 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Prelude (class Eq, class Monad, class Show, bind, const, discard, pure, show, ($), (&&), (<$>), (<*>), (<<<), (==), (>=>), (||))
+import Prelude (class Eq, class Monad, class Show, bind, const, discard, pure, show, ($), (<$>), (<<<), (==), (>=>))
 
 -- | The closure of f, not including the root argument.
 -- | The closure of f contains no double entries iff the result of
@@ -102,33 +102,28 @@ conjunction left right id = ArrayT do
   r <- runArrayT $ right id
   pure $ union l r
 
-logicalOperation :: forall m s. Monad m =>
-  (Value -> Value -> Value) ->
-  (s -> ArrayT m Value) ->
-  (s -> ArrayT m Value) ->
-  (s -> ArrayT m Value)
-logicalOperation f a b c = ArrayT do
-  (as :: Array Value) <- runArrayT (a c)
-  (bs :: Array Value) <- runArrayT (b c)
-  (rs :: Array Value) <- pure $ f <$> as <*> bs
-  if null rs
-    then pure [Value "false"]
-    else pure rs
-
-wrapLogicalOperator :: (Boolean -> Boolean -> Boolean) -> (Value -> Value -> Value)
-wrapLogicalOperator g (Value p) (Value q) = Value $ show (g (p == "true") (q == "true"))
-
 logicalAnd :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->
   (s -> ArrayT m Value) ->
   (s -> ArrayT m Value)
-logicalAnd = logicalOperation (wrapLogicalOperator (&&))
+logicalAnd a b c = ArrayT do
+  (as :: Array Value) <- runArrayT (a c)
+  (bs :: Array Value) <- runArrayT (b c)
+  case head as, head bs of
+    Just (Value "true"), Just (Value "true") -> pure [Value "true"]
+    _, _ -> pure [Value "false"]
 
 logicalOr :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->
   (s -> ArrayT m Value) ->
   (s -> ArrayT m Value)
-logicalOr = logicalOperation (wrapLogicalOperator (||))
+logicalOr a b c = ArrayT do
+  (as :: Array Value) <- runArrayT (a c)
+  (bs :: Array Value) <- runArrayT (b c)
+  case head as, head bs of
+    Just (Value "true"), _ -> pure [Value "true"]
+    _, Just (Value "true") -> pure [Value "true"]
+    _, _ -> pure [Value "false"]
 
 exists :: forall m s o. Eq o => Monad m =>
   (s -> ArrayT m o) ->
@@ -189,6 +184,7 @@ available' ids = do
 
 -- | Implements negation by failure in the sense that if the source returns no values, it is interpreted
 -- | as `false`, hence `not` returns `true`.
+-- | In other words: if we have a Boolean property, the absence of a value for that property is mapped to `false`.
 not :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->
   (s -> ArrayT m Value)
@@ -203,6 +199,12 @@ not' source id = ArrayT do
   (r :: Array Boolean) <- runArrayT $ source id
   pure (HA.not <$> r)
 
+-- | Implements negation by failure in the sense that if the source returns no values, it is interpreted
+-- | as `false`, hence `not` returns `true`.
+-- | In other words: if we have a Boolean property, the absence of a value for that property is understood to be `false`.
+-- | not_ [] ==> [true]
+-- | not_ [Value "false"] ==> [true]
+-- | not_ [Value "true"] ==> [false]
 not_ :: forall m. Monad m => Array Value -> m (Array Boolean)
 not_ r = if null r
   then pure [true]
