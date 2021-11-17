@@ -28,13 +28,16 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Object (Object)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
+import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
 import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.Perspective (Perspective)
+import Perspectives.Representation.Perspective (Perspective, StateSpec)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 
@@ -58,6 +61,8 @@ type EnumeratedRoleRecord =
   , views :: Array ViewType
 
   , perspectives :: Array Perspective
+
+  , actions :: EncodableMap StateSpec (Object Action)
 
   , functional :: Boolean
   , mandatory :: Boolean
@@ -92,6 +97,8 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
   , views: []
 
   , perspectives: []
+
+  , actions: EncodableMap empty
 
   , functional: true
   , mandatory: false

@@ -23,7 +23,7 @@
 module Perspectives.Query.ExpandPrefix where
 
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), RoleIdentification(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), RoleIdentification(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
@@ -148,6 +148,11 @@ instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPa
     state' <- expandPrefix state
     effect' <- expandPrefix effect
     pure (AC (ActionE r {subject = subject', object = object', state = state', effect = effect'}))
+  expandPrefix (CA (ContextActionE r@{subject, object, state, effect})) = do
+    subject' <- expandPrefix subject
+    state' <- expandPrefix state
+    effect' <- expandPrefix effect
+    pure (CA (ContextActionE r {subject = subject', state = state', effect = effect'}))
   expandPrefix (SO (SelfOnly r@{subject, object, state})) = do
     subject' <- expandPrefix subject
     object' <- expandPrefix object

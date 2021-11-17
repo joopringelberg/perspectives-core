@@ -28,12 +28,15 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Object (Object)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
+import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Perspective (Perspective)
+import Perspectives.Representation.Perspective (Perspective, StateSpec)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==), ($))
 
@@ -55,6 +58,8 @@ type CalculatedRoleRecord =
 
   , perspectives :: Array Perspective
 
+  , actions :: EncodableMap StateSpec (Object Action)
+
   , pos :: ArcPosition
   }
 
@@ -71,6 +76,8 @@ defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
   , views: []
 
   , perspectives: []
+
+  , actions: EncodableMap empty
 
   , pos: pos
   }

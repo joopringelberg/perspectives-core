@@ -53,7 +53,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileReco
 import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Instances.Combinators (closure)
 import Perspectives.InvertedQuery (RelevantProperties(..))
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
@@ -720,6 +720,75 @@ handlePostponedStateQualifiedParts = do
         modifyAllSubjectPerspectives qualifiedUsers objectQfd = for_ qualifiedUsers
           (modifyPerspective objectQfd object start
             (\(Perspective pr) -> Perspective pr {selfOnly = true}))
+
+    handlePart (AST.CA (AST.ContextActionE{id, subject, object:currentContext, state, effect, start})) = do
+      -- `currentContextDomain` represents the current context, expressed as a Domain.
+      currentcontextDomain <- pure (CDOM $ ST $ currentContext)
+      -- `subject` is the current subject of lexical analysis. It is represented by
+      -- an ExplicitRole data constructor.
+      -- The current subject is always a single role type, but it may be calculated
+      -- (and the range of the calculation may be a combination of many Enumerated role
+      -- types).
+      -- These qualifiedUsers will end up in InvertedQueries.
+      (qualifiedUsers :: Array RoleType) <- collectRoles subject
+      -- Each of the expressons in the statements is applied to the object, always a context instance.
+      -- We include the following standard variables:
+      --  origin -> is always included as an identity step, obviously provided as argument on executing the action.
+      --  currentcontext -> is provided on executing the action. Equals the origin.
+      --  currentactor -> It's type is the qualifiedUser computed above.
+      -- The last VarBinding has a computation of type TypeTimeOnly, which instructs the unsafeCompiler to remove it.
+      effectWithEnvironment <- pure $ addContextualBindingsToStatements
+        [ makeIdentityStep "origin" start
+        , makeIdentityStep "currentcontext" start
+        , makeTypeTimeOnlyRoleStep "currentactor" (unsafePartial fromJust $ head qualifiedUsers) start
+        ]
+        effect
+      states <- stateSpec2States state
+      -- The effect starts with the Perspective object, i.e. the syntacticObject.
+      (theAction :: QueryFunctionDescription) <- compileStatement
+        states
+        currentcontextDomain
+        currentcontextDomain
+        qualifiedUsers
+        effectWithEnvironment
+
+      stateSpecs <- stateSpecificationToStateSpec state
+      modifyAllSubjectRoles
+        qualifiedUsers
+        id
+        (Action theAction)
+        stateSpecs
+      where
+        -- Add the action to the map of StateSpecs to an Object of Action identifier to Action of all user roles.
+        -- (Actions are double indexed in user roles: first by StateSpec, then by Action identifier).
+        modifyAllSubjectRoles :: Array RoleType -> String -> Action -> Array StateSpec -> PhaseThree Unit
+        modifyAllSubjectRoles qualifiedUsers actionId theAction stateSpecs = for_ qualifiedUsers
+          \(userRole :: RoleType) -> case userRole of
+            ENR (EnumeratedRoleType r) -> do
+              EnumeratedRole er <- getsDF (unsafePartial fromJust <<< lookup r <<< _.enumeratedRoles)
+              modifyDF \dfr@{enumeratedRoles} -> dfr {enumeratedRoles = insert
+                r
+                (EnumeratedRole (addToRoleRecord er))
+                enumeratedRoles
+                }
+
+            CR (CalculatedRoleType r) -> do
+              CalculatedRole cr <- getsDF (unsafePartial fromJust <<< lookup r <<< _.calculatedRoles)
+              modifyDF \dfr@{calculatedRoles} -> dfr {calculatedRoles = insert
+                r
+                (CalculatedRole (addToRoleRecord cr))
+                calculatedRoles
+                }
+          where
+            addToRoleRecord :: forall f. {actions :: EncodableMap StateSpec (Object Action) | f} -> {actions :: EncodableMap StateSpec (Object Action) | f}
+            addToRoleRecord r@{actions} = r {actions = EncodableMap $ foldl
+              (\accumulatedActions nextState -> case Map.lookup nextState accumulatedActions of
+                Nothing -> Map.insert nextState (singleton actionId theAction) accumulatedActions
+                Just actionsObject -> Map.insert nextState (insert actionId theAction actionsObject) accumulatedActions
+              )
+              (unwrap actions)
+              stateSpecs}
+
 
     modifyStateDependentPerspectives ::
       AST.StateSpecification ->

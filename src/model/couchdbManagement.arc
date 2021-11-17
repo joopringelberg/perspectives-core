@@ -49,6 +49,9 @@ domain CouchdbManagement
       property Name (mandatory, String)
       state NotBound = not exists binder CouchdbServers
         on entry
+          -- When a peer assigns the current user to the Accounts role,
+          -- we make sure that the current user has the CouchdbServer bound
+          -- in the CouchdbManagementApp.
           do for Accounts
             bind origin to CouchdbServers in cm:MyCouchdbApp
           notify Accounts
@@ -120,17 +123,21 @@ domain CouchdbManagement
 
       property ToBeRemoved (Boolean)
 
+      action RequestRepository
+        letA
+          myrepo <- createContext Repository bound to Repositories
+          measadmin <- createRole Admin in myrepo >> context
+        in
+          bind_ currentactor to measadmin
+
       -- As an Account, one can see both public repositories and repositories managed by oneself (as Admin).
       perspective on filter Repositories with IsPublic or binding >> context >> Repository$Admin binds sys:Me
         only (CreateAndFill)
         verbs (Consult)
         props (Name) verbs (SetPropertyValue)
-        action RequestRepository
-          letA
-            myrepo <- createContext Repository bound to Repositories
-            measadmin <- createRole Admin in myrepo >> context
-          in
-            bind_ currentactor to measadmin
+
+      perspective on extern
+        props (Url, Name) verbs (Consult)
 
     -- This role should be in public space.
     -- A Repositories instance comes complete with an (empty) Admin role.

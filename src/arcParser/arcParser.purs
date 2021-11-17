@@ -30,7 +30,7 @@ import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
@@ -417,6 +417,7 @@ rolePart = do
     "indexed", _ -> indexedE
     "property", _ -> propertyE
     "view", _ -> viewE
+    "action", _ -> SQP <$> actionE
     _, _ -> fail "Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view"
 
 -- | Combine the RolePart elements that result from "on entry", "on exit" and "state" into a root state for the role.
@@ -560,6 +561,7 @@ stateE = withPos do
       (Tuple first second) <- twoReservedWords
       case first, second of
         "state", _ -> singleton <<< SUBSTATE <$> stateE
+        "action", _ -> actionE
         "on", "entry" -> onEntryE
         "on", "exit" -> onExitE
         "perspective", "on" -> perspectiveOn
@@ -985,10 +987,16 @@ actionE :: IP (List StateQualifiedPart)
 actionE = do
   start <- getPosition
   id <- reserved "action" *> token.identifier
-  {subject, state, object} <- getArcParserState
+  {subject, state, object, currentContext} <- getArcParserState
   case subject, object of
     Nothing, _ -> fail "User role is not specified"
-    _, Nothing -> fail "object of perspective must be given"
+    Just s, Nothing -> do
+      kw <- option "" (lookAhead reservedIdentifier)
+      effect <- if kw == "letA"
+        then Let <$> letWithAssignment
+        else Statements <$> fromFoldable <$> entireBlock1 assignment
+      end <- getPosition
+      pure $ singleton $ CA $ ContextActionE {id, subject: s, object: currentContext, state, effect, start, end}
     Just s, Just o -> do
       kw <- option "" (lookAhead reservedIdentifier)
       effect <- if kw == "letA"

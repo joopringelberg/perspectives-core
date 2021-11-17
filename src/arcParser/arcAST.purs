@@ -119,6 +119,7 @@ data StateQualifiedPart =
   R RoleVerbE |
   P PropertyVerbE |
   AC ActionE |
+  CA ContextActionE |
   SO SelfOnly |
   N NotificationE |
   AE AutomaticEffectE |
@@ -159,6 +160,19 @@ newtype ActionE = ActionE
   { id :: String
   , subject :: RoleIdentification
   , object :: RoleIdentification
+  , state :: StateSpecification
+  , effect :: Statements
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
+
+--------------------------------------------------------------------------------
+---- CONTEXTACTION
+--------------------------------------------------------------------------------
+newtype ContextActionE = ContextActionE
+  { id :: String
+  , subject :: RoleIdentification
+  , object :: ContextType
   , state :: StateSpecification
   , effect :: Statements
   , start :: ArcPosition
@@ -308,6 +322,9 @@ instance showPropOrView :: Show PropsOrView where show = genericShow
 
 derive instance genericActionElement :: Generic ActionE _
 instance showActionElement :: Show ActionE where show = genericShow
+
+derive instance genericContextActionElement :: Generic ContextActionE _
+instance showContextActionElement :: Show ContextActionE where show = genericShow
 
 derive instance genericViewElement :: Generic ViewE _
 instance showViewElement :: Show ViewE where show = genericShow
