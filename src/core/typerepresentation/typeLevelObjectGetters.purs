@@ -28,15 +28,14 @@ import Control.Monad.Trans.Class (lift)
 import Control.Plus (map, (<|>), empty)
 import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, foldr, fromFoldable, intersect, null, singleton)
 import Data.FoldableWithIndex (foldWithIndexM)
-import Data.Map (Map, empty, lookup, insert, keys) as Map
-import Data.Map (unionWith, values)
+import Data.Map (Map, empty, lookup, insert, keys, unionWith, values) as Map
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for_, traverse)
-import Foreign.Object (keys, lookup, union) as OBJ
+import Foreign.Object (Object, keys, lookup, union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MonadPerspectives, (###=), type (~~>), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
@@ -49,11 +48,11 @@ import Perspectives.Instances.Combinators (closure_, conjunction, some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialisesADT)
-import Perspectives.Representation.Action (Action(..))
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -557,12 +556,12 @@ isAspectOfPerspective perspectiveAspect perspective = unwrap $ (objectOfPerspect
 -- | The values of isEnumerated must be equal.
 addPerspectiveTo :: Perspective -> Perspective -> Perspective
 addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Perspective perspective
-  { roleVerbs = EncodableMap $ unionWith append (unwrap perspectiveAspect.roleVerbs) (unwrap perspective.roleVerbs)
+  { roleVerbs = EncodableMap $ Map.unionWith append (unwrap perspectiveAspect.roleVerbs) (unwrap perspective.roleVerbs)
   -- Note that we take a simple approach here, foregoing the opportunity to append to PropertyVerbs when their
   -- PropertySets are equal.
-  , propertyVerbs = EncodableMap $ unionWith append (unwrap perspectiveAspect.propertyVerbs) (unwrap perspective.propertyVerbs)
+  , propertyVerbs = EncodableMap $ Map.unionWith append (unwrap perspectiveAspect.propertyVerbs) (unwrap perspective.propertyVerbs)
   -- Note that two Action maps with duplicate keys will lose actions when added to each other.
-  , actions = EncodableMap $ unionWith OBJ.union (unwrap perspectiveAspect.actions) (unwrap perspective.actions)
+  , actions = EncodableMap $ Map.unionWith OBJ.union (unwrap perspectiveAspect.actions) (unwrap perspective.actions)
   , selfOnly = perspectiveAspect.selfOnly || perspective.selfOnly
   }
 
@@ -578,10 +577,31 @@ isPerspectiveOnSelf qfd = some (
 ------- FUNCTIONS FOR ACTIONS
 ----------------------------------------------------------------------------------------
 type ActionName = String
+-- | Note that we assume action names are unique over states for the perspective a user role has on an object.
 getAction :: ActionName -> Perspective -> Maybe Action
 getAction actionName (Perspective{actions}) = foldl
   (\maction stateDepActions -> case maction of
     Just action -> Just action
     Nothing -> OBJ.lookup actionName stateDepActions)
   Nothing
-  (values $ unwrap actions)
+  (Map.values $ unwrap actions)
+
+-- | Note that we assume action names are unique over states for the perspective a user role has on an object.
+getContextAction :: ActionName -> RoleType -> MonadPerspectives (Maybe Action)
+getContextAction actionName userRoleType = do
+  stateActionMap <- actionsOfRoleType userRoleType
+  pure $ foldl
+    (\maction (stateDepActions :: OBJ.Object Action) -> case maction of
+      Just action -> Just action
+      Nothing -> OBJ.lookup actionName stateDepActions)
+    Nothing
+    (Map.values stateActionMap)
+
+-- TODO. Dit moet state-dependent worden! Kan afhangen van ContextState, SubjectState en ObjectState.
+getContextActions :: RoleType -> MonadPerspectives (Array ActionName)
+getContextActions userRoleType = do
+  stateActionMap <- actionsOfRoleType userRoleType
+  pure $ foldl
+    (\(cumulatedActions :: Array ActionName) (stateDepActions :: OBJ.Object Action) -> cumulatedActions <> OBJ.keys stateDepActions)
+    []
+    (Map.values stateActionMap)

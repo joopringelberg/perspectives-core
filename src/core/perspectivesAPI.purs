@@ -51,6 +51,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..
 import Perspectives.Assignment.Update (deleteProperty, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
+import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -83,7 +84,7 @@ import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, remo
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectivesForContextAndUser)
-import Perspectives.Types.ObjectGetters (findPerspective, getAction, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
+import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, getContextActions, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
 import Simple.JSON (read)
 
@@ -278,6 +279,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (perspectivesForContextAndUser userRoleInstance userRoleType)
           (ContextInstance object)
 
+    -- { request: GetContextActions
+    -- , subject: RoleType // the user role type
+    -- }
+    Api.GetContextActions -> do
+      userRoleType <- getRoleType subject
+      actionNames <- getContextActions userRoleType
+      sendResponse (Result corrId actionNames) setter
+
     -- { request: "GetRolesWithProperties", object: ContextInstance, predicate: roleType}
     -- Api.GetRolesWithProperties ->
     --   registerSupportedEffect
@@ -462,6 +471,32 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   lift2 $ restoreFrame oldFrame
               _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show authoringRole <> "', perspectiveId '" <> perspectiveId <> "' and action name '" <> actionName <> "'.") setter
             )
+      (\e -> sendResponse (Error corrId (show e)) setter)
+
+    -- { request: Action
+    -- , subject: RoleType // the user role type
+    -- , predicate: String // action identifier
+    -- , object: RoleInstance // the context identifier.
+    -- }
+    Api.ContextAction -> catchError
+      (do
+        -- Find the action from the subject type and the Action name.
+        userRoleType <- getRoleType subject
+        maction <- getContextAction predicate userRoleType
+        muserRoleInstance <- (ContextInstance object) ##> getMeInRoleAndContext userRoleType
+        case muserRoleInstance, maction of
+          Just user, Just (ACTION.Action action) -> void $ runMonadPerspectivesTransaction authoringRole
+            do
+              oldFrame <- lift2 $ pushFrame
+              lift2 $ addBinding "currentcontext" [object]
+              lift2 $ addBinding "origin" [object]
+              lift2 $ addBinding "currentactor" [unwrap user] -- userRoleType??
+              updater <- lift2 $ compileAssignment action
+              updater (ContextInstance object)
+              lift2 $ restoreFrame oldFrame
+          _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show userRoleType <>
+            "' and action name '" <> predicate <> "'.") setter
+        )
       (\e -> sendResponse (Error corrId (show e)) setter)
 
     -- `subject` is an external role, object is a role type identifier (either

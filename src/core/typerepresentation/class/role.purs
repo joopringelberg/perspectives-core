@@ -25,24 +25,27 @@ module Perspectives.Representation.Class.Role where
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, (<|>))
 import Data.Array (cons, foldMap, null, (:))
+import Data.Map (Map)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
+import Foreign.Object (Object)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), range, domain2roleType)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
 import Perspectives.Representation.ADT (ADT(..), product, reduce)
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, externalRole, roles)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (intersectionOfArrays, unionOfArrays)
-import Perspectives.Representation.Perspective (Perspective)
+import Perspectives.Representation.Perspective (Perspective, StateSpec)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
@@ -73,6 +76,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsBindingADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   perspectives :: r -> Array Perspective
+  contextActions :: r -> Map StateSpec (Object Action)
 
 rangeOfRoleCalculation' :: String -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> rangeOfRoleCalculation'_ (CalculatedRoleType r)
@@ -105,6 +109,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   roleAspectsADT = rangeOfCalculatedRole
   roleAspectsBindingADT = rangeOfCalculatedRole
   perspectives r = (unwrap r).perspectives
+  contextActions r = unwrap (unwrap r).actions
 
 rangeOfCalculatedRole :: CalculatedRole -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
@@ -157,6 +162,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
         sum@(SUM _) -> PROD (sum : (ST $ identifier r) : aspects)
         UNIVERSAL -> UNIVERSAL
   perspectives r = (unwrap r).perspectives
+  contextActions r = unwrap (unwrap r).actions
 
 -----------------------------------------------------------
 -- FUNCTIONS OF ADT
@@ -437,6 +443,10 @@ displayNameOfRoleType (CR e) = getCalculatedRole e >>= pure <<< displayName
 roleTypeIsEnumerated :: RoleType -> Boolean
 roleTypeIsEnumerated (ENR _) = true
 roleTypeIsEnumerated _ = false
+
+actionsOfRoleType :: RoleType -> MonadPerspectives (Map StateSpec (Object Action))
+actionsOfRoleType (ENR r) = getPerspectType r >>= pure <<< contextActions
+actionsOfRoleType (CR r) = getPerspectType r >>= pure <<< contextActions
 
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
