@@ -32,7 +32,7 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getContext)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedRoleType, RoleType, externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, externalRoleType)
 import Prelude ((<<<), (<>), (<$>), ($), bind, pure)
 
 -----------------------------------------------------------
@@ -45,7 +45,6 @@ class ContextClass c where
   contextRole :: c -> Array RoleType
   externalRole :: c -> EnumeratedRoleType
   userRole :: c -> Array RoleType
-  actions :: c -> Array ActionType
   aspects :: c -> Array ContextType
   nestedContexts :: c -> Array ContextType
   position :: c -> ArcPosition
@@ -61,7 +60,6 @@ instance contextContextClass :: ContextClass Context where
   contextRole = _.contextRol <<< unwrap
   externalRole (Context{_id}) = externalRoleType _id
   userRole = _.gebruikerRol <<< unwrap
-  actions = _.actions <<< unwrap
   aspects = _.contextAspects <<< unwrap
   nestedContexts = _.nestedContexts <<< unwrap
   position = _.pos <<< unwrap

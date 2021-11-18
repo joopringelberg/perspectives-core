@@ -134,28 +134,6 @@ instance showInformedAssumption :: Show InformedAssumption where
   show = genericShow
 
 -----------------------------------------------------------
--- ASSIGNMENT (RULE) DEPENDENCYTRACKING
------------------------------------------------------------
--- | An ActionInstance represents the applicability of an Action to the instance of a Context.
--- data ActionInstance = ActionInstance ContextInstance ActionType
---
--- instance eqActionInstance :: Eq ActionInstance where
---   eq (ActionInstance c1 a1) (ActionInstance c2 a2) = eq c1 c2 && eq a1 a2
---
--- instance showActionInstance :: Show ActionInstance where
---   show (ActionInstance c1 a1) = "ActionInstance( " <> show c1 <> ", " <> show a1 <> " )"
---
--- instance ordActionInstance :: Ord ActionInstance where
---   compare (ActionInstance c1 a1) (ActionInstance c2 a2) = case compare c1 c2 of
---     EQ -> compare a1 a2
---     otherwise -> otherwise
-
-
--- | Actions should be re-run as the Assumptions underlying their computation change.
--- | We register the dependency of Actions for ContextInstances with a double registration that allows us to
--- | travel from Assumptions to ActionInstances and vice versa by simple lookup.
-
------------------------------------------------------------
 -- STATE EXECUTION
 -----------------------------------------------------------
 -- | A StateEvaluation is a combination of an instance of a Context, the user role type

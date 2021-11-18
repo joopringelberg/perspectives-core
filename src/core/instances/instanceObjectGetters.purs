@@ -25,15 +25,16 @@ module Perspectives.Instances.ObjectGetters where
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)
-import Data.Array (elemIndex, findIndex, foldMap, head, index, length, null, singleton)
+import Data.Array (elemIndex, findIndex, foldMap, foldl, head, index, length, null, singleton)
 import Data.Foldable (for_)
+import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap, ala)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Foreign.Object (keys, lookup, values)
+import Foreign.Object (Object, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
@@ -44,8 +45,11 @@ import Perspectives.Identifiers (LocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
+import Perspectives.Representation.Action (Action)
+import Perspectives.Representation.Class.Role (actionsOfRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
+import Perspectives.Representation.Perspective (StateSpec(..)) as SP
+import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
 import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&), eq, (<$>))
 
@@ -102,6 +106,21 @@ getActiveStates_ ci = (try $ getContextMember IP.states ci) >>=
 
 contextIsInState :: StateIdentifier -> ContextInstance -> MonadPerspectives Boolean
 contextIsInState stateId ci = getActiveStates_ ci >>= pure <<< isJust <<< elemIndex stateId
+
+-- | Get the ContextAction names for the context and user role instance, depending on the state
+-- | of both.
+getContextActions :: RoleType -> RoleInstance -> ContextInstance ~~> ActionIdentifier
+getContextActions userRoleType userRoleInstance cid = ArrayT do
+  (stateActionMap :: Map.Map SP.StateSpec (Object Action)) <- lift $ actionsOfRoleType userRoleType
+  (contextStates :: Array StateIdentifier) <- runArrayT $ getActiveStates cid
+  (userStates :: Array StateIdentifier) <- runArrayT $ getActiveRoleStates userRoleInstance
+  -- Try each state of the subject and each state of the context
+  pure $ ActionIdentifier <$> foldl
+    (\(cumulatedActions :: Array String) (nextState :: SP.StateSpec) -> case Map.lookup nextState stateActionMap of
+      Nothing -> cumulatedActions
+      Just (actions :: Object Action) -> cumulatedActions <> keys actions)
+    []
+    ((SP.ContextState <$> contextStates) <> (SP.SubjectState <$> userStates))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE

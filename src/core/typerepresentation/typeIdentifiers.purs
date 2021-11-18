@@ -259,21 +259,21 @@ instance prettyPrintPerspectiveType :: PrettyPrint PerspectiveType where
 derive newtype instance writeForeignPerspectiveType :: WriteForeign PerspectiveType
 derive newtype instance readForeignPerspectiveType :: ReadForeign PerspectiveType
 
-newtype ActionType = ActionType String
-derive instance newtypeActionType :: Newtype ActionType _
-derive instance genericRepActionType :: Generic ActionType _
-derive newtype instance encodeActionType :: Encode ActionType
-derive newtype instance decodeActionType :: Decode ActionType
-instance showActionType :: Show ActionType where
-  show i = "ActionType " <> (unwrap i)
-instance eqActionType :: Eq ActionType where
-  eq (ActionType id1) (ActionType id2) = id1 == id2
-instance ordActionType :: Ord ActionType where
-  compare (ActionType a1) (ActionType a2) = compare a1 a2
-instance prettyPrintActionType :: PrettyPrint ActionType where
+newtype ActionIdentifier = ActionIdentifier String
+derive instance newtypeActionIdentifier :: Newtype ActionIdentifier _
+derive instance genericRepActionIdentifier :: Generic ActionIdentifier _
+derive newtype instance encodeActionIdentifier :: Encode ActionIdentifier
+derive newtype instance decodeActionIdentifier :: Decode ActionIdentifier
+instance showActionIdentifier :: Show ActionIdentifier where
+  show i = "ActionIdentifier " <> (unwrap i)
+instance eqActionIdentifier :: Eq ActionIdentifier where
+  eq (ActionIdentifier id1) (ActionIdentifier id2) = id1 == id2
+instance ordActionIdentifier :: Ord ActionIdentifier where
+  compare (ActionIdentifier a1) (ActionIdentifier a2) = compare a1 a2
+instance prettyPrintActionIdentifier :: PrettyPrint ActionIdentifier where
   prettyPrint' t = show
-derive newtype instance writeForeignActionType :: WriteForeign ActionType
-derive newtype instance readForeignActionType :: ReadForeign ActionType
+derive newtype instance writeForeignActionIdentifier :: WriteForeign ActionIdentifier
+derive newtype instance readForeignActionIdentifier :: ReadForeign ActionIdentifier
 
 newtype StateIdentifier = StateIdentifier String
 derive instance newtypeStateIdentifier :: Newtype StateIdentifier _

@@ -24,7 +24,6 @@ module Perspectives.GlobalState where
 
 import Prelude (Unit, pure, bind, unit)
 
-import Perspectives.Assignment.ActionCache (ActionCache, actionCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Dependency (ActiveSupportedEffects, activeSupportedEffects)
 import Perspectives.GlobalUnsafeStrMap (clear)
@@ -41,11 +40,7 @@ import Perspectives.GlobalUnsafeStrMap (clear)
 clearEffectulFunctionCaches :: MonadPerspectives Unit
 clearEffectulFunctionCaches = do
   _ <- pure clearActiveSupportedEffects
-  _ <- pure clearActionCache
   pure unit
   where
-    clearActionCache :: ActionCache
-    clearActionCache = clear actionCache
-
     clearActiveSupportedEffects :: ActiveSupportedEffects
     clearActiveSupportedEffects = clear activeSupportedEffects

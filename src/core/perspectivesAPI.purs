@@ -62,7 +62,7 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getRoleBinders, roleType, roleType_, siblings)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getRoleBinders, roleType, roleType_, siblings)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.State (getSystemIdentifier)
@@ -84,7 +84,7 @@ import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, remo
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectivesForContextAndUser)
-import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, getContextActions, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
+import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
 import Simple.JSON (read)
 
@@ -281,11 +281,20 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
 
     -- { request: GetContextActions
     -- , subject: RoleType // the user role type
+    -- , object: ContextInstance
     -- }
     Api.GetContextActions -> do
       userRoleType <- getRoleType subject
-      actionNames <- getContextActions userRoleType
-      sendResponse (Result corrId actionNames) setter
+      subjectGetter <- getRoleFunction subject
+      muserRoleInstance <- (ContextInstance object) ##> subjectGetter
+      case muserRoleInstance of
+        Nothing -> sendResponse (Error corrId ("There is no user role instance for role type '" <> subject <> "' in context instance '" <> object <> "'!")) setter
+        -- The computation of actions depends on subject- and context state.
+        Just userRoleInstance -> registerSupportedEffect
+          corrId
+          setter
+          (getContextActions userRoleType userRoleInstance)
+          (ContextInstance object) 
 
     -- { request: "GetRolesWithProperties", object: ContextInstance, predicate: roleType}
     -- Api.GetRolesWithProperties ->

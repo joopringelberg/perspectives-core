@@ -28,6 +28,8 @@ domain CouchdbManagement
     user Manager = sys:Me
       perspective on CouchdbServers
         defaults
+      -- Manager needs this perspective for others to accept Admins created in state NoAdmin.
+      perspective on CouchdbServers >> binding >> context >> CouchdbServer$Admin
 
     -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
     -- filled with CouchdbManagementApp$Admin.
@@ -92,6 +94,9 @@ domain CouchdbManagement
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       aspect acc:Body$Accounts
 
+      perspective on CouchdbServer$Admin
+        props (Voornaam, Achternaam) verbs (Consult)
+
       state IsFilled = exists binding
         on entry
           do for Admin
@@ -126,7 +131,7 @@ domain CouchdbManagement
       action RequestRepository
         letA
           myrepo <- createContext Repository bound to Repositories
-          measadmin <- createRole Admin in myrepo >> context
+          measadmin <- createRole Admin in myrepo >> binding >> context
         in
           bind_ currentactor to measadmin
 

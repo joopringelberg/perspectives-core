@@ -492,9 +492,6 @@ rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiv
 perspectivesClosure :: EnumeratedRoleType ~~~> Perspective
 perspectivesClosure = roleAspectsClosure >=> perspectivesOfRole
 
--- isAutomatic :: ActionType ~~~> Boolean
--- isAutomatic at = ArrayT (getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
-
 -- | Get all Perspectives that are defined for a RoleType or its Aspects.
 -- | A CalculatedRole has no aspects, hence all Perspectives returned are defined directly on it.
 perspectivesClosure_ :: RoleType ~~~> Perspective
@@ -595,13 +592,4 @@ getContextAction actionName userRoleType = do
       Just action -> Just action
       Nothing -> OBJ.lookup actionName stateDepActions)
     Nothing
-    (Map.values stateActionMap)
-
--- TODO. Dit moet state-dependent worden! Kan afhangen van ContextState, SubjectState en ObjectState.
-getContextActions :: RoleType -> MonadPerspectives (Array ActionName)
-getContextActions userRoleType = do
-  stateActionMap <- actionsOfRoleType userRoleType
-  pure $ foldl
-    (\(cumulatedActions :: Array ActionName) (stateDepActions :: OBJ.Object Action) -> cumulatedActions <> OBJ.keys stateDepActions)
-    []
     (Map.values stateActionMap)
