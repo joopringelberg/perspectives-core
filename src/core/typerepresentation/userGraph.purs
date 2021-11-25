@@ -24,13 +24,15 @@ module Perspectives.Representation.UserGraph where
 
 import Prelude
 
+import Data.Foldable (find)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleType(..))
 
 -------------------------------------------------------------------------------
 ---- USER GRAPH REPRESENTATION
@@ -70,3 +72,11 @@ instance showUserNode :: Show UserNode where
 
 instance eqUserNode :: Eq UserNode where
   eq = genericEq
+
+usersInGraph :: UserGraph -> Array RoleType
+usersInGraph (UserGraph nodes) = map (\(UserNode {userType}) -> userType) nodes
+
+getUserEdges :: UserGraph -> RoleType -> Array RoleType
+getUserEdges (UserGraph nodes) rt = case find (\(UserNode {userType}) -> rt == userType) nodes of
+  Nothing -> []
+  Just (UserNode{edges}) -> map ENR edges

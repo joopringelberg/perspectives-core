@@ -55,6 +55,7 @@ import Perspectives.Instances.Combinators (closure)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
+import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization)
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
@@ -112,6 +113,7 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       invertPerspectiveObjects
       -- combinePerspectives
       addUserRoleGraph
+      checkSynchronization
       )
     df
     indexedContexts
