@@ -62,7 +62,7 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getRoleBinders, roleType, roleType_, siblings)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getRoleBinders, getRoleName, roleType, roleType_, siblings)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.State (getSystemIdentifier)
@@ -262,6 +262,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetCouchdbUrl -> do
       url <- gets \s -> maybe "" identity s.userInfo.couchdbUrl
       sendResponse (Result corrId [url]) setter
+    -- {object: Role Instance}
+    Api.GetRoleName -> registerSupportedEffect
+      corrId
+      setter
+      getRoleName
+      (RoleInstance object)
     Api.GetUserIdentifier -> do
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
@@ -294,7 +300,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           corrId
           setter
           (getContextActions userRoleType userRoleInstance)
-          (ContextInstance object) 
+          (ContextInstance object)
 
     -- { request: "GetRolesWithProperties", object: ContextInstance, predicate: roleType}
     -- Api.GetRolesWithProperties ->
