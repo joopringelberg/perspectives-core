@@ -50,11 +50,11 @@ isModelName s = test modelRegex s
 buitenRol :: String -> String
 buitenRol s = if isModelName s
   then s <> "$_External"
-  else s <> "_External"
+  else s <> "$External"
 
--- | Returns the identifier minus the "_External" or "$_buitenRol" part.
+-- | Returns the identifier minus the "$External" or "$_External" part.
 deconstructBuitenRol :: String -> String
-deconstructBuitenRol s = replaceAll (Pattern "_External") (Replacement "")(replaceAll (Pattern "$_External") (Replacement "") s)
+deconstructBuitenRol s = replaceAll (Pattern "$External") (Replacement "")(replaceAll (Pattern "$_External") (Replacement "") s)
 
 isExternalRole :: String -> Boolean
 isExternalRole n = isJust $ stripSuffix (Pattern "External") n

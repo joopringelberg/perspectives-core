@@ -78,4 +78,4 @@ instance prettyPrintValue :: PrettyPrint Value where
   prettyPrint' t = show
 
 externalRole :: ContextInstance -> RoleInstance
-externalRole ct = RoleInstance (unwrap ct <> "_External")
+externalRole ct = RoleInstance (unwrap ct <> "$External")

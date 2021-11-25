@@ -41,8 +41,9 @@ import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
-import Perspectives.Identifiers (LocalName, deconstructModelName)
+import Perspectives.Identifiers (LocalName, deconstructBuitenRol, deconstructLocalName, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
+import Perspectives.Instances.Combinators (disjunction)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.Action (Action)
@@ -121,6 +122,10 @@ getContextActions userRoleType userRoleInstance cid = ArrayT do
       Just (actions :: Object Action) -> cumulatedActions <> keys actions)
     []
     ((SP.ContextState <$> contextStates) <> (SP.SubjectState <$> userStates))
+
+-- | Returns the name of the model that defines the context type as a String Value.
+contextModelName :: ContextInstance ~~> Value
+contextModelName (ContextInstance cid) = maybe empty (pure <<< Value) (deconstructModelName cid)
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE
@@ -391,6 +396,8 @@ roleIsInState stateId ri = getActiveRoleStates_ ri >>= pure <<< isJust <<< elemI
 roleModelName :: RoleInstance ~~> Value
 roleModelName (RoleInstance rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
 
--- | Returns the name of the model that defines the context type as a String Value.
-contextModelName :: ContextInstance ~~> Value
-contextModelName (ContextInstance cid) = maybe empty (pure <<< Value) (deconstructModelName cid)
+-- | Return the value of the local property "Name", or return the last segment of the role type name.
+getRoleName :: RoleInstance ~~> Value
+getRoleName = disjunction
+  (getUnqualifiedProperty "Name")
+  (roleType >=> ArrayT <<< pure <<< map Value <<< (maybe [] singleton) <<< deconstructLocalName <<< deconstructBuitenRol <<< unwrap)
