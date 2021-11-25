@@ -27,11 +27,12 @@ domain BodiesWithAccounts
       property UserName (String)
 
     -- Admin can always create and fill Accounts and see the UserName.
-    user Admin
+    user Admin filledBy sys:PerspectivesSystem$User
       aspect bwa:WithCredentials
+      
       perspective on Accounts
-        only (Create, Fill)
-        props (UserName) verbs (SetPropertyValue)
+        only (Create, Fill, CreateAndFill, Remove)
+        props (UserName, Voornaam, Achternaam) verbs (SetPropertyValue, Consult)
 
         -- We limit visibility of the Password to the situation that it
         -- does not exist.
@@ -56,11 +57,17 @@ domain BodiesWithAccounts
     -- This allows us to create a screen to browse through Accounts without
     -- loading all references at once with the context.
     -- Specialisation may restrict their fillers.
-    user Accounts (unlinked)
+    user Accounts (unlinked) filledBy sys:PerspectivesSystem$User
       aspect bwa:WithCredentials
       property IsAccepted (Boolean)
       property IsRejected (Boolean)
       property PasswordReset (Boolean)
+
+      -- We add this perspective to enable synchronisation between
+      -- Admin and Accounts.
+      perspective on Admin
+        props (Voornaam, Achternaam) verbs (Consult)
+
       state IsFilled = exists binding
         -- Use this state to inform the applicant that his case is in
         -- consideration.

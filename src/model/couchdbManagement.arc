@@ -67,6 +67,9 @@ domain CouchdbManagement
       -- TODO. Remove this as soon as we do not need the view anymore for the GUI.
       view AdminProps (UserName, Password)
 
+      perspective on CouchdbServer$Accounts
+        props (ToBeRemoved) verbs (Consult, SetPropertyValue)
+
       perspective on Repositories
         defaults
 
@@ -82,20 +85,12 @@ domain CouchdbManagement
       perspective on extern
         defaults
 
-      perspective on CouchdbServer$Accounts
-        only (CreateAndFill, Fill, Remove)
-        props (Voornaam, Achternaam) verbs (Consult)
-        props (ToBeRemoved) verbs (Consult, SetPropertyValue)
-
     -- Note that the aspect acc:Body introduces a Guest role
     -- with a perspective that allows it to create an Account.
 
     -- This role should be in private space.
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       aspect acc:Body$Accounts
-
-      perspective on CouchdbServer$Admin
-        props (Voornaam, Achternaam) verbs (Consult)
 
       state IsFilled = exists binding
         on entry
