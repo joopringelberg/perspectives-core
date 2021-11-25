@@ -47,6 +47,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.State (State) as PEState
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
+import Perspectives.Representation.UserGraph (UserGraph(..))
 import Perspectives.Representation.View (View)
 import Perspectives.Utilities (class PrettyPrint)
 import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, pure, unit, void, ($), (<<<), (==))
@@ -71,6 +72,7 @@ type DomeinFileRecord =
   , modelDescription :: Maybe PerspectRol
   , referredModels :: Array DomeinFileId
   , invertedQueriesInOtherDomains :: Object (Array SeparateInvertedQuery)
+  , userGraph :: UserGraph
   }
 
 derive instance genericDomeinFile :: Generic DomeinFile _
@@ -168,6 +170,7 @@ defaultDomeinFileRecord =
   , modelDescription: Nothing
   , referredModels: []
   , invertedQueriesInOtherDomains: empty
+  , userGraph: UserGraph []
 }
 
 defaultDomeinFile :: DomeinFile

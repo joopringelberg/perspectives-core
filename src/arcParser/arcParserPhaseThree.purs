@@ -82,6 +82,7 @@ import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as 
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (aspectsOfRole, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
 import Perspectives.Utilities (prettyPrint)
@@ -110,6 +111,7 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       compileStateQueries
       invertPerspectiveObjects
       -- combinePerspectives
+      addUserRoleGraph
       )
     df
     indexedContexts
@@ -950,6 +952,11 @@ handlePostponedStateQualifiedParts = do
 
         roleKind :: Partial => StateIdentifier -> PhaseThree RoleKind
         roleKind (StateIdentifier s) = State.gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
+
+addUserRoleGraph :: PhaseThree Unit
+addUserRoleGraph = do
+  ugraph <- buildUserGraph
+  modifyDF \dfr -> dfr {userGraph = ugraph}
 
 invertPerspectiveObjects :: PhaseThree Unit
 invertPerspectiveObjects = do
