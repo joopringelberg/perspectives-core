@@ -69,14 +69,14 @@ type PhaseTwoState =
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot,
 -- | and allows exceptions.
 -- | It allows for a variable bottom of the monadic stack.
-type PhaseTwo' a m = ExceptT PerspectivesError (StateT PhaseTwoState m) a
+type PhaseTwo' m = ExceptT PerspectivesError (StateT PhaseTwoState m)
 
 -- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
-runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo' :: forall a m. PhaseTwo' m a -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
 runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord empty empty Nil
 
 runPhaseTwo_' :: forall a m.
-  PhaseTwo' a m ->
+  PhaseTwo' m a ->
   DomeinFileRecord ->
   Object ContextType ->
   Object EnumeratedRoleType ->
@@ -95,10 +95,10 @@ runPhaseTwo_' computation dfr indexedContexts indexedRoles postponedParts = runS
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 -- | Used in the test modules.
-evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
+evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' m a -> m (Either PerspectivesError a)
 evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord empty empty
 
-evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> Object ContextType -> Object EnumeratedRoleType -> m (Either PerspectivesError a)
+evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' m a -> DomeinFileRecord -> Object ContextType -> Object EnumeratedRoleType -> m (Either PerspectivesError a)
 evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExceptT computation)
   { bot: false
   , dfr: drf
@@ -112,11 +112,11 @@ evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExc
   }
 
 -- type PhaseTwo a = PhaseTwo' a Identity
-type PhaseTwo a = PhaseTwo' a Aff
+type PhaseTwo = PhaseTwo' Aff
 
 -- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
 -- | an Action is a Bot, and allows exceptions.
-type PhaseThree a = PhaseTwo' a MonadPerspectives
+type PhaseThree = PhaseTwo' MonadPerspectives
 
 lift2 :: forall a. MonadPerspectives a -> PhaseThree a
 lift2 = lift <<< lift
@@ -140,17 +140,17 @@ getDF = lift $ gets _.dfr
 getsDF :: forall m n. MonadState PhaseTwoState m => (DomeinFileRecord -> n) -> m n
 getsDF f = gets (f <<< _.dfr)
 
-getVariableBindings :: forall m. Monad m => PhaseTwo' (Environment QueryFunctionDescription) m
+getVariableBindings :: forall m. Monad m => PhaseTwo' m (Environment QueryFunctionDescription)
 getVariableBindings = lift $ gets _.variableBindings
 
-addBinding :: forall m. Monad m => String -> QueryFunctionDescription -> PhaseTwo' Unit m
+addBinding :: forall m. Monad m => String -> QueryFunctionDescription -> PhaseTwo' m Unit
 addBinding varName qfd = void $ modify \s@{variableBindings} -> s {variableBindings = ENV.addVariable varName qfd variableBindings}
 
-lookupVariableBinding :: forall m. Monad m => String -> PhaseTwo' (Maybe QueryFunctionDescription) m
+lookupVariableBinding :: forall m. Monad m => String -> PhaseTwo' m (Maybe QueryFunctionDescription)
 lookupVariableBinding varName = getVariableBindings >>= pure <<< (ENV.lookup varName)
 
 -- | Introduce a new scope.
-withFrame :: forall a m. Monad m => PhaseTwo' a m -> PhaseTwo' a m
+withFrame :: forall a m. Monad m => PhaseTwo' m a -> PhaseTwo' m a
 withFrame computation = do
   old <- getVariableBindings
   void $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
@@ -180,25 +180,25 @@ withNamespaces pairs pt = do
   pure ctxt
 
 -- | Expand prefixes to full model names.
-expandNamespace :: forall m. Monad m => String -> (PhaseTwo' String) m
+expandNamespace :: forall m. Monad m => String -> (PhaseTwo' m) String
 expandNamespace s = do
   namespaces <- lift $ gets _.namespaces
   pure $ expandNamespaces namespaces s
 
 -- | From an expanded name like "model:System$MySystem" returns a Maybe Context.
 -- | Note: returns indexed context names from PhaseTwoState.
-isIndexedContext :: forall m. Monad m => String -> (PhaseTwo' (Maybe ContextType)) m
+isIndexedContext :: forall m. Monad m => String -> (PhaseTwo' m) (Maybe ContextType)
 isIndexedContext n = do
   indexedContexts <- lift $ gets _.indexedContexts
   pure $ OBJ.lookup n indexedContexts
 
-isIndexedRole :: forall m. Monad m => String -> (PhaseTwo' (Maybe EnumeratedRoleType)) m
+isIndexedRole :: forall m. Monad m => String -> (PhaseTwo' m) (Maybe EnumeratedRoleType)
 isIndexedRole n = do
   indexedRoles <- lift $ gets _.indexedRoles
   pure $ OBJ.lookup n indexedRoles
 
 -- | Find a perspective in PhaseTwoState.
-findPerspective :: forall m. Monad m => RoleType -> Step -> PhaseTwo' (Maybe Perspective ) m
+findPerspective :: forall m. Monad m => RoleType -> Step -> PhaseTwo' m (Maybe Perspective )
 findPerspective subject object = do
   perspectives <- lift $ gets _.perspectives
   pure $ MAP.lookup (Tuple subject object) perspectives
