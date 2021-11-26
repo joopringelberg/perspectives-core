@@ -22,7 +22,7 @@
 
 module Perspectives.Representation.Perspective where
 
-import Data.Array (difference, findIndex, null)
+import Data.Array (concat, difference, findIndex, foldl, fromFoldable, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
@@ -38,10 +38,10 @@ import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, range)
 import Perspectives.Representation.ADT (ADT, leavesInADT)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
-import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb, RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
-import Prelude (class Eq, class Ord, class Show, ($), (&&))
+import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
+import Prelude (class Eq, class Ord, class Show, ($), (&&), (<>))
 
 -----------------------------------------------------------
 -- PERSPECTIVE
@@ -164,3 +164,33 @@ instance showPropertyVerbs :: Show PropertyVerbs where show = genericShow
 derive instance eqPropertyVerbs :: Eq PropertyVerbs
 instance encodePropertyVerbs :: Encode PropertyVerbs where encode = genericEncode defaultOptions
 instance decodePropertyVerbs :: Decode PropertyVerbs where decode = genericDecode defaultOptions
+
+-----------------------------------------------------------
+-- MODIFICATIONSUMMARY
+-----------------------------------------------------------
+-- | The ModificationSummary is used to indicate in an InvertedQuery whether the
+-- | locus of its attachment can be modified by the user according to a Perspective.
+-- | This is regardless of state! We use this aspect of InvertedQueries to check on the
+-- | completeness of synchronization.
+type ModificationSummary =
+  { modifiesRoleInstancesOf :: Array EnumeratedRoleType
+  , modifiesRoleBindingOf :: Array EnumeratedRoleType
+  , modifiesPropertiesOf :: ExplicitSet PropertyType
+  }
+
+-- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
+createModificationSummary :: Partial => Perspective -> ModificationSummary
+createModificationSummary p@(Perspective{roleVerbs, propertyVerbs}) =
+  { modifiesRoleInstancesOf: if perspectiveSupportsOneOfRoleVerbs p [Remove, Delete, Create, CreateAndFill]
+    then leavesInADT $ objectOfPerspective p
+    else []
+  , modifiesRoleBindingOf: if perspectiveSupportsOneOfRoleVerbs p [CreateAndFill, Fill, Unbind, RemoveFiller]
+    then leavesInADT $ objectOfPerspective p
+    else []
+  , modifiesPropertiesOf: foldl
+      (\modifiableProperties (PropertyVerbs props verbs) -> if overlapsPSet (PSet [RemovePropertyValue, DeleteProperty, AddPropertyValue, SetPropertyValue]) verbs
+        then props <> modifiableProperties
+        else modifiableProperties)
+      Empty
+      (concat $ fromFoldable $ values $ unwrap propertyVerbs)
+  }

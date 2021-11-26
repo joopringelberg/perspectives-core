@@ -57,6 +57,13 @@ instance functorExplicitSet :: Functor ExplicitSet where
   map f Empty = Empty
   map f (PSet as) = PSet (f <$> as)
 
+instance semigroupExplicitSet :: Semigroup (ExplicitSet a) where
+  append Universal _ = Universal
+  append _ Universal = Universal
+  append Empty x = x
+  append x Empty = x
+  append (PSet a1) (PSet a2) = PSet (a1 <> a2)
+
 -----------------------------------------------------------
 -- FUNCTIONS ON EXPLICITSET
 -----------------------------------------------------------
@@ -108,6 +115,20 @@ subsetPSet p q = case p, q of
     Universal, _ -> false
     _, Universal -> true
     (PSet x), (PSet y) -> subset (fromFoldable x) (fromFoldable y)
+
+overlapsPSet :: forall a. Eq a => Ord a => ExplicitSet a -> ExplicitSet a -> Boolean
+overlapsPSet p q = case p, q of
+    a, b | a == b -> true
+    Empty, _ -> false
+    _, Empty -> false
+    Universal, _ -> true
+    _, Universal -> true
+    (PSet x), (PSet y) -> foldl
+      (\result nextY -> if result
+        then result
+        else isJust $ elemIndex nextY x)
+      false
+      y
 
 elements :: forall a. Partial => ExplicitSet a -> Array a
 elements (PSet s) = s
