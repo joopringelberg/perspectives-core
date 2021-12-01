@@ -4,15 +4,15 @@ domain System
   use cdb for model:Couchdb
   use ser for model:Serialise
 
-  case TrustedCluster
-    external
-      property Naam (mandatory, String)
-      view Kaartje (Naam)
-    user ClusterGenoot (relational) filledBy User
-      property Url (mandatory, String)
-      view Adressering (Url, Voornaam)
-      perspective on ClusterGenoot
-        view Adressering (Consult)
+  --case TrustedCluster
+    --external
+      --property Naam (mandatory, String)
+      --view Kaartje (Naam)
+    --user ClusterGenoot (relational) filledBy User
+      --property Url (mandatory, String)
+      --view Adressering (Url, Voornaam)
+      --perspective on ClusterGenoot
+        --view Adressering (Consult)
 
   case PerspectivesSystem
     indexed sys:MySystem
@@ -27,7 +27,7 @@ domain System
 
       view ShowLibraries (ShowLibraries)
 
-    context TheTrustedCluster filledBy TrustedCluster
+    --context TheTrustedCluster filledBy TrustedCluster
 
     user User (mandatory)
       property Achternaam (mandatory, relational, String)
@@ -175,7 +175,7 @@ domain System
 
     user Invitee (mandatory) filledBy Guest
       perspective on Inviter
-        defaults
+        props (Voornaam, Achternaam) verbs (Consult)
       perspective on extern
         view ForInvitee (Consult)
 
