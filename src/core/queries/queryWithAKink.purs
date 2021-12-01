@@ -23,6 +23,7 @@
 module Perspectives.Query.Kinked where
 
 import Control.Monad.Error.Class (throwError)
+import Control.Monad.Reader (ReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, concat, cons, elemIndex, foldr, fromFoldable, intercalate, null, uncons, union, unsnoc)
 import Data.Generic.Rep (class Generic)
@@ -31,11 +32,11 @@ import Data.Map (Map, values)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MP)
+import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (makeComposition, setPathForStep)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, PhaseTwo', addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (compose, queryFunctionIsFunctional, queryFunctionIsMandatory, invertFunction)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, replaceDomain)
@@ -43,11 +44,12 @@ import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, getCalculation, getRole)
+import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
-import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=), (*>))
+import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
@@ -233,16 +235,18 @@ invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q
 --------------------------------------------------------------------------------------------------------------
 ---- SET INVERTED QUERIES
 --------------------------------------------------------------------------------------------------------------
+type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
+
 setInvertedQueries ::
   Array RoleType ->
   Map PropertyType (Array StateIdentifier) ->
   Array StateIdentifier ->
   QueryFunctionDescription ->
   Boolean ->
-  PhaseThree Unit
+  WithModificationSummary Unit
 setInvertedQueries users statesPerProperty roleStates qfd selfOnly = do
   -- log ("setInvertedQueries:" <> "\n users =" <> show users <> "\n states = " <> show roleStates <> "\n statesPerProperty = " <> showTree statesPerProperty <> "\n qfd = " <> show qfd)
-  (zqs :: (Array QueryWithAKink)) <- invert qfd
+  (zqs :: (Array QueryWithAKink)) <- lift $ invert qfd
   for_ zqs \qwk@(ZQ backward forward) -> do
     -- What is confusing about what follows is that it just seems to handle the first step of an inverted query.
     -- What about the steps that follow?

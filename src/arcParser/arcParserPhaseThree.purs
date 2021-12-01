@@ -30,6 +30,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 
 import Control.Monad.Error.Class (try)
 import Control.Monad.Except (throwError)
+import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, elemIndex, filter, findIndex, foldM, foldl, foldr, fromFoldable, head, index, length, uncons, updateAt, union)
@@ -55,7 +56,7 @@ import Perspectives.Instances.Combinators (closure)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
-import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization)
+import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
@@ -76,7 +77,7 @@ import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), ge
 import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..))
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
@@ -960,6 +961,14 @@ addUserRoleGraph = do
   ugraph <- buildUserGraph
   modifyDF \dfr -> dfr {userGraph = ugraph}
 
+checkSynchronization :: PhaseThree Unit
+checkSynchronization = do
+  df@{_id} <- lift $ State.gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    SYNC.checkSynchronization
+
 invertPerspectiveObjects :: PhaseThree Unit
 invertPerspectiveObjects = do
   df@{_id} <- lift $ State.gets _.dfr
@@ -986,7 +995,9 @@ invertPerspectiveObjects = do
           -- Sets the inverted queries directly in the EnumeratedRoles and Properties in the
           -- DomeinFile we keep in PhaseTwoState.
           sPerProp <- lift2 $ statesPerProperty p
-          setInvertedQueries [roleType] sPerProp (roleStates p) object selfOnly
+          runReaderT
+            (setInvertedQueries [roleType] sPerProp (roleStates p) object selfOnly)
+            (unsafePartial createModificationSummary p)
 
         explicitSet2RelevantProperties :: ExplicitSet PropertyType -> RelevantProperties
         explicitSet2RelevantProperties Universal = All

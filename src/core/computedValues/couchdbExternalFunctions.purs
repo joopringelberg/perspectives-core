@@ -62,6 +62,7 @@ import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
+import Perspectives.InvertedQuery (addInvertedQuery', deleteInvertedQuery')
 import Perspectives.Models (modelsInUse) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -79,7 +80,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Warning (PerspectivesWarning(..))
-import Prelude (class Eq, Unit, append, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
+import Prelude (Unit, append, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -388,13 +389,13 @@ addModelToLocalStore' url = do
       Just s -> pure s
 
 addInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
-addInvertedQuery = modifyInvertedQuery cons
+addInvertedQuery = modifyInvertedQuery true
 
 removeInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
-removeInvertedQuery = modifyInvertedQuery delete
+removeInvertedQuery = modifyInvertedQuery false
 
-modifyInvertedQuery :: (forall a. Eq a => a -> Array a -> Array a) -> SeparateInvertedQuery -> State DomeinFileRecord Unit
-modifyInvertedQuery modf = modifyInvertedQuery'
+modifyInvertedQuery :: Boolean -> SeparateInvertedQuery -> State DomeinFileRecord Unit
+modifyInvertedQuery add = modifyInvertedQuery'
   where
     modifyInvertedQuery' :: SeparateInvertedQuery -> State DomeinFileRecord Unit
     modifyInvertedQuery' (OnContextDelta_context typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
@@ -402,35 +403,37 @@ modifyInvertedQuery modf = modifyInvertedQuery'
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{onContextDelta_context}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_context = modf invertedQuery onContextDelta_context}) enumeratedRoles}
+        Just (EnumeratedRole rr@{onContextDelta_context}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_context = (if add then cons else delete) invertedQuery onContextDelta_context}) enumeratedRoles}
 
     modifyInvertedQuery' (OnContextDelta_role typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup typeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{onContextDelta_role}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_role = modf invertedQuery onContextDelta_role}) enumeratedRoles}
+        Just (EnumeratedRole rr@{onContextDelta_role}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_role = (if add then cons else delete) invertedQuery onContextDelta_role}) enumeratedRoles}
 
     modifyInvertedQuery' (OnRoleDelta_binder typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup typeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{onRoleDelta_binder}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binder = modf invertedQuery onRoleDelta_binder}) enumeratedRoles}
+        Just (EnumeratedRole rr@{onRoleDelta_binder}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binder = (if add then cons else delete) invertedQuery onRoleDelta_binder}) enumeratedRoles}
 
     modifyInvertedQuery' (OnRoleDelta_binding typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup typeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{onRoleDelta_binding}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binding = modf invertedQuery onRoleDelta_binding}) enumeratedRoles}
+        Just (EnumeratedRole rr@{onRoleDelta_binding}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binding = (if add then cons else delete) invertedQuery onRoleDelta_binding}) enumeratedRoles}
 
-    modifyInvertedQuery' (OnPropertyDelta typeName invertedQuery) = void $ modify \dfr@{enumeratedProperties} ->
+    modifyInvertedQuery' (OnPropertyDelta eroleType typeName invertedQuery) = void $ modify \dfr@{enumeratedProperties} ->
       case lookup typeName enumeratedProperties of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedProperty rr@{onPropertyDelta}) -> dfr {enumeratedProperties = insert typeName (EnumeratedProperty rr {onPropertyDelta = modf invertedQuery onPropertyDelta}) enumeratedProperties}
+        Just (EnumeratedProperty rr@{onPropertyDelta}) -> dfr {enumeratedProperties = insert typeName (EnumeratedProperty rr {onPropertyDelta = if add
+          then addInvertedQuery' invertedQuery eroleType onPropertyDelta
+          else deleteInvertedQuery' invertedQuery eroleType onPropertyDelta}) enumeratedProperties}
 
 -- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do

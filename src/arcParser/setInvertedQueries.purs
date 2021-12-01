@@ -23,29 +23,37 @@
 module Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries where
 
 import Control.Monad.Except (throwError)
-import Data.Array (foldl, union)
+import Control.Monad.Reader (ReaderT, ask)
+import Data.Array (elemIndex, foldl, union)
 import Data.Map (Map, lookup) as Map
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..))
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInvertedQuery')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.Inversion (domain2RoleType)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range, roleRange)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range, roleDomain, roleRange)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.ExplicitSet (isElementOf)
+import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, or)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
-import Prelude (Unit, flip, identity, pure, unit, ($), (<$>))
+import Prelude (Unit, flip, identity, pure, unit, ($), (<$>), bind, (==))
+
+type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
 
 -- The first argument is the backward path of the second argument.
+-- | This function is partial because we assume that the range of the QFD is just a single EnumeratedRoleType,
+-- | in case Value2Role.
+-- | It is also partial because we do not handle all cases.
 setPathForStep :: Partial =>
   QueryFunctionDescription ->
   QueryWithAKink ->
@@ -53,145 +61,190 @@ setPathForStep :: Partial =>
   Array StateIdentifier ->
   Map.Map PropertyType (Array StateIdentifier) ->
   Boolean ->
-  PhaseThree Unit
-setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProperty selfOnly = case qf of
-  QF.Value2Role pt -> case pt of
-    ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
-      Nothing -> addInvertedQueryForDomain (unwrap p)
-        (InvertedQuery
-          { description: qWithAK
-          , backwardsCompiled: Nothing
-          , forwardsCompiled: Nothing
-          , users
-          , statesPerProperty: EncodableMap statesPerProperty
-          -- NOTE. Mag het voorkomen dat de property niet in statesPerProperty zit?
-          -- en wat is de betekenis van een InvertedQuery zonder states?
-          , states: maybe [] identity (Map.lookup (ENP p) statesPerProperty)
-          , selfOnly
-          })
-        OnPropertyDelta
-        dfr
-      Just ep -> dfr {enumeratedProperties = insert (unwrap p) (addPathToProperty ep qWithAK) enumeratedProperties}
-    -- CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in setPathForStep."
-    CP _ -> pure unit
+  WithModificationSummary Unit
+setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProperty selfOnly = do
+  {modifiesRoleInstancesOf, modifiesRoleBindingOf, modifiesPropertiesOf} <- ask
+  case qf of
+    QF.Value2Role pt -> if dom == ran
+      -- This handles cases like `step >>= sum`, where we construct a Value2Role
+      -- but really must ignore it.
+      then pure unit
+      else case pt of
+        ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
+          Nothing -> addInvertedQueryForDomain (unwrap p)
+            (InvertedQuery
+              { description: qWithAK
+              , backwardsCompiled: Nothing
+              , forwardsCompiled: Nothing
+              , users
+              , modifies: isElementOf pt modifiesPropertiesOf
+              , statesPerProperty: EncodableMap statesPerProperty
+              -- NOTE. Mag het voorkomen dat de property niet in statesPerProperty zit?
+              -- en wat is de betekenis van een InvertedQuery zonder states?
+              , states: maybe [] identity (Map.lookup (ENP p) statesPerProperty)
+              , selfOnly
+              })
+            (OnPropertyDelta (case ran of RDOM (ST et) -> et))
+            dfr
+          Just ep -> dfr {enumeratedProperties = insert (unwrap p) (addPathToProperty ep qWithAK (isElementOf pt modifiesPropertiesOf) (case ran of RDOM (ST et) -> et)) enumeratedProperties}
+        -- CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in setPathForStep."
+        CP _ -> pure unit
 
-  -- add to onRoleDelta_binder of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
-  QF.DataTypeGetterWithParameter QF.GetRoleBindersF enr -> modifyDF \dfr@{enumeratedRoles} -> let
-    -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
-    -- the binder. We skip the binding step because its cardinality is larger than one. It would cause a fan-out
-    -- while we know, when applying the inverted query when handling a RoleBindingDelta, the exact path to follow.
-    -- The function `aisInRoleDelta` applies the forward part to the binding (not the binder).
-    -- Hence we don't have to adapt the forward part.
-    -- We add the inverted query to the **BINDING ROLE**, not the bound role. This has two reasons:
-    --  * the bound role may well be in another model, leading to an InvertedQuery for another domain;
-    --  * if runtime a role is bound that is a specialisation of the required role, it will still trigger the inverted query.
-    oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
-    roleNames = unwrap <$> (leavesInADT $ unsafePartial roleRange qfd)
-    invertedQuery = case oneStepLess of
-      -- Backward consisted of just a single step and that was GetRoleBindersF.
-      -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
-      -- is already the end result we want to obtain. Hence we do with the Identity function, where the domain and
-      -- range are the range of the backward step.
-      ZQ Nothing fwd -> ZQ (Just (SQD ran (QF.DataTypeGetter IdentityF) ran True True)) fwd
-      x -> x
-    in
-      foldl (\dfr' roleName ->
-        case lookup roleName enumeratedRoles of
-          Nothing -> addInvertedQueryForDomain roleName
-            (InvertedQuery {description: invertedQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-            OnRoleDelta_binder
-            dfr'
-          Just en -> dfr' {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en invertedQuery) enumeratedRoles})
-        dfr
-        roleNames
-
-  -- add to onRoleDelta_binding of the role that we apply `binding` to (the domain of the step; the role that binds).
-  QF.DataTypeGetter QF.BindingF -> modifyDF \dfr@{enumeratedRoles} -> case dom of
-    (RDOM EMPTY) -> dfr
-    otherwise -> let
+    -- add to onRoleDelta_binder of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
+    QF.DataTypeGetterWithParameter QF.GetRoleBindersF enr -> modifyDF \dfr@{enumeratedRoles} -> let
+      -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
+      -- the binder. We skip the binding step because its cardinality is larger than one. It would cause a fan-out
+      -- while we know, when applying the inverted query when handling a RoleBindingDelta, the exact path to follow.
+      -- The function `aisInRoleDelta` applies the forward part to the binding (not the binder).
+      -- Hence we don't have to adapt the forward part.
+      -- We add the inverted query to the **BINDING ROLE**, not the bound role. This has two reasons:
+      --  * the bound role may well be in another model, leading to an InvertedQuery for another domain;
+      --  * if runtime a role is bound that is a specialisation of the required role, it will still trigger the inverted query.
+      oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
       roleNames = unwrap <$> (leavesInADT $ unsafePartial roleRange qfd)
+      invertedQuery = case oneStepLess of
+        -- Backward consisted of just a single step and that was GetRoleBindersF.
+        -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
+        -- is already the end result we want to obtain. Hence we do with the Identity function, where the domain and
+        -- range are the range of the backward step.
+        ZQ Nothing fwd -> ZQ (Just (SQD ran (QF.DataTypeGetter IdentityF) ran True True)) fwd
+        x -> x
+      in
+        foldl (\dfr' roleName ->
+          case lookup roleName enumeratedRoles of
+            Nothing -> addInvertedQueryForDomain roleName
+              (InvertedQuery
+                { description: invertedQuery
+                , backwardsCompiled: Nothing
+                , forwardsCompiled: Nothing
+                , users
+                , modifies: isJust $ elemIndex (EnumeratedRoleType enr) modifiesRoleBindingOf
+                , statesPerProperty: EncodableMap statesPerProperty
+                , states
+                , selfOnly})
+              OnRoleDelta_binder
+              dfr'
+            Just en -> dfr' {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en invertedQuery (isJust $ elemIndex (EnumeratedRoleType enr) modifiesRoleBindingOf)) enumeratedRoles })
+          dfr
+          roleNames
+
+    -- add to onRoleDelta_binding of the role that we apply `binding` to (the domain of the step; the role that binds).
+    QF.DataTypeGetter QF.BindingF -> modifyDF \dfr@{enumeratedRoles} -> case dom of
+      (RDOM EMPTY) -> dfr
+      otherwise -> let
+        roleNames = unwrap <$> (leavesInADT $ unsafePartial roleRange qfd)
+        in
+          foldl (\dfr' roleName ->
+            case lookup roleName  enumeratedRoles of
+              Nothing -> addInvertedQueryForDomain roleName
+                (InvertedQuery
+                  { description: qWithAK
+                  , backwardsCompiled: Nothing
+                  , forwardsCompiled: Nothing
+                  , users
+                  , modifies: (isJust $ elemIndex (EnumeratedRoleType roleName) modifiesRoleBindingOf)
+                  , statesPerProperty: EncodableMap statesPerProperty
+                  , states
+                  , selfOnly})
+                OnRoleDelta_binding
+                dfr'
+              Just en -> dfr' {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en qWithAK (isJust $ elemIndex (EnumeratedRoleType roleName) modifiesRoleBindingOf)) enumeratedRoles})
+            dfr
+            roleNames
+    QF.RolGetter roleType -> case roleType of
+      ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> let
+        -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
+        -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
+        -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
+        -- for that by prepending it with the inversal of the first backward step - which is, by construction, a
+        -- `context` step.
+        oneStepLess = removeFirstBackwardsStep qWithAK
+          (\ran' dom' man' -> Just $ SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
+        in case oneStepLess of
+          ZQ Nothing _ -> dfr
+          _ -> case lookup roleName enumeratedRoles of
+            Nothing -> addInvertedQueryForDomain roleName
+              (InvertedQuery
+                { description: oneStepLess
+                , backwardsCompiled: Nothing
+                , forwardsCompiled: Nothing
+                , users
+                , modifies: (isJust $ elemIndex (EnumeratedRoleType roleName) modifiesRoleBindingOf)
+                , statesPerProperty: EncodableMap statesPerProperty
+                , states
+                , selfOnly
+                })
+              OnContextDelta_role
+              dfr
+            Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_role en oneStepLess (isJust $ elemIndex (EnumeratedRoleType roleName) modifiesRoleBindingOf)) enumeratedRoles}
+      CR _ -> throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
+
+    QF.DataTypeGetter QF.ContextF -> modifyDF \dfr@{enumeratedRoles} -> let
+      roleNames = unwrap <$> (leavesInADT $ unsafePartial roleDomain qfd)
       in
         foldl (\dfr' roleName ->
           case lookup roleName  enumeratedRoles of
             Nothing -> addInvertedQueryForDomain roleName
-              (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-              OnRoleDelta_binding
+              (InvertedQuery
+                { description: qWithAK
+                , backwardsCompiled: Nothing
+                , forwardsCompiled: Nothing
+                , users
+                , modifies: (isJust $ elemIndex (EnumeratedRoleType roleName) modifiesRoleBindingOf)
+                , statesPerProperty: EncodableMap statesPerProperty
+                , states
+                , selfOnly
+                })
+              OnContextDelta_context
               dfr'
-            Just en -> dfr' {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en qWithAK) enumeratedRoles})
-          dfr
-          roleNames
-  QF.RolGetter roleType -> case roleType of
-    ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> let
-      -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
-      -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
-      -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
-      -- for that by prepending it with the inversal of the first backward step - which is, by construction, a
-      -- `context` step.
-      oneStepLess = removeFirstBackwardsStep qWithAK
-        (\ran' dom' man' -> Just $ SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
-      in case oneStepLess of
-        ZQ Nothing _ -> dfr
-        _ -> case lookup roleName enumeratedRoles of
-          Nothing -> addInvertedQueryForDomain roleName
-            (InvertedQuery {description: oneStepLess, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-            OnContextDelta_role
-            dfr
-          Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_role en oneStepLess) enumeratedRoles}
-    CR _ -> throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
+            Just en -> dfr' {enumeratedRoles = insert roleName (addPathToOnContextDelta_context en qWithAK (isJust $ elemIndex (EnumeratedRoleType roleName) modifiesRoleBindingOf)) enumeratedRoles})
+        dfr
+        roleNames
 
-  QF.DataTypeGetter QF.ContextF -> modifyDF \dfr@{enumeratedRoles} -> let
-    roleNames = unwrap <$> (leavesInADT $ unsafePartial roleRange qfd)
-    in
-      foldl (\dfr' roleName ->
-        case lookup roleName  enumeratedRoles of
-          Nothing -> addInvertedQueryForDomain roleName
-            (InvertedQuery {description: qWithAK, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-            OnContextDelta_context
-            dfr'
-          Just en -> dfr' {enumeratedRoles = insert roleName (addPathToOnContextDelta_context en qWithAK) enumeratedRoles})
-      dfr
-      roleNames
+    -- As there is, by construction, no link from the range (an external role type)
+    -- to the domain (a context type), we can not attach an inverted query anywhere
+    QF.ExternalCoreContextGetter f -> pure unit
 
-  -- As there is, by construction, no link from the range (an external role type)
-  -- to the domain (a context type), we can not attach an inverted query anywhere
-  QF.ExternalCoreContextGetter f -> pure unit
+    -- The query would be added to onContextDelta_role of the external role. Such inverse queries are run when a new
+    -- instance of the role type is added to the context (or when it is removed). But the external role never changes,
+    -- so this is superfluous.
+    QF.DataTypeGetter QF.ExternalRoleF -> pure unit
 
-  -- The query would be added to onContextDelta_role of the external role. Such inverse queries are run when a new
-  -- instance of the role type is added to the context (or when it is removed). But the external role never changes,
-  -- so this is superfluous.
-  QF.DataTypeGetter QF.ExternalRoleF -> pure unit
+    -- Ignore ExternalRoleF and IdentityF in an inverse path. We do not
+    -- establish queries to gather affected contexts on them. For IdentityF this is
+    -- because we will establish a query on the next step (or have done so at the
+    -- previous step). For ExternalRoleF this is because there cannot be ContextDeltas
+    -- for the External role.
+    QF.DataTypeGetter QF.IdentityF -> pure unit
 
-  -- Ignore ExternalRoleF and IdentityF in an inverse path. We do not
-  -- establish queries to gather affected contexts on them. For IdentityF this is
-  -- because we will establish a query on the next step (or have done so at the
-  -- previous step). For ExternalRoleF this is because there cannot be ContextDeltas
-  -- for the External role.
-  QF.DataTypeGetter QF.IdentityF -> pure unit
-
-  _ -> throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
+    _ -> throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
 
   where
-    addPathToProperty :: EnumeratedProperty -> QueryWithAKink -> EnumeratedProperty
-    addPathToProperty (EnumeratedProperty propRecord@{_id, onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = union onPropertyDelta [(InvertedQuery
+    addPathToProperty :: EnumeratedProperty -> QueryWithAKink -> Boolean -> EnumeratedRoleType -> EnumeratedProperty
+    addPathToProperty (EnumeratedProperty propRecord@{_id, onPropertyDelta}) inverseQuery modifies eroleType = EnumeratedProperty propRecord {onPropertyDelta = addInvertedQuery' (InvertedQuery
       { description: inverseQuery
       , backwardsCompiled: Nothing
       , forwardsCompiled: Nothing
       , users
+      , modifies
       , statesPerProperty: EncodableMap statesPerProperty
       , states: maybe [] identity (Map.lookup (ENP _id) statesPerProperty)
-      , selfOnly})]}
+      , selfOnly})
+      eroleType
+      onPropertyDelta
+    }
 
-    addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = union onRoleDelta_binder [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})] }
+    addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryWithAKink -> Boolean -> EnumeratedRole
+    addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery modifies = EnumeratedRole rolRecord {onRoleDelta_binder = union onRoleDelta_binder [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})] }
 
-    addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = union onRoleDelta_binding [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})]}
+    addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryWithAKink -> Boolean -> EnumeratedRole
+    addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery modifies = EnumeratedRole rolRecord {onRoleDelta_binding = union onRoleDelta_binding [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})]}
 
-    addPathToOnContextDelta_context :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = union onContextDelta_context [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})]}
+    addPathToOnContextDelta_context :: EnumeratedRole -> QueryWithAKink -> Boolean -> EnumeratedRole
+    addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery modifies = EnumeratedRole rolRecord {onContextDelta_context = union onContextDelta_context [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})]}
 
-    addPathToOnContextDelta_role :: EnumeratedRole -> QueryWithAKink -> EnumeratedRole
-    addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = union onContextDelta_role [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})]}
+    addPathToOnContextDelta_role :: EnumeratedRole -> QueryWithAKink -> Boolean -> EnumeratedRole
+    addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery modifies = EnumeratedRole rolRecord {onContextDelta_role = union onContextDelta_role [(InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})]}
 
 ------------------------------------------------------------------------------------------
 ---- REMOVE FIRST BACKWARDS STEP

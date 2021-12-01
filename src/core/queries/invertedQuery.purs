@@ -32,18 +32,19 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, null, union)
+import Data.Array (cons, delete, null, union)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Object (Object, insert, lookup)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, isContextDomain, isRoleDomain, range)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -----------------------------------------------------------
@@ -55,6 +56,8 @@ newtype InvertedQuery = InvertedQuery
   , forwardsCompiled :: (Maybe HiddenFunction)
   -- TODO dit kan er maar één zijn.
   , users :: Array RoleType
+  -- True iff the user can modify the structural element where the InvertedQuery is attached.
+  , modifies :: Boolean
   -- Yield PerspectiveObject InvertedQueryResult data only in one of these states:
   , states :: Array StateIdentifier
   , statesPerProperty :: EncodableMap PropertyType (Array StateIdentifier)
@@ -91,6 +94,16 @@ equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}
 -- | if it specifies the same states, we add its users.
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
 addInvertedQuery q qs = cons q qs
+
+addInvertedQuery' :: InvertedQuery -> EnumeratedRoleType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
+addInvertedQuery' q eroleType qs = case lookup (unwrap eroleType) qs of
+  Nothing -> insert (unwrap eroleType) [q] qs
+  Just x -> insert (unwrap eroleType) (cons q x) qs
+
+deleteInvertedQuery' :: InvertedQuery -> EnumeratedRoleType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
+deleteInvertedQuery' q eroleType qs = case lookup (unwrap eroleType) qs of
+  Nothing -> qs
+  Just x -> insert (unwrap eroleType) (delete q x) qs
 
 -- TODO. Dit voegt InvertedQueries samen die apart moeten blijven.
 -- addInvertedQuery q@(InvertedQuery{users, states}) qs = case findIndex (equalDescriptions q) qs of

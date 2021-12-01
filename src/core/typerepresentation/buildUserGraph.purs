@@ -24,21 +24,21 @@ module Perspectives.Representation.UserGraph.Build where
 
 import Prelude
 
-import Control.Monad.State (gets)
+import Control.Monad.State (State, execState, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (concat, filter)
-import Data.Maybe (maybe)
+import Data.Array (concat, filter, nub, union)
+import Data.Foldable (for_)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
-import Foreign.Object (Object, lookup, values)
+import Foreign.Object (Object, empty, insert, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
 import Perspectives.Query.QueryTypes (roleRange)
 import Perspectives.Representation.ADT (leavesInADT)
-import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.Role (class RoleClass, perspectives)
+import Perspectives.Representation.Class.Role (class RoleClass, Role(..), expansionOfRole, perspectives)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleKind(..), RoleType(..))
-import Perspectives.Representation.UserGraph (UserGraph(..), UserNode(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleKind(..))
+import Perspectives.Representation.UserGraph (Edges(..), UserGraph(..), UserNode(..))
 import Perspectives.Types.ObjectGetters (perspectiveObjectQfd)
 
 -------------------------------------------------------------------------------
@@ -50,14 +50,30 @@ buildUserGraph = do
   {enumeratedRoles, calculatedRoles} <- (lift $ gets _.dfr)
   eUserRoles <- pure $ filter ((eq UserRole) <<< _.kindOfRole <<< unwrap) (values enumeratedRoles)
   cUserRoles <- pure $ filter ((eq UserRole) <<< _.kindOfRole <<< unwrap) (values calculatedRoles)
-  pure $ UserGraph $ (map (userRoleToUserNode ENR enumeratedRoles) eUserRoles) <>
-    (map (userRoleToUserNode CR enumeratedRoles) cUserRoles)
+  -- Multiple Calculated user roles may expand to the same Enumerated user role (and the latter may have perspectives
+  -- of itself, too). All UserNodes with the same userType should be combined.
+  pure $ UserGraph $ combineUserNodes $ concat $ (map (userRoleToUserNode E enumeratedRoles) eUserRoles) <>
+    (map (userRoleToUserNode C enumeratedRoles) cUserRoles)
   where
-    userRoleToUserNode :: forall r i. RoleClass r i => (i -> RoleType) -> Object EnumeratedRole -> r -> UserNode
-    userRoleToUserNode constructor enumeratedRoles r = UserNode
-      { userType: constructor $ identifier r
-      , edges: filter isUserNode $ concat $ map (leavesInADT <<< unsafePartial roleRange <<< perspectiveObjectQfd) (perspectives r)
-      }
+    -- Because we expand the user role having a perspective, multiple UserNodes may result.
+    userRoleToUserNode :: forall r i. RoleClass r i => (r -> Role) -> Object EnumeratedRole -> r -> Array UserNode
+    userRoleToUserNode constructor enumeratedRoles r = let
+        -- retain the user roles in the enumerated role expansion of the perspectives of r.
+        edges = nub $ filter isUserNode $ concat $ map (leavesInADT <<< unsafePartial roleRange <<< perspectiveObjectQfd) (perspectives r)
+      in
+        -- TODO. Voor goede foutmeldingen zouden we de oorspronkelijke calculated rolename ook willen hebben in UserNode.
+        (\userType -> UserNode { userType, edges: Edges edges }) <$> (unsafePartial expansionOfRole (constructor r))
       where
+      -- We only lookup in the enumerated role types, because we deal with the enumerated role expansion above.
       isUserNode :: EnumeratedRoleType -> Boolean
       isUserNode (EnumeratedRoleType rt) = maybe false ((eq UserRole) <<< _.kindOfRole <<< unwrap) $ lookup rt enumeratedRoles
+
+    combineUserNodes :: Array UserNode -> Object Edges
+    combineUserNodes nodes = execState (for_ nodes combine) empty
+      where
+        combine :: UserNode -> State (Object Edges) Unit
+        combine (UserNode{userType, edges}) = do
+          (intermediate :: Object Edges) <- get
+          case lookup (unwrap userType) intermediate of
+            Nothing -> void $ modify (insert (unwrap userType) edges)
+            Just (Edges es) -> void $ modify (insert (unwrap userType) (Edges $ union es (unwrap edges)))

@@ -24,22 +24,22 @@ module Perspectives.Representation.UserGraph where
 
 import Prelude
 
-import Data.Foldable (find)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype)
+import Data.Maybe (isJust, maybe)
+import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleType(..))
+import Foreign.Object (Object, keys, lookup)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 
 -------------------------------------------------------------------------------
 ---- USER GRAPH REPRESENTATION
 -------------------------------------------------------------------------------
-
-newtype UserGraph = UserGraph (Array UserNode)
-newtype UserNode = UserNode {userType :: RoleType, edges :: Array EnumeratedRoleType}
+-- | A UserGraph is purely in terms of Enumerated Role types with kind UserRole.
+newtype UserGraph = UserGraph (Object Edges)
+newtype Edges = Edges (Array EnumeratedRoleType)
 
 derive instance genericUserGraph :: Generic UserGraph _
 
@@ -57,6 +57,24 @@ instance showUserGraph :: Show UserGraph where
 instance eqUserGraph :: Eq UserGraph where
   eq = genericEq
 
+derive instance genericEdges :: Generic Edges _
+
+derive instance newtypeEdges :: Newtype Edges _
+
+instance encodeEdges :: Encode Edges where
+  encode = genericEncode defaultOptions --{unwrapSingleConstructors = true}
+
+instance decodeEdges :: Decode Edges where
+  decode = genericDecode defaultOptions
+
+instance showEdges :: Show Edges where
+  show = genericShow
+
+instance eqEdges :: Eq Edges where
+  eq = genericEq
+
+newtype UserNode = UserNode {userType :: EnumeratedRoleType, edges :: Edges}
+
 derive instance genericUserNode :: Generic UserNode _
 
 derive instance newtypeUserNode :: Newtype UserNode _
@@ -73,10 +91,11 @@ instance showUserNode :: Show UserNode where
 instance eqUserNode :: Eq UserNode where
   eq = genericEq
 
-usersInGraph :: UserGraph -> Array RoleType
-usersInGraph (UserGraph nodes) = map (\(UserNode {userType}) -> userType) nodes
+usersInGraph :: UserGraph -> Array EnumeratedRoleType
+usersInGraph (UserGraph graph) = map EnumeratedRoleType (keys graph)
 
-getUserEdges :: UserGraph -> RoleType -> Array RoleType
-getUserEdges (UserGraph nodes) rt = case find (\(UserNode {userType}) -> rt == userType) nodes of
-  Nothing -> []
-  Just (UserNode{edges}) -> map ENR edges
+getUserEdges :: UserGraph -> EnumeratedRoleType -> Edges
+getUserEdges (UserGraph graph) (EnumeratedRoleType rt) = maybe (Edges []) identity (lookup rt graph)
+
+isInGraph :: EnumeratedRoleType -> UserGraph -> Boolean
+isInGraph rt (UserGraph graph) = isJust $ lookup (unwrap rt) graph

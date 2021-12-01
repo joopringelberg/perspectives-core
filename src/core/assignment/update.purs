@@ -56,7 +56,7 @@ import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, lift2, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_id, rol_isMe, rol_states)
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_id, rol_isMe, rol_pspType, rol_states)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
@@ -315,7 +315,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
         Just rid -> (lift2 $ try $ getPerspectEntiteit rid) >>= handlePerspectRolError "addProperty"
           \(pe :: PerspectRol) -> do
             -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
-            users <- aisInPropertyDelta rid propertyName
+            users <- aisInPropertyDelta rid propertyName (rol_pspType pe)
             deltas <- for valuesAndDeltas \(Tuple value msignedDelta) -> do
                 delta <- case msignedDelta of
                   Nothing -> do
@@ -374,7 +374,7 @@ removeProperty rids propertyName values = case ARR.head rids of
         Just rid -> (lift2 $ try $ getPerspectEntiteit rid) >>=
           handlePerspectRolError "removeProperty"
           \(pe :: PerspectRol) -> do
-            users <- aisInPropertyDelta rid propertyName
+            users <- aisInPropertyDelta rid propertyName (rol_pspType pe)
             -- Create a delta for all values at once.
             delta <- pure $ RolePropertyDelta
               { id : rid
@@ -414,7 +414,7 @@ deleteProperty rids propertyName = case ARR.head rids of
             handlePerspectRolError
             "deleteProperty"
             \(pe :: PerspectRol) -> do
-              users <- aisInPropertyDelta rid propertyName
+              users <- aisInPropertyDelta rid propertyName (rol_pspType pe)
               -- Create a delta for all values.
               delta <- pure $ RolePropertyDelta
                 { id : rid

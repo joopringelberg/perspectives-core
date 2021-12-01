@@ -32,6 +32,7 @@ module Perspectives.Query.ExpressionCompiler where
 
 import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Except (lift, throwError)
+import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets)
 import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, uncons)
 import Data.Either (Either(..))
@@ -62,6 +63,7 @@ import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCal
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (adtIsFunctional, binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
@@ -252,7 +254,12 @@ compileAndDistributeStep dom stp users stateIdentifiers = do
   (statesPerProperty :: Map PropertyType (Array StateIdentifier)) <- pure case propertyOfRange descr of
     Nothing -> empty
     Just p -> singleton p stateIdentifiers
-  setInvertedQueries users statesPerProperty stateIdentifiers descr notSelfOnly
+  runReaderT
+    (setInvertedQueries users statesPerProperty stateIdentifiers descr notSelfOnly)
+    { modifiesRoleInstancesOf: []
+    , modifiesRoleBindingOf: []
+    , modifiesPropertiesOf: Empty
+    }
   pure descr
   where
     notSelfOnly :: Boolean

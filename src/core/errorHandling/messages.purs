@@ -28,6 +28,7 @@ module Perspectives.Parsing.Messages where
 -- | This module defines the structure and kind of these errors.
 
 import Control.Monad.Except (ExceptT, throwError)
+import Data.Foldable (intercalate)
 import Data.List.Lazy.NonEmpty (singleton)
 import Data.List.Lazy.Types (NonEmptyList)
 import Data.Newtype (unwrap)
@@ -41,7 +42,7 @@ import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Show, (<>), show, (<<<))
+import Prelude (class Eq, class Show, map, show, (<<<), (<>))
 
 -- | A Perspectives sourcefile (text or diagram) will be parsed in two passes.
 -- | The resulting internal representation of types is type-checked.
@@ -114,6 +115,10 @@ data PerspectivesError
     | RuleErrorBoundary String String
     | ParserError String ArcPosition
     | MissingObject ArcPosition ArcPosition
+
+    | PropertySynchronizationIncomplete EnumeratedPropertyType EnumeratedRoleType (Array EnumeratedRoleType)
+
+
     | Custom String
 
 derive instance eqPerspectivesError :: Eq PerspectivesError
@@ -137,6 +142,9 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (MissingObject start end) = "(MissingObject) The expression contains a reference to the 'currentobject' variable but there is no current object in scope (between " <> show start <> " and " <> show end <> ")"
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
+
+  show (PropertySynchronizationIncomplete prop source destinations) = "(PropertySynchronizationIncomplete) Modifications to property '" <> (unwrap prop) <> "' by '" <> unwrap source <> "' cannot be sent to " <> intercalate ", " (map unwrap destinations) <> "."
+
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here)."
   show (RoleHasNoProperty rtype qn start end) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "' (between " <> show start <> " and " <> show end <> ")."
   show UniversalRoleHasNoParts = "(UniversalRoleHasNoParts) 'NoBinding' gives no access to properties, aspects, binding, etc."

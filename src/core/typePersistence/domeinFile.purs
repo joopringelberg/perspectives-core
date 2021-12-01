@@ -109,7 +109,7 @@ data SeparateInvertedQuery = OnContextDelta_context TypeName InvertedQuery |
 	OnContextDelta_role TypeName InvertedQuery |
 	OnRoleDelta_binding TypeName InvertedQuery |
 	OnRoleDelta_binder TypeName InvertedQuery |
-	OnPropertyDelta TypeName InvertedQuery
+	OnPropertyDelta EnumeratedRoleType TypeName InvertedQuery
 
 type TypeName = String
 
@@ -170,7 +170,7 @@ defaultDomeinFileRecord =
   , modelDescription: Nothing
   , referredModels: []
   , invertedQueriesInOtherDomains: empty
-  , userGraph: UserGraph []
+  , userGraph: UserGraph empty
 }
 
 defaultDomeinFile :: DomeinFile

@@ -39,7 +39,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse, traverse_)
 import Data.Tuple (Tuple(..), snd)
 import Effect.Exception (error)
-import Foreign.Object (lookup)
+import Foreign.Object (Object, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependency)
 import Perspectives.ContextAndRole (isDefaultContextDelta)
@@ -588,8 +588,8 @@ magic ctxt roleInstances rtype users =  do
 -- The role instance is the current object; so if a perspective is conditional on object state, we can check
 -- this role instance.
 -- Note we don't evaluate any forward part; it is not needed, so it may be Nothing.
-aisInPropertyDelta :: RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction (Array RoleInstance)
-aisInPropertyDelta id property = do
+aisInPropertyDelta :: RoleInstance -> EnumeratedPropertyType -> EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
+aisInPropertyDelta id property eroleType = do
   calculations <- lift2 $ compileDescriptions' property
   -- `handleBackwardQuery` just passes on users that have at least one
   -- valid perspective, even if the condition is object state.
@@ -602,19 +602,19 @@ aisInPropertyDelta id property = do
       modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
       (try $ retrieveDomeinFile modelName) >>=
         handleDomeinFileError' "aisInPropertyDelta" []
-          \(df :: DomeinFile) -> do
-            -- Get the AffectedContextCalculations in onPropertyDelta.
-            (calculations :: Array InvertedQuery) <- pure $ unsafePartial $ fromJust $ preview (onPropertyDelta rt) df
-            -- Compile the descriptions.
-            if areCompiled calculations
-              then pure calculations
-              else do
-                compiledCalculations <- traverse compileBoth calculations
-                -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
-                modifyDomeinFileInCache (over (onPropertyDelta rt) (const compiledCalculations)) modelName
-                pure compiledCalculations
+          \(df :: DomeinFile) -> case preview (onPropertyDelta rt) df of
+            Nothing -> pure []
+            Just iqObj -> case lookup (unwrap eroleType) iqObj of
+              Nothing -> pure []
+              Just calculations -> if areCompiled calculations
+                then pure calculations
+                else do
+                  compiledCalculations <- traverse compileBoth calculations
+                  -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
+                  modifyDomeinFileInCache (over (onPropertyDelta rt) (const (insert (unwrap eroleType) compiledCalculations iqObj))) modelName
+                  pure compiledCalculations
       where
-        onPropertyDelta :: EnumeratedPropertyType -> Traversal' DomeinFile (Array InvertedQuery)
+        onPropertyDelta :: EnumeratedPropertyType -> Traversal' DomeinFile (Object (Array InvertedQuery))
         onPropertyDelta (EnumeratedPropertyType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedProperties") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "onPropertyDelta")
 
 -- | Changes the model in cache (but not in Couchdb). For a given lens that retrieves one of onRoleDelta_binder,

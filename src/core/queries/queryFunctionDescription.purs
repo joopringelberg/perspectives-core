@@ -127,7 +127,7 @@ instance decodeQueryFunctionDescription :: Decode QueryFunctionDescription where
 instance showQueryFunctionDescription :: Show QueryFunctionDescription where
   show q = genericShow q
 
-derive instance ordQueryFunctionDescription :: Ord QueryFunctionDescription 
+derive instance ordQueryFunctionDescription :: Ord QueryFunctionDescription
 ---------------------------------------------------------------------------------------------------------------------
 ---- TRAVERSING
 ---------------------------------------------------------------------------------------------------------------------
@@ -177,6 +177,10 @@ range (MQD _ _ _ r _ _) = r
 
 roleRange :: Partial => QueryFunctionDescription -> ADT EnumeratedRoleType
 roleRange r = case range r of
+  RDOM et -> et
+
+roleDomain :: Partial => QueryFunctionDescription -> ADT EnumeratedRoleType
+roleDomain r = case domain r of
   RDOM et -> et
 
 domain :: QueryFunctionDescription -> Range

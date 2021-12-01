@@ -28,10 +28,11 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Object (Object, empty)
+import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==))
@@ -53,7 +54,7 @@ type EnumeratedPropertyRecord =
 
   , pos :: ArcPosition
 
-  , onPropertyDelta :: Array InvertedQuery
+  , onPropertyDelta :: Object (Array InvertedQuery)
   }
 
 defaultEnumeratedProperty :: String -> String -> String -> Range -> ArcPosition -> EnumeratedProperty
@@ -66,7 +67,7 @@ defaultEnumeratedProperty id dn role range pos = EnumeratedProperty
   , functional: true
   , mandatory: false
   , pos: pos
-  , onPropertyDelta: []
+  , onPropertyDelta: empty
 }
 
 derive instance genericRepEnumeratedProperty :: Generic EnumeratedProperty _

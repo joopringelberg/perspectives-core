@@ -22,75 +22,131 @@
 
 module Perspectives.Parsing.Arc.CheckSynchronization where
 
-import Control.Monad.State (State, evalState, get, gets, lift, modify)
-import Data.Array (cons, delete, elemIndex, filter, foldl, head, length, null)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Control.Monad.State (State, evalState, execState, get, gets, lift, modify)
+import Data.Array (concat, cons, delete, difference, elemIndex, filter, foldM, head, length, null, union)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, for_)
-import Effect.Class.Console (log)
-import Foreign.Object (lookup)
+import Data.Tuple (Tuple(..))
+import Effect.Class.Console (logShow)
+import Foreign.Object (filterKeys, lookup, size)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
-import Perspectives.Representation.Class.Identifiable (identifier)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole)
+import Perspectives.Representation.Class.Role (Role(..), allLocallyRepresentedProperties, expansionOfRole, kindOfRole)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, RoleType)
-import Perspectives.Representation.UserGraph (UserGraph(..), UserNode(..), getUserEdges, usersInGraph)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<<<), (<>), (>), (>>=))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType, roletype2string)
+import Perspectives.Representation.UserGraph (UserGraph(..), getUserEdges, isInGraph, usersInGraph)
+import Prelude (Unit, bind, discard, identity, pure, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=))
 
 -----------------------------------------------------------
 -- PROJECT THE USER ROLE GRAPH
 -----------------------------------------------------------
+-- | The startpoints of the projection are the user role types with a modifying perspective.
+newtype UserGraphProjection = UserGraphProjection
+  { startpoints :: Array EnumeratedRoleType
+  , graph :: UserGraph
+  , modifiedUserRole :: Maybe EnumeratedRoleType
+  }
+
 -- | For an EnumeratedRoleType, return a UserGraph that is restricted to users with a perspective on
 -- | that role type that allows them to see the instances.
-projectForRoleInstanceDeltas :: Partial => EnumeratedRoleType -> PhaseThree UserGraph
+projectForRoleInstanceDeltas :: Partial => EnumeratedRoleType -> PhaseThree UserGraphProjection
 projectForRoleInstanceDeltas etype = do
-  UserGraph nodes <- (lift $ gets (_.userGraph <<< _.dfr))
+  UserGraph edgesObject <- (lift $ gets (_.userGraph <<< _.dfr))
   EnumeratedRole{onContextDelta_context, onContextDelta_role} <- (lift $ gets (_.enumeratedRoles <<< _.dfr)) >>= pure <<< fromJust <<< lookup (unwrap etype)
-  usersWithAPerspective <- pure $ foldl
-    (\collectedUsers (InvertedQuery {users}) -> collectedUsers <> users)
-    []
-    (onContextDelta_context <> onContextDelta_role)
-  pure $ UserGraph $ filter (criterium usersWithAPerspective) nodes
+  -- Expand to EnumeratedRoleTypes, because the UserGraph is in terms of EnumeratedRoleTypes, too.
+  users <- usersWithAPerspective (onContextDelta_context <> onContextDelta_role)
+  startpoints <- usersWithAModifyingPerspective (onContextDelta_context <> onContextDelta_role)
+  pure $ UserGraphProjection
+    { startpoints
+    , graph: UserGraph $ filterKeys (criterium users) edgesObject
+    , modifiedUserRole: Nothing
+    }
   where
-    criterium :: Array RoleType -> UserNode -> Boolean
-    criterium usersWithAPerspective (UserNode{ userType }) = isJust $ elemIndex userType usersWithAPerspective
+    criterium :: Array EnumeratedRoleType -> String -> Boolean
+    criterium usersWithAPerspective' userType = isJust $ elemIndex (EnumeratedRoleType userType) usersWithAPerspective'
 
 -- | For an EnumeratedRoleType, return a UserGraph that is restricted to users with a perspective on
 -- | that role type that allows them to see the binding.
-projectForRoleBindingDeltas :: Partial => EnumeratedRoleType -> PhaseThree UserGraph
+projectForRoleBindingDeltas :: Partial => EnumeratedRoleType -> PhaseThree UserGraphProjection
 projectForRoleBindingDeltas etype = do
-  UserGraph nodes <- (lift $ gets (_.userGraph <<< _.dfr))
+  UserGraph edgesObject <- (lift $ gets (_.userGraph <<< _.dfr))
   EnumeratedRole{onRoleDelta_binding, onRoleDelta_binder} <- (lift $ gets (_.enumeratedRoles <<< _.dfr)) >>= pure <<< fromJust <<< lookup (unwrap etype)
-  usersWithAPerspective <- pure $ foldl
-    (\collectedUsers (InvertedQuery {users}) -> collectedUsers <> users)
-    []
-    (onRoleDelta_binding <> onRoleDelta_binder)
-  pure $ UserGraph $ filter (criterium usersWithAPerspective) nodes
+  users <- usersWithAPerspective (onRoleDelta_binding <> onRoleDelta_binder)
+  startpoints <- usersWithAModifyingPerspective (onRoleDelta_binding <> onRoleDelta_binder)
+  pure $ UserGraphProjection
+    { startpoints
+    , graph: UserGraph $ filterKeys (criterium users) edgesObject
+    , modifiedUserRole: Nothing
+    }
   where
-    criterium :: Array RoleType -> UserNode -> Boolean
-    criterium usersWithAPerspective (UserNode{ userType }) = isJust $ elemIndex userType usersWithAPerspective
+    criterium :: Array EnumeratedRoleType -> String -> Boolean
+    criterium usersWithAPerspective' userType = isJust $ elemIndex (EnumeratedRoleType userType) usersWithAPerspective'
 
 -- | For an EnumeratedRoleType, return a UserGraph that is restricted to users with a perspective on
 -- | that role type that allows them to see the binding.
-projectForPropertyDeltas :: Partial => EnumeratedPropertyType -> PhaseThree UserGraph
-projectForPropertyDeltas etype = do
-  UserGraph nodes <- (lift $ gets (_.userGraph <<< _.dfr))
-  EnumeratedProperty{onPropertyDelta} <- (lift $ gets (_.enumeratedProperties <<< _.dfr)) >>= pure <<< fromJust <<< lookup (unwrap etype)
-  usersWithAPerspective <- pure $ foldl
-    (\collectedUsers (InvertedQuery {users}) -> collectedUsers <> users)
-    []
-    onPropertyDelta
-  pure $ UserGraph $ filter (criterium usersWithAPerspective) nodes
+projectForPropertyDeltas :: Partial => EnumeratedPropertyType -> EnumeratedRoleType -> PhaseThree UserGraphProjection
+projectForPropertyDeltas etype erole = do
+  UserGraph edgesObject <- (lift $ gets (_.userGraph <<< _.dfr))
+  -- We cannot rely on looking up in the model in state, because Aspect properties
+  -- are included. But the entire synchronization check (including this function) is run
+  -- in the context of a withDomeinFile call, hence we can just retrieve the property
+  -- using getProperty
+  EnumeratedProperty{onPropertyDelta} <- lift $ lift $ getEnumeratedProperty etype
+  users <- usersWithAPerspective (maybe [] identity (lookup (unwrap erole) onPropertyDelta))
+  startpoints <- usersWithAModifyingPerspective (maybe [] identity (lookup (unwrap erole) onPropertyDelta))
+  eroleRep <- lift $ lift $ getEnumeratedRole erole
+  pure $ UserGraphProjection
+    { startpoints
+    , graph: UserGraph $ filterKeys (criterium users) edgesObject
+    , modifiedUserRole: if UserRole == kindOfRole eroleRep
+      then Just erole
+      else Nothing
+    }
   where
-    criterium :: Array RoleType -> UserNode -> Boolean
-    criterium usersWithAPerspective (UserNode{ userType }) = isJust $ elemIndex userType usersWithAPerspective
+    criterium :: Array EnumeratedRoleType -> String -> Boolean
+    criterium usersWithAPerspective' userType = isJust $ elemIndex (EnumeratedRoleType userType) usersWithAPerspective'
+
+
+usersWithAPerspective :: Partial => Array InvertedQuery -> PhaseThree (Array EnumeratedRoleType)
+usersWithAPerspective invertedQueries = foldM
+  (\collectedUsers (InvertedQuery {users}) -> do
+    roles <- for users getRoleFromState
+    eroles <- pure $ concat $ expansionOfRole <$> roles
+    pure $ eroles `union` collectedUsers
+  )
+  []
+  invertedQueries
+
+usersWithAModifyingPerspective :: Partial => Array InvertedQuery -> PhaseThree (Array EnumeratedRoleType)
+usersWithAModifyingPerspective invertedQueries = foldM
+  (\collectedUsers (InvertedQuery {users, modifies}) -> if modifies
+    then do
+      roles <- for users getRoleFromState
+      eroles <- pure $ concat $ expansionOfRole <$> roles
+      pure $ eroles `union` collectedUsers
+    else pure collectedUsers
+  )
+  []
+  invertedQueries
+
+getRoleFromState :: Partial => RoleType -> PhaseThree Role
+getRoleFromState rt = do
+  {enumeratedRoles, calculatedRoles} <- (lift $ gets _.dfr)
+  case lookup (roletype2string rt) enumeratedRoles, lookup (roletype2string rt) calculatedRoles of
+    Just er, Nothing -> pure $ E er
+    Nothing, Just cr -> pure $ C cr
+
 
 -----------------------------------------------------------
 -- COMPUTE DISCONNECTED SUBGRAPHS
 -----------------------------------------------------------
-type UserType = RoleType
+type UserType = EnumeratedRoleType
 
 type SubGraphState =
 	{ currentSubGraph :: Array UserType
@@ -99,7 +155,7 @@ type SubGraphState =
 	, unvisitedNodes :: Array UserType
 	}
 
-type UserGroup = Array RoleType
+type UserGroup = Array EnumeratedRoleType
 
 -- | Construct all groups of nodes in the graph that form a subgraph that is not connected to any of the
 -- | other subgraphs. At least one subgraph is expected.
@@ -135,8 +191,56 @@ findAllSubGraphs graph = evalState findAllSubGraphs'
     unvisitedNodes <- gets _.unvisitedNodes
     void $ for (filter
         (\edge -> isJust $ elemIndex edge unvisitedNodes)
-        (getUserEdges graph userType))
+        (unwrap $ getUserEdges graph userType))
       buildCurrentSubGraph
+
+-----------------------------------------------------------
+-- CHECKALLSTARTPOINTS
+-----------------------------------------------------------
+-- From each node with a modifiying perspective, walk the graph in a depth-first
+-- manner and afterwards check whether all nodes have been visited.
+-- Collect visited nodes in state to prevent looping.
+-- Collect starting nodes that connect completely for optimalization.
+-- Collect failed nodes with the nodes that cannot be reached.
+
+type ConnectionState =
+  { visitedNodes :: UserGroup
+  , completelyConnectedNodes :: UserGroup
+  , failures :: Array MissingConnections}
+
+type MissingConnections = Tuple UserType UserGroup
+
+checkAllStartpoints :: UserGraphProjection -> Array MissingConnections
+checkAllStartpoints (UserGraphProjection{startpoints, graph, modifiedUserRole}) = _.failures $ execState (for_ startpoints checkStartPoint)
+  { visitedNodes: []
+  , completelyConnectedNodes: []
+  , failures: []}
+  where
+    checkStartPoint :: UserType -> State ConnectionState Unit
+    checkStartPoint startpoint = do
+      void $ modify \s -> s {visitedNodes = case modifiedUserRole of
+        Nothing -> []
+        Just ur -> if ur == startpoint
+          then []
+          else [ur]}
+      walkTheTree startpoint
+      {visitedNodes} <- get
+      if length visitedNodes == (size $ unwrap graph)
+        then void $ modify \s@{completelyConnectedNodes} -> s {completelyConnectedNodes = cons startpoint completelyConnectedNodes}
+        else void $ modify \s@{failures} -> s { failures = cons (Tuple startpoint (difference (usersInGraph graph) visitedNodes)) failures}
+      where
+      walkTheTree :: UserType -> State ConnectionState Unit
+      walkTheTree currentNode = if isInGraph currentNode graph
+        then do
+          {visitedNodes, completelyConnectedNodes} <- get
+          if isJust $ elemIndex currentNode visitedNodes
+            then pure unit
+            else if isJust $ elemIndex currentNode completelyConnectedNodes
+              then void $ modify \s -> s {visitedNodes = usersInGraph graph}
+              else do
+                void $ modify \s -> s {visitedNodes = [currentNode] `union` visitedNodes}
+                for_ (unwrap $ getUserEdges graph currentNode) walkTheTree
+        else pure unit
 
 -----------------------------------------------------------
 -- CHECKSYNCHRONIZATION
@@ -145,10 +249,14 @@ checkSynchronization :: PhaseThree Unit
 checkSynchronization = do
   -- For all EnumeratedProperties, project the UserGraph and construct its subGraphs.
   -- Warn the modeller if there are more than one.
-  eprops <- (lift $ gets (_.enumeratedProperties <<< _.dfr))
-  for_ eprops \prop -> do
-    projectedGraph <- unsafePartial projectForPropertyDeltas (identifier prop)
-    subGraphs <- pure $ findAllSubGraphs projectedGraph
-    if length subGraphs > 1
-      then log ("Found unconnected subgraphs for property " <> show (identifier prop) <> ".\n" <> show subGraphs)
-      else pure unit
+  {enumeratedRoles, enumeratedProperties} <- lift $ gets _.dfr
+  for_ enumeratedRoles \(EnumeratedRole{_id:roleId, properties}) -> do
+    allLocalProps <- lift $ lift $ allLocallyRepresentedProperties (ST roleId)
+    for_ allLocalProps \propType -> case propType of
+      ENP propId -> do
+        projectedGraph <- unsafePartial projectForPropertyDeltas propId roleId
+        case checkAllStartpoints projectedGraph of
+          none | null none -> pure unit
+          failures -> for_ failures \(Tuple source destinations) -> logShow (PropertySynchronizationIncomplete propId source destinations)
+      otherwise -> pure unit
+    pure unit

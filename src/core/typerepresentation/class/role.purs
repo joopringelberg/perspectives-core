@@ -37,9 +37,9 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), range, domain2roleType)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
-import Perspectives.Representation.ADT (ADT(..), product, reduce)
+import Perspectives.Representation.ADT (ADT(..), leavesInADT, product, reduce)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.CalculatedRole (CalculatedRole)
+import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Context (contextAspects, externalRole, roles)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
@@ -370,6 +370,13 @@ adtOfRoleAndBinding (C c) = roleAndBinding c
 contextOfRole :: Role -> MP (ADT ContextType)
 contextOfRole (E e) = context e
 contextOfRole (C c) = context c
+
+-- Partial, because of the embedded case and because domain2roleType is Partial because it just handles
+-- RDOM cases.
+-- | The same result as roleADT, but not in MonadPerspectives.
+expansionOfRole :: Partial => Role -> Array EnumeratedRoleType
+expansionOfRole (E (EnumeratedRole {_id})) = [_id]
+expansionOfRole (C (CalculatedRole {calculation})) = leavesInADT $ domain2roleType $ range $ (case calculation of Q qd -> qd)
 
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLETYPE
