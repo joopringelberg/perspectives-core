@@ -26,7 +26,7 @@ import Prelude
 
 import Control.Monad.State (State, execState, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (concat, filter, filterA, head, nub, union)
+import Data.Array (concat, cons, filter, filterA, head, nub, union)
 import Data.Foldable (for_)
 import Data.Map (Map, empty, insert, lookup)
 import Data.Maybe (Maybe(..))
@@ -78,8 +78,8 @@ buildUserGraph = do
     expandSourceToExtension t@(Tuple source edges) = case source of
       ENR _ -> pure [t]
       CR croleType -> do
-        expansion <- getRole source >>= pure <<< expansionOfRole
-        pure $ flip Tuple edges <<< ENR <$> expansion
+        expansion <- getRole source >>= pure <<< map ENR <<< expansionOfRole
+        pure $ flip Tuple edges <$> (cons source expansion)
 
     -- Apply the Filler Rule: When U1 has a perspective on U2, we connect U1 to U2 in the
     -- User Graph. The Filler Rule says we should connect filler F of U1 to U2 as well
@@ -87,8 +87,9 @@ buildUserGraph = do
     expandSourceToBindings :: Tuple RoleType Edges -> MonadPerspectives (Array Node)
     expandSourceToBindings t@(Tuple source edges) = case source of
       ENR eroleType -> do
-        recursiveFillers <- getEnumeratedRole eroleType >>= roleAndBinding >>= bindingOfADT >>= pure <<< map ENR <<< leavesInADT
-        pure $ flip Tuple edges <$> recursiveFillers
+        rAndb <- getEnumeratedRole eroleType >>= roleAndBinding
+        recursiveFillers <- bindingOfADT rAndb >>= pure <<< leavesInADT
+        pure $ flip Tuple edges <$> (ENR <$> (recursiveFillers <> leavesInADT rAndb))
       CR _ -> pure [t]
 
     -- Because we expand the user role having a perspective, multiple UserNodes may result.
