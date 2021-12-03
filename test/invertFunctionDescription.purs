@@ -26,7 +26,7 @@ import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunction
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), PropertyType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), PropertyType(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile')
 import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP, withModel_, withSystem)
