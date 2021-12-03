@@ -172,6 +172,8 @@ domain System
       view ForInvitee (InviterLastName, Message)
 
     user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
+      perspective on Invitee
+        props (Voornaam, Achternaam) verbs (Consult)
 
     user Invitee (mandatory) filledBy Guest
       perspective on Inviter
@@ -182,4 +184,4 @@ domain System
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
       perspective on Invitee
-        defaults
+        only (Fill)

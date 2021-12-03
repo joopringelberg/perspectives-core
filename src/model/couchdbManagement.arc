@@ -27,7 +27,8 @@ domain CouchdbManagement
     -- Becoming a Couchdb Server Admin should be managed outside Perspectives.
     user Manager = sys:Me
       perspective on CouchdbServers
-        defaults
+        only (CreateAndFill)
+        props (Name, Url) verbs (Consult)
       -- Manager needs this perspective for others to accept Admins created in state NoAdmin.
       perspective on CouchdbServers >> binding >> context >> CouchdbServer$Admin
 

@@ -25,7 +25,7 @@ domain BrokerServices
 
     user Guest = sys:Me
       perspective on ManagedBrokers
-        defaults
+        props (Name) verbs (Consult)
       perspective on Contracts
         view BrokerContract$External$ForAccountHolder (Consult)
 
@@ -51,6 +51,9 @@ domain BrokerServices
         defaults
       perspective on extern
         defaults
+      -- Without this perspective we get a synchronization warning.
+      perspective on Accounts >> binding >> context >> Administrator
+        props (ConfirmationCode) verbs (Consult)
 
     user Guest = sys:Me
       perspective on Administrator
