@@ -33,7 +33,7 @@ import Control.Monad.Except (throwError)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, elemIndex, filter, findIndex, foldM, foldl, foldr, fromFoldable, head, index, length, uncons, updateAt, union)
+import Data.Array (cons, elemIndex, filter, findIndex, foldM, foldl, foldr, fromFoldable, head, index, intercalate, length, uncons, union, updateAt)
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
@@ -863,7 +863,7 @@ handlePostponedStateQualifiedParts = do
     modifyPerspective :: QueryFunctionDescription -> RoleIdentification -> ArcPosition -> (Perspective -> Perspective) -> RoleType -> PhaseThree Unit
     modifyPerspective objectQfd roleSpec start modifier userRole = do
       (roleTypes :: Array RoleType) <- collectRoles roleSpec
-      displayName <- lift2 $ show <$> traverse displayNameOfRoleType roleTypes
+      displayName <- lift2 $ intercalate ", " <$> traverse displayNameOfRoleType roleTypes
       isSelfPerspective <- (lift $ lift (userRole ###>> (unsafePartial isPerspectiveOnSelf objectQfd)))
       case userRole of
         ENR (EnumeratedRoleType r) -> do
