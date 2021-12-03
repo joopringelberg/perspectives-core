@@ -35,6 +35,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert, lookup)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
+import Perspectives.Data.EncodableMap (EncodableMap(..), empty) as EM
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InvertedQuery (InvertedQuery)
@@ -170,7 +171,7 @@ defaultDomeinFileRecord =
   , modelDescription: Nothing
   , referredModels: []
   , invertedQueriesInOtherDomains: empty
-  , userGraph: UserGraph empty
+  , userGraph: UserGraph $ EM.EncodableMap EM.empty
 }
 
 defaultDomeinFile :: DomeinFile

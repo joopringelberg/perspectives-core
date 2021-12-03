@@ -862,8 +862,8 @@ handlePostponedStateQualifiedParts = do
     -- Apply, for this user, the modifier to his perspective on the object (and create a perspective if necessary).
     modifyPerspective :: QueryFunctionDescription -> RoleIdentification -> ArcPosition -> (Perspective -> Perspective) -> RoleType -> PhaseThree Unit
     modifyPerspective objectQfd roleSpec start modifier userRole = do
-      (roleType :: Maybe RoleType) <- head <$> collectRoles roleSpec
-      mroleDisplayName <- lift2 $ traverse displayNameOfRoleType roleType
+      (roleTypes :: Array RoleType) <- collectRoles roleSpec
+      displayName <- lift2 $ show <$> traverse displayNameOfRoleType roleTypes
       isSelfPerspective <- (lift $ lift (userRole ###>> (unsafePartial isPerspectiveOnSelf objectQfd)))
       case userRole of
         ENR (EnumeratedRoleType r) -> do
@@ -871,15 +871,12 @@ handlePostponedStateQualifiedParts = do
           mi <- pure $ findIndex (\(Perspective{object}) -> object == objectQfd) perspectives
           perspective <- case mi of
             Nothing -> do
-              displayName <- case mroleDisplayName of
-                Just roleName -> pure roleName
-                Nothing -> lift2 $ reduce (getEnumeratedRole >=> pure <<< _.displayName <<< unwrap) (unsafePartial domain2roleType $ range objectQfd)
               pure $ Perspective
                 { id: (roletype2string userRole) <> "_" <> show (length perspectives)
                 , object: objectQfd
                 , isEnumerated: (isQFDofEnumeratedRole objectQfd)
                 , displayName
-                , roleType
+                , roleTypes
                 , roleVerbs: EncodableMap Map.empty
                 , propertyVerbs: EncodableMap Map.empty
                 , actions: EncodableMap Map.empty
@@ -900,15 +897,12 @@ handlePostponedStateQualifiedParts = do
           perspective <- case mi of
             Nothing -> do
               -- mroleName <- lift2 $ roleIdentification2displayName roleSpec
-              displayName <- case mroleDisplayName of
-                Just roleName -> pure roleName
-                Nothing -> lift2 $ reduce (getEnumeratedRole >=> pure <<< _.displayName <<< unwrap) (unsafePartial domain2roleType $ range objectQfd)
               pure $ Perspective
                 { id: (roletype2string userRole) <> "_" <> show (length perspectives)
                 , object: objectQfd
                 , isEnumerated: (isQFDofEnumeratedRole objectQfd)
                 , displayName
-                , roleType
+                , roleTypes
                 , roleVerbs: EncodableMap Map.empty
                 , propertyVerbs: EncodableMap Map.empty
                 , actions: EncodableMap Map.empty
@@ -958,8 +952,13 @@ handlePostponedStateQualifiedParts = do
 
 addUserRoleGraph :: PhaseThree Unit
 addUserRoleGraph = do
-  ugraph <- buildUserGraph
-  modifyDF \dfr -> dfr {userGraph = ugraph}
+  df@{_id} <- lift $ State.gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    do
+      ugraph <- buildUserGraph
+      modifyDF \dfr -> dfr {userGraph = ugraph}
 
 checkSynchronization :: PhaseThree Unit
 checkSynchronization = do

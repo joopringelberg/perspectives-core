@@ -25,7 +25,7 @@ module Perspectives.TypePersistence.PerspectiveSerialisation where
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
-import Data.Array (catMaybes, concat, cons, filter, findIndex, foldl, modifyAt, uncons, union)
+import Data.Array (catMaybes, concat, cons, filter, findIndex, foldl, head, modifyAt, uncons, union)
 import Data.Map (lookup)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype, unwrap)
@@ -117,10 +117,10 @@ serialisePerspective ::
   ContextInstance ->
   Perspective ->
   MonadPerspectivesQuery' SerialisedPerspective'
-serialisePerspective contextStates subjectStates cid p@(Perspective {id, object, isEnumerated, displayName, roleType, roleVerbs, propertyVerbs, actions}) = do
+serialisePerspective contextStates subjectStates cid p@(Perspective {id, object, isEnumerated, displayName, roleTypes, roleVerbs, propertyVerbs, actions}) = do
   properties <- lift $ serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> (contextStates <> subjectStates)))
   roleInstances <- roleInstancesWithProperties properties cid p
-  roleKind <- lift $ traverse roleKindOfRoleType roleType
+  roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes)
   -- If the binding of the ADT that is the range of the object QueryFunctionDescription, is an external role,
   -- its context type may be created.
   contextTypesToCreate <- (lift $ leavesInADT <$> bindingOfADT (unsafePartial domain2roleType (range object)))
@@ -132,7 +132,8 @@ serialisePerspective contextStates subjectStates cid p@(Perspective {id, object,
     , isFunctional: pessimistic $ functional object
     , isMandatory: pessimistic $ mandatory object
     , isCalculated: not isEnumerated
-    , roleType: roletype2string <$> roleType
+    -- NOTE: there can be more than one roleType.
+    , roleType: roletype2string <$> head roleTypes
     , roleKind
     , verbs: show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip lookup (unwrap roleVerbs)) <$> (contextStates <> subjectStates)))
     , properties: fromFoldable ((\prop@({id:propId}) -> Tuple propId prop) <$> properties)

@@ -29,7 +29,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.List (findIndex) as LST
 import Data.Map (values)
-import Data.Maybe (Maybe, isJust)
+import Data.Maybe (isJust)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -57,7 +57,7 @@ type PerspectiveRecord =
   , object :: QueryFunctionDescription
   , displayName :: String
   -- The RoleType of the object of the perspective.
-  , roleType :: Maybe RoleType
+  , roleTypes :: Array RoleType
   , isEnumerated :: Boolean
   , roleVerbs :: EncodableMap StateSpec RoleVerbList
 	, propertyVerbs :: EncodableMap StateSpec (Array PropertyVerbs)

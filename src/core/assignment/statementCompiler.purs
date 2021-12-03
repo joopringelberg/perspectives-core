@@ -29,11 +29,8 @@ where
 import Control.Monad.Except (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, filterA, foldM, head, length, null, uncons)
-import Data.Char.Unicode (toLower)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Data.String (Pattern(..), Replacement(..), replace)
-import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Foreign.Object (Object, keys, values)
 import Partial.Unsafe (unsafePartial)
@@ -259,10 +256,6 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             -- TODO: behandel hier Foreign functions.
             else throwError (UnknownExternalFunction start end effectName)
       where
-        mapName :: String -> String
-        mapName s = case CU.uncons (replace (Pattern "$") (Replacement "_") (replace (Pattern "model:") (Replacement "") s)) of
-          (Just {head, tail}) -> CU.fromCharArray [toLower head] <> tail
-          Nothing -> s
 
         qualifyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType
         qualifyWithRespectTo roleIdentifier contextFunctionDescription start end = do

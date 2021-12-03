@@ -39,7 +39,7 @@ import Perspectives.Parsing.Arc.Statement.AST (LetStep(..))
 import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Show, map, show, (<<<), (<>))
@@ -116,7 +116,7 @@ data PerspectivesError
     | ParserError String ArcPosition
     | MissingObject ArcPosition ArcPosition
 
-    | PropertySynchronizationIncomplete EnumeratedPropertyType EnumeratedRoleType (Array EnumeratedRoleType)
+    | PropertySynchronizationIncomplete EnumeratedPropertyType RoleType (Array RoleType)
 
 
     | Custom String
@@ -143,7 +143,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
 
-  show (PropertySynchronizationIncomplete prop source destinations) = "(PropertySynchronizationIncomplete) Modifications to property '" <> (unwrap prop) <> "' by '" <> unwrap source <> "' cannot be sent to " <> intercalate ", " (map unwrap destinations) <> "."
+  show (PropertySynchronizationIncomplete prop source destinations) = "(PropertySynchronizationIncomplete) Modifications to property '" <> (unwrap prop) <> "' by '" <> roletype2string source <> "' cannot be sent to " <> intercalate ", " (map roletype2string destinations) <> "."
 
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here)."
   show (RoleHasNoProperty rtype qn start end) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "' (between " <> show start <> " and " <> show end <> ")."
