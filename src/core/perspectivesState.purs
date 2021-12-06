@@ -52,6 +52,7 @@ newPerspectivesState uinfo publicRepo =
   , stompClient: Nothing
   , databases: empty
   -- , couchdbUrl: Nothing -- For using Couchdb as backend for Pouchdb.
+  , warnings: []
   }
 
 -----------------------------------------------------------
@@ -102,6 +103,9 @@ stompClient = gets _.stompClient
 setStompClient :: StompClient -> MonadPerspectives Unit
 setStompClient bs = modify \s -> s {stompClient = Just bs}
 
+getWarnings :: MonadPerspectives (Array String)
+getWarnings = gets _.warnings
+
 -----------------------------------------------------------
 -- RESETTING CACHES
 -----------------------------------------------------------
@@ -119,6 +123,9 @@ resetCaches = do
   resetDomeinCache
   resetRoleInstances
   resetContextInstances
+
+resetWarnings :: MonadPerspectives Unit
+resetWarnings = modify \s -> s { warnings = []}
 -----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS
 -----------------------------------------------------------

@@ -24,11 +24,14 @@ module Perspectives.ErrorLogging where
 
 import Prelude
 
+import Control.Monad.AvarMonadAsk (modify)
+import Data.Array (cons)
 import Data.Maybe (Maybe)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (Error)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Warning (PerspectivesWarning)
@@ -41,5 +44,7 @@ logPerspectivesError = liftEffect <<< log <<< show
 
 -- TODO. Create a system of warnings to be shared with the modelling user.
 -- For now, we just log the warning on screen.
-warnModeller :: forall m. MonadEffect m => Maybe RoleInstance -> PerspectivesWarning -> m Unit
-warnModeller mModeller warning = liftEffect $ log $ show warning
+warnModeller :: Maybe RoleInstance -> PerspectivesWarning -> MonadPerspectives Unit
+warnModeller mModeller warning = do
+  modify \(s@{warnings}) -> s { warnings = cons (show warning) warnings }
+  log $ show warning

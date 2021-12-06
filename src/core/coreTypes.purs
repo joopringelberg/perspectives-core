@@ -91,6 +91,8 @@ type PerspectivesExtraState =
 
   , stompClient :: Maybe StompClient
 
+  , warnings :: Array String 
+
   )
 
 -----------------------------------------------------------

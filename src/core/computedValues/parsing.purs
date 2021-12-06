@@ -29,7 +29,7 @@ import Prelude
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (head)
+import Data.Array (cons, head, intercalate)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
@@ -42,6 +42,7 @@ import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.LoadCRL (loadAndCacheCrlFile')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_, loadArcAndCrl')
 import Unsafe.Coerce (unsafeCoerce)
@@ -52,10 +53,14 @@ parseAndCompileArc arcSource_ _ = case head arcSource_ of
   Nothing -> pure $ Value "No arc source given!"
   Just arcSource -> catchError
     do
+      lift $ lift $ resetWarnings
       r <- lift $ lift $ loadAndCompileArcFile_ arcSource
       case r of
         Left errs -> ArrayT $ pure (Value <<< show <$> errs)
-        Right _ -> pure $ Value "OK"
+        -- Als er meldingen zijn, geef die dan terug.
+        Right _ -> do
+          warnings <- lift $ lift $ getWarnings
+          pure $ Value $ intercalate "\n" (cons "OK" warnings)
     \e -> ArrayT $ pure [Value (show e)]
 
 -- | Read the .crl file, parse it and try to compile it.

@@ -23,27 +23,27 @@
 module Perspectives.Parsing.Arc.CheckSynchronization where
 
 import Control.Monad.State (State, evalState, execState, get, gets, lift, modify)
-import Data.Array (concat, cons, delete, difference, elemIndex, filter, foldM, head, length, null, union)
+import Data.Array (cons, delete, difference, elemIndex, filter, foldM, head, length, null, union)
 import Data.Map (filterKeys, size)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, for_)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (logShow)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
+import Perspectives.ErrorLogging (warnModeller)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
-import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole)
-import Perspectives.Representation.Class.Role (Role(..), allLocallyRepresentedProperties, expansionOfRole, kindOfRole)
+import Perspectives.Representation.Class.Role (Role(..), allLocallyRepresentedProperties, kindOfRole)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), roletype2string)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleKind(..), RoleType(..), roletype2string)
 import Perspectives.Representation.UserGraph (UserGraph(..), getUserEdges, isInGraph, usersInGraph)
-import Prelude (Unit, bind, discard, identity, pure, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=))
+import Perspectives.Warning (PerspectivesWarning(..))
+import Prelude (Unit, bind, discard, identity, pure, unit, void, ($), (<<<), (<>), (==), (>>=))
 
 -----------------------------------------------------------
 -- PROJECT THE USER ROLE GRAPH
@@ -234,7 +234,7 @@ checkAllStartpoints (UserGraphProjection{startpoints, graph, modifiedUserRole}) 
             else if isJust $ elemIndex currentNode completelyConnectedNodes
               then void $ modify \s -> s {visitedNodes = usersInGraph graph}
               else do
-                void $ modify \s -> s {visitedNodes = [currentNode] `union` visitedNodes}
+                void $ modify \s -> s {visitedNodes = visitedNodes `union` [currentNode]}
                 for_ (unwrap $ getUserEdges graph currentNode) walkTheTree
         else pure unit
 
@@ -253,6 +253,6 @@ checkSynchronization = do
         projectedGraph <- unsafePartial projectForPropertyDeltas propId roleId
         case checkAllStartpoints projectedGraph of
           none | null none -> pure unit
-          failures -> for_ failures \(Tuple source destinations) -> logShow (PropertySynchronizationIncomplete propId source destinations)
+          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (PropertySynchronizationIncomplete propId source destinations)
       otherwise -> pure unit
     pure unit

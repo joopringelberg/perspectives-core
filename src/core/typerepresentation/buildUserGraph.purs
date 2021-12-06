@@ -74,7 +74,7 @@ buildUserGraph = do
     -- Apply the Calculated User Rule: when CU1 has a perspective on U2, we connect
     -- CU1 to U2 in the User Graph. This rule says we should connect extension U1 of CU1
     -- to U2 as well.
-    expandSourceToExtension :: Partial => Node -> MonadPerspectives (Array (Tuple RoleType Edges))
+    expandSourceToExtension :: Partial => Node -> MonadPerspectives (Array Node)
     expandSourceToExtension t@(Tuple source edges) = case source of
       ENR _ -> pure [t]
       CR croleType -> do

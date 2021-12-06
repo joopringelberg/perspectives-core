@@ -24,10 +24,16 @@ module Perspectives.Warning where
 
 import Prelude
 
+import Data.Foldable (intercalate)
+import Data.Newtype (unwrap)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, RoleType, roletype2string)
+
 data PerspectivesWarning =
     ModelLacksModelId String
   | ModelLacksUrl String
+  | PropertySynchronizationIncomplete EnumeratedPropertyType RoleType (Array RoleType)
 
 instance showPerspectivesWarning :: Show PerspectivesWarning where
   show (ModelLacksModelId dfid) = "(ModelLacksModelId) The model '" <> dfid <> "' lacks a value for the property ModelIdentification on its Model instance."
   show (ModelLacksUrl dfid) = "(ModelLacksUrl) The model '" <> dfid <> "' lacks a value for the property Url on its Model instance."
+  show (PropertySynchronizationIncomplete prop source destinations) = "(PropertySynchronizationIncomplete) Modifications to property:\n\t'" <> (unwrap prop) <> "'\n by:\n\t'" <> roletype2string source <> "'\n cannot be sent to:\n\t*" <> intercalate "\n\t *" (map roletype2string destinations) <> "."

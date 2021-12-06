@@ -148,11 +148,11 @@ updateModel arrWithurl arrWithModelName modelsInUse = case head arrWithModelName
   Nothing -> do
     descriptionGetter <- lift2 $ getDynamicPropertyGetter "model:System$Model$External$Description" (ST (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"))
     description <- lift2 (modelsInUse ##= descriptionGetter)
-    warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
+    lift $ lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
   Just modelName -> do
     DomeinFile{invertedQueriesInOtherDomains} <- lift2 $ getDomeinFile $ DomeinFileId modelName
     case head arrWithurl of
-      Nothing -> warnModeller Nothing (ModelLacksUrl modelName)
+      Nothing -> lift $ lift $ warnModeller Nothing (ModelLacksUrl modelName)
       Just url -> do
         -- Untangle the InvertedQueries of the previous model.
         forWithIndex_ invertedQueriesInOtherDomains
