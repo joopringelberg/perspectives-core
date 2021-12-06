@@ -23,8 +23,8 @@
 module Perspectives.Parsing.Arc.CheckSynchronization where
 
 import Control.Monad.State (State, evalState, execState, get, gets, lift, modify)
-import Data.Array (cons, delete, difference, elemIndex, filter, foldM, head, length, null, union)
-import Data.Map (filterKeys, size)
+import Data.Array (cons, delete, difference, elemIndex, filter, foldM, head, null, union)
+import Data.Map (filterKeys)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, for_)
@@ -221,7 +221,10 @@ checkAllStartpoints (UserGraphProjection{startpoints, graph, modifiedUserRole}) 
           else [ur]}
       walkTheTree startpoint
       {visitedNodes} <- get
-      if length visitedNodes == (size $ unwrap $ unwrap graph)
+      -- Comparing lengths will not do as the modifiedUserRole may or may not occur in the graph, but will occurr in
+      -- the visited nodes.
+      unvisitedNodes <- pure (difference (usersInGraph graph) visitedNodes)
+      if null unvisitedNodes
         then void $ modify \s@{completelyConnectedNodes} -> s {completelyConnectedNodes = cons startpoint completelyConnectedNodes}
         else void $ modify \s@{failures} -> s { failures = cons (Tuple startpoint (difference (usersInGraph graph) visitedNodes)) failures}
       where
