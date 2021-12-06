@@ -26,7 +26,7 @@ import Prelude
 
 import Control.Monad.State (State, execState, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (concat, cons, filter, filterA, head, nub, union)
+import Data.Array (concat, cons, filter, filterA, foldM, head, nub, union)
 import Data.Foldable (for_)
 import Data.Map (Map, empty, insert, lookup)
 import Data.Maybe (Maybe(..))
@@ -62,12 +62,16 @@ buildUserGraph = do
         pure <<< concat >>=
           -- Apply Filler Rule.
           traverse expandSourceToBindings >>=
-            pure <<< concat)
+            pure <<< concat >>=
+              -- Apply Inverted Calculated User Rule
+              traverse (unsafePartial expandDestinationToExtension))
   (fromCroles :: Array Node) <- lift $ lift
     (traverse userRoleToUserNode cUserRoles >>=
     -- Apply Calculated User Rule.
       traverse (unsafePartial expandSourceToExtension) >>=
-        pure <<< concat)
+        pure <<< concat >>=
+          -- Apply Inverted Calculated User Rule
+          traverse (unsafePartial expandDestinationToExtension))
   -- All UserNodes with the same userType should be combined.
   pure $ UserGraph $ EncodableMap $ combineUserNodes (fromEroles <> fromEroles)
   where
@@ -91,6 +95,23 @@ buildUserGraph = do
         recursiveFillers <- bindingOfADT rAndb >>= pure <<< leavesInADT
         pure $ flip Tuple edges <$> (ENR <$> (recursiveFillers <> leavesInADT rAndb))
       CR _ -> pure [t]
+
+    -- Apply the Inverted Calculated User Rule: When U1 has a perspective on calculated user role C2,
+    -- we connect U1 to C2 in the User Graph. The Inverted Calculated User Rule says we should connect
+    -- U1 to extension U2 as well.
+    expandDestinationToExtension :: Partial => Node -> MonadPerspectives Node
+    expandDestinationToExtension t@(Tuple source (Edges edges)) = do
+      -- close the Array of RoleTypes in edges under expansionOfRole, while preserving the originals.
+      expansion <- foldM
+        (\destinations nextDestination ->
+          case nextDestination of
+            -- Each Enumerated role is in the result on the outset.
+            ENR _ -> pure destinations
+            CR _ -> getRole nextDestination >>= pure <<< map ENR <<< expansionOfRole
+            )
+        edges
+        edges
+      pure $ Tuple source (Edges expansion)
 
     -- Because we expand the user role having a perspective, multiple UserNodes may result.
     userRoleToUserNode :: forall r i. RoleClass r i => r -> MonadPerspectives Node
