@@ -48,7 +48,7 @@ import Foreign.Object (lookup, insert) as OBJ
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery, addInvertedQuery')
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery, addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep, makeComposition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
@@ -134,7 +134,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
               })
             OnContextDelta_context
             df
-          Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQuery
+          Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQueryIndexedByContext
             (InvertedQuery
               { description: qwk
               , backwardsCompiled: Nothing
@@ -145,6 +145,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
               , statesPerProperty: EncodableMap statesPerProperty
               , selfOnly
               })
+
             onContextDelta_context }) roles}
 
     addToOnRoleDeltaBinder :: QueryWithAKink -> EnumeratedRoleType -> Array StateIdentifier -> WithModificationSummary Unit
@@ -207,7 +208,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
                 })
               (OnPropertyDelta eroleType)
               df
-            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = OBJ.insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQuery'
+            Just (EnumeratedProperty epr@{onPropertyDelta}) -> df {enumeratedProperties = OBJ.insert p (EnumeratedProperty epr {onPropertyDelta = addInvertedQueryIndexedByRole
                 (InvertedQuery
                   {description: ZQ backwards' forwards'
                   , backwardsCompiled: Nothing

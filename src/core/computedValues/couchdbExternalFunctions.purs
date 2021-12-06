@@ -62,7 +62,7 @@ import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
-import Perspectives.InvertedQuery (addInvertedQuery', deleteInvertedQuery')
+import Perspectives.InvertedQuery (addInvertedQueryIndexedByRole, deleteInvertedQueryIndexedByRole)
 import Perspectives.Models (modelsInUse) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -432,8 +432,8 @@ modifyInvertedQuery add = modifyInvertedQuery'
         -- after the author of the imported model referenced it.
         Nothing -> dfr
         Just (EnumeratedProperty rr@{onPropertyDelta}) -> dfr {enumeratedProperties = insert typeName (EnumeratedProperty rr {onPropertyDelta = if add
-          then addInvertedQuery' invertedQuery eroleType onPropertyDelta
-          else deleteInvertedQuery' invertedQuery eroleType onPropertyDelta}) enumeratedProperties}
+          then addInvertedQueryIndexedByRole invertedQuery eroleType onPropertyDelta
+          else deleteInvertedQueryIndexedByRole invertedQuery eroleType onPropertyDelta}) enumeratedProperties}
 
 -- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do

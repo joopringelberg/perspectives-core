@@ -33,7 +33,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInvertedQuery')
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInvertedQueryIndexedByRole)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range, roleDomain, roleRange)
@@ -221,7 +221,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
 
   where
     addPathToProperty :: EnumeratedProperty -> QueryWithAKink -> Boolean -> EnumeratedRoleType -> EnumeratedProperty
-    addPathToProperty (EnumeratedProperty propRecord@{_id, onPropertyDelta}) inverseQuery modifies eroleType = EnumeratedProperty propRecord {onPropertyDelta = addInvertedQuery' (InvertedQuery
+    addPathToProperty (EnumeratedProperty propRecord@{_id, onPropertyDelta}) inverseQuery modifies eroleType = EnumeratedProperty propRecord {onPropertyDelta = addInvertedQueryIndexedByRole (InvertedQuery
       { description: inverseQuery
       , backwardsCompiled: Nothing
       , forwardsCompiled: Nothing

@@ -44,7 +44,7 @@ import Foreign.Object (Object, insert, lookup)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, isContextDomain, isRoleDomain, range)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -----------------------------------------------------------
@@ -95,13 +95,25 @@ equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
 addInvertedQuery q qs = cons q qs
 
-addInvertedQuery' :: InvertedQuery -> EnumeratedRoleType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
-addInvertedQuery' q eroleType qs = case lookup (unwrap eroleType) qs of
+-- | Add an InvertedQuery to a PropertyType, indexed with an EnumeratedRoleType.
+addInvertedQueryIndexedByContext :: InvertedQuery -> ContextType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
+addInvertedQueryIndexedByContext q cType qs = case lookup (unwrap cType) qs of
+  Nothing -> insert (unwrap cType) [q] qs
+  Just x -> insert (unwrap cType) (cons q x) qs
+
+deleteInvertedQueryIndexedByContext :: InvertedQuery -> ContextType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
+deleteInvertedQueryIndexedByContext q cType qs = case lookup (unwrap cType) qs of
+  Nothing -> qs
+  Just x -> insert (unwrap cType) (delete q x) qs
+
+-- | Add an InvertedQuery to a PropertyType, indexed with an EnumeratedRoleType.
+addInvertedQueryIndexedByRole :: InvertedQuery -> EnumeratedRoleType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
+addInvertedQueryIndexedByRole q eroleType qs = case lookup (unwrap eroleType) qs of
   Nothing -> insert (unwrap eroleType) [q] qs
   Just x -> insert (unwrap eroleType) (cons q x) qs
 
-deleteInvertedQuery' :: InvertedQuery -> EnumeratedRoleType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
-deleteInvertedQuery' q eroleType qs = case lookup (unwrap eroleType) qs of
+deleteInvertedQueryIndexedByRole :: InvertedQuery -> EnumeratedRoleType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
+deleteInvertedQueryIndexedByRole q eroleType qs = case lookup (unwrap eroleType) qs of
   Nothing -> qs
   Just x -> insert (unwrap eroleType) (delete q x) qs
 

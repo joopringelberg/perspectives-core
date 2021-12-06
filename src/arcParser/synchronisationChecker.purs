@@ -36,8 +36,10 @@ import Perspectives.ErrorLogging (warnModeller)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Class.Context (contextADT, externalRole)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole)
-import Perspectives.Representation.Class.Role (Role(..), allLocallyRepresentedProperties, kindOfRole)
+import Perspectives.Representation.Class.Role (Role(..), allLocallyRepresentedProperties, allRoles, kindOfRole)
+import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleKind(..), RoleType(..), roletype2string)
@@ -60,7 +62,7 @@ newtype UserGraphProjection = UserGraphProjection
 projectForRoleInstanceDeltas :: Partial => EnumeratedRoleType -> PhaseThree UserGraphProjection
 projectForRoleInstanceDeltas etype = do
   UserGraph (EncodableMap edgesObject) <- (lift $ gets (_.userGraph <<< _.dfr))
-  EnumeratedRole{onContextDelta_context, onContextDelta_role} <- (lift $ gets (_.enumeratedRoles <<< _.dfr)) >>= pure <<< fromJust <<< lookup (unwrap etype)
+  EnumeratedRole{onContextDelta_context, onContextDelta_role} <- lift $ lift $ getEnumeratedRole etype
   -- Expand to EnumeratedRoleTypes, because the UserGraph is in terms of EnumeratedRoleTypes, too.
   users <- usersWithAPerspective (onContextDelta_context <> onContextDelta_role)
   startpoints <- usersWithAModifyingPerspective (onContextDelta_context <> onContextDelta_role)
@@ -93,13 +95,13 @@ projectForRoleBindingDeltas etype = do
 -- | For an EnumeratedProperty§Type, return a UserGraph that is restricted to users with a perspective on
 -- | that property type.
 projectForPropertyDeltas :: Partial => EnumeratedPropertyType -> EnumeratedRoleType -> PhaseThree UserGraphProjection
-projectForPropertyDeltas etype erole = do
+projectForPropertyDeltas ePropType erole = do
   UserGraph (EncodableMap edgesObject) <- (lift $ gets (_.userGraph <<< _.dfr))
   -- We cannot rely on looking up in the model in state, because Aspect properties
   -- are included. But the entire synchronization check (including this function) is run
   -- in the context of a withDomeinFile call, hence we can just retrieve the property
   -- using getProperty
-  EnumeratedProperty{onPropertyDelta} <- lift $ lift $ getEnumeratedProperty etype
+  EnumeratedProperty{onPropertyDelta} <- lift $ lift $ getEnumeratedProperty ePropType
   users <- usersWithAPerspective (maybe [] identity (lookup (unwrap erole) onPropertyDelta))
   startpoints <- usersWithAModifyingPerspective (maybe [] identity (lookup (unwrap erole) onPropertyDelta))
   eroleRep <- lift $ lift $ getEnumeratedRole erole
@@ -248,7 +250,7 @@ checkSynchronization :: PhaseThree Unit
 checkSynchronization = do
   -- For all EnumeratedProperties, project the UserGraph and construct its subGraphs.
   -- Warn the modeller if there are more than one.
-  {enumeratedRoles, enumeratedProperties} <- lift $ gets _.dfr
+  {contexts, enumeratedRoles} <- lift $ gets _.dfr
   for_ enumeratedRoles \(EnumeratedRole{_id:roleId, properties}) -> do
     allLocalProps <- lift $ lift $ allLocallyRepresentedProperties (ST roleId)
     for_ allLocalProps \propType -> case propType of
@@ -259,3 +261,13 @@ checkSynchronization = do
           failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (PropertySynchronizationIncomplete propId source destinations)
       otherwise -> pure unit
     pure unit
+  for_ contexts \c@(Context{_id}) -> do
+    -- All roles, including Aspect roles, but without the External Role.
+    allLocalRoles <- lift $ lift $ allRoles (contextADT c)
+    for_ (cons (ENR $ externalRole c) allLocalRoles) \roleType -> case roleType of
+      ENR roleId -> do
+        projectedGraph <- unsafePartial projectForRoleInstanceDeltas roleId
+        case checkAllStartpoints projectedGraph of
+          none | null none -> pure unit
+          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleSynchronizationIncomplete roleId source destinations)
+      otherwise -> pure unit

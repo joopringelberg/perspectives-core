@@ -66,7 +66,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
-import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..), isFunctionalFunction)
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
@@ -325,6 +325,9 @@ compileSimpleStep currentDomain s@(Binding pos) = do
       (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift2 $ bindingOfADT r
       case typeOfBinding of
         UNIVERSAL -> throwError $ RoleHasNoBinding pos r
+        -- TODO. If the 'in context' clause is used, add the context
+        -- type as EmbeddingContext to the RDOM.
+        -- If not, just use the static context of typeOfBinding.
         otherwise -> pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM typeOfBinding) True False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
