@@ -85,6 +85,7 @@ import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
@@ -99,8 +100,10 @@ data SimpleStep =
   ArcIdentifier ArcPosition String
   | Value ArcPosition Range String
   | CreateEnumeratedRole ArcPosition String
-  | Binding ArcPosition
-  | Binder ArcPosition String
+  -- Binding has an optional embedding context.
+  | Binding ArcPosition (Maybe String)
+  -- Binder has an optional embedding context.
+  | Binder ArcPosition String (Maybe String)
   | Context ArcPosition
   | Extern ArcPosition
   | SequenceFunction ArcPosition QF.FunctionName
@@ -178,8 +181,12 @@ instance decodeSimpleStep :: Decode SimpleStep where
 instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (ArcIdentifier _ s) = "ArcIdentifier " <> s
   prettyPrint' t (CreateEnumeratedRole _ s) = "CreateEnumeratedRole " <> s
-  prettyPrint' t (Binding _) = "Binding"
-  prettyPrint' t (Binder _ s) = "Binder " <> s
+  prettyPrint' t (Binding _ embeddingContext) = "Binding " <> (case embeddingContext of
+    Nothing -> ""
+    Just ec -> ec)
+  prettyPrint' t (Binder _ s embeddingContext) = "Binder " <> s <> (case embeddingContext of
+    Nothing -> ""
+    Just ec -> " " <> ec)
   prettyPrint' t (Context _) = "Context"
   prettyPrint' t (Extern _) = "Extern"
   prettyPrint' t (SequenceFunction _ s) = "SequenceFunction " <> show s

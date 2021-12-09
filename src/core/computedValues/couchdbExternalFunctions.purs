@@ -29,7 +29,7 @@ import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.State (State, StateT, execState, execStateT, get, modify, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
-import Data.Array (cons, delete, head)
+import Data.Array (cons, head)
 import Data.Array as ARR
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -62,7 +62,7 @@ import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (isMe)
-import Perspectives.InvertedQuery (addInvertedQueryIndexedByRole, deleteInvertedQueryIndexedByRole)
+import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.Models (modelsInUse) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -398,33 +398,38 @@ modifyInvertedQuery :: Boolean -> SeparateInvertedQuery -> State DomeinFileRecor
 modifyInvertedQuery add = modifyInvertedQuery'
   where
     modifyInvertedQuery' :: SeparateInvertedQuery -> State DomeinFileRecord Unit
-    modifyInvertedQuery' (OnContextDelta_context typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+    modifyInvertedQuery' (OnContextDelta_context embeddingContext typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup typeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{onContextDelta_context}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_context = (if add then cons else delete) invertedQuery onContextDelta_context}) enumeratedRoles}
+        Just (EnumeratedRole rr@{onContextDelta_context}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_context =
+          (if add then addInvertedQueryIndexedByContext else deleteInvertedQueryIndexedByContext)
+            invertedQuery
+            embeddingContext
+            onContextDelta_context
+          }) enumeratedRoles}
 
-    modifyInvertedQuery' (OnContextDelta_role typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+    modifyInvertedQuery' (OnContextDelta_role embeddingContext typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup typeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{onContextDelta_role}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_role = (if add then cons else delete) invertedQuery onContextDelta_role}) enumeratedRoles}
+        Just (EnumeratedRole rr@{onContextDelta_role}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onContextDelta_role = (if add then addInvertedQueryIndexedByContext else deleteInvertedQueryIndexedByContext) invertedQuery embeddingContext onContextDelta_role}) enumeratedRoles}
 
-    modifyInvertedQuery' (OnRoleDelta_binder typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+    modifyInvertedQuery' (OnRoleDelta_binder embeddingContext typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup typeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{onRoleDelta_binder}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binder = (if add then cons else delete) invertedQuery onRoleDelta_binder}) enumeratedRoles}
+        Just (EnumeratedRole rr@{onRoleDelta_binder}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binder = (if add then addInvertedQueryIndexedByContext else deleteInvertedQueryIndexedByContext) invertedQuery embeddingContext onRoleDelta_binder}) enumeratedRoles}
 
-    modifyInvertedQuery' (OnRoleDelta_binding typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+    modifyInvertedQuery' (OnRoleDelta_binding embeddingContext typeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup typeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{onRoleDelta_binding}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binding = (if add then cons else delete) invertedQuery onRoleDelta_binding}) enumeratedRoles}
+        Just (EnumeratedRole rr@{onRoleDelta_binding}) -> dfr {enumeratedRoles = insert typeName (EnumeratedRole rr {onRoleDelta_binding = (if add then addInvertedQueryIndexedByContext else deleteInvertedQueryIndexedByContext) invertedQuery embeddingContext onRoleDelta_binding}) enumeratedRoles}
 
     modifyInvertedQuery' (OnPropertyDelta eroleType typeName invertedQuery) = void $ modify \dfr@{enumeratedProperties} ->
       case lookup typeName enumeratedProperties of

@@ -78,7 +78,7 @@ instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty Enu
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
   isCalculated _ = pure false
-  calculation r = pure $ SQD (RDOM (ST (role r))) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range (Just $ ENP (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
+  calculation r = pure $ SQD (RDOM (ST (role r)) Nothing) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range (Just $ ENP (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
 
 rangeOfPropertyType :: PropertyType -> MonadPerspectives Range
 rangeOfPropertyType (ENP pt) = getEnumeratedProperty pt >>= range

@@ -63,9 +63,10 @@ projectForRoleInstanceDeltas :: Partial => EnumeratedRoleType -> PhaseThree User
 projectForRoleInstanceDeltas etype = do
   UserGraph (EncodableMap edgesObject) <- (lift $ gets (_.userGraph <<< _.dfr))
   EnumeratedRole{onContextDelta_context, onContextDelta_role} <- lift $ lift $ getEnumeratedRole etype
+  invertedQueries <- pure $ (maybe [] identity (lookup (unwrap etype) onContextDelta_context) <> maybe [] identity (lookup (unwrap etype) onContextDelta_role))
   -- Expand to EnumeratedRoleTypes, because the UserGraph is in terms of EnumeratedRoleTypes, too.
-  users <- usersWithAPerspective (onContextDelta_context <> onContextDelta_role)
-  startpoints <- usersWithAModifyingPerspective (onContextDelta_context <> onContextDelta_role)
+  users <- usersWithAPerspective invertedQueries
+  startpoints <- usersWithAModifyingPerspective invertedQueries
   pure $ UserGraphProjection
     { startpoints
     , graph: UserGraph $ EncodableMap $ filterKeys (criterium users) edgesObject
@@ -81,8 +82,9 @@ projectForRoleBindingDeltas :: Partial => EnumeratedRoleType -> PhaseThree UserG
 projectForRoleBindingDeltas etype = do
   UserGraph (EncodableMap edgesObject) <- (lift $ gets (_.userGraph <<< _.dfr))
   EnumeratedRole{onRoleDelta_binding, onRoleDelta_binder} <- (lift $ gets (_.enumeratedRoles <<< _.dfr)) >>= pure <<< fromJust <<< lookup (unwrap etype)
-  users <- usersWithAPerspective (onRoleDelta_binding <> onRoleDelta_binder)
-  startpoints <- usersWithAModifyingPerspective (onRoleDelta_binding <> onRoleDelta_binder)
+  invertedQueries <- pure $ (maybe [] identity (lookup (unwrap etype) onRoleDelta_binding) <> maybe [] identity (lookup (unwrap etype) onRoleDelta_binder))
+  users <- usersWithAPerspective invertedQueries
+  startpoints <- usersWithAModifyingPerspective invertedQueries
   pure $ UserGraphProjection
     { startpoints
     , graph: UserGraph $ EncodableMap $ filterKeys (criterium users) edgesObject

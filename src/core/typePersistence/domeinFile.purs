@@ -106,10 +106,10 @@ instance revisionDomeinFile :: Revision DomeinFile where
 -------------------------------------------------------------------------------
 ---- INVERTEDQUERYCOLLECTION
 -------------------------------------------------------------------------------
-data SeparateInvertedQuery = OnContextDelta_context TypeName InvertedQuery |
-	OnContextDelta_role TypeName InvertedQuery |
-	OnRoleDelta_binding TypeName InvertedQuery |
-	OnRoleDelta_binder TypeName InvertedQuery |
+data SeparateInvertedQuery = OnContextDelta_context ContextType TypeName InvertedQuery |
+	OnContextDelta_role ContextType TypeName InvertedQuery |
+	OnRoleDelta_binding ContextType TypeName InvertedQuery |
+	OnRoleDelta_binder ContextType TypeName InvertedQuery |
 	OnPropertyDelta EnumeratedRoleType TypeName InvertedQuery
 
 type TypeName = String

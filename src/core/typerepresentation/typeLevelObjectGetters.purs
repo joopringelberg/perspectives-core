@@ -81,6 +81,9 @@ roleRootStates = roleAspectsClosure >=> roleRootState
 enumeratedRolePropertyTypes_ :: EnumeratedRoleType -> MonadPerspectives (Array PropertyType)
 enumeratedRolePropertyTypes_ = getEnumeratedRole >=> \(EnumeratedRole{properties}) -> pure properties
 
+enumeratedRoleContextType :: EnumeratedRoleType -> MonadPerspectives ContextType
+enumeratedRoleContextType = getEnumeratedRole >=> pure <<< _.context <<< unwrap
+
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
 ----------------------------------------------------------------------------------------

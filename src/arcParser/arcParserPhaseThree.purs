@@ -307,7 +307,7 @@ compileCalculatedRolesAndProperties = do
           cp@(CalculatedProperty {calculation, role}) <- lift2 $ getCalculatedProperty propertyType
           case calculation of
             Q _ -> pure unit
-            S stp -> void $ compileAndSaveProperty (RDOM $ ST role) stp cp
+            S stp -> void $ compileAndSaveProperty (RDOM (ST role) Nothing) stp cp
 
 handlePostponedStateQualifiedParts  :: PhaseThree Unit
 handlePostponedStateQualifiedParts = do
@@ -336,7 +336,7 @@ handlePostponedStateQualifiedParts = do
     -- This case MUST represent the current object that holds in the body of `perspective on`. Multiple Enumerated role types can result from this case.
     collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd ->
       case range qfd of
-        RDOM adt -> pure $ reduce adt
+        RDOM adt _ -> pure $ reduce adt
         otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
       where
         -- Translate the RoleIdentification to an array of EnumeratedRoleTypes.
@@ -929,7 +929,7 @@ handlePostponedStateQualifiedParts = do
           else isRoleRootState stateId >>= if _
             then do
               rk <- unsafePartial $ roleKind stateId
-              state' <- State <$> modifyState (unwrap $ constructState stateId (Q $ trueCondition (RDOM $ ST (EnumeratedRoleType (unwrap stateId))))
+              state' <- State <$> modifyState (unwrap $ constructState stateId (Q $ trueCondition (RDOM (ST (EnumeratedRoleType (unwrap stateId))) Nothing))
                 (case rk of
                   UserRole -> (Srole (EnumeratedRoleType (unwrap stateId)))
                   _ -> (Orole (EnumeratedRoleType (unwrap stateId)))) [])
@@ -1213,8 +1213,8 @@ adaptRoleStepToDomain _ stp = stp
 
 stateFulObject2Domain :: StateFulObject -> Domain
 stateFulObject2Domain (Cnt ctxt) = CDOM (ST ctxt)
-stateFulObject2Domain (Orole rle) = RDOM (ST rle)
-stateFulObject2Domain (Srole rle) = RDOM (ST rle)
+stateFulObject2Domain (Orole rle) = RDOM (ST rle) Nothing
+stateFulObject2Domain (Srole rle) = RDOM (ST rle) Nothing
 
 -- True, iff the identifier is that of a EnumeratedRole
 isEnumeratedRoleState :: StateIdentifier -> PhaseThree Boolean

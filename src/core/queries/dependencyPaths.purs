@@ -51,7 +51,7 @@ instance showDependency :: Show Dependency where
 -- | Given information on a Domain, turn a string value into a Dependency.
 -- | Caveats: Role types are construed to be Enumerated.
 domain2Dependency :: Domain -> String -> Dependency
-domain2Dependency (RDOM _) s = R $ RoleInstance s
+domain2Dependency (RDOM _ _) s = R $ RoleInstance s
 domain2Dependency (CDOM _) s = C $ ContextInstance s
 domain2Dependency (VDOM _ (Just pr)) s = V (propertytype2string pr) $ Value s
 domain2Dependency (VDOM _ Nothing) s = V "" $ Value s

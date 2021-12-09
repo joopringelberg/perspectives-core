@@ -162,7 +162,7 @@ isContextDomain (CDOM _) = true
 isContextDomain _ = false
 
 isRoleDomain :: Domain -> Boolean
-isRoleDomain (RDOM _) = true
+isRoleDomain (RDOM _ _) = true
 isRoleDomain _ = false
 
 -----------------------------------------------------------------------------------------
@@ -177,11 +177,11 @@ range (MQD _ _ _ r _ _) = r
 
 roleRange :: Partial => QueryFunctionDescription -> ADT EnumeratedRoleType
 roleRange r = case range r of
-  RDOM et -> et
+  RDOM et _ -> et
 
 roleDomain :: Partial => QueryFunctionDescription -> ADT EnumeratedRoleType
 roleDomain r = case domain r of
-  RDOM et -> et
+  RDOM et _ -> et
 
 domain :: QueryFunctionDescription -> Range
 domain (SQD d _ _ _ _) = d
@@ -237,7 +237,14 @@ replaceDomain (MQD dom f qfds ran fun man) d = (MQD d f (flip replaceDomain d <$
 -----------------------------------------------------------------------------------------
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
-data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM RAN.Range (Maybe PropertyType) | ContextKind | RoleKind
+data Domain =
+  -- The ContextType represents the embedding context type for Aspect roles that are added
+  -- as such to the context type. If Nothing, use the static context type.
+    RDOM (ADT EnumeratedRoleType) (Maybe ContextType)
+  | CDOM (ADT ContextType)
+  | VDOM RAN.Range (Maybe PropertyType)
+  | ContextKind
+  | RoleKind
 
 type Range = Domain
 
@@ -251,7 +258,7 @@ instance eqDomain :: Eq Domain where
   eq d1 d2 = genericEq d1 d2
 
 instance writeForeignDomain :: WriteForeign Domain where
-  writeImpl (RDOM adt) = unsafeToForeign { rdom: write adt}
+  writeImpl (RDOM adt ct) = unsafeToForeign { rdom: write adt, ctype: write ct}
   writeImpl (CDOM adt) = unsafeToForeign { cdom: write adt}
   writeImpl (VDOM ran mprop) = unsafeToForeign { range: write ran, maybeproperty: write mprop}
   writeImpl ContextKind = unsafeToForeign "ContextKind"
@@ -259,7 +266,7 @@ instance writeForeignDomain :: WriteForeign Domain where
 
 instance readForeignDomain :: ReadForeign Domain where
   readImpl f =
-    (\({rdom: adt} :: {rdom :: ADT EnumeratedRoleType})-> (RDOM adt)) <$> (readImpl f)
+    (\({rdom, ctype} :: {rdom :: ADT EnumeratedRoleType, ctype :: Maybe ContextType})-> (RDOM rdom ctype)) <$> (readImpl f)
     <|> (\({cdom: adt} :: {cdom :: ADT ContextType}) -> (CDOM adt)) <$> (readImpl f)
     <|> (\({range:r, maybeproperty} :: {range :: RAN.Range, maybeproperty :: Maybe PropertyType}) -> (VDOM r maybeproperty)) <$> (readImpl f)
     <|>
@@ -317,17 +324,19 @@ ind :: String
 ind = "  "
 
 sumOfDomains :: Domain -> Domain -> Maybe Domain
-sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))
+sumOfDomains (RDOM a ec1) (RDOM b ec2) | ec1 == ec2 = Just (RDOM (SUM [a, b]) ec1)
+sumOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (SUM [a, b]) Nothing)
 sumOfDomains (CDOM a) (CDOM b) = Just (CDOM (SUM [a, b]))
 sumOfDomains _ _ = Nothing
 
 productOfDomains :: Domain -> Domain -> Maybe Domain
-productOfDomains (RDOM a) (RDOM b) = Just (RDOM (PROD [a, b]))
+productOfDomains (RDOM a ec1) (RDOM b ec2) | ec1 == ec2 = Just (RDOM (PROD [a, b]) ec1)
+productOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (PROD [a, b]) Nothing)
 productOfDomains (CDOM a) (CDOM b) = Just (CDOM (PROD [a, b]))
 productOfDomains _ _ = Nothing
 
 domain2roleType :: Partial => Domain -> ADT EnumeratedRoleType
-domain2roleType (RDOM r) = r
+domain2roleType (RDOM r _) = r
 
 domain2contextType :: Partial => Domain -> ADT ContextType
 domain2contextType (CDOM c) = c

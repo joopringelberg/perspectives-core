@@ -48,10 +48,10 @@ import Foreign.Object (lookup, insert) as OBJ
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQuery, addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole)
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), RelevantProperties(..), addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (removeFirstBackwardsStep, makeComposition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
@@ -118,7 +118,17 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
   where
     addToOnContextDelta :: QueryWithAKink -> EnumeratedRoleType -> Array StateIdentifier -> WithModificationSummary Unit
     addToOnContextDelta qwk@(ZQ backwards _) r@(EnumeratedRoleType roleId) states = do
+      staticContext <- (lift $ lift $ lift $ getEnumeratedRole r) >>= pure <<< _.context <<< unwrap
       {modifiesRoleInstancesOf} <- ask
+      -- First step of backwards is ContextF. This step will have a role domain (RDOM).
+      -- If we have an embeddingContext in that domain, that will be the context type we end up in.
+      -- Otherwise it will be the static context of the role type in the domain, which is, by construction, here,
+      -- the type r.
+      embeddingContext <- case domain <$> backwards of
+        Just (RDOM adt membeddingContext) -> case membeddingContext of
+          Just ec -> pure ec
+          Nothing -> pure staticContext
+        otherwise -> pure staticContext
       modifyDF \df@{enumeratedRoles:roles} ->
         case OBJ.lookup roleId roles of
           Nothing -> addInvertedQueryForDomain roleId
@@ -132,7 +142,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
               , statesPerProperty: EncodableMap statesPerProperty
               , selfOnly
               })
-            OnContextDelta_context
+            (OnContextDelta_context embeddingContext)
             df
           Just (EnumeratedRole rr@{onContextDelta_context}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onContextDelta_context = addInvertedQueryIndexedByContext
             (InvertedQuery
@@ -145,11 +155,12 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
               , statesPerProperty: EncodableMap statesPerProperty
               , selfOnly
               })
-
+            embeddingContext
             onContextDelta_context }) roles}
 
     addToOnRoleDeltaBinder :: QueryWithAKink -> EnumeratedRoleType -> Array StateIdentifier -> WithModificationSummary Unit
-    addToOnRoleDeltaBinder qwk r@(EnumeratedRoleType roleId) states = do
+    addToOnRoleDeltaBinder qwk@(ZQ backwards _) r@(EnumeratedRoleType roleId) states = do
+      staticContext <- (lift $ lift $ lift $ getEnumeratedRole r) >>= pure <<< _.context <<< unwrap
       {modifiesRoleBindingOf} <- ask
         -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
         -- the binder. We skip the binder step because its cardinality is larger than one, causing a fan-out while
@@ -158,6 +169,15 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
         -- This is because the function `runForwardsComputation` is applied to the binding and will collect all properties
         -- dynamically from it (relying on makeChainGetter), if there is no forwards part.
       description <- pure $ removeFirstBackwardsStep qwk (\_ _ _ -> Nothing)
+      -- First step of backwards is ContextF. This step will have a role domain (RDOM).
+      -- If we have an embeddingContext in that domain, that will be the context type we end up in.
+      -- Otherwise it will be the static context of the role type in the domain, which is, by construction, here,
+      -- the type r.
+      embeddingContext <- case domain <$> backwards of
+        Just (RDOM adt membeddingContext) -> case membeddingContext of
+          Just ec -> pure ec
+          Nothing -> pure staticContext
+        otherwise -> pure staticContext
       modifyDF
         \df@{enumeratedRoles:roles} ->
           case OBJ.lookup roleId roles of
@@ -172,9 +192,9 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
                 , statesPerProperty: EncodableMap statesPerProperty
                 , selfOnly
                 })
-              OnRoleDelta_binder
+              (OnRoleDelta_binder embeddingContext)
               df
-            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQuery (InvertedQuery
+            Just (EnumeratedRole rr@{onRoleDelta_binder}) -> df {enumeratedRoles = OBJ.insert roleId (EnumeratedRole rr { onRoleDelta_binder = addInvertedQueryIndexedByContext (InvertedQuery
               { description
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
@@ -182,7 +202,9 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
               , modifies: isJust $ elemIndex r modifiesRoleBindingOf
               , states
               , statesPerProperty: EncodableMap statesPerProperty
-              , selfOnly}) onRoleDelta_binder}) roles}
+              , selfOnly})
+              embeddingContext
+              onRoleDelta_binder}) roles}
 
     addToProperties :: QueryWithAKink -> PropertyType -> Array StateIdentifier -> EnumeratedRoleType -> WithModificationSummary Unit
     addToProperties qwk@(ZQ backwards forwards) prop states eroleType = case prop of
@@ -229,7 +251,7 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
       fun <- propertyTypeIsFunctional p
       man <- propertyTypeIsMandatory p
       range <- rangeOfPropertyType p
-      pure $ makeComposition (SQD (VDOM range (Just p)) (Value2Role p) (RDOM (ST role)) True True) qfd
+      pure $ makeComposition (SQD (VDOM range (Just p)) (Value2Role p) (domain qfd) True True) qfd
 
     postPendProp :: PropertyType -> QueryFunctionDescription -> MP QueryFunctionDescription
     postPendProp p qfd = do
@@ -242,7 +264,8 @@ setInvertedQueriesForUserAndRole users (ST role) statesPerProperty perspectiveOn
     addBindingStep b (ZQ backwards _) = do
       fun <- getEnumeratedRole role >>= RL.functional
       man <- getEnumeratedRole role >>= RL.mandatory
-      backwards' <- pure $ makeComposition (SQD (RDOM b) (DataTypeGetterWithParameter GetRoleBindersF (unwrap role)) (RDOM (ST role)) (bool2threeValued fun) (bool2threeValued man)) <$> backwards
+      -- We do not know whether the binding (filling role) is an Aspect in its embedding context.
+      backwards' <- pure $ makeComposition (SQD (RDOM b Nothing) (DataTypeGetterWithParameter GetRoleBindersF (unwrap role)) (RDOM (ST role) Nothing) (bool2threeValued fun) (bool2threeValued man)) <$> backwards
       pure $ ZQ backwards' Nothing
 
     -- | Collect the Properties defined on the EnumeratedRoleType and its Aspect Roles (transitively closed).

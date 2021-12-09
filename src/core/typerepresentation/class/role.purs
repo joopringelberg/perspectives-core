@@ -26,6 +26,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, (<|>))
 import Data.Array (cons, foldMap, null, (:))
 import Data.Map (Map)
+import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
@@ -84,10 +85,10 @@ rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> 
   where
     rangeOfRoleCalculation'_ :: forall r i. RoleClass r i => i -> MonadPerspectives (ADT EnumeratedRoleType)
     rangeOfRoleCalculation'_ i = getPerspectType i >>= calculation >>= case _ of
-        SQD _ _ (RDOM p) _ _ -> pure p
-        UQD _ _ _ (RDOM p) _ _ -> pure p
-        BQD _ _ _ _ (RDOM p) _ _ -> pure p
-        MQD _ _ _ (RDOM p) _ _ -> pure p
+        SQD _ _ (RDOM p _) _ _ -> pure p
+        UQD _ _ _ (RDOM p _) _ _ -> pure p
+        BQD _ _ _ _ (RDOM p _) _ _ -> pure p
+        MQD _ _ _ (RDOM p _) _ _ -> pure p
         otherwise -> empty
 
 -----------------------------------------------------------
@@ -118,7 +119,7 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
   where
     roleCalculationRange :: QueryFunctionDescription -> MonadPerspectives (ADT EnumeratedRoleType)
     roleCalculationRange qfd = case range qfd of
-      (RDOM p) -> pure p
+      (RDOM p _) -> pure p
       otherwise -> throwError (error ("range of calculation of a calculated role is not a role Domain."))
 
 -----------------------------------------------------------
@@ -135,8 +136,8 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
   calculation r = if (unwrap r).unlinked
-    then pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF (identifier_ r)) (RDOM (ST (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
-    else pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
+    then pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF (identifier_ r)) (RDOM (ST (identifier r)) Nothing) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
+    else pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)) Nothing) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
   roleADT r = pure (ST $ identifier r)
   roleAndBinding r = pure $ case (unwrap r).binding of
     PROD terms -> PROD (cons (ST $ identifier r) terms)
@@ -392,10 +393,10 @@ getRole (CR c) = getPerspectType c >>= pure <<< C
 -- | Does not include the binding, for (ENR (EnumeratedRoleType e)).
 rangeOfRoleCalculation :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfRoleCalculation = getRole >=> getCalculation >=> case _ of
-    SQD _ _ (RDOM p) _ _ -> pure p
-    UQD _ _ _ (RDOM p) _ _ -> pure p
-    BQD _ _ _ _ (RDOM p) _ _ -> pure p
-    MQD _ _ _ (RDOM p) _ _ -> pure p
+    SQD _ _ (RDOM p _) _ _ -> pure p
+    UQD _ _ _ (RDOM p _) _ _ -> pure p
+    BQD _ _ _ _ (RDOM p _) _ _ -> pure p
+    MQD _ _ _ (RDOM p _) _ _ -> pure p
     otherwise -> empty -- NB: The Alt instance of Aff throws an error on empty!
 
 typeExcludingBinding :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)

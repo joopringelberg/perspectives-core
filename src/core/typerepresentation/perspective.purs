@@ -104,7 +104,7 @@ stateSpec2StateIdentifier (ObjectState s) = s
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 objectOfPerspective :: Partial => Perspective -> ADT EnumeratedRoleType
 objectOfPerspective (Perspective {object}) = case range object of
-  RDOM adt -> adt
+  RDOM adt _ -> adt
 
 -- | Disregarding state, returns true iff the perspective lets the user apply the
 -- | verb to the property.

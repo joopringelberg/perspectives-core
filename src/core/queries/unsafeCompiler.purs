@@ -72,7 +72,7 @@ import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', isUnlinked_, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||))
+import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -90,7 +90,7 @@ compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   -- TODO moeten we hier de currentcontext pushen?
   RC.calculation ct >>= compileFunction
 
-compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) = do
+compileFunction (SQD (RDOM roleAdt _) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) = do
   g <- getDynamicPropertyGetter pt roleAdt
   pure $ unsafeCoerce g
 
@@ -114,7 +114,7 @@ compileFunction (SQD _ (ExternalCoreContextGetter functionName) ran _ _) = do
 compileFunction (SQD _ (DataTypeGetter IdentityF) _ _ _) = pure $ (pure <<< identity)
 
 compileFunction (SQD dom (DataTypeGetter ModelNameF) _ _ _) = case dom of
-  RDOM _ -> pure $ unsafeCoerce roleModelName
+  RDOM _ _ -> pure $ unsafeCoerce roleModelName
   CDOM _ -> pure $ unsafeCoerce contextModelName
   VDOM _ (Just pt) -> pure \_ -> pure $ propertytype2string pt
   ContextKind -> pure $ unsafeCoerce contextTypeModelName'

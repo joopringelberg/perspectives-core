@@ -36,7 +36,7 @@ import Data.Array (cons, delete, null, union)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -94,6 +94,9 @@ equalDescriptions (InvertedQuery{description:d1}) (InvertedQuery{description:d2}
 -- | if it specifies the same states, we add its users.
 addInvertedQuery :: InvertedQuery -> Array InvertedQuery -> Array InvertedQuery
 addInvertedQuery q qs = cons q qs
+
+lookupInvertedQueries :: String -> Object (Array InvertedQuery) -> Array (InvertedQuery)
+lookupInvertedQueries s obj = maybe [] identity (lookup s obj)
 
 -- | Add an InvertedQuery to a PropertyType, indexed with an EnumeratedRoleType.
 addInvertedQueryIndexedByContext :: InvertedQuery -> ContextType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)

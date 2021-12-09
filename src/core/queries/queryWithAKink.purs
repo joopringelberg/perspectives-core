@@ -47,7 +47,7 @@ import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, 
 import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
 import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -196,7 +196,7 @@ invert_ q@(SQD dom (VariableLookup varName) _ _ _) = do
     Just qfd | qfd == q -> pure []
     Just qfd -> invert_ qfd
 
-invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man) = do
+invert_ qfd@(SQD dom@(RDOM roleAdt embeddingContext) f@(PropertyGetter prop@(ENP _)) ran fun man) = do
   (hasProp :: Boolean) <- lift $ lift $ roleHasProperty roleAdt
   if hasProp
     then do
@@ -204,24 +204,27 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
       case minvertedF of
         Nothing -> pure []
         Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom True True)] Nothing]
-    else ((lift $ lift (expandPropertyQuery roleAdt)) >>= invert_)
+    else ((lift $ lift (expandPropertyQuery embeddingContext roleAdt)) >>= invert_)
 
   where
-
-    expandPropertyQuery :: ADT EnumeratedRoleType -> MP QueryFunctionDescription
-    expandPropertyQuery adt = do
+    -- Creates a series of nested binding expressions until the property has been reached.
+    -- The first binding uses the embeddingContext available on the original role.
+    -- For the rest of the binding steps we have no information on the embedding context.
+    expandPropertyQuery :: Maybe ContextType -> ADT EnumeratedRoleType -> MP QueryFunctionDescription
+    expandPropertyQuery embeddingContext adt = do
       hasProp <- roleHasProperty adt
       if hasProp
-        then pure (SQD (RDOM adt) (PropertyGetter prop) ran fun man)
-        else makeComposition <$> makeBinding adt <*> (bindingOfADT adt >>= expandPropertyQuery)
+        then pure (SQD (RDOM adt embeddingContext) (PropertyGetter prop) ran fun man)
+        else makeComposition <$> makeBinding adt <*> (bindingOfADT adt >>= expandPropertyQuery Nothing)
+
+      where
+      makeBinding :: ADT EnumeratedRoleType -> MP QueryFunctionDescription
+      makeBinding adt = do
+        b <- bindingOfADT adt
+        pure (SQD (RDOM adt embeddingContext) (DataTypeGetter BindingF) (RDOM b Nothing) True False)
 
     roleHasProperty :: ADT EnumeratedRoleType -> MP Boolean
     roleHasProperty adt = allLocallyRepresentedProperties adt >>= pure <<< isJust <<< (elemIndex prop)
-
-    makeBinding :: ADT EnumeratedRoleType -> MP QueryFunctionDescription
-    makeBinding adt = do
-      b <- bindingOfADT adt
-      pure (SQD (RDOM adt) (DataTypeGetter BindingF) (RDOM b) True False)
 
 invert_ (SQD dom f ran _ _) = do
   (minvertedF :: Maybe QueryFunction) <- pure $ invertFunction dom f ran
@@ -283,6 +286,6 @@ setInvertedQueries users statesPerProperty roleStates qfd selfOnly = do
     -- a Perspective Object, where the perspective may have properties;
     -- an expression in a statement with a Property value.
     case forward, backward, domain <$> backward of
-      Nothing, Just bw, Just (RDOM role) ->
+      Nothing, Just bw, Just (RDOM role _) ->
         void $ setInvertedQueriesForUserAndRole users role statesPerProperty true qwk selfOnly
       _, _, _ -> pure unit

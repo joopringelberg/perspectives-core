@@ -300,7 +300,7 @@ interpret (SQD _ (DataTypeGetter IdentityF) _ _ _) a = pure a
 
 interpret (SQD dom (DataTypeGetter ModelNameF) _ _ _) a = do
   result <- unsafePartial case dom, a.head of
-    RDOM _, R rid  -> roleModelName rid
+    RDOM _ _, R rid  -> roleModelName rid
     CDOM _, C cid -> contextModelName cid
     VDOM _ (Just pt), V _ _ -> pure $ Value $ propertytype2string pt
     ContextKind, CT ct -> unsafeCoerce contextTypeModelName' ct

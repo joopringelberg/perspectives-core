@@ -114,9 +114,9 @@ simpleStep :: IP Step
 simpleStep = try
   (Simple <$> (ArcIdentifier <$> getPosition <*> arcIdentifier)
   <|>
-  Simple <$> (Binding <$> (getPosition <* reserved "binding"))
+  Simple <$> (Binding <$> (getPosition <* reserved "binding") <*> (optionMaybe (reserved "in" *> arcIdentifier)))
   <|>
-  Simple <$> (Binder <$> (getPosition <* reserved "binder") <*> arcIdentifier)
+  Simple <$> (Binder <$> (getPosition <* reserved "binder") <*> arcIdentifier <*> (optionMaybe (reserved "in" *> arcIdentifier)))
   <|>
   Simple <$> (Context <$> (getPosition <* reserved "context"))
   <|>
@@ -265,8 +265,8 @@ startOf stp = case stp of
   where
     startOfSimple (ArcIdentifier p _) = p
     startOfSimple (Value p _ _) = p
-    startOfSimple (Binding p) = p
-    startOfSimple (Binder p _) = p
+    startOfSimple (Binding p _) = p
+    startOfSimple (Binder p _ _) = p
     startOfSimple (Context p) = p
     startOfSimple (Extern p) = p
     startOfSimple (CreateEnumeratedRole p _) = p
@@ -300,8 +300,8 @@ endOf stp = case stp of
   where
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
     endOfSimple (Value (ArcPosition{line, column}) _ v) = ArcPosition({line, column: column + length v + 1})
-    endOfSimple (Binding (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
-    endOfSimple (Binder (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 6}
+    endOfSimple (Binding (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 7}
+    endOfSimple (Binder (ArcPosition{line, column}) _ _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}

@@ -54,24 +54,24 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedC
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Kinked (setInvertedQueries)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, propertyOfRange, range, roleRange, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2contextType, domain2roleType, functional, mandatory, propertyOfRange, range, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
-import Perspectives.Representation.ADT (ADT(..), sum)
+import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
-import Perspectives.Representation.Class.Role (adtIsFunctional, binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding)
+import Perspectives.Representation.Class.Role (adtIsFunctional, binding, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, hasNotMorePropertiesThan, roleADT, roleTypeIsFunctional, roleTypeIsMandatory)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
-import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..), isFunctionalFunction)
+import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
-import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
+import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), roletype2string)
-import Perspectives.Types.ObjectGetters (isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain)
+import Perspectives.Types.ObjectGetters (isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, show, unit, void, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 
 ------------------------------------------------------------------------------------
@@ -89,13 +89,6 @@ compileExpression domain stp = compileStep domain stp >>= traverseQfd (qualifyRe
 ------------------------------------------------------------------------------------
 ------ COMPILING ROLE REFERENCES
 ------------------------------------------------------------------------------------
--- Describe a conjunction of rolegetters.
-makeConjunction :: Domain -> QueryFunctionDescription -> RoleType -> FD
-makeConjunction currentDomain left rt2 = do
-  right <- makeRoleGetter currentDomain rt2
-  (rightADT :: ADT EnumeratedRoleType) <- lift2 $ typeExcludingBinding rt2
-  pure $ BQD currentDomain (QF.BinaryCombinator UnionF) left right (RDOM (sum [unsafePartial roleRange left, rightADT])) THREE.False (THREE.or (mandatory left) (mandatory right))
-
 -- | Constructs a QueryFunctionDescription that describes getting a role of the given type.
 -- | CalculatedRoles are compiled, when necessary. The result of such an on-the-fly compilation is saved
 -- | in the domeinCache.
@@ -108,16 +101,19 @@ makeRoleGetter currentDomain rt@(CR ct) = do
       S step -> compileAndSaveRole currentDomain step crole
   isF <- lift2 $ roleTypeIsFunctional rt
   isM <- lift2 $ roleTypeIsMandatory rt
-  pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
+  pure $ SQD currentDomain (QF.RolGetter rt) (RDOM adt Nothing) (bool2threeValued isF) (bool2threeValued isM)
 
 makeRoleGetter currentDomain rt@(ENR et) = do
   unlinked <- lift2 $ isUnlinked_ et
   adt <- lift2 (getEnumeratedRole et >>= roleADT)
   isF <- lift2 $ roleTypeIsFunctional rt
   isM <- lift2 $ roleTypeIsMandatory rt
+  -- NOTE that we lose information here in case the currentDomain consists of multiple context types.
+  -- This may cause a loss of accuracy in the query compiler, as the resulting range of this statement is not precise.
+  mContextType <- pure $ head $ leavesInADT $ unsafePartial domain2contextType currentDomain
   if unlinked
-    then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter QF.GetRoleInstancesForContextFromDatabaseF (unwrap et)) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
-    else pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
+    then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter QF.GetRoleInstancesForContextFromDatabaseF (unwrap et)) (RDOM adt mContextType) (bool2threeValued isF) (bool2threeValued isM)
+    else pure $ SQD currentDomain (QF.RolGetter rt) (RDOM adt mContextType) (bool2threeValued isF) (bool2threeValued isM)
 
 -- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
 -- | Saves it in the DomainCache.
@@ -136,7 +132,7 @@ compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole}) = withFrame do
 -- | Ensures that the range of the QueryFunctionDescription is a qualified
 -- | EnumeratedRole.
 qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = do
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType)) embeddingContext) isF isM) = do
   -- Note that it doesn't matter if we take the roles from the cache or from
   -- PhaseThreeState: the role identifiers are identical.
   enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
@@ -145,10 +141,10 @@ qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM 
     (\_ -> lift $ lift $ getEnumeratedRole (EnumeratedRoleType computedType) >>= \(EnumeratedRole{_id}) -> pure $ ST _id)
   case computedTypeADT of
     ST (EnumeratedRoleType qComputedType) | computedType == qComputedType -> pure qfd
-    _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT) isF isM)
+    _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args (RDOM computedTypeADT embeddingContext) isF isM)
 qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCorePropertyGetter f) args (VDOM ran mrop) isF isM) = pure qfd
 qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreContextGetter f) args (CDOM (ST (ContextType computedType))) isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ExternalCoreContextGetter"
-qualifyReturnsClause pos qfd@(MQD dom' (QF.ForeignRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ForeignRoleGetter"
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ForeignRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType)) _) isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ForeignRoleGetter"
 qualifyReturnsClause pos qfd = pure qfd
 
 -- | Finds a RoleType defined in the model we're compiling whose string value ends with the given segments,
@@ -287,7 +283,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
     Nothing -> do
       mindexedRoleType <- isIndexedRole ident
       case mindexedRoleType of
-        Just indexedRoleType -> pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (ST indexedRoleType)) True True
+        Just indexedRoleType -> pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (ST indexedRoleType) Nothing) True True
         Nothing -> case currentDomain of
           (CDOM c) -> do
             (rts :: Array RoleType) <- if isQualifiedWithDomein ident
@@ -304,7 +300,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
               Just {head, tail} -> if null tail
                 then makeRoleGetter currentDomain head
                 else throwError (NotUniquelyIdentifying pos ident (roletype2string <$> rts))
-          (RDOM r) -> do
+          (RDOM r _) -> do
             (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
               then  lift2 $ runArrayT $ lookForPropertyType ident r
               else lift2 $ runArrayT $ lookForUnqualifiedPropertyType ident r
@@ -318,9 +314,9 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
 compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $
   SQD currentDomain (QF.Constant range stringRepresentation) (VDOM range Nothing) True True
 
-compileSimpleStep currentDomain s@(Binding pos) = do
+compileSimpleStep currentDomain s@(Binding pos membeddingContext) = do
   case currentDomain of
-    (RDOM (r :: ADT EnumeratedRoleType)) -> do
+    (RDOM (r :: ADT EnumeratedRoleType) _) -> do
       -- The binding of a role is always an ADT EnumeratedRoleType.
       (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift2 $ bindingOfADT r
       case typeOfBinding of
@@ -328,12 +324,25 @@ compileSimpleStep currentDomain s@(Binding pos) = do
         -- TODO. If the 'in context' clause is used, add the context
         -- type as EmbeddingContext to the RDOM.
         -- If not, just use the static context of typeOfBinding.
-        otherwise -> pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM typeOfBinding) True False
+        otherwise -> do
+          (mQembeddingContext :: Maybe ContextType) <- case membeddingContext of
+            Nothing -> pure Nothing
+            Just embeddingContext -> if isQualifiedWithDomein embeddingContext
+              then pure $ Just $ ContextType embeddingContext
+              -- Try to qualify the name within the Domain.
+              else do
+                {_id:namespace} <- lift $ gets _.dfr
+                (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain embeddingContext (unsafePartial $ fromJust $ (deconstructModelName namespace))
+                case head qnames of
+                  Nothing -> throwError $ UnknownContext pos embeddingContext
+                  (Just qn) | length qnames == 1 -> pure $ Just qn
+                  otherwise -> throwError $ NotUniquelyIdentifying pos embeddingContext (map unwrap qnames)
+          pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM typeOfBinding mQembeddingContext) True False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
-compileSimpleStep currentDomain s@(Binder pos binderName) = do
+compileSimpleStep currentDomain s@(Binder pos binderName membeddingContext) = do
   case currentDomain of
-    (RDOM (r :: ADT EnumeratedRoleType)) -> do
+    (RDOM (r :: ADT EnumeratedRoleType) _) -> do
       (qBinderType :: EnumeratedRoleType) <- if isQualifiedWithDomein binderName
         then pure $ EnumeratedRoleType binderName
         -- Try to qualify the name within the Domain.
@@ -345,20 +354,35 @@ compileSimpleStep currentDomain s@(Binder pos binderName) = do
             (Just qn) | length qnames == 1 -> pure qn
             otherwise -> throwError $ NotUniquelyIdentifying pos binderName (map unwrap qnames)
 
+      (mQembeddingContext :: Maybe ContextType) <- case membeddingContext of
+        Nothing -> pure Nothing
+        Just embeddingContext -> if isQualifiedWithDomein embeddingContext
+          then pure $ Just $ ContextType embeddingContext
+          -- Try to qualify the name within the Domain.
+          else do
+            {_id:namespace} <- lift $ gets _.dfr
+            (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain embeddingContext (unsafePartial $ fromJust $ (deconstructModelName namespace))
+            case head qnames of
+              Nothing -> throwError $ UnknownContext pos embeddingContext
+              (Just qn) | length qnames == 1 -> pure $ Just qn
+              otherwise -> throwError $ NotUniquelyIdentifying pos embeddingContext (map unwrap qnames)
+
       -- Now we have a qualified Rolename for the binder, check if it indeed binds the role that is the currentDomain.
       -- That is, its binding (an ADT) must be more general than the currentDomain.
       (bindingOfBinder :: (ADT EnumeratedRoleType)) <- lift2 $ getEnumeratedRole qBinderType >>= binding
       lessEq <- lift2 $ hasNotMorePropertiesThan bindingOfBinder r
       if lessEq
-        then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter GetRoleBindersF (unwrap qBinderType)) (RDOM $ ST qBinderType) True False
+        then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter GetRoleBindersF (unwrap qBinderType)) (RDOM (ST qBinderType) mQembeddingContext) True False
         else throwError $ RoleDoesNotBind pos (ENR qBinderType) r
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Context pos) = do
   case currentDomain of
-    (RDOM (r :: ADT EnumeratedRoleType)) -> do
+    (RDOM (r :: ADT EnumeratedRoleType) membeddingContext) -> do
       (typeOfContext :: ADT ContextType) <- lift2 $ contextOfADT r
-      pure $ SQD currentDomain (QF.DataTypeGetter ContextF) (CDOM typeOfContext) True True
+      case membeddingContext of
+        Nothing -> pure $ SQD currentDomain (QF.DataTypeGetter ContextF) (CDOM typeOfContext) True True
+        Just embeddingContext -> pure $ SQD currentDomain (QF.DataTypeGetter ContextF) (CDOM $ ST embeddingContext) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(TypeOfContext pos) = do
@@ -394,18 +418,18 @@ compileSimpleStep currentDomain (TypeTimeOnlyContext pos ctype) = pure $
   SQD currentDomain (QF.TypeTimeOnlyContextF ctype) (CDOM (ST $ ContextType ctype)) True True
 
 compileSimpleStep currentDomain (TypeTimeOnlyEnumeratedRole pos rtype) = pure $
-  SQD currentDomain (QF.TypeTimeOnlyEnumeratedRoleF rtype) (RDOM (ST $ EnumeratedRoleType rtype)) True True
+  SQD currentDomain (QF.TypeTimeOnlyEnumeratedRoleF rtype) (RDOM (ST $ EnumeratedRoleType rtype) Nothing) True True
 
 compileSimpleStep currentDomain (TypeTimeOnlyCalculatedRole pos ctype) = do
   -- Get the ADT for the calculated role.
   adt <- lift $ lift $ getRoleADTFromString ctype
-  pure $ SQD currentDomain (QF.TypeTimeOnlyCalculatedRoleF ctype) (RDOM adt) True True
+  pure $ SQD currentDomain (QF.TypeTimeOnlyCalculatedRoleF ctype) (RDOM adt Nothing) True True
 
 compileSimpleStep currentDomain s@(Extern pos) = do
   case currentDomain of
     (CDOM c) -> do
       (rts :: ADT EnumeratedRoleType) <- lift2 $ externalRoleOfADT c
-      pure $ SQD currentDomain (QF.DataTypeGetter ExternalRoleF) (RDOM $ rts) True True
+      pure $ SQD currentDomain (QF.DataTypeGetter ExternalRoleF) (RDOM rts Nothing) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 -- compileSimpleStep currentDomain (CreateContext pos ident) = do
@@ -434,11 +458,14 @@ compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
         Nothing -> throwError $ UnknownRole pos ident
         (Just qn) | length qnames == 1 -> pure qn
         otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
-  pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateRoleF (unwrap qroleType)) (RDOM (ST qroleType)) True True
+  -- NOTE that we lose information here in case the currentDomain consists of multiple context types.
+  -- This may cause a loss of accuracy in the query compiler, as the resulting range of this statement is not precise.
+  mContextType <- pure $ head $ leavesInADT $ unsafePartial domain2contextType currentDomain
+  pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateRoleF (unwrap qroleType)) (RDOM (ST qroleType) mContextType) True True
 
 compileSimpleStep currentDomain (Identity _) = do
   isFunctional <- case currentDomain of
-    RDOM r -> (lift $ lift $ adtIsFunctional r) >>= if _ then pure True else pure False
+    RDOM r _ -> (lift $ lift $ adtIsFunctional r) >>= if _ then pure True else pure False
     _ -> pure Unknown
   pure $ SQD currentDomain (QF.DataTypeGetter IdentityF) currentDomain isFunctional True
 
@@ -472,13 +499,13 @@ compileUnaryStep currentDomain st@(Exists pos s) = do
 compileUnaryStep currentDomain st@(Binds pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator BindsF) descriptionOfs (VDOM PBool Nothing) True True
+    RDOM _ _ -> pure $ UQD currentDomain (QF.UnaryCombinator BindsF) descriptionOfs (VDOM PBool Nothing) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
 
 compileUnaryStep currentDomain st@(BoundBy pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator BoundByF) descriptionOfs (VDOM PBool Nothing) True True
+    RDOM _ _ -> pure $ UQD currentDomain (QF.UnaryCombinator BoundByF) descriptionOfs (VDOM PBool Nothing) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
 
 compileUnaryStep currentDomain st@(Available pos s) = do
@@ -508,14 +535,14 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       f1 <- compileStep currentDomain left
       f2 <- compileStep currentDomain right
       case (range f1), (range f2) of
-        (RDOM _), (RDOM _) -> pure $ BQD currentDomain (QF.BinaryCombinator UnionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
+        (RDOM _ _), (RDOM _ _) -> pure $ BQD currentDomain (QF.BinaryCombinator UnionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
         _, _ -> throwError $ NotARoleDomain currentDomain (startOf left) (endOf right)
     Intersection pos -> do
       f1 <- compileStep currentDomain left
       f2 <- compileStep currentDomain right
       -- TODO. Als de types een lege doorsnede hebben, een waarschuwing geven?
       case (range f1), (range f2) of
-        (RDOM _), (RDOM _) -> pure $ BQD currentDomain (QF.BinaryCombinator IntersectionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
+        (RDOM _ _), (RDOM _ _) -> pure $ BQD currentDomain (QF.BinaryCombinator IntersectionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
         _, _ -> throwError $ NotARoleDomain currentDomain (startOf left) (endOf right)
     BindsOp pos -> do
       f1 <- compileStep currentDomain left
@@ -523,7 +550,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       if (pessimistic $ functional f1)
         then if (pessimistic $ functional f2)
           then case (range f1), (range f2) of
-            (RDOM _), (RDOM _) -> pure $ BQD
+            (RDOM _ _), (RDOM _ _) -> pure $ BQD
               currentDomain
               (QF.BinaryCombinator BindsF)
               f1
@@ -677,12 +704,12 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
                   then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (ST (ContextType computedType))) Unknown Unknown
 
                   -- Collect role instances.
-                  else pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+                  else pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST (EnumeratedRoleType computedType)) Nothing) Unknown Unknown
               else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
       else do
         compiledArgs <- traverse (compileStep currentDomain) arguments
         -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
-        pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
+        pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST (EnumeratedRoleType computedType)) Nothing) Unknown Unknown
 
   where
 

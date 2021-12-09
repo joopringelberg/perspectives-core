@@ -28,7 +28,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Foreign.Object (Object)
+import Foreign.Object (Object, empty) as OBJ
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
 import Perspectives.InvertedQuery (InvertedQuery)
@@ -62,18 +62,19 @@ type EnumeratedRoleRecord =
 
   , perspectives :: Array Perspective
 
-  , actions :: EncodableMap StateSpec (Object Action)
+  , actions :: EncodableMap StateSpec (OBJ.Object Action)
 
   , functional :: Boolean
   , mandatory :: Boolean
 
   , pos :: ArcPosition
 
-  , onRoleDelta_binding :: Array InvertedQuery
-  , onRoleDelta_binder :: Array InvertedQuery
+  -- The keys in these objects are the String representations of context types.
+  , onRoleDelta_binding :: OBJ.Object (Array InvertedQuery)
+  , onRoleDelta_binder :: OBJ.Object (Array InvertedQuery)
 
-  , onContextDelta_context :: Array InvertedQuery
-  , onContextDelta_role :: Array InvertedQuery
+  , onContextDelta_context :: OBJ.Object (Array InvertedQuery)
+  , onContextDelta_role :: OBJ.Object (Array InvertedQuery)
 
   , indexedRole :: Maybe RoleInstance
 
@@ -105,10 +106,10 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
 
   , pos: pos
 
-  , onRoleDelta_binding: []
-  , onRoleDelta_binder: []
-  , onContextDelta_context: []
-  , onContextDelta_role: []
+  , onRoleDelta_binding: OBJ.empty
+  , onRoleDelta_binder: OBJ.empty
+  , onContextDelta_context: OBJ.empty
+  , onContextDelta_role: OBJ.empty
 
   , indexedRole: Nothing
   , unlinked: false
