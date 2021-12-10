@@ -25,7 +25,7 @@ module Perspectives.Parsing.Arc.CheckSynchronization where
 import Control.Monad.State (State, evalState, execState, get, gets, lift, modify)
 import Data.Array (cons, delete, difference, elemIndex, filter, foldM, head, null, union)
 import Data.Map (filterKeys)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, for_)
 import Data.Tuple (Tuple(..))
@@ -45,7 +45,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleKind(..), RoleType(..), roletype2string)
 import Perspectives.Representation.UserGraph (UserGraph(..), getUserEdges, isInGraph, usersInGraph)
 import Perspectives.Warning (PerspectivesWarning(..))
-import Prelude (Unit, bind, discard, identity, pure, unit, void, ($), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, identity, pure, unit, void, ($), (<<<), (<>), (==))
 
 -----------------------------------------------------------
 -- PROJECT THE USER ROLE GRAPH
@@ -78,10 +78,11 @@ projectForRoleInstanceDeltas etype = do
 
 -- | For an EnumeratedRoleType, return a UserGraph that is restricted to users with a perspective on
 -- | that role type that allows them to see the binding.
+-- | Because we include Aspects, roles may be in another namespace than the model.
 projectForRoleBindingDeltas :: Partial => EnumeratedRoleType -> PhaseThree UserGraphProjection
 projectForRoleBindingDeltas etype = do
   UserGraph (EncodableMap edgesObject) <- (lift $ gets (_.userGraph <<< _.dfr))
-  EnumeratedRole{onRoleDelta_binding, onRoleDelta_binder} <- (lift $ gets (_.enumeratedRoles <<< _.dfr)) >>= pure <<< fromJust <<< lookup (unwrap etype)
+  EnumeratedRole{onRoleDelta_binding, onRoleDelta_binder} <- lift $ lift $ getEnumeratedRole etype
   invertedQueries <- pure $ (maybe [] identity (lookup (unwrap etype) onRoleDelta_binding) <> maybe [] identity (lookup (unwrap etype) onRoleDelta_binder))
   users <- usersWithAPerspective invertedQueries
   startpoints <- usersWithAModifyingPerspective invertedQueries
@@ -268,8 +269,14 @@ checkSynchronization = do
     allLocalRoles <- lift $ lift $ allRoles (contextADT c)
     for_ (cons (ENR $ externalRole c) allLocalRoles) \roleType -> case roleType of
       ENR roleId -> do
+        -- CHECK INVERTED QUERIES FOR 'CONTEXT' AND '<ROLE>' OPERATORS
         projectedGraph <- unsafePartial projectForRoleInstanceDeltas roleId
         case checkAllStartpoints projectedGraph of
           none | null none -> pure unit
           failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleSynchronizationIncomplete roleId source destinations)
+        -- CHECK INVERTED QUERIES FOR 'BINDING' AND 'BINDER' OPERATORS
+        projectedGraph' <- unsafePartial projectForRoleBindingDeltas roleId
+        case checkAllStartpoints projectedGraph' of
+          none | null none -> pure unit
+          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleBindingSynchronizationIncomplete roleId source destinations)
       otherwise -> pure unit
