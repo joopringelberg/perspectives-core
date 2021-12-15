@@ -225,6 +225,7 @@ propertiesOfRole s =
 aspectsOfRole :: EnumeratedRoleType ~~~> EnumeratedRoleType
 aspectsOfRole = ArrayT <<< (getPerspectType >=> roleAspects)
 
+-- | All types of the role, including the root type itself.
 roleAspectsClosure :: EnumeratedRoleType ~~~> EnumeratedRoleType
 roleAspectsClosure = closure_ aspectsOfRole
 

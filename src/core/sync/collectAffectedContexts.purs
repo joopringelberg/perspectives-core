@@ -25,7 +25,7 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Reader (lift)
-import Data.Array (filterA, foldM, head, nub, singleton, union)
+import Data.Array (filterA, foldM, foldl, head, nub, singleton, union)
 import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
@@ -33,7 +33,7 @@ import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty (foldM) as LNE
-import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse, traverse_)
@@ -64,15 +64,15 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.State (StateFulObject(..))
 import Perspectives.Representation.State (StateFulObject(..), State(..)) as State
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), toArray)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, roleAspectsClosure)
+import Perspectives.Types.ObjectGetters (contextAspectsClosure, enumeratedRoleContextType, roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Utilities (findM)
-import Prelude (Unit, bind, const, discard, identity, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, const, discard, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -313,9 +313,9 @@ addRoleObservingContexts id roleType roleInstance = do
   -- Index with the embedding context. In _onContextDelta_context we store (the inverted query that begins with)
   -- the context step away from role instance. We then arrive at context instance id.
   -- Its type we use to index the bindingCalculations.
-  for_ (maybe [] identity (lookup (unwrap ctype) contextCalculations)) (handleBackwardQuery roleInstance)
+  lookupInvertedRoleQueries ctype contextCalculations >>= traverse_ (handleBackwardQuery roleInstance)
   roleCalculations <- lift2 $ compileBothFor _onContextDelta_role roleType
-  for_ (maybe [] identity (lookup (unwrap ctype) roleCalculations)) (handleBackwardQuery roleInstance)
+  lookupInvertedRoleQueries ctype roleCalculations >>= traverse_ (handleBackwardQuery roleInstance)
 
 -----------------------------------------------------------
 -- FOR ROLE DELTAS
@@ -346,26 +346,25 @@ aisInRoleDelta (RoleBindingDelta dr@{id:binder, binding:mbinding, oldBinding, de
         -- Index with the embedding context. In onRoleDelta_binding we store (the inverted query that begins with)
         -- the binding step away from binder. We then arrive at binding.
         -- Its context type we use to index the bindingCalculations.
-      users1 <- join <$> (for (maybe [] identity (lookup (unwrap bindingContextType) bindingCalculations))
+      users1 <- join <$> (lookupInvertedRoleQueries bindingContextType bindingCalculations >>=
         -- Find all affected contexts, starting from the binder instance of the Delta.
-        (\iq -> (handleBackwardQuery binder iq) >>= runForwardsComputation binder iq))
+        traverse (\iq -> (handleBackwardQuery binder iq) >>= runForwardsComputation binder iq))
       -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually bind something:
-      users2 <- do
-        -- Index with the embedding context. In onRoleDelta_binder we store (the inverted query that begins with)
-        -- the binder step away from binding. We then arrive at binder.
-        -- Its context type we use to index the binderCalculations.
-        (for (maybe [] identity (lookup (unwrap binderContextType) binderCalculations))
-          (\iq -> if isForSelfOnly iq
-            then handleSelfOnlyQuery iq binder binding
-            else (handleBackwardQuery binder iq) >>= runForwardsComputation binding iq)) >>= pure <<< join
-
+      -- Index with the embedding context. In onRoleDelta_binder we store (the inverted query that begins with)
+      -- the binder step away from binding. We then arrive at binder.
+      -- Its context type we use to index the binderCalculations.
+      users2 <- join <$> (lookupInvertedRoleQueries binderContextType binderCalculations >>=
+        traverse (\iq -> if isForSelfOnly iq
+          then handleSelfOnlyQuery iq binder binding
+          else (handleBackwardQuery binder iq) >>= runForwardsComputation binding iq)
+        )
       -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually overwrite something:
       users3 <- case oldBinding of
-        Just bnd | deltaType == SetBinding -> do
+        Just bnd | deltaType == SetBinding ->
           -- We deal here just with the case that we destroy a binding; not with the case that we add one.
           -- Hence, no forward computation. `handleBackwardQuery` just passes on users that have at least one
           -- valid perspective, even if the condition is object state.
-          join <$> map snd <<< join <$> for (maybe [] identity (lookup (unwrap binderContextType) binderCalculations)) (handleBackwardQuery bnd)
+          join <$> map snd <<< join <$> (lookupInvertedRoleQueries binderContextType binderCalculations >>= traverse (handleBackwardQuery bnd))
         otherwise -> pure []
       pure (nub $ union users1 (users2 `union` users3))
 
@@ -617,7 +616,9 @@ aisInPropertyDelta id property eroleType = do
   calculations <- lift2 $ compileDescriptions' property
   -- `handleBackwardQuery` just passes on users that have at least one
   -- valid perspective, even if the condition is object state.
-  (cwu :: Array ContextWithUsers) <- join <$> for (maybe [] identity (lookup (unwrap eroleType) calculations)) (handleBackwardQuery id)
+  -- We must use all types of the role to look up calculations.
+  allCalculations <- lookupInvertedPropertyQueries eroleType calculations
+  (cwu :: Array ContextWithUsers) <- join <$> for allCalculations (handleBackwardQuery id)
   lift2 $ filterA notIsMe (nub $ join $ snd <$> cwu)
   where
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Object (Array InvertedQuery))
@@ -723,3 +724,21 @@ type CalculationsLens = Lens' EnumeratedRoleRecord (Object (Array InvertedQuery)
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift
+
+lookupInvertedPropertyQueries :: EnumeratedRoleType -> Object (Array InvertedQuery) -> MonadPerspectivesTransaction (Array InvertedQuery)
+lookupInvertedPropertyQueries eroleType calculations = do
+  allRoletypes <- lift2 (eroleType ###= roleAspectsClosure)
+  pure $ foldl (\calcs nextEnumeratedType -> case lookup (unwrap nextEnumeratedType) calculations of
+    Nothing -> calcs
+    Just newCalcs -> calcs <> newCalcs)
+    []
+    allRoletypes
+
+lookupInvertedRoleQueries :: ContextType -> Object (Array InvertedQuery) -> MonadPerspectivesTransaction (Array InvertedQuery)
+lookupInvertedRoleQueries contextType calculations = do
+  allContextTypes <- lift2 (contextType ###= contextAspectsClosure)
+  pure $ foldl (\calcs nextContextType -> case lookup (unwrap nextContextType) calculations of
+    Nothing -> calcs
+    Just newCalcs -> calcs <> newCalcs)
+    []
+    allContextTypes
