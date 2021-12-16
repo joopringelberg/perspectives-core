@@ -33,7 +33,7 @@ import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, lowerCaseName)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reserved, stringUntilNewline)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoReservedWords)
@@ -159,7 +159,11 @@ contextE = withPos do
           case first, second of
             "perspective", "on" -> CSQP <$> perspectiveOn
             "perspective", "of" -> CSQP <$> perspectiveOf
-            _, _ -> fail "Expected: domain, case, party, activity; or thing, user, context, external, state, on entry, on exit"
+            _, _ -> case first of
+              "" -> do
+                thisWord <- stringUntilNewline
+                fail ("Expected: domain, case, party, activity; or thing, user, context, external, state, on entry, on exit (but found '" <> thisWord <> "'.)")
+              otherwise -> fail ("Expected: domain, case, party, activity; or thing, user, context, external, state, on entry, on exit (but found '" <> otherwise <> "'.)")
 
     explicitSubjectState :: IP StateSpecification
     explicitSubjectState = do
@@ -418,7 +422,11 @@ rolePart = do
     "property", _ -> propertyE
     "view", _ -> viewE
     "action", _ -> SQP <$> actionE
-    _, _ -> fail "Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view"
+    _, _ -> case first of
+      "" -> do
+        thisWord <- stringUntilNewline
+        fail ("Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view (but found '" <> thisWord <> "'.)")
+      otherwise -> fail ("Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view (but found '" <> otherwise <> "'.)")
 
 -- | Combine the RolePart elements that result from "on entry", "on exit" and "state" into a root state for the role.
 -- | The elements we combine are: NotificationE, AutomaticEffectE and StateE.
@@ -566,7 +574,11 @@ stateE = withPos do
         "on", "exit" -> onExitE
         "perspective", "on" -> perspectiveOn
         "perspective", "of" -> perspectiveOf
-        _, _ -> fail ("Expected: on (entry/exit), perspective (on/of) (but found '" <> first <> "'.)")
+        _, _ -> case first of
+          "" -> do
+            thisWord <- stringUntilNewline
+            fail ("Expected: on (entry/exit), perspective (on/of), state, action, on entry, on exit (but found '" <> thisWord <> "'.)")
+          otherwise -> fail ("Expected: on (entry/exit), perspective (on/of), state, action, on entry, on exit (but found '" <> otherwise <> "'.)")
 
 -- We need to use `try` because this parser will consume "perspective" from the
 -- expression "perspective of".
@@ -635,7 +647,11 @@ perspectivePart = do
     "perspective", "on" -> perspectiveOn
     "perspective", "of" -> perspectiveOf
     "selfonly", _ -> singleton <<< SO <$> selfOnly
-    one, two -> fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly, but found: '" <> one <> "' and '" <> two <> "'.")
+    _, _ -> case first of
+      "" -> do
+        thisWord <- stringUntilNewline
+        fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly (but found '" <> thisWord <> "'.)")
+      otherwise -> fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly (but found '" <> otherwise <> "'.)")
 
 -- | inState =
 -- |  in [{subject | object | context}] state [<ident>]
@@ -680,7 +696,11 @@ inState = do
         "perspective", "on" -> perspectiveOn
         "perspective", "of" -> perspectiveOf
         "action", _ -> actionE
-        _, _ -> fail ("Expected: view, props, only, except, all roleverbs, perspective (on/of), action expected (but found '" <> first <> "'.)")
+        _, _ -> case first of
+          "" -> do
+            thisWord <- stringUntilNewline
+            fail ("Expected: view, props, only, except, all roleverbs, perspective (on/of), action (but found '" <> thisWord <> "'.)")
+          otherwise -> fail ("Expected: view, props, only, except, all roleverbs, perspective (on/of), action (but found '" <> otherwise <> "'.)")
 
 inStateKeywords :: IP String
 inStateKeywords = reserved "in" *> reserved "state" *> pure "inState"
