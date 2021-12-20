@@ -56,7 +56,7 @@ domain ModelManagement
       property ArcUrl (mandatory, String)
       property ArcSource (mandatory, String)
       property ArcFeedback (mandatory, String)
-      property ArcOK = ArcFeedback == "OK"
+      property ArcOK = ArcFeedback matches /^OK/
       property CrlUrl (mandatory, String)
       property CrlSource (mandatory, String)
       property CrlFeedback (mandatory, String)
