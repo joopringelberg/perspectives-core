@@ -34,16 +34,16 @@ module Perspectives.GlobalUnsafeStrMap
   , modify
   , keys
   , values
+  , filterKeys
   ) where
 
 import Data.Lens (lens, wander)
 import Data.Lens.At (class At)
 import Data.Lens.Index (class Index)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Unit (Unit)
 import Foreign (Foreign, isUndefined, unsafeFromForeign)
 import Foreign.Object (Object)
-import Prelude (class Show, flip, pure, show, (#), (>>>), map)
+import Prelude (class Show, Unit, flip, map, pure, show, (#), (>>>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A reference to a mutable map
@@ -113,3 +113,6 @@ delete' :: forall a. String -> GLStrMap a -> GLStrMap a
 delete' k m = let
   x = delete_ m k
   in m
+
+-- | Remove all key-value pairs that do not satisfy a predicate.
+foreign import filterKeys :: forall a. (String -> Boolean) -> GLStrMap a -> GLStrMap a

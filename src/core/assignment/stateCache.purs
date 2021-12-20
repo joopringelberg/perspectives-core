@@ -27,10 +27,12 @@ import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Perspectives.Assignment.SentenceCompiler (CompiledSentence)
 import Perspectives.CoreTypes (Updater, type (~~>))
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
+import Perspectives.DomeinFile (DomeinFileId(..))
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, filterKeys)
+import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier)
-import Prelude (const, unit)
+import Prelude (Unit, const, unit)
 
 type ContextStateCache = GLStrMap CompiledContextState
 
@@ -54,6 +56,13 @@ cacheCompiledContextState a u = const u (poke contextStateCache (unwrap a) u)
 
 retrieveCompiledContextState :: StateIdentifier -> (Maybe CompiledContextState)
 retrieveCompiledContextState a = peek contextStateCache (unwrap a)
+
+-- | Remove, from both caches, all compiled states from a particular domain.
+clearModelStates :: DomeinFileId -> Unit
+clearModelStates (DomeinFileId s) = let
+  _ = filterKeys isQualifiedWithDomein contextStateCache
+  _ = filterKeys isQualifiedWithDomein roleStateCache
+  in unit
 
 type RoleStateCache = GLStrMap CompiledRoleState
 

@@ -49,3 +49,15 @@ exports["keys"] = function(m) {
 exports["values"] = function(m) {
   return Object.values(m);
 }
+
+exports["filterKeys"] = function(predicate){
+  return function(m){
+    Object.keys(m).forEach(function(key) {
+      if (!predicate( key ))
+      {
+        delete m[key];
+      }
+    });
+    return m;
+  };
+}
