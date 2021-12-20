@@ -143,6 +143,7 @@ perspectDef = LanguageDef
                   , "with"
                   , "from"
                   , "role"
+                  , "matches"
 
                   -- Functions in expressions
                   , "specialisesRoleType"

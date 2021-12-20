@@ -23,8 +23,9 @@
 module Perspectives.Parsing.Arc.Identifiers where
 
 import Control.Alt (void, (<|>))
-import Data.Array (intercalate, many, cons)
+import Data.Array (cons, elemIndex, intercalate, many)
 import Data.Char.Unicode (isLower)
+import Data.Maybe (isJust)
 import Data.String.CodeUnits (fromCharArray)
 import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Parsing.Arc.Token (token)
@@ -59,6 +60,28 @@ arcIdentifier = (qualifiedName <|> prefixedName <|> segmentedName) <?> "a capita
       first <- token.identifier
       rest <- many (string "$" *> token.identifier)
       pure (intercalate "$" (cons first rest))
+
+-- | Parses /.../
+regexExpression' :: IP String
+regexExpression' = do
+  void $ string "/"
+  s <- stringUntilForwardSlash
+  void $ string "/"
+  pure s
+  where
+    stringUntilForwardSlash :: IP String
+    stringUntilForwardSlash = do
+      (chars :: Array Char) <- many (satisfy (_ /= '/'))
+      _ <- whiteSpace
+      pure $ fromCharArray chars
+
+-- | Parses gimyu.
+regexFlags' :: IP String
+regexFlags' = do
+  (chars :: Array Char) <- many (satisfy (\c -> isJust $ elemIndex c ['g', 'i', 'm', 'y', 'u']))
+  _ <- whiteSpace
+  pure $ fromCharArray chars
+
 
 stringUntilNewline :: IP String
 stringUntilNewline = do

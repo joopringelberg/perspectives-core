@@ -45,6 +45,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
+import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, rol_binding, rol_gevuldeRollen, rol_id, rol_isMe, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.ContextRoleParser (parseAndCache)
@@ -139,6 +140,7 @@ pendingInvitations _ = ArrayT do
 
 -- | Overwrites the model currently residing in the local models database.
 -- | Takes care of inverted queries.
+-- | Clears compiled states from cache.
 -- | The first argument should contain the Url at which the new model version resides.
 -- | The second argument should contain the string version of the model name ("model:Something")
 -- | The third argument is an array with an instance of the role ModelsInuse. NOTE: this has to be adapted when we
@@ -162,6 +164,8 @@ updateModel arrWithurl arrWithModelName modelsInUse = case head arrWithModelName
               \(DomeinFile dfr) -> do
                 -- Here we must take care to preserve the screens.js attachment.
                 lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
+        -- Clear the caches of compiled states.
+        void $ pure $ clearModelStates (DomeinFileId modelName)
         -- Install the new model, taking care of outgoing InvertedQueries.
         addModelToLocalStore' url
         DomeinFile dfr <- lift2 $ getDomeinFile $ DomeinFileId modelName

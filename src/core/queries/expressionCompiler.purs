@@ -50,6 +50,7 @@ import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isExter
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, makeContextStep, makeIdentityStep, stepContainsVariableReference)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -414,6 +415,10 @@ compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
       pure $ SQD currentDomain (QF.DataTypeGetterWithParameter SpecialisesRoleTypeF (unwrap qRoleName)) (VDOM PBool Nothing) (isFunctionalFunction SpecialisesRoleTypeF) False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
+compileSimpleStep currentDomain s@(RegEx pos (reg :: RegExP)) = do
+  case currentDomain of
+    VDOM PString _ -> pure $ SQD currentDomain (QF.RegExMatch reg) (VDOM PBool Nothing) True False
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 compileSimpleStep currentDomain (TypeTimeOnlyContext pos ctype) = pure $
   SQD currentDomain (QF.TypeTimeOnlyContextF ctype) (CDOM (ST $ ContextType ctype)) True True
 
@@ -587,6 +592,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         Union _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Union"
         Intersection _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Intersection"
         BindsOp _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: BindsOp"
+        Matches _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Matches"
 
         -- >>= is parsed as the operator Sequence.
         -- "sum", "product", "minimum", "maximum" and "count" are parsed as SequenceFunction

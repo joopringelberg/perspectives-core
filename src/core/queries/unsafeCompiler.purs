@@ -37,7 +37,7 @@ import Data.Array (elemIndex, findIndex, head, index, null, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
-import Data.String.Regex (test)
+import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
@@ -55,6 +55,7 @@ import Perspectives.Instances.ObjectGetters (binding, binding_, binds, bindsOper
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
+import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType)
 import Perspectives.Representation.ADT (ADT(..))
@@ -330,6 +331,11 @@ compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ 
     SpecialisesRoleTypeF -> pure $ unsafeCoerce (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)))
 
     _ -> throwError (error $ "Unknown function for DataTypeGetterWithParameter: " <> show functionName)
+
+compileFunction (SQD _ (RegExMatch (RegExP (reg :: Regex))) _ _ _) = pure \s -> do
+  case match reg s of
+    Nothing -> pure "false"
+    otherwise -> pure "true"
 
 -- Catch all
 compileFunction qd = throwError (error $ "Cannot create a function out of '" <> prettyPrint qd <> "'.")

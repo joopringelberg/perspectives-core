@@ -26,14 +26,17 @@ import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Array (elemIndex, fromFoldable, many)
 import Data.DateTime (DateTime)
+import Data.Either (Either(..))
 import Data.JSDate (JSDate, parse, toDateTime)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.String (length)
 import Data.String.CodeUnits as SCU
+import Data.String.Regex (parseFlags, regex)
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
+import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, regexExpression', regexFlags', reserved)
 import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
@@ -143,11 +146,24 @@ simpleStep = try
   Simple <$> (RoleTypes <$> (getPosition <* reserved "roleTypes"))
   <|>
   Simple <$> (SpecialisesRoleType <$> (getPosition <* reserved "specialisesRoleType") <*> arcIdentifier)
-
+  <|>
+  Simple <$> (RegEx <$> getPosition <*> regexExpression)
   -- VARIABLE MUST BE LAST!
   <|>
   Simple <$> (Variable <$> getPosition <*> lowerCaseName)
   ) <?> "binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count"
+
+-- | Parses just the regular expression; not "matches", which is interpreted like ">>".
+-- | We expect an expression like this: /.../gimyu
+-- | where all flags are optional.
+regexExpression :: IP RegExP
+regexExpression = do
+  regexString <- regexExpression'
+  flags <- option "" regexFlags'
+  result <- pure $ regex regexString (parseFlags flags)
+  case result of
+    Left e -> fail e
+    Right r -> pure $ RegExP r
 
 sequenceFunction :: IP FunctionName
 sequenceFunction = (token.symbol "sum" *> pure AddF
@@ -178,7 +194,7 @@ isUnaryKeyword kw = isJust $ elemIndex kw ["not", "exists", "binds", "boundBy", 
 
 unaryStep :: IP Step
 unaryStep = do
-  keyword <- lookAhead reservedIdentifier <?> "not, exists, binds or available."
+  keyword <- lookAhead reservedIdentifier <?> "not, exists, binds, boundBy or available."
   case keyword of
     "not" -> (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step))))
     "exists" -> Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
@@ -224,6 +240,10 @@ operator =
   (Intersection <$> (getPosition <* token.reservedOp "both"))
   <|>
   (BindsOp <$> (getPosition <* token.reserved "binds"))
+  <|>
+  -- NOTICE the trick here: we map "matches" to Compose, so we can use it as an infix operator while it
+  -- builds on the result of the previous step.
+  (Compose <$> (getPosition <* token.reserved "matches"))
   ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, either, both, binds"
 
 operatorPrecedence :: Operator -> Int
@@ -246,6 +266,7 @@ operatorPrecedence (LessThanEqual _) = 3
 operatorPrecedence (GreaterThan _) = 3
 operatorPrecedence (GreaterThanEqual _) = 3
 operatorPrecedence (BindsOp _) = 3
+operatorPrecedence (Matches _) = 3
 
 operatorPrecedence (LogicalAnd _) = 2
 operatorPrecedence (LogicalOr _) = 2
@@ -282,12 +303,14 @@ startOf stp = case stp of
     startOfSimple (TypeTimeOnlyContext p _) = p
     startOfSimple (TypeTimeOnlyEnumeratedRole p _) = p
     startOfSimple (TypeTimeOnlyCalculatedRole p _) = p
+    startOfSimple (RegEx p _) = p
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
     startOfUnary (Binds p _) = p
     startOfUnary (BoundBy p _) = p
     startOfUnary (Available p _) = p
+
 
 endOf :: Step -> ArcPosition
 endOf stp = case stp of
@@ -317,6 +340,7 @@ endOf stp = case stp of
     endOfSimple (TypeTimeOnlyContext p _) = p
     endOfSimple (TypeTimeOnlyEnumeratedRole p _) = p
     endOfSimple (TypeTimeOnlyCalculatedRole p _) = p
+    endOfSimple (RegEx (ArcPosition{line, column}) (RegExP r)) = ArcPosition{line, column: column + length (show r) + 1}
 
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}

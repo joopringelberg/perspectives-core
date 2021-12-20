@@ -30,6 +30,7 @@ import Data.Maybe (Maybe)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
+import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
@@ -226,6 +227,7 @@ isMandatoryFunction fn = case fn of
 data QueryFunction
   = DataTypeGetter FunctionName
   | DataTypeGetterWithParameter FunctionName String
+  | RegExMatch RegExP
   | PropertyGetter PropertyType
   | Value2Role PropertyType
   | RolGetter RoleType

@@ -90,6 +90,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.QueryFunction (FunctionName) as QF
+import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
@@ -114,6 +115,7 @@ data SimpleStep =
   | TypeOfContext ArcPosition
   | RoleTypes ArcPosition
   | SpecialisesRoleType ArcPosition String
+  | RegEx ArcPosition RegExP
 
   -- These step types are used in Perspectives.Parsing.Arc.PhaseThree for the standard variables.
   | TypeTimeOnlyContext ArcPosition String
@@ -154,6 +156,7 @@ data Operator =
   | Union ArcPosition
   | Intersection ArcPosition
   | BindsOp ArcPosition
+  | Matches ArcPosition
 
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
@@ -200,6 +203,7 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (TypeTimeOnlyContext _ s) = "TypeTimeOnlyContext " <> s
   prettyPrint' t (TypeTimeOnlyEnumeratedRole _ s) = "TypeTimeOnlyEnumeratedRole " <> s
   prettyPrint' t (TypeTimeOnlyCalculatedRole _ s) = "TypeTimeOnlyCalculatedRole " <> s
+  prettyPrint' t (RegEx _ r) = show r
 
 derive instance genericBinaryStep :: Generic BinaryStep _
 instance showBinaryStep :: Show BinaryStep where show = genericShow
@@ -276,6 +280,7 @@ instance prettyPrintOperator :: PrettyPrint Operator where
   prettyPrint' t (Union _) = "Union"
   prettyPrint' t (Intersection _) = "Intersection"
   prettyPrint' t (BindsOp _) = "Binds"
+  prettyPrint' t (Matches _) = "Matches"
 
 derive instance genericComputationStep :: Generic ComputationStep _
 instance showComputationStep :: Show ComputationStep where show s = genericShow s
