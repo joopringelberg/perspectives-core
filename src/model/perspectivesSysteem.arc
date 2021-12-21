@@ -42,6 +42,9 @@ domain System
         defaults
       perspective on ModelsInUse
         defaults
+        --in object state
+        action Refresh
+          PerformUpdate = true
       perspective on IndexedContexts
         defaults
       perspective on IndexedContextOfModel
@@ -50,6 +53,8 @@ domain System
         defaults
       perspective on Contacts
         props (Voornaam, Achternaam) verbs (Consult)
+      perspective on External
+        view ShowLibraries verbs (Consult, SetPropertyValue)
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
 

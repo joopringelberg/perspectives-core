@@ -81,7 +81,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Warning (PerspectivesWarning(..))
-import Prelude (Unit, append, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
+import Prelude (Unit, append, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||), eq)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -145,38 +145,49 @@ pendingInvitations _ = ArrayT do
 -- | The second argument should contain the string version of the model name ("model:Something")
 -- | The third argument is an array with an instance of the role ModelsInuse. NOTE: this has to be adapted when we
 -- | start using model:CouchbManagement.
-updateModel :: Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
-updateModel arrWithurl arrWithModelName modelsInUse = case head arrWithModelName of
+updateModel :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
+updateModel arrWithurl arrWithModelName arrWithDependencies modelsInUse = case head arrWithModelName of
   Nothing -> do
     descriptionGetter <- lift2 $ getDynamicPropertyGetter "model:System$Model$External$Description" (ST (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"))
     description <- lift2 (modelsInUse ##= descriptionGetter)
     lift $ lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
   Just modelName -> do
-    DomeinFile{invertedQueriesInOtherDomains} <- lift2 $ getDomeinFile $ DomeinFileId modelName
-    case head arrWithurl of
-      Nothing -> lift $ lift $ warnModeller Nothing (ModelLacksUrl modelName)
-      Just url -> do
+    case head arrWithurl, head arrWithDependencies of
+      Nothing, _ -> lift $ lift $ warnModeller Nothing (ModelLacksUrl modelName)
+      Just url, mwithDependencies -> do
+        repositoryUrl <- repository url
+        updateModel' (maybe false (eq "true") mwithDependencies) repositoryUrl (DomeinFileId modelName)
+  where
+    -- TODO. Note that while we have not yet the model identification as an URL, the parameter url is bound to
+    -- the repository location of the model supplied in the call to updateModel.
+    updateModel' :: Boolean -> String -> DomeinFileId -> MonadPerspectivesTransaction Unit
+    updateModel' withDependencies url dfId@(DomeinFileId modelName) = do
+      DomeinFile{invertedQueriesInOtherDomains, referredModels} <- lift2 $ getDomeinFile dfId
+      if withDependencies
+        then for_ referredModels (updateModel' withDependencies url)
+        else pure unit
         -- Untangle the InvertedQueries of the previous model.
-        forWithIndex_ invertedQueriesInOtherDomains
-          \domainName queries -> do
-            (lift2 $ try $ getDomeinFile (DomeinFileId domainName)) >>=
-              handleDomeinFileError "updateModel'"
-              \(DomeinFile dfr) -> do
-                -- Here we must take care to preserve the screens.js attachment.
-                lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
-        -- Clear the caches of compiled states.
-        void $ pure $ clearModelStates (DomeinFileId modelName)
-        -- Install the new model, taking care of outgoing InvertedQueries.
-        addModelToLocalStore' url
-        DomeinFile dfr <- lift2 $ getDomeinFile $ DomeinFileId modelName
-        -- Find all models in use.
-        models' <- lift2 (Models.modelsInUse >>= traverse getDomeinFile)
-        -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
-        lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
-          forWithIndex_ invertedQueries
-            \domainName queries -> if domainName == modelName
-              then for_ queries addInvertedQuery
-              else pure unit) dfr))
+      forWithIndex_ invertedQueriesInOtherDomains
+        \domainName queries -> do
+          (lift2 $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+            handleDomeinFileError "updateModel'"
+            \(DomeinFile dfr) -> do
+              -- Here we must take care to preserve the screens.js attachment.
+              lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
+      -- Clear the caches of compiled states.
+      void $ pure $ clearModelStates (DomeinFileId modelName)
+      -- Install the new model, taking care of outgoing InvertedQueries.
+      -- TODO. As soon as model identifiers are URLs, do not concatenate the url to the modelName.
+      addModelToLocalStore' (url <> modelName)
+      DomeinFile dfr <- lift2 $ getDomeinFile $ DomeinFileId modelName
+      -- Find all models in use.
+      models' <- lift2 (Models.modelsInUse >>= traverse getDomeinFile)
+      -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
+      lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
+        forWithIndex_ invertedQueries
+          \domainName queries -> if domainName == modelName
+            then for_ queries addInvertedQuery
+            else pure unit) dfr))
 
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
 -- | Load the dependencies first.
@@ -381,16 +392,16 @@ addModelToLocalStore' url = do
           void $ addAttachment perspect_models modelName rev "screens.js" attachment (MediaType "text/ecmascript")
           updateRevision (DomeinFileId modelName)
 
-    -- Returns string ending on forward slash (/).
-    repository :: String -> MonadPerspectivesTransaction String
-    repository url' = case getFirstMatch (unsafeRegex "^(.*/).+$" noFlags) url' of
-      Nothing -> throwError (error ("Cannot get repository from " <> url'))
-      Just s -> pure s
-
     documentName :: String -> MonadPerspectivesTransaction String
     documentName url' = case getFirstMatch (unsafeRegex "^.*/(.+)$" noFlags) url' of
       Nothing -> throwError (error ("Cannot get document name from " <> url'))
       Just s -> pure s
+
+-- Returns string ending on forward slash (/).
+repository :: String -> MonadPerspectivesTransaction String
+repository url' = case getFirstMatch (unsafeRegex "^(.*/).+$" noFlags) url' of
+  Nothing -> throwError (error ("Cannot get repository from " <> url'))
+  Just s -> pure s
 
 addInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
 addInvertedQuery = modifyInvertedQuery true
@@ -584,7 +595,7 @@ externalFunctions =
   , Tuple "model:Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
   , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
   , Tuple "model:Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
-  , Tuple "model:Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
+  , Tuple "model:Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 3}
   , Tuple "model:Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
   , Tuple "model:Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
   , Tuple "model:Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 4}

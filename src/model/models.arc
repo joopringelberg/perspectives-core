@@ -73,7 +73,7 @@ domain Models
       perspective on Versions
         verbs (Consult)
       perspective on extern
-        defaults
+        props (Name, ModelIdentification, LastVersion, LastVersionUrl) verbs (Consult)
         in object state
           action Boot
             letA
