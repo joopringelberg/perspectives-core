@@ -6,6 +6,7 @@ import Control.Monad.Free (Free)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (length)
 import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
@@ -167,7 +168,7 @@ theSuite = suite "TypeLevelQueries" do
       (Left e) -> liftAff $ assert (show e) false
       (Right step) -> do
         -- logShow step
-        r' <- evalPhaseTwo' $ compileStep (RDOM $ ST $ EnumeratedRoleType "model:System$Invitation$External") step
+        r' <- evalPhaseTwo' $ compileStep (RDOM (ST $ EnumeratedRoleType "model:System$Invitation$External") Nothing) step
         case r' of
           Left e -> liftAff $ assert (show e) false
           Right qfd -> do

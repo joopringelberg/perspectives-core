@@ -82,7 +82,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:Test$AnotherRole))' as its Range"
             case calculation of
-              (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:Test$AnotherRole"))) _ _)) -> true
+              (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:Test$AnotherRole")) Nothing) _ _)) -> true
               otherwise -> false
           assert "The queryfunction of the calculation should be '(RolGetter \"model:Test$AnotherRole\")'"
             case calculation of

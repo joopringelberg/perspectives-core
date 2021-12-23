@@ -75,7 +75,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   ensureERole "model:MyTestDomain$SomeUser" dr' >>=
                     ensurePerspectiveOn "model:MyTestDomain$YetAnotherRole" >>=
                       objectOfPerspective >>=
-                        isCalculationOf (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")))
+                        isCalculationOf (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")) Nothing)
 
   test "Testing qualifyActionRoles: External." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  user Driver\n    perspective on External\n      all roleverbs" ARC.domain
@@ -365,7 +365,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   case calculation of
                     Q c -> do
                       assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$SubContext$Modellen))' as its Range"
-                        (range c == (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen"))))
+                        (range c == (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen")) Nothing))
                       assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter model:Couchdb$Models)'"
                         case queryFunction c of
                           (ExternalCoreRoleGetter "model:Couchdb$Models") -> true
@@ -495,7 +495,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                           assert "The queryfunction should be move" (eq qf QF.Move )
                           assert "The binding should be a rolgetter for model:Test$Company$Employee"
                             case rle of
-                              (BQD _ _ _ _ (RDOM (ST (EnumeratedRoleType "model:Test$Company$Employee"))) _ _) -> true
+                              (BQD _ _ _ _ (RDOM (ST (EnumeratedRoleType "model:Test$Company$Employee")) Nothing) _ _) -> true
                               otherwise -> false
                           -- logShow cte
                           assert "The role to move should come from C2"

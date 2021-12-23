@@ -131,7 +131,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                 Just (CalculatedRole{calculation}) -> do
                   -- logShow calculation
                   case calculation of
-                    (Q (MQD _ f _ (RDOM (ST (EnumeratedRoleType "Modellen"))) _ _)) -> assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"model:Couchdb$Models\")'" (f == (ExternalCoreRoleGetter "model:Couchdb$Models"))
+                    (Q (MQD _ f _ (RDOM (ST (EnumeratedRoleType "Modellen")) Nothing) _ _)) -> assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"model:Couchdb$Models\")'" (f == (ExternalCoreRoleGetter "model:Couchdb$Models"))
                     (Q _) -> assert "The calculation should have '(RDOM (ST EnumeratedRoleType Modellen))' as its Range" false
                     (S (Computation (ComputationStep {computedType}))) -> assert "The step should have 'model:MyTestDomain$Modellen' as computedType" (computedType == "model:MyTestDomain$Modellen")
                     otherwise -> assert ("Unexpected result: " <> show otherwise) false
