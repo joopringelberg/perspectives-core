@@ -52,6 +52,7 @@ import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
+import Perspectives.Deltas (addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, SeparateInvertedQuery(..))
@@ -263,6 +264,9 @@ addModelToLocalStore' url = do
       case parseResult of
         Left e -> throwError (error (show e))
         Right (Tuple contextInstances roleInstances') -> do
+          -- Add the new instances to the transaction, so their states will be computed etc.
+          for_ contextInstances (addCreatedContextToTransaction <<< identifier)
+          for_ roleInstances' (addCreatedRoleToTransaction <<< identifier)
           -- Restore the modelDescription, preferring the version left over from a previous installation
           -- over the version that came out of the user instances in the crl file.
           case mmodelDescription of
