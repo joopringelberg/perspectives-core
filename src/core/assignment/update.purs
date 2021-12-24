@@ -40,7 +40,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, difference, elemIndex, filter, find, foldM, last, null, union)
+import Data.Array (cons, difference, elemIndex, filter, filterA, find, foldM, last, null, union)
 import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Foldable (for_)
@@ -57,12 +57,12 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_id, rol_isMe, rol_pspType, rol_states)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>), (##=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding_, contextType, roleType)
+import Perspectives.Instances.ObjectGetters (binding_, contextType, getPropertyFromTelescope, roleType)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.ADT (ADT(..))
@@ -444,8 +444,14 @@ deleteProperty rids propertyName = case ARR.head rids of
 -- | CURRENTUSER: there can be no change to the current user.
 setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 setProperty rids propertyName values = do
-  deleteProperty rids propertyName
-  addProperty rids propertyName (flip Tuple Nothing <$> values)
+  rids' <- filterA hasDifferentValues rids
+  deleteProperty rids' propertyName
+  addProperty rids' propertyName (flip Tuple Nothing <$> values)
+  where
+    hasDifferentValues :: RoleInstance -> MonadPerspectivesTransaction Boolean
+    hasDifferentValues rid = do
+      vals <- lift2 (rid ##= getPropertyFromTelescope propertyName)
+      pure $ (not $ null (difference values vals)) || (not $ null (difference vals values))
 
 -----------------------------------------------------------
 -- CACHEANDSAVE

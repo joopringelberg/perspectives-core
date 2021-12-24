@@ -493,6 +493,7 @@ rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiv
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR PERSPECTIVES
 ----------------------------------------------------------------------------------------
+-- | All Perspectives of an EnumeratedRoleType or one of its Aspects.
 perspectivesClosure :: EnumeratedRoleType ~~~> Perspective
 perspectivesClosure = roleAspectsClosure >=> perspectivesOfRole
 
@@ -504,7 +505,7 @@ perspectivesClosure_ t = perspectivesOfRole_ t
 
 -- | For a user RoleType, get all perspectives of that RoleType
 perspectivesOfRole_ :: RoleType ~~~> Perspective
-perspectivesOfRole_ (ENR erole) = ArrayT (getEnumeratedRole erole >>= pure <<< perspectives)
+perspectivesOfRole_ (ENR erole) = perspectivesOfRole erole
 perspectivesOfRole_ (CR crole) = ArrayT (getCalculatedRole crole >>= pure <<< perspectives)
 
 perspectiveObjectQfd :: Perspective -> QueryFunctionDescription
