@@ -67,6 +67,11 @@ parseInt s = do
     Left e -> throwError (error $ "Cannot parse an integer from '" <> s <> "' (" <> show e <> ")")
     Right i -> pure i
 
+parseBool :: forall m. MonadError Error m => MonadEffect m => String -> m Boolean
+parseBool "true" = pure true
+parseBool "false" = pure false
+parseBool s = throwError (error $ "Cannot parse a bool from '" <> s <> "'.")
+
 -------------------------------------------------------------------------------
 -- VALUE TO VARIOUS TYPES
 -------------------------------------------------------------------------------

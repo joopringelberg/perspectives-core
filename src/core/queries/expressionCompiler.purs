@@ -337,7 +337,7 @@ compileSimpleStep currentDomain s@(Binding pos membeddingContext) = do
                 case head qnames of
                   Nothing -> throwError $ UnknownContext pos embeddingContext
                   (Just qn) | length qnames == 1 -> pure $ Just qn
-                  otherwise -> throwError $ NotUniquelyIdentifying pos embeddingContext (map unwrap qnames)
+                  _ -> throwError $ NotUniquelyIdentifying pos embeddingContext (map unwrap qnames)
           pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM typeOfBinding mQembeddingContext) True False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
@@ -605,19 +605,26 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
             -- This was parsed as `SequenceFunction f` and is now compiled as `UnaryCombinator f` in an SQD.
             -- Notice by the domain and range that we assume functions that are Monoids.
             -- Notice the strangeness of compiling a binary expression into an SQD description.
-            SQD dom (QF.UnaryCombinator fname) _ _ _-> case fname of
+            SQD dom (QF.UnaryCombinator fname) ran _ _-> case fname of
               -- we can count anything and the result is a number.
-              CountF -> pure $ SQD dom (QF.DataTypeGetter fname) (VDOM PNumber Nothing) True True
+              -- We must change the range of f2' as all SequenceFunctions are compiled to have equal domain and range.
+              CountF -> pure (BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 (SQD dom (QF.UnaryCombinator CountF) (VDOM PNumber Nothing) True True) (VDOM PNumber Nothing) True True)
               -- We have interpretations of AddF, SubtractF for numbers and strings only.
               -- For MinimumF and MaximumF we have interpretations for numbers and strings and booleans and dates.
               -- For AndF and OrF we have an interpretation for Booleans only.
               -- We also require that the VDOM should have an EnumeratedPropertyType.
-              AddF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
-              SubtractF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
-              MinimumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
-              MaximumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
-              AndF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
-              OrF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD dom (QF.DataTypeGetter fname) dom True True)
+              AddF -> ensureDomainIsRange dom [PNumber, PString] pos
+                (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
+              SubtractF -> ensureDomainIsRange dom [PNumber, PString] pos
+                (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
+              MinimumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos
+                (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
+              MaximumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos
+                (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
+              AndF -> ensureDomainIsRange dom [PBool] pos
+                (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
+              OrF -> ensureDomainIsRange dom [PBool] pos
+                (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
               _ -> throwError $ ArgumentMustBeSequenceFunction pos
             _ -> throwError $ ArgumentMustBeSequenceFunction pos
 

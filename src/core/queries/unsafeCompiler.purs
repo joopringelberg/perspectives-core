@@ -33,17 +33,17 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
-import Data.Array (elemIndex, findIndex, head, index, null, unsafeIndex)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Array (elemIndex, findIndex, foldl, head, index, length, null, singleton, unsafeIndex)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Data.Traversable (traverse)
+import Data.Traversable (maximum, minimum, traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, liftToInstanceLevel)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, liftToInstanceLevel)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -52,7 +52,7 @@ import Perspectives.Instances.Combinators (available_, exists, filter, logicalAn
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRoleBinders, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
-import Perspectives.Instances.Values (parseInt)
+import Perspectives.Instances.Values (parseBool, parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
@@ -207,6 +207,13 @@ compileFunction (SQD dom (VariableLookup varName) range _ _) = pure $ unsafeCoer
 -- If the second term is a constant, we can ignore the left term. This is an optimalisation.
 compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (Constant _ _) _ _ _) _ _ _) = compileFunction f2
 
+compileFunction (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 _ _ _) = do
+  (f1' :: String ~~> String) <- compileFunction f1
+  (f2' :: Array String ~~> String) <- compileSequenceFunction f2
+  pure \s -> ArrayT do
+    results <- runArrayT $ f1' s
+    runArrayT $ f2' results
+
 -- If the domain of f1 is a Value, ignore f1 and just compile f2.
 -- This is an edge case that arises when we invert queries that have a Value as range.
 -- The inverted query has a Value as domain. We then completely ignore that first step.
@@ -339,6 +346,43 @@ compileFunction (SQD _ (RegExMatch (RegExP (reg :: Regex))) _ _ _) = pure \s -> 
 
 -- Catch all
 compileFunction qd = throwError (error $ "Cannot create a function out of '" <> prettyPrint qd <> "'.")
+
+---------------------------------------------------------------------------------------------------
+-- COMPILESEQUENCEFUNCTION
+---------------------------------------------------------------------------------------------------
+-- We have interpretations of AddF for numbers and strings only.
+-- For MinimumF and MaximumF we have interpretations for numbers and strings and booleans and dates.
+-- For AndF and OrF we have an interpretation for Booleans only.
+-- We also require that the VDOM should have an EnumeratedPropertyType.
+-- TODO. Het probleem is dat we (String ~~> String) moeten opleveren!
+compileSequenceFunction :: QueryFunctionDescription -> MP (Array String -> MonadPerspectivesQuery String)
+compileSequenceFunction (SQD dom (UnaryCombinator sequenceFunctionName) _ _ _) | isJust $ elemIndex sequenceFunctionName [CountF, MinimumF, MaximumF, AddF]  = case sequenceFunctionName of
+  CountF -> pure \things -> pure (show $ length things)
+  MinimumF -> case dom of
+    (VDOM RAN.PNumber _) -> pure \numbers -> ArrayT do
+      nrs <- traverse parseInt numbers
+      pure $ maybe [] (singleton <<< show) (minimum nrs)
+    (VDOM RAN.PString _) -> pure \strings -> ArrayT $ pure $ (maybe [] singleton) (minimum strings)
+    (VDOM RAN.PBool _) -> pure \bools -> ArrayT do
+      bls <- traverse parseBool bools
+      pure $ maybe [] (singleton <<< show) (minimum bools)
+    _ -> throwError (error $ "compileSequenceFunction cannot handle domain '" <> show dom <> "' for 'minimum'.")
+  MaximumF -> case dom of
+    (VDOM RAN.PNumber _) -> pure \numbers -> ArrayT do
+      nrs <- traverse parseInt numbers
+      pure $ maybe [] (singleton <<< show) (maximum nrs)
+    (VDOM RAN.PString _) -> pure \strings -> ArrayT $ pure $ (maybe [] singleton) (maximum strings)
+    _ -> throwError (error $ "compileSequenceFunction cannot handle domain '" <> show dom <> "' for 'maximum'.")
+  AddF -> case dom of
+    (VDOM RAN.PNumber _) -> pure \numbers -> ArrayT $ do
+      (nrs :: Array Int) <- traverse parseInt numbers
+      pure $ [show (foldl (\cumulator nr -> cumulator + nr) 0 nrs)]
+    -- pure (\numbers -> pure $ foldl (\cumulator str -> cumulator + str) "" numbers)
+    (VDOM RAN.PString _) -> pure \strings -> ArrayT $ pure [foldl (\cumulator str -> cumulator <> str) "" strings]
+    _ -> throwError (error $ "compileSequenceFunction cannot handle domain '" <> show dom <> "' for 'add'.")
+  op -> throwError (error $ "compileSequenceFunction cannot handle sequence function: '" <> show op <> "'.")
+-- Catch all
+compileSequenceFunction qd = throwError (error $ "compileSequenceFunction cannot create a function out of '" <> prettyPrint qd <> "'.")
 
 ---------------------------------------------------------------------------------------------------
 -- TYPETIMEONLY

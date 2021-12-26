@@ -57,6 +57,7 @@ data FunctionName =
   | BoundByF
   | FilterF
   | ComposeF
+  | ComposeSequenceF
   | UnionF
   | IntersectionF
   | CreateContextF      -- TODO
@@ -108,6 +109,7 @@ instance showFunctionName :: Show FunctionName where
     show BoundByF = "boundBy"
     show FilterF = "filter"
     show ComposeF = "compose"
+    show ComposeSequenceF = "composeSequence"
     show UnionF = "either"
     show IntersectionF = "both"
     show CreateContextF = "createContext"
@@ -154,6 +156,7 @@ isFunctionalFunction fn = case fn of
   BoundByF -> True
   FilterF -> Unknown
   ComposeF -> Unknown
+  ComposeSequenceF -> True
   UnionF -> False
   IntersectionF -> False
   CreateContextF -> True
@@ -195,6 +198,7 @@ isMandatoryFunction fn = case fn of
   BoundByF -> True
   FilterF -> False
   ComposeF -> Unknown
+  ComposeSequenceF -> Unknown
   UnionF -> False
   IntersectionF -> False
   CreateContextF -> True
