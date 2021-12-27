@@ -171,7 +171,7 @@ contextE = withPos do
       ctxt@(ContextType ccontext) <- getCurrentContext
       pos <- getPosition
       if isCalculated
-        then pure $ SubjectState (ExplicitRole ctxt (CR $ CalculatedRoleType $ ccontext <> "$" <> segments) pos) Nothing
+        then getCurrentState
         else pure $ SubjectState (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
 
     explicitObjectState :: IP StateSpecification
@@ -180,7 +180,7 @@ contextE = withPos do
       ctxt@(ContextType ccontext) <- getCurrentContext
       pos <- getPosition
       if isCalculated
-        then pure $ ObjectState (ExplicitRole ctxt (CR $ CalculatedRoleType $ ccontext <> "$" <> segments) pos) Nothing
+        then getCurrentState
         else pure $ ObjectState (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
 
     externalRoleState :: IP StateSpecification

@@ -173,9 +173,10 @@ serialiseProperties object pverbs = do
           , verbs: show <$> verbs
           }
 
+    -- Pair each PropertyType will all PropertyVerbs available for it.
     expandPropertyVerbs :: Array PropertyType -> PropertyVerbs -> Array (Tuple PropertyType (Array PropertyVerb))
     expandPropertyVerbs allProps (PropertyVerbs props verbs) = let
-      verbs' = expandVerbs verbs
+      (verbs' :: Array PropertyVerb) = expandVerbs verbs
       in (flip Tuple verbs') <$> expandPropSet props
       where
         expandVerbs :: ExplicitSet PropertyVerb -> Array PropertyVerb
@@ -188,6 +189,7 @@ serialiseProperties object pverbs = do
         expandPropSet Empty = []
         expandPropSet (PSet as) = as
 
+    -- Replace two Tuples with the same PropertyType with a single Tuple, with the union of their PropertyVerbs.
     add :: Array (Tuple PropertyType (Array PropertyVerb))
       -> (Tuple PropertyType (Array PropertyVerb))
       -> Array (Tuple PropertyType (Array PropertyVerb))
