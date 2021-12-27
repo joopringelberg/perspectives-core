@@ -270,7 +270,7 @@ loadModelIfMissing modelName = do
   if isNothing mDomeinFile
     then do
       repositoryUrl <- lift2 publicRepository
-      addModelToLocalStore' (repositoryUrl <> modelName)
+      addModelToLocalStore' (repositoryUrl <> modelName) true
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
       (lift2 $ try $ getDomeinFile (DomeinFileId modelName)) >>=
         handleDomeinFileError "loadModelIfMissing"

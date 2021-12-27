@@ -82,7 +82,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Warning (PerspectivesWarning(..))
-import Prelude (Unit, append, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||), eq)
+import Prelude (Unit, append, bind, discard, eq, flip, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -179,7 +179,7 @@ updateModel arrWithurl arrWithModelName arrWithDependencies modelsInUse = case h
       void $ pure $ clearModelStates (DomeinFileId modelName)
       -- Install the new model, taking care of outgoing InvertedQueries.
       -- TODO. As soon as model identifiers are URLs, do not concatenate the url to the modelName.
-      addModelToLocalStore' (url <> modelName)
+      addModelToLocalStore' (url <> modelName) false
       DomeinFile dfr <- lift2 $ getDomeinFile $ DomeinFileId modelName
       -- Find all models in use.
       models' <- lift2 (Models.modelsInUse >>= traverse getDomeinFile)
@@ -201,10 +201,10 @@ addModelToLocalStore :: Array String -> RoleInstance -> MonadPerspectivesTransac
 addModelToLocalStore urls _ = addModelsToLocalStore_ urls
 
 addModelsToLocalStore_ :: Array String -> MonadPerspectivesTransaction Unit
-addModelsToLocalStore_ urls = for_ urls addModelToLocalStore'
+addModelsToLocalStore_ urls = for_ urls (flip addModelToLocalStore' true)
 
-addModelToLocalStore' :: String -> MonadPerspectivesTransaction Unit
-addModelToLocalStore' url = do
+addModelToLocalStore' :: String -> Boolean -> MonadPerspectivesTransaction Unit
+addModelToLocalStore' url originalLoad = do
   case namespaceFromUrl url of
     Nothing -> throwError (error $ "Repository URL does not end on model name: " <> url)
     Just ns -> do
@@ -216,7 +216,7 @@ addModelToLocalStore' url = do
       for_ referredModels \dfid -> do
         mmodel <- lift $ lift $ tryGetPerspectEntiteit dfid
         case mmodel of
-          Nothing -> addModelToLocalStore' (append repositoryUrl (unwrap dfid))
+          Nothing -> addModelToLocalStore' (append repositoryUrl (unwrap dfid)) originalLoad
           Just _ -> pure unit
       -- Store the model in Couchdb.
       -- Fetch the local revision before saving: it belongs to the repository,
@@ -265,8 +265,11 @@ addModelToLocalStore' url = do
         Left e -> throwError (error (show e))
         Right (Tuple contextInstances roleInstances') -> do
           -- Add the new instances to the transaction, so their states will be computed etc.
-          for_ contextInstances (addCreatedContextToTransaction <<< identifier)
-          for_ roleInstances' (addCreatedRoleToTransaction <<< identifier)
+          if originalLoad
+            then do
+              for_ contextInstances (addCreatedContextToTransaction <<< identifier)
+              for_ roleInstances' (addCreatedRoleToTransaction <<< identifier)
+            else pure unit
           -- Restore the modelDescription, preferring the version left over from a previous installation
           -- over the version that came out of the user instances in the crl file.
           case mmodelDescription of
