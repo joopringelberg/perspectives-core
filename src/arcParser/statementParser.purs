@@ -30,11 +30,11 @@ import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (VarBinding(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reserved)
-import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, nestedBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, nestedBlock, outdented')
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..), LetABinding(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>), (<*>))
-import Text.Parsing.Indent (withPos)
+import Text.Parsing.Indent (indented', withPos)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (lookAhead, manyTill, option, optionMaybe, try, (<?>))
 
@@ -71,17 +71,19 @@ roleCreation :: IP Assignment
 roleCreation = do
   start <- getPosition
   roleIdentifier <- reserved "createRole" *> arcIdentifier
-  contextExpression <- optionMaybe (reserved "in" *> step)
+  -- Check indentiation to prevent confusion of 'in' with the 'in' of the letA.
+  contextExpression <- optionMaybe (indented' *> reserved "in" *> step)
   end <- getPosition
   pure $ CreateRole {start, end, roleIdentifier, contextExpression}
 
 -- createContext ContextType bound to RoleType [ in <contextExpression>]
 createContext :: IP Assignment
-createContext = do
+createContext = withPos do
   start <- getPosition
   contextTypeIdentifier <- reserved "createContext" *> arcIdentifier
   roleTypeIdentifier <- reserved "bound" *> reserved "to" *> arcIdentifier
-  contextExpression <- optionMaybe (reserved "in" *> step)
+  -- Check indentiation to prevent confusion of 'in' with the 'in' of the letA.
+  contextExpression <- optionMaybe (indented' *> reserved "in" *> step)
   end <- getPosition
   pure $ CreateContext {start, end, contextTypeIdentifier, roleTypeIdentifier, contextExpression}
 
@@ -203,7 +205,7 @@ callEffect = do
     <|>
     do
       first <- step
-      -- By using manyTill we get the errir messages inside arguments to the end user.
+      -- By using manyTill we get the error messages inside arguments to the end user.
       -- sepBy would hide them.
       rest <- manyTill (token.comma *> step) (token.symbol ")")
       pure (Cons first rest))
@@ -214,8 +216,10 @@ callEffect = do
 letWithAssignment :: IP LetStep
 letWithAssignment = try $ withPos do
   start <- getPosition
-  bindings <- reserved "letA" *> nestedBlock letABinding
-  assignments <- reserved "in" *> nestedBlock assignment
+  -- bindings <- reserved "letA" *> nestedBlock letABinding
+  bindings <- reserved "letA" *> withPos (manyTill letABinding outdented')
+  -- assignments <- reserved "in" *> nestedBlock assignment
+  assignments <- reserved "in" *> withPos (manyTill assignment outdented')
   end <- getPosition
   pure $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
 

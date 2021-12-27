@@ -37,7 +37,7 @@ import Effect.Aff (Aff)
 import Perspectives.Parsing.Arc.AST (RoleIdentification, StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..))
-import Prelude (class Monad, Unit, bind, discard, flip, not, pure, show, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (==), (>), (>>=), (||))
+import Prelude (class Monad, Unit, bind, discard, flip, not, pure, show, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (==), (>), (>>=), (||), (>=))
 import Record (get, set) as Record
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
@@ -290,6 +290,7 @@ nestedBlock p = do
     else pure Nil
 
 -- | True iff the Parser Position is further to the right than the reference position.
+-- NOTE: this is the same as Text.Parsing.Indent.indented' but returns a Boolean.
 isIndented :: IP Boolean
 isIndented = do
     (indentParserPosition :: ArcPosition) <- get'
@@ -298,10 +299,21 @@ isIndented = do
 
 isSameOrIndented :: IP Boolean
 isSameOrIndented = do
-    (indentParserPosition :: ArcPosition) <- get'
-    (parserPosition :: ArcPosition) <- getPosition
-    pure ((not (sourceColumn parserPosition <= sourceColumn indentParserPosition)) ||
-      (sourceLine parserPosition == sourceLine indentParserPosition))
+  -- The stored position.
+  (indentParserPosition :: ArcPosition) <- get'
+  -- The current position.
+  (parserPosition :: ArcPosition) <- getPosition
+  pure ((not (sourceColumn parserPosition <= sourceColumn indentParserPosition)) ||
+    (sourceLine parserPosition == sourceLine indentParserPosition))
+
+-- | Parses only when outdented with respect to the level of reference, but does not change internal state
+outdented' :: IP Unit
+outdented' = do
+  -- The stored position.
+  indentParserPosition <- get'
+  -- The current position.
+  parserPosition <- getPosition
+  if (sourceColumn parserPosition >= sourceColumn indentParserPosition) then fail "not outdented" else pure unit
 
 isNextLine :: IP Boolean
 isNextLine = do
