@@ -73,7 +73,7 @@ import Perspectives.Representation.Action (AutomaticAction(..), Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole, tryGetPerspectType)
 import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -83,7 +83,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (aspectsOfRole, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
@@ -686,16 +686,23 @@ handlePostponedStateQualifiedParts = do
 
           -- pure $ PSet (ENP <<< EnumeratedPropertyType <$> (fromFoldable ps))
         collectPropertyTypes (AST.View view) = do
-          (views :: Object View) <- getsDF _.views
-          -- As we have postponed handling these parse tree fragments after
-          -- handling all others, there can be no forward references.
-          -- The property references in Views are, by now, qualified.
-          candidates <- pure $ filter (flip endsWithSegments view) (keys views)
-          case length candidates of
-            0 -> throwError $ UnknownView start view
-            1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
-              Just (View {propertyReferences}) -> pure $ PSet propertyReferences
-            _ -> throwError $ NotUniquelyIdentifying start view candidates
+          if isQualifiedWithDomein view
+            then do
+              mview <- lift2 $ tryGetPerspectType (ViewType view)
+              case mview of
+                Just (View {propertyReferences}) -> pure $ PSet propertyReferences
+                Nothing -> throwError $ UnknownView start view
+            else do
+              (views :: Object View) <- getsDF _.views
+              -- As we have postponed handling these parse tree fragments after
+              -- handling all others, there can be no forward references.
+              -- The property references in Views are, by now, qualified.
+              candidates <- pure $ filter (flip endsWithSegments view) (keys views)
+              case length candidates of
+                0 -> throwError $ UnknownView start view
+                1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
+                  Just (View {propertyReferences}) -> pure $ PSet propertyReferences
+                _ -> throwError $ NotUniquelyIdentifying start view candidates
 
     handlePart (AST.SO (AST.SelfOnly{subject, object, state, start, end})) = do
       currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)

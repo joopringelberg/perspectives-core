@@ -23,7 +23,7 @@
 module Perspectives.Query.ExpandPrefix where
 
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), RoleIdentification(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
@@ -137,11 +137,12 @@ instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPa
     object' <- expandPrefix object
     state' <- expandPrefix state
     pure (R (RoleVerbE r {subject = subject', object = object', state = state'}))
-  expandPrefix (P (PropertyVerbE r@{subject, object, state})) = do
+  expandPrefix (P (PropertyVerbE r@{subject, object, state, propsOrView})) = do
     subject' <- expandPrefix subject
     object' <- expandPrefix object
     state' <- expandPrefix state
-    pure (P (PropertyVerbE r {subject = subject', object = object', state = state'}))
+    propsOrView' <- expandPrefix propsOrView
+    pure (P (PropertyVerbE r {subject = subject', object = object', state = state', propsOrView = propsOrView'}))
   expandPrefix (AC (ActionE r@{subject, object, state, effect})) = do
     subject' <- expandPrefix subject
     object' <- expandPrefix object
@@ -171,6 +172,10 @@ instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPa
     effect' <- expandPrefix effect
     pure (AE (AutomaticEffectE r {subject = subject', object = object', transition = transition', effect = effect'}))
   expandPrefix (SUBSTATE s) = SUBSTATE <$> expandPrefix s
+
+instance containsPrefixesPropsOrView :: ContainsPrefixes PropsOrView where
+  expandPrefix (View s) = View <$> (expandNamespace s)
+  expandPrefix x = pure x
 
 instance containsPrefixesRoleIdentification :: ContainsPrefixes RoleIdentification where
   expandPrefix r@(ExplicitRole _ _ _) = pure r

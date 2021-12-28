@@ -952,7 +952,7 @@ propertyVerbs = basedOnView <|> basedOnProps
           -- | view <ArcIdentifier> [: (<PropertyVerb+)]
           start <- getPosition
           view <- reserved "view" *> (View <$> arcIdentifier)
-          (pv :: ExplicitSet PropertyVerb) <- option Universal lotsOfVerbs
+          (pv :: ExplicitSet PropertyVerb) <- option Universal (reserved "verbs" *> lotsOfVerbs)
           end <- getPosition
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
         _, _ -> fail "User role and object of perspective must be given"
