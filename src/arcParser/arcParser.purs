@@ -554,7 +554,7 @@ stateE = withPos do
       -- | In IP, defined as an IntendParser on top of StateT ArcParserState Identity, we now have a
       -- | new ArcParserState object with member 'state' being StateIdentifier "{previousStateIdentifier}$id".
       condition <- sameOrIndented *> reserved "=" *> step
-      allParts <- concat <$> nestedBlock statePart
+      allParts <- option Nil (concat <$> nestedBlock statePart)
       stateParts <- pure $ filter (case _ of
         SUBSTATE _ -> false
         _ -> true) allParts
