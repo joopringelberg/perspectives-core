@@ -303,6 +303,9 @@ compileAssignmentFromRole (MQD dom (ExternalEffectFullFunction functionName) arg
 -- Catchall, remove when all cases have been covered.
 compileAssignmentFromRole otherwise = throwError (error ("Found unknown case for compileAssignmentFromRole: " <> show otherwise))
 
+-- | This is a special way to compile Creating assignment statements, that result in a function that actually returns
+-- | something, as opposed to ordinary assignment statements (including Creating statements) that return nothing.
+-- | For a context, the role that binds the external role of the newly created context is returned.
 compileCreatingAssignments :: QueryFunctionDescription -> MP (RoleInstance -> MonadPerspectivesTransaction (Array String))
 compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
@@ -315,7 +318,7 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
         { id = "model:User$c" <> (show g)
         , ctype = unwrap qualifiedContextTypeIdentifier
         })
-      unsafePartial (unwrap <<< fromJust) <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap roleId) (RolSerialization
+      unsafePartial (unwrap <<< fromJust) <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization
         { id: Nothing
         , properties: PropertySerialization empty
         , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
