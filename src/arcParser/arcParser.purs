@@ -419,7 +419,7 @@ rolePart = do
   case first, second of
     "perspective", "on" -> SQP <$> perspectiveOn
     "perspective", "of" -> SQP <$> perspectiveOf
-    "in", "state" -> SQP <$> inState
+    "in", _ -> SQP <$> inState
     "on", "entry" -> SQP <$> onEntryE
     "on", "exit" -> SQP <$> onExitE
     "state", _ -> ROLESTATE <$> stateE
