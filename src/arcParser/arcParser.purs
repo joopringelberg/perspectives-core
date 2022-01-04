@@ -154,6 +154,12 @@ contextE = withPos do
         "context" -> explicitObjectState >>= flip withArcParserState contextRoleE
         "external" -> externalRoleState >>= flip withArcParserState externalRoleE
         "state" -> STATE <$> stateE
+        "on" -> do
+          (Tuple first second) <- twoReservedWords
+          case first, second of
+            "on", "entry" -> CSQP <$> onEntryE
+            "on", "exit" -> CSQP <$> onExitE
+            _, _ -> fail "Expected 'entry' or 'exit' after 'on'."
         _ -> do
           (Tuple first second) <- twoReservedWords
           case first, second of
