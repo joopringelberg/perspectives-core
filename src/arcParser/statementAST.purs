@@ -51,7 +51,8 @@ data AssignmentOperator =
 type WithTextRange f = {start :: ArcPosition, end :: ArcPosition | f}
 
 data Assignment =
-	Remove (WithTextRange (roleExpression :: Step))
+	RemoveRole (WithTextRange (roleExpression :: Step))
+  | RemoveContext (WithTextRange (roleExpression :: Step))
 	| CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
   | CreateContext (WithTextRange (contextTypeIdentifier :: String, roleTypeIdentifier :: String, contextExpression :: Maybe Step))
   | CreateContext_ (WithTextRange (contextTypeIdentifier :: String, roleExpression :: Step))
@@ -62,12 +63,14 @@ data Assignment =
   | Unbind (WithTextRange (bindingExpression :: Step, roleIdentifier :: Maybe String))
   | Unbind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
   | DeleteRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
+  | DeleteContext (WithTextRange (contextRoleIdentifier :: String, contextExpression :: Maybe Step))
   | DeleteProperty (WithTextRange (propertyIdentifier :: String, roleExpression :: Maybe Step))
   | PropertyAssignment (WithTextRange (propertyIdentifier :: String, operator :: AssignmentOperator, valueExpression :: Step, roleExpression :: Maybe Step ))
   | ExternalEffect (WithTextRange (effectName :: String, arguments :: (Array Step) ) )
 
 startOfAssignment :: Assignment -> ArcPosition
-startOfAssignment (Remove{start}) = start
+startOfAssignment (RemoveRole{start}) = start
+startOfAssignment (RemoveContext{start}) = start
 startOfAssignment (CreateRole{start}) = start
 startOfAssignment (CreateContext{start}) = start
 startOfAssignment (CreateContext_{start}) = start
@@ -77,12 +80,14 @@ startOfAssignment (Bind_{start}) = start
 startOfAssignment (Unbind{start}) = start
 startOfAssignment (Unbind_{start}) = start
 startOfAssignment (DeleteRole{start}) = start
+startOfAssignment (DeleteContext{start}) = start
 startOfAssignment (DeleteProperty{start}) = start
 startOfAssignment (PropertyAssignment{start}) = start
 startOfAssignment (ExternalEffect{start}) = start
 
 endOfAssignment :: Assignment -> ArcPosition
-endOfAssignment (Remove{end}) = end
+endOfAssignment (RemoveRole{end}) = end
+endOfAssignment (RemoveContext{end}) = end
 endOfAssignment (CreateRole{end}) = end
 endOfAssignment (CreateContext{end}) = end
 endOfAssignment (CreateContext_{end}) = end
@@ -92,6 +97,7 @@ endOfAssignment (Bind_{end}) = end
 endOfAssignment (Unbind{end}) = end
 endOfAssignment (Unbind_{end}) = end
 endOfAssignment (DeleteRole{end}) = end
+endOfAssignment (DeleteContext{end}) = end
 endOfAssignment (DeleteProperty{end}) = end
 endOfAssignment (PropertyAssignment{end}) = end
 endOfAssignment (ExternalEffect{end}) = end
@@ -136,7 +142,8 @@ instance encodeAssignment :: Encode Assignment where
 instance decodeAssignment :: Decode Assignment where
   decode q = genericDecode defaultOptions q
 instance prettyPrintAssignment :: PrettyPrint Assignment where
-  prettyPrint' t (Remove {roleExpression}) = "Remove " <> prettyPrint' t roleExpression
+  prettyPrint' t (RemoveRole {roleExpression}) = "Remove role " <> prettyPrint' t roleExpression
+  prettyPrint' t (RemoveContext {roleExpression}) = "Remove context" <> prettyPrint' t roleExpression
   prettyPrint' t (CreateRole {roleIdentifier, contextExpression}) = "CreateRole " <> roleIdentifier <> " " <> prettyPrint' t contextExpression
   prettyPrint' t (CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression}) = let
     context = if isNothing contextExpression then "current context" else prettyPrint' t contextExpression
@@ -149,6 +156,7 @@ instance prettyPrintAssignment :: PrettyPrint Assignment where
   prettyPrint' t (Unbind {bindingExpression, roleIdentifier}) = "Unbind " <> prettyPrint' t bindingExpression <> "\n" <> t <> show roleIdentifier
   prettyPrint' t (Unbind_ {bindingExpression, binderExpression}) = "Unbind_ " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") binderExpression
   prettyPrint' t (DeleteRole {roleIdentifier, contextExpression}) = "DeleteRole " <> roleIdentifier <> " " <> prettyPrint' t contextExpression
+  prettyPrint' t (DeleteContext {contextRoleIdentifier, contextExpression}) = "DeleteContext " <> contextRoleIdentifier <> " " <> prettyPrint' t contextExpression
   prettyPrint' t (DeleteProperty {propertyIdentifier, roleExpression}) = "DeleteProperty " <> propertyIdentifier <> " " <> prettyPrint' t roleExpression
   prettyPrint' t (PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression}) = "PropertyAssignment " <> propertyIdentifier <> " " <> prettyPrint' t operator <> " " <> "\n" <> t <> prettyPrint' (t <> "  ") valueExpression <> "\n" <> t <> prettyPrint' (t <> "  ") roleExpression
   prettyPrint' t (ExternalEffect {arguments}) = "ExternalEffect\n" <> intercalate ("\n" <> t) (prettyPrint' (t <> "  ") <$> arguments)

@@ -49,16 +49,16 @@ import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2contextType, domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, lessThanOrEqualTo)
+import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, kindOfRole, lessThanOrEqualTo)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=), (<<<), (>))
+import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=), (<<<), (>), (&&))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -126,15 +126,28 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
       addAssignmentToSequence seq v = makeSequence <$> pure seq <*> (describeAssignmentStatement subjects v)
 
   -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
-  -- The assignment functions arbitrarily return the currentContext. Hence,
+  -- The assignment functions arbitrarily return the currentContext, except for the Create statements CreateRole
+  -- and CreateContext. Hence,
   -- we declare the functions to be both functional and mandatory.
   -- All inverted queries that need be created are created in this function.
   -- TODO: Controleer of de assignment operators wel corresponderen met de toegekende Verbs.
   describeAssignmentStatement :: Array RoleType -> Assignment -> PhaseThree QueryFunctionDescription
   describeAssignmentStatement subjects ass = case ass of
-      Remove {roleExpression} -> do
+      RemoveRole {roleExpression} -> do
         rle <- ensureRole subjects roleExpression
-        pure $ UQD currentcontextDomain QF.Remove rle currentcontextDomain True True
+        pure $ UQD currentcontextDomain QF.RemoveRole rle currentcontextDomain True True
+      RemoveContext {roleExpression, start, end} -> do
+        rle <- ensureRole subjects roleExpression
+        -- The range of the QueryFunctionDescription must consist of EnumeratedRoleTypes that have kind ContextRole.
+        isContextRole <- foldM
+          (\isContextRole eRole -> do
+            EnumeratedRole{kindOfRole} <- lift $ lift $ getEnumeratedRole eRole
+            pure $ isContextRole && (ContextRole == kindOfRole))
+          true
+          (leavesInADT $ unsafePartial domain2roleType $ range rle)
+        if isContextRole
+          then pure $ UQD currentcontextDomain QF.RemoveContext rle currentcontextDomain True True
+          else throwError $ NotAContextRole start end
       CreateRole {roleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
@@ -210,6 +223,15 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
         pure $ UQD originDomain (QF.DeleteRole qualifiedRoleIdentifier) cte originDomain True True
+
+      DeleteContext f@{contextRoleIdentifier, contextExpression, start, end} -> do
+        (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
+        -- TODO: it must be a ContextRole
+        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo contextRoleIdentifier cte f.start f.end
+        EnumeratedRole{kindOfRole} <- lift $ lift $ getEnumeratedRole qualifiedRoleIdentifier
+        if kindOfRole == ContextRole
+          then pure $ UQD originDomain (QF.DeleteContext qualifiedRoleIdentifier) cte originDomain True True
+          else throwError $ NotAContextRole start end
 
       DeleteProperty f@{propertyIdentifier, roleExpression, start, end} -> do
         (roleQfd :: QueryFunctionDescription) <- case roleExpression of

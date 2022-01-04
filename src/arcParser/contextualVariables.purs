@@ -83,7 +83,9 @@ statementContainsVariableReference varName (Statements stats) =
   ala Disj foldMap (assignmentContainsReference varName <$> stats)
 
 assignmentContainsReference :: String -> Assignment -> Boolean
-assignmentContainsReference varName (Remove {roleExpression}) = stepContainsVariableReference varName roleExpression
+assignmentContainsReference varName (RemoveRole {roleExpression}) = stepContainsVariableReference varName roleExpression
+
+assignmentContainsReference varName (RemoveContext {roleExpression}) = stepContainsVariableReference varName roleExpression
 
 assignmentContainsReference varName (CreateRole {contextExpression}) = maybe false (stepContainsVariableReference varName) contextExpression
 
@@ -117,6 +119,8 @@ assignmentContainsReference varName (Unbind_ {bindingExpression, binderExpressio
   stepContainsVariableReference varName binderExpression
 
 assignmentContainsReference varName (DeleteRole {contextExpression}) = maybe false (stepContainsVariableReference varName) contextExpression
+
+assignmentContainsReference varName (DeleteContext {contextExpression}) = maybe false (stepContainsVariableReference varName) contextExpression
 
 assignmentContainsReference varName (DeleteProperty {roleExpression}) =
   maybe false (stepContainsVariableReference varName) roleExpression

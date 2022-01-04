@@ -28,7 +28,6 @@ module Perspectives.Parsing.Messages where
 -- | This module defines the structure and kind of these errors.
 
 import Control.Monad.Except (ExceptT, throwError)
-import Data.Foldable (intercalate)
 import Data.List.Lazy.NonEmpty (singleton)
 import Data.List.Lazy.Types (NonEmptyList)
 import Data.Newtype (unwrap)
@@ -39,10 +38,10 @@ import Perspectives.Parsing.Arc.Statement.AST (LetStep(..))
 import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Show, map, show, (<<<), (<>))
+import Prelude (class Eq, class Show, show, (<<<), (<>))
 
 -- | A Perspectives sourcefile (text or diagram) will be parsed in two passes.
 -- | The resulting internal representation of types is type-checked.
@@ -90,6 +89,7 @@ data PerspectivesError
     | CannotCreateCalculatedProperty CalculatedPropertyType ArcPosition ArcPosition
     | NotAContextDomain QueryFunctionDescription Domain ArcPosition ArcPosition
     | NotARoleDomain Domain ArcPosition ArcPosition
+    | NotAContextRole ArcPosition ArcPosition
     | NotFunctional ArcPosition ArcPosition Step
     | MaybeNotFunctional ArcPosition ArcPosition Step
     | WrongPropertyRange ArcPosition ArcPosition RAN.Range RAN.Range
@@ -159,6 +159,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (CannotCreateCalculatedRole cr start end) = "(CannotCreateCalculatedRole) Can not create an instance of a calculated role (" <> show cr <> ") between: " <> show start <> " and: " <> show end
   show (CannotCreateCalculatedProperty pt start end) = "(CannotCreateCalculatedProperty) Can not change the value of a property that is calculated, between: " <> show start <> " and: " <> show end
   show (NotARoleDomain dom start end) = "(NotARoleDomain) This expression should have a role type: " <> show dom <> ", between " <> show start <> " and " <> show end
+  show (NotAContextRole start end) = "(NotAContextRole) All role types in this expression should be context roles (binding the external role of a context), between " <> show start <> " and " <> show end
   show (NotAContextDomain qfd dom start end) = "(NotAContextDomain) This expression:\n" <> prettyPrint qfd <> "\nshould return a context type, but has instead: " <> show dom <> ", between " <> show start <> " and " <> show end
   show (NotFunctional start end qfd) = "(NotFunctional) This expression is not a single value, between " <> show start <> " and " <> show end
   show (MaybeNotFunctional start end qfd) = "(MaybeNotFunctional) This expression might not be a single value, between " <> show start <> " and " <> show end

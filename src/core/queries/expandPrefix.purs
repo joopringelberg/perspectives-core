@@ -85,9 +85,12 @@ instance containsPrefixesComputationStep :: ContainsPrefixes ComputationStep whe
     pure $ ComputationStep r {functionName = efunctionName, arguments = earguments, computedType = ecomputedType}
 
 instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
-  expandPrefix (Remove r@{roleExpression}) = do
+  expandPrefix (RemoveRole r@{roleExpression}) = do
     eroleExpression <- expandPrefix roleExpression
-    pure $ Remove r{roleExpression = eroleExpression}
+    pure $ RemoveRole r{roleExpression = eroleExpression}
+  expandPrefix (RemoveContext r@{roleExpression}) = do
+    eroleExpression <- expandPrefix roleExpression
+    pure $ RemoveContext r{roleExpression = eroleExpression}
   expandPrefix (CreateRole r@{contextExpression}) = do
     econtextExpression <- traverse expandPrefix contextExpression
     pure $ CreateRole r {contextExpression = econtextExpression}
@@ -119,6 +122,9 @@ instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
   expandPrefix (DeleteRole r@{contextExpression}) = do
     econtextExpression <- traverse expandPrefix contextExpression
     pure $ DeleteRole r{contextExpression = econtextExpression}
+  expandPrefix (DeleteContext r@{contextExpression}) = do
+    econtextExpression <- traverse expandPrefix contextExpression
+    pure $ DeleteContext r{contextExpression = econtextExpression}
   expandPrefix (DeleteProperty r@{roleExpression}) = do
     eroleExpression <- traverse expandPrefix roleExpression
     pure $ DeleteProperty r{roleExpression = eroleExpression}

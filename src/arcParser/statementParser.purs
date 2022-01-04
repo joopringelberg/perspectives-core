@@ -30,7 +30,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (VarBinding(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reserved)
-import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, nestedBlock, outdented')
+import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, outdented')
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..), LetABinding(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>), (<*>))
@@ -47,25 +47,46 @@ roleAssignment :: IP Assignment
 roleAssignment = do
   keyword <- lookAhead reservedIdentifier <?> "Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, createContext, createContext_ or callEffect"
   case keyword of
-    "remove" -> removal
+    "remove" -> do
+      (Tuple first second) <- twoReservedWords
+      case first, second of
+        "remove", "role" -> roleRemoval
+        "remove", "context" -> contextRemoval
+        _, _ -> fail ("Expected 'role' or 'context' after 'remove'.")
     "createRole" -> roleCreation
     "move" -> move
     "bind" -> bind'
     "bind_" -> bind_
     "unbind" -> unbind
     "unbind_" -> unbind_
-    "delete" -> roleDeletion
+    "delete" -> do
+      (Tuple first second) <- twoReservedWords
+      case first, second of
+        "delete", "role" -> roleDeletion
+        "delete", "context" -> contextDeletion
+        _, _ -> fail ("Expected 'role' or 'context' after 'delete'.")
     "callEffect" -> callEffect
     "createContext" -> createContext
     "createContext_" -> createContext_
     s -> fail ("Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, or callEffect but found '" <> s <> "'.")
 
-removal :: IP Assignment
-removal = do
+roleRemoval :: IP Assignment
+roleRemoval = do
   start <- getPosition
-  roleExpression <- (reserved "remove" *> step)
+  reserved "remove"
+  reserved "role"
+  roleExpression <- step
   end <- getPosition
-  pure $ Remove {start, end, roleExpression}
+  pure $ RemoveRole {start, end, roleExpression}
+
+contextRemoval :: IP Assignment
+contextRemoval = do
+  start <- getPosition
+  reserved "remove"
+  reserved "context"
+  roleExpression <- step
+  end <- getPosition
+  pure $ RemoveContext {start, end, roleExpression}
 
 roleCreation :: IP Assignment
 roleCreation = do
@@ -195,6 +216,18 @@ roleDeletion = do
   contextExpression <- optionMaybe (reserved "from" *> step)
   end <- getPosition
   pure $ DeleteRole {start, end, roleIdentifier, contextExpression}
+
+contextDeletion :: IP Assignment
+contextDeletion = do
+  start <- getPosition
+  reserved "delete"
+  reserved "context"
+  reserved "bound"
+  reserved "to"
+  contextRoleIdentifier <- arcIdentifier
+  contextExpression <- optionMaybe (reserved "from" *> step)
+  end <- getPosition
+  pure $ DeleteContext {start, end, contextRoleIdentifier, contextExpression}
 
 callEffect :: IP Assignment
 callEffect = do
