@@ -89,12 +89,14 @@ buildUserGraph = do
     -- User Graph. The Filler Rule says we should connect filler F of U1 to U2 as well
     -- (and apply this rule recursively).
     expandSourceToBindings :: Tuple RoleType Edges -> MonadPerspectives (Array Node)
-    expandSourceToBindings t@(Tuple source edges) = case source of
-      ENR eroleType -> do
-        rAndb <- getEnumeratedRole eroleType >>= roleAndBinding
-        recursiveFillers <- bindingOfADT rAndb >>= pure <<< leavesInADT
-        pure $ flip Tuple edges <$> (ENR <$> (recursiveFillers <> leavesInADT rAndb))
-      CR _ -> pure [t]
+    expandSourceToBindings t = pure [t]
+    -- TODO. Dit is tijdelijk uitgeschakeld bij wijze van experiment. Schakel opnieuw in of verwijder.
+    -- expandSourceToBindings t@(Tuple source edges) = case source of
+    --   ENR eroleType -> do
+    --     rAndb <- getEnumeratedRole eroleType >>= roleAndBinding
+    --     recursiveFillers <- bindingOfADT rAndb >>= pure <<< leavesInADT
+    --     pure $ flip Tuple edges <$> (ENR <$> (recursiveFillers <> leavesInADT rAndb))
+    --   CR _ -> pure [t]
 
     -- Apply the Inverted Calculated User Rule: When U1 has a perspective on calculated user role C2,
     -- we connect U1 to C2 in the User Graph. The Inverted Calculated User Rule says we should connect

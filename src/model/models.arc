@@ -28,12 +28,13 @@ domain Models
             do for LocalUser
               -- For the implementer: notice that this effect is called with
               -- a context role instance!
-              callEffect cdb:UpdateModel( LastVersionUrl, ModelIdentification)
+              callEffect cdb:UpdateModel( LastVersionUrl, ModelIdentification, IncludingDependencies)
               PerformUpdate = false
           on exit
             do for LocalUser
               CurrentVersion = LastVersion
       property PerformUpdate (Boolean)
+      property IncludingDependencies (Boolean)
       property CurrentVersion (String)
 
   -- The PUBLIC context type ModelDescription allows for a description of a model from the outside (not needing the model itself).

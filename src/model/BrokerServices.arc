@@ -23,11 +23,18 @@ domain BrokerServices
     -- The BrokerServices I use (have a contract with).
     context Contracts = sys:Me >> binder AccountHolder >> context >> extern
 
+    -- The BrokerServices I am the Administrator of.
+    context MyBrokers = sys:Me >> binder BrokerService$Administrator >> context >> extern
+
     user Guest = sys:Me
       perspective on ManagedBrokers
+        only (CreateAndFill)
         props (Name) verbs (Consult)
       perspective on Contracts
-        view BrokerContract$External$ForAccountHolder (Consult)
+        view BrokerContract$External$ForAccountHolder verbs (Consult)
+      perspective on MyBrokers
+        all roleverbs
+        props (Name) verbs (Consult)
 
   -- A Managed service.
   case BrokerService
@@ -95,10 +102,10 @@ domain BrokerServices
       view ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, Achternaam)
 
       perspective on extern
-        view External$ForAccountHolder (Consult)
+        view External$ForAccountHolder verbs (Consult)
       perspective on AccountHolder
         all roleverbs
-        view AccountHolder$ForAccountHolder (Consult)
+        view AccountHolder$ForAccountHolder verbs (Consult)
 
     user Administrator filledBy bs:BrokerService$Administrator
       aspect sys:Invitation$Inviter
@@ -107,9 +114,9 @@ domain BrokerServices
 
       perspective on AccountHolder
         all roleverbs
-        view AccountHolder$ForAdministrator (Consult)
+        view AccountHolder$ForAdministrator verbs (Consult)
       perspective on extern
-        view External$ForAdministrator (Consult)
+        view External$ForAdministrator verbs (Consult)
 
     user Guest = sys:Me
       perspective on Administrator

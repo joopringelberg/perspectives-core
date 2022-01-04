@@ -4,16 +4,6 @@ domain System
   use cdb for model:Couchdb
   use ser for model:Serialise
 
-  --case TrustedCluster
-    --external
-      --property Naam (mandatory, String)
-      --view Kaartje (Naam)
-    --user ClusterGenoot (relational) filledBy User
-      --property Url (mandatory, String)
-      --view Adressering (Url, Voornaam)
-      --perspective on ClusterGenoot
-        --view Adressering (Consult)
-
   case PerspectivesSystem
     indexed sys:MySystem
     aspect sys:RootContext
@@ -26,8 +16,6 @@ domain System
       property ShowLibraries (Boolean)
 
       view ShowLibraries (ShowLibraries)
-
-    --context TheTrustedCluster filledBy TrustedCluster
 
     user User (mandatory)
       property Achternaam (mandatory, relational, String)
@@ -45,6 +33,9 @@ domain System
         --in object state
         action Refresh
           PerformUpdate = true
+        action RefreshWithDependencies
+          IncludingDependencies = true
+          PerformUpdate = true
       perspective on IndexedContexts
         defaults
       perspective on IndexedContextOfModel
@@ -55,6 +46,10 @@ domain System
         props (Voornaam, Achternaam) verbs (Consult)
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
+      perspective on Modellen
+        view Modellen$ModelPresentation verbs (Consult)
+      perspective on PendingInvitations
+        view ForInvitee verbs (Consult)
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
 
@@ -74,19 +69,23 @@ domain System
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context IndexedContexts (relational) filledBy sys:RootContext
       state Dangles = not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
-        -- If the user has removed the model, this bot will clear away the corresponding entry in IndexedContexts.
+        -- If the user has removed the model, this automatic action will clear away the corresponding entry in IndexedContexts.
+        -- We also remove the IndexedContext itself (the entry to the functionality).
         on entry
           do for User
-            remove origin
+            remove context origin
 
     -- This will become obsolete when we start using model:CouchdbManagement.
     context ModelsInUse (relational) filledBy Model
       property PerformUpdate (Boolean)
+      property IncludingDependencies (Boolean)
       state Update = PerformUpdate
         on entry
           do for User
-            callEffect cdb:UpdateModel( Url, ModelIdentification )
+            callEffect cdb:UpdateModel( Url, ModelIdentification, IncludingDependencies )
             PerformUpdate = false
+            -- Updating without dependencies is the default.
+            IncludingDependencies = false
           notify User
             "Model {ModelIdentification} has been updated."
       state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
@@ -150,6 +149,7 @@ domain System
       property ModelIdentification (mandatory, String)
       property Url (mandatory, String)
       property IsLibrary (mandatory, Boolean)
+      view ModelPresentation (Description, ModelIdentification, IsLibrary)
     user Author filledBy User
       aspect sys:RootContext$RootUser
       perspective on extern
@@ -184,7 +184,7 @@ domain System
       perspective on Inviter
         props (Voornaam, Achternaam) verbs (Consult)
       perspective on extern
-        view ForInvitee (Consult)
+        view ForInvitee verbs (Consult)
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)

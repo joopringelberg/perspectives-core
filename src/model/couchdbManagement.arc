@@ -31,6 +31,7 @@ domain CouchdbManagement
         props (Name, Url) verbs (Consult)
       -- Manager needs this perspective for others to accept Admins created in state NoAdmin.
       perspective on CouchdbServers >> binding >> context >> CouchdbServer$Admin
+        only (Create, Fill)
 
     -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
     -- filled with CouchdbManagementApp$Admin.
@@ -93,6 +94,7 @@ domain CouchdbManagement
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       aspect acc:Body$Accounts
 
+      -- We want to be able to use the state acc:Body$Accounts$IsFilled.
       state IsFilled = exists binding
         on entry
           do for Admin
@@ -108,7 +110,7 @@ domain CouchdbManagement
         on entry
           do for Admin
             callEffect cdb:DeleteUser( context >> extern >> Url, binding )
-            remove origin
+            remove role origin
 
       state Resetpassword = PasswordReset
         on entry
@@ -166,7 +168,7 @@ domain CouchdbManagement
             callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
             callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
             callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
-            remove binding >> context >> Repository$Admin
+            remove role binding >> context >> Repository$Admin
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -204,7 +206,7 @@ domain CouchdbManagement
           do for ServerAdmin
             callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
             callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
-            remove origin
+            remove role origin
       property ToBeRemoved (Boolean)
 
       -- The admin can also create an Author and give him/her the right to add and
@@ -238,7 +240,7 @@ domain CouchdbManagement
             in
               callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_write", binding >> UserName)
               callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_read", binding >> UserName)
-              remove origin
+              remove role origin
 
       -- Admin can set this to true to remove the Author from the Repository.
       -- By using this mechanism instead of directly removing the role,
@@ -269,7 +271,7 @@ domain CouchdbManagement
         on entry
           do for Admin
             callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
-            remove origin
+            remove role origin
       state Accepted = IsAccepted
         -- An account that is accepted has a perspective on available models.
         perspective on AvailableModels

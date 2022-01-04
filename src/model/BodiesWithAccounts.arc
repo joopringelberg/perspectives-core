@@ -29,7 +29,7 @@ domain BodiesWithAccounts
     -- Admin can always create and fill Accounts and see the UserName.
     user Admin filledBy sys:PerspectivesSystem$User
       aspect bwa:WithCredentials
-      
+
       perspective on Accounts
         only (Create, Fill, CreateAndFill, Remove)
         props (UserName, Voornaam, Achternaam) verbs (SetPropertyValue, Consult)
@@ -57,7 +57,7 @@ domain BodiesWithAccounts
     -- This allows us to create a screen to browse through Accounts without
     -- loading all references at once with the context.
     -- Specialisation may restrict their fillers.
-    user Accounts (unlinked) filledBy sys:PerspectivesSystem$User
+    user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       aspect bwa:WithCredentials
       property IsAccepted (Boolean)
       property IsRejected (Boolean)
