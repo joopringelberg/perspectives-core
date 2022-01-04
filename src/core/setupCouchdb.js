@@ -32,7 +32,6 @@ exports.roleFromContextView = (function (doc)
    // a proxy for being a role:
    if (doc.contents.universeRoleDelta)
    {
-     emit( [doc.contents.pspType, doc.contents.context], doc._id );
      doc.contents.states.forEach(
        function(stateId)
        {
