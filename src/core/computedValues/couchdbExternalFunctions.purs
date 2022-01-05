@@ -265,6 +265,8 @@ addModelToLocalStore' url originalLoad = do
         Left e -> throwError (error (show e))
         Right (Tuple contextInstances roleInstances') -> do
           -- Add the new instances to the transaction, so their states will be computed etc.
+          -- NOTE that the model description that we store in the file is, at this point, still waiting to be
+          -- handled in the Transaction. It does therefore not have all states (particularly not the aspect states).
           if originalLoad
             then do
               for_ contextInstances (addCreatedContextToTransaction <<< identifier)
