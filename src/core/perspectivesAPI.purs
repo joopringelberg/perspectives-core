@@ -59,7 +59,7 @@ import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unre
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Fuzzysort (matchIndexedContextNames)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (buitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getRoleBinders, getRoleName, roleType, roleType_, siblings)
@@ -536,7 +536,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- The model describing the ContextType must be locally installed.
     withLocalName :: String -> ContextType -> (RoleType -> MonadPerspectives Unit) -> MonadPerspectives Unit
     withLocalName localRoleName contextType effect = do
-      qrolNames <- runArrayT $ lookForUnqualifiedRoleType localRoleName contextType
+      qrolNames <- if isQualifiedName localRoleName
+        then if isExternalRole localRoleName
+          then if deconstructBuitenRol localRoleName == (unwrap contextType)
+            then pure [(ENR $ (EnumeratedRoleType localRoleName))]
+            else pure []
+          else runArrayT $ lookForRoleType localRoleName contextType
+        else runArrayT $ lookForUnqualifiedRoleType localRoleName contextType
       case head qrolNames of
         (Just (qrolname :: RoleType)) -> effect qrolname
         Nothing -> do
