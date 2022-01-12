@@ -26,6 +26,7 @@ domain System
       property Id (String)
       indexed sys:Me
       view VolledigeNaam (Voornaam, Achternaam)
+      view SyncId (Id)
       perspective on User
         defaults
       perspective on ModelsInUse
@@ -79,6 +80,13 @@ domain System
     context ModelsInUse (relational) filledBy Model
       property PerformUpdate (Boolean)
       property IncludingDependencies (Boolean)
+      on exit
+        notify User
+          "Model {origin >> binding >> ModelIdentification} has been removed completely."
+        do for User
+          -- Make sure that the context instance that describes the model is removed itself.
+          remove context origin
+          callEffect cdb:RemoveModelFromLocalStore ( origin >> binding >> ModelIdentification )
       state Update = PerformUpdate
         on entry
           do for User
@@ -111,6 +119,11 @@ domain System
   case ContextWithNotification
     thing Notifications (relational)
       property Message (String)
+    -- As soon as we have perspective contextualisation, add NotifiedUser as an Aspect to all users that can be notified.
+    user NotifiedUser
+      perspective on Notifications
+        action DeleteNotifications
+          delete role Notifications
 
   case PhysicalContext
     user UserWithAddress
@@ -154,6 +167,7 @@ domain System
       aspect sys:RootContext$RootUser
       perspective on extern
     context IndexedContext (mandatory) filledBy sys:RootContext
+      -- Dit wordt alleen gebruikt in model:System.
       property Name (mandatory, String)
     thing IndexedRole (relational)
       property Name (mandatory, String)
@@ -189,4 +203,4 @@ domain System
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
       perspective on Invitee
-        only (Fill)
+        only (Fill, Create)
