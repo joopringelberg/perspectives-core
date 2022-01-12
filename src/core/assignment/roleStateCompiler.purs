@@ -35,7 +35,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, foldMap, index, null)
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Map (Map, lookup)
+import Data.Map (Map)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (ala, alaF, over, unwrap)
@@ -156,7 +156,7 @@ evaluateRoleState roleId userRoleType stateId = do
 enteringRoleState :: RoleInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
 enteringRoleState roleId userRoleType stateId = do
   log ("Entering role state " <> unwrap stateId <> " for role " <> unwrap roleId)
-  -- Add the state identifier to the path of states in the role instance, triggering query updates
+  -- Add the state identifier to the states in the role instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveRoleState stateId roleId
   {automaticOnEntry, notifyOnEntry, perspectivesOnEntry} <- getCompiledState stateId
@@ -181,31 +181,7 @@ enteringRoleState roleId userRoleType stateId = do
           updater roleId
           lift2 $ restoreFrame oldFrame
       else pure unit
-  forWithIndex_ notifyOnEntry \(allowedUser :: RoleType) {compiledSentence, contextGetter} -> do
-    currentcontext <- lift2 $ (roleId ##>> contextGetter)
-    currentactors <- lift2 $ (currentcontext ##= (getRoleInstances allowedUser))
-    bools <- lift2 $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
-    if ala Conj foldMap bools
-      then do
-        oldFrame <- lift2 $ pushFrame
-        lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
-        lift2 $ addBinding "origin" [unwrap roleId]
-        lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
-        storeNotificationInContext <- lift2 (currentcontext ##>> (contextType >=> liftToInstanceLevel  (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
-        sentenceText <- lift2 $ compiledSentence roleId
-        void $ createAndAddRoleInstance
-          (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
-          (if storeNotificationInContext
-            then (unwrap currentcontext)
-            else mySystem)
-          (RolSerialization
-            { id: Nothing
-            , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
-              [sentenceText]
-            -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
-            , binding: Just $ unwrap roleId})
-        lift2 $ restoreFrame oldFrame
-      else pure unit
+  forWithIndex_ notifyOnEntry (notify roleId me)
   State {object} <- lift2 $ getState stateId
   case object of
     Nothing -> pure unit
@@ -226,13 +202,42 @@ enteringRoleState roleId userRoleType stateId = do
   subStates <- lift2 $ subStates_ stateId
   for_ subStates (evaluateRoleState roleId userRoleType)
 
+notify :: RoleInstance -> String -> RoleType -> CompiledNotification -> MonadPerspectivesTransaction Unit
+notify roleId me allowedUser {compiledSentence, contextGetter} = do
+  currentcontext <- lift2 $ (roleId ##>> contextGetter)
+  currentactors <- lift2 $ (currentcontext ##= (getRoleInstances allowedUser))
+  bools <- lift2 $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
+  if ala Conj foldMap bools
+    then do
+      oldFrame <- lift2 $ pushFrame
+      lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
+      lift2 $ addBinding "origin" [unwrap roleId]
+      lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+      storeNotificationInContext <- lift2 (currentcontext ##>> (contextType >=> liftToInstanceLevel  (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
+      sentenceText <- lift2 $ compiledSentence roleId
+      mySystem <- lift2 $ getMySystem
+      void $ createAndAddRoleInstance
+        (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
+        (if storeNotificationInContext
+          then (unwrap currentcontext)
+          else mySystem)
+        (RolSerialization
+          { id: Nothing
+          , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
+            [sentenceText]
+          -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
+          , binding: Just $ unwrap roleId})
+      lift2 $ restoreFrame oldFrame
+    else pure unit
+
 -- | This function is only called on states that the role was in before. Moreover, it (the role) is no longer in
 -- | the parent state of this state, hence we should exit it. We do not check the condition.
 -- |
--- | On exiting a state, we de-register that state with the role instance and trigger client query updates.
--- | We run all automatic actions and create notifications.
--- | Finally, we find the substate that is still active (if any) and apply `exitingRoleState` to it.
--- | Invariant: the state is registered as active and its query evaluates to false.
+-- | On exiting a state, we find all substates that are still active (if any) and apply `exitingRoleState` to it.
+-- | We then de-register that state with the role instance and trigger client query updates.
+-- | We then run all automatic actions and create notifications.
+-- |
+-- | Invariant: the state is registered as inactive and its query evaluates to false.
 -- |
 -- | Put an error boundary around this function.
 -- | Ensure that the current context is available in the environment before applying this function!
@@ -246,36 +251,23 @@ exitingRoleState roleId userRoleType stateId = do
     if roleWasInSubState
       then exitingRoleState roleId userRoleType subStateId
       else pure unit
-  -- Add the state identifier to the path of states in the context instance, triggering query updates
+  -- Remove the state identifier from the states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
   setInActiveRoleState stateId roleId
-  {automaticOnExit} <- getCompiledState stateId
+  {automaticOnExit, notifyOnExit} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction, but only if
   -- the end user fills the allowedUser role in this context.
   -- NOTE that the userRoleType is computed prior to executing the transaction.
   -- It may happen that during the transaction, the end user is put into another role (too).
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
+  me <- lift2 getUserIdentifier
   forWithIndex_ automaticOnExit \(allowedUser :: RoleType) {updater, contextGetter} -> do
-    me <- lift2 getUserIdentifier
     bools <- lift2 (roleId ##= contextGetter >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
     if ala Conj foldMap bools
       then updater roleId
       else pure unit
-  State {notifyOnExit} <- lift2 $ getState stateId
-  case lookup userRoleType (unwrap notifyOnExit) of
-    Nothing -> pure unit
-    Just l -> do
-      mySystem <- lift2 $ getMySystem
-      void $ createAndAddRoleInstance
-        (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
-        mySystem
-        (RolSerialization
-          { id: Nothing
-          , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
-            [(show l)]
-          -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
-          , binding: Just $ unwrap roleId})
+  forWithIndex_ notifyOnExit (notify roleId me)
 
 -- | Check all substates until one of them is found for which conditionSatisfied holds;
 findSatisfiedSubstate :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
