@@ -163,16 +163,15 @@ enteringState contextId userRoleType stateId = do
     bools <- lift2 (contextId ##= getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
     if ala Conj foldMap bools
       -- Run for each object.
-      then withAuthoringRole allowedUser
-        if isJust objectGetter
-          then for_ objects \object -> do
-            oldFrame <- lift2 pushFrame
-            lift2 $ addBinding "currentobject" [unwrap object]
-            updater contextId
-            lift2 $ restoreFrame oldFrame
-          -- Note we do not push an empty set of values for object, like we did for rules.
-          -- The modeller should not use the 'object' variable.
-          else updater contextId
+      then if isJust objectGetter
+        then for_ objects \object -> do
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentobject" [unwrap object]
+          updater contextId
+          lift2 $ restoreFrame oldFrame
+        -- Note we do not push an empty set of values for object, like we did for rules.
+        -- The modeller should not use the 'object' variable.
+        else updater contextId
       else pure unit
   forWithIndex_ notifyOnEntry (notify contextId me)
   -- NOTE. We have a compiled version of the object, too.
