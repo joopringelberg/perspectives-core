@@ -12,20 +12,28 @@ domain SimpleChat
   case ChatApp
     indexed cht:MyChats
     aspect sys:RootContext
+    on exit
+      do for Chatter
+        delete context bound to Chats
     external
       aspect sys:RootContext$External
-    --context Chats = callExternal cdb:RoleInstances( "modelSimpleChat$Chat$External" ) returns Chat$External
     context Chats (relational, unlinked) filledBy Chat
     user Chatter (mandatory) filledBy sys:PerspectivesSystem$User
       aspect sys:RootContext$RootUser
       perspective on Chats
-        all roleverbs
-      perspective on Chats >> binding >> context >> Initiator
-        only (Create, Fill)
+        only (CreateAndFill, Remove, Delete)
+        props (Title) verbs (Consult)
 
   case Chat
     aspect sys:Invitation
     aspect cht:WithText
+    state NoInitiator = not exists Initiator
+      perspective of Creator
+        perspective on Initiator
+          only (Create, Fill)
+      on entry
+        do for Creator
+          bind sys:Me to Initiator
     state NotBound = (exists Partner) and not exists extern >> binder Chats
       on entry
         do for Partner
@@ -34,11 +42,12 @@ domain SimpleChat
       aspect sys:Invitation$External
       property Title (String)
 
-    user Initiator (mandatory) filledBy Chatter
+    user Initiator (mandatory) filledBy sys:PerspectivesSystem$User
       aspect sys:Invitation$Inviter
       aspect cht:WithText$TextWriter
       perspective on Partner
-        defaults
+        view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
+        props (MyText) verbs (Consult)
       perspective on Initiator
         defaults
       perspective on extern
@@ -48,11 +57,14 @@ domain SimpleChat
       aspect sys:Invitation$Invitee
       aspect cht:WithText$TextWriter
       perspective on extern
-        verbs (Consult)
+        props (Title) verbs (Consult)
       perspective on Initiator
-        defaults
+        view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
+        props (MyText) verbs (Consult)
       perspective on Partner
         defaults
+
+    user Creator = filter sys:Me with not exists currentcontext >> Initiator
 
     thing PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
 
