@@ -23,10 +23,27 @@ domain SimpleChat
       perspective on Chats
         only (CreateAndFill, Remove, Delete)
         props (Title) verbs (Consult)
+        action RemoveThisChat
+          remove context origin
+          remove role origin
 
   case Chat
     aspect sys:Invitation
     aspect cht:WithText
+    -------------------------------------------------------------------------------
+    ---- CLEANUP ON EXIT
+    ---- The states IAmInitiator and IAmPartner explicitly unbind the role that
+    ---- the current user fills, on exit. In this way, the other participant
+    ---- will know that she has pulled out of this Chat when it is deleted.
+    -------------------------------------------------------------------------------
+    state IAmInitiator = Initiator binds sys:Me
+      on exit
+        do for Initiator
+          unbind sys:Me from Initiator
+    state IAmPartner = Partner binds sys:Me
+      on exit
+        do for Partner
+          unbind sys:Me from Partner
     state NoInitiator = not exists Initiator
       perspective of Creator
         perspective on Initiator
@@ -34,7 +51,7 @@ domain SimpleChat
       on entry
         do for Creator
           bind sys:Me to Initiator
-    state NotBound = (exists Partner) and not exists extern >> binder Chats
+    state NotBound = not exists extern >> binder Chats
       on entry
         do for Partner
           bind extern to Chats in cht:MyChats
