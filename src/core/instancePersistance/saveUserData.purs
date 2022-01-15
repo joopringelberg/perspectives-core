@@ -212,6 +212,10 @@ removeContextInstance id authorizedRole = do
             otherwise -> invertedQueryResults
         })
 
+-- | Removes all incoming links:
+-- |  * the 'fills' link from the role's filler to the role itself;
+-- |  * the 'filledBy' links from the roles filled by the role to the role itself.
+-- | Does not adapt the outgoing links from this role, because it will be removed anyway.
 -- | Collects the union of the user role instances that occurr in the bindings.
 -- | Takes care of PERSISTENCE for the role instance that is removed.
 -- | Takes care of the five responsibilities wrt the binding and the  binders
@@ -220,13 +224,18 @@ removeRoleInstance_ :: RoleInstance -> WriterT (Array RoleInstance) MonadPerspec
 removeRoleInstance_ roleId = (lift $ lift2 $ try (getPerspectRol roleId)) >>=
   handlePerspectRolError "removeRoleInstance_"
     \originalRole@(PerspectRol{gevuldeRollen, binding}) -> do
-    -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
+
+    -- HANDLE ALL ROLES FILLED BY THE CURRENT ROLE (roleId); REMOVE INCOMING FILLEDBY LINKS.
+    -- Remove the role instance from all roles that have it as their binding (that are filled by it).
+    -- This will push Deltas.
     forWithIndex_ gevuldeRollen \_ filledRollen ->
       for_ filledRollen \filledRolId -> do
         (lift $ removeBinding true filledRolId) >>= tell
+
+    -- HANDLE THE ROLE THAT FILLS THE CURRENT ROLE; REMOVE INCOMING FILLS LINK.
     -- Remove the inverse binding administration: bnd is no longer filled by roleId.
     case binding of
-      Just bnd -> (lift $ (bnd `removedAsFilledFrom` roleId))
+      Just filler -> (lift $ (filler `noLongerFills` roleId))
       otherwise -> pure unit
     -- Remove from couchdb, remove from the cache.
     void $ lift $ (scheduleRoleRemoval roleId)
@@ -399,9 +408,10 @@ handleNewPeer roleInstance = (lift2 $ try$ getPerspectRol roleInstance) >>=
         then context `serialisedAsDeltasFor` roleInstance
         else pure unit
 
+-- | Removes the link between the role and its filler, in both directions (unless the filler is removed anyway:
+-- | then we just handle the link from role to filler).
 -- | Removes the binding R of the rol, if any.
--- | If the binding is an external role, checks if it should be removed.
--- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
+-- | Removes the role as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
 -- | Modifies the Role instance.
 -- | If the the role instance has in fact no binding before the operation, this is a no-op without effect.
 -- | Parameter `bindingRemoved` is true iff the role that is the binding of the role will be removed.
@@ -435,14 +445,20 @@ removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId)
           , encryptedDelta: sign $ encodeJSON $ delta}
         addDelta (DeltaInTransaction { users, delta: signedDelta})
 
+        -- Remove the link from filler to filled (= the current role), unless it (filler) is removed anyway.
         if not bindingRemoved
           then do
             (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
             -- Remove the inverse binding administration: roleId is no longer filled by bindingId.
-            roleId `removedAsFilledFrom` bindingId
+            -- NOTE: Because there is no role removal, in this case the mutation may be carried out immediately.
+            bindingId `noLongerFills` roleId
           -- the role that has the binding will be removed anyway.
           else pure unit
 
+        -- Remove the link from filled (= the current role) to filler.
+        -- TODO. Hier breek ik de structuur af, VOORDAT on exit acties kunnen zijn uitgevoerd. Dit moet ook uitgesteld worden.
+        -- If bindingRemoved is true, postpone the actual mutation in the Transaction. In that way, we keep
+        -- the structure intact until after on exit actions have been run for bindingId.
         cacheAndSave roleId (over PerspectRol (\rl -> rl {bindingDelta = Nothing})
           (changeRol_isMe (removeRol_binding originalRole) false))
 
@@ -454,19 +470,23 @@ removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId)
 
         pure users
 
--- | <filledId> `removedAsFilledFrom` <fillerId>
--- | Removes filled from gevuldeRollen of filler (because filled no longer has filler as binding).
--- | If gevuldeRollen becomes empty, and filler is an external role, removes the context of filler (cascade delete).
-removedAsFilledFrom :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
-removedAsFilledFrom fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) >>=
+-- | <fillerId> `noLongerFills` <filledId>
+-- | Break the link from filler to filled.
+-- | Not the other way round!
+-- | Removes filled from gevuldeRollen of filler (because filler no longer fills filled).
+-- | {Commented out: If gevuldeRollen becomes empty, and filler is an external role, removes the context of filler (cascade delete).}
+noLongerFills :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
+noLongerFills fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) >>=
   handlePerspectRolError "removeAsFilledFrom"
     \(filler :: PerspectRol) -> (lift2 $ try $ getPerspectEntiteit filledId) >>=
       handlePerspectRolError "removeAsFilledFrom"
       \(filled :: PerspectRol) -> do
+        -- TODO. Hier breek ik de structuur af, VOORDAT on exit acties kunnen zijn uitgevoerd. Dit moet ook uitgesteld worden (maar niet altijd, zie hierboven).
+        -- TODO. Users met een perspectief op filler zouden moeten worden geïnformeerd, als filled wordt weggegooid.
+        filler'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen filler (rol_pspType filled) filledId)
         -- If, after removing the binder, no binders (filled roles) are left on the filler  AND it is an external role,
         -- remove the context! This is because we then have a context whose external role fills no other role (is not
         -- bound anywhere).
-        filler'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen filler (rol_pspType filled) filledId)
         -- if (isEmpty gevuldeRollen && isExternalRole (unwrap fillerId))
         --   then removeContextInstance (ContextInstance $ deconstructBuitenRol (unwrap fillerId)) false
         --   else cacheAndSave fillerId filler'
