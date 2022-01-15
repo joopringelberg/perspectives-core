@@ -43,6 +43,7 @@ domain WitCoin
             Post = 100 for cred
             -- Here we create a role instance for LastTransaction.
             bind trans >> binding to LastTransaction
+            -- And we add a Witness.
             bind Witnesses >> binding to Witness in trans >> binding >> context
 
       perspective of Manager
@@ -57,7 +58,7 @@ domain WitCoin
     user Manager = sys:Me
       in state AtLeastOneTransaction
         perspective on Transactions
-          only (CreateAndFill)
+          only (CreateAndFill, Delete, Remove)
           props (TransactionPartnerName, MyTransferSum, MyResultingSaldo) verbs (Consult)
 
           -------------------------------------------------------------------------------
@@ -81,17 +82,21 @@ domain WitCoin
               bind sys:Me to Initiator in trans >> binding >> context
 
       perspective on Transactions >> binding >> context >> Debitor
-        only (CreateAndFill)
+        only (Create, Fill)
 
       perspective on Transactions >> binding >> context >> Creditor
-        only (CreateAndFill)
+        only (Create, Fill)
 
       perspective on Witnesses
         only (Create, Fill)
-        view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on LastTransaction
+        only (Create, Fill)
 
     -------------------------------------------------------------------------------
-    ---- WITNESS
+    ---- WITNESSES
+    ---- These are the Witnesses that service me in Transactions.
     ---- We really want many witnesses, but for now we'll do with just one.
     -------------------------------------------------------------------------------
     user Witnesses filledBy sys:PerspectivesSystem$User
@@ -181,6 +186,8 @@ domain WitCoin
                   bind origin to NextDeb in wit:MyWitCoinApp >> LastTransaction >> binding >> context
                   -- Here we bind this Transaction to the existing role instance of LastTransaction.
                   bind_ origin to wit:MyWitCoinApp >> LastTransaction
+                  -- Add to Transactions, so Creditor can see it.
+                  bind origin to Transactions in wit:MyWitCoinApp
           state CreditorInLastTransaction = IAmCreditorInLastTransaction
             state Committed = exists Committed
               on entry
@@ -188,6 +195,8 @@ domain WitCoin
                   bind origin to NextCred in wit:MyWitCoinApp >> LastTransaction >> binding >> context
                   -- Here we bind this Transaction to the existing role instance of LastTransaction.
                   bind_ origin to wit:MyWitCoinApp >> LastTransaction
+                  -- Add to Transactions, so Creditor can see it.
+                  bind origin to Transactions in wit:MyWitCoinApp
 
     state TransferFunds = (exists Debitor >> Prior) and exists Creditor >> Prior
       on entry
@@ -208,7 +217,7 @@ domain WitCoin
         view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
 
       perspective on Witness
-        view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
 
       perspective on NextDeb
         only (Create, Fill)
@@ -218,6 +227,11 @@ domain WitCoin
 
       perspective on extern >> binder Transactions >> context >> LastTransaction
         only (Create, Fill)
+
+      perspective on Debitor
+        props (Prior, Post) verbs (Consult)
+        -- This is to make sure the binding of Debitor gets transferred to himself by others.
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
 
     -------------------------------------------------------------------------------
     ---- CREDITOR
@@ -241,6 +255,11 @@ domain WitCoin
       perspective on extern >> binder Transactions >> context >> LastTransaction
         only (Create, Fill)
 
+      perspective on Creditor
+        props (Prior, Post) verbs (Consult)
+        -- This is to make sure the binding of Creditor gets transferred to himself by others.
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
     -------------------------------------------------------------------------------
     ---- INITIATOR
     -------------------------------------------------------------------------------
@@ -252,12 +271,16 @@ domain WitCoin
     user Witness filledBy sys:PerspectivesSystem$User
       perspective on Debitor
         props (Prior, Post) verbs (SetPropertyValue)
+        -- This is to make sure Witness gets to see the User behind Debitor.
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
         on entry of object state PostCanBeComputed
           do
             Post = Prior - context >> extern >> TransferSum
 
       perspective on Creditor
         props (Prior, Post) verbs (SetPropertyValue)
+        -- This is to make sure Witness gets to see the User behind Creditor.
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
 
       --perspective on NextDebRole
         --props (Prior) verbs (SetPropertyValue)
