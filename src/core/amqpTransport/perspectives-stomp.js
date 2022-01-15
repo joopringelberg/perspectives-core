@@ -51,7 +51,7 @@ function connectAndSubscribeImpl (stompClient, params, emitStep, finishStep, emi
   };
   stompClient.debug = function (str)
     {
-    console.log(str);
+    // console.log(str);
   };
 
   stompClient.emitToPurescript = function(message)
