@@ -31,33 +31,33 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (unsafeIndex, head)
+import Data.Array (concat, cons, head, nub, unsafeIndex)
 import Data.Array.NonEmpty (fromArray, head) as ANE
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Object (empty)
+import Foreign.Object (empty, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.Error.Boundaries (handlePerspectRolError)
+import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
-import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, getRoleInstances, role2context, role2propertyValue, role2role, role2string, typeTimeOnly)
@@ -66,8 +66,20 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
-import Perspectives.SaveUserData (handleNewPeer, removeAllRoleInstances, removeBinding, removeContextInstance, removeRoleInstance, setBinding)
+import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding)
+import Perspectives.Sync.Transaction (Transaction(..))
 import Unsafe.Coerce (unsafeCoerce)
+
+scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
+scheduleRoleRemoval id = lift $ modify (over Transaction \t@{rolesToBeRemoved} -> t {rolesToBeRemoved = cons id rolesToBeRemoved})
+
+scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
+scheduleContextRemoval authorizedRole id = (lift2 $ try $ getPerspectContext id) >>=
+  handlePerspectContextError "removeContextInstance"
+  \(ctxt@(PerspectContext{rolInContext})) ->
+    lift $ modify (over Transaction \t@{contextsToBeRemoved, rolesToBeRemoved} -> t
+      { contextsToBeRemoved = cons (Tuple id authorizedRole) contextsToBeRemoved
+      , rolesToBeRemoved = nub $ rolesToBeRemoved <> (concat $ values rolInContext)})
 
 -- Put an error boundary around this function.
 compileAssignmentFromRole :: QueryFunctionDescription -> MP (Updater RoleInstance)
@@ -75,38 +87,41 @@ compileAssignmentFromRole (UQD _ QF.RemoveRole rle _ _ mry) = do
   roleGetter <- role2role rle
   pure \roleId -> do
     (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
-    for_ roles removeRoleInstance
+    for_ roles scheduleRoleRemoval
 
 compileAssignmentFromRole (UQD _ QF.RemoveContext rle _ _ mry) = do
   roleGetter <- role2role rle
   pure \roleId -> do
     (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
-    contextsToBeRemoved <- lift $ lift (roleId ##= roleGetter >=> binding >=> context)
+    contextsToBeRemoved <- lift2 (roleId ##= roleGetter >=> binding >=> context)
     case head roles of
       Nothing -> pure unit
       Just ri -> do
-        rtype <- lift $ lift $ roleType_ ri
-        for_ roles removeRoleInstance
-        for_ contextsToBeRemoved (flip removeContextInstance (Just $ ENR rtype))
+        authorizedRole <- lift2 $ roleType_ ri
+        for_ roles scheduleRoleRemoval
+        for_ contextsToBeRemoved (scheduleContextRemoval $ Just $ ENR authorizedRole)
 
 -- Delete all instances of the role.
 compileAssignmentFromRole (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextsToDeleteFrom
+  roleGetter <- pure $ getRoleInstances (ENR qualifiedRoleIdentifier)
   pure \roleId -> do
-    ctxts <- lift $ lift (roleId ##= contextGetter)
-    for_ ctxts \ctxt -> do
-      removeAllRoleInstances qualifiedRoleIdentifier ctxt
+    ctxtsToDeleteFrom <- lift $ lift (roleId ##= contextGetter)
+    for_ ctxtsToDeleteFrom \ctxtToDeleteFrom -> do
+      (roles :: Array RoleInstance) <- lift $ lift (ctxtToDeleteFrom ##= roleGetter)
+      for_ roles scheduleRoleRemoval
 
 -- Delete all instances of the context role and the contexts bound by them.
 compileAssignmentFromRole (UQD _ (QF.DeleteContext qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextsToDeleteFrom
   pure \roleId -> do
     ctxts <- lift $ lift (roleId ##= contextGetter)
-    for_ ctxts \ctxt -> do
+    for_ ctxts \ctxtToDeleteFrom -> do
       -- Remove all role instances and remove all contexts bound to them.
-      contextsToBeRemoved <- lift2 (ctxt ##= getRoleInstances (ENR qualifiedRoleIdentifier) >=> binding >=> context)
-      for_ contextsToBeRemoved (flip removeContextInstance (Just $ ENR qualifiedRoleIdentifier))
-      removeAllRoleInstances qualifiedRoleIdentifier ctxt
+      rolesToBeRemoved <- lift2 (ctxtToDeleteFrom ##= getRoleInstances (ENR qualifiedRoleIdentifier))
+      contextsToBeRemoved <- lift2 (ctxtToDeleteFrom ##= getRoleInstances (ENR qualifiedRoleIdentifier) >=> binding >=> context)
+      for_ rolesToBeRemoved scheduleRoleRemoval
+      for_ contextsToBeRemoved (scheduleContextRemoval $ Just $ ENR qualifiedRoleIdentifier)
 
 compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription

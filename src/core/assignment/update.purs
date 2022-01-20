@@ -165,7 +165,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
       -- Notice that even though we compute the users for a single given RoleInstance, we can use that result
       -- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
       -- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
-      users <- usersWithPerspectiveOnRoleInstance rolName (identifier $ unsafePartial $ fromJust $ ARR.head roles)
+      users <- usersWithPerspectiveOnRoleInstance rolName (identifier $ unsafePartial $ fromJust $ ARR.head roles) true
       -- SYNCHRONISATION
       subject <- getSubject
       author <- getAuthor
@@ -189,20 +189,24 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
       -- QUERY UPDATES
       (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
 
+-- OBSOLETE!!
 -- | Modifies the context instance by detaching the given role instances.
 -- | Notice that this function does neither uncache nor unsave the rolInstances
 -- | themselves. Instead, use removeRoleInstance.
 -- | Does not touch the binding of any of the role instances.
 -- | PERSISTENCE of the context instance.
 -- | SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
--- | RULE TRIGGERING
+-- | STATE EVALUATION
 -- | QUERY UPDATES
 -- | CURRENTUSER for contextId and one of rolInstances.
 removeRoleInstancesFromContext :: ContextInstance -> EnumeratedRoleType -> (Updater (NonEmptyArray RoleInstance))
 removeRoleInstancesFromContext contextId rolName rolInstances = do
-  -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
+  -- Guarantees STATE EVALUATION because contexts with a vantage point are added to
   -- the transaction, too.
-  users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances)
+  -- As a side effect, usersWithPerspectiveOnRoleInstance adds Deltas to the transaction for the continuation of the
+  -- path beyond the given role instance.
+  -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from doing this.
+  users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances) false
   subject <- getSubject
 -- SYNCHRONISATION
   author <- getAuthor
@@ -238,6 +242,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
           Just me -> do
             (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
             -- CURRENTUSER.
+            -- TODO. Is dit voldoende? Moet er niet een andere rol gevonden worden?
             cacheAndSave contextId (changeContext_me changedContext Nothing)
 
 -- | Detach the role instances from their current context and attach them to the new context.

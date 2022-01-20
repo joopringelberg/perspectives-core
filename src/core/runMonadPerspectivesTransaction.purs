@@ -30,6 +30,7 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, traverse)
+import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
@@ -56,6 +57,7 @@ import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getMyType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
+import Perspectives.SaveUserData (removeContextInstance, removeRoleInstance)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (roleRootStates, contextRootStates)
@@ -83,18 +85,14 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
     run = do
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
-      -- 2. Now run states, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
-      (ft@(Transaction{correlationIdentifiers, contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved}) :: Transaction) <- lift AA.get >>= runStates
+
+      -- 2. Now run all actions.
+      ft@(Transaction{correlationIdentifiers}) <- lift AA.get >>= runAllAutomaticActions
+
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then lift $ lift $ distributeTransaction ft else pure unit
-      -- Definitively remove instances
-      -- log ("Will remove these contexts: " <> show contextsToBeRemoved)
-      -- TODO. Moeten hier niet de onExits worden uitgevoerd?
-      lift2 $ for_ contextsToBeRemoved tryRemoveEntiteit
-      -- log ("Will remove these roles: " <> show rolesToBeRemoved)
-      lift2 $ for_ rolesToBeRemoved tryRemoveEntiteit
-      -- log ("Will remove these models: " <> show modelsToBeRemoved)
-      lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
+
+      -- 4. Run effects.
       -- log "==========RUNNING EFFECTS============"
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
       lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do
@@ -105,6 +103,27 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
             -- logShow corrId
             runner unit
       pure r
+
+    runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction
+    runAllAutomaticActions previousTransaction = do
+      -- Run monotonic actions first.
+      (ft@(Transaction{contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved}) :: Transaction) <- runMonotonicActions previousTransaction
+      -- Install a fresh transaction.
+      lift $ void $ AA.modify cloneEmptyTransaction
+      -- Detach and remove instances, collecting new information in the fresh Transaction.
+      -- log ("Will remove these contexts: " <> show contextsToBeRemoved)
+      -- TODO: ZONDER AUTHORINGROLE zal de ontvanger het niet accepteren.
+      for_ contextsToBeRemoved \(Tuple ctxt authorizedRole) -> removeContextInstance ctxt authorizedRole
+      -- log ("Will remove these roles: " <> show rolesToBeRemoved)
+      for_ rolesToBeRemoved removeRoleInstance
+      -- log ("Will remove these models: " <> show modelsToBeRemoved)
+      lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
+      -- If the new transaction is not empty, run again.
+      nt <- lift AA.get
+      if isEmptyTransaction nt
+        then pure previousTransaction
+        else pure <<< (<>) previousTransaction =<< runAllAutomaticActions nt
+
 
 -- | Run and discard the transaction.
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
@@ -118,13 +137,12 @@ runSterileTransaction a =
 -- | If any are collected, recursively calls itself.
 -- | Notice that context- and role instances are still not actually removed from cache, nor from Couchdb, while
 -- | this function runs.
-runStates :: Transaction -> MonadPerspectivesTransaction Transaction
-runStates t = do
+runMonotonicActions :: Transaction -> MonadPerspectivesTransaction Transaction
+runMonotonicActions previousTransaction@(Transaction{invertedQueryResults, createdContexts, createdRoles, contextsToBeRemoved, rolesToBeRemoved}) = do
   -- log "==========RUNNING STATES============"
-  Transaction{invertedQueryResults, createdContexts, createdRoles, contextsToBeRemoved, rolesToBeRemoved} <- lift $ AA.get
-  (stateEvaluations :: Array StateEvaluation) <- join <$> traverse computeStateEvaluations invertedQueryResults
-  -- Only now install a fresh transaction.
+  -- Install a fresh transaction.
   lift $ void $ AA.modify cloneEmptyTransaction
+  (stateEvaluations :: Array StateEvaluation) <- lift2 $ join <$> traverse computeStateEvaluations invertedQueryResults
   -- Evaluate all collected stateEvaluations.
   for_ stateEvaluations \s -> case s of
     ContextStateEvaluation stateId contextId roleType -> do
@@ -161,25 +179,6 @@ runStates t = do
           catchError (for_ states (enteringState ctxt myType))
             \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
           lift2 $ restoreFrame oldFrame
-  -- Exit the rootState of contexts that are deleted, unless we did so before.
-  activeContextInstances <- lift2 $ filterA (\rid -> rid ##>> exists' getActiveStates) contextsToBeRemoved
-  for_ activeContextInstances
-    \ctxt -> do
-      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
-      case mmyType of
-        Nothing -> pure unit
-        Just myType -> do
-          states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
-          if null states
-            then pure unit
-            else do
-              -- Provide a new frame for the current context variable binding.
-              oldFrame <- lift2 pushFrame
-              lift2 $ addBinding "currentcontext" [unwrap ctxt]
-              -- Error boundary.
-              catchError (for_ states (exitingState ctxt myType))
-                \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
-              lift2 $ restoreFrame oldFrame
   -- Enter the rootState of roles that are created.
   for_ createdRoles
     \rid -> do
@@ -214,28 +213,47 @@ runStates t = do
               catchError (for_ states (exitingRoleState rid myType))
                 \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
               lift2 $ restoreFrame oldFrame
+  -- Exit the rootState of contexts that are deleted, unless we did so before.
+  activeContextInstances <- lift2 $ filterA (\(Tuple rid _) -> rid ##>> exists' getActiveStates) contextsToBeRemoved
+  for_ activeContextInstances
+    \(Tuple ctxt _) -> do
+      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
+      case mmyType of
+        Nothing -> pure unit
+        Just myType -> do
+          states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+          if null states
+            then pure unit
+            else do
+              -- Provide a new frame for the current context variable binding.
+              oldFrame <- lift2 pushFrame
+              lift2 $ addBinding "currentcontext" [unwrap ctxt]
+              -- Error boundary.
+              catchError (for_ states (exitingState ctxt myType))
+                \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
+              lift2 $ restoreFrame oldFrame
   nt <- lift AA.get
   if isEmptyTransaction nt
-    then pure t
-    else pure <<< (<>) t =<< runStates nt
+    then pure previousTransaction
+    else pure <<< (<>) previousTransaction =<< runMonotonicActions nt
   where
     -- Add to each context or role instance the user role type and the RootState type.
-    computeStateEvaluations :: InvertedQueryResult -> MonadPerspectivesTransaction (Array StateEvaluation)
+    computeStateEvaluations :: InvertedQueryResult -> MonadPerspectives (Array StateEvaluation)
     computeStateEvaluations (ContextStateQuery contextInstances) = join <$> do
-      activeInstances <- lift2 $ filterA (\rid -> rid ##>> exists' getActiveStates) contextInstances
+      activeInstances <- filterA (\rid -> rid ##>> exists' getActiveStates) contextInstances
       case head activeInstances of
         Nothing -> pure []
         Just contextInstance -> do
           -- States includes root states of Aspects.
-          states <- lift2 (contextInstance ##= contextType >=> liftToInstanceLevel contextRootStates)
+          states <- contextInstance ##= contextType >=> liftToInstanceLevel contextRootStates
           for activeInstances \cid -> do
             -- Note that the user may play different roles in the various context instances.
-            (mmyType :: Maybe RoleType) <- lift2 (cid ##> getMyType)
+            (mmyType :: Maybe RoleType) <- cid ##> getMyType
             case mmyType of
               Nothing -> pure []
               Just (CR myType) -> if isGuestRole myType
                 then do
-                  (mmguest :: Maybe RoleInstance) <- lift2 (cid ##> getCalculatedRoleInstances myType)
+                  (mmguest :: Maybe RoleInstance) <- cid ##> getCalculatedRoleInstances myType
                   case mmguest of
                     -- If the Guest role is not filled, don't execute bots on its behalf!
                     Nothing -> pure []
@@ -243,21 +261,21 @@ runStates t = do
                 else pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
               Just (ENR myType) -> pure $ (\state -> ContextStateEvaluation state cid (ENR myType)) <$> states
     computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
-      activeInstances <- lift2 $ filterA (\rid -> rid ##>> exists' getActiveRoleStates) roleInstances
+      activeInstances <- filterA (\rid -> rid ##>> exists' getActiveRoleStates) roleInstances
       case head activeInstances of
         Nothing -> pure []
         Just roleInstance -> do
           -- Neem aspecten hier ook mee!
-          states <- lift2 (roleInstance ##= roleType >=> liftToInstanceLevel roleRootStates)
+          states <- roleInstance ##= roleType >=> liftToInstanceLevel roleRootStates
           -- If the roleInstance has no recorded states, this means it has been marked for removal
           -- and has exited all its states. We should not do that again!
           for activeInstances \rid -> do
-            (mmyType :: Maybe RoleType) <- lift2 (rid ##> context >=> getMyType)
+            (mmyType :: Maybe RoleType) <- rid ##> context >=> getMyType
             case mmyType of
               Nothing -> pure []
               Just (CR myType) -> if isGuestRole myType
                 then do
-                  (mmguest :: Maybe RoleInstance) <- lift2 (rid ##> context >=> getCalculatedRoleInstances myType)
+                  (mmguest :: Maybe RoleInstance) <- rid ##> context >=> getCalculatedRoleInstances myType
                   case mmguest of
                     Nothing -> pure []
                     otherwise -> pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states

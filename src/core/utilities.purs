@@ -27,6 +27,7 @@ import Data.Array (cons, uncons)
 import Data.Foldable (intercalate)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, foldMap)
 import Prelude (class Monad, class Show, type (~>), bind, map, pure, show, (<>), (>>=))
 import Prim.RowList as RL
@@ -93,6 +94,9 @@ instance arrayPrettyPrint :: (Show v, PrettyPrint v) => PrettyPrint (Array v) wh
 instance maybePrettyPrint :: (PrettyPrint v) => PrettyPrint (Maybe v) where
   prettyPrint' tab Nothing = "Nothing"
   prettyPrint' tab (Just v) = "Just " <> prettyPrint' tab v
+
+instance tuplePrettyPrint :: (PrettyPrint f, PrettyPrint s) => PrettyPrint (Tuple f s) where
+  prettyPrint' tab (Tuple f s) = "Tuple " <> prettyPrint' tab f <> prettyPrint' tab s
 
 newline :: String
 newline = "\n"

@@ -408,11 +408,14 @@ roleIsInPerspectiveOf :: Partial => EnumeratedRoleType -> RoleType ~~~> Boolean
 roleIsInPerspectiveOf = flip hasPerspectiveOnRole
 
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
+-- | True iff the user RoleType has a perspective whose object includes the EnumeratedRoleType and one of the verbs
+-- | (unless no verbs are specified).
 hasPerspectiveOnRoleWithVerbs :: Partial => Array RoleVerb -> RoleType -> EnumeratedRoleType ~~~> Boolean
 hasPerspectiveOnRoleWithVerbs verbs ur rt = ArrayT ((hasPerspectiveWithVerb ur rt verbs) >>= pure <<< singleton)
 
 -- | True if the user role (subjectType (first) argument) has a perspective
 -- | on the object (roleType (second) argument) that includes one of the given RoleVerbs,
+-- | (unless no verbs are specified),
 -- | OR if the role type has the aspect "sys:RootContext$RootUser"
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 hasPerspectiveWithVerb :: Partial => RoleType -> EnumeratedRoleType -> Array RoleVerb -> MonadPerspectives Boolean
@@ -425,8 +428,11 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
       --    * whose object adt includes a leaf that is the object roleType or one of its aspects, AND
       --    * that supports at least one of the requested RoleVerbs.
       (allObjects :: Array EnumeratedRoleType) <- roleType ###= roleAspectsClosure
-      isJust <$> findPerspective subjectType
-        (\perspective@(Perspective{roleVerbs}) -> pure ((not $ null $ intersect allObjects (leavesInADT $ objectOfPerspective perspective)) && (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs)))
+      isJust <$> findPerspective subjectType  -- TODO. GEEFT MAAR één perspectief terug; kunnen er niet meerdere zijn?
+        (\perspective@(Perspective{roleVerbs}) -> pure (
+          (not $ null $ intersect allObjects (leavesInADT $ objectOfPerspective perspective))
+          &&
+          (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs)))
 
 ----------------------------------------------------------------------------------------
 ------- USER ROLETYPES WITH A PERSPECTIVE ON A PROPERTYTYPE
@@ -473,6 +479,7 @@ findPerspective subjectType criterium = execStateT f Nothing
 -- | qualified with the given PropertyVerb.
 
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
+-- TODO: VERB WORDT NOG NIET GETOETST!
 hasPerspectiveOnPropertyWithVerb :: Partial => RoleType -> EnumeratedRoleType -> EnumeratedPropertyType -> PropertyVerb -> MonadPerspectives Boolean
 hasPerspectiveOnPropertyWithVerb subjectType roleType property verb = do
   adt <- getEnumeratedRole roleType >>= roleADT

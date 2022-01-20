@@ -181,6 +181,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         Left e -> handleError e
         Right _ -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
 
+    -- TODO Het lijkt niet nuttig om beide cases te behouden.
     RemoveUnboundExternalRoleInstance -> do
       (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
         Left e -> handleError e

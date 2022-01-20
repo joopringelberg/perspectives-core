@@ -103,7 +103,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
       -- the binder. We skip the binding step because its cardinality is larger than one. It would cause a fan-out
       -- while we know, when applying the inverted query when handling a RoleBindingDelta, the exact path to follow.
-      -- The function `aisInRoleDelta` applies the forward part to the binding (not the binder).
+      -- The function `usersWithPerspectiveOnRoleBinding` applies the forward part to the binding (not the binder).
       -- Hence we don't have to adapt the forward part.
       -- We add the inverted query to the **BINDING ROLE**, not the bound role. This has two reasons:
       --  * the bound role may well be in another model, leading to an InvertedQuery for another domain;

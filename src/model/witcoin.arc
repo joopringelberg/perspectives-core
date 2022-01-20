@@ -35,8 +35,8 @@ domain WitCoin
       on entry
         do for Manager
           letA
-            trans <- createContext Transaction bound to Transactions
-            cred <- createRole Creditor in trans >> binding >> context
+            trans <- create context Transaction bound to Transactions
+            cred <- create role Creditor in trans >> binding >> context
           in
             bind_ sys:Me to cred
             Prior = 0 for cred
@@ -66,7 +66,7 @@ domain WitCoin
           -------------------------------------------------------------------------------
           action NewPayment
             letA
-              trans <- createContext Transaction bound to Transactions
+              trans <- create context Transaction bound to Transactions
             in
               bind sys:Me to Debitor in trans >> binding >> context
               bind sys:Me to Initiator in trans >> binding >> context
@@ -76,7 +76,7 @@ domain WitCoin
           -------------------------------------------------------------------------------
           action RequestPayment
             letA
-              trans <- createContext Transaction bound to Transactions
+              trans <- create context Transaction bound to Transactions
             in
               bind sys:Me to Creditor in trans >> binding >> context
               bind sys:Me to Initiator in trans >> binding >> context

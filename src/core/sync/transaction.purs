@@ -31,6 +31,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Data.Tuple (Tuple)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
@@ -41,9 +42,9 @@ import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.DomeinFile (DomeinFileId)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
-import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
+import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Semigroup, class Show, bind, ($), (<>), pure)
 
@@ -55,7 +56,7 @@ newtype Transaction = Transaction (TransactionRecord
   , correlationIdentifiers :: Array CorrelationIdentifier
   , authoringRole :: RoleType
   , rolesToBeRemoved :: Array RoleInstance
-  , contextsToBeRemoved :: Array ContextInstance
+  , contextsToBeRemoved :: Array (Tuple ContextInstance (Maybe RoleType))
   , modelsToBeRemoved :: Array DomeinFileId
   , createdContexts :: Array ContextInstance
   , createdRoles :: Array RoleInstance

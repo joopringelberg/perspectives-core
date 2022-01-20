@@ -128,8 +128,8 @@ domain CouchdbManagement
 
       action RequestRepository
         letA
-          myrepo <- createContext Repository bound to Repositories
-          measadmin <- createRole Admin in myrepo >> binding >> context
+          myrepo <- create context Repository bound to Repositories
+          measadmin <- create role Admin in myrepo >> binding >> context
         in
           bind_ currentactor to measadmin
 
@@ -161,7 +161,7 @@ domain CouchdbManagement
         state NoAdmin = not exists binding >> context >> Repository$Admin
           on entry
             do for Admin
-              createRole Admin in binding >> context
+              create role Admin in binding >> context
       state Remove = ToBeRemoved
         on entry
           do for Admin

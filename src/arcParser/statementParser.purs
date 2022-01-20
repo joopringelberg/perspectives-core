@@ -45,7 +45,7 @@ assignment = isPropertyAssignment >>= if _
 
 roleAssignment :: IP Assignment
 roleAssignment = do
-  keyword <- lookAhead reservedIdentifier <?> "Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, createContext, createContext_ or callEffect"
+  keyword <- lookAhead reservedIdentifier <?> "Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete or callEffect"
   case keyword of
     "remove" -> do
       (Tuple first second) <- twoReservedWords
@@ -53,7 +53,6 @@ roleAssignment = do
         "remove", "role" -> roleRemoval
         "remove", "context" -> contextRemoval
         _, _ -> fail ("Expected 'role' or 'context' after 'remove'.")
-    "createRole" -> roleCreation
     "move" -> move
     "bind" -> bind'
     "bind_" -> bind_
@@ -66,9 +65,18 @@ roleAssignment = do
         "delete", "context" -> contextDeletion
         _, _ -> fail ("Expected 'role' or 'context' after 'delete'.")
     "callEffect" -> callEffect
-    "createContext" -> createContext
-    "createContext_" -> createContext_
-    s -> fail ("Expected remove, createRole, move, bind, bind_, unbind, unbind_, delete, or callEffect but found '" <> s <> "'.")
+    "create" -> do
+      (Tuple first second) <- twoReservedWords
+      case first, second of
+        "create", "role" -> roleCreation
+        "create", "context" -> createContext
+        _, _ -> fail ("Expected 'role' or 'context' after 'create'.")
+    "create_" -> do
+      (Tuple first second) <- twoReservedWords
+      case first, second of
+        "create_", "context" -> createContext_
+        _, _ -> fail ("Expected 'context' after 'create_'.")
+    s -> fail ("Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete or callEffect but found '" <> s <> "'.")
 
 roleRemoval :: IP Assignment
 roleRemoval = do
@@ -91,7 +99,7 @@ contextRemoval = do
 roleCreation :: IP Assignment
 roleCreation = do
   start <- getPosition
-  roleIdentifier <- reserved "createRole" *> arcIdentifier
+  roleIdentifier <- reserved "create" *> reserved "role" *> arcIdentifier
   -- Check indentiation to prevent confusion of 'in' with the 'in' of the letA.
   contextExpression <- optionMaybe (indented' *> reserved "in" *> step)
   end <- getPosition
@@ -101,7 +109,7 @@ roleCreation = do
 createContext :: IP Assignment
 createContext = withPos do
   start <- getPosition
-  contextTypeIdentifier <- reserved "createContext" *> arcIdentifier
+  contextTypeIdentifier <- reserved "create" *> reserved "context" *> arcIdentifier
   roleTypeIdentifier <- reserved "bound" *> reserved "to" *> arcIdentifier
   -- Check indentiation to prevent confusion of 'in' with the 'in' of the letA.
   contextExpression <- optionMaybe (indented' *> reserved "in" *> step)
@@ -112,7 +120,7 @@ createContext = withPos do
 createContext_ :: IP Assignment
 createContext_ = do
   start <- getPosition
-  contextTypeIdentifier <- reserved "createContext_" *> arcIdentifier
+  contextTypeIdentifier <- reserved "create_" *> reserved "context" *> arcIdentifier
   roleExpression <- reserved "bound" *> reserved "to" *> step
   end <- getPosition
   pure $ CreateContext_ {start, end, contextTypeIdentifier, roleExpression}
@@ -259,11 +267,11 @@ letWithAssignment = try $ withPos do
 letABinding :: IP LetABinding
 letABinding = do
   varName <- (lowerCaseName <* token.reservedOp "<-") <?> "lower case name followed by <-"
-  keyword <- option "" (lookAhead reservedIdentifier)
-  case keyword of
-    "createContext" -> Stat <$> pure varName <*> createContext
-    "createRole" -> Stat <$> pure varName <*> roleCreation
-    _ -> Expr <$> (VarBinding <$> pure varName <*> step)
+  (Tuple first second) <- twoReservedWords
+  case first, second of
+    "create", "role" -> Stat <$> pure varName <*> roleCreation
+    "create", "context" -> Stat <$> pure varName <*> createContext
+    _, _ -> Expr <$> (VarBinding <$> pure varName <*> step)
 
 
 -- | Looking ahead, find at least one reserved identifier, two if possible.

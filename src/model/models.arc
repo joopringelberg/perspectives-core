@@ -79,7 +79,7 @@ domain Models
           action Boot
             letA
               -- Create the indexed context:
-              irole <- createContext ModelsOverview bound to IndexedContexts in sys:MySystem
+              irole <- create context ModelsOverview bound to IndexedContexts in sys:MySystem
             in
               -- Add the indexed name:
               Name = "model://perspect.it/Models$MyModels" for irole

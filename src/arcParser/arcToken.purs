@@ -123,8 +123,8 @@ perspectDef = LanguageDef
 
                   -- Expressions
                   , "remove"
-                  , "createRole"
-                  , "createContext"
+                  , "create"
+                  , "create_"
                   , "bound"
                   , "move"
                   , "bind"

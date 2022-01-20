@@ -52,7 +52,7 @@ import Perspectives.Assignment.Update (deleteProperty, setPreferredUserRoleType,
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileAssignment (compileAssignment)
-import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
+import Perspectives.CompileRoleAssignment (compileAssignmentFromRole, scheduleRoleRemoval)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
@@ -80,7 +80,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
-import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeRoleInstance, removeContextIfUnbound)
+import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeContextIfUnbound)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectivesForContextAndUser)
@@ -372,7 +372,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                 else sendResponse (Error corrId ("Cannot remove an external role from non-database query role " <> (unwrap ctype))) setter
             (ENR rtype) -> sendResponse (Error corrId ("Cannot remove an external role from enumerated role " <> (unwrap rtype) <> " - use unbind instead!")) setter
         else do
-          void $ runMonadPerspectivesTransaction authoringRole $ removeRoleInstance (RoleInstance subject)
+          void $ runMonadPerspectivesTransaction authoringRole $ scheduleRoleRemoval (RoleInstance subject)
           sendResponse (Result corrId []) setter
     Api.DeleteRole -> do
       -- TODO. Hanteer het geval dat subject een DBQ role is. Of misschien veiliger om er DeleteAllInstances van te maken?

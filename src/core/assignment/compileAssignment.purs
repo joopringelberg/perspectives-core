@@ -44,6 +44,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
+import Perspectives.CompileRoleAssignment (scheduleRoleRemoval, scheduleContextRemoval)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Error.Boundaries (handlePerspectRolError)
@@ -65,7 +66,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
-import Perspectives.SaveUserData (handleNewPeer, removeAllRoleInstances, removeBinding, removeContextInstance, removeRoleInstance, setBinding)
+import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Put an error boundary around this function.
@@ -74,8 +75,9 @@ compileAssignment (UQD _ QF.RemoveRole rle _ _ mry) = do
   roleGetter <- context2role rle
   pure \contextId -> do
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
-    for_ roles removeRoleInstance
+    for_ roles scheduleRoleRemoval
 
+-- Removes both the roles with kind ContextRole that hold the contexts, and the contexts themselves.
 compileAssignment (UQD _ QF.RemoveContext rle _ _ mry) = do
   roleGetter <- context2role rle
   pure \contextId -> do
@@ -84,28 +86,31 @@ compileAssignment (UQD _ QF.RemoveContext rle _ _ mry) = do
     case head roles of
       Nothing -> pure unit
       Just ri -> do
-        rtype <- lift $ lift $ roleType_ ri
-        for_ roles removeRoleInstance
-        for_ contextsToBeRemoved (flip removeContextInstance (Just $ ENR rtype))
+        authorizedRole <- lift2 $ roleType_ ri
+        for_ roles scheduleRoleRemoval
+        for_ contextsToBeRemoved (scheduleContextRemoval $ Just $ ENR authorizedRole)
 
 -- Delete all instances of the role. Model
 compileAssignment (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextsToDeleteFrom
+  roleGetter <- pure $ getRoleInstances (ENR qualifiedRoleIdentifier)
   pure \contextId -> do
     ctxts <- lift $ lift (contextId ##= contextGetter)
-    for_ ctxts \ctxt -> do
-      removeAllRoleInstances qualifiedRoleIdentifier ctxt
+    for_ ctxts \ctxtToDeleteFrom -> do
+      (roles :: Array RoleInstance) <- lift $ lift (ctxtToDeleteFrom ##= roleGetter)
+      for_ roles scheduleRoleRemoval
 
 -- Delete all instances of the context role and the contexts bound by them.
 compileAssignment (UQD _ (QF.DeleteContext qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextsToDeleteFrom
   pure \contextId -> do
     ctxts <- lift $ lift (contextId ##= contextGetter)
-    for_ ctxts \ctxt -> do
+    for_ ctxts \ctxtToDeleteFrom -> do
       -- Remove all role instances and remove all contexts bound to them.
-      eRoles <- lift2 (ctxt ##= getRoleInstances (ENR qualifiedRoleIdentifier) >=> binding >=> context)
-      for_ eRoles (flip removeContextInstance (Just $ ENR qualifiedRoleIdentifier))
-      removeAllRoleInstances qualifiedRoleIdentifier ctxt
+      rolesToBeRemoved <- lift2 (ctxtToDeleteFrom ##= getRoleInstances (ENR qualifiedRoleIdentifier))
+      contextsToBeRemoved <- lift2 (ctxtToDeleteFrom ##= getRoleInstances (ENR qualifiedRoleIdentifier) >=> binding >=> context)
+      for_ rolesToBeRemoved scheduleRoleRemoval
+      for_ contextsToBeRemoved (scheduleContextRemoval $ Just $ ENR qualifiedRoleIdentifier)
 
 compileAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription

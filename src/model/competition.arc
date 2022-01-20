@@ -63,7 +63,7 @@ domain Competition
     state NoTeam = not exists Teams
       on entry
         do for Manager
-          createContext Team bound to Teams
+          create context Team bound to Teams
     external
       property Name (String)
     user Manager = com:CompetitionManager
@@ -76,7 +76,7 @@ domain Competition
     state NoCaptain = not exists Captain
       on entry
         do for Manager
-          createRole Captain
+          create role Captain
 
     external
       property Name (String)

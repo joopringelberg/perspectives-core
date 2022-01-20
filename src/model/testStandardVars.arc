@@ -15,4 +15,4 @@ domain TestStandardVars
             action MyAction
               SomeProperty = true
               Name = "Joop" for currentactor
-              createRole R2 in currentcontext
+              create role R2 in currentcontext

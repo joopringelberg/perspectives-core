@@ -25,7 +25,7 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Reader (lift)
-import Data.Array (filterA, foldM, foldl, head, nub, singleton, union)
+import Data.Array (difference, filterA, foldM, foldl, head, nub, null, singleton, union)
 import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
@@ -37,7 +37,7 @@ import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse, traverse_)
-import Data.Tuple (Tuple(..), snd)
+import Data.Tuple (Tuple(..), fst, snd)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, lookup, values)
 import Partial.Unsafe (unsafePartial)
@@ -82,9 +82,9 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | given role instance is used for the computation of the perspective object (it may be that object itself or be
 -- | on a path to the object).
 -- | As a side effect, Deltas are added to the transaction for the continuation of the path beyond the given role
--- | instance.
-usersWithPerspectiveOnRoleInstance ::  EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
-usersWithPerspectiveOnRoleInstance roleType roleInstance = do
+-- | instance. This is conditional on the last argument.
+usersWithPerspectiveOnRoleInstance ::  EnumeratedRoleType -> RoleInstance -> Boolean -> MonadPerspectivesTransaction (Array RoleInstance)
+usersWithPerspectiveOnRoleInstance roleType roleInstance runForwards = do
   embeddingContextType <- lift2 $ enumeratedRoleContextType roleType
   users1 <- do
     -- Find all InvertedQueryResults, starting from the role instance of the Delta (provided as third argument to this function).
@@ -102,7 +102,10 @@ usersWithPerspectiveOnRoleInstance roleType roleInstance = do
     -- If iq has the selfOnly modifier, we must apply a new algorithm to the roleInstance and the roleInstance.
     (for contextCalculations \iq -> if isForSelfOnly iq
       then handleSelfOnlyQuery iq roleInstance roleInstance
-      else handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq) >>= pure <<< join
+      else if runForwards
+        then handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq
+        else handleBackwardQuery roleInstance iq >>= pure <<< join <<< map snd
+        ) >>= pure <<< join
   users2 <- do
     (roleCalculations :: (Array InvertedQuery)) <- lift2 (roleType ###=
       (roleAspectsClosure >=>
@@ -112,8 +115,10 @@ usersWithPerspectiveOnRoleInstance roleType roleInstance = do
       -- Find all InvertedQueryResults, starting from the new role instance of the Delta.
       -- We do not start on the context because the cardinality of the role getting step is larger than one and
       -- we want to make sure that the new binding is in the path for the users.
-    (for roleCalculations \iq ->
-      handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq) >>= pure <<< join
+    (for roleCalculations \iq -> if runForwards
+      then handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq
+      else handleBackwardQuery roleInstance iq >>= pure <<< join <<< map snd
+      ) >>= pure <<< join
   pure $ nub $ union users1 users2
 
 type ContextWithUsers = Tuple ContextInstance (Array RoleInstance)
@@ -294,8 +299,14 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
                     singleton <<< Tuple cid <$> lift2 (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
                   else pure []
 
+-- | Adds the InvertedQueryResult to the current Transaction, but only if the resource is not marked as (to be) removed.
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
-addInvertedQueryResult result = lift $ AA.modify \(Transaction r@{invertedQueryResults}) -> Transaction (r {invertedQueryResults = union [result] invertedQueryResults})
+addInvertedQueryResult (ContextStateQuery ctxts) = lift $ AA.modify \(Transaction r@{invertedQueryResults, contextsToBeRemoved}) -> case difference ctxts (fst <$> contextsToBeRemoved) of
+  nothing | null nothing -> Transaction r
+  ctxts' -> Transaction (r {invertedQueryResults = union [ContextStateQuery ctxts'] invertedQueryResults})
+addInvertedQueryResult (RoleStateQuery roles) = lift $ AA.modify \(Transaction r@{invertedQueryResults, rolesToBeRemoved}) -> case difference roles rolesToBeRemoved of
+  nothing | null nothing -> Transaction r
+  roles' -> Transaction (r {invertedQueryResults = union [RoleStateQuery roles'] invertedQueryResults})
 
 -----------------------------------------------------------
 -- OBSERVINGCONTEXTS
@@ -318,20 +329,17 @@ addRoleObservingContexts id roleType roleInstance = do
   lookupInvertedRoleQueries ctype roleCalculations >>= traverse_ (handleBackwardQuery roleInstance)
 
 -----------------------------------------------------------
--- FOR ROLE DELTAS
+-- FOR ROLEBINDING DELTAS
 -----------------------------------------------------------
--- | Computes the AffectedContexts and adds them to the Transaction.
--- | Adds the users that should receive it, to the Delta.
--- | Adds users for SYNCHRONISATION, guarantees RULE TRIGGERING.
--- | Adds deltas for paths beyond the nodes involved in the binding,
--- | for queries that use the binder- or binding step.
+-- | Computes the InvertedQueryResults (for STATE EVALUATION) and adds them to the Transaction.
+-- | Returns all users (for SYNCHRONISATION) that have a perspective that takes them through the binding relation.
 -- | A binding represents two types of step: `binding` and `binder <TypeOfBinder>`
 -- | This function finds all queries recorded on the types of the roles represented
--- | by id, the new binding and the old binding, that have such steps.
--- Implementation note: because we accept 'dangling' roles (roles with no context) we catch
--- errors when computing affected contexts.
-aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction (Array RoleInstance)
-aisInRoleDelta (RoleBindingDelta dr@{id:binder, binding:mbinding, oldBinding, deltaType}) = do
+-- | by binder, the new binding and the old binding, that have such steps.
+-- | As a side effect, Deltas are added to the transaction for the continuation of the path beyond the given role
+-- | instance. This is conditional on the last argument.
+usersWithPerspectiveOnRoleBinding :: RoleBindingDelta -> Boolean -> MonadPerspectivesTransaction (Array RoleInstance)
+usersWithPerspectiveOnRoleBinding (RoleBindingDelta dr@{id:binder, binding:mbinding, oldBinding, deltaType}) runForwards = do
   binderType <- lift2 (binder ##>> OG.roleType)
   case mbinding of
     Nothing -> pure []
@@ -342,22 +350,29 @@ aisInRoleDelta (RoleBindingDelta dr@{id:binder, binding:mbinding, oldBinding, de
       bindingCalculations <- lift2 $ compileBothFor _onRoleDelta_binding binderType
       -- We've stored the relevant InvertedQueries with the type of the binder,
       -- so we execute them on any binding that is a specialisation of (or equal to) the required binding type.
-      binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder binderType
-        -- Index with the embedding context. In onRoleDelta_binding we store (the inverted query that begins with)
-        -- the binding step away from binder. We then arrive at binding.
+      -- TODO: implement the above!
+      binderCalculations <- lift2 $ compileBothFor _onRoleDelta_binder bindingType
+        -- Index with the embedding context. In onRoleDelta_binding we store (the inverted query that
+        -- begins with) the binding step away from binder. We then arrive at binding.
         -- Its context type we use to index the bindingCalculations.
       users1 <- join <$> (lookupInvertedRoleQueries bindingContextType bindingCalculations >>=
         -- Find all affected contexts, starting from the binder instance of the Delta.
-        traverse (\iq -> (handleBackwardQuery binder iq) >>= runForwardsComputation binder iq))
+        traverse (\iq -> if runForwards
+          then (handleBackwardQuery binder iq) >>= runForwardsComputation binder iq
+          else handleBackwardQuery binder iq >>= pure <<< join <<< map snd
+          ))
       -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually bind something:
       -- Index with the embedding context. In onRoleDelta_binder we store (the inverted query that begins with)
       -- the binder step away from binding. We then arrive at binder.
       -- Its context type we use to index the binderCalculations.
       users2 <- join <$> (lookupInvertedRoleQueries binderContextType binderCalculations >>=
         traverse (\iq -> if isForSelfOnly iq
+          -- These inverted queries skip the first step and so must be applied to the binder itself.
           then handleSelfOnlyQuery iq binder binding
-          else (handleBackwardQuery binder iq) >>= runForwardsComputation binding iq)
-        )
+          else if runForwards
+            then (handleBackwardQuery binder iq) >>= runForwardsComputation binding iq
+            else handleBackwardQuery binder iq >>= pure <<< join <<< map snd
+        ))
       -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually overwrite something:
       users3 <- case oldBinding of
         Just bnd | deltaType == SetBinding ->

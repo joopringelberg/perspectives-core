@@ -78,7 +78,7 @@ domain BrokerServices
     state NoAccountHolder = (exists Administrator) and (not exists AccountHolder)
       on entry
         do for BrokerContract$Administrator
-          createRole AccountHolder
+          create role AccountHolder
     external
       aspect sys:Invitation$External
       property Url = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url

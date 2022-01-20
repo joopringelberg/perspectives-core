@@ -126,7 +126,7 @@ domain CouchdbManagement
         defaults
         action RequestStorage
           letA
-            store <- createContext Storage in Storages
+            store <- create context Storage in Storages
           in
             bind Party to currentrole in store -- KLOPT DIT WEL?
 
