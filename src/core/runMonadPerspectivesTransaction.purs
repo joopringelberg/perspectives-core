@@ -44,7 +44,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
-import Perspectives.Identifiers (hasLocalName)
+import Perspectives.Identifiers (hasLocalName, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (exists')
@@ -115,7 +115,10 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- TODO: ZONDER AUTHORINGROLE zal de ontvanger het niet accepteren.
       for_ contextsToBeRemoved \(Tuple ctxt authorizedRole) -> removeContextInstance ctxt authorizedRole
       -- log ("Will remove these roles: " <> show rolesToBeRemoved)
-      for_ rolesToBeRemoved removeRoleInstance
+      -- External roles are handled with their contexts.
+      for_ rolesToBeRemoved \r -> if isExternalRole (unwrap r)
+        then pure unit
+        else removeRoleInstance r
       -- log ("Will remove these models: " <> show modelsToBeRemoved)
       lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- If the new transaction is not empty, run again.

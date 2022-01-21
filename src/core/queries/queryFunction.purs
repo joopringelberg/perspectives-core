@@ -265,7 +265,7 @@ data QueryFunction
 	| Unbind (Maybe EnumeratedRoleType)
   | Unbind_
 	| DeleteRole EnumeratedRoleType
-  | DeleteContext EnumeratedRoleType
+  | DeleteContext RoleType
 	| DeleteProperty EnumeratedPropertyType
   | Move
   | RemoveRole

@@ -68,15 +68,13 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
-import Perspectives.Query.QueryTypes (queryFunction, secondOperand)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getRoleFunction, getRoleInstances)
-import Perspectives.Representation.ADT (ADT, reduce)
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (calculation, getRoleType, kindOfRole, rangeOfRoleCalculation, roleADT)
+import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
-import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
@@ -84,7 +82,7 @@ import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, remo
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectivesForContextAndUser)
-import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
+import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
 import Simple.JSON (read)
 
@@ -317,7 +315,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       \(qrolname :: RoleType) -> case qrolname of
         -- If a CalculatedRole AND a Database Query Role, do not create a role instance.
         (CR embeddingctype) -> do
-          isDBQ <- isDatabaseQueryRole embeddingctype
+          isDBQ <- isDatabaseQueryRole qrolname
           if isDBQ
             then withNewContext authoringRole (Just qrolname)
               \(ContextInstance id) -> lift2 $ sendResponse (Result corrId [buitenRol id]) setter
@@ -366,7 +364,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         then withLocalName predicate (ContextType object)
           \(qrolname :: RoleType) -> case qrolname of
             cr@(CR ctype) -> do
-              isDBQ <- isDatabaseQueryRole ctype
+              isDBQ <- isDatabaseQueryRole cr
               if isDBQ
                 then void $ runMonadPerspectivesTransaction authoringRole $ removeContextIfUnbound (RoleInstance subject) (Just cr)
                 else sendResponse (Error corrId ("Cannot remove an external role from non-database query role " <> (unwrap ctype))) setter
@@ -562,20 +560,6 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           case ctxt of
             (Left messages) -> lift2 $ sendResponse (Error corrId (show messages)) setter
             (Right ctxtId) -> effect ctxtId
-
--- | Tests whether we have a sequence of which the last part applies an ExternalCoreRoleGetter function.
--- | Returns `false` if the type cannot be found.
-isDatabaseQueryRole :: CalculatedRoleType -> MonadPerspectives Boolean
-isDatabaseQueryRole cr = do
-  calculatedRole <- getPerspectType cr
-  qfd <- calculation calculatedRole
-  case queryFunction qfd of
-    (BinaryCombinator SequenceF) -> case queryFunction <$> secondOperand qfd of
-      Just (ExternalCoreRoleGetter _) -> roleADT calculatedRole >>= isExternal
-      otherwise -> pure false
-    otherwise -> pure false
-  where
-    isExternal = reduce (pure <<< isExternalRole <<< unwrap)
 
 -----------------------------------------------------------
 -- API FUNCTIONS

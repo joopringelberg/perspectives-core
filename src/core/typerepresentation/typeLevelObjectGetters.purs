@@ -43,21 +43,22 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError')
-import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments)
+import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole)
 import Perspectives.Instances.Combinators (closure_, conjunction, some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, roleRange)
-import Perspectives.Representation.ADT (ADT(..), leavesInADT, equalsOrSpecialisesADT)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, queryFunction, range, roleRange, secondOperand)
+import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialisesADT, leavesInADT, reduce)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec, isPerspectiveOnADT, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, stateSpec2StateIdentifier)
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier(..), propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
@@ -336,6 +337,28 @@ roleTypeModelName' rt = maybe empty (pure <<< Value) (deconstructModelName (role
 -- | whose local name is the first parameter value.
 localRoleSpecialisation :: String -> ContextType ~~~> EnumeratedRoleType
 localRoleSpecialisation localAspectName = COMB.filter allEnumeratedRoles (hasAspectWithLocalName localAspectName)
+
+-- | Tests whether we have a sequence of which the last part applies an ExternalCoreRoleGetter function.
+-- | Returns `false` if the type cannot be found.
+isDatabaseQueryRole :: RoleType -> MonadPerspectives Boolean
+isDatabaseQueryRole (ENR _) = pure false
+isDatabaseQueryRole (CR cr) = do
+  calculatedRole <- getPerspectType cr
+  qfd <- calculation calculatedRole
+  computesDatabaseQueryRole qfd
+
+-- | Tests whether we have a sequence of which the last part applies an ExternalCoreRoleGetter function.
+-- | Returns `false` if the type cannot be found.
+computesDatabaseQueryRole :: QueryFunctionDescription -> MonadPerspectives Boolean
+computesDatabaseQueryRole qfd = do
+  case queryFunction qfd of
+    (BinaryCombinator SequenceF) -> case queryFunction <$> secondOperand qfd of
+      Just (ExternalCoreRoleGetter _) -> isExternal (unsafePartial domain2roleType $ range qfd)
+      otherwise -> pure false
+    otherwise -> pure false
+  where
+    isExternal :: ADT EnumeratedRoleType -> MonadPerspectives Boolean
+    isExternal = reduce (pure <<< isExternalRole <<< unwrap)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS AND ON VIEWS

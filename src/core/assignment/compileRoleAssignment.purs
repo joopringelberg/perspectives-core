@@ -70,20 +70,22 @@ import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding)
 import Perspectives.Sync.Transaction (Transaction(..))
+import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
 scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
 scheduleRoleRemoval id = lift $ modify (over Transaction \t@{rolesToBeRemoved} -> t {rolesToBeRemoved = cons id rolesToBeRemoved})
 
+-- | Schedule all roles in the context, including its external role, for removal.
 scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
 scheduleContextRemoval authorizedRole id = (lift2 $ try $ getPerspectContext id) >>=
   handlePerspectContextError "removeContextInstance"
-  \(ctxt@(PerspectContext{rolInContext})) ->
+  \(ctxt@(PerspectContext{rolInContext, buitenRol})) ->
     lift $ modify (over Transaction \t@{contextsToBeRemoved, rolesToBeRemoved} -> t
       { contextsToBeRemoved = cons (Tuple id authorizedRole) contextsToBeRemoved
-      , rolesToBeRemoved = nub $ rolesToBeRemoved <> (concat $ values rolInContext)})
+      , rolesToBeRemoved = cons buitenRol $ nub $ rolesToBeRemoved <> (concat $ values rolInContext)})
 
--- Put an error boundary around this function.
+-- Deletes, from all contexts, the role instance.
 compileAssignmentFromRole :: QueryFunctionDescription -> MP (Updater RoleInstance)
 compileAssignmentFromRole (UQD _ QF.RemoveRole rle _ _ mry) = do
   roleGetter <- role2role rle
@@ -91,8 +93,14 @@ compileAssignmentFromRole (UQD _ QF.RemoveRole rle _ _ mry) = do
     (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
     for_ roles scheduleRoleRemoval
 
+-- Removes, from all contexts, both the role with kind ContextRole that hold the contexts, and the context themselves.
+-- Handles DBQ roles by not trying to remove a context role.
 compileAssignmentFromRole (UQD _ QF.RemoveContext rle _ _ mry) = do
-  roleGetter <- role2role rle
+  roleGetter <- computesDatabaseQueryRole rle >>=
+    if _
+      -- A database query role is calculated. No context role instances can be removed.
+      then pure \_ -> ArrayT $ pure []
+      else role2role rle
   pure \roleId -> do
     (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
     contextsToBeRemoved <- lift2 (roleId ##= roleGetter >=> binding >=> context)
@@ -103,7 +111,7 @@ compileAssignmentFromRole (UQD _ QF.RemoveContext rle _ _ mry) = do
         for_ roles scheduleRoleRemoval
         for_ contextsToBeRemoved (scheduleContextRemoval $ Just $ ENR authorizedRole)
 
--- Delete all instances of the role.
+-- Deletes, from all contexts, all instances of the role.
 compileAssignmentFromRole (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextsToDeleteFrom
   roleGetter <- pure $ getRoleInstances (ENR qualifiedRoleIdentifier)
@@ -113,24 +121,29 @@ compileAssignmentFromRole (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) context
       (roles :: Array RoleInstance) <- lift $ lift (ctxtToDeleteFrom ##= roleGetter)
       for_ roles scheduleRoleRemoval
 
--- Delete all instances of the context role and the contexts bound by them.
+-- Deletes, from all contexts, all instances of the role and the context that fills it.
+-- Handles DBQ roles by not trying to remove a context role.
 compileAssignmentFromRole (UQD _ (QF.DeleteContext qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
-  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextsToDeleteFrom
+  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- isDatabaseQueryRole qualifiedRoleIdentifier >>=
+    if _
+      -- A database query role is calculated. No context role instances can be removed.
+      then pure \_ -> ArrayT $ pure []
+      else role2context contextsToDeleteFrom
   pure \roleId -> do
     ctxts <- lift $ lift (roleId ##= contextGetter)
     for_ ctxts \ctxtToDeleteFrom -> do
       -- Remove all role instances and remove all contexts bound to them.
-      rolesToBeRemoved <- lift2 (ctxtToDeleteFrom ##= getRoleInstances (ENR qualifiedRoleIdentifier))
-      contextsToBeRemoved <- lift2 (ctxtToDeleteFrom ##= getRoleInstances (ENR qualifiedRoleIdentifier) >=> binding >=> context)
+      rolesToBeRemoved <- lift2 (ctxtToDeleteFrom ##= getRoleInstances qualifiedRoleIdentifier)
+      contextsToBeRemoved <- lift2 (ctxtToDeleteFrom ##= getRoleInstances qualifiedRoleIdentifier >=> binding >=> context)
       for_ rolesToBeRemoved scheduleRoleRemoval
-      for_ contextsToBeRemoved (scheduleContextRemoval $ Just $ ENR qualifiedRoleIdentifier)
+      for_ contextsToBeRemoved (scheduleContextRemoval $ Just qualifiedRoleIdentifier)
 
+-- Create a context. Fill a new context role instance with its external role, unless it is a DBQ role.
 compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
   pure \(roleId :: RoleInstance) -> do
     ctxts <- lift2 (roleId ##= contextGetter)
     for_ ctxts \ctxt -> do
-      -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
       g <- liftEffect guid
       case qualifiedRoleIdentifier of
         -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.

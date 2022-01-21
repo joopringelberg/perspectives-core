@@ -34,7 +34,6 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (Object, keys, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Api (isDatabaseQueryRole)
 import Perspectives.CoreTypes ((###>), (###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
@@ -52,13 +51,13 @@ import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, lessThanOrEqualTo)
+import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleKindOfRoleType)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
+import Perspectives.Types.ObjectGetters (isDatabaseQueryRole, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
 import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=), (<<<), (>), (&&))
 
 ------------------------------------------------------------------------------------
@@ -163,7 +162,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         (qualifiedRoleIdentifier :: RoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
         case qualifiedRoleIdentifier of
           CR calculatedType -> do
-            isDBQRole <- lift2 $ isDatabaseQueryRole calculatedType
+            isDBQRole <- lift2 $ isDatabaseQueryRole qualifiedRoleIdentifier
             if isDBQRole
               then pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (ST $ EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier) Nothing) True True
               else throwError $ CannotCreateCalculatedRole calculatedType start end
@@ -234,8 +233,8 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
       DeleteContext f@{contextRoleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         -- TODO: it must be a ContextRole
-        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyAsEnumeratedTypeWithRespectTo contextRoleIdentifier cte f.start f.end
-        EnumeratedRole{kindOfRole} <- lift $ lift $ getEnumeratedRole qualifiedRoleIdentifier
+        (qualifiedRoleIdentifier :: RoleType) <- qualifyWithRespectTo contextRoleIdentifier cte f.start f.end
+        kindOfRole <- (lift $ lift $ roleKindOfRoleType qualifiedRoleIdentifier)
         if kindOfRole == ContextRole
           then pure $ UQD originDomain (QF.DeleteContext qualifiedRoleIdentifier) cte originDomain True True
           else throwError $ NotAContextRole start end

@@ -133,6 +133,8 @@ removeContextIfUnbound roleInstance@(RoleInstance rid) rtype = do
     Nothing -> removeContextInstance (ContextInstance $ deconstructBuitenRol rid) rtype
     otherwise -> pure unit
 
+-- | Remove the context instance plus roles after detaching all its roles.
+-- | Does NOT remove the context role binding the external role.
 removeContextInstance :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
 removeContextInstance id authorizedRole = do
   (lift $ lift $ try $ getPerspectContext id) >>=
