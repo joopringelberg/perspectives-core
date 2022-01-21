@@ -45,7 +45,7 @@ assignment = isPropertyAssignment >>= if _
 
 roleAssignment :: IP Assignment
 roleAssignment = do
-  keyword <- lookAhead reservedIdentifier <?> "Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete or callEffect"
+  keyword <- lookAhead reservedIdentifier <?> "Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete or callEffect "
   case keyword of
     "remove" -> do
       (Tuple first second) <- twoReservedWords

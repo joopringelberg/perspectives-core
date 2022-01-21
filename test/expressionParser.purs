@@ -13,7 +13,8 @@ import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Statement (assignment, roleAssignment)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..))
-import Perspectives.Representation.QueryFunction (FunctionName(..))
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..)) as PAS
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Utilities (prettyPrint)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -399,7 +400,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "remove MyRole" roleAssignment
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(Remove _)) -> do
+      (Right a@(PAS.RemoveRole _)) -> do
         -- logShow a
         assert "'remove MyRole' should be parsed as a Remove assignment" true
       otherwise -> assert ("'remove MyRole' should be parsed as a Remove assignment, instead this was returned: " <> show otherwise) false
@@ -408,7 +409,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "createRole MyRole" assignment
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(CreateRole {contextExpression})) -> do
+      (Right a@(PAS.CreateRole {contextExpression})) -> do
         -- logShow a
         assert "There should be no contextExpression" (isNothing contextExpression)
       otherwise -> assert ("'createRole MyRole' should be parsed as a CreateRole assignment, instead this was returned: " <> show otherwise) false
@@ -417,7 +418,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "createRole MyRole in SomeContextRole >> binding >> context" assignment
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(CreateRole {contextExpression})) -> do
+      (Right a@(PAS.CreateRole {contextExpression})) -> do
         -- logShow a
         assert "There should be a contextExpression" (isJust contextExpression)
       otherwise -> assert ("'createRole MyRole in SomeContextRole >> binding >> context' should be parsed as a CreateRole assignment, instead this was returned: " <> show otherwise) false
@@ -426,7 +427,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "move MyRole" assignment
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(Move {roleExpression: Simple (ArcIdentifier _ "MyRole"), contextExpression})) -> do
+      (Right a@(PAS.Move {roleExpression: Simple (ArcIdentifier _ "MyRole"), contextExpression})) -> do
         -- logShow a
         assert "test ok" (isNothing contextExpression)
       otherwise -> assert ("'move MyRole' should be parsed as a Move assignment, instead this was returned: " <> show otherwise) false
@@ -435,7 +436,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "move MyRole to SomeContextRole >> binding >> context" assignment
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(Move {contextExpression})) -> do
+      (Right a@(PAS.Move {contextExpression})) -> do
         -- logShow a
         assert "There should be a contextExpression" (isJust contextExpression)
       otherwise -> assert ("'move MyRole to SomeContextRole >> binding >> context' should be parsed as a Move assignment, instead this was returned: " <> show otherwise) false
@@ -444,7 +445,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "bind MyRole to AnotherRole" assignment
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(Bind {bindingExpression: Simple (ArcIdentifier _ "MyRole"), roleIdentifier})) -> do
+      (Right a@(PAS.Bind {bindingExpression: Simple (ArcIdentifier _ "MyRole"), roleIdentifier})) -> do
         -- logShow a
         assert "roleIdentifier should be 'AnotherRole'" (roleIdentifier == "AnotherRole")
       otherwise -> assert ("'bind MyRole to AnotherRole' should be parsed as a Bind assignment, instead this was returned: " <> show otherwise) false
@@ -453,7 +454,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Assignment) <- {-pure $ unwrap $-} runIndentParser "bind MyRole to AnotherRole in SomeContextRole >> binding >> context" assignment
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(Bind {bindingExpression: Simple (ArcIdentifier _ "MyRole"), roleIdentifier, contextExpression})) -> do
+      (Right a@(PAS.Bind {bindingExpression: Simple (ArcIdentifier _ "MyRole"), roleIdentifier, contextExpression})) -> do
         -- logShow a
         assert "roleIdentifier should be 'AnotherRole'" (isJust contextExpression)
       otherwise -> assert ("'bind MyRole to AnotherRole in SomeContextRole >> binding >> context' should be parsed as a Bind assignment, instead this was returned: " <> show otherwise) false
