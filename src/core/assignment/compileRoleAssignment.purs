@@ -31,8 +31,9 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (concat, cons, head, nub, unsafeIndex)
+import Data.Array (concat, cons, head, nub, unsafeIndex, catMaybes)
 import Data.Array.NonEmpty (fromArray, head) as ANE
+import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (over, unwrap)
@@ -48,6 +49,7 @@ import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -130,14 +132,23 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifie
     for_ ctxts \ctxt -> do
       -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
       g <- liftEffect guid
-      newContext <- runExceptT $ constructContext (Just $ ENR qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
-        { id = "model:User$c" <> (show g)
-        , ctype = unwrap qualifiedContextTypeIdentifier
-        })
-      void $ createAndAddRoleInstance qualifiedRoleIdentifier (unwrap roleId) (RolSerialization
-        { id: Nothing
-        , properties: PropertySerialization empty
-        , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+      case qualifiedRoleIdentifier of
+        -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.
+        -- Create a context without binding contextrole.
+        CR calculatedType -> void $ runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
+          { id = "model:User$c" <> (show g)
+          , ctype = unwrap qualifiedContextTypeIdentifier
+          })
+
+        ENR enumeratedType -> do
+          void $ runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
+            { id = "model:User$c" <> (show g)
+            , ctype = unwrap qualifiedContextTypeIdentifier
+            })
+          void $ createAndAddRoleInstance enumeratedType (unwrap roleId) (RolSerialization
+            { id: Nothing
+            , properties: PropertySerialization empty
+            , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
 
 compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleGetterDescription
@@ -349,17 +360,39 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
   pure \(roleId :: RoleInstance) -> do
     ctxts <- lift2 (roleId ##= contextGetter)
-    for ctxts \ctxt -> do
+    results <- for ctxts \ctxt -> do
       -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
       g <- liftEffect guid
-      newContext <- runExceptT $ constructContext (Just $ ENR qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
-        { id = "model:User$c" <> (show g)
-        , ctype = unwrap qualifiedContextTypeIdentifier
-        })
-      unsafePartial (unwrap <<< fromJust) <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization
-        { id: Nothing
-        , properties: PropertySerialization empty
-        , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+      case qualifiedRoleIdentifier of
+        -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.
+        -- Create a context without binding contextrole.
+        CR calculatedType -> do
+          r <- runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
+            { id = "model:User$c" <> (show g)
+            , ctype = unwrap qualifiedContextTypeIdentifier
+            })
+          case r of
+            Left e -> do
+              logPerspectivesError e
+              pure $ Left e
+            Right ci -> pure $ Right $ unwrap ci
+
+        ENR enumeratedType -> do
+          r <- runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
+            { id = "model:User$c" <> (show g)
+            , ctype = unwrap qualifiedContextTypeIdentifier
+            })
+          case r of
+            Left e -> do
+              logPerspectivesError e
+              pure $ Left e
+            Right _ -> (Right <<< unwrap <<< unsafePartial fromJust) <$> createAndAddRoleInstance
+              enumeratedType (unwrap ctxt)
+              (RolSerialization
+                { id: Nothing
+                , properties: PropertySerialization empty
+                , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+    pure $ catMaybes (hush <$> results)
 
 compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription

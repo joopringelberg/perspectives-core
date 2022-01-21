@@ -34,11 +34,12 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (Object, keys, values)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Api (isDatabaseQueryRole)
 import Perspectives.CoreTypes ((###>), (###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
+import Perspectives.Identifiers (areLastSegmentsOf, buitenRol, deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame)
@@ -51,7 +52,7 @@ import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, kindOfRole, lessThanOrEqualTo)
+import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, lessThanOrEqualTo)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
@@ -150,7 +151,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           else throwError $ NotAContextRole start end
       CreateRole {roleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
-        qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
+        qualifiedRoleIdentifier <- qualifyAsEnumeratedTypeWithRespectTo roleIdentifier cte start end
         -- NOTE that we lose information here in case the currentDomain consists of multiple context types.
         -- This may cause a loss of accuracy in the query compiler, as the resulting range of this statement is not precise.
         mContextType <- pure $ head $ leavesInADT $ unsafePartial domain2contextType $ range cte
@@ -159,8 +160,14 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
       CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
-        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
-        pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (ST qualifiedRoleIdentifier) Nothing) True True
+        (qualifiedRoleIdentifier :: RoleType) <- qualifyWithRespectTo roleTypeIdentifier cte start end
+        case qualifiedRoleIdentifier of
+          CR calculatedType -> do
+            isDBQRole <- lift2 $ isDatabaseQueryRole calculatedType
+            if isDBQRole
+              then pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (ST $ EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier) Nothing) True True
+              else throwError $ CannotCreateCalculatedRole calculatedType start end
+          ENR enumeratedType -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (ST enumeratedType) Nothing) True True
 
       CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
         roleQfd <- ensureRole subjects roleExpression
@@ -179,7 +186,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         (bindings :: QueryFunctionDescription) <- ensureRole subjects bindingExpression
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         -- binderType should be an EnumeratedRoleType (local name should resolve w.r.t. the contextExpression)
-        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
+        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyAsEnumeratedTypeWithRespectTo roleIdentifier cte f.start f.end
         -- If the roleIdentifier is functional, the bindings should be functional too.
         (lift $ lift $ ROLE.roleTypeIsFunctional (ENR qualifiedRoleIdentifier)) >>= if _
           then case functional bindings of
@@ -221,13 +228,13 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
 
       DeleteRole f@{roleIdentifier, contextExpression} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
-        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
+        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyAsEnumeratedTypeWithRespectTo roleIdentifier cte f.start f.end
         pure $ UQD originDomain (QF.DeleteRole qualifiedRoleIdentifier) cte originDomain True True
 
       DeleteContext f@{contextRoleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         -- TODO: it must be a ContextRole
-        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo contextRoleIdentifier cte f.start f.end
+        (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyAsEnumeratedTypeWithRespectTo contextRoleIdentifier cte f.start f.end
         EnumeratedRole{kindOfRole} <- lift $ lift $ getEnumeratedRole qualifiedRoleIdentifier
         if kindOfRole == ContextRole
           then pure $ UQD originDomain (QF.DeleteContext qualifiedRoleIdentifier) cte originDomain True True
@@ -281,7 +288,14 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             else throwError (UnknownExternalFunction start end effectName)
       where
 
-        qualifyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType
+        qualifyAsEnumeratedTypeWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType
+        qualifyAsEnumeratedTypeWithRespectTo roleIdentifier contextFunctionDescription start end = do
+          t <- qualifyWithRespectTo roleIdentifier contextFunctionDescription start end
+          case t of
+            ENR et -> pure et
+            CR ct' -> throwError $ CannotCreateCalculatedRole ct' start end
+
+        qualifyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree RoleType
         qualifyWithRespectTo roleIdentifier contextFunctionDescription start end = do
           (ct :: ADT ContextType) <- case range contextFunctionDescription of
             (CDOM ct') -> pure ct'
@@ -296,8 +310,8 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                 otherwise -> throwError $ Custom ("Cannot get the external role of a compound type: " <> show otherwise)
               else lift2 (ct ###= lookForUnqualifiedRoleTypeOfADT roleIdentifier)
           case head mrt of
-            Just (ENR et) -> pure et
-            Just (CR ct') -> throwError $ CannotCreateCalculatedRole ct' start end
+            Just et@(ENR _) -> pure et
+            Just ct'@(CR _) -> pure ct'
             otherwise -> throwError $ ContextHasNoRole ct roleIdentifier
 
         -- Either the identifier is qualified, or we qualify it with respect to the model.
