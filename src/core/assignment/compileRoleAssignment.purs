@@ -69,14 +69,15 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding)
+import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
 scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
-scheduleRoleRemoval id = lift $ modify (over Transaction \t@{rolesToBeRemoved, rolesToExit} -> t
+scheduleRoleRemoval id = lift $ modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
   { rolesToExit =  rolesToExit `union` [id]
-  , rolesToBeRemoved = rolesToBeRemoved `union` [id]
+  , scheduledAssignments = scheduledAssignments `union` [RoleRemoval id]
   })
 
 -- | Schedule all roles in the context, including its external role, for removal.
@@ -84,8 +85,8 @@ scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectives
 scheduleContextRemoval authorizedRole id = (lift2 $ try $ getPerspectContext id) >>=
   handlePerspectContextError "removeContextInstance"
   \(ctxt@(PerspectContext{rolInContext, buitenRol})) ->
-    lift $ modify (over Transaction \t@{contextsToBeRemoved, rolesToExit} -> t
-      { contextsToBeRemoved = cons (Tuple id authorizedRole) contextsToBeRemoved
+    lift $ modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
+      { scheduledAssignments = scheduledAssignments `union` [(ContextRemoval id authorizedRole)]
       , rolesToExit = nub $ cons buitenRol $ rolesToExit <> (concat $ values rolInContext)})
 
 -- Deletes, from all contexts, the role instance.

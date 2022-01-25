@@ -30,10 +30,10 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
-import Data.Tuple (Tuple(..), fst)
 import Effect.Aff.AVar (new)
 import Effect.Class.Console (log)
 import Foreign.Object (empty)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), liftToInstanceLevel, (##>), (##>>), (##=))
@@ -59,6 +59,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance)
+import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRemoved)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (roleRootStates, contextRootStates)
@@ -108,27 +109,24 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
     runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction
     runAllAutomaticActions previousTransaction = do
       -- Run monotonic actions, after
-      --  * adding contextsToBeRemoved to the untouchableContexts and
+      --  * adding all ContextRemovals to the untouchableContexts and
       --  * adding rolesToExit to the untouchableRoles.
       lift $ AA.modify (\t -> over Transaction (\tr -> tr
         { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
-        , untouchableContexts = tr.untouchableContexts <> (fst <$> tr.contextsToBeRemoved)
+        , untouchableContexts = tr.untouchableContexts <> (contextsToBeRemoved tr.scheduledAssignments)
         })
         t)
-      at@(Transaction{contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved, rolesToExit, rolesToUnbind, invertedQueryResults}) <- runEntryAndExitActions previousTransaction
+      at@(Transaction{modelsToBeRemoved, rolesToExit, invertedQueryResults, scheduledAssignments}) <- runEntryAndExitActions previousTransaction
 
       -- Install a fresh transaction (cloning preserves the untouchableContexts and untouchableRoles
-      -- but removes the contextsToBeRemoved, rolesToBeRemoved and rolesToExit).
-      log "==========RUNNING REMOVALS============"
+      -- but removes the scheduledAssignments and rolesToExit).
+      log "==========RUNNING SCHEDULED ASSIGNMENTS============"
       lift $ void $ AA.modify cloneEmptyTransaction
       -- Detach and remove instances, collecting new information in the fresh Transaction.
-      log ("Will remove these contexts: " <> show contextsToBeRemoved)
-      for_ contextsToBeRemoved \(Tuple ctxt authorizedRole) -> removeContextInstance ctxt authorizedRole
-      log ("Will remove these roles: " <> show rolesToBeRemoved)
-      -- External roles are handled with their contexts.
-      for_ rolesToBeRemoved removeRoleInstance
-      log ("Will unbind these roles: " <> show rolesToUnbind)
-      for_ rolesToUnbind changeRoleBinding
+      for_ scheduledAssignments case _ of
+        ContextRemoval ctxt authorizedRole -> removeContextInstance ctxt authorizedRole
+        RoleRemoval rid -> removeRoleInstance rid
+        RoleUnbinding filled mNewFiller -> changeRoleBinding filled mNewFiller
       -- log ("Will remove these models: " <> show modelsToBeRemoved)
       lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- Now state has changed. Re-evaluate the resources that may change state.
@@ -221,10 +219,10 @@ runSterileTransaction a =
 -- | Notice that context- and role instances are still not actually removed from cache, nor from Couchdb, while
 -- | this function runs.
 -- | Terminates on the fixpoint where no more states need to be evaluated.
--- | Invariant: when called, the rolesToExit are already part of the untouchableRoles and the contextsToBeRemoved
+-- | Invariant: when called, the rolesToExit are already part of the untouchableRoles and the ContextRemovals
 -- | are part of untouchableContexts, for the transaction in state.
 runEntryAndExitActions :: Transaction -> MonadPerspectivesTransaction Transaction
-runEntryAndExitActions previousTransaction@(Transaction{createdContexts, createdRoles, contextsToBeRemoved, rolesToExit}) = do
+runEntryAndExitActions previousTransaction@(Transaction{createdContexts, createdRoles, scheduledAssignments, rolesToExit}) = do
   log "==========RUNNING ON ENTRY AND ON EXIT ACTIONS============"
   -- Install a fresh transaction, keeping the untouchableRoles and untouchableContexts.
   lift $ void $ AA.modify cloneEmptyTransaction
@@ -278,9 +276,25 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
                 \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
               lift2 $ restoreFrame oldFrame
   -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
-  contextsThatHaveNotExited <- lift2 $ filterA (\(Tuple rid _) -> rid ##>> exists' getActiveStates) contextsToBeRemoved
-  for_ contextsThatHaveNotExited
-    \(Tuple ctxt _) -> do
+  contextsThatHaveNotExited <- lift2 $ filterA (\sa -> case sa of
+      ContextRemoval ctxt _ -> ctxt ##>> exists' getActiveStates
+      _ -> pure false)
+    scheduledAssignments
+  for_ contextsThatHaveNotExited $ unsafePartial exitContext
+    -- First append the collected rolesToExit and ContextRemovals to the untouchableRoles and untouchableContexts
+    -- to preserve the invariant.
+  lift $ AA.modify (\t -> over Transaction (\tr -> tr
+    { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
+    , untouchableContexts = tr.untouchableContexts <> (contextsToBeRemoved tr.scheduledAssignments)
+    })
+    t)
+  nt <- lift AA.get
+  if isEmptyTransaction nt
+    then pure previousTransaction
+    else pure <<< (<>) previousTransaction =<< runEntryAndExitActions nt
+  where
+    exitContext :: Partial => ScheduledAssignment -> MonadPerspectivesTransaction Unit
+    exitContext (ContextRemoval ctxt _) = do
       (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
       case mmyType of
         Nothing -> pure unit
@@ -296,17 +310,6 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
               catchError (for_ states (exitingState ctxt myType))
                 \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
               lift2 $ restoreFrame oldFrame
-    -- First append the collected rolesToExit and contextsToBeRemoved to the untouchableRoles and untouchableContexts
-    -- to preserve the invariant.
-  lift $ AA.modify (\t -> over Transaction (\tr -> tr
-    { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
-    , untouchableContexts = tr.untouchableContexts <> (fst <$> tr.contextsToBeRemoved)
-    })
-    t)
-  nt <- lift AA.get
-  if isEmptyTransaction nt
-    then pure previousTransaction
-    else pure <<< (<>) previousTransaction =<< runEntryAndExitActions nt
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift

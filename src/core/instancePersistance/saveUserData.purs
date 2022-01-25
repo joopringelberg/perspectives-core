@@ -77,6 +77,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -502,12 +503,12 @@ removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId)
 
         -- PERSISTENCE
         -- Schedule the removal of the binding.
-        lift $ modify (\t -> over Transaction (\tr -> tr {rolesToUnbind = union [Tuple roleId Nothing] tr.rolesToUnbind}) t)
+        lift $ modify (\t -> over Transaction (\tr -> tr {scheduledAssignments = tr.scheduledAssignments `union` [RoleUnbinding roleId Nothing]}) t)
 
         pure users
 
-changeRoleBinding :: Tuple RoleInstance (Maybe RoleInstance) -> MonadPerspectivesTransaction Unit
-changeRoleBinding (Tuple filledId mNewFiller) = (lift2 $ try $ getPerspectEntiteit filledId) >>=
+changeRoleBinding :: RoleInstance -> (Maybe RoleInstance) -> MonadPerspectivesTransaction Unit
+changeRoleBinding filledId mNewFiller = (lift2 $ try $ getPerspectEntiteit filledId) >>=
   handlePerspectRolError "changeRoleBinding"
     \(filled :: PerspectRol) -> do
       roleWillBeRemoved <- lift $ gets \(Transaction{untouchableRoles}) -> isJust $ elemIndex filledId untouchableRoles

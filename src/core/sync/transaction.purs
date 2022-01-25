@@ -42,6 +42,7 @@ import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.DomeinFile (DomeinFileId)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.ScheduledAssignment (ScheduledAssignment)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
@@ -58,14 +59,10 @@ newtype Transaction = Transaction (TransactionRecord
   -- rolesToExit is the only complete collection of role instances that will be removed
   -- (including role instances that are removed with their context).
   , rolesToExit :: Array RoleInstance
-  -- rolesToBeRemoved just holds role instances that are individually removed.
-  , rolesToBeRemoved :: Array RoleInstance
-  , contextsToBeRemoved :: Array (Tuple ContextInstance (Maybe RoleType))
+  , scheduledAssignments :: Array ScheduledAssignment
   , modelsToBeRemoved :: Array DomeinFileId
   , createdContexts :: Array ContextInstance
   , createdRoles :: Array RoleInstance
-  -- The first RoleInstance has its binding modified; the second RoleInstance, if present, is the new binding.
-  , rolesToUnbind :: Array (Tuple RoleInstance (Maybe RoleInstance))
   -- No Delta and no InvertedQueryResult (leading to state evaluation) should be constructed using one of the
   -- resources in the next two members.
   , untouchableContexts :: Array ContextInstance
@@ -99,30 +96,28 @@ instance encodeTransactie' :: Encode Transaction' where
 instance decodeTransactie :: Decode Transaction where
   decode f = do
     ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- decode f
-    pure $ Transaction{author, timeStamp, deltas, changedDomeinFiles, invertedQueryResults: [], correlationIdentifiers: [], authoringRole: ENR $ EnumeratedRoleType "model:System$PerspectivesContext$User", rolesToBeRemoved: [], rolesToExit: [], contextsToBeRemoved: [], modelsToBeRemoved: [], createdContexts: [], createdRoles: [], untouchableRoles: [], untouchableContexts: [], rolesToUnbind: []}
+    pure $ Transaction{author, timeStamp, deltas, changedDomeinFiles, scheduledAssignments: [], invertedQueryResults: [], correlationIdentifiers: [], authoringRole: ENR $ EnumeratedRoleType "model:System$PerspectivesContext$User", rolesToExit: [], modelsToBeRemoved: [], createdContexts: [], createdRoles: [], untouchableRoles: [], untouchableContexts: []}
 
 instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, invertedQueryResults, authoringRole, rolesToBeRemoved, rolesToExit, contextsToBeRemoved, modelsToBeRemoved, createdContexts, createdRoles, rolesToUnbind, untouchableRoles, untouchableContexts})
-    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToBeRemoved: rtbr, rolesToExit: rte, contextsToBeRemoved: ctbr, modelsToBeRemoved: mtbr, createdContexts: cc, rolesToUnbind: rtu, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc}) = Transaction
+  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts})
+    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, scheduledAssignments: sa, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToExit: rte, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc}) = Transaction
       { author: author
       , timeStamp: timeStamp
       , deltas: deltas `union` ds
       , changedDomeinFiles: union changedDomeinFiles cd
+      , scheduledAssignments: scheduledAssignments <> sa
       , invertedQueryResults: invertedQueryResults `union` iqr
       , correlationIdentifiers: union correlationIdentifiers ci
       , authoringRole
-      , rolesToBeRemoved: rolesToBeRemoved <> rtbr
       , rolesToExit: rolesToExit <> rte
-      , contextsToBeRemoved: contextsToBeRemoved <> ctbr
       , modelsToBeRemoved: modelsToBeRemoved <> mtbr
       , createdContexts: createdContexts <> cc
       , createdRoles: createdRoles <> cr
       , untouchableRoles: if length untouchableRoles > length ur then untouchableRoles else ur
       , untouchableContexts: if length untouchableContexts > length uc then untouchableContexts else uc
-      , rolesToUnbind: rolesToUnbind <> rtu
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
@@ -142,18 +137,16 @@ createTransaction authoringRole author =
       , timeStamp: SerializableDateTime (toDateTime n)
       , deltas: []
       , changedDomeinFiles: []
+      , scheduledAssignments: []
       , invertedQueryResults: []
       , correlationIdentifiers: []
       , authoringRole
-      , rolesToBeRemoved: []
       , rolesToExit: []
-      , contextsToBeRemoved: []
       , modelsToBeRemoved: []
       , createdContexts: []
       , createdRoles: []
       , untouchableContexts: []
       , untouchableRoles: []
-      , rolesToUnbind: []
     }
 
 cloneEmptyTransaction :: Transaction -> Transaction
@@ -162,18 +155,16 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchabl
   , timeStamp: timeStamp
   , deltas: []
   , changedDomeinFiles: []
+  , scheduledAssignments: []
   , invertedQueryResults: []
   , correlationIdentifiers: []
   , authoringRole
-  , rolesToBeRemoved: []
   , rolesToExit: []
-  , contextsToBeRemoved: []
   , modelsToBeRemoved: []
   , createdContexts: []
   , createdRoles: []
   , untouchableRoles
   , untouchableContexts
-  , rolesToUnbind: []
 }
 
 isEmptyTransaction :: Transaction -> Boolean
