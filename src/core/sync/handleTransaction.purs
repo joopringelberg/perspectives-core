@@ -87,14 +87,14 @@ executeContextDelta (ContextDelta{deltaType, id: contextId, roleType, roleInstan
       Right _ -> moveRoleInstancesToAnotherContext contextId (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
 
 executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
-executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, roleWillBeRemoved, subject}) signedDelta = do
+executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, subject}) signedDelta = do
   log (show deltaType <> " of " <> show roleId <> " (to) " <> show binding)
   roleType' <- lift2 (roleId ##>> roleType)
   (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Verbs.Fill, Verbs.CreateAndFill]) >>= case _ of
     Left e -> handleError e
     Right _ -> case deltaType of
       SetBinding -> void $ setBinding roleId (unsafePartial $ fromJust binding) (Just signedDelta)
-      RemoveBinding -> void $ removeBinding roleWillBeRemoved roleId
+      RemoveBinding -> void $ removeBinding roleId
 
 -- TODO. Wat met SetPropertyValue?
 executeRolePropertyDelta :: RolePropertyDelta -> SignedDelta -> MonadPerspectivesTransaction Unit

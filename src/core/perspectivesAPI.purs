@@ -429,7 +429,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.RemoveBinding -> catchError
       do
         -- Remove the binding from subject. We don't know whether that binding will be removed itself, hence bindingRemoved=false.
-        void $ runMonadPerspectivesTransaction authoringRole $ removeBinding false (RoleInstance subject)
+        void $ runMonadPerspectivesTransaction authoringRole $ removeBinding (RoleInstance subject)
         sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- Check whether a role exists for contextType with the localRolName and whether it allows RolID as binding.

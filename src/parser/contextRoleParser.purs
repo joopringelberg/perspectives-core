@@ -414,7 +414,6 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
           , id: rolId
           , binding: bindng
           , oldBinding: Nothing
-          , roleWillBeRemoved: false
           , deltaType: SetBinding
           })
       cacheRol rolId
@@ -709,7 +708,6 @@ definition = do
       , id: rolId
       , binding: Just bindng
       , oldBinding: Nothing
-      , roleWillBeRemoved: false
       , deltaType: SetBinding
       })
   cacheRol rolId

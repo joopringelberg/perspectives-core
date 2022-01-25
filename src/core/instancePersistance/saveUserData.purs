@@ -117,7 +117,6 @@ saveContextInstance id = do
         , binding: binding
         , oldBinding: Nothing
         , deltaType: SetBinding
-        , roleWillBeRemoved: false
         , subject
         })
         true
@@ -235,7 +234,6 @@ statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, pspType:roleType,
         , binding: filler
         , oldBinding: Nothing
         , deltaType: RemoveBinding
-        , roleWillBeRemoved: true -- is not used
         , subject: UserInstance (RoleInstance "") -- is not used
       })
       -- Do not run forwards query!
@@ -418,7 +416,6 @@ setBinding_ roleId (newBindingId :: RoleInstance) msignedDelta = (lift2 $ try $ 
           , binding: Just newBindingId
           , oldBinding: rol_binding originalRole
           , deltaType: SetBinding
-          , roleWillBeRemoved: false
           , subject
           }
         -- Adds deltas for paths beyond the nodes involved in the binding,
@@ -454,12 +451,6 @@ handleNewPeer roleInstance = (lift2 $ try$ getPerspectRol roleInstance) >>=
         then context `serialisedAsDeltasFor` roleInstance
         else pure unit
 
--- | Removes the link between the role and its filler, in both directions (unless the filler is removed anyway:
--- | then we just handle the link from role to filler, i.e. the FILLEDBY link).
--- | Removes the binding R of the rol, if any.
--- | Removes the role as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
--- | Modifies the Role instance.
--- | If the the role instance has in fact no binding before the operation, this is a no-op without effect.
 -- | Parameter `bindingRemoved` is true iff the role that is the binding of the role will be removed.
 -- | In that case we need not add a RoleBindingDelta, because peers will work out from the UniverseRoleDelta
 -- | what to do with the binding.
@@ -468,8 +459,8 @@ handleNewPeer roleInstance = (lift2 $ try$ getPerspectRol roleInstance) >>=
 -- | QUERY UPDATES for `binding <roleId>` and `binder <TypeOfRoleId>`.
 -- | SYNCHRONISATION by RoleBindingDelta.
 -- | CURRENTUSER for roleId and its context.
-removeBinding :: Boolean -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
-removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId) >>=
+removeBinding :: RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+removeBinding roleId = (lift2 $ try $ getPerspectEntiteit roleId) >>=
   handlePerspectRolError' "removeBinding" []
     \(originalRole :: PerspectRol) -> case rol_binding originalRole of
       Nothing -> pure []
@@ -480,16 +471,15 @@ removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId)
 
         -- STATE EVALUATION
         subject <- getSubject
-        roleWillBeRemoved <- lift $ gets \(Transaction{untouchableRoles}) -> isJust $ elemIndex roleId untouchableRoles
         delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
                       { id : roleId
                       , binding: (rol_binding originalRole)
                       , oldBinding: (rol_binding originalRole)
                       , deltaType: RemoveBinding
-                      , roleWillBeRemoved
                       , subject
                       }
         users <- usersWithPerspectiveOnRoleBinding delta true
+        roleWillBeRemoved <- lift $ gets \(Transaction{untouchableRoles}) -> isJust $ elemIndex roleId untouchableRoles
         if roleWillBeRemoved
           then pure unit
           else do
@@ -507,6 +497,20 @@ removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId)
 
         pure users
 
+-- | Removes the link between the role and its filler, in both directions (unless the filler is removed anyway:
+-- | then we just handle the link from role to filler, i.e. the FILLEDBY link).
+-- | Removes the binding R of the rol, if any.
+-- | Removes the role as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
+-- | Modifies the Role instance.
+-- | If the the role instance has in fact no binding before the operation, this is a no-op without effect.
+-- | Parameter `bindingRemoved` is true iff the role that is the binding of the role will be removed.
+-- | In that case we need not add a RoleBindingDelta, because peers will work out from the UniverseRoleDelta
+-- | what to do with the binding.
+-- | PERSISTENCE of binding role and old binding.
+-- | STATE CHANGE for `binding <roleId`, `binder <TypeOfRoleId>` for the old binding.
+-- | QUERY UPDATES for `binding <roleId>` and `binder <TypeOfRoleId>`.
+-- | SYNCHRONISATION by RoleBindingDelta.
+-- | CURRENTUSER for roleId and its context.
 changeRoleBinding :: RoleInstance -> (Maybe RoleInstance) -> MonadPerspectivesTransaction Unit
 changeRoleBinding filledId mNewFiller = (lift2 $ try $ getPerspectEntiteit filledId) >>=
   handlePerspectRolError "changeRoleBinding"

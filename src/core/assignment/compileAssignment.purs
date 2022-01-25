@@ -231,11 +231,11 @@ compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
     Nothing -> pure
       \contextId -> do
         binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.allRoleBinders)
-        for_ binders (removeBinding false)
+        for_ binders removeBinding
     Just roleType -> pure
       \contextId -> do
         binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getRoleBinders roleType)
-        for_ binders (removeBinding false)
+        for_ binders removeBinding
 
 compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
@@ -247,7 +247,7 @@ compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
     -- is taken into account, too.
     void $ case binder of
       Nothing -> pure []
-      Just binder' -> removeBinding false binder'
+      Just binder' -> removeBinding binder'
 
 compileAssignment (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd

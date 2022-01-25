@@ -31,7 +31,7 @@ import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Show, show, (<>), (==), (&&))
@@ -212,7 +212,6 @@ newtype RoleBindingDelta = RoleBindingDelta (DeltaRecord
   , binding :: Maybe RoleInstance
   , oldBinding :: Maybe RoleInstance
   , deltaType :: RoleBindingDeltaType
-  , roleWillBeRemoved :: Boolean
   -- Remove, Change
   ))
 
@@ -223,7 +222,7 @@ instance showRoleDelta :: Show RoleBindingDelta where
   show = genericShow
 
 instance eqRoleDelta :: Eq RoleBindingDelta where
-  eq (RoleBindingDelta {id:i1, binding:b1, oldBinding:ob1, deltaType:d1, roleWillBeRemoved:r1}) (RoleBindingDelta {id:i2, binding:b2, oldBinding:ob2, deltaType:d2, roleWillBeRemoved:r2}) = i1 == i2 && b1 == b2 && ob1 == ob2 && d1 == d2 && r1 == r2
+  eq (RoleBindingDelta {id:i1, binding:b1, oldBinding:ob1, deltaType:d1}) (RoleBindingDelta {id:i2, binding:b2, oldBinding:ob2, deltaType:d2}) = i1 == i2 && b1 == b2 && ob1 == ob2 && d1 == d2
 
 instance encodeRoleDelta :: Encode RoleBindingDelta where
   encode = genericEncode defaultOptions
