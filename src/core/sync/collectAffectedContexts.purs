@@ -37,7 +37,7 @@ import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse, traverse_)
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple(..), snd)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, lookup, values)
 import Partial.Unsafe (unsafePartial)
@@ -301,10 +301,10 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
 
 -- | Adds the InvertedQueryResult to the current Transaction, but only if the resource is not marked as (to be) removed.
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
-addInvertedQueryResult (ContextStateQuery ctxts) = lift $ AA.modify \(Transaction r@{invertedQueryResults, contextsToBeRemoved}) -> case difference ctxts (fst <$> contextsToBeRemoved) of
+addInvertedQueryResult (ContextStateQuery ctxts) = lift $ AA.modify \(Transaction r@{invertedQueryResults, untouchableContexts}) -> case difference ctxts untouchableContexts of
   nothing | null nothing -> Transaction r
   ctxts' -> Transaction (r {invertedQueryResults = union [ContextStateQuery ctxts'] invertedQueryResults})
-addInvertedQueryResult (RoleStateQuery roles) = lift $ AA.modify \(Transaction r@{invertedQueryResults, rolesToBeRemoved}) -> case difference roles rolesToBeRemoved of
+addInvertedQueryResult (RoleStateQuery roles) = lift $ AA.modify \(Transaction r@{invertedQueryResults, untouchableRoles}) -> case difference roles untouchableRoles of
   nothing | null nothing -> Transaction r
   roles' -> Transaction (r {invertedQueryResults = union [RoleStateQuery roles'] invertedQueryResults})
 

@@ -25,13 +25,14 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (filterA, head, null, sort)
+import Data.Array (filterA, head, length, null, sort)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isNothing)
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Effect.Aff.AVar (new)
+import Effect.Class.Console (log)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
@@ -44,7 +45,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
-import Perspectives.Identifiers (hasLocalName, isExternalRole)
+import Perspectives.Identifiers (hasLocalName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (exists')
@@ -57,7 +58,7 @@ import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getMyType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
-import Perspectives.SaveUserData (removeContextInstance, removeRoleInstance)
+import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (roleRootStates, contextRootStates)
@@ -93,7 +94,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       if share then lift $ lift $ distributeTransaction ft else pure unit
 
       -- 4. Run effects.
-      -- log "==========RUNNING EFFECTS============"
+      log "==========RUNNING EFFECTS============"
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
       lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do
         mEffect <- pure $ lookupActiveSupportedEffect corrId
@@ -106,27 +107,106 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
 
     runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction
     runAllAutomaticActions previousTransaction = do
-      -- Run monotonic actions first.
-      (ft@(Transaction{contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved}) :: Transaction) <- runMonotonicActions previousTransaction
-      -- Install a fresh transaction.
+      -- Run monotonic actions, after
+      --  * adding contextsToBeRemoved to the untouchableContexts and
+      --  * adding rolesToExit to the untouchableRoles.
+      lift $ AA.modify (\t -> over Transaction (\tr -> tr
+        { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
+        , untouchableContexts = tr.untouchableContexts <> (fst <$> tr.contextsToBeRemoved)
+        })
+        t)
+      at@(Transaction{contextsToBeRemoved, rolesToBeRemoved, modelsToBeRemoved, rolesToExit, rolesToUnbind, invertedQueryResults}) <- runEntryAndExitActions previousTransaction
+
+      -- Install a fresh transaction (cloning preserves the untouchableContexts and untouchableRoles
+      -- but removes the contextsToBeRemoved, rolesToBeRemoved and rolesToExit).
+      log "==========RUNNING REMOVALS============"
       lift $ void $ AA.modify cloneEmptyTransaction
       -- Detach and remove instances, collecting new information in the fresh Transaction.
-      -- log ("Will remove these contexts: " <> show contextsToBeRemoved)
-      -- TODO: ZONDER AUTHORINGROLE zal de ontvanger het niet accepteren.
+      log ("Will remove these contexts: " <> show contextsToBeRemoved)
       for_ contextsToBeRemoved \(Tuple ctxt authorizedRole) -> removeContextInstance ctxt authorizedRole
-      -- log ("Will remove these roles: " <> show rolesToBeRemoved)
+      log ("Will remove these roles: " <> show rolesToBeRemoved)
       -- External roles are handled with their contexts.
-      for_ rolesToBeRemoved \r -> if isExternalRole (unwrap r)
-        then pure unit
-        else removeRoleInstance r
+      for_ rolesToBeRemoved removeRoleInstance
+      log ("Will unbind these roles: " <> show rolesToUnbind)
+      for_ rolesToUnbind changeRoleBinding
       -- log ("Will remove these models: " <> show modelsToBeRemoved)
       lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
+      -- Now state has changed. Re-evaluate the resources that may change state.
+      (stateEvaluations :: Array StateEvaluation) <- lift2 $ join <$> traverse computeStateEvaluations invertedQueryResults
+      log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
+      for_ stateEvaluations \s -> case s of
+        ContextStateEvaluation stateId contextId roleType -> do
+          -- Provide a new frame for the current context variable binding.
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap contextId]
+          -- Error boundary.
+          catchError (evaluateContextState contextId roleType stateId)
+            \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
+        RoleStateEvaluation stateId roleId roleType -> do
+          cid <- lift2 (roleId ##>> context)
+          oldFrame <- lift2 pushFrame
+          -- NOTE. This may not be necessary; we have no analysis in runtime whether these variables occur in
+          -- expressions in state.
+          lift2 $ addBinding "currentcontext" [unwrap cid]
+          -- TODO. add binding for "currentobject" or "currentsubject"?!
+          -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
+          catchError (evaluateRoleState roleId roleType stateId)
+            \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
       -- If the new transaction is not empty, run again.
       nt <- lift AA.get
       if isEmptyTransaction nt
-        then pure previousTransaction
-        else pure <<< (<>) previousTransaction =<< runAllAutomaticActions nt
+        then pure at
+        else pure <<< (<>) at =<< runAllAutomaticActions nt
+      where
+        -- Add to each context or role instance the user role type and the RootState type.
+        computeStateEvaluations :: InvertedQueryResult -> MonadPerspectives (Array StateEvaluation)
+        computeStateEvaluations (ContextStateQuery contextInstances) = join <$> do
+          activeInstances <- filterA (\rid -> rid ##>> exists' getActiveStates) contextInstances
+          case head activeInstances of
+            Nothing -> pure []
+            Just contextInstance -> do
+              -- States includes root states of Aspects.
+              states <- contextInstance ##= contextType >=> liftToInstanceLevel contextRootStates
+              for activeInstances \cid -> do
+                -- Note that the user may play different roles in the various context instances.
+                (mmyType :: Maybe RoleType) <- cid ##> getMyType
+                case mmyType of
+                  Nothing -> pure []
+                  Just (CR myType) -> if isGuestRole myType
+                    then do
+                      (mmguest :: Maybe RoleInstance) <- cid ##> getCalculatedRoleInstances myType
+                      case mmguest of
+                        -- If the Guest role is not filled, don't execute bots on its behalf!
+                        Nothing -> pure []
+                        otherwise -> pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
+                    else pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
+                  Just (ENR myType) -> pure $ (\state -> ContextStateEvaluation state cid (ENR myType)) <$> states
+        computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
+          activeInstances <- filterA (\rid -> rid ##>> exists' getActiveRoleStates) roleInstances
+          case head activeInstances of
+            Nothing -> pure []
+            Just roleInstance -> do
+              -- Neem aspecten hier ook mee!
+              states <- roleInstance ##= roleType >=> liftToInstanceLevel roleRootStates
+              -- If the roleInstance has no recorded states, this means it has been marked for removal
+              -- and has exited all its states. We should not do that again!
+              for activeInstances \rid -> do
+                (mmyType :: Maybe RoleType) <- rid ##> context >=> getMyType
+                case mmyType of
+                  Nothing -> pure []
+                  Just (CR myType) -> if isGuestRole myType
+                    then do
+                      (mmguest :: Maybe RoleInstance) <- rid ##> context >=> getCalculatedRoleInstances myType
+                      case mmguest of
+                        Nothing -> pure []
+                        otherwise -> pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
+                    else pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
+                  Just (ENR myType) -> pure $ (\state -> RoleStateEvaluation state rid (ENR myType)) <$> states
 
+        isGuestRole :: CalculatedRoleType -> Boolean
+        isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
 
 -- | Run and discard the transaction.
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
@@ -140,33 +220,14 @@ runSterileTransaction a =
 -- | If any are collected, recursively calls itself.
 -- | Notice that context- and role instances are still not actually removed from cache, nor from Couchdb, while
 -- | this function runs.
-runMonotonicActions :: Transaction -> MonadPerspectivesTransaction Transaction
-runMonotonicActions previousTransaction@(Transaction{invertedQueryResults, createdContexts, createdRoles, contextsToBeRemoved, rolesToBeRemoved}) = do
-  -- log "==========RUNNING STATES============"
-  -- Install a fresh transaction.
+-- | Terminates on the fixpoint where no more states need to be evaluated.
+-- | Invariant: when called, the rolesToExit are already part of the untouchableRoles and the contextsToBeRemoved
+-- | are part of untouchableContexts, for the transaction in state.
+runEntryAndExitActions :: Transaction -> MonadPerspectivesTransaction Transaction
+runEntryAndExitActions previousTransaction@(Transaction{createdContexts, createdRoles, contextsToBeRemoved, rolesToExit}) = do
+  log "==========RUNNING ON ENTRY AND ON EXIT ACTIONS============"
+  -- Install a fresh transaction, keeping the untouchableRoles and untouchableContexts.
   lift $ void $ AA.modify cloneEmptyTransaction
-  (stateEvaluations :: Array StateEvaluation) <- lift2 $ join <$> traverse computeStateEvaluations invertedQueryResults
-  -- Evaluate all collected stateEvaluations.
-  for_ stateEvaluations \s -> case s of
-    ContextStateEvaluation stateId contextId roleType -> do
-      -- Provide a new frame for the current context variable binding.
-      oldFrame <- lift2 pushFrame
-      lift2 $ addBinding "currentcontext" [unwrap contextId]
-      -- Error boundary.
-      catchError (evaluateContextState contextId roleType stateId)
-        \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
-      lift2 $ restoreFrame oldFrame
-    RoleStateEvaluation stateId roleId roleType -> do
-      cid <- lift2 (roleId ##>> context)
-      oldFrame <- lift2 pushFrame
-      -- NOTE. This may not be necessary; we have no analysis in runtime whether these variables occur in
-      -- expressions in state.
-      lift2 $ addBinding "currentcontext" [unwrap cid]
-      -- TODO. add binding for "currentobject" or "currentsubject"?!
-      -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
-      catchError (evaluateRoleState roleId roleType stateId)
-        \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
-      lift2 $ restoreFrame oldFrame
   -- Enter the rootState of new contexts.
   for_ createdContexts
     \ctxt -> do
@@ -197,9 +258,9 @@ runMonotonicActions previousTransaction@(Transaction{invertedQueryResults, creat
           catchError (for_ states (enteringRoleState rid myType))
             \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
           lift2 $ restoreFrame oldFrame
-  -- Exit the rootState of roles that are removed, unless we did so before.
-  activeRoleInstances <- lift2 $ filterA (\rid -> rid ##>> exists' getActiveRoleStates) rolesToBeRemoved
-  for_ activeRoleInstances
+  -- Exit the rootState of roles that are scheduled to be removed, unless we did so before.
+  rolesThatHaveNotExited <- lift2 $ filterA (\rid -> rid ##>> exists' getActiveRoleStates) rolesToExit
+  for_ rolesThatHaveNotExited
     \rid -> do
       ctxt <- lift2 (rid ##>> context)
       (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
@@ -216,9 +277,9 @@ runMonotonicActions previousTransaction@(Transaction{invertedQueryResults, creat
               catchError (for_ states (exitingRoleState rid myType))
                 \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
               lift2 $ restoreFrame oldFrame
-  -- Exit the rootState of contexts that are deleted, unless we did so before.
-  activeContextInstances <- lift2 $ filterA (\(Tuple rid _) -> rid ##>> exists' getActiveStates) contextsToBeRemoved
-  for_ activeContextInstances
+  -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
+  contextsThatHaveNotExited <- lift2 $ filterA (\(Tuple rid _) -> rid ##>> exists' getActiveStates) contextsToBeRemoved
+  for_ contextsThatHaveNotExited
     \(Tuple ctxt _) -> do
       (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
       case mmyType of
@@ -235,58 +296,17 @@ runMonotonicActions previousTransaction@(Transaction{invertedQueryResults, creat
               catchError (for_ states (exitingState ctxt myType))
                 \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
               lift2 $ restoreFrame oldFrame
+    -- First append the collected rolesToExit and contextsToBeRemoved to the untouchableRoles and untouchableContexts
+    -- to preserve the invariant.
+  lift $ AA.modify (\t -> over Transaction (\tr -> tr
+    { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
+    , untouchableContexts = tr.untouchableContexts <> (fst <$> tr.contextsToBeRemoved)
+    })
+    t)
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure previousTransaction
-    else pure <<< (<>) previousTransaction =<< runMonotonicActions nt
-  where
-    -- Add to each context or role instance the user role type and the RootState type.
-    computeStateEvaluations :: InvertedQueryResult -> MonadPerspectives (Array StateEvaluation)
-    computeStateEvaluations (ContextStateQuery contextInstances) = join <$> do
-      activeInstances <- filterA (\rid -> rid ##>> exists' getActiveStates) contextInstances
-      case head activeInstances of
-        Nothing -> pure []
-        Just contextInstance -> do
-          -- States includes root states of Aspects.
-          states <- contextInstance ##= contextType >=> liftToInstanceLevel contextRootStates
-          for activeInstances \cid -> do
-            -- Note that the user may play different roles in the various context instances.
-            (mmyType :: Maybe RoleType) <- cid ##> getMyType
-            case mmyType of
-              Nothing -> pure []
-              Just (CR myType) -> if isGuestRole myType
-                then do
-                  (mmguest :: Maybe RoleInstance) <- cid ##> getCalculatedRoleInstances myType
-                  case mmguest of
-                    -- If the Guest role is not filled, don't execute bots on its behalf!
-                    Nothing -> pure []
-                    otherwise -> pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
-                else pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
-              Just (ENR myType) -> pure $ (\state -> ContextStateEvaluation state cid (ENR myType)) <$> states
-    computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
-      activeInstances <- filterA (\rid -> rid ##>> exists' getActiveRoleStates) roleInstances
-      case head activeInstances of
-        Nothing -> pure []
-        Just roleInstance -> do
-          -- Neem aspecten hier ook mee!
-          states <- roleInstance ##= roleType >=> liftToInstanceLevel roleRootStates
-          -- If the roleInstance has no recorded states, this means it has been marked for removal
-          -- and has exited all its states. We should not do that again!
-          for activeInstances \rid -> do
-            (mmyType :: Maybe RoleType) <- rid ##> context >=> getMyType
-            case mmyType of
-              Nothing -> pure []
-              Just (CR myType) -> if isGuestRole myType
-                then do
-                  (mmguest :: Maybe RoleInstance) <- rid ##> context >=> getCalculatedRoleInstances myType
-                  case mmguest of
-                    Nothing -> pure []
-                    otherwise -> pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
-                else pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
-              Just (ENR myType) -> pure $ (\state -> RoleStateEvaluation state rid (ENR myType)) <$> states
-
-    isGuestRole :: CalculatedRoleType -> Boolean
-    isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
+    else pure <<< (<>) previousTransaction =<< runEntryAndExitActions nt
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift

@@ -12,12 +12,16 @@ domain SimpleChat
   case ChatApp
     indexed cht:MyChats
     aspect sys:RootContext
+    aspect sys:ContextWithNotification
     on exit
       do for Chatter
         delete context bound to Chats
     external
       aspect sys:RootContext$External
     context Chats (relational, unlinked) filledBy Chat
+      on exit
+        notify Chatter
+          "Chat '{Title}' has been removed."
     user Chatter (mandatory) filledBy sys:PerspectivesSystem$User
       aspect sys:RootContext$RootUser
       perspective on Chats
@@ -25,25 +29,10 @@ domain SimpleChat
         props (Title) verbs (Consult)
         action RemoveThisChat
           remove context origin
-          remove role origin
 
   case Chat
     aspect sys:Invitation
     aspect cht:WithText
-    -------------------------------------------------------------------------------
-    ---- CLEANUP ON EXIT
-    ---- The states IAmInitiator and IAmPartner explicitly unbind the role that
-    ---- the current user fills, on exit. In this way, the other participant
-    ---- will know that she has pulled out of this Chat when it is deleted.
-    -------------------------------------------------------------------------------
-    state IAmInitiator = Initiator binds sys:Me
-      on exit
-        do for Initiator
-          unbind sys:Me from Initiator
-    state IAmPartner = Partner binds sys:Me
-      on exit
-        do for Partner
-          unbind sys:Me from Partner
     state NoInitiator = not exists Initiator
       perspective of Creator
         perspective on Initiator
@@ -65,6 +54,7 @@ domain SimpleChat
       perspective on Partner
         view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
         props (MyText) verbs (Consult)
+        only (Create, Fill)
       perspective on Initiator
         defaults
       perspective on extern

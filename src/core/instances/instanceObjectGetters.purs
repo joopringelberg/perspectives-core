@@ -382,12 +382,12 @@ siblings rid = ArrayT $ (lift $ try $ getPerspectRol rid) >>=
 
 getActiveRoleStates :: RoleInstance ~~> StateIdentifier
 getActiveRoleStates ri = ArrayT $ (try $ lift $ getRolMember (_.states <<< unwrap) ri) >>=
-  handlePerspectContextError' "getActiveRoleStates" []
+  handlePerspectRolError' "getActiveRoleStates" []
     \states -> (tell $ ArrayWithoutDoubles [RoleState ri]) *> pure states
 
 getActiveRoleStates_ :: RoleInstance -> MonadPerspectives (Array StateIdentifier)
 getActiveRoleStates_ ci = (try $ getRolMember (_.states <<< unwrap) ci) >>=
-  handlePerspectContextError' "getActiveRoleStates_" [] pure <<< identity
+  handlePerspectRolError' "getActiveRoleStates_" [] pure <<< identity
 
 roleIsInState :: StateIdentifier -> RoleInstance -> MonadPerspectives Boolean
 roleIsInState stateId ri = getActiveRoleStates_ ri >>= pure <<< isJust <<< elemIndex stateId

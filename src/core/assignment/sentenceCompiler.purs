@@ -49,7 +49,7 @@ compileSentence xToString (Sentence parts) = do
         Q calc -> xToString calc >>= pure <<< flip evalMonadPerspectivesQuery
     parts
   pure \roleId ->
-    intercalate " " <<< concat <$> traverse (\p -> p roleId) compiledParts
+    intercalate "" <<< concat <$> traverse (\p -> p roleId) compiledParts
 
 -- | From a Sentence, create a function that takes a ContextInstance and produces a String in MonadPerspectives.
 compileContextSentence :: Sentence -> MonadPerspectives (CompiledSentence ContextInstance)

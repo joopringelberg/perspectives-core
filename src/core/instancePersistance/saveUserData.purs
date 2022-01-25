@@ -39,26 +39,29 @@ module Perspectives.SaveUserData
   , setBinding
   , setBinding_
   , handleNewPeer
+  , changeRoleBinding
   )
 
   where
 
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.State (lift)
-import Data.Array (concat, delete, head, nub)
+import Data.Array (concat, delete, elemIndex, head, nub, union)
 import Data.Array.NonEmpty (singleton)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, for_, traverse)
+import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
-import Foreign.Object (isEmpty, lookup, values)
+import Foreign.Object (isEmpty, values)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (getAuthor, getSubject, setMe, cacheAndSave)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, usersWithPerspectiveOnRoleBinding, lift2, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_buitenRol, context_iedereRolInContext, context_me, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, rol_binding, rol_context, rol_isMe, rol_pspType)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests, findRoleStateRequests)
@@ -78,6 +81,7 @@ import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
+import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>), (==), (>>=), (<$>))
@@ -161,7 +165,11 @@ removeContextInstance id authorizedRole = do
               , deltaType: RemoveExternalRoleInstance
               , subject
               }}}
-      lift2 $ removeEntiteit id
+      -- Only now remove all resources.
+      lift2 $ do
+        for_ (concat $ values rolInContext) removeEntiteit
+        void $ removeEntiteit buitenRol
+        removeEntiteit id
 
 -- | Modifies the context instance by detaching the given role instances.
 -- | Notice that this function does neither uncache nor unsave the rolInstances
@@ -192,7 +200,7 @@ removeRoleInstance roleId = (lift2 $ try $ (getPerspectRol roleId)) >>= handlePe
 -- | that it's context is removed:
 -- | STATE EVALUATION
 -- | QUERY UPDATES
--- | PERSISTENCE (just severe the binding links and remove the role instance).
+-- | PERSISTENCE (just severe the binding links).
 handleRoleOnContextRemoval :: RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
 handleRoleOnContextRemoval roleId = (lift2 $ try $ (getPerspectRol roleId)) >>= handlePerspectRolError' "removeRoleInstance" []
   \role@(PerspectRol{pspType:roleType, context:contextId, binding, gevuldeRollen:filledRoles}) -> do
@@ -203,8 +211,6 @@ handleRoleOnContextRemoval roleId = (lift2 $ try $ (getPerspectRol roleId)) >>= 
     -- PERSISTENCE (Remove the incoming links on both the incoming and outgoing
     -- binding relations).
     severeBindingLinks role
-    -- PERSISTENCE (finally remove the role instance from cache and database).
-    lift2 $ void $ removeEntiteit roleId
     pure users
 
 -- | Returns peers with a perspective on the instance.
@@ -285,9 +291,8 @@ removeRoleInstanceFromContext role@(PerspectRol{_id:roleId, pspType:roleType, co
               Just myType -> do
                 mme <- lift2 (contextId ##> getRoleInstances myType)
                 cacheAndSave contextId (changeContext_me changedContext mme)
+                -- and set isMe of mme!
           else cacheAndSave contextId changedContext
-
-    -- PERSISTENCE (severe the binding links of the incoming FILLS relation).
 
 -- | PERSISTENCE. Remove the incoming links on both the incoming and outgoing
 -- | binding relations.
@@ -296,11 +301,10 @@ severeBindingLinks (PerspectRol{_id:roleId, pspType:roleType, binding, gevuldeRo
   -- Severe the binding links of the incoming FILLS relation:
   case binding of
     Nothing -> pure unit
-    Just b -> b `noLongerFills` roleId
+    -- (Remove from the gevuldeRollen, in other words: change filler)
+    Just b -> b `fillerNoLongerPointsTo` roleId
   -- Severe the binding links of the outgoing FILLS relation:
-  case lookup (unwrap roleType) filledRoles of
-    Nothing -> pure unit
-    Just filledRoles' -> for_ filledRoles' \filled -> filled `noLongerFilledBy` roleId
+  for_ filledRoles (\filledRoles' -> for_ filledRoles' \filled -> filled `filledNoLongerPointsTo` roleId)
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
@@ -456,8 +460,10 @@ handleNewPeer roleInstance = (lift2 $ try$ getPerspectRol roleInstance) >>=
 -- | Modifies the Role instance.
 -- | If the the role instance has in fact no binding before the operation, this is a no-op without effect.
 -- | Parameter `bindingRemoved` is true iff the role that is the binding of the role will be removed.
+-- | In that case we need not add a RoleBindingDelta, because peers will work out from the UniverseRoleDelta
+-- | what to do with the binding.
 -- | PERSISTENCE of binding role and old binding.
--- | RULE TRIGGERING for `binding <roleId`, `binder <TypeOfRoleId>` for the old binding.
+-- | STATE CHANGE for `binding <roleId`, `binder <TypeOfRoleId>` for the old binding.
 -- | QUERY UPDATES for `binding <roleId>` and `binder <TypeOfRoleId>`.
 -- | SYNCHRONISATION by RoleBindingDelta.
 -- | CURRENTUSER for roleId and its context.
@@ -467,74 +473,182 @@ removeBinding bindingRemoved roleId = (lift2 $ try $ getPerspectEntiteit roleId)
     \(originalRole :: PerspectRol) -> case rol_binding originalRole of
       Nothing -> pure []
       Just bindingId -> do
-        -- NOTE. because the role can be a user role with a perspective on itself, we have to compute the users
-        -- for this delta *before* we actually delete the binding!
+        -- QUERY EVALUATION
         (lift2 $ findBinderRequests bindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
+        (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
+
+        -- STATE EVALUATION
         subject <- getSubject
+        roleWillBeRemoved <- lift $ gets \(Transaction{untouchableRoles}) -> isJust $ elemIndex roleId untouchableRoles
         delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
                       { id : roleId
                       , binding: (rol_binding originalRole)
                       , oldBinding: (rol_binding originalRole)
                       , deltaType: RemoveBinding
-                      , roleWillBeRemoved: bindingRemoved
+                      , roleWillBeRemoved
                       , subject
                       }
         users <- usersWithPerspectiveOnRoleBinding delta true
-        author <- getAuthor
-        signedDelta <- pure $ SignedDelta
-          { author
-          , encryptedDelta: sign $ encodeJSON $ delta}
-        addDelta (DeltaInTransaction { users, delta: signedDelta})
+        if roleWillBeRemoved
+          then pure unit
+          else do
+            -- SYNCHRONISATION
+            -- Only push a RoleBindingDelta if the role will not be removed.
+            author <- getAuthor
+            signedDelta <- pure $ SignedDelta
+              { author
+              , encryptedDelta: sign $ encodeJSON $ delta}
+            addDelta (DeltaInTransaction { users, delta: signedDelta})
 
-        -- Remove the link from filler to filled (= the current role), unless it (filler) is removed anyway.
-        if not bindingRemoved
-          then do
-            (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
-            -- Remove the inverse binding administration: roleId is no longer filled by bindingId.
-            -- NOTE: Because there is no role removal, in this case the mutation may be carried out immediately.
-            bindingId `noLongerFills` roleId
-          -- the role that has the binding will be removed anyway.
-          else pure unit
-
-        -- Remove the link from filled (= the current role) to filler.
-        -- TODO. Hier breek ik de structuur af, VOORDAT on exit acties kunnen zijn uitgevoerd. Dit moet ook uitgesteld worden.
-        -- If bindingRemoved is true, postpone the actual mutation in the Transaction. In that way, we keep
-        -- the structure intact until after on exit actions have been run for bindingId.
-        cacheAndSave roleId (over PerspectRol (\rl -> rl {bindingDelta = Nothing})
-          (changeRol_isMe (removeRol_binding originalRole) false))
-
-        (lift2 $ try $ getPerspectContext $ rol_context originalRole) >>=
-          handlePerspectContextError "removeBinding"
-            \ctxt -> if (context_me ctxt == (Just roleId))
-              then setMe (rol_context originalRole) Nothing
-              else pure unit
+        -- PERSISTENCE
+        -- Schedule the removal of the binding.
+        lift $ modify (\t -> over Transaction (\tr -> tr {rolesToUnbind = union [Tuple roleId Nothing] tr.rolesToUnbind}) t)
 
         pure users
 
--- | <fillerId> `noLongerFills` <filledId>
+changeRoleBinding :: Tuple RoleInstance (Maybe RoleInstance) -> MonadPerspectivesTransaction Unit
+changeRoleBinding (Tuple filledId mNewFiller) = (lift2 $ try $ getPerspectEntiteit filledId) >>=
+  handlePerspectRolError "changeRoleBinding"
+    \(filled :: PerspectRol) -> do
+      roleWillBeRemoved <- lift $ gets \(Transaction{untouchableRoles}) -> isJust $ elemIndex filledId untouchableRoles
+      -- If the role will be removed, we don't modify it (we don't remove its binding).
+      -- However, regardless of that we'll have to modify the filler.
+      -- If the role will not be removed and there is a new filler, we fill it with that filler
+      -- and record with the filler the new filled role.
+
+      -- Regardless of the filled will be removed, we'll have to remove the pointer from the filler to it.
+      case rol_binding filled of
+        Just filler -> filler `fillerNoLongerPointsTo` filledId
+        _ -> pure unit
+
+      if not roleWillBeRemoved
+        -- Remove the link from filler to filled (= the current role).
+        then do
+          case mNewFiller of
+            Nothing -> case rol_binding filled of
+              Nothing -> pure unit
+              Just filler -> filledId `filledNoLongerPointsTo` filler
+            Just newFiller -> do
+              filledId `filledPointsTo` newFiller
+              newFiller `fillerPointsTo` filledId
+        else pure unit
+
+      -- CURRENTUSER
+      -- True, iff filled bound the User of this System.
+      filledIsMe <- lift2 $ isMe filledId
+      if roleWillBeRemoved
+        then if filledIsMe
+          -- We leave filled as it is.
+          -- Tries to find a new value for Me
+          -- in the context of filled and will set its isMe to true.
+          then lookForAlternativeMe filledId (rol_context filled)
+          else pure unit
+        else if filledIsMe
+          then case mNewFiller of
+            Nothing -> do
+              -- If there is no filler, isMe of the filled must be false.
+              roleIsNotMe filledId -- Changes isMe of the role to false.
+              -- Tries to find a new value for Me
+              -- in the context of filled and will set its isMe to true.
+              lookForAlternativeMe filledId (rol_context filled)
+            Just newFiller -> do
+              newFillerIsMe <- lift2 $ isMe newFiller
+              if newFillerIsMe
+                -- Filled was me and is me again. No change.
+                then pure unit
+                else do
+                  roleIsNotMe filledId
+                  lookForAlternativeMe filledId (rol_context filled)
+          else case mNewFiller of
+            Nothing -> pure unit
+            Just newFiller -> do
+              newFillerIsMe <- lift2 $ isMe newFiller
+              if newFillerIsMe
+                then roleIsMe filledId (rol_context filled) -- Set isMe of the role and set the role to Me of the context.
+                else pure unit
+
+-- | In the context of the roleInstance, find the role that is me and set its isMe to true.
+-- | Set the me of the context to that role.
+-- | If not found, set me of the context to Nothing.
+-- | Invariant: roleId was the previous value of me of contextId at the time of calling.
+lookForAlternativeMe :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
+lookForAlternativeMe roleId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
+  handlePerspectContextError "lookForAlternativeMe"
+    \ctxt -> do
+      mmyType <- lift2 (contextId ##> getMyType)
+      case mmyType of
+        Nothing -> cacheAndSave contextId (changeContext_me ctxt Nothing)
+        Just myType -> do
+          mme <- lift2 (contextId ##> getRoleInstances myType)
+          case mme of
+            Nothing -> cacheAndSave contextId (changeContext_me ctxt Nothing)
+            Just me -> roleIsMe me contextId
+
+-- | Set isMe of the roleInstance to false.
+roleIsNotMe :: RoleInstance -> MonadPerspectivesTransaction Unit
+roleIsNotMe roleId = (lift2 $ try $ getPerspectRol roleId) >>=
+  handlePerspectRolError "roleIsNotMe"
+    \role -> do
+      cacheAndSave roleId (changeRol_isMe role false)
+
+-- | Set isMe of the roleInstance to true.
+-- | Set me of the context to the roleInstance.
+roleIsMe :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
+roleIsMe roleId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
+  handlePerspectContextError "roleIsMe"
+    \ctxt -> (lift2 $ try $ getPerspectRol roleId) >>=
+      handlePerspectRolError "roleIsMe"
+        \role -> do
+          cacheAndSave roleId (changeRol_isMe role true)
+          cacheAndSave contextId (changeContext_me ctxt (Just roleId))
+
+-- | <fillerId> `fillerNoLongerPointsTo` <filledId>
 -- | Break the link from filler to filled (FILLS link)
+-- | (Remove from the gevuldeRollen, in other words: change filler)
 -- | Not the other way round!
 -- | Removes filled from gevuldeRollen of filler (because filler no longer fills filled).
 -- | This function takes care of
 -- | PERSISTENCE
--- | CURRENTUSER is not relevant.
--- TODO: SYNC, STATE TRIGGERING, QUERY UPDATES.
-noLongerFills :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
-noLongerFills fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) >>=
-  handlePerspectRolError "noLongerFills"
+fillerNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
+fillerNoLongerPointsTo fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) >>=
+  handlePerspectRolError "fillerNoLongerPointsTo"
     \(filler :: PerspectRol) -> (lift2 $ try $ getPerspectEntiteit filledId) >>=
-      handlePerspectRolError "noLongerFills"
+      handlePerspectRolError "fillerNoLongerPointsTo"
       \(filled :: PerspectRol) -> do
-        -- TODO. Users met een perspectief op filler zouden moeten worden geïnformeerd, als filled wordt weggegooid.
         filler'@(PerspectRol{gevuldeRollen}) <- pure $ (removeRol_gevuldeRollen filler (rol_pspType filled) filledId)
         cacheAndSave fillerId filler'
 
--- | <filledId> `noLongerFilledBy` <fillerId>
+-- | <fillerId> `fillerPointsTo` <filledId>
+-- | Add the link from filler to filled (FILLS link)
+-- | (Add to= the gevuldeRollen, in other words: change filler)
+-- | Not the other way round!
+-- | Adds filled from gevuldeRollen of filler (because filler now fills filled).
+-- | This function takes care of
+-- | PERSISTENCE
+fillerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
+fillerPointsTo fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) >>=
+  handlePerspectRolError "fillerNoLongerPointsTo"
+    \(filler :: PerspectRol) -> (lift2 $ try $ getPerspectEntiteit filledId) >>=
+      handlePerspectRolError "fillerNoLongerPointsTo"
+      \(filled :: PerspectRol) -> do
+        filler'@(PerspectRol{gevuldeRollen}) <- pure $ (addRol_gevuldeRollen filler (rol_pspType filled) filledId)
+        cacheAndSave fillerId filler'
+
+-- | <filledId> `filledNoLongerPointsTo` <fillerId>
 -- | Break the link from Filled to Filler (FILLEDBY link).
 -- | Not the other way round!
--- | Removes the binding from Filled.
+-- | (Remove the binding, in other words: change filled)
 -- | NOTE: the second argument is currently useless, but we anticipate with it on multiple fillers.
-noLongerFilledBy :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
-noLongerFilledBy filledId fillerId = (lift2 $ try $ getPerspectEntiteit filledId) >>=
-  handlePerspectRolError "noLongerFilledBy"
+filledNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
+filledNoLongerPointsTo filledId fillerId = (lift2 $ try $ getPerspectEntiteit filledId) >>=
+  handlePerspectRolError "filledNoLongerPointsTo"
     \(filled :: PerspectRol) -> cacheAndSave filledId (removeRol_binding filled)
+
+-- | <filledId> `filledPointsTo` <fillerId>
+-- | Add the link from Filled to Filler (FILLEDBY link).
+-- | Not the other way round!
+-- | (Insert the binding, in other words: change filled)
+filledPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
+filledPointsTo filledId fillerId = (lift2 $ try $ getPerspectEntiteit filledId) >>=
+  handlePerspectRolError "filledNoLongerPointsTo"
+    \(filled :: PerspectRol) -> cacheAndSave filledId (changeRol_binding fillerId filled)

@@ -31,7 +31,7 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (concat, cons, head, nub, unsafeIndex, catMaybes)
+import Data.Array (catMaybes, concat, cons, head, nub, union, unsafeIndex)
 import Data.Array.NonEmpty (fromArray, head) as ANE
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
@@ -74,16 +74,19 @@ import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, isDatabaseQu
 import Unsafe.Coerce (unsafeCoerce)
 
 scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
-scheduleRoleRemoval id = lift $ modify (over Transaction \t@{rolesToBeRemoved} -> t {rolesToBeRemoved = cons id rolesToBeRemoved})
+scheduleRoleRemoval id = lift $ modify (over Transaction \t@{rolesToBeRemoved, rolesToExit} -> t
+  { rolesToExit =  rolesToExit `union` [id]
+  , rolesToBeRemoved = rolesToBeRemoved `union` [id]
+  })
 
 -- | Schedule all roles in the context, including its external role, for removal.
 scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
 scheduleContextRemoval authorizedRole id = (lift2 $ try $ getPerspectContext id) >>=
   handlePerspectContextError "removeContextInstance"
   \(ctxt@(PerspectContext{rolInContext, buitenRol})) ->
-    lift $ modify (over Transaction \t@{contextsToBeRemoved, rolesToBeRemoved} -> t
+    lift $ modify (over Transaction \t@{contextsToBeRemoved, rolesToExit} -> t
       { contextsToBeRemoved = cons (Tuple id authorizedRole) contextsToBeRemoved
-      , rolesToBeRemoved = cons buitenRol $ nub $ rolesToBeRemoved <> (concat $ values rolInContext)})
+      , rolesToExit = nub $ cons buitenRol $ rolesToExit <> (concat $ values rolInContext)})
 
 -- Deletes, from all contexts, the role instance.
 compileAssignmentFromRole :: QueryFunctionDescription -> MP (Updater RoleInstance)
