@@ -126,7 +126,8 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       for_ scheduledAssignments case _ of
         ContextRemoval ctxt authorizedRole -> removeContextInstance ctxt authorizedRole
         RoleRemoval rid -> removeRoleInstance rid
-        RoleUnbinding filled mNewFiller -> changeRoleBinding filled mNewFiller
+        -- TODO: moeten we msignedDelta niet meegeven?
+        RoleUnbinding filled mNewFiller msignedDelta -> changeRoleBinding filled mNewFiller
       -- log ("Will remove these models: " <> show modelsToBeRemoved)
       lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- Now state has changed. Re-evaluate the resources that may change state.

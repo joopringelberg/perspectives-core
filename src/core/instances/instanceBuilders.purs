@@ -72,7 +72,7 @@ import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), ge
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
-import Perspectives.SaveUserData (setBinding)
+import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -80,7 +80,7 @@ import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDel
 import Prelude (Unit, bind, discard, flip, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
--- | Calls setBinding on each role.
+-- | Calls setFirstBinding on each role.
 -- | Calls setProperty for each property value.
 -- | calls addRoleInstancesToContext on the role instances.
 -- | This function is complete w.r.t. the five responsibilities, for the context and its roles.
@@ -106,7 +106,7 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
             (rolInstances' :: NonEmptyArray (Tuple RolSerialization RoleInstance)) <- forWithIndex
               (unwrap rolDescriptions)
               (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId))
-            -- SYNCHRONISATION: through setBinding adds a RoleBindingDelta, also sets isMe.
+            -- SYNCHRONISATION: through setFirstBinding adds a RoleBindingDelta, also sets isMe.
             -- CURRENTUSER
             for_ rolInstances' addBindingToRoleInstance
             -- Add the completed Role instances to the context.
@@ -146,7 +146,7 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
           void $ lift $ lift $ constructEmptyRole contextInstanceId roleType i roleInstanceId
           pure $ Tuple s roleInstanceId
 
-    -- SYNCHRONISATION: through setBinding adds a RoleBindingDelta.
+    -- SYNCHRONISATION: through setFirstBinding adds a RoleBindingDelta.
     addBindingToRoleInstance :: (Tuple RolSerialization RoleInstance) -> (WriterT (Array RoleInstance) (ExceptT PerspectivesError MonadPerspectivesTransaction)) Unit
     addBindingToRoleInstance (Tuple (RolSerialization{binding, properties}) roleInstance) = do
       users <- case binding of
@@ -154,8 +154,8 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
         Nothing -> lift $ lift $ lift2 $ saveEntiteit roleInstance *> pure []
         Just bnd -> do
           expandedBinding <- RoleInstance <$> (lift $ lift $ lift2 $ expandDefaultNamespaces bnd)
-          -- setBinding saves, too.
-          lift $ lift $ setBinding roleInstance expandedBinding Nothing
+          -- setFirstBinding saves, too.
+          lift $ lift $ setFirstBinding roleInstance expandedBinding Nothing
       case properties of
         (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
           lift $ lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
@@ -259,7 +259,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
         Nothing -> pure unit
         Just bnd -> do
           expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
-          void $ setBinding roleInstance expandedBinding Nothing
+          void $ setFirstBinding roleInstance expandedBinding Nothing
       -- Then add the properties
       case properties of
         (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->

@@ -55,7 +55,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
-import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, setBinding)
+import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, replaceBinding, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
@@ -93,8 +93,9 @@ executeRoleBindingDelta (RoleBindingDelta{id: roleId, binding, deltaType, subjec
   (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Verbs.Fill, Verbs.CreateAndFill]) >>= case _ of
     Left e -> handleError e
     Right _ -> case deltaType of
-      SetBinding -> void $ setBinding roleId (unsafePartial $ fromJust binding) (Just signedDelta)
+      SetFirstBinding -> void $ setFirstBinding roleId (unsafePartial $ fromJust binding) (Just signedDelta)
       RemoveBinding -> void $ removeBinding roleId
+      ReplaceBinding -> void $ replaceBinding roleId (unsafePartial $ fromJust binding) (Just signedDelta)
 
 -- TODO. Wat met SetPropertyValue?
 executeRolePropertyDelta :: RolePropertyDelta -> SignedDelta -> MonadPerspectivesTransaction Unit

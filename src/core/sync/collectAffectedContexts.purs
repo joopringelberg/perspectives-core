@@ -375,7 +375,7 @@ usersWithPerspectiveOnRoleBinding (RoleBindingDelta dr@{id:binder, binding:mbind
         ))
       -- All InvertedQueries with a backwards step that is `binder <TypeOfBinder>`, iff we actually overwrite something:
       users3 <- case oldBinding of
-        Just bnd | deltaType == SetBinding ->
+        Just bnd | deltaType == ReplaceBinding ->
           -- We deal here just with the case that we destroy a binding; not with the case that we add one.
           -- Hence, no forward computation. `handleBackwardQuery` just passes on users that have at least one
           -- valid perspective, even if the condition is object state.

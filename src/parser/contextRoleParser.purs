@@ -414,7 +414,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
           , id: rolId
           , binding: bindng
           , oldBinding: Nothing
-          , deltaType: SetBinding
+          , deltaType: SetFirstBinding
           })
       cacheRol rolId
         (PerspectRol defaultRolRecord
@@ -708,7 +708,7 @@ definition = do
       , id: rolId
       , binding: Just bindng
       , oldBinding: Nothing
-      , deltaType: SetBinding
+      , deltaType: SetFirstBinding
       })
   cacheRol rolId
     (PerspectRol defaultRolRecord

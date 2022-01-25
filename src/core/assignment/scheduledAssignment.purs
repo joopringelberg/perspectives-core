@@ -38,6 +38,7 @@ import Data.Maybe (Maybe)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (RoleType)
+import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Utilities (class PrettyPrint)
 
 data ScheduledAssignment =
@@ -45,7 +46,7 @@ data ScheduledAssignment =
   ContextRemoval ContextInstance (Maybe RoleType)
   | RoleRemoval RoleInstance
   -- The first RoleInstance has its binding modified; the second RoleInstance, if present, is the new binding.
-  | RoleUnbinding RoleInstance (Maybe RoleInstance)
+  | RoleUnbinding RoleInstance (Maybe RoleInstance) (Maybe SignedDelta)
 
 derive instance genericScheduledAssignment :: Generic ScheduledAssignment _
 

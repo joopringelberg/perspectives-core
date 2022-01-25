@@ -78,7 +78,7 @@ import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
-import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, removeAllRoleInstances, removeContextIfUnbound)
+import Perspectives.SaveUserData (handleNewPeer, removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectivesForContextAndUser)
@@ -335,7 +335,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       withNewContext authoringRole (Just $ ENR rtype)
         \(ContextInstance id) -> do
           -- now bind it in the role instance.
-          void $ setBinding (RoleInstance subject) (RoleInstance $ buitenRol id) Nothing
+          void $ setFirstBinding (RoleInstance subject) (RoleInstance $ buitenRol id) Nothing
           lift2 $ sendResponse (Result corrId [buitenRol id]) setter
     Api.ImportTransaction -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) TransactionForPeer) -> sendResponse (Error corrId (show e)) setter

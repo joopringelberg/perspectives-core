@@ -235,7 +235,7 @@ instance prettyPrintRoleBindingDelta :: PrettyPrint RoleBindingDelta where
 -----------------------------------------------------------
 -- ROLEBINDINGDELTATYPE
 -----------------------------------------------------------
-data RoleBindingDeltaType = SetBinding | RemoveBinding
+data RoleBindingDeltaType = SetFirstBinding | RemoveBinding | ReplaceBinding
 
 derive instance genericRoleBindingDeltaType :: Generic RoleBindingDeltaType _
 

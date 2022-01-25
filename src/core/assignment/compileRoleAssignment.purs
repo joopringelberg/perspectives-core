@@ -68,7 +68,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
-import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding)
+import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, setFirstBinding)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, isDatabaseQueryRole)
@@ -181,7 +181,7 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifi
         , ctype = unwrap qualifiedContextTypeIdentifier
         })
       -- now bind it in the role instance.
-      void $ setBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
+      void $ setFirstBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
 
 compileAssignmentFromRole (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
@@ -236,12 +236,9 @@ compileAssignmentFromRole (BQD _ QF.Bind_ binding binder _ _ _) = do
     (binding' :: Maybe RoleInstance) <- lift $ lift (roleId ##> bindingGetter)
     (binder' :: Maybe RoleInstance) <- lift $ lift (roleId ##> binderGetter)
     -- setBinding caches, saves, sets isMe and me.
-    void $ case binding' of
-      Nothing -> pure []
-      Just binding'' -> case binder' of
-        Nothing -> pure []
-        Just binder'' -> do
-          setBinding binder'' binding'' Nothing <* handleNewPeer binder''
+    void $ case binding', binder' of
+      Just binding'', Just binder'' -> setBinding binder'' binding'' Nothing <* handleNewPeer binder''
+      _, _ -> pure []
 
 compileAssignmentFromRole (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (RoleInstance ~~> RoleInstance)) <- role2role bindings
