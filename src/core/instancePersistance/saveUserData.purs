@@ -345,7 +345,7 @@ replaceBinding roleId (newBindingId :: RoleInstance) msignedDelta = (lift2 $ try
       if (rol_binding originalRole == Just newBindingId)
         then pure []
         else do
-          users <- removeBinding_ roleId
+          users <- removeBinding_ roleId (Just newBindingId) msignedDelta
           -- PERSISTENCE
           -- Schedule the replacement of the binding.
           lift $ modify (\t -> over Transaction (\tr -> tr {scheduledAssignments = tr.scheduledAssignments `union` [RoleUnbinding roleId (Just newBindingId) msignedDelta]}) t)
@@ -444,15 +444,18 @@ handleNewPeer roleInstance = (lift2 $ try$ getPerspectRol roleInstance) >>=
 -- | SYNCHRONISATION by RoleBindingDelta.
 removeBinding :: RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
 removeBinding roleId = do
-  users <- removeBinding_ roleId
+  users <- removeBinding_ roleId Nothing Nothing
   -- PERSISTENCE
   -- Schedule the removal of the binding.
   lift $ modify (\t -> over Transaction (\tr -> tr {scheduledAssignments = tr.scheduledAssignments `union` [RoleUnbinding roleId Nothing Nothing]}) t)
   pure users
 
-removeBinding_ :: RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
-removeBinding_ roleId = (lift2 $ try $ getPerspectEntiteit roleId) >>=
-  handlePerspectRolError' "removeBinding" []
+-- | QUERY EVALUATION
+-- | STATE EVALUATION
+-- | SYNCHRONISATION
+removeBinding_ :: RoleInstance -> Maybe RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
+removeBinding_ roleId mFillerId msignedDelta = (lift2 $ try $ getPerspectEntiteit roleId) >>=
+  handlePerspectRolError' "removeBinding_" []
     \(originalRole :: PerspectRol) -> case rol_binding originalRole of
       Nothing -> pure []
       Just bindingId -> do
@@ -464,9 +467,14 @@ removeBinding_ roleId = (lift2 $ try $ getPerspectEntiteit roleId) >>=
         subject <- getSubject
         delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
                       { id : roleId
-                      , binding: (rol_binding originalRole)
+                      , binding: case mFillerId of
+                          Nothing -> (rol_binding originalRole)
+                          otherwise -> mFillerId
                       , oldBinding: (rol_binding originalRole)
-                      , deltaType: RemoveBinding
+                      -- TODO. Dit moet ook een ReplaceBinding kunnen zijn!
+                      , deltaType: case mFillerId of
+                        Nothing -> RemoveBinding
+                        otherwise -> ReplaceBinding
                       , subject
                       }
         users <- usersWithPerspectiveOnRoleBinding delta true
@@ -477,9 +485,11 @@ removeBinding_ roleId = (lift2 $ try $ getPerspectEntiteit roleId) >>=
             -- SYNCHRONISATION
             -- Only push a RoleBindingDelta if the role will not be removed.
             author <- getAuthor
-            signedDelta <- pure $ SignedDelta
-              { author
-              , encryptedDelta: sign $ encodeJSON $ delta}
+            signedDelta <- case msignedDelta of
+              Nothing ->  pure $ SignedDelta
+                { author
+                , encryptedDelta: sign $ encodeJSON $ delta}
+              Just signedDelta -> pure signedDelta
             addDelta (DeltaInTransaction { users, delta: signedDelta})
 
         pure users
