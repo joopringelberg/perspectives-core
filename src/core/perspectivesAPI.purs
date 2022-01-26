@@ -52,8 +52,8 @@ import Perspectives.Assignment.Update (deleteProperty, setPreferredUserRoleType,
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileAssignment (compileAssignment)
-import Perspectives.CompileRoleAssignment (compileAssignmentFromRole, scheduleRoleRemoval)
-import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>))
+import Perspectives.CompileRoleAssignment (compileAssignmentFromRole, scheduleContextRemoval, scheduleRoleRemoval)
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>), (###>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -72,7 +72,7 @@ import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyG
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation)
+import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation, roleKindOfRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
@@ -81,8 +81,8 @@ import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransac
 import Perspectives.SaveUserData (handleNewPeer, removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.TypePersistence.PerspectiveSerialisation (perspectivesForContextAndUser)
-import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
+import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
+import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
 import Simple.JSON (read)
 
@@ -283,6 +283,32 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (perspectivesForContextAndUser userRoleInstance userRoleType)
           (ContextInstance object)
 
+    -- { request: "GetPerspective", subject: UserRoleType OPTIONAL, predicate: RoleInstance, object: ContextInstance OPTIONAL }
+    Api.GetPerspective -> do
+      contextInstance <- if object == ""
+        then (RoleInstance predicate) ##>> context
+        else pure $ ContextInstance object
+      contextType <- contextInstance ##>> contextType
+      (objectRoleType :: EnumeratedRoleType) <- (RoleInstance predicate) ##>> roleType
+      (muserRoleType :: Maybe RoleType) <- if subject == ""
+        then contextInstance ##> getMyType
+        else contextType ###> lookForRoleType subject
+      case muserRoleType of
+        Nothing -> do
+          message <- if subject == ""
+            then pure ("Cannot find your role in the context " <> object)
+            else pure ("Cannot find the role type '" <> subject <> "' in context type '" <> show contextType <> "'.")
+          sendResponse (Error corrId message) setter
+        Just userRoleType -> do
+          muserRoleInstance <- contextInstance ##> getRoleInstances userRoleType
+          case muserRoleInstance of
+            Nothing -> sendResponse (Error corrId ("There is no user role instance for role type '" <> subject <> "' in context instance '" <> object <> "'!")) setter
+            Just userRoleInstance -> registerSupportedEffect
+              corrId
+              setter
+              (perspectiveForContextAndUser userRoleInstance userRoleType (ENR objectRoleType))
+              contextInstance
+
     -- { request: GetContextActions
     -- , subject: RoleType // the user role type
     -- , object: ContextInstance
@@ -360,9 +386,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- The context type given in object must be described in a locally installed model.
     Api.RemoveRol -> do
       if (isExternalRole subject)
-        -- now we must have a predicate and an object.
-        then withLocalName predicate (ContextType object)
-          \(qrolname :: RoleType) -> case qrolname of
+        then do
+          (qrolname :: RoleType) <- string2RoleType subject
+          case qrolname of
             cr@(CR ctype) -> do
               isDBQ <- isDatabaseQueryRole cr
               if isDBQ
@@ -372,6 +398,20 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         else do
           void $ runMonadPerspectivesTransaction authoringRole $ scheduleRoleRemoval (RoleInstance subject)
           sendResponse (Result corrId []) setter
+    -- {request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype}
+    -- The context type given in object must be described in a locally installed model.
+    -- The RoleType (given in the predicate) must be of kind ContextRole. It may be an unqualified name.
+    Api.RemoveContext -> do
+      (autorizedRole :: RoleType) <- string2RoleType predicate
+      kind <- roleKindOfRoleType autorizedRole
+      if kind == ContextRole
+        then do
+          void $ runMonadPerspectivesTransaction authoringRole do
+            scheduleRoleRemoval (RoleInstance subject)
+            contextToBeRemoved <- lift2 ((RoleInstance subject) ##>> binding >=> context)
+            scheduleContextRemoval (Just autorizedRole) contextToBeRemoved
+          sendResponse (Result corrId []) setter
+        else sendResponse (Error corrId ("Cannot remove a context from a non-context role kind: " <> show autorizedRole )) setter
     Api.DeleteRole -> do
       -- TODO. Hanteer het geval dat subject een DBQ role is. Of misschien veiliger om er DeleteAllInstances van te maken?
       void $ runMonadPerspectivesTransaction authoringRole $ removeAllRoleInstances (EnumeratedRoleType subject) (ContextInstance object)

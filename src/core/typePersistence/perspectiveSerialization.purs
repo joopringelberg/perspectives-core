@@ -49,7 +49,7 @@ import Perspectives.Representation.Class.Property (getProperty, isCalculated, fu
 import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleKindOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), PerspectiveId)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..))
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, PropertyType, RoleKind, RoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
@@ -62,9 +62,13 @@ type SerialisedPerspective' =
   , isFunctional :: Boolean
   , isMandatory :: Boolean
   , isCalculated :: Boolean
+  -- The RoleType having the Perspective.
+  , userRoleType :: String
   -- The RoleType of the object of the Perspective.
   , roleType :: Maybe String
   , roleKind :: Maybe RoleKind
+  -- The ContextInstance in which the roleInstances are embedded as EnumeratedRole instances.
+  , contextInstance :: ContextInstance
   , verbs :: Array String
   -- All properties, including those available to some role instance.
   , properties :: Object SerialisedProperty
@@ -92,17 +96,18 @@ type SerialisedProperty =
 newtype SerialisedPerspective = SerialisedPerspective String
 derive instance newtypeSerialisedPerspective :: Newtype SerialisedPerspective _
 
--- | Get the serialisation of the Role instance with
+-- | Get the serialisation of the perspective the user role type has on the object role type,
+-- | in a given context instance.
 perspectiveForContextAndUser ::
   RoleInstance ->           -- The user role instance
   RoleType ->               -- The user role type
-  PerspectiveId ->          -- The String identifying the perspective for the user role type.
+  RoleType ->               -- An object role type, will be matched against the Perspective's roleTypes member.
   (ContextInstance ~~> SerialisedPerspective)
-perspectiveForContextAndUser subject userRoleType perspectiveId cid = ArrayT do
+perspectiveForContextAndUser subject userRoleType objectRoleType cid = ArrayT do
   contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
   subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
   allPerspectives <- lift$  perspectivesOfRoleType userRoleType
-  traverse ((serialisePerspective contextStates subjectStates cid) >=> pure <<< SerialisedPerspective <<< writeJSON) (filter (eq perspectiveId <<< _.id <<< unwrap) allPerspectives)
+  traverse ((serialisePerspective contextStates subjectStates cid userRoleType) >=> pure <<< SerialisedPerspective <<< writeJSON) (filter (isJust <<< elemIndex objectRoleType <<< _.roleTypes <<< unwrap) allPerspectives)
 
 perspectivesForContextAndUser :: RoleInstance -> RoleType -> (ContextInstance ~~> SerialisedPerspective)
 perspectivesForContextAndUser subject userRoleType cid = ArrayT do
@@ -110,7 +115,7 @@ perspectivesForContextAndUser subject userRoleType cid = ArrayT do
   subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
   -- NOTE that we ignore perspectives that the user role's aspects may have!
   perspectives <- lift $ perspectivesOfRoleType userRoleType
-  (traverse (serialisePerspective contextStates subjectStates cid) perspectives) >>=
+  (traverse (serialisePerspective contextStates subjectStates cid userRoleType) perspectives) >>=
     (filterA sendToClient) >>=
       pure <<< map (SerialisedPerspective <<< writeJSON)
   where
@@ -127,9 +132,10 @@ serialisePerspective ::
   Array StateSpec ->
   Array StateSpec ->
   ContextInstance ->
+  RoleType ->
   Perspective ->
   AssumptionTracking SerialisedPerspective'
-serialisePerspective contextStates subjectStates cid p@(Perspective {id, object, isEnumerated, displayName, roleTypes, roleVerbs, propertyVerbs, actions}) = do
+serialisePerspective contextStates subjectStates cid userRoleType p@(Perspective {id, object, isEnumerated, displayName, roleTypes, roleVerbs, propertyVerbs, actions}) = do
   properties <- lift $ serialiseProperties object (concat (catMaybes $ (flip lookup (unwrap propertyVerbs)) <$> (contextStates <> subjectStates)))
   roleInstances <- roleInstancesWithProperties properties cid p
   roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes)
@@ -145,8 +151,10 @@ serialisePerspective contextStates subjectStates cid p@(Perspective {id, object,
     , isFunctional: pessimistic $ functional object
     , isMandatory: pessimistic $ mandatory object
     , isCalculated: not isEnumerated
+    , userRoleType: (roletype2string userRoleType)
     -- NOTE: there can be more than one roleType.
     , roleType: roletype2string <$> head roleTypes
+    , contextInstance: cid
     , roleKind
     , verbs: show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip lookup (unwrap roleVerbs)) <$> (contextStates <> subjectStates)))
     , properties: fromFoldable ((\prop@({id:propId}) -> Tuple propId prop) <$> (properties <> unifiedProps roleInstances))

@@ -56,7 +56,7 @@ type PerspectiveRecord =
   { id :: PerspectiveId
   , object :: QueryFunctionDescription
   , displayName :: String
-  -- The RoleType of the object of the perspective.
+  -- The RoleTypes of the object of the perspective.
   , roleTypes :: Array RoleType
   , isEnumerated :: Boolean
   , roleVerbs :: EncodableMap StateSpec RoleVerbList

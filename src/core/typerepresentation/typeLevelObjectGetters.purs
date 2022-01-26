@@ -62,7 +62,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier(..), propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
+import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||), (*>))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -88,6 +88,9 @@ enumeratedRoleContextType = getEnumeratedRole >=> pure <<< _.context <<< unwrap
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
 ----------------------------------------------------------------------------------------
+string2RoleType :: String -> MonadPerspectives RoleType
+string2RoleType qualifiedRoleName = getEnumeratedRole (EnumeratedRoleType qualifiedRoleName) *> pure (ENR $ EnumeratedRoleType qualifiedRoleName) <|> pure (CR $ CalculatedRoleType qualifiedRoleName)
+
 -- | If a role with the given qualified name is available in the Context or its (in)direct aspects,
 -- | return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
