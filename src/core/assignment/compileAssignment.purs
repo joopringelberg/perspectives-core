@@ -30,12 +30,12 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, head, unsafeIndex)
+import Data.Array (catMaybes, head, union, unsafeIndex)
 import Data.Array.NonEmpty (fromArray, head) as ANE
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
@@ -69,6 +69,8 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, setFirstBinding)
+import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
+import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -344,6 +346,13 @@ compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _)
         c
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )
+
+compileAssignment (MQD dom (ExternalDestructiveFunction functionName) args _ _ _) = do
+  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (unsafeCoerce compileFunction) args
+  pure (\c -> do
+    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
+    lift $ modify (over Transaction \t@{scheduledAssignments} -> t
+      { scheduledAssignments = scheduledAssignments `union` [ExecuteDestructiveEffect functionName (unwrap c) values] }))
 
 -- Catchall, remove when all cases have been covered.
 compileAssignment otherwise = throwError (error ("Found unknown case for compileAssignment: " <> show otherwise))

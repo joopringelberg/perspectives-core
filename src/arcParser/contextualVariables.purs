@@ -133,6 +133,9 @@ assignmentContainsReference varName (PropertyAssignment {valueExpression, roleEx
 assignmentContainsReference varName (ExternalEffect {arguments}) =
   ala Disj foldMap $ stepContainsVariableReference varName <$> arguments
 
+assignmentContainsReference varName (ExternalDestructiveEffect {arguments}) =
+  ala Disj foldMap $ stepContainsVariableReference varName <$> arguments
+
 --------------------------------------------------------------------------
 --- CONSTRUCTING AND ADDING BINDINGS
 --------------------------------------------------------------------------

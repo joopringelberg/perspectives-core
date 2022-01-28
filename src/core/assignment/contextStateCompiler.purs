@@ -116,8 +116,8 @@ compileState stateId = do
 -- | This function is applied without knowing whether state condition is valid.
 -- | Ensure that the current context is available in the environment before applying this function!
 -- | Put an error boundary around this function.
-evaluateContextState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
-evaluateContextState contextId userRoleType stateId = do
+evaluateContextState :: ContextInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
+evaluateContextState contextId stateId = do
   contextIsInState <- conditionSatisfied contextId stateId
   if contextIsInState
     then do
@@ -126,12 +126,12 @@ evaluateContextState contextId userRoleType stateId = do
         then do
           log ("Already in context state " <> unwrap stateId <> ": " <> unwrap contextId)
           subStates <- lift2 $ subStates_ stateId
-          for_ subStates (evaluateContextState contextId userRoleType)
-        else enteringState contextId userRoleType stateId
+          for_ subStates (evaluateContextState contextId)
+        else enteringState contextId stateId
     else do
       contextWasInState <- lift2 $ isActive stateId contextId
       if contextWasInState
-        then exitingState contextId userRoleType stateId
+        then exitingState contextId stateId
         else pure unit
 
 -- | This function is only called (and should only be called) on states whose condition is valid.
@@ -142,8 +142,8 @@ evaluateContextState contextId userRoleType stateId = do
 -- |
 -- | Put an error boundary around this function.
 -- | Ensure that the current context is available in the environment before applying this function!
-enteringState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
-enteringState contextId userRoleType stateId = do
+enteringState :: ContextInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
+enteringState contextId stateId = do
   log ("Entering context state " <> unwrap stateId <> " for context " <> unwrap contextId)
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
@@ -192,7 +192,7 @@ enteringState contextId userRoleType stateId = do
 
   -- Recur.
   subStates <- lift2 $ subStates_ stateId
-  for_ subStates (evaluateContextState contextId userRoleType)
+  for_ subStates (evaluateContextState contextId)
 
 notify :: ContextInstance -> String -> RoleType -> CompiledSentence ContextInstance -> MonadPerspectivesTransaction Unit
 notify contextId me allowedUser compiledSentence = do
@@ -231,15 +231,15 @@ notify contextId me allowedUser compiledSentence = do
 -- |
 -- | Put an error boundary around this function.
 -- | Ensure that the current context is available in the environment before applying this function!
-exitingState :: ContextInstance -> RoleType -> StateIdentifier -> MonadPerspectivesTransaction Unit
-exitingState contextId userRoleType stateId = do
+exitingState :: ContextInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
+exitingState contextId stateId = do
   log ("Exiting context state " <> unwrap stateId <> " for context " <> unwrap contextId)
   -- Recur. We do this first, because we have to exit the deepest nested substate first.
   subStates <- lift2 $ subStates_ stateId
   for_ subStates \subStateId -> do
     contextWasInSubState <- lift2 $ isActive subStateId contextId
     if contextWasInSubState
-      then exitingState contextId userRoleType subStateId
+      then exitingState contextId subStateId
       else pure unit
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.

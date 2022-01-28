@@ -26,7 +26,7 @@ import Prelude
 
 import Data.Foldable (intercalate)
 import Data.Newtype (unwrap)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, RoleType, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, RoleType, StateIdentifier, roletype2string)
 
 data PerspectivesWarning =
     ModelLacksModelId String
@@ -34,6 +34,8 @@ data PerspectivesWarning =
   | PropertySynchronizationIncomplete EnumeratedPropertyType RoleType (Array RoleType)
   | RoleSynchronizationIncomplete EnumeratedRoleType RoleType (Array RoleType)
   | RoleBindingSynchronizationIncomplete EnumeratedRoleType RoleType (Array RoleType)
+  | NotificationError StateIdentifier
+  | AutomaticActionError StateIdentifier
 
 instance showPerspectivesWarning :: Show PerspectivesWarning where
   show (ModelLacksModelId dfid) = "(ModelLacksModelId) The model '" <> dfid <> "' lacks a value for the property ModelIdentification on its Model instance."
@@ -41,3 +43,5 @@ instance showPerspectivesWarning :: Show PerspectivesWarning where
   show (PropertySynchronizationIncomplete prop source destinations) = "(PropertySynchronizationIncomplete) Modifications to property:\n\t'" <> (unwrap prop) <> "'\n by:\n\t'" <> roletype2string source <> "'\n cannot be sent to:\n\t* " <> intercalate "\n\t* " (map roletype2string destinations) <> "."
   show (RoleSynchronizationIncomplete role source destinations) = "(RoleSynchronizationIncomplete) New (and removed) instances of role type:\n\t'" <> (unwrap role) <> "'\n by:\n\t'" <> roletype2string source <> "'\n cannot be sent to:\n\t* " <> intercalate "\n\t* " (map roletype2string destinations) <> "."
   show (RoleBindingSynchronizationIncomplete role source destinations) = "(RoleBindingSynchronizationIncomplete) Filling (and emptying) instances of role type:\n\t'" <> (unwrap role) <> "'\n by:\n\t'" <> roletype2string source <> "'\n cannot be communicated with:\n\t* " <> intercalate "\n\t* " (map roletype2string destinations) <> "."
+  show (NotificationError stateId) = "(NotificationError) Error on notifying in state " <> unwrap stateId
+  show (AutomaticActionError stateId) = "(AutomaticActionError) Error on executing automatic action in state " <> unwrap stateId 

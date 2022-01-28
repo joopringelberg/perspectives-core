@@ -67,6 +67,7 @@ data Assignment =
   | DeleteProperty (WithTextRange (propertyIdentifier :: String, roleExpression :: Maybe Step))
   | PropertyAssignment (WithTextRange (propertyIdentifier :: String, operator :: AssignmentOperator, valueExpression :: Step, roleExpression :: Maybe Step ))
   | ExternalEffect (WithTextRange (effectName :: String, arguments :: (Array Step) ) )
+  | ExternalDestructiveEffect (WithTextRange (effectName :: String, arguments :: (Array Step) ) )
 
 startOfAssignment :: Assignment -> ArcPosition
 startOfAssignment (RemoveRole{start}) = start
@@ -84,6 +85,7 @@ startOfAssignment (DeleteContext{start}) = start
 startOfAssignment (DeleteProperty{start}) = start
 startOfAssignment (PropertyAssignment{start}) = start
 startOfAssignment (ExternalEffect{start}) = start
+startOfAssignment (ExternalDestructiveEffect{start}) = start
 
 endOfAssignment :: Assignment -> ArcPosition
 endOfAssignment (RemoveRole{end}) = end
@@ -101,6 +103,7 @@ endOfAssignment (DeleteContext{end}) = end
 endOfAssignment (DeleteProperty{end}) = end
 endOfAssignment (PropertyAssignment{end}) = end
 endOfAssignment (ExternalEffect{end}) = end
+endOfAssignment (ExternalDestructiveEffect{end}) = end
 
 derive instance genericStatements :: Generic Statements _
 instance showStatements :: Show Statements where show = genericShow
@@ -160,6 +163,7 @@ instance prettyPrintAssignment :: PrettyPrint Assignment where
   prettyPrint' t (DeleteProperty {propertyIdentifier, roleExpression}) = "DeleteProperty " <> propertyIdentifier <> " " <> prettyPrint' t roleExpression
   prettyPrint' t (PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression}) = "PropertyAssignment " <> propertyIdentifier <> " " <> prettyPrint' t operator <> " " <> "\n" <> t <> prettyPrint' (t <> "  ") valueExpression <> "\n" <> t <> prettyPrint' (t <> "  ") roleExpression
   prettyPrint' t (ExternalEffect {arguments}) = "ExternalEffect\n" <> intercalate ("\n" <> t) (prettyPrint' (t <> "  ") <$> arguments)
+  prettyPrint' t (ExternalDestructiveEffect {arguments} )= "ExternalDestructiveEffect\n" <> intercalate ("\n" <> t) (prettyPrint' (t <> "  ") <$> arguments)
 
 derive instance genericAssignmentOperator :: Generic AssignmentOperator _
 instance showAssignmentOperator :: Show AssignmentOperator where show = genericShow

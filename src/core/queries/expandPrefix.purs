@@ -136,6 +136,10 @@ instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
     eeffectName <- expandNamespace effectName
     earguments <- traverse expandPrefix arguments
     pure $ ExternalEffect r {effectName = eeffectName, arguments = earguments}
+  expandPrefix (ExternalDestructiveEffect r@{effectName, arguments}) = do
+    eeffectName <- expandNamespace effectName
+    earguments <- traverse expandPrefix arguments
+    pure $ ExternalEffect r {effectName = eeffectName, arguments = earguments}
 
 instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPart where
   expandPrefix (R (RoleVerbE r@{subject, object, state})) = do

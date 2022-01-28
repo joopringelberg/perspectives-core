@@ -285,6 +285,23 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                   else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
             -- TODO: behandel hier Foreign functions.
             else throwError (UnknownExternalFunction start end effectName)
+      ExternalDestructiveEffect f@{start, end, effectName, arguments} -> do
+        case (deconstructModelName effectName) of
+          Nothing -> throwError (NotWellFormedName start effectName)
+          Just modelName -> if isExternalCoreModule modelName
+            then do
+              mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs effectName
+              case mexpectedNrOfArgs of
+                Nothing -> throwError (UnknownExternalFunction start end effectName)
+                Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
+                  then do
+                    -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
+                    -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
+                    compiledArguments <- traverse (\s -> compileExpression originDomain s) arguments
+                    pure $ MQD originDomain (QF.ExternalDestructiveFunction effectName) compiledArguments originDomain Unknown Unknown
+                  else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
+            -- TODO: behandel hier Foreign functions.
+            else throwError (UnknownExternalFunction start end effectName)
       where
 
         qualifyAsEnumeratedTypeWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType

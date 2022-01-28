@@ -48,6 +48,9 @@ domain System
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
       perspective on Modellen
+        action StartUsing
+          callEffect cdb:AddModelToLocalStore( Url )
+          bind origin to ModelsInUse in currentcontext
         view Modellen$ModelPresentation verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
@@ -69,24 +72,15 @@ domain System
 
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context IndexedContexts (relational) filledBy sys:RootContext
-      state Dangles = not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
-        -- If the user has removed the model, this automatic action will clear away the corresponding entry in IndexedContexts.
-        -- We also remove the IndexedContext itself (the entry to the functionality).
-        on entry
-          do for User
-            remove context origin
 
     -- This will become obsolete when we start using model:CouchdbManagement.
     context ModelsInUse (relational) filledBy Model
       property PerformUpdate (Boolean)
       property IncludingDependencies (Boolean)
-      on exit
-        notify User
-          "Model {origin >> binding >> ModelIdentification} has been removed completely."
-        do for User
-          -- Make sure that the context instance that describes the model is removed itself.
-          remove context origin
-          callEffect cdb:RemoveModelFromLocalStore ( origin >> binding >> ModelIdentification )
+      property HasBeenInstalled (Boolean)
+      --on exit
+        --notify User
+          --"Model {origin >> binding >> ModelIdentification} has been removed completely."
       state Update = PerformUpdate
         on entry
           do for User
@@ -96,13 +90,21 @@ domain System
             IncludingDependencies = false
           notify User
             "Model {ModelIdentification} has been updated."
-      state NotInIndexedContexts = exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
+      state NotInIndexedContexts = not HasBeenInstalled and exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
         -- Create an entry in IndexedContexts if its model has been taken in use.
         on entry
           do for User
             bind binding >> context >> IndexedContext >> binding to IndexedContexts
+            HasBeenInstalled = true
           notify User
-            "{ binding >> ModelIdentification }added!"
+            "{ binding >> ModelIdentification } added!"
+      state Dangles = (not exists binding >> context >> IndexedContext >> binding) and HasBeenInstalled
+        -- If the user has removed the App, this automatic action will clear away the corresponding entry in ModelsInuse.
+        -- We also remove the Model itself (the entry to the functionality).
+        on entry
+          do for User
+            remove context origin
+            callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelIdentification )
       view ModelInUsePresentation (Description, Name, PerformUpdate)
 
     context PendingInvitations = callExternal cdb:PendingInvitations() returns sys:Invitation$External

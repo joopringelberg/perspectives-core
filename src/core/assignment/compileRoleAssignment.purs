@@ -363,6 +363,13 @@ compileAssignmentFromRole (MQD dom (ExternalEffectFullFunction functionName) arg
       _ -> throwError (error "Too many arguments for external core module: maximum is 4")
     )
 
+compileAssignmentFromRole (MQD dom (ExternalDestructiveFunction functionName) args _ _ _) = do
+  (argFunctions :: Array (RoleInstance ~~> String)) <- traverse (unsafeCoerce compileFunction) args
+  pure (\c -> do
+    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
+    lift $ modify (over Transaction \t@{scheduledAssignments} -> t
+      { scheduledAssignments = scheduledAssignments `union` [ExecuteDestructiveEffect functionName (unwrap c) values] }))
+
 -- Catchall, remove when all cases have been covered.
 compileAssignmentFromRole otherwise = throwError (error ("Found unknown case for compileAssignmentFromRole: " <> show otherwise))
 

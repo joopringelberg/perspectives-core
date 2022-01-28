@@ -47,7 +47,7 @@ import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Semigroup, class Show, bind, ($), (<>), pure, (>))
+import Prelude (class Semigroup, class Show, bind, ($), (<>), pure, (>), (&&))
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -151,14 +151,14 @@ createTransaction authoringRole author =
 
 cloneEmptyTransaction :: Transaction -> Transaction
 cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts}) = Transaction
-  { author: author
-  , timeStamp: timeStamp
+  { author
+  , timeStamp
+  , authoringRole
   , deltas: []
   , changedDomeinFiles: []
   , scheduledAssignments: []
   , invertedQueryResults: []
   , correlationIdentifiers: []
-  , authoringRole
   , rolesToExit: []
   , modelsToBeRemoved: []
   , createdContexts: []
@@ -167,5 +167,16 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchabl
   , untouchableContexts
 }
 
+-- | We consider a Transaction to be 'empty' when it shows no difference to the clone of the original.
+-- | This means it is considered to be not empty when one of the members that is wiped on cloning, has content.
 isEmptyTransaction :: Transaction -> Boolean
-isEmptyTransaction (Transaction {deltas}) = null deltas
+isEmptyTransaction (Transaction tr) =
+  null tr.deltas
+  && null tr.changedDomeinFiles
+  && null tr.scheduledAssignments
+  && null tr.invertedQueryResults
+  && null tr.correlationIdentifiers
+  && null tr.rolesToExit
+  && null tr.modelsToBeRemoved
+  && null tr.createdContexts
+  && null tr.createdRoles

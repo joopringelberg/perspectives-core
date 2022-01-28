@@ -80,7 +80,6 @@ perspectDef = LanguageDef
                   , "properties"
                   , "filledBy"
                   , "for"
-                  , "callEffect"
 
                   -- Properties
                   , "property"
@@ -133,6 +132,7 @@ perspectDef = LanguageDef
                   , "unbind_"
                   , "delete"
                   , "callEffect"
+                  , "callDestructiveEffect"
                   , "letE"
                   , "letA"
                   , "callExternal"

@@ -23,20 +23,21 @@
 module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, modify) as AA
-import Control.Monad.Error.Class (catchError, try)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (filterA, head, length, null, sort)
+import Data.Array (filterA, head, length, null, sort, unsafeIndex)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isNothing)
+import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Effect.Aff.AVar (new)
 import Effect.Class.Console (log)
+import Effect.Exception (error)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), liftToInstanceLevel, (##>), (##>>), (##=))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), MPT, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
@@ -45,6 +46,8 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore')
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
+import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
@@ -63,7 +66,8 @@ import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRe
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (roleRootStates, contextRootStates)
-import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
+import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (*>))
+import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -124,10 +128,11 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       lift $ void $ AA.modify cloneEmptyTransaction
       -- Detach and remove instances, collecting new information in the fresh Transaction.
       for_ scheduledAssignments case _ of
-        ContextRemoval ctxt authorizedRole -> removeContextInstance ctxt authorizedRole
-        RoleRemoval rid -> removeRoleInstance rid
+        ContextRemoval ctxt authorizedRole -> log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole
+        RoleRemoval rid -> log ("Remove role " <> unwrap rid) *> removeRoleInstance rid
         -- TODO: moeten we msignedDelta niet meegeven?
-        RoleUnbinding filled mNewFiller msignedDelta -> changeRoleBinding filled mNewFiller
+        RoleUnbinding filled mNewFiller msignedDelta -> log ("Remove filler of " <> unwrap filled) *> changeRoleBinding filled mNewFiller
+        ExecuteDestructiveEffect functionName origin values -> executeEffect functionName origin values
       -- log ("Will remove these models: " <> show modelsToBeRemoved)
       lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- Now state has changed. Re-evaluate the resources that may change state.
@@ -139,7 +144,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
           oldFrame <- lift2 pushFrame
           lift2 $ addBinding "currentcontext" [unwrap contextId]
           -- Error boundary.
-          catchError (evaluateContextState contextId roleType stateId)
+          catchError (evaluateContextState contextId stateId)
             \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
           lift2 $ restoreFrame oldFrame
         RoleStateEvaluation stateId roleId roleType -> do
@@ -150,7 +155,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
           lift2 $ addBinding "currentcontext" [unwrap cid]
           -- TODO. add binding for "currentobject" or "currentsubject"?!
           -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
-          catchError (evaluateRoleState roleId roleType stateId)
+          catchError (evaluateRoleState roleId stateId)
             \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
           lift2 $ restoreFrame oldFrame
       -- If the new transaction is not empty, run again.
@@ -230,52 +235,42 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
   -- Enter the rootState of new contexts.
   for_ createdContexts
     \ctxt -> do
-      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
-      case mmyType of
-        Nothing -> pure unit
-        Just myType -> do
-          states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
-          -- Provide a new frame for the current context variable binding.
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap ctxt]
-          -- Error boundary.
-          catchError (for_ states (enteringState ctxt myType))
-            \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+      states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+      -- Provide a new frame for the current context variable binding.
+      oldFrame <- lift2 pushFrame
+      lift2 $ addBinding "currentcontext" [unwrap ctxt]
+      -- Error boundary.
+      catchError (for_ states (enteringState ctxt))
+        \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
+      lift2 $ restoreFrame oldFrame
   -- Enter the rootState of roles that are created.
   for_ createdRoles
     \rid -> do
       ctxt <- lift2 (rid ##>> context)
-      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
-      case mmyType of
-        Nothing -> pure unit
-        Just myType -> do
-          states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap ctxt]
-          -- Error boundary.
-          catchError (for_ states (enteringRoleState rid myType))
-            \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+      states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+      oldFrame <- lift2 pushFrame
+      lift2 $ addBinding "currentcontext" [unwrap ctxt]
+      -- Error boundary.
+      catchError (for_ states (enteringRoleState rid))
+        \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
+      lift2 $ restoreFrame oldFrame
   -- Exit the rootState of roles that are scheduled to be removed, unless we did so before.
+  log ("Roles to exit: " <> show rolesToExit)
   rolesThatHaveNotExited <- lift2 $ filterA (\rid -> rid ##>> exists' getActiveRoleStates) rolesToExit
+  log ("Roles that have not exited: " <> show rolesThatHaveNotExited)
   for_ rolesThatHaveNotExited
     \rid -> do
       ctxt <- lift2 (rid ##>> context)
-      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
-      case mmyType of
-        Nothing -> pure unit
-        Just myType -> do
-          states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
-          if null states
-            then pure unit
-            else do
-              oldFrame <- lift2 pushFrame
-              lift2 $ addBinding "currentcontext" [unwrap ctxt]
-              -- Error boundary.
-              catchError (for_ states (exitingRoleState rid myType))
-                \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
-              lift2 $ restoreFrame oldFrame
+      states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+      if null states
+        then pure unit
+        else do
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          -- Error boundary.
+          catchError (for_ states (exitingRoleState rid))
+            \e -> logPerspectivesError $ Custom ("Cannot exit role state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
   -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
   contextsThatHaveNotExited <- lift2 $ filterA (\sa -> case sa of
       ContextRemoval ctxt _ -> ctxt ##>> exists' getActiveStates
@@ -296,21 +291,17 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
   where
     exitContext :: Partial => ScheduledAssignment -> MonadPerspectivesTransaction Unit
     exitContext (ContextRemoval ctxt _) = do
-      (mmyType :: Maybe RoleType) <- lift2 (ctxt ##> getMyType)
-      case mmyType of
-        Nothing -> pure unit
-        Just myType -> do
-          states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
-          if null states
-            then pure unit
-            else do
-              -- Provide a new frame for the current context variable binding.
-              oldFrame <- lift2 pushFrame
-              lift2 $ addBinding "currentcontext" [unwrap ctxt]
-              -- Error boundary.
-              catchError (for_ states (exitingState ctxt myType))
-                \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
-              lift2 $ restoreFrame oldFrame
+      states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+      if null states
+        then pure unit
+        else do
+          -- Provide a new frame for the current context variable binding.
+          oldFrame <- lift2 pushFrame
+          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          -- Error boundary.
+          catchError (for_ states (exitingState ctxt))
+            \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
+          lift2 $ restoreFrame oldFrame
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift
@@ -339,3 +330,31 @@ loadModelIfMissing modelName = do
               mySys
               (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just $ unwrap _id})
     else pure unit
+
+-----------------------------------------------------------
+-- EXECUTEEFFECT
+-----------------------------------------------------------
+executeEffect :: String -> String -> Array (Array String) -> MonadPerspectivesTransaction Unit
+executeEffect functionName origin values = do
+  (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
+  case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
+    0 -> (unsafeCoerce f :: String -> MPT Unit) origin
+    1 -> (unsafeCoerce f :: (Array String -> String -> MPT Unit))
+      (unsafePartial (unsafeIndex values 0))
+      origin
+    2 -> (unsafeCoerce f :: (Array String -> Array String -> String -> MPT Unit))
+      (unsafePartial (unsafeIndex values 0))
+      (unsafePartial (unsafeIndex values 1))
+      origin
+    3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> String -> MPT Unit))
+      (unsafePartial (unsafeIndex values 0))
+      (unsafePartial (unsafeIndex values 1))
+      (unsafePartial (unsafeIndex values 2))
+      origin
+    4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> String -> MPT Unit))
+      (unsafePartial (unsafeIndex values 0))
+      (unsafePartial (unsafeIndex values 1))
+      (unsafePartial (unsafeIndex values 2))
+      (unsafePartial (unsafeIndex values 3))
+      origin
+    _ -> throwError (error "Too many arguments for external core module: maximum is 4")

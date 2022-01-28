@@ -274,6 +274,7 @@ data QueryFunction
   | RemovePropertyValue EnumeratedPropertyType
   | SetPropertyValue EnumeratedPropertyType
   | ExternalEffectFullFunction String
+  | ExternalDestructiveFunction String
   | ForeignEffectFullFunction String
 
   | TypeTimeOnlyContextF String

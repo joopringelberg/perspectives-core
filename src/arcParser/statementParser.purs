@@ -45,7 +45,7 @@ assignment = isPropertyAssignment >>= if _
 
 roleAssignment :: IP Assignment
 roleAssignment = do
-  keyword <- lookAhead reservedIdentifier <?> "Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete or callEffect "
+  keyword <- lookAhead reservedIdentifier <?> "Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete, callEffect or callDestructiveEffect "
   case keyword of
     "remove" -> do
       (Tuple first second) <- twoReservedWords
@@ -65,6 +65,7 @@ roleAssignment = do
         "delete", "context" -> contextDeletion
         _, _ -> fail ("Expected 'role' or 'context' after 'delete'.")
     "callEffect" -> callEffect
+    "callDestructiveEffect" -> callDestructiveEffect
     "create" -> do
       (Tuple first second) <- twoReservedWords
       case first, second of
@@ -76,7 +77,7 @@ roleAssignment = do
       case first, second of
         "create_", "context" -> createContext_
         _, _ -> fail ("Expected 'context' after 'create_'.")
-    s -> fail ("Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete or callEffect but found '" <> s <> "'.")
+    s -> fail ("Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete, callDestructiveEffect or callEffect but found '" <> s <> "'.")
 
 roleRemoval :: IP Assignment
 roleRemoval = do
@@ -252,6 +253,22 @@ callEffect = do
       pure (Cons first rest))
   end <- getPosition
   pure $ ExternalEffect {start, end, effectName, arguments: (fromFoldable arguments)}
+
+callDestructiveEffect :: IP Assignment
+callDestructiveEffect = do
+  start <- getPosition
+  effectName <- reserved "callDestructiveEffect" *> arcIdentifier
+  arguments <- token.symbol "(" *>
+    (((token.symbol ")") *> pure Nil)
+    <|>
+    do
+      first <- step
+      -- By using manyTill we get the error messages inside arguments to the end user.
+      -- sepBy would hide them.
+      rest <- manyTill (token.comma *> step) (token.symbol ")")
+      pure (Cons first rest))
+  end <- getPosition
+  pure $ ExternalDestructiveEffect {start, end, effectName, arguments: (fromFoldable arguments)}
 
 -- | A let with assignments: letA <binding>+ in <assignment>+.
 letWithAssignment :: IP LetStep

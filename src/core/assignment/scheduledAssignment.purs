@@ -47,6 +47,10 @@ data ScheduledAssignment =
   | RoleRemoval RoleInstance
   -- The first RoleInstance has its binding modified; the second RoleInstance, if present, is the new binding.
   | RoleUnbinding RoleInstance (Maybe RoleInstance) (Maybe SignedDelta)
+  -- The first String is the name of the ExternalEffectFullFunction,
+  -- the second String represents the context- or role identifier and 
+  -- the Array of Arrays of Strings represent the argument values.
+  | ExecuteDestructiveEffect String String (Array (Array String))
 
 derive instance genericScheduledAssignment :: Generic ScheduledAssignment _
 
