@@ -35,6 +35,8 @@ import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..), endOfAssignment, startOfAssignment)
+import Perspectives.Query.QueryTypes (RoleInContext(..))
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), RoleType(..))
 import Prelude (($), (<$>), (<>), (==), (||))
 
@@ -150,9 +152,8 @@ makeTypeTimeOnlyContextStep varName ctype pos = (VarBinding varName (Simple $ Ty
 
 -- The resulting step will be compiled to a QueryFunctionDescription with function TypeTimeOnlyRoleF,
 -- which the unsafeCompiler will ignore.
-makeTypeTimeOnlyRoleStep :: VarName -> RoleType -> ArcPosition -> VarBinding
-makeTypeTimeOnlyRoleStep varName (ENR (EnumeratedRoleType rtype)) pos = (VarBinding varName (Simple $ TypeTimeOnlyEnumeratedRole pos (rtype)))
-makeTypeTimeOnlyRoleStep varName (CR (CalculatedRoleType rtype)) pos = (VarBinding varName (Simple $ TypeTimeOnlyCalculatedRole pos (rtype)))
+makeTypeTimeOnlyRoleStep :: Partial => VarName -> ADT RoleInContext -> ArcPosition -> VarBinding
+makeTypeTimeOnlyRoleStep varName (ST (RoleInContext{context, role})) pos = VarBinding varName (Simple $ TypeTimeOnlyEnumeratedRole pos (unwrap context) (unwrap role))
 
 -- | Produces a step that takes the context of its origin.
 makeContextStep :: VarName -> ArcPosition -> VarBinding

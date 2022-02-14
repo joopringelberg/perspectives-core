@@ -28,20 +28,21 @@ import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.List (findIndex) as LST
-import Data.Map (values)
+import Data.Map (Map, values, fromFoldable) as MAP
 import Data.Maybe (isJust)
 import Data.Newtype (class Newtype, unwrap)
+import Data.Tuple (Tuple(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object)
 import Perspectives.Data.EncodableMap (EncodableMap)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..), range)
 import Perspectives.Representation.ADT (ADT, leavesInADT)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
-import Prelude (class Eq, class Ord, class Show, ($), (&&), (<>))
+import Prelude (class Eq, class Ord, class Show, ($), (&&), (<>), (<#>))
 
 -----------------------------------------------------------
 -- PERSPECTIVE
@@ -102,14 +103,14 @@ stateSpec2StateIdentifier (ObjectState s) = s
 -- ACCESSORS
 -----------------------------------------------------------
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-objectOfPerspective :: Partial => Perspective -> ADT EnumeratedRoleType
+objectOfPerspective :: Partial => Perspective -> ADT RoleInContext
 objectOfPerspective (Perspective {object}) = case range object of
-  RDOM adt _ -> adt
+  RDOM adt -> adt
 
 -- | Disregarding state, returns true iff the perspective lets the user apply the
 -- | verb to the property.
 perspectiveSupportsPropertyForVerb :: Perspective -> PropertyType -> PropertyVerb -> Boolean
-perspectiveSupportsPropertyForVerb (Perspective {propertyVerbs}) property verb = find $ values $ unwrap propertyVerbs
+perspectiveSupportsPropertyForVerb (Perspective {propertyVerbs}) property verb = find $ MAP.values $ unwrap propertyVerbs
   where
     find :: List (Array PropertyVerbs) -> Boolean
     find pvs = isJust $ LST.findIndex
@@ -121,7 +122,7 @@ perspectiveSupportsPropertyForVerb (Perspective {propertyVerbs}) property verb =
 -- | Disregarding state, returns true iff the perspective lets the user apply *some*
 -- | verb to the property.
 perspectiveSupportsProperty :: Perspective -> PropertyType -> Boolean
-perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ values $ unwrap propertyVerbs
+perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ MAP.values $ unwrap propertyVerbs
   where
     find :: List (Array PropertyVerbs) -> Boolean
     find pvs = isJust $ LST.findIndex
@@ -135,24 +136,24 @@ perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ valu
 -- | the types that occur on each path through the ADT tree (the 'union' of the paths, as it were).
 -- | <perspective> `isPerspectiveOnADT` <adt>
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-isPerspectiveOnADT :: Partial => Perspective -> ADT EnumeratedRoleType -> Boolean
+isPerspectiveOnADT :: Partial => Perspective -> ADT RoleInContext -> Boolean
 isPerspectiveOnADT p adt = null (leavesInADT adt `difference` (leavesInADT $ objectOfPerspective p))
 
 -- | Regardless of state, does the perspective allow for the RoleVerb?
 perspectiveSupportsRoleVerb :: Perspective -> RoleVerb -> Boolean
 perspectiveSupportsRoleVerb (Perspective{roleVerbs}) verb = isJust $ LST.findIndex
   (\rvs -> hasVerb verb rvs)
-  (values $ unwrap roleVerbs)
+  (MAP.values $ unwrap roleVerbs)
 
 perspectiveSupportsRoleVerbs :: Perspective -> Array RoleVerb -> Boolean
 perspectiveSupportsRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.findIndex
   (\rvs -> hasAllVerbs verbs rvs)
-  (values $ unwrap roleVerbs)
+  (MAP.values $ unwrap roleVerbs)
 
 perspectiveSupportsOneOfRoleVerbs :: Perspective -> Array RoleVerb -> Boolean
 perspectiveSupportsOneOfRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.findIndex
   (\rvs -> hasOneOfTheVerbs verbs rvs)
-  (values $ unwrap roleVerbs)
+  (MAP.values $ unwrap roleVerbs)
 
 -----------------------------------------------------------
 -- PROPERTYVERBS
@@ -173,10 +174,13 @@ instance decodePropertyVerbs :: Decode PropertyVerbs where decode = genericDecod
 -- | This is regardless of state! We use this aspect of InvertedQueries to check on the
 -- | completeness of synchronization.
 type ModificationSummary =
-  { modifiesRoleInstancesOf :: Array EnumeratedRoleType
-  , modifiesRoleBindingOf :: Array EnumeratedRoleType
-  , modifiesPropertiesOf :: ExplicitSet PropertyType
+  { modifiesRoleInstancesOf :: Array RoleInContext
+  , modifiesRoleBindingOf :: Array RoleInContext
+  -- TODO Refine this to PropertyInRole = PropertyInRole { role :: EnumeratedRoleType, property :: PropertyType}
+  , modifiesPropertiesOf :: MAP.Map EnumeratedRoleType (ExplicitSet EnumeratedPropertyType)
   }
+
+newtype PropertyInRole = PropertyInRole { role :: EnumeratedRoleType, property :: PropertyType}
 
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 createModificationSummary :: Partial => Perspective -> ModificationSummary
@@ -187,10 +191,18 @@ createModificationSummary p@(Perspective{roleVerbs, propertyVerbs}) =
   , modifiesRoleBindingOf: if perspectiveSupportsOneOfRoleVerbs p [CreateAndFill, Fill, Unbind, RemoveFiller]
     then leavesInADT $ objectOfPerspective p
     else []
-  , modifiesPropertiesOf: foldl
-      (\modifiableProperties (PropertyVerbs props verbs) -> if overlapsPSet (PSet [RemovePropertyValue, DeleteProperty, AddPropertyValue, SetPropertyValue]) verbs
-        then props <> modifiableProperties
-        else modifiableProperties)
-      Empty
-      (concat $ fromFoldable $ values $ unwrap propertyVerbs)
+  -- , modifiesPropertiesOf: foldl
+  --     (\modifiableProperties (PropertyVerbs props verbs) -> if overlapsPSet (PSet [RemovePropertyValue, DeleteProperty, AddPropertyValue, SetPropertyValue]) verbs
+  --       then props <> modifiableProperties
+  --       else modifiableProperties)
+  --     Empty
+  --     (concat $ fromFoldable $ values $ unwrap propertyVerbs)
+  , modifiesPropertiesOf: let
+      (props :: ExplicitSet EnumeratedPropertyType) = foldl
+          (\(modifiableProperties :: ExplicitSet EnumeratedPropertyType) (PropertyVerbs props verbs) -> if overlapsPSet (PSet [RemovePropertyValue, DeleteProperty, AddPropertyValue, SetPropertyValue]) verbs
+            then (props <#> case _ of ENP pt -> pt) <> modifiableProperties
+            else modifiableProperties)
+          Empty
+          (concat $ fromFoldable $ MAP.values $ unwrap propertyVerbs)
+      in MAP.fromFoldable $ (leavesInADT $ objectOfPerspective p) <#> \(RoleInContext{role}) -> Tuple role props
   }

@@ -35,7 +35,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert, lookup)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
-import Perspectives.Data.EncodableMap (EncodableMap(..), empty) as EM
+import Perspectives.Data.EncodableMap (empty) as EM
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InvertedQuery (InvertedQuery)
@@ -44,7 +44,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), InvertedQueryKey)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.State (State) as PEState
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
@@ -106,11 +106,16 @@ instance revisionDomeinFile :: Revision DomeinFile where
 -------------------------------------------------------------------------------
 ---- INVERTEDQUERYCOLLECTION
 -------------------------------------------------------------------------------
-data SeparateInvertedQuery = OnContextDelta_context ContextType TypeName InvertedQuery |
-	OnContextDelta_role ContextType TypeName InvertedQuery |
-	OnRoleDelta_binding ContextType TypeName InvertedQuery |
-	OnRoleDelta_binder ContextType TypeName InvertedQuery |
-	OnPropertyDelta EnumeratedRoleType TypeName InvertedQuery
+data SeparateInvertedQuery =
+  -- Type of the role instance; Type of the context instance to store on; InvertedQuery
+  RoleInvertedQuery EnumeratedRoleType TypeName InvertedQuery |                  -- `role` step
+  -- Type of the context of the role instance; Type of the role instance to store on; InvertedQuery
+	ContextInvertedQuery ContextType TypeName InvertedQuery |                      -- `context` step
+  -- Triple keys; Type of the role instance to store on; InvertedQuery
+	FilledByInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |        -- `filledBy` step
+	FillsInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |           -- `fills` step
+  -- EnumeratedRoleTypes to index with; EnumeratedProperty to store on; InvertedQuery
+	OnPropertyDelta (Array EnumeratedRoleType) TypeName InvertedQuery              -- `Value2Role` step.
 
 type TypeName = String
 
@@ -171,7 +176,7 @@ defaultDomeinFileRecord =
   , modelDescription: Nothing
   , referredModels: []
   , invertedQueriesInOtherDomains: empty
-  , userGraph: UserGraph $ EM.EncodableMap EM.empty
+  , userGraph: UserGraph $ EM.empty
 }
 
 defaultDomeinFile :: DomeinFile

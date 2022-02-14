@@ -30,7 +30,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
-import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
+import Perspectives.Data.EncodableMap (EncodableMap, empty)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -77,7 +77,7 @@ defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
 
   , perspectives: []
 
-  , actions: EncodableMap empty
+  , actions: empty
 
   , pos: pos
   }

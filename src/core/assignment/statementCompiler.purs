@@ -46,7 +46,8 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2contextType, domain2roleType, functional, mandatory, range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
+import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Representation.ADT (ADT(..), leavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
@@ -140,8 +141,8 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         rle <- ensureRole subjects roleExpression
         -- The range of the QueryFunctionDescription must consist of EnumeratedRoleTypes that have kind ContextRole.
         isContextRole <- foldM
-          (\isContextRole eRole -> do
-            EnumeratedRole{kindOfRole} <- lift $ lift $ getEnumeratedRole eRole
+          (\isContextRole (QT.RoleInContext{role}) -> do
+            EnumeratedRole{kindOfRole} <- lift $ lift $ getEnumeratedRole role
             pure $ isContextRole && (ContextRole == kindOfRole))
           true
           (leavesInADT $ unsafePartial domain2roleType $ range rle)
@@ -155,7 +156,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         -- This may cause a loss of accuracy in the query compiler, as the resulting range of this statement is not precise.
         mContextType <- pure $ head $ leavesInADT $ unsafePartial domain2contextType $ range cte
         -- Because we can use CreateRole in a binding in a letA, we return a meaningful range value.
-        pure $ UQD originDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM (ST qualifiedRoleIdentifier) mContextType) True True
+        pure $ UQD originDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType originDomain) qualifiedRoleIdentifier)) True True
       CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
@@ -164,9 +165,15 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           CR calculatedType -> do
             isDBQRole <- lift2 $ isDatabaseQueryRole qualifiedRoleIdentifier
             if isDBQRole
-              then pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (ST $ EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier) Nothing) True True
+              then pure $ UQD
+                originDomain
+                (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier)
+                cte
+                (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType originDomain) (EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier)))
+                True
+                True
               else throwError $ CannotCreateCalculatedRole calculatedType start end
-          ENR enumeratedType -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (ST enumeratedType) Nothing) True True
+          ENR enumeratedType -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType originDomain) enumeratedType)) True True
 
       CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
         roleQfd <- ensureRole subjects roleExpression
@@ -212,7 +219,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         pure $ BQD originDomain QF.Bind_ bindings binders originDomain True True
 
       Unbind f@{bindingExpression, roleIdentifier} -> do
-        (bindings :: QueryFunctionDescription) <- ensureRole subjects  bindingExpression
+        (bindings :: QueryFunctionDescription) <- ensureRole subjects bindingExpression
         -- the type of the binder (indicated by roleIdentifier) should be an EnumeratedRoleType (local name should resolve w.r.t. the binders of the bindings). We try to resolve in the model and then filter candidates on whether they bind the bindings. If they don't, the expression has no meaning.
         (qualifiedRoleIdentifier :: Maybe EnumeratedRoleType) <- qualifyBinderType roleIdentifier (unsafePartial $ domain2roleType $ range bindings) f.start f.end
         pure $ UQD originDomain (QF.Unbind qualifiedRoleIdentifier) bindings originDomain True True
@@ -252,7 +259,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           Just e -> do
             qfd <- compileExpression originDomain e
             case range qfd of
-              (RDOM _ _) -> pure qfd
+              (RDOM _) -> pure qfd
               otherwise -> throwError $ NotARoleDomain (range qfd) (startOf e) (endOf e)
 
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
@@ -342,9 +349,9 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
               none -> throwError $ CannotFindContextType start end contextIdentifier
 
         qualifyPropertyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedPropertyType
-        qualifyPropertyWithRespectTo propertyIdentifier roleQfdunctionDescription start end = do
-          (rt :: ADT EnumeratedRoleType) <- case range roleQfdunctionDescription of
-            (RDOM rt' _) -> pure rt'
+        qualifyPropertyWithRespectTo propertyIdentifier roleQfd start end = do
+          (rt :: ADT EnumeratedRoleType) <- case range roleQfd of
+            (RDOM rt') -> pure $ roleInContext2Role <$> rt'
             otherwise -> throwError $ NotARoleDomain otherwise start end
           (mrt :: Maybe PropertyType) <- lift2 (rt ###> lookForUnqualifiedPropertyType propertyIdentifier)
           case mrt of
@@ -354,7 +361,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
 
         -- | If the name is unqualified, look for an EnumeratedRole with matching local name in the Domain.
         -- | Then, we check whether a candidate's binding type equals the second argument, or is less specialised. In other words: whether the candidate could bind it (the second argument).
-        qualifyBinderType :: Maybe String -> ADT EnumeratedRoleType -> ArcPosition -> ArcPosition -> PhaseThree (Maybe EnumeratedRoleType)
+        qualifyBinderType :: Maybe String -> ADT QT.RoleInContext -> ArcPosition -> ArcPosition -> PhaseThree (Maybe EnumeratedRoleType)
         qualifyBinderType Nothing _ _ _ = pure Nothing
         qualifyBinderType (Just ident) bindings start end = if isQualifiedWithDomein ident
           then pure $ Just $ EnumeratedRoleType ident
@@ -386,7 +393,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           -- An expression that results in a RoleInstance, in this state, for this usertype.
           qfd <- compileExpression originDomain stp
           case range qfd of
-            (RDOM _ _) -> pure qfd
+            (RDOM _) -> pure qfd
             otherwise -> throwError $ NotARoleDomain (range qfd) (startOf stp) (endOf stp)
 
         ensureFunctional :: Step -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
@@ -403,7 +410,8 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
               -- Apply the identity function if the current domain is a context;
               CDOM _ -> pure (SQD originDomain (QF.DataTypeGetter QF.IdentityF) originDomain True True)
               -- Apply the context function if it is a role!
-              RDOM _ membeddingContext -> case membeddingContext of
-                Nothing -> pure (SQD originDomain (QF.DataTypeGetter QF.ContextF) currentcontextDomain True True)
-                Just embeddingContext -> pure (SQD originDomain (QF.DataTypeGetter QF.ContextF) (CDOM $ ST embeddingContext) True True)
+              RDOM roleADT -> pure (SQD originDomain (QF.DataTypeGetter QF.ContextF) (CDOM $ roleInContext2Context <$> roleADT) True True)
+              -- RDOM _ membeddingContext -> case membeddingContext of
+              --   Nothing -> pure (SQD originDomain (QF.DataTypeGetter QF.ContextF) currentcontextDomain True True)
+              --   Just embeddingContext -> pure (SQD originDomain (QF.DataTypeGetter QF.ContextF) (CDOM $ ST embeddingContext) True True)
             (Just (stp :: Step)) -> ensureContext subjects stp

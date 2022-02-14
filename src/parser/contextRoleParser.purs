@@ -401,7 +401,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         }
       contextDelta <- deltaSignedByMe $ encodeJSON $ ContextDelta
         { subject: UserInstance $ RoleInstance me
-        , id: ContextInstance $ show cname
+        , contextInstance: ContextInstance $ show cname
         , roleType: EnumeratedRoleType $ show rname
         , roleInstances: singleton rolId
         , destinationContext: Nothing
@@ -411,9 +411,9 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         Nothing -> pure Nothing
         Just b -> Just <$> (deltaSignedByMe $ encodeJSON $ RoleBindingDelta
           { subject: UserInstance $ RoleInstance me
-          , id: rolId
-          , binding: bindng
-          , oldBinding: Nothing
+          , filled: rolId
+          , filler: bindng
+          , oldFiller: Nothing
           , deltaType: SetFirstBinding
           })
       cacheRol rolId
@@ -697,7 +697,7 @@ definition = do
     }
   contextDelta <- deltaSignedByMe $ encodeJSON $ ContextDelta
     { subject: UserInstance $ RoleInstance me
-    , id: ContextInstance enclContext
+    , contextInstance: ContextInstance enclContext
     , roleType: EnumeratedRoleType (show prop)
     , roleInstances: singleton rolId
     , destinationContext: Nothing
@@ -705,9 +705,9 @@ definition = do
     }
   bindingDelta <- Just <$> (deltaSignedByMe $ encodeJSON $ RoleBindingDelta
       { subject: UserInstance $ RoleInstance me
-      , id: rolId
-      , binding: Just bindng
-      , oldBinding: Nothing
+      , filled: rolId
+      , filler: Just bindng
+      , oldFiller: Nothing
       , deltaType: SetFirstBinding
       })
   cacheRol rolId

@@ -38,12 +38,14 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
-import Perspectives.Representation.ADT (leavesInADT)
-import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Role (class RoleClass, bindingOfADT, expansionOfRole, getRole, perspectives, roleAndBinding, roleKindOfRoleType, typeOfRole)
+import Perspectives.Representation.Class.Role (class RoleClass, expansionOfRole, getRole, perspectives, roleKindOfRoleType, typeOfRole)
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
 import Perspectives.Representation.UserGraph (Edges(..), UserGraph(..))
+
+-- | In this module we don't treat (user) roles as RoleInContexts. This means that Aspect user roles
+-- | are not handled correctly; perspectives on Aspect User roles are treated as if they hold for any
+-- | occurrence of the User role that is used as Aspect.
 
 -------------------------------------------------------------------------------
 ---- BUILDING THE USER GRAPH
@@ -128,7 +130,7 @@ buildUserGraph = do
       isUserNode rt = eq UserRole <$> roleKindOfRoleType rt
 
       proximalObject :: Perspective -> Array RoleType
-      proximalObject (Perspective{roleTypes, object}) = case head roleTypes of
+      proximalObject (Perspective{roleTypes}) = case head roleTypes of
         Just cr@(CR _) -> [cr]
         otherwise -> roleTypes
 

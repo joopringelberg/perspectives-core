@@ -300,7 +300,7 @@ interpret (SQD _ (DataTypeGetter IdentityF) _ _ _) a = pure a
 
 interpret (SQD dom (DataTypeGetter ModelNameF) _ _ _) a = do
   result <- unsafePartial case dom, a.head of
-    RDOM _ _, R rid  -> roleModelName rid
+    RDOM _, R rid  -> roleModelName rid
     CDOM _, C cid -> contextModelName cid
     VDOM _ (Just pt), V _ _ -> pure $ Value $ propertytype2string pt
     ContextKind, CT ct -> unsafeCoerce contextTypeModelName' ct
@@ -361,7 +361,7 @@ interpret qfd a = case a.head of
         (lift2MPQ $ PC.calculation cp) >>= flip interpret a
       (SQD _ (DataTypeGetter ContextF) _ _ _) -> (flip consOnMainPath a) <<< C <$> context rid
       (SQD _ (DataTypeGetter BindingF) _ _ _) -> (flip consOnMainPath a) <<< R <$> binding rid
-      (SQD _ (DataTypeGetterWithParameter GetRoleBindersF parameter) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getRoleBinders (EnumeratedRoleType parameter) rid
+      (SQD _ (DataTypeGetterWithTwoParameters GetRoleBindersF roleType contextType) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getRoleBinders (EnumeratedRoleType roleType) rid
 
       otherwise -> throwError (error $ "(head=RoleInstance) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show rid)
 

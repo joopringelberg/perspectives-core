@@ -28,7 +28,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..))
 import Perspectives.Query.QueryTypes (range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
@@ -39,6 +39,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType, PropertyType(..))
+import Perspectives.Types.ObjectGetters (enumeratedRoleContextType)
 import Prelude (pure, (>>=), ($), (<>), bind, (>=>), (<<<))
 
 -- TODO. Controleer of de opzet van RoleClass.expandedADT hier van toepassing is.
@@ -78,7 +79,9 @@ instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty Enu
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
   isCalculated _ = pure false
-  calculation r = pure $ SQD (RDOM (ST (role r)) Nothing) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range (Just $ ENP (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
+  calculation r = do
+    context <- enumeratedRoleContextType (role r)
+    pure $ SQD (RDOM (ST $ RoleInContext {context, role: (role r)})) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range (Just $ ENP (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
 
 rangeOfPropertyType :: PropertyType -> MonadPerspectives Range
 rangeOfPropertyType (ENP pt) = getEnumeratedProperty pt >>= range

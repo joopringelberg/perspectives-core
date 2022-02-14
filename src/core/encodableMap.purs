@@ -23,16 +23,22 @@
 module Perspectives.Data.EncodableMap
 
 ( EncodableMap(..)
-, module MapExports)
+, insert
+, delete
+, lookup
+, values
+, empty)
 where
 
 import Prelude
 
 import Data.Array.Partial (head, tail)
-import Data.Map (Map, fromFoldable, showTree, toUnfoldable)
+import Data.List (List)
+import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty) as Map
 import Data.Map (empty) as MapExports
-import Data.Newtype (class Newtype)
-import Data.Traversable (traverse)
+import Data.Maybe (Maybe)
+import Data.Newtype (class Newtype, unwrap)
+import Data.Traversable (class Traversable, sequenceDefault, traverse)
 import Data.Tuple (Tuple(..))
 import Foreign (Foreign, unsafeFromForeign)
 import Foreign.Class (class Decode, class Encode, decode, encode)
@@ -40,18 +46,39 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (class PrettyPrint)
 
 
-newtype EncodableMap k v = EncodableMap (Map k v)
+newtype EncodableMap k v = EncodableMap (Map.Map k v)
 
 derive instance newtypeEncodableMap :: Newtype (EncodableMap k v) _
 instance showEncodableMap :: (Show k, Show v) => Show (EncodableMap k v) where show (EncodableMap m) = show m
 instance eqEncodableMap :: (Eq k, Eq v) => Eq (EncodableMap k v) where eq (EncodableMap m1) (EncodableMap m2) = eq m1 m2
 
 instance encodeEncodableMap :: (Encode k, Encode v) => Encode (EncodableMap k v) where
-	encode (EncodableMap m) = encode ((\(Tuple k v) -> [encode k, encode v]) <$> (toUnfoldable m :: Array (Tuple k v)))
+	encode (EncodableMap m) = encode ((\(Tuple k v) -> [encode k, encode v]) <$> (Map.toUnfoldable m :: Array (Tuple k v)))
 instance decodeEncodableMap :: (Ord k, Decode k, Decode v) => Decode (EncodableMap k v) where
-  decode f = EncodableMap <<< fromFoldable <$> (traverse
+  decode f = EncodableMap <<< Map.fromFoldable <$> (traverse
 		(\pair -> Tuple <$> (unsafePartial $ decode $ head pair) <*> (unsafePartial $ decode (head $ tail pair)))
 		(unsafeFromForeign f :: Array (Array Foreign)))
 
 instance prettyPrintEncodableMap :: (Show k, Show v) => PrettyPrint (EncodableMap k v) where
-	prettyPrint' t (EncodableMap mp) = showTree mp
+	prettyPrint' t (EncodableMap mp) = Map.showTree mp
+
+-- instance traversableEncodableMap :: Traversable (EncodableMap k) where
+--   traverse f (EncodableMap mp)  = EncodableMap <$> (traverse f mp)
+--   sequence (EncodableMap mp) t = EncodableMap <$> (traverse t)
+  -- sequence (EncodableMap mp) = EncodableMap <$> traverse identity mp
+
+
+insert :: forall k v. Ord k => k -> v -> EncodableMap k v -> EncodableMap k v
+insert k v mp = EncodableMap $ Map.insert k v (unwrap mp)
+
+delete :: forall k v. Ord k => k -> EncodableMap k v -> EncodableMap k v
+delete k mp = EncodableMap $ Map.delete k (unwrap mp)
+
+lookup :: forall k v. Ord k => k -> EncodableMap k v -> Maybe v
+lookup k mp = Map.lookup k (unwrap mp)
+
+values :: forall k v. EncodableMap k v -> List v
+values (EncodableMap mp) = Map.values mp
+
+empty :: forall k v. EncodableMap k v
+empty = EncodableMap Map.empty

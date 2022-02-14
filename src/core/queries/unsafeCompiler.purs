@@ -57,7 +57,7 @@ import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookup
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -91,8 +91,8 @@ compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   -- TODO moeten we hier de currentcontext pushen?
   RC.calculation ct >>= compileFunction
 
-compileFunction (SQD (RDOM roleAdt _) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) = do
-  g <- getDynamicPropertyGetter pt roleAdt
+compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) = do
+  g <- getDynamicPropertyGetter pt (roleInContext2Role <$> roleAdt)
   pure $ unsafeCoerce g
 
 compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
@@ -115,7 +115,7 @@ compileFunction (SQD _ (ExternalCoreContextGetter functionName) ran _ _) = do
 compileFunction (SQD _ (DataTypeGetter IdentityF) _ _ _) = pure $ (pure <<< identity)
 
 compileFunction (SQD dom (DataTypeGetter ModelNameF) _ _ _) = case dom of
-  RDOM _ _ -> pure $ unsafeCoerce roleModelName
+  RDOM _ -> pure $ unsafeCoerce roleModelName
   CDOM _ -> pure $ unsafeCoerce contextModelName
   VDOM _ (Just pt) -> pure \_ -> pure $ propertytype2string pt
   ContextKind -> pure $ unsafeCoerce contextTypeModelName'

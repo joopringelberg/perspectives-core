@@ -177,7 +177,7 @@ addRoleInstancesToContext contextId rolName instancesAndDeltas = do
           otherwise -> pure $ SignedDelta
             { author
             , encryptedDelta: sign $ encodeJSON $ ContextDelta
-              { id : contextId
+              { contextInstance : contextId
               , roleType: rolName
               , deltaType: AddRoleInstancesToContext
               , roleInstances: (singleton _id)

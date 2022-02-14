@@ -119,7 +119,8 @@ data SimpleStep =
 
   -- These step types are used in Perspectives.Parsing.Arc.PhaseThree for the standard variables.
   | TypeTimeOnlyContext ArcPosition String
-  | TypeTimeOnlyEnumeratedRole ArcPosition String
+  -- ArcPosition, EnumeratedRoleType, ContextType
+  | TypeTimeOnlyEnumeratedRole ArcPosition String String
   | TypeTimeOnlyCalculatedRole ArcPosition String
 
 data UnaryStep =
@@ -201,7 +202,7 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (TypeOfContext _) = "TypeOfContext"
   prettyPrint' t (SpecialisesRoleType _ s) = "SpecialisesRoleType " <> s
   prettyPrint' t (TypeTimeOnlyContext _ s) = "TypeTimeOnlyContext " <> s
-  prettyPrint' t (TypeTimeOnlyEnumeratedRole _ s) = "TypeTimeOnlyEnumeratedRole " <> s
+  prettyPrint' t (TypeTimeOnlyEnumeratedRole _ r c) = "TypeTimeOnlyEnumeratedRole " <> r <> " " <> c
   prettyPrint' t (TypeTimeOnlyCalculatedRole _ s) = "TypeTimeOnlyCalculatedRole " <> s
   prettyPrint' t (RegEx _ r) = show r
 

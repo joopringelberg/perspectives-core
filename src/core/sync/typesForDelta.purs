@@ -159,7 +159,7 @@ instance prettyPrintUniverseRoleDeltaType :: PrettyPrint UniverseRoleDeltaType w
 -- CONTEXTDELTA
 -----------------------------------------------------------
 newtype ContextDelta = ContextDelta (DeltaRecord
-  ( id :: ContextInstance
+  ( contextInstance :: ContextInstance
   , roleType :: EnumeratedRoleType
   , roleInstances :: SerializableNonEmptyArray RoleInstance
   , destinationContext :: Maybe ContextInstance
@@ -173,7 +173,7 @@ instance showContextDelta :: Show ContextDelta where
   show = genericShow
 
 instance eqContextDelta :: Eq ContextDelta where
-  eq (ContextDelta {id:i1, roleType:r1, roleInstances:ri1, destinationContext: dc1, deltaType:d1}) (ContextDelta {id:i2, roleType:r2, roleInstances:ri2, destinationContext: dc2, deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && dc1 == dc2 && d1 == d2
+  eq (ContextDelta {contextInstance:i1, roleType:r1, roleInstances:ri1, destinationContext: dc1, deltaType:d1}) (ContextDelta {contextInstance:i2, roleType:r2, roleInstances:ri2, destinationContext: dc2, deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && dc1 == dc2 && d1 == d2
 
 instance encodeContextDelta :: Encode ContextDelta where
   encode = genericEncode defaultOptions
@@ -208,9 +208,9 @@ instance prettyPrintContextDeltaType :: PrettyPrint ContextDeltaType where
 -- ROLEBINDINGDELTA
 -----------------------------------------------------------
 newtype RoleBindingDelta = RoleBindingDelta (DeltaRecord
-  ( id :: RoleInstance
-  , binding :: Maybe RoleInstance
-  , oldBinding :: Maybe RoleInstance
+  ( filled :: RoleInstance
+  , filler :: Maybe RoleInstance
+  , oldFiller :: Maybe RoleInstance
   , deltaType :: RoleBindingDeltaType
   -- Remove, Change
   ))
@@ -222,7 +222,7 @@ instance showRoleDelta :: Show RoleBindingDelta where
   show = genericShow
 
 instance eqRoleDelta :: Eq RoleBindingDelta where
-  eq (RoleBindingDelta {id:i1, binding:b1, oldBinding:ob1, deltaType:d1}) (RoleBindingDelta {id:i2, binding:b2, oldBinding:ob2, deltaType:d2}) = i1 == i2 && b1 == b2 && ob1 == ob2 && d1 == d2
+  eq (RoleBindingDelta {filled:i1, filler:b1, oldFiller:ob1, deltaType:d1}) (RoleBindingDelta {filled:i2, filler:b2, oldFiller:ob2, deltaType:d2}) = i1 == i2 && b1 == b2 && ob1 == ob2 && d1 == d2
 
 instance encodeRoleDelta :: Encode RoleBindingDelta where
   encode = genericEncode defaultOptions

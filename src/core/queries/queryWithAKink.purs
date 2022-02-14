@@ -25,21 +25,21 @@ module Perspectives.Query.Kinked where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, concat, cons, elemIndex, foldr, fromFoldable, intercalate, null, uncons, union, unsnoc)
+import Data.Array (catMaybes, cons, elemIndex, foldr, intercalate, null, uncons, unsnoc)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Map (Map, values)
+import Data.Map (Map)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
-import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (makeComposition, setPathForStep)
+import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (makeComposition, storeInvertedQuery)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, PhaseTwo', addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (compose, queryFunctionIsFunctional, queryFunctionIsMandatory, invertFunction)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range, replaceDomain)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, domain, range, replaceDomain, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
@@ -47,7 +47,7 @@ import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, 
 import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
 import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -196,7 +196,7 @@ invert_ q@(SQD dom (VariableLookup varName) _ _ _) = do
     Just qfd | qfd == q -> pure []
     Just qfd -> invert_ qfd
 
-invert_ qfd@(SQD dom@(RDOM roleAdt embeddingContext) f@(PropertyGetter prop@(ENP _)) ran fun man) = do
+invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man) = do
   (hasProp :: Boolean) <- lift $ lift $ roleHasProperty roleAdt
   if hasProp
     then do
@@ -204,27 +204,25 @@ invert_ qfd@(SQD dom@(RDOM roleAdt embeddingContext) f@(PropertyGetter prop@(ENP
       case minvertedF of
         Nothing -> pure []
         Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom True True)] Nothing]
-    else ((lift $ lift (expandPropertyQuery embeddingContext roleAdt)) >>= invert_)
+    else ((lift $ lift (expandPropertyQuery roleAdt)) >>= invert_)
 
   where
     -- Creates a series of nested binding expressions until the property has been reached.
-    -- The first binding uses the embeddingContext available on the original role.
-    -- For the rest of the binding steps we have no information on the embedding context.
-    expandPropertyQuery :: Maybe ContextType -> ADT EnumeratedRoleType -> MP QueryFunctionDescription
-    expandPropertyQuery embeddingContext adt = do
+    expandPropertyQuery :: ADT RoleInContext -> MP QueryFunctionDescription
+    expandPropertyQuery adt = do
       hasProp <- roleHasProperty adt
       if hasProp
-        then pure (SQD (RDOM adt embeddingContext) (PropertyGetter prop) ran fun man)
-        else makeComposition <$> makeBinding adt <*> (bindingOfADT adt >>= expandPropertyQuery Nothing)
+        then pure (SQD (RDOM adt) (PropertyGetter prop) ran fun man)
+        else makeComposition <$> makeBinding adt <*> (bindingOfADT adt >>= expandPropertyQuery)
 
       where
-      makeBinding :: ADT EnumeratedRoleType -> MP QueryFunctionDescription
-      makeBinding adt = do
-        b <- bindingOfADT adt
-        pure (SQD (RDOM adt embeddingContext) (DataTypeGetter BindingF) (RDOM b Nothing) True False)
+      makeBinding :: ADT RoleInContext -> MP QueryFunctionDescription
+      makeBinding adt' = do
+        b <- bindingOfADT adt'
+        pure (SQD (RDOM adt') (DataTypeGetter BindingF) (RDOM b) True False)
 
-    roleHasProperty :: ADT EnumeratedRoleType -> MP Boolean
-    roleHasProperty adt = allLocallyRepresentedProperties adt >>= pure <<< isJust <<< (elemIndex prop)
+    roleHasProperty :: ADT RoleInContext -> MP Boolean
+    roleHasProperty adt = allLocallyRepresentedProperties (roleInContext2Role <$> adt) >>= pure <<< isJust <<< (elemIndex prop)
 
 invert_ (SQD dom f ran _ _) = do
   (minvertedF :: Maybe QueryFunction) <- pure $ invertFunction dom f ran
@@ -250,42 +248,25 @@ setInvertedQueries ::
 setInvertedQueries users statesPerProperty roleStates qfd selfOnly = do
   -- log ("setInvertedQueries:" <> "\n users =" <> show users <> "\n states = " <> show roleStates <> "\n statesPerProperty = " <> showTree statesPerProperty <> "\n qfd = " <> show qfd)
   (zqs :: (Array QueryWithAKink)) <- lift $ invert qfd
+
   for_ zqs \qwk@(ZQ backward forward) -> do
-    -- What is confusing about what follows is that it just seems to handle the first step of an inverted query.
-    -- What about the steps that follow?
-    -- Reflect that we have generated *separate inverted queries* for all these steps, each 'kinking' the original query
-    -- at a different position.
-    -- So if the original query was:
-    --    s1 >> s2 >> s3
-    -- we generate:
-    --    backwards (forwards)
-    --    ^s1 (s2 >> s3)          and for this we store an InvertedQuery with s1
-    --    ^s1 << ^s2 (s3)         and for this we store an InvertedQuery with s2
-    --    ^s1 << ^s2 << ^s3 ()    and for this we store an InvertedQuery with s3
-    -- where x << y equals y >> x.
 
-    -- Handle two cases of the backward query:
-    --  * (...) << SQD, i.e. when the backward part is a composition (whose first step is not a composition, that would be an error!). Set the InvertedQuery with respect to the first step of backward.
-    --  * SQD, i.e. when the backward part is just a single step. Set the InvertedQuery for that step.
-    case backward of
-      -- case (...) << SQD
-      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1@(SQD _ _ _ _ _) qfd2 _ _ _)) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty selfOnly
+      -- Store the QueryWithAKink.
+      storeInvertedQuery qwk users roleStates statesPerProperty selfOnly
 
-      -- This case does not have an SQD as the first step, which should not occur in an inverted query.
-      (Just b@(BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _)) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint qfd1)
-
-      -- TODO. Doubleert dit niet met de case hieronder, voor setInvertedQueriesForUserAndRole?
-      -- case SQD
-      (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users (roleStates `union` (concat $ fromFoldable $ values statesPerProperty)) statesPerProperty selfOnly
-
-      (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
-
-      Nothing -> pure unit
-
-    -- Handle the endpoint of the original query when it ends in a Role. There are two cases:
-    -- a Perspective Object, where the perspective may have properties;
-    -- an expression in a statement with a Property value.
-    case forward, backward, domain <$> backward of
-      Nothing, Just bw, Just (RDOM role _) ->
-        void $ setInvertedQueriesForUserAndRole users role statesPerProperty true qwk selfOnly
-      _, _, _ -> pure unit
+      -- If the original query represents the object of a perspective, we need to do more work
+      -- to handle the properties in the perspective.
+      -- We do this just for the full inversion of the object query, i.e. when there is no forward part.
+      -- To ensure we're not dealing with a property definition, we check that the Domain of the backwards part is
+      -- an RDOM (role) domain (the inversion of a property definition query would start with a VDOM (property) domain).
+      case forward, backward, domain <$> backward of
+        Nothing, Just bw, Just (RDOM role) ->
+          void $ unsafePartial $
+            setInvertedQueriesForUserAndRole
+              bw
+              users
+              role
+              statesPerProperty
+              qwk
+              selfOnly
+        _, _, _ -> pure unit

@@ -43,7 +43,7 @@ import Perspectives.Identifiers (Namespace, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
-import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), RoleInContext(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
@@ -55,7 +55,8 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEn
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.State (State(..), StateFulObject(..), constructState)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.View (View(..)) as VIEW
 import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=), (<$>))
 
@@ -79,7 +80,7 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       contextParts' <- case (head (filter (case _ of
         RE (RoleE{id:rid}) -> rid == "External"
         otherwise -> false) contextParts)) of
-          Nothing -> pure $ Cons (RE (RoleE{id: "External", kindOfRole: ExternalRole, roleParts: Nil, pos})) contextParts
+          Nothing -> pure $ Cons (RE (RoleE{id: "External", kindOfRole: TI.ExternalRole, roleParts: Nil, pos})) contextParts
           otherwise -> pure contextParts
       context' <- foldM handleParts context contextParts'
       modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
@@ -138,18 +139,18 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     -- Insert a Role type into a Context type.
     insertRoleInto :: Role -> Context -> Context
     insertRoleInto (E (EnumeratedRole {_id, kindOfRole})) c = case kindOfRole, c of
-      RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (ENR _id) rolInContext}
-      ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR _id) contextRol}
-      ExternalRole, ctxt -> ctxt
+      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (ENR _id) rolInContext}
+      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR _id) contextRol}
+      TI.ExternalRole, ctxt -> ctxt
       -- We may have added the user before, on handling his BotRole.
-      UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR _id) gebruikerRol of
+      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR _id) gebruikerRol of
         Nothing -> cons (ENR _id) gebruikerRol
         (Just _) -> gebruikerRol}
 
     insertRoleInto (C (CalculatedRole {_id, kindOfRole})) c = case kindOfRole, c of
-      RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR _id) rolInContext}
-      ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR _id) contextRol}
-      UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR _id) gebruikerRol}
+      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR _id) rolInContext}
+      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR _id) contextRol}
+      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR _id) gebruikerRol}
       -- A catchall case that just returns the context. Calculated roles for ExternalRole and UserRole should be ignored.
       _, _ -> c
 
@@ -225,16 +226,16 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
           -- Role of the binding (which then is a Context)
           -- This is because the ArcIdentifier following 'filledBy' for a ContextRole, identifies the context - not its
           -- external role.
-          expandedBnd <- if kindOfRole == ContextRole
+          expandedBnd <- if kindOfRole == TI.ContextRole
             then expandNamespace (externalRoleType_ bnd)
             else expandNamespace bnd
           -- By default, comma separated types form a SUM wrt binding.
           -- We assume expandedBnd refers to an EnumeratedRoleType. This need not be so;
           -- it will be repaired in PhaseThree.
-          pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding expandedBnd})
+          pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding (RoleInContext {context: ContextType "", role: EnumeratedRoleType expandedBnd})})
 
     -- ROLEASPECT
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{roleAspects}) (RoleAspect a pos') = do
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{context, roleAspects}) (RoleAspect a pos') = do
       expandedAspect <- expandNamespace a
       if isQualifiedWithDomein expandedAspect
         then pure (EnumeratedRole $ roleUnderConstruction {roleAspects = cons (EnumeratedRoleType expandedAspect) roleAspects})
@@ -248,7 +249,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     -- ROLESTATE
     handleParts roleName e@(EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId, subStates})) = do
       stateKind <- pure (case kind of
-        UserRole -> Srole _id
+        TI.UserRole -> Srole _id
         _ -> Orole _id)
       state@(State{id:ident}) <- traverseStateE stateKind s
       substates <- for subStates (traverseStateE stateKind)
@@ -260,13 +261,13 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 
     -- We we add roleName as another disjunct of a sum type.
     -- Notice that we treat roles as units here; not as collections of properties!
-    addToADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
-    addToADT adt roleName = case adt of
-      EMPTY -> ST $ EnumeratedRoleType roleName
-      SUM terms -> SUM $ cons (ST $ EnumeratedRoleType roleName) terms
-      p@(PROD _) -> SUM [p, ST $ EnumeratedRoleType roleName]
-      s@(ST _) -> SUM [s, ST $ EnumeratedRoleType roleName]
-      UNIVERSAL -> ST $ EnumeratedRoleType roleName
+    addToADT :: ADT RoleInContext -> RoleInContext -> ADT RoleInContext
+    addToADT adt roleInContext = case adt of
+      EMPTY -> ST roleInContext
+      SUM terms -> SUM $ cons (ST roleInContext) terms
+      p@(PROD _) -> SUM [p, ST roleInContext]
+      s@(ST _) -> SUM [s, ST roleInContext]
+      UNIVERSAL -> ST roleInContext
 
     -- We we add roleName as another conjunct of a product type.
     -- `roleName` should be qualified.
@@ -407,9 +408,11 @@ traversePropertyE r ns = if isCalculatedProperty r
 traverseEnumeratedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
 traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
-  property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns (case range of
-    Nothing -> PString
-    Just r -> r) pos
+  property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns
+    (case range of
+      Nothing -> PString
+      Just r -> r)
+    pos
   property' <- foldM (unsafePartial handleParts) property propertyParts
   modifyDF (\df -> addPropertyToDomeinFile (Property.E property') df)
   pure (Property.E property')

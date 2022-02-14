@@ -39,7 +39,7 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, AssumptionTracking
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleRange)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (leavesInADT)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
@@ -141,7 +141,7 @@ serialisePerspective contextStates subjectStates cid userRoleType p@(Perspective
   roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes)
   -- If the binding of the ADT that is the range of the object QueryFunctionDescription, is an external role,
   -- its context type may be created.
-  contextTypesToCreate <- (lift $ leavesInADT <$> bindingOfADT (unsafePartial domain2roleType (range object)))
+  contextTypesToCreate <- (lift $ leavesInADT <<< map roleInContext2Role <$> bindingOfADT (unsafePartial domain2roleType (range object)))
     >>= pure <<< (filter (isExternalRole <<< unwrap))
     >>= lift <<< traverse getEnumeratedRole
     >>= pure <<< map (_.context <<< unwrap)
@@ -203,7 +203,7 @@ serialisePerspective contextStates subjectStates cid userRoleType p@(Perspective
 
 serialiseProperties :: QueryFunctionDescription -> Array PropertyVerbs -> MonadPerspectives (Array SerialisedProperty)
 serialiseProperties object pverbs = do
-  allProps <- allProperties (unsafePartial domain2roleType $ range object)
+  allProps <- allProperties (roleInContext2Role <$> (unsafePartial domain2roleType $ range object))
   (x :: Array (Tuple PropertyType (Array PropertyVerb))) <- pure $ concat (expandPropertyVerbs allProps <$> pverbs)
   (y :: Array (Tuple PropertyType (Array PropertyVerb))) <- pure $ case uncons x of
     Just {head, tail} -> foldl add [head] tail
@@ -290,7 +290,7 @@ roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerb
   -- propertyGetters <- pure []
   (propertyGetters :: Array Intermediate) <- for sps
     (\{id, verbs} -> do
-      getter <- lift $ getDynamicPropertyGetter id (unsafePartial roleRange object)
+      getter <- lift $ getDynamicPropertyGetter id (roleInContext2Role <$> unsafePartial roleRange object)
       pure $ {id, getter, verbs})
   for roleInstances (roleInstanceWithProperties propertyGetters)
   where
@@ -307,7 +307,7 @@ roleInstancesWithProperties sps cid (Perspective{object, roleVerbs, propertyVerb
       extraIntermediates <- for
         objectStateBasedSerialisedProperties
         (\{id, verbs} -> do
-          getter <- lift $ getDynamicPropertyGetter id (unsafePartial roleRange object)
+          getter <- lift $ getDynamicPropertyGetter id (roleInContext2Role <$> (unsafePartial roleRange object))
           pure $ {id, getter, verbs})
       -- Add the extra SerialisedProperties to the Array we already had
       (allIntermediates :: Array Intermediate) <- pure $ foldl add intermediates extraIntermediates

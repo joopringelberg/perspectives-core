@@ -32,19 +32,21 @@ module Perspectives.InvertedQuery where
 
 import Prelude
 
-import Data.Array (cons, delete, null, union)
+import Data.Array (cons, delete, null, union, elemIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Map (Map, lookup) as MAP
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, insert, lookup)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, isContextDomain, isRoleDomain, range)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), isContextDomain, isRoleDomain, range)
+import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -----------------------------------------------------------
@@ -98,22 +100,71 @@ addInvertedQuery q qs = cons q qs
 lookupInvertedQueries :: String -> Object (Array InvertedQuery) -> Array (InvertedQuery)
 lookupInvertedQueries s obj = maybe [] identity (lookup s obj)
 
--- | Add an InvertedQuery to a PropertyType, indexed with an EnumeratedRoleType.
-addInvertedQueryIndexedByContext :: InvertedQuery -> ContextType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
-addInvertedQueryIndexedByContext q cType qs = case lookup (unwrap cType) qs of
-  Nothing -> insert (unwrap cType) [q] qs
-  Just x -> insert (unwrap cType) (cons q x) qs
-
 deleteInvertedQueryIndexedByContext :: InvertedQuery -> ContextType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
 deleteInvertedQueryIndexedByContext q cType qs = case lookup (unwrap cType) qs of
   Nothing -> qs
   Just x -> insert (unwrap cType) (delete q x) qs
 
--- | Add an InvertedQuery to a PropertyType, indexed with an EnumeratedRoleType.
-addInvertedQueryIndexedByRole :: InvertedQuery -> EnumeratedRoleType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
-addInvertedQueryIndexedByRole q eroleType qs = case lookup (unwrap eroleType) qs of
-  Nothing -> insert (unwrap eroleType) [q] qs
-  Just x -> insert (unwrap eroleType) (cons q x) qs
+-- | Add an InvertedQuery to (the inverted queries of) an EnumeratedRole type, indexed with ContextType.
+-- | The inverted queries are stored in the contextInvertedQueries of the EnumeratedRole.
+-- | Their first step is `context`.
+addInvertedQueryIndexedByContext ::
+  InvertedQuery ->
+  ContextType ->
+  Object (Array InvertedQuery) ->
+  Array RoleInContext ->
+  EnumeratedRoleType ->
+  Object (Array InvertedQuery)
+addInvertedQueryIndexedByContext q cType qs modifiesRoleInstancesOf role = let
+  q' = if isJust $ elemIndex (RoleInContext{context: cType, role}) modifiesRoleInstancesOf
+    then over InvertedQuery (\qr -> qr {modifies=true}) q
+    else q
+  in case lookup (unwrap cType) qs of
+    Nothing -> insert (unwrap cType) [q'] qs
+    Just x -> insert (unwrap cType) (cons q' x) qs
+
+addInvertedQueryToPropertyIndexedByRole ::
+  InvertedQuery ->
+  EnumeratedRoleType ->
+  Object (Array InvertedQuery) ->
+  MAP.Map EnumeratedRoleType (ExplicitSet EnumeratedPropertyType) ->
+  EnumeratedPropertyType ->
+  Object (Array InvertedQuery)
+addInvertedQueryToPropertyIndexedByRole q eroleType qs modifiesPropertiesOf propertyType = let
+  q' = case MAP.lookup eroleType modifiesPropertiesOf of
+    Nothing -> q
+    Just props -> if isElementOf propertyType props
+      then over InvertedQuery (\qr -> qr {modifies=true}) q
+      else q
+  in case lookup (unwrap eroleType) qs of
+    Nothing -> insert (unwrap eroleType) [q'] qs
+    Just x -> insert (unwrap eroleType) (cons q' x) qs
+
+deleteInvertedQueryFromPropertyTypeIndexedByRole ::
+  InvertedQuery ->
+  EnumeratedRoleType ->
+  Object (Array InvertedQuery) ->
+  Object (Array InvertedQuery)
+deleteInvertedQueryFromPropertyTypeIndexedByRole q eroleType qs = case lookup (unwrap eroleType) qs of
+  Nothing -> qs
+  Just queries -> insert (unwrap eroleType) (delete q queries) qs
+
+-- | Add an InvertedQuery to (the inverted queries of) a Context type, indexed with an EnumeratedRoleType.
+-- | Their first step is `role`.
+addInvertedQueryIndexedByRole ::
+  InvertedQuery ->
+  EnumeratedRoleType ->
+  Object (Array InvertedQuery) ->
+  Array RoleInContext ->
+  ContextType ->
+  Object (Array InvertedQuery)
+addInvertedQueryIndexedByRole q eroleType qs modifiesRoleInstancesOf context = let
+  q' = if isJust $ elemIndex (RoleInContext {context, role: eroleType}) modifiesRoleInstancesOf
+    then over InvertedQuery (\qr -> qr {modifies=true}) q
+    else q
+  in case lookup (unwrap eroleType) qs of
+    Nothing -> insert (unwrap eroleType) [q'] qs
+    Just x -> insert (unwrap eroleType) (cons q' x) qs
 
 deleteInvertedQueryIndexedByRole :: InvertedQuery -> EnumeratedRoleType -> Object (Array InvertedQuery) -> Object (Array InvertedQuery)
 deleteInvertedQueryIndexedByRole q eroleType qs = case lookup (unwrap eroleType) qs of

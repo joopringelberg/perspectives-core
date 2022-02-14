@@ -35,6 +35,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
 import Perspectives.Persistent (getPerspectContext)
+import Perspectives.Query.QueryTypes (RoleInContext) as QT
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
@@ -115,9 +116,9 @@ checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding roletype instanceToBind = do
   -- If the model is not available locally, try to get it from the repository.
   (instanceType :: EnumeratedRoleType) <- roleType_ instanceToBind
-  (instanceType' :: ADT EnumeratedRoleType) <- (getEnumeratedRole >=> roleAspectsBindingADT) instanceType
+  (instanceType' :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleAspectsBindingADT) instanceType
   -- TODO. Voor de rol moet ik alleen de binding ophalen.
   -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRoleAspectsBinding
-  (roleType' :: ADT EnumeratedRoleType) <- bindingOfRole roletype
+  (roleType' :: ADT QT.RoleInContext) <- bindingOfRole roletype
   b1 <- roleType' `lessThanOrEqualTo` instanceType'
   pure $ b1 && not (roletype == ENR instanceType)

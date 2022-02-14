@@ -35,7 +35,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.Expression.AST (PureLetStep(..), Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (LetStep(..))
-import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range)
+import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range, RoleInContext(..))
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier)
@@ -74,8 +74,8 @@ data PerspectivesError
     | RoleHasNoBinding ArcPosition (ADT EnumeratedRoleType)
     | RoleCannotHaveBinding ArcPosition ArcPosition String
     | IncompatibleDomainsForJunction Domain Domain
-    | RoleDoesNotBind ArcPosition RoleType (ADT EnumeratedRoleType)
-    | LocalRoleDoesNotBind ArcPosition ArcPosition String (ADT EnumeratedRoleType)
+    | RoleDoesNotBind ArcPosition RoleType (ADT RoleInContext)
+    | LocalRoleDoesNotBind ArcPosition ArcPosition String (ADT RoleInContext)
     | IncompatibleComposition ArcPosition Range Domain
     | TypesCannotBeCompared ArcPosition Range Range
     | NotABoolean ArcPosition

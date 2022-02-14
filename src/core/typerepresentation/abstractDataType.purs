@@ -48,11 +48,17 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Ord, class Show, bind, flip, map, pure, show, ($), (<$>), (<<<), (<>), (==), (>>>))
+import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, flip, map, pure, show, ($), (<$>), (<<<), (<>), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
+
+instance functorADT :: Functor ADT where
+  map f (ST a) = ST $ f a
+  map f EMPTY = EMPTY
+  map f (SUM adts) = SUM (map (map f) adts)
+  map f (PROD adts) = PROD (map (map f) adts)
+  map f UNIVERSAL = UNIVERSAL
 
 derive instance genericRepADT :: Generic (ADT a) _
 
@@ -172,7 +178,7 @@ class Reducible a b where
 
 -- | Reduce an `ADT EnumeratedRoleType` with `f :: EnumeratedRoleType -> MP Boolean`
 -- | Does **not** take the binding of a role into account.
-instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
+instance reducibleToBool :: Reducible a Boolean where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do
     (bools :: Array Boolean) <- traverse (reduce f) adts
@@ -183,7 +189,7 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
   reduce f EMPTY = pure false
   reduce f UNIVERSAL = pure true
 
-instance reducibleToString :: Reducible EnumeratedRoleType String where
+instance reducibleToString :: Reducible a String where
   reduce f (ST a) = f a
   reduce f (SUM adts) = intercalate ", " <$> traverse (reduce f) adts
   reduce f (PROD adts) = intercalate "+" <$> traverse (reduce f) adts

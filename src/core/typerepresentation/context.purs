@@ -28,7 +28,9 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Object (Object, empty)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
+import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
@@ -58,6 +60,8 @@ type ContextRecord =
 
   , indexedContext :: Maybe ContextInstance
 
+  , invertedQueries :: Object (Array InvertedQuery)
+
   , pos :: ArcPosition
   }
 
@@ -82,6 +86,8 @@ defaultContext id dname kind context pos = Context { _id: (ContextType id)
   , pos: pos
 
   , indexedContext: Nothing
+
+  , invertedQueries: empty
   }
 
 derive instance genericRepContext :: Generic Context _

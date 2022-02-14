@@ -27,11 +27,11 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (endsWithSegments)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..), isFunctionalFunction, isMandatoryFunction)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType(..))
 import Prelude (class Monoid, class Semigroup, ($), (<$>), (<>))
 
 -- | For each type of function that appears as a single step in a query, we compute the inverse step.
@@ -43,7 +43,7 @@ invertFunction dom qf ran = case qf of
       then Just $ DataTypeGetter ExternalRoleF
       else Just $ RolGetter $ ENR (unsafePartial $ domain2RoleType dom)
     BindingF -> case ran of
-      (RDOM EMPTY _) -> Nothing
+      (RDOM EMPTY) -> Nothing
       otherwise -> Just $ DataTypeGetterWithParameter GetRoleBindersF (unwrap $ unsafePartial $ domain2RoleType dom)
     ExternalRoleF -> Just $ DataTypeGetter ContextF
     -- Identity steps add nothing to the query and can be left out.
@@ -79,7 +79,7 @@ invertFunction dom qf ran = case qf of
   where
     -- NOTE: this is a shortcut that depends on a naming convention. It allows us to **not** make this function in MP.
     isExternalRole :: Domain -> Boolean
-    isExternalRole (RDOM (ST (EnumeratedRoleType n)) _) = n `endsWithSegments` "External"
+    isExternalRole (RDOM (ST (RoleInContext {role}))) = unwrap role `endsWithSegments` "External"
     isExternalRole _ = false
 
 -- | Checks whether the QueryFunction returns just a single result.
@@ -141,7 +141,7 @@ queryFunctionIsMandatory qf = case qf of
   _ -> Unknown
 
 domain2RoleType :: Partial => Domain -> EnumeratedRoleType
-domain2RoleType (RDOM (ST e) _) = e
+domain2RoleType (RDOM (ST (RoleInContext {role}))) = role
 
 domain2PropertyType :: Partial => Domain -> PropertyType
 domain2PropertyType (VDOM _ (Just pt)) = pt

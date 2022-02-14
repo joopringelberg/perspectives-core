@@ -301,7 +301,7 @@ startOf stp = case stp of
     startOfSimple (SpecialisesRoleType p _) = p
 
     startOfSimple (TypeTimeOnlyContext p _) = p
-    startOfSimple (TypeTimeOnlyEnumeratedRole p _) = p
+    startOfSimple (TypeTimeOnlyEnumeratedRole p _ _) = p
     startOfSimple (TypeTimeOnlyCalculatedRole p _) = p
     startOfSimple (RegEx p _) = p
 
@@ -338,7 +338,7 @@ endOf stp = case stp of
     endOfSimple (SpecialisesRoleType (ArcPosition{line, column}) ident) = ArcPosition{line, column: column + 19 + length ident}
 
     endOfSimple (TypeTimeOnlyContext p _) = p
-    endOfSimple (TypeTimeOnlyEnumeratedRole p _) = p
+    endOfSimple (TypeTimeOnlyEnumeratedRole p _ _) = p
     endOfSimple (TypeTimeOnlyCalculatedRole p _) = p
     endOfSimple (RegEx (ArcPosition{line, column}) (RegExP r)) = ArcPosition{line, column: column + length (show r) + 1}
 

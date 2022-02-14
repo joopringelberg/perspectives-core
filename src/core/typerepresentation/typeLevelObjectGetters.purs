@@ -46,7 +46,7 @@ import Perspectives.Error.Boundaries (handleDomeinFileError')
 import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole)
 import Perspectives.Instances.Combinators (closure_, conjunction, some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, queryFunction, range, roleRange, secondOperand)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
 import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialisesADT, leavesInADT, reduce)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
@@ -191,13 +191,13 @@ subStates_ = tryGetState >=> pure <<< (maybe [] _.subStates <<< map unwrap)
 -- | Look for a Property on a given EnumeratedRoleType (including its own aspects - not
 -- | recursively - and its own binding - not recursively), using a criterium.
 lookForPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
-lookForPropertyType_ s i = (lift $ getRole (ENR i)) >>= lift <<< adtOfRoleAspectsBinding >>= lookForProperty (propertytype2string >>> ((==) s))
+lookForPropertyType_ s i = (lift $ getRole (ENR i)) >>= lift <<< adtOfRoleAspectsBinding >>= lookForProperty (propertytype2string >>> ((==) s)) <<< map roleInContext2Role
 
 -- | Look for an unqualified Property on a given RoleType
 -- | (recursing on aspects and on the binding of Enumerated Roles), using a criterium.
 lookForUnqualifiedPropertyType_ :: String -> (RoleType ~~~> PropertyType)
 lookForUnqualifiedPropertyType_ s (ENR i) = lookForProperty (propertytype2string >>> areLastSegmentsOf s) (ST i)
-lookForUnqualifiedPropertyType_ s (CR i) = (lift $ getCalculatedRole i) >>= lift <<< roleADT >>= lookForProperty (propertytype2string >>> areLastSegmentsOf s)
+lookForUnqualifiedPropertyType_ s (CR i) = (lift $ getCalculatedRole i) >>= lift <<< roleADT >>= lookForProperty (propertytype2string >>> areLastSegmentsOf s) <<< map roleInContext2Role
 
 -- | Look for a Property on a given ADT, using a qualified name (recursing on aspects
 -- | and on the binding of Enumerated Roles).
@@ -219,9 +219,9 @@ lookForProperty criterium adt = ArrayT (allProperties adt >>= pure <<< filter cr
 -- | All properties, computed recursively over binding and Aspects, of the Role.
 propertiesOfRole :: String ~~~> PropertyType
 propertiesOfRole s =
-  ArrayT (allProperties (ST $ EnumeratedRoleType s))
+  ArrayT (getPerspectType (EnumeratedRoleType s) >>= roleADT >>= allProperties <<< map roleInContext2Role)
   <|>
-  ArrayT (getPerspectType (CalculatedRoleType s) >>= roleADT >>= allProperties)
+  ArrayT (getPerspectType (CalculatedRoleType s) >>= roleADT >>= allProperties <<< map roleInContext2Role)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR ASPECTS
@@ -271,7 +271,7 @@ perspectivesOfRole rt = ArrayT (getEnumeratedRole rt >>= unwrap >>> _.perspectiv
 -- | <UserRole> `perspectiveOnADT` <ADT> gives the perspectives (at most one) of the
 -- | UserRole on the role represented by the ADT.
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-perspectiveOnADT :: Partial => RoleType -> (ADT EnumeratedRoleType) ~~~> Perspective
+perspectiveOnADT :: Partial => RoleType -> (ADT RoleInContext) ~~~> Perspective
 perspectiveOnADT userRoleType adt = ArrayT do
   (ps :: Array Perspective) <- perspectivesOfRoleType userRoleType
   pure $ filter (flip isPerspectiveOnADT adt) ps
@@ -360,8 +360,8 @@ computesDatabaseQueryRole qfd = do
       otherwise -> pure false
     otherwise -> pure false
   where
-    isExternal :: ADT EnumeratedRoleType -> MonadPerspectives Boolean
-    isExternal = reduce (pure <<< isExternalRole <<< unwrap)
+    isExternal :: ADT RoleInContext -> MonadPerspectives Boolean
+    isExternal = reduce \(RoleInContext{role}) -> pure $ isExternalRole $ unwrap role
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS AND ON VIEWS
@@ -382,10 +382,10 @@ hasProperty p = lift <<< getView >=> pure <<< isJust <<< elemIndex p <<< propert
 -- | All views of either a CalculatedRole or an EnumeratedRole. This includes Views defined
 -- | locally on a CalculatedRole.
 viewsOfRoleType :: RoleType ~~~> ViewType
-viewsOfRoleType (ENR rt) = ArrayT (getEnumeratedRole rt >>= roleADT >>= allViews)
+viewsOfRoleType (ENR rt) = ArrayT (getEnumeratedRole rt >>= roleADT >>= allViews <<< map roleInContext2Role)
 viewsOfRoleType (CR rt) = ArrayT do
   localViews <- getCalculatedRole rt >>= pure <<< _.views <<< unwrap
-  otherViews <- getCalculatedRole rt >>= roleADT >>= allViews
+  otherViews <- getCalculatedRole rt >>= roleADT >>= allViews <<< map roleInContext2Role
   pure (localViews <> otherViews)
 
 ----------------------------------------------------------------------------------------
@@ -456,7 +456,7 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
       (allObjects :: Array EnumeratedRoleType) <- roleType ###= roleAspectsClosure
       isJust <$> findPerspective subjectType  -- TODO. GEEFT MAAR één perspectief terug; kunnen er niet meerdere zijn?
         (\perspective@(Perspective{roleVerbs}) -> pure (
-          (not $ null $ intersect allObjects (leavesInADT $ objectOfPerspective perspective))
+          (not $ null $ intersect allObjects (leavesInADT (roleInContext2Role <$> objectOfPerspective perspective) ))
           &&
           (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs)))
 
@@ -508,11 +508,11 @@ findPerspective subjectType criterium = execStateT f Nothing
 -- TODO: VERB WORDT NOG NIET GETOETST!
 hasPerspectiveOnPropertyWithVerb :: Partial => RoleType -> EnumeratedRoleType -> EnumeratedPropertyType -> PropertyVerb -> MonadPerspectives Boolean
 hasPerspectiveOnPropertyWithVerb subjectType roleType property verb = do
-  adt <- getEnumeratedRole roleType >>= roleADT
+  -- adt <- getEnumeratedRole roleType >>= roleADT
   isJust <$> findPerspective
     subjectType
     -- The test is: is `property` included in the collection of properties of the perspective object?
-    (allProperties <<< objectOfPerspective >=> pure <<< isJust <<< elemIndex (ENP property))
+    (allProperties <<< map roleInContext2Role <<< objectOfPerspective >=> pure <<< isJust <<< elemIndex (ENP property))
 
 -- perspectiveSupportsProperty
 rolesWithPerspectiveOnProperty :: PropertyType -> ContextType ~~~> RoleType
@@ -571,7 +571,7 @@ propertiesInPerspective (Perspective{propertyVerbs, object}) = foldWithIndexM f 
 
 propertyVerbs2PropertyArray :: QueryFunctionDescription -> PropertyVerbs -> MonadPerspectives (Array PropertyType)
 propertyVerbs2PropertyArray object (PropertyVerbs pset _) = case pset of
-  Universal -> allProperties (unsafePartial roleRange object)
+  Universal -> allProperties (roleInContext2Role <$> (unsafePartial roleRange object))
   Empty -> pure []
   PSet props -> pure props
 

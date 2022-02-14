@@ -231,6 +231,7 @@ isMandatoryFunction fn = case fn of
 data QueryFunction
   = DataTypeGetter FunctionName
   | DataTypeGetterWithParameter FunctionName String
+  | DataTypeGetterWithTwoParameters FunctionName String String
   | RegExMatch RegExP
   | PropertyGetter PropertyType
   | Value2Role PropertyType

@@ -246,13 +246,17 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
       contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces contextId)
       rolInstances <- lift2 (contextInstanceId ##= getRoleInstances (ENR roleType))
       (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole roleType
+      -- SYNCHRONISATION by UniverseRoleDelta
       (PerspectRol r@{_id:roleInstance}) <- case mRoleId of
         Nothing -> do
           rolInstanceId <- pure $ RoleInstance (unwrap contextInstanceId <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType)) <> "_" <> (rol_padOccurrence (getNextRolIndex rolInstances)))
           constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) rolInstanceId
         Just roleId -> constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) (RoleInstance roleId)
 
-      -- Then add the new Role instance to the context. Takes care of SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
+      -- Then add the new Role instance to the context. Takes care of SYNCHRONISATION by constructing and
+      -- adding a ContextDelta. Also adds the UniverseRoleDelta constructed by constructEmptyRole.
+      -- We postpone adding the UniverseRoleDelta because we cannot compute the users to distribute it to yet.
+      -- This is done in addRoleInstancesToContext.
       addRoleInstancesToContext contextInstanceId roleType (singleton (Tuple roleInstance Nothing))
       -- Then add the binding
       case binding of

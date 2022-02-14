@@ -38,7 +38,7 @@ import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Disj (Disj(..))
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, over, unwrap)
 import Data.Traversable (foldMap, traverse)
 import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
@@ -162,7 +162,7 @@ isContextDomain (CDOM _) = true
 isContextDomain _ = false
 
 isRoleDomain :: Domain -> Boolean
-isRoleDomain (RDOM _ _) = true
+isRoleDomain (RDOM _) = true
 isRoleDomain _ = false
 
 -----------------------------------------------------------------------------------------
@@ -175,13 +175,17 @@ range (UQD _ _ _ r _ _) = r
 range (BQD _ _ _ _ r _ _) = r
 range (MQD _ _ _ r _ _) = r
 
-roleRange :: Partial => QueryFunctionDescription -> ADT EnumeratedRoleType
+roleRange :: Partial => QueryFunctionDescription -> ADT RoleInContext
 roleRange r = case range r of
-  RDOM et _ -> et
+  RDOM et -> et
 
-roleDomain :: Partial => QueryFunctionDescription -> ADT EnumeratedRoleType
+roleDomain :: Partial => QueryFunctionDescription -> ADT RoleInContext
 roleDomain r = case domain r of
-  RDOM et _ -> et
+  RDOM et -> et
+
+contextDomain :: Partial => QueryFunctionDescription -> ADT ContextType
+contextDomain r = case domain r of
+  CDOM ct -> ct
 
 domain :: QueryFunctionDescription -> Range
 domain (SQD d _ _ _ _) = d
@@ -233,14 +237,51 @@ replaceDomain (BQD dom f qfd1 qfd2 ran fun man) d = case f of
 replaceDomain (MQD dom f qfds ran fun man) d = (MQD d f (flip replaceDomain d <$> qfds) ran fun man)
 
 -----------------------------------------------------------------------------------------
+---- ROLEINCONTEXT
+-----------------------------------------------------------------------------------------
+-- | An EnumeratedRoleType is lexically defined in a single ContextType.
+-- | However, as an Aspect it may be a role in unlimited other ContextTypes.
+-- | Therefore, on the typelevel, we represent a role domain as an EnumeratedRoleType in a ContextType.
+newtype RoleInContext = RoleInContext {context :: ContextType, role :: EnumeratedRoleType}
+derive instance genericRoleInContext :: Generic RoleInContext _
+derive instance newtypeRoleInContext :: Newtype RoleInContext _
+instance showRoleInContext :: Show RoleInContext where show = genericShow
+instance eqRoleInContext :: Eq RoleInContext where eq = genericEq
+instance writeForeignRoleInContext :: WriteForeign RoleInContext where
+  writeImpl (RoleInContext r) = writeImpl r
+instance readForeignRoleInContext :: ReadForeign RoleInContext where
+  readImpl f = RoleInContext <$> readImpl f
+instance encodeRoleInContext :: Encode RoleInContext where encode = writeImpl
+instance decodeRoleInContext :: Decode RoleInContext where decode = readImpl
+instance ordRoleInContext :: Ord RoleInContext where compare = genericCompare
+instance prettyPrintRoleInContext :: PrettyPrint RoleInContext where
+  prettyPrint' tab (RoleInContext r) = "PrettyPrint" <> show r
+
+roleInContext2Role :: RoleInContext -> EnumeratedRoleType
+roleInContext2Role (RoleInContext{role}) = role
+
+roleInContext2Context :: RoleInContext -> ContextType
+roleInContext2Context (RoleInContext{context}) = context
+
+adtRoleInContext2adtEnumeratedRoleType :: ADT RoleInContext -> ADT EnumeratedRoleType
+adtRoleInContext2adtEnumeratedRoleType = map roleInContext2Role
+
+replaceContext :: ADT RoleInContext -> ContextType -> ADT RoleInContext
+replaceContext adt ctxt = (over RoleInContext (\r -> r {context = ctxt})) <$> adt
+
+adtContext2AdtRoleInContext :: ADT ContextType -> EnumeratedRoleType -> ADT RoleInContext
+adtContext2AdtRoleInContext adt role = (\context -> RoleInContext {context, role}) <$> adt
+
+-----------------------------------------------------------------------------------------
 ---- DOMAIN
 -----------------------------------------------------------------------------------------
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
 data Domain =
   -- The ContextType represents the embedding context type for Aspect roles that are added
-  -- as such to the context type. If Nothing, use the static context type.
-    RDOM (ADT EnumeratedRoleType) (Maybe ContextType)
+  -- as such to the context type. If Nothing, use the static context type (the namespace of the Enumerated).
+    -- RDOM (ADT EnumeratedRoleType) (Maybe ContextType)
+    RDOM (ADT RoleInContext)
   | CDOM (ADT ContextType)
   | VDOM RAN.Range (Maybe PropertyType)
   | ContextKind
@@ -258,7 +299,8 @@ instance eqDomain :: Eq Domain where
   eq d1 d2 = genericEq d1 d2
 
 instance writeForeignDomain :: WriteForeign Domain where
-  writeImpl (RDOM adt ct) = unsafeToForeign { rdom: write adt, ctype: write ct}
+  -- writeImpl (RDOM adt ct) = unsafeToForeign { rdom: write adt, ctype: write ct}
+  writeImpl (RDOM adt) = unsafeToForeign { rdom: write adt}
   writeImpl (CDOM adt) = unsafeToForeign { cdom: write adt}
   writeImpl (VDOM ran mprop) = unsafeToForeign { range: write ran, maybeproperty: write mprop}
   writeImpl ContextKind = unsafeToForeign "ContextKind"
@@ -266,7 +308,8 @@ instance writeForeignDomain :: WriteForeign Domain where
 
 instance readForeignDomain :: ReadForeign Domain where
   readImpl f =
-    (\({rdom, ctype} :: {rdom :: ADT EnumeratedRoleType, ctype :: Maybe ContextType})-> (RDOM rdom ctype)) <$> (readImpl f)
+    -- (\({rdom, ctype} :: {rdom :: ADT EnumeratedRoleType, ctype :: Maybe ContextType})-> (RDOM rdom ctype)) <$> (readImpl f)
+    RDOM <$> (readImpl f)
     <|> (\({cdom: adt} :: {cdom :: ADT ContextType}) -> (CDOM adt)) <$> (readImpl f)
     <|> (\({range:r, maybeproperty} :: {range :: RAN.Range, maybeproperty :: Maybe PropertyType}) -> (VDOM r maybeproperty)) <$> (readImpl f)
     <|>
@@ -324,19 +367,24 @@ ind :: String
 ind = "  "
 
 sumOfDomains :: Domain -> Domain -> Maybe Domain
-sumOfDomains (RDOM a ec1) (RDOM b ec2) | ec1 == ec2 = Just (RDOM (SUM [a, b]) ec1)
-sumOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (SUM [a, b]) Nothing)
+-- sumOfDomains (RDOM a ec1) (RDOM b ec2) | ec1 == ec2 = Just (RDOM (SUM [a, b]) ec1)
+sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))
+-- sumOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (SUM [a, b]) Nothing)
 sumOfDomains (CDOM a) (CDOM b) = Just (CDOM (SUM [a, b]))
 sumOfDomains _ _ = Nothing
 
 productOfDomains :: Domain -> Domain -> Maybe Domain
-productOfDomains (RDOM a ec1) (RDOM b ec2) | ec1 == ec2 = Just (RDOM (PROD [a, b]) ec1)
-productOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (PROD [a, b]) Nothing)
+-- productOfDomains (RDOM a ec1) (RDOM b ec2) | ec1 == ec2 = Just (RDOM (PROD [a, b]) ec1)
+-- productOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (PROD [a, b]) Nothing)
+productOfDomains (RDOM a) (RDOM b) = Just (RDOM (PROD [a, b]))
 productOfDomains (CDOM a) (CDOM b) = Just (CDOM (PROD [a, b]))
 productOfDomains _ _ = Nothing
 
-domain2roleType :: Partial => Domain -> ADT EnumeratedRoleType
-domain2roleType (RDOM r _) = r
+domain2roleInContext :: Partial => Domain -> ADT RoleInContext
+domain2roleInContext (RDOM r) = r
+
+domain2roleType :: Partial => Domain -> ADT RoleInContext
+domain2roleType (RDOM r) = r
 
 domain2contextType :: Partial => Domain -> ADT ContextType
 domain2contextType (CDOM c) = c
@@ -353,3 +401,9 @@ instance showCalculation :: Show Calculation where
   show = genericShow
 instance eqCalculation :: Eq Calculation where
   eq = genericEq
+
+-----------------------------------------------------------------------------------------
+---- ADT CONTEXTTYPE TO ADT ROLEINCONTEXT
+-----------------------------------------------------------------------------------------
+context2RoleInContextADT :: ADT ContextType -> EnumeratedRoleType -> ADT RoleInContext
+context2RoleInContextADT adt role = (\context -> RoleInContext{context, role}) <$> adt

@@ -32,10 +32,10 @@ class DeltaAssumption d where
   assumption :: d -> Assumption
 
 instance contextDeltaAssumption :: DeltaAssumption ContextDelta where
-  assumption (ContextDelta{id, roleType}) = Tuple (unwrap id) (unwrap roleType)
+  assumption (ContextDelta{contextInstance, roleType}) = Tuple (unwrap contextInstance) (unwrap roleType)
 
 instance roleBindingDeltaAssumption :: DeltaAssumption RoleBindingDelta where
-  assumption (RoleBindingDelta{id, binding}) = Tuple (unwrap id) "model:System$Role$binding"
+  assumption (RoleBindingDelta{filled}) = Tuple (unwrap filled) "model:System$Role$binding"
 
 instance rolePropertyDeltaAssumption :: DeltaAssumption RolePropertyDelta where
   assumption (RolePropertyDelta{id, property}) = Tuple (unwrap id) (unwrap property)

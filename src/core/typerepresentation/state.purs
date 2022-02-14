@@ -32,7 +32,7 @@ import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
-import Perspectives.Data.EncodableMap (EncodableMap(..), empty)
+import Perspectives.Data.EncodableMap (EncodableMap, empty)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription)
 import Perspectives.Representation.Action (AutomaticAction)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -80,11 +80,11 @@ constructState id condition stateFulObject subStates = State
 	, stateFulObject
 	, query: condition
 	, object: Nothing -- used to compute the objects in enteringState, to bind to "currentobject".
-	, notifyOnEntry: EncodableMap empty
-	, notifyOnExit: EncodableMap empty
-	, automaticOnEntry: EncodableMap empty
-	, automaticOnExit: EncodableMap empty
-	, perspectivesOnEntry: EncodableMap empty
+	, notifyOnEntry: empty
+	, notifyOnExit: empty
+	, automaticOnEntry: empty
+	, automaticOnExit: empty
+	, perspectivesOnEntry: empty
 	, subStates
 	}
 derive instance newtypeState :: Newtype State _
