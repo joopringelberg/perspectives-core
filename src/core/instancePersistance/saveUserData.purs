@@ -62,7 +62,7 @@ import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, usersWithPerspectiveOnRoleBinding, lift2, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, rol_binding, rol_context, rol_isMe, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests, findRoleStateRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
@@ -70,7 +70,7 @@ import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspect
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allRoleBinders, getProperty, isMe)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, contextType, getProperty, isMe)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
@@ -96,21 +96,22 @@ import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>
 -- | roles.
 saveContextInstance :: Updater ContextInstance
 saveContextInstance id = do
-  (ctxt@(PerspectContext{pspType})) <- lift2 $ saveEntiteit id
+  (ctxt@(PerspectContext{pspType:cType})) <- lift2 $ saveEntiteit id
   subject <- getSubject
   forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances ->
     case head instances of
       Nothing -> pure unit
-      -- RULE TRIGGERING
-      Just i -> addRoleObservingContexts pspType id (EnumeratedRoleType roleName) i
+      -- STATE CHANGES
+      Just i -> addRoleObservingContexts cType id (EnumeratedRoleType roleName) i
   for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> do
-    (PerspectRol{_id, binding, pspType:roleType, gevuldeRollen}) <- lift2 $ saveEntiteit rol
+    (PerspectRol{_id, binding, pspType:roleType, filledRoles}) <- lift2 $ saveEntiteit rol
     case binding of
       Nothing -> pure unit
-      Just b -> (lift2 $ findBinderRequests b roleType) >>= addCorrelationIdentifiersToTransactie
-    for_ gevuldeRollen \instances ->
-      for_ instances \binder ->
-        (lift2 $ findBindingRequests binder) >>= addCorrelationIdentifiersToTransactie
+      Just b -> (lift2 $ findBinderRequests b cType roleType) >>= addCorrelationIdentifiersToTransactie
+    for_ filledRoles \roleMap ->
+      for_ roleMap \instances ->
+        for_ instances \binder ->
+          (lift2 $ findBindingRequests binder) >>= addCorrelationIdentifiersToTransactie
     -- For rule triggering, not for the delta or SYNCHRONISATION:
     if isJust binding
       then void $ usersWithPerspectiveOnRoleBinding (RoleBindingDelta
@@ -262,9 +263,10 @@ synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contex
 -- | each request that needs to be updated when the role instance is removed.
 queryUpdatesForRoleRemoval :: PerspectRol -> MonadPerspectivesTransaction Unit
 queryUpdatesForRoleRemoval role@(PerspectRol{_id:roleId, pspType:roleType, context:contextId}) = do
+  cType <- lift2 (contextId ##>> contextType)
   (lift2 $ findRoleRequests contextId roleType) >>= addCorrelationIdentifiersToTransactie
   (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
-  (lift2 $ findBinderRequests roleId roleType) >>= addCorrelationIdentifiersToTransactie
+  (lift2 $ findBinderRequests roleId cType roleType) >>= addCorrelationIdentifiersToTransactie
   (lift2 $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
   if rol_isMe role
     then (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me"))
@@ -297,14 +299,16 @@ removeRoleInstanceFromContext role@(PerspectRol{_id:roleId, pspType:roleType, co
 -- | PERSISTENCE. Remove the incoming links on both the incoming and outgoing
 -- | binding relations.
 severeBindingLinks :: PerspectRol -> MonadPerspectivesTransaction Unit
-severeBindingLinks (PerspectRol{_id:roleId, pspType:roleType, binding, gevuldeRollen}) = do
+severeBindingLinks (PerspectRol{_id:roleId, pspType:roleType, binding, filledRoles}) = do
   -- Severe the binding links of the incoming FILLS relation:
   case binding of
     Nothing -> pure unit
-    -- (Remove from the gevuldeRollen, in other words: change filler)
+    -- (Remove from the filledRoles, in other words: change filler)
     Just b -> b `fillerNoLongerPointsTo` roleId
   -- Severe the binding links of the outgoing FILLS relation:
-  for_ gevuldeRollen (\filledRoles' -> for_ filledRoles' \filled -> filled `filledNoLongerPointsTo` roleId)
+  for_ filledRoles \roleMap ->
+    for_ roleMap (\filledRoles' ->
+      for_ filledRoles' \filled -> filled `filledNoLongerPointsTo` roleId)
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
@@ -370,7 +374,8 @@ setFirstBinding filled filler msignedDelta = (lift2 $ try $ getPerspectEntiteit 
           filler `fillerPointsTo` filled
 
           -- QUERY EVALUATION
-          (lift2 $ findBinderRequests filler (rol_pspType filledRole)) >>= addCorrelationIdentifiersToTransactie
+          filledContextType <- lift2 (rol_context filledRole ##>> contextType)
+          (lift2 $ findBinderRequests filler filledContextType (rol_pspType filledRole)) >>= addCorrelationIdentifiersToTransactie
           (lift2 $ findBindingRequests filled) >>= addCorrelationIdentifiersToTransactie
 
           -- ISME, ME
@@ -459,9 +464,10 @@ removeBinding_ filled mFillerId msignedDelta = (lift2 $ try $ getPerspectEntitei
   handlePerspectRolError' "removeBinding_" []
     \(originalRole :: PerspectRol) -> case rol_binding originalRole of
       Nothing -> pure []
-      Just bindingId -> do
+      Just oldFillerId -> do
+        cType <- lift2 (rol_context originalRole ##>> contextType)
         -- QUERY EVALUATION
-        (lift2 $ findBinderRequests bindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
+        (lift2 $ findBinderRequests oldFillerId cType (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
         (lift2 $ findBindingRequests filled) >>= addCorrelationIdentifiersToTransactie
 
         -- STATE EVALUATION
@@ -498,7 +504,7 @@ removeBinding_ filled mFillerId msignedDelta = (lift2 $ try $ getPerspectEntitei
 -- | Removes the link between the role and its filler, in both directions (unless the filler is removed anyway:
 -- | then we just handle the link from role to filler, i.e. the FILLEDBY link).
 -- | Removes the binding R of the rol, if any.
--- | Removes the role as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
+-- | Removes the role as value of 'filledRoles' for psp:Rol$binding from the binding R.
 -- | Modifies the Role instance.
 -- | If the the role instance has in fact no binding before the operation and no filler is given as parameter,
 -- | this is a no-op without effect.
@@ -603,9 +609,9 @@ roleIsMe roleId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
 
 -- | <fillerId> `fillerNoLongerPointsTo` <filledId>
 -- | Break the link from filler to filled (FILLS link)
--- | (Remove from the gevuldeRollen, in other words: change filler)
+-- | (Remove from the filledRoles, in other words: change filler)
 -- | Not the other way round!
--- | Removes filled from gevuldeRollen of filler (because filler no longer fills filled).
+-- | Removes filled from filledRoles of filler (because filler no longer fills filled).
 -- | This function takes care of
 -- | PERSISTENCE
 fillerNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -614,14 +620,15 @@ fillerNoLongerPointsTo fillerId filledId = (lift2 $ try $ getPerspectEntiteit fi
     \(filler :: PerspectRol) -> (lift2 $ try $ getPerspectEntiteit filledId) >>=
       handlePerspectRolError "fillerNoLongerPointsTo"
       \(filled :: PerspectRol) -> do
-        filler' <- pure $ (removeRol_gevuldeRollen filler (rol_pspType filled) filledId)
+        filledContextType <- lift2 (rol_context filled ##>> contextType)
+        filler' <- pure $ (removeRol_gevuldeRollen filler filledContextType (rol_pspType filled) filledId)
         cacheAndSave fillerId filler'
 
 -- | <fillerId> `fillerPointsTo` <filledId>
 -- | Add the link from filler to filled (FILLS link)
--- | (Add to= the gevuldeRollen, in other words: change filler)
+-- | (Add to the filledRoles, in other words: change filler)
 -- | Not the other way round!
--- | Adds filled from gevuldeRollen of filler (because filler now fills filled).
+-- | Adds filled from filledRoles of filler (because filler now fills filled).
 -- | This function takes care of
 -- | PERSISTENCE
 fillerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -630,7 +637,8 @@ fillerPointsTo fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) 
     \(filler :: PerspectRol) -> (lift2 $ try $ getPerspectEntiteit filledId) >>=
       handlePerspectRolError "fillerNoLongerPointsTo"
       \(filled :: PerspectRol) -> do
-        filler' <- pure $ (addRol_gevuldeRollen filler (rol_pspType filled) filledId)
+        filledContextType <- lift2 (rol_context filled ##>> contextType)
+        filler' <- pure $ (addRol_gevuldeRollen filler filledContextType (rol_pspType filled) filledId)
         cacheAndSave fillerId filler'
 
 -- | <filledId> `filledNoLongerPointsTo` <fillerId>

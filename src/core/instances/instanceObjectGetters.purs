@@ -26,7 +26,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)
 import Data.Array (elemIndex, findIndex, foldMap, foldl, head, index, length, null, singleton)
-import Data.Foldable (for_)
+import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
@@ -34,9 +34,9 @@ import Data.Newtype (unwrap, ala)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Foreign.Object (Object, keys, lookup, values)
+import Foreign.Object (Object, keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -50,9 +50,9 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Role (actionsOfRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
-import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
-import Prelude (bind, discard, flip, identity, join, map, not, pure, show, ($), (*>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (&&), eq, (<$>))
+import Prelude (bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -175,31 +175,12 @@ bottom r = ArrayT do
 -- | From the instance of a Role of any kind, find the instances of the Role of the given
 -- | type that bind it (that have it as their binding). The type of rname (EnumeratedRoleType) may
 -- | be psp:Context$externalRole.
-getRoleBinders :: EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
-getRoleBinders rname r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
+getRoleBinders :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
+getRoleBinders cType rname r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
   handlePerspectRolError' "getRoleBinders" []
-    \((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) -> do
-      tell $ ArrayWithoutDoubles [Binder r rname]
-      case (lookup (unwrap rname) gevuldeRollen) of
-        Nothing -> pure []
-        (Just bs) -> pure bs
-
--- | From the instance of a Rol of any kind, find the instances of the Rol with the given local name
--- | that bind it (that have it as their binding). The type of ln can be 'externalRole'.
--- Test.Perspectives.ObjectGetterConstructors
-getUnqualifiedRoleBinders :: LocalName -> (RoleInstance ~~> RoleInstance)
-getUnqualifiedRoleBinders ln r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
-  handlePerspectRolError' "getUnqualifiedRoleBinders" []
-    \(role@(IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) -> do
-      case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys gevuldeRollen) of
-        Nothing -> pure []
-        (Just i) -> do
-          rn <- pure (unsafePartial $ fromJust (index (keys gevuldeRollen) i))
-          tell $ ArrayWithoutDoubles [Binder r (EnumeratedRoleType rn)]
-          -- tell [assumption (unwrap r) rn]
-          case lookup rn gevuldeRollen of
-            Nothing -> pure []
-            (Just bs) -> pure bs
+    \(role :: IP.PerspectRol) -> do
+      tell $ ArrayWithoutDoubles [Binder r cType rname]
+      pure $ rol_gevuldeRol role cType rname
 
 getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
@@ -277,9 +258,21 @@ hasType rt rid = ArrayT do
 allRoleBinders :: RoleInstance ~~> RoleInstance
 allRoleBinders r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
   handlePerspectRolError' "allRoleBinders" []
-    \((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) -> do
-      for_ (keys gevuldeRollen) (\key -> tell $ ArrayWithoutDoubles [Binder r (EnumeratedRoleType key)]) -- tell [assumption (unwrap r) key])
-      pure $ join $ values gevuldeRollen
+    \((IP.PerspectRol{filledRoles}) :: IP.PerspectRol) ->
+      foldWithIndexM
+        (\cIndex (vals :: Array RoleInstance) (roleMap :: Object (Array RoleInstance)) -> do
+          vals' <- foldWithIndexM
+            (\rIndex (cum :: Array RoleInstance) (vals' :: Array RoleInstance) -> do
+              tell $ ArrayWithoutDoubles [Binder r (ContextType cIndex)(EnumeratedRoleType rIndex)]
+              pure (cum <> vals'))
+            []
+            roleMap
+          pure (vals <> vals'))
+        []
+        filledRoles
+
+      -- for_ (keys filledRoles) (\key -> tell $ ArrayWithoutDoubles [Binder r (EnumeratedRoleType key)])
+      -- pure $ join $ values filledRoles
 
 -- | `isMe` has an internal error boundary. On failure, it returns false.
 isMe :: RoleInstance -> MP Boolean

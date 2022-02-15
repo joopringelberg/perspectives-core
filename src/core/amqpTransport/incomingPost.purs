@@ -45,7 +45,7 @@ import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, exclud
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (brokerService, setBrokerService, setStompClient, stompClient)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
@@ -118,12 +118,15 @@ retrieveBrokerService = getUserIdentifier >>= (\u -> (RoleInstance u) ##> constr
 constructBrokerServiceForUser :: RoleInstance -> MonadPerspectivesQuery BrokerService
 constructBrokerServiceForUser userId = do
   -- LET OP: gaat misschien fout als model:BrokerServices nog niet beschikbaar is.
-  accountHolder <- getRoleBinders (EnumeratedRoleType "model:BrokerServices$BrokerContract$AccountHolder") userId
+  accountHolder <- getRoleBinders
+    (ContextType "model:BrokerServices$BrokerContract")
+    (EnumeratedRoleType "model:BrokerServices$BrokerContract$AccountHolder")
+    userId
   (Value login) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerContract$AccountHolder$AccountName") accountHolder
   (Value passcode) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerContract$AccountHolder$AccountPassword") accountHolder
   (Value queueId) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerContract$AccountHolder$QueueName") accountHolder
 
-  brokerContractExternal <- (context >=> externalRole >=> getRoleBinders (EnumeratedRoleType "model:BrokerServices$BrokerService$Accounts") >=> context >=> externalRole) accountHolder
+  brokerContractExternal <- (context >=> externalRole >=> getRoleBinders (ContextType "model:BrokerServices$BrokerService") (EnumeratedRoleType "model:BrokerServices$BrokerService$Accounts") >=> context >=> externalRole) accountHolder
   (Value url) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerService$External$Url") brokerContractExternal
   (Value vhost) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerService$External$Exchange") brokerContractExternal
 

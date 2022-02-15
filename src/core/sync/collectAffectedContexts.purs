@@ -584,8 +584,8 @@ createDeltasFromAssumption users (Binding roleInstance) = do
             Nothing -> pure unit
             Just bd -> addDelta $ DeltaInTransaction {users, delta: bd}
 
-createDeltasFromAssumption users (Binder roleInstance roleType) = do
-  bndrs <- lift2 (roleInstance ##= getRoleBinders roleType)
+createDeltasFromAssumption users (Binder roleInstance contextType roleType) = do
+  bndrs <- lift2 (roleInstance ##= getRoleBinders contextType roleType)
   -- There may not be a bndr!
   case ANE.fromArray bndrs of
     Nothing -> pure unit

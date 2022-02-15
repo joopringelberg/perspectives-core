@@ -30,11 +30,11 @@ import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (unwrap)
+import Data.Newtype (unwrap, over) as NT
 import Data.Ord (Ordering, compare)
 import Data.String (Pattern(..), lastIndexOf, splitAt)
 import Data.Symbol (SProxy(..))
-import Foreign.Object (Object, delete, empty, filter, insert, lookup)
+import Foreign.Object (Object, delete, empty, filter, insert, lookup, singleton)
 import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, (###=))
@@ -53,7 +53,7 @@ context_id :: PerspectContext -> ContextInstance
 context_id (PerspectContext{_id})= _id
 
 context_Namespace :: PerspectContext -> Namespace
-context_Namespace (PerspectContext{_id}) = unsafePartial $ fromJust $ deconstructNamespace (unwrap _id)
+context_Namespace (PerspectContext{_id}) = unsafePartial $ fromJust $ deconstructNamespace (NT.unwrap _id)
 
 changeContext_id :: ContextInstance -> PerspectContext -> PerspectContext
 changeContext_id id (PerspectContext cr) = PerspectContext $ cr {_id = id}
@@ -133,7 +133,7 @@ addContext_rolInContext ct@(PerspectContext cr@{aliases,rolInContext}) r@(Enumer
       { rolInContext = insert rolName [rolId] rolInContext
       -- Add all Aspects of the role as its aliases to the context.
       -- Note this does too much work when there is more than one aspect.
-      , aliases = foldl (\als aspect -> insert (unwrap aspect) rolName als) aliases aspects
+      , aliases = foldl (\als aspect -> insert (NT.unwrap aspect) rolName als) aliases aspects
       }
   Just roles -> pure $ PerspectContext cr {rolInContext = insert rolName (cons rolId roles) rolInContext}
 
@@ -156,7 +156,7 @@ modifyContext_rolInContext ct@(PerspectContext cr@{rolInContext, aliases}) r@(En
     aspects <- r ###= roleAspectsClosure
     pure $ PerspectContext cr
       { rolInContext = insert rolName (f []) rolInContext
-      , aliases = foldl (\als aspect -> insert (unwrap aspect) rolName als) aliases aspects
+      , aliases = foldl (\als aspect -> insert (NT.unwrap aspect) rolName als) aliases aspects
       }
   Just roles -> pure $ set (_roleInstances' r) (Just (f roles)) ct
 
@@ -198,7 +198,7 @@ defaultRolRecord =
   , _rev: Nothing
   , binding: Nothing
   , properties: empty
-  , gevuldeRollen: empty
+  , filledRoles: empty
   , occurrence: 0
   , isMe: false
   , universeRoleDelta: SignedDelta {author: "", encryptedDelta: "UniverseRoleDelta from defaultRolRecord"}
@@ -276,7 +276,7 @@ _propertyValues' (EnumeratedPropertyType t) = _Newtype <<< _properties <<< at t
     _properties = prop (SProxy :: SProxy "properties")
 
 rol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value
-rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup (unwrap pn) properties)
+rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup (NT.unwrap pn) properties)
 
 addRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
 -- addRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.union values) rl
@@ -288,44 +288,61 @@ removeRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> Pe
 removeRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.difference values) rl
 
 deleteRol_property :: PerspectRol -> EnumeratedPropertyType -> PerspectRol
-deleteRol_property (PerspectRol rl@{properties}) propertyName = PerspectRol (rl {properties = delete (unwrap propertyName) properties})
+deleteRol_property (PerspectRol rl@{properties}) propertyName = PerspectRol (rl {properties = delete (NT.unwrap propertyName) properties})
 
 setRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
 setRol_property rl propertyName values = set (_propertyValues' propertyName) (Just values) rl
 
-rol_gevuldeRollen :: PerspectRol -> Object (Array RoleInstance)
-rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen
+rol_gevuldeRollen :: PerspectRol -> Object (Object (Array RoleInstance))
+rol_gevuldeRollen (PerspectRol{filledRoles}) = filledRoles
 
-setRol_gevuldeRollen :: PerspectRol -> Object (Array RoleInstance) -> PerspectRol
-setRol_gevuldeRollen (PerspectRol r) grollen = PerspectRol (r {gevuldeRollen = grollen})
+setRol_gevuldeRollen :: PerspectRol -> Object (Object (Array RoleInstance)) -> PerspectRol
+setRol_gevuldeRollen (PerspectRol r) grollen = PerspectRol (r {filledRoles = grollen})
 
-rol_gevuldeRol :: PerspectRol -> EnumeratedRoleType -> Array RoleInstance
-rol_gevuldeRol  (PerspectRol{gevuldeRollen}) rn = maybe [] identity (lookup (unwrap rn) gevuldeRollen)
+rol_gevuldeRol :: PerspectRol -> ContextType -> EnumeratedRoleType -> Array RoleInstance
+rol_gevuldeRol  (PerspectRol{filledRoles}) cType rn = case lookup (NT.unwrap cType) filledRoles of
+  Nothing -> []
+  Just roleMap -> maybe [] identity (lookup (NT.unwrap rn) roleMap)
 
--- | The first argument is the role instance that receives a new inverse link to a role that binds it.
--- | The third argument represents the role instance that binds the role of the first argument.
+-- | The first argument is the role Filler instance that receives a new inverse link to a role that binds it.
+-- | The fourth argument represents the Filled role instance that binds the role of the first argument.
+-- | the second and third argument form the double index under which we store the new filled role.
+-- | They are respectively its context type and its role type.
 -- | This operation is idempotent.
-addRol_gevuldeRollen :: PerspectRol -> EnumeratedRoleType -> RoleInstance -> PerspectRol
-addRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
-  case lookup (unwrap rolName) gevuldeRollen of
-    Nothing -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) [rolID] gevuldeRollen}
-    (Just roles) -> do
-      case Arr.elemIndex rolID roles of
-        Nothing -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) (Arr.union [rolID] roles) gevuldeRollen}
-        otherwise -> ct
+addRol_gevuldeRollen :: PerspectRol -> ContextType -> EnumeratedRoleType -> RoleInstance -> PerspectRol
+addRol_gevuldeRollen filler cType rolName filled = let
+  cIndex = NT.unwrap cType
+  rIndex = NT.unwrap rolName
+  f = NT.over PerspectRol (\cr ->
+    case lookup cIndex cr.filledRoles of
+      Nothing -> cr {filledRoles = insert cIndex (singleton rIndex [filled]) cr.filledRoles}
+      Just (roleMap :: Object (Array RoleInstance)) -> case lookup rIndex roleMap of
+        Nothing -> cr {filledRoles = insert cIndex (insert rIndex [filled] roleMap) cr.filledRoles}
+        (Just roles) -> do
+          case Arr.elemIndex filled roles of
+            Nothing -> cr {filledRoles = insert cIndex (insert rIndex (Arr.union [filled] roles) roleMap) cr.filledRoles}
+            otherwise -> cr
+      )
+  in f filler
 
-removeRol_gevuldeRollen :: PerspectRol -> EnumeratedRoleType -> RoleInstance -> PerspectRol
-removeRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
-  case lookup (unwrap rolName) gevuldeRollen of
-    Nothing -> ct
-    (Just (roles :: Array RoleInstance)) -> do
-      case Arr.elemIndex rolID roles of
-        Nothing -> ct
-        otherwise -> let
-          roles' = Arr.delete rolID roles in
-            if null roles'
-              then PerspectRol cr {gevuldeRollen = delete (unwrap rolName) gevuldeRollen}
-              else PerspectRol cr {gevuldeRollen = insert (unwrap rolName) roles' gevuldeRollen}
+removeRol_gevuldeRollen :: PerspectRol -> ContextType -> EnumeratedRoleType -> RoleInstance -> PerspectRol
+removeRol_gevuldeRollen ct cType rolName rolID = let
+  cIndex = NT.unwrap cType
+  rIndex = NT.unwrap rolName
+  f = NT.over PerspectRol \cr ->
+    case lookup cIndex cr.filledRoles of
+      Nothing -> cr
+      Just roleMap -> case lookup rIndex roleMap of
+        Nothing -> cr
+        (Just (roles :: Array RoleInstance)) -> do
+          case Arr.elemIndex rolID roles of
+            Nothing -> cr
+            otherwise -> let
+              roles' = Arr.delete rolID roles in
+                if null roles'
+                  then cr {filledRoles = insert cIndex (delete rIndex roleMap) cr.filledRoles}
+                  else cr {filledRoles = insert cIndex (insert rIndex roles' roleMap) cr.filledRoles}
+  in f ct
 
 rol_states :: PerspectRol -> Array StateIdentifier
 rol_states (PerspectRol{states}) = states
@@ -362,9 +379,9 @@ rol_padOccurrence n =  case floor( log( toNumber n) / ln10 ) of
 getNextRolIndex :: Array RoleInstance -> Int
 getNextRolIndex rolIds = case Arr.last rolIds of
   Nothing -> 0
-  (Just id) -> case lastIndexOf (Pattern "_") (unwrap id) of
+  (Just id) -> case lastIndexOf (Pattern "_") (NT.unwrap id) of
     Nothing -> 0
-    (Just n) -> let {after} = splitAt (n + 1) (unwrap id) in
+    (Just n) -> let {after} = splitAt (n + 1) (NT.unwrap id) in
       case fromString after of
         Nothing -> 0
         (Just x) -> x + 1

@@ -112,7 +112,8 @@ type RolRecord =
   , binding :: Binding
   -- The four fields below could also be modeled as Maybe values.
   , properties :: F.Object (Array Value)
-  , gevuldeRollen :: F.Object (Array RoleInstance)
+  -- The first index is the String representation of the ContextType, the second that of the EnumeratedRoleType.
+  , filledRoles :: F.Object (F.Object (Array RoleInstance))
   , occurrence :: Int
   , isMe :: Boolean
   , universeRoleDelta :: SignedDelta

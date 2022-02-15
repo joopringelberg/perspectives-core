@@ -332,9 +332,14 @@ compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
   (f1' :: String ~~> Value) <- unsafeCoerce (compileFunction f1)
   pure (unsafeCoerce $ not f1')
 
+compileFunction (SQD _ (DataTypeGetterWithTwoParameters functionName parameter1 parameter2) _ _ _ ) = do
+  case functionName of
+    GetRoleBindersF -> pure $ unsafeCoerce (getRoleBinders (ContextType parameter2) (EnumeratedRoleType parameter1))
+
+    _ -> throwError (error $ "Unknown function for DataTypeGetterWithTwoParameters: " <> show functionName)
+
 compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ _ ) = do
   case functionName of
-    GetRoleBindersF -> pure $ unsafeCoerce (getRoleBinders (EnumeratedRoleType parameter))
     SpecialisesRoleTypeF -> pure $ unsafeCoerce (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)))
 
     _ -> throwError (error $ "Unknown function for DataTypeGetterWithParameter: " <> show functionName)

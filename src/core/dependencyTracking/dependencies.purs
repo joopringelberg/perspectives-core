@@ -40,7 +40,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GL
 import Perspectives.Persistent (class Persistent, entityExists)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..))
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
 -- | the computation of the query that delivers the results to the ApiEffect, has changed.
@@ -164,13 +164,13 @@ findBindingRequests (RoleInstance roleId) = do
     Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Role$binding" typesForResource)
 
 -- | Returns CorrelationIdentifiers for requests through the API that have
--- | the `binder <typeId>` step on the `roleId`.
-findBinderRequests :: RoleInstance -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
-findBinderRequests (RoleInstance roleId) (EnumeratedRoleType typeId) = do
+-- | the `binder <EnumeratedRoleType> in <ContextType>` step on the `roleId`.
+findBinderRequests :: RoleInstance -> ContextType -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
+findBinderRequests (RoleInstance roleId) (ContextType cType) (EnumeratedRoleType rType) = do
   r <- queryAssumptionRegister
   case lookup roleId r of
     Nothing -> pure []
-    Just typesForResource -> pure $ maybe [] identity (lookup typeId typesForResource)
+    Just typesForResource -> pure $ maybe [] identity (lookup (cType <> rType) typesForResource)
 
 findContextStateRequests :: ContextInstance -> MP (Array CorrelationIdentifier)
 findContextStateRequests (ContextInstance contextId) = do
@@ -210,7 +210,8 @@ toAssumption :: InformedAssumption -> Assumption
 toAssumption (RoleAssumption ci rt) = assumption (unwrap ci) (unwrap rt)
 toAssumption (Me ci) = assumption (unwrap ci) "model:System$Context$Me"
 toAssumption (Binding ri) = assumption (unwrap ri) "model:System$Role$binding"
-toAssumption (Binder ri rt) = assumption (unwrap ri) (unwrap rt)
+-- NOTE that we create a single key out of the ContextType and RoleType by concatenating their String values.
+toAssumption (Binder ri ct rt) = assumption (unwrap ri) ((unwrap ct) <> (unwrap rt))
 toAssumption (Property ri pt) = assumption (unwrap ri) (unwrap pt)
 toAssumption (Context ri) = assumption (unwrap ri) "model:System$Role$context"
 toAssumption (External ci) = assumption (unwrap ci) "model:System$Context$external"
@@ -221,7 +222,7 @@ canBeUntypedAssumption :: InformedAssumption -> Boolean
 canBeUntypedAssumption (RoleAssumption _ _) = true
 canBeUntypedAssumption (Me c) = true
 canBeUntypedAssumption (Binding _) = true
-canBeUntypedAssumption (Binder _ _) = true
+canBeUntypedAssumption (Binder _ _ _) = true
 canBeUntypedAssumption (Property _ _) = true
 canBeUntypedAssumption (Context _) = false
 canBeUntypedAssumption (External _) = false

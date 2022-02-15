@@ -48,7 +48,7 @@ import Perspectives.Instances.Environment (Environment)
 import Perspectives.Persistence.API (PouchdbState)
 import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction)
 import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, ($), (<<<), (<>), (>>=))
 
@@ -119,8 +119,10 @@ type AssumptionRegister = F.Object (F.Object (Array CorrelationIdentifier))
 data InformedAssumption =
 	RoleAssumption ContextInstance EnumeratedRoleType
 	| Me ContextInstance
+  -- Binding = filler role
   | Binding RoleInstance                               -- RoleInstance is the role with a binding
-	| Binder RoleInstance EnumeratedRoleType
+  -- Binder = filled role
+	| Binder RoleInstance ContextType EnumeratedRoleType
 	| Property RoleInstance EnumeratedPropertyType
 	| Context RoleInstance
 	| External ContextInstance

@@ -23,15 +23,15 @@
 module Perspectives.ContextRoleParser where
 
 import Control.Alt (void, (<|>))
-import Control.Monad.State (State, StateT, execState, execStateT, get, gets, modify)
+import Control.Monad.State (StateT, execStateT, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable, insert) as AR
 import Data.Array (dropEnd, foldl, intercalate)
 import Data.Char.Unicode (isLower)
 import Data.Either (Either(..))
-import Data.Foldable (elem, fold, for_, traverse_)
+import Data.Foldable (elem, fold, traverse_)
 import Data.List.Types (List(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), split)
 import Data.String.CodeUnits (fromCharArray)
@@ -40,8 +40,8 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..), fst)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
-import Foreign.Object (alter)
-import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType, setRol_gevuldeRollen)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, (###=))
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
@@ -747,8 +747,9 @@ userData = do
     -- These must be RootContexts.
     eroles <- AR.many (context Nothing)
     (roles :: FO.Object PerspectRol) <- getRoleInstances
+    (contexts :: FO.Object PerspectContext) <- getContextInstances
     -- Set the inverse bindings.
-    setRoleInstances $ addGevuldeRollen roles <$> roles
+    setRoleInstances $ addGevuldeRollen contexts roles <$> roles
     -- Check each role instance for binding to a role with isMe == true. Then set 'me' on their contexts.
     x <- getRoleInstances >>= traverseWithIndex
       (\id role -> do
@@ -771,17 +772,19 @@ userData = do
     userDataDeclaration :: IP Unit
     userDataDeclaration = reserved "UserData"
 
-    -- Find all roles that bind r. Add them as the value of gevuldeRollen to r, each under its type as key.
-    addGevuldeRollen :: FO.Object PerspectRol -> PerspectRol -> PerspectRol
-    addGevuldeRollen roles r = setRol_gevuldeRollen r (execState collect FO.empty)
+    -- Find all Filled roles that bind (are filled by) r.
+    -- Add them as the value of filledRoles to filler, each under the type of its context and its own type as keys.
+    addGevuldeRollen :: FO.Object PerspectContext -> FO.Object PerspectRol -> PerspectRol -> PerspectRol
+    addGevuldeRollen contexts filledRoles filler = foldl (\filler' filledRole ->
+      if rol_binding filledRole == Just (ID.identifier filler)
+        then addRol_gevuldeRollen filler (roleContextType filledRole) (rol_pspType filledRole) (ID.identifier filledRole)
+        else filler)
+      filler
+      filledRoles
       where
-        collect :: State (FO.Object (Array RoleInstance)) Unit
-        collect = for_ roles (\role -> if rol_binding role == Just (ID.identifier r)
-          then void $ modify
-            (alter
-              (Just <<< (maybe [ID.identifier role] (AR.cons (ID.identifier role))))
-              (unwrap $ rol_pspType role))
-          else pure unit)
+        roleContextType :: PerspectRol -> ContextType
+        roleContextType role = case unsafePartial fromJust $ FO.lookup (unwrap $ rol_context role) contexts of
+          PerspectContext{pspType} -> pspType
 
     -- Either the role has isMe == true, or its binding recursively has. Stop recursion on leaving the model.
     representsCurrentUser :: FO.Object PerspectRol -> PerspectRol -> IP Boolean

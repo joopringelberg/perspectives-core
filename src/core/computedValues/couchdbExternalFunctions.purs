@@ -48,9 +48,9 @@ import Effect.Exception (error)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, rol_binding, rol_gevuldeRollen, rol_id, rol_isMe, rol_pspType, setRol_gevuldeRollen)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, rol_binding, rol_context, rol_gevuldeRollen, rol_id, rol_isMe, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.ContextRoleParser (parseAndCache)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>>))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction, addCreatedRoleToTransaction)
@@ -64,7 +64,7 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (getFirstMatch, namespaceFromUrl)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
-import Perspectives.Instances.ObjectGetters (isMe)
+import Perspectives.Instances.ObjectGetters (contextType, isMe)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.Models (modelsInUse) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
@@ -286,6 +286,7 @@ addModelToLocalStore' url originalLoad = do
               roleInstances'
               (\i newRole' -> do
                 -- Fetch from the database, not cache.
+                newRoleContextType <- lift ((rol_context newRole') ##>> contextType)
                 (mrole :: Maybe PerspectRol) <- lift $ tryFetchEntiteit (RoleInstance i)
                 case mrole of
                   -- If we find a previous version in the database, overwrite it.
@@ -319,7 +320,7 @@ addModelToLocalStore' url originalLoad = do
                               "addModelToLocalStore'"
                               -- set the inverse binding if not already there.
                               \newBinding -> do
-                                void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType newRole) (RoleInstance i))
+                                void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole) (RoleInstance i))
                                 void $ lift $ saveEntiteit newBindingId
                                 saveRoleInstance i $ changeRevision (rev oldRole) newRole
                         Just oldBindingId -> if newBindingId == oldBindingId
@@ -347,7 +348,7 @@ addModelToLocalStore' url originalLoad = do
                           "addModelToLocalStore'"
                           -- set the inverse binding if not already there.
                           \newBinding -> do
-                            void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType newRole') (RoleInstance i))
+                            void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole') (RoleInstance i))
                             void $ lift $ saveEntiteit newBindingId
                             saveRoleInstance i newRole'
                             -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.

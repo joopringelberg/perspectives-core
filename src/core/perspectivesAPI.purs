@@ -71,7 +71,7 @@ import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
-import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation, roleKindOfRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
@@ -146,26 +146,26 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject)
     -- Api.GetBindingType -> registerSupportedEffect corrId setter (binding >=> roleType) (RoleInstance subject)
 
-    -- {request: "GetRoleBinders", subject: <RoleInstance>, predicate: <EnumeratedRoleType>}
+    -- {request: "GetRoleBinders", subject: <RoleInstance>, predicate: <EnumeratedRoleType>, object: Maybe <ContextType>}
+    -- The empty string represents Nothing when used as object.
     Api.GetRoleBinders -> (try $ getPerspectRol (RoleInstance subject)) >>=
       case _ of
         Left err -> do
           logPerspectivesError $ RolErrorBoundary "Api.GetRoleBinders" (show err)
           sendResponse (Error corrId (show $ RolErrorBoundary "Api.GetRoleBinders" (show err))) setter
-        Right (PerspectRol{pspType}) -> do
-          void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
-          registerSupportedEffect corrId setter (getRoleBinders (EnumeratedRoleType predicate)) (RoleInstance subject)
-
-    -- {request: "GetUnqualifiedRoleBinders", subject: <RoleInstance>, predicate: <local role name>}
-    -- Api.GetUnqualifiedRoleBinders -> (try $ getPerspectRol (RoleInstance subject)) >>=
-    --     case _ of
-    --       Left err -> do
-    --         logPerspectivesError $ RolErrorBoundary "Api.GetUnqualifiedRoleBinders" (show err)
-    --         sendResponse (Error corrId (show $ RolErrorBoundary "Api.GetUnqualifiedRoleBinders" (show err))) setter
-    --       Right (PerspectRol{pspType}) -> do
-    --         void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
-    --         registerSupportedEffect corrId setter (getUnqualifiedRoleBinders predicate) (RoleInstance subject)
-
+        Right (PerspectRol{pspType, context}) -> case object of
+            "" -> do
+              cType <- context ##>> contextType
+              void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+              registerSupportedEffect corrId setter (getRoleBinders cType (EnumeratedRoleType predicate)) (RoleInstance subject)
+            contextTypeName -> (try $ getContext (ContextType contextTypeName)) >>=
+              case _ of
+                Left err -> do
+                  logPerspectivesError $ ContextErrorBoundary "Api.GetRoleBinders" (show err)
+                  sendResponse (Error corrId (show $ ContextErrorBoundary "Api.GetRoleBinders" (show err))) setter
+                Right cType -> do
+                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+                  registerSupportedEffect corrId setter (getRoleBinders (ContextType contextTypeName) (EnumeratedRoleType predicate)) (RoleInstance subject)
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
       registerSupportedEffect corrId setter f (ContextInstance subject)

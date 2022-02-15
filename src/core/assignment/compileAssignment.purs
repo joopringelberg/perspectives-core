@@ -63,6 +63,8 @@ import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, getRoleInstances, typeTimeOnly)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
@@ -231,9 +233,10 @@ compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
       \contextId -> do
         binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.allRoleBinders)
         for_ binders removeBinding
-    Just roleType -> pure
-      \contextId -> do
-        binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getRoleBinders roleType)
+    Just roleType -> do
+      EnumeratedRole role <- getEnumeratedRole roleType
+      pure \contextId -> do
+        binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getRoleBinders role.context roleType)
         for_ binders removeBinding
 
 compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do

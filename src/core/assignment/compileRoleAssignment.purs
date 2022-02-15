@@ -63,6 +63,8 @@ import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPers
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, getRoleInstances, role2context, role2propertyValue, role2role, role2string, typeTimeOnly)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
@@ -247,9 +249,13 @@ compileAssignmentFromRole (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
       \roleId -> do
         binders <- lift $ lift (roleId ##= bindingsGetter >=> OG.allRoleBinders)
         for_ binders removeBinding
-    Just roleType -> pure
-      \roleId -> do
-        binders <- lift $ lift (roleId ##= bindingsGetter >=> OG.getRoleBinders roleType)
+    Just roleType -> do
+      EnumeratedRole role <- getEnumeratedRole roleType
+      pure \roleId -> do
+        -- We have no information about the ContextType in which these binders of type `roleType` are a member.
+        -- Therefore we currently just remove them from the lexical context of roleType.
+        -- When we implement the `remove filler` syntax, the modeller can specify the ContextType as well.
+        binders <- lift $ lift (roleId ##= bindingsGetter >=> OG.getRoleBinders role.context roleType)
         for_ binders removeBinding
 
 compileAssignmentFromRole (BQD _ QF.Unbind_ bindings binders _ _ _) = do
