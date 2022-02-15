@@ -25,7 +25,7 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (runPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), queryFunction, range)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), queryFunction, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (effectOfAction)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -75,7 +75,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   ensureERole "model:MyTestDomain$SomeUser" dr' >>=
                     ensurePerspectiveOn "model:MyTestDomain$YetAnotherRole" >>=
                       objectOfPerspective >>=
-                        isCalculationOf (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")) Nothing)
+                        isCalculationOf (RDOM (ST $ RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")}))
 
   test "Testing qualifyActionRoles: External." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  user Driver\n    perspective on External\n      all roleverbs" ARC.domain
@@ -136,7 +136,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
                   (Just (EnumeratedRole{binding})) -> assert
                     "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                    (binding == ST (EnumeratedRoleType "model:MyTestDomain$Bound"))
+                    (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
 
   test "Testing qualifyBindings: qualified reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Binder (mandatory) filledBy model:MyTestDomain$Bound\n  thing Bound (mandatory)" ARC.domain
@@ -158,7 +158,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
                   (Just (EnumeratedRole{binding})) -> assert
                     "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                    (binding == ST (EnumeratedRoleType "model:MyTestDomain$Bound"))
+                    (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
 
   test "Testing qualifyBindings: prefixed reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  use my for model:MyTestDomain\n  thing Binder (mandatory) filledBy my:Bound\n  thing Bound (mandatory)" ARC.domain
@@ -180,7 +180,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
                   (Just (EnumeratedRole{binding})) -> assert
                     "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                    (binding == ST (EnumeratedRoleType "model:MyTestDomain$Bound"))
+                    (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
 
   test "Testing qualifyBindings: missing reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Binder (mandatory) filledBy Bount\n  thing Bound (mandatory)" ARC.domain
@@ -365,7 +365,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   case calculation of
                     Q c -> do
                       assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$SubContext$Modellen))' as its Range"
-                        (range c == (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen")) Nothing))
+                        (range c == (RDOM (ST $ RoleInContext {context: (ContextType "model:MyTestDomain$SubContext"), role: (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen")})))
                       assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter model:Couchdb$Models)'"
                         case queryFunction c of
                           (ExternalCoreRoleGetter "model:Couchdb$Models") -> true
@@ -495,7 +495,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                           assert "The queryfunction should be move" (eq qf QF.Move )
                           assert "The binding should be a rolgetter for model:Test$Company$Employee"
                             case rle of
-                              (BQD _ _ _ _ (RDOM (ST (EnumeratedRoleType "model:Test$Company$Employee")) Nothing) _ _) -> true
+                              (BQD _ _ _ _ (RDOM (ST (RoleInContext{context: (ContextType "model:Test$Company"), role: EnumeratedRoleType "model:Test$Company$Employee"}))) _ _) -> true
                               otherwise -> false
                           -- logShow cte
                           assert "The role to move should come from C2"

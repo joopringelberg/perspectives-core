@@ -22,7 +22,7 @@ import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Persistence.API (deleteDocument, tryGetDocument)
 import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
-import Perspectives.Representation.Class.Cacheable (cacheEntity, removeInternally)
+import Perspectives.Representation.Class.Cacheable (ContextType(..), cacheEntity, removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadArcAndCrl, loadCompileAndSaveArcFile')
@@ -74,11 +74,12 @@ theSuite = suiteSkip  "Model:System" do
         -- Bind the description of Model:TestBotActie to an instance of ModelsInUse
         descriptionId <- pure "model:User$TestBotActieModel_External"
         binder <- pure $ EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"
+        binderContextType <- pure $ ContextType "model:System$PerspectivesSystem"
         roleIds <- runMonadPerspectivesTransaction $ createAndAddRoleInstance binder "model:User$test"
           (RolSerialization{ id: Nothing, properties: PropertySerialization empty, binding: Just descriptionId})
         role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head (catMaybes roleIds))
         b <- getPerspectRol (RoleInstance descriptionId)
-        void $ cacheEntity (RoleInstance descriptionId) (addRol_gevuldeRollen b binder _id)
+        void $ cacheEntity (RoleInstance descriptionId) (addRol_gevuldeRollen b binderContextType binder _id)
         void $ saveEntiteit (RoleInstance descriptionId)
 
         -- Check if model:TestBotActie is in perspect_models

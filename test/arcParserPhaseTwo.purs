@@ -33,7 +33,7 @@ import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, PhaseTwo', evalPhaseTwo', expandNamespace, withNamespaces)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -131,7 +131,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                 Just (CalculatedRole{calculation}) -> do
                   -- logShow calculation
                   case calculation of
-                    (Q (MQD _ f _ (RDOM (ST (EnumeratedRoleType "Modellen")) Nothing) _ _)) -> assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"model:Couchdb$Models\")'" (f == (ExternalCoreRoleGetter "model:Couchdb$Models"))
+                    (Q (MQD _ f _ (RDOM (ST (RoleInContext {context: (ContextType "model:System$PerspectivesSystem"), role: (EnumeratedRoleType "model:System$PerspectivesSystem$Modellen")}))) _ _)) -> assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"model:Couchdb$Models\")'" (f == (ExternalCoreRoleGetter "model:Couchdb$Models"))
                     (Q _) -> assert "The calculation should have '(RDOM (ST EnumeratedRoleType Modellen))' as its Range" false
                     (S (Computation (ComputationStep {computedType}))) -> assert "The step should have 'model:MyTestDomain$Modellen' as computedType" (computedType == "model:MyTestDomain$Modellen")
                     otherwise -> assert ("Unexpected result: " <> show otherwise) false
@@ -235,7 +235,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
             \ filled with 'ST EnumeratedRoleType model:System$PerspectivesSystem$User'"
               case (lookup "model:MyTestDomain$MyUser" dr'.enumeratedRoles) of
                 Nothing -> false
-                (Just (EnumeratedRole {binding})) -> binding == (ST $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+                (Just (EnumeratedRole {binding})) -> binding == (ST $ RoleInContext {context: ContextType "model:System$PerspectivesSystem", role: EnumeratedRoleType "model:System$PerspectivesSystem$User"})
 
   -- test "Role has context" do
   --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    FilledBy : model:MyTestDomain$MyOtherRole" domain
@@ -549,7 +549,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
             -- logShow dr'
             case lookup "model:Feest$Uitje" enumeratedRoles of
               (Just (EnumeratedRole{binding})) -> assert "The binding of Uitje should be an External Role"
-                (binding == (ST $ EnumeratedRoleType "Speeltuin$External"))
+                (binding == (ST $ RoleInContext {context: ContextType "model:Feest$Speeltuin", role: EnumeratedRoleType "model:Feest$Speeltuin$External"}))
               otherwise -> assert "The binding of Uitje should be an External Role" false
 
   test "Role with a state" do

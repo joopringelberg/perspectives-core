@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Free (Free)
-import Data.Array (catMaybes, head, length)
+import Data.Array (catMaybes, head, length, null)
 import Data.Array.NonEmpty (singleton)
 import Data.Either (Either(..), isRight)
 import Data.Maybe (Maybe(..), isJust)
@@ -13,7 +13,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Foreign.Object (Object, fromFoldable, lookup, empty)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.ContextAndRole (context_me, rol_gevuldeRollen, rol_isMe)
+import Perspectives.ContextAndRole (context_me, rol_gevuldeRol, rol_gevuldeRollen, rol_isMe)
 import Perspectives.ContextRoleParser (expandedName, roleBindingByReference)
 import Perspectives.CoreTypes ((##>>))
 import Perspectives.EntiteitAndRDFAliases (RolName)
@@ -26,7 +26,7 @@ import Perspectives.LoadCRL.FS (loadAndCacheCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectRol, getPerspectContext)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Perspectives.SaveUserData (removeBinding, setBinding)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile')
@@ -48,9 +48,11 @@ theSuite = suite "ContextRoleParser" do
     _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
     (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCase$Self")
-    ra <- getPerspectRol rl >>= pure <<< rol_gevuldeRollen
-    liftAff $ assert "There should be two inverse bindings for model:Test$TestCase$NestedCase$NestedSelf" (Just 2 == (length <$> (lookup "model:Test$TestCase$NestedCase$NestedSelf" ra)))
-    liftAff $ assert "There should be an inverse binding for model:Test$TestCase$NestedCase2$NestedSelf" (isJust (lookup "model:Test$TestCase$NestedCase2$NestedSelf" ra))
+    ra <- getPerspectRol rl
+    liftAff $ assert "There should be two inverse bindings for model:Test$TestCase$NestedCase$NestedSelf" (2 == (length $ rol_gevuldeRol ra (ContextType "model:Test$TestCase$NestedCase") (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")))
+
+    liftAff $ assert "There should be an inverse binding for model:Test$TestCase$NestedCase2$NestedSelf" (not $ null $ rol_gevuldeRol ra (ContextType "model:Test$TestCase$NestedCase2") (EnumeratedRoleType "model:Test$TestCase$NestedCase2$NestedSelf"))
+
 
   test "Load both a model and instances" $ runP $ withSystem do
     _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
@@ -93,7 +95,7 @@ theSuite = suite "ContextRoleParser" do
   test "me for the context of a role from which we remove the binding." $ runP $ withSystem do
     _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
-    void $ runMonadPerspectivesTransaction $ removeBinding false
+    void $ runMonadPerspectivesTransaction $ removeBinding
       (RoleInstance "model:User$MyTestCase$MyNestedCase2$NestedSelf_0001")
     c <- getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
     liftAff $ assert "MyNestedCase2 should have 'me' equal to Nothing" (context_me c == Nothing)

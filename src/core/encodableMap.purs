@@ -27,18 +27,19 @@ module Perspectives.Data.EncodableMap
 , delete
 , lookup
 , values
-, empty)
+, empty
+, keys)
 where
 
 import Prelude
 
 import Data.Array.Partial (head, tail)
 import Data.List (List)
-import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty) as Map
-import Data.Map (empty) as MapExports
+import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty, keys) as Map
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
-import Data.Traversable (class Traversable, sequenceDefault, traverse)
+import Data.Set (Set)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Foreign (Foreign, unsafeFromForeign)
 import Foreign.Class (class Decode, class Encode, decode, encode)
@@ -82,3 +83,6 @@ values (EncodableMap mp) = Map.values mp
 
 empty :: forall k v. EncodableMap k v
 empty = EncodableMap Map.empty
+
+keys :: forall k v. EncodableMap k v -> Set k
+keys (EncodableMap mp) = Map.keys mp

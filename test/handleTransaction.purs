@@ -24,7 +24,7 @@ import Perspectives.Persistence.State (withCouchdbUrl)
 import Perspectives.Persistent.ChangesFeed (EventSource, closeEventSource)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, localReplication)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
@@ -79,7 +79,7 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
                   --  * `me` of that context should be the latter.
                   mySysteem <- getMySystem
                   (user :: RoleInstance) <- ContextInstance mySysteem ##>> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$PerspectivesSystem$User")
-                  mchannel <- user ##> (getRoleBinders (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> context)
+                  mchannel <- user ##> (getRoleBinders (ContextType "model:System$Channel") (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> context)
                   case mchannel of
                     Nothing -> liftAff $ assert "There should be a channel on this side" false
                     Just channel -> do
@@ -125,7 +125,7 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
       -- Check if there is a channel document, starting with the user.
       mySysteem <- getMySystem
       (user :: RoleInstance) <- ContextInstance mySysteem ##>> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$PerspectivesSystem$User")
-      mchannel <- user ##> (getRoleBinders (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> context)
+      mchannel <- user ##> (getRoleBinders (ContextType "model:System$Channel") (EnumeratedRoleType "model:System$Channel$ConnectedPartner") >=> context)
       case mchannel of
         Nothing -> liftAff $ assert "There should be a channel on this side" false
         Just channel -> do

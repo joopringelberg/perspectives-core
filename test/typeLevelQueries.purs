@@ -17,7 +17,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Query.ExpressionCompiler (compileStep)
-import Perspectives.Query.QueryTypes (Domain(..))
+import Perspectives.Query.QueryTypes (Domain(..), RoleInContext(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -50,7 +50,7 @@ theSuite = suite "TypeLevelQueries" do
             (getter :: ContextInstance ~~> ContextType) <- unsafeCoerce (compileFunction qfd)
             -- Now get the type of MySystem
             theType <- (ContextInstance "model:User$test") ##>> getter
-            liftAff $ assert "The type retrieved should be model:System$PerspectivesSystem" (theType == (ContextType "model:System$PerspectivesSystem"))
+            liftAff $ assert "The type retrieved should be model:System$PerspectivesSystem" (theType == (ContextType  "model:System$PerspectivesSystem"))
 
   test "Retrieve the role types of a context type" $ runP $ withSystem do
     (r :: Either ParseError Step) <- {-pure $ unwrap $-} lift $ runIndentParser "roleTypes" step
@@ -168,7 +168,7 @@ theSuite = suite "TypeLevelQueries" do
       (Left e) -> liftAff $ assert (show e) false
       (Right step) -> do
         -- logShow step
-        r' <- evalPhaseTwo' $ compileStep (RDOM (ST $ EnumeratedRoleType "model:System$Invitation$External") Nothing) step
+        r' <- evalPhaseTwo' $ compileStep (RDOM (ST $ RoleInContext {context: ContextType "model:System$Invitation", role: EnumeratedRoleType "model:System$Invitation$External"}) ) step
         case r' of
           Left e -> liftAff $ assert (show e) false
           Right qfd -> do

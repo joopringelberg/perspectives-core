@@ -11,6 +11,7 @@ import Effect.Class.Console (log, logShow)
 import Perspectives.CoreTypes ((###=), (###>>))
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Parsing.Messages (PerspectivesError)
+import Perspectives.Query.QueryTypes (roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (allProperties, roleADT)
@@ -76,6 +77,6 @@ theSuite = suite "Perspectives.Types.ObjectGetters" do
   test "allProperties, CalculatedRoleType" $ runP $ withSimpleChat do
     adt <- getPerspectType (CalculatedRoleType "model:SimpleChat$Chat$Me") >>= roleADT
     -- logShow adt
-    ps1 <- allProperties adt
+    ps1 <- allProperties (roleInContext2Role <$> adt)
     -- logShow $ ps1 -- 4
     liftAff $ assert "Initiator has 4 properties" (length ps1 == 4)

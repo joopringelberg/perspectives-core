@@ -15,7 +15,8 @@ import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFileRecord)
-import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, Range, range)
+import Perspectives.Identifiers (deconstructNamespace_)
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, Range, RoleInContext(..), range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action, AutomaticAction)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -26,7 +27,7 @@ import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(.
 import Perspectives.Representation.Perspective (StateSpec)
 import Perspectives.Representation.Range (Range) as Range
 import Perspectives.Representation.State (State(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType, StateIdentifier(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType, StateIdentifier(..))
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 import Test.Unit (Test)
 
@@ -59,9 +60,11 @@ ensureERole roleName {enumeratedRoles} = case lookup roleName enumeratedRoles of
 
 -- | Ensure the object is compiled to a description before applying this function
 -- | (in PhaseThree)
+-- | NOTE: we assume that roleName is not instantiated as an Aspect role in another context
+-- | (we derive the context type as the lexical context of the EnumeratedRoleType)
 ensurePerspectiveOn :: String -> EnumeratedRole -> Aff Perspective.Perspective
 ensurePerspectiveOn roleName (EnumeratedRole{perspectives}) = case head $ filter
-  (unsafePartial Perspective.objectOfPerspective >>> eq (ST $ EnumeratedRoleType roleName)) perspectives of
+  (unsafePartial Perspective.objectOfPerspective >>> eq (ST $ RoleInContext {context: ContextType $ deconstructNamespace_ roleName, role: EnumeratedRoleType roleName})) perspectives of
   Nothing -> failure  ("There should be a Perspective on '" <> roleName <> "'.")
   Just p -> pure p
 

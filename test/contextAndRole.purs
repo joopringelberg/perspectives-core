@@ -10,7 +10,7 @@ import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRolle
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile)
 import Test.Perspectives.Utils (runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -112,8 +112,8 @@ theSuite = suite "ContextAndRole" do
     role6 <- pure $ removeRol_binding role4
     liftAff $ assert "removeRol_binding fails" ((rol_binding role6 == Nothing))
 
-    role7 <- pure $ addRol_gevuldeRollen role6 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla")
-    liftAff $ assert "addRol_gevuldeRollen fails" ((rol_gevuldeRol role7 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") == [(RoleInstance "blabla")]))
+    role7 <- pure $ addRol_gevuldeRollen role6 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla")
+    liftAff $ assert "addRol_gevuldeRollen fails" ((rol_gevuldeRol role7 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") == [(RoleInstance "blabla")]))
 
-    role8 <- pure $ removeRol_gevuldeRollen role7 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla")
-    liftAff $ assert "removeRol_gevuldeRollen fails" ((rol_gevuldeRol role8 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") == []))
+    role8 <- pure $ removeRol_gevuldeRollen role7 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla")
+    liftAff $ assert "removeRol_gevuldeRollen fails" ((rol_gevuldeRol role8 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") == []))

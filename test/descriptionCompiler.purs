@@ -21,13 +21,13 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (runPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -82,7 +82,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:Test$AnotherRole))' as its Range"
             case calculation of
-              (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:Test$AnotherRole")) Nothing) _ _)) -> true
+              (Q (SQD _ _ (RDOM (ST (RoleInContext{context: (ContextType "model:Test"), role: (EnumeratedRoleType "model:Test$AnotherRole")}))) _ _)) -> true
               otherwise -> false
           assert "The queryfunction of the calculation should be '(RolGetter \"model:Test$AnotherRole\")'"
             case calculation of
