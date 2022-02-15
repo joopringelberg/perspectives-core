@@ -309,7 +309,8 @@ instance writeForeignDomain :: WriteForeign Domain where
 instance readForeignDomain :: ReadForeign Domain where
   readImpl f =
     -- (\({rdom, ctype} :: {rdom :: ADT EnumeratedRoleType, ctype :: Maybe ContextType})-> (RDOM rdom ctype)) <$> (readImpl f)
-    RDOM <$> (readImpl f)
+    -- RDOM <$> (readImpl f)
+    (\({rdom: adt} :: {rdom :: ADT RoleInContext}) -> (RDOM adt)) <$> (readImpl f)
     <|> (\({cdom: adt} :: {cdom :: ADT ContextType}) -> (CDOM adt)) <$> (readImpl f)
     <|> (\({range:r, maybeproperty} :: {range :: RAN.Range, maybeproperty :: Maybe PropertyType}) -> (VDOM r maybeproperty)) <$> (readImpl f)
     <|>
