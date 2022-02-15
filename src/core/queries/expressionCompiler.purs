@@ -329,7 +329,7 @@ compileSimpleStep currentDomain s@(Binding pos membeddingContext) = do
         -- Construct a RoleInContext with it.
         -- Otherwise, take the default specified with the role(s) that is(are) the current domain.
         otherwise -> case membeddingContext of
-          Nothing -> pure $ SQD currentDomain (QF.DataTypeGetterWithParameter BindingF "") (RDOM adtOfBinding) True False
+          Nothing -> pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM adtOfBinding) True False
           Just context -> if isQualifiedWithDomein context
             then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter BindingF context) (RDOM $ replaceContext adtOfBinding (ContextType context)) True False
             -- Try to qualify the name within the Domain.
@@ -338,7 +338,7 @@ compileSimpleStep currentDomain s@(Binding pos membeddingContext) = do
               (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context (unsafePartial $ fromJust $ (deconstructModelName namespace))
               case head qnames of
                 Nothing -> throwError $ UnknownContext pos context
-                (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM $ replaceContext adtOfBinding qn) True False
+                (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.DataTypeGetterWithParameter BindingF (unwrap qn)) (RDOM $ replaceContext adtOfBinding qn) True False
                 _ -> throwError $ NotUniquelyIdentifying pos context (map unwrap qnames)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 

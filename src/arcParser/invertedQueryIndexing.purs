@@ -127,9 +127,8 @@ compiletimeIndexForFilledByQueries qfd | isRoleDomain $ domain qfd = for (leaves
     keysForRoleInContext (RoleInContext{context:startContext, role:startRole}) = do
       (adtBinding :: ADT RoleInContext) <- lift $ lift $ getEnumeratedRole startRole >>= binding
       case queryFunction qfd of
-        (DataTypeGetterWithParameter BindingF mContextType) -> case mContextType of
-          "" -> pure $ Tuple startRole ((leavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext endContext endRole))
-          ctype -> pure $ Tuple startRole ((leavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext (ContextType ctype) endRole))
+        (DataTypeGetter BindingF) -> pure $ Tuple startRole ((leavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext endContext endRole))
+        (DataTypeGetterWithParameter BindingF cType) -> pure $ Tuple startRole ((leavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext (ContextType cType) endRole))
 
 -- | Compute the keys for the fills (Binder) step.
 -- | Returns a map whose keys identify EnumeratedRoles and whose values are Arrays of keys that the given

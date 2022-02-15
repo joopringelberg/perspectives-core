@@ -20,6 +20,19 @@
 
 -- END LICENSE
 
+-- TODO
+  --  A case expression contains unreachable cases:
+  --
+  --   (MQD dom fun args ran _ _)                 a
+  --   (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a
+  --   (BQD _ (BinaryCombinator g) f1 f2 _ _ _)   a
+  --   (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a
+  --   (BQD _ (BinaryCombinator g) f1 f2 _ _ _)   a
+  --   ...
+  --
+  -- in binding group interpret, getterFromPropertyType, getDynamicPropertyGetter
+
+
 module Perspectives.Query.Interpreter where
 
 import Control.Monad.AvarMonadAsk (modify)

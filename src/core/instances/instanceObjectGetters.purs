@@ -25,7 +25,7 @@ module Perspectives.Instances.ObjectGetters where
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)
-import Data.Array (elemIndex, findIndex, foldMap, foldl, head, index, length, null, singleton)
+import Data.Array (elemIndex, filterA, findIndex, foldMap, foldl, head, index, length, null, singleton)
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
@@ -164,6 +164,18 @@ binding_ r = (try $ getPerspectEntiteit r) >>=
       case rol_binding role of
         Nothing -> pure Nothing
         (Just b) -> pure $ Just b
+
+-- | Just the fillers that come instances of a particular ContextType.
+bindingInContext :: ContextType -> RoleInstance ~~> RoleInstance
+bindingInContext cType r = ArrayT do
+  (fillers :: Array RoleInstance) <- runArrayT $ binding r
+  filterA
+    (\filler -> (lift $ try $ getPerspectEntiteit filler) >>=
+      handlePerspectRolError' "bindingInContext" false
+        \(role :: IP.PerspectRol) -> do
+          fillerContextType <-  lift ((rol_context role) ##>> contextType)
+          pure (eq cType fillerContextType))
+    fillers
 
 bottom :: RoleInstance ~~> RoleInstance
 bottom r = ArrayT do
