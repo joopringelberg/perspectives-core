@@ -398,9 +398,16 @@ enumeratedRole_ uname knd pos = do
 -- | This parser always succeeds.
 -- | If it detects no filledBy clause, it leaves consumed state as it is and returns Nil.
 filledBy :: IP (List RolePart)
-filledBy = (option Nil $
-  (reserved "filledBy" *> token.commaSep arcIdentifier >>= pure <<< map FilledByAttribute)
-  )
+filledBy = option Nil (reserved "filledBy" *> (token.commaSep1 filler))
+  where
+    filler :: IP RolePart
+    filler = do
+      role <- arcIdentifier
+      mcontext <- optionMaybe (reserved "in" *> arcIdentifier)
+      case mcontext of
+        Nothing -> do
+          pure $ FilledByAttribute role (ContextType "")
+        Just context -> pure $ FilledByAttribute role (ContextType context)
 
 -- | rolePart =
 -- | 	<perspectiveOn> |

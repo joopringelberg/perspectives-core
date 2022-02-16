@@ -218,7 +218,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     handleParts roleName (EnumeratedRole roleUnderConstruction) UnlinkedAttribute = pure (EnumeratedRole $ roleUnderConstruction {unlinked = true})
 
     -- FILLEDBYATTRIBUTE
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{binding}) (FilledByAttribute bnd) = do
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{binding}) (FilledByAttribute bnd context) = do
       if bnd == "None"
         then pure (EnumeratedRole $ roleUnderConstruction {binding = UNIVERSAL})
         else do
@@ -232,7 +232,10 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
           -- By default, comma separated types form a SUM wrt binding.
           -- We assume expandedBnd refers to an EnumeratedRoleType. This need not be so;
           -- it will be repaired in PhaseThree.
-          pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding (RoleInContext {context: ContextType "", role: EnumeratedRoleType expandedBnd})})
+          -- Note that `context` may not yet be fully qualified.
+          -- It may also be unspecified, coded as an empty string.
+          -- PhaseThree will resolve both issues.
+          pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding (RoleInContext {context, role: EnumeratedRoleType expandedBnd})})
 
     -- ROLEASPECT
     handleParts roleName (EnumeratedRole roleUnderConstruction@{context, roleAspects}) (RoleAspect a pos') = do

@@ -177,6 +177,17 @@ qualifyLocalRoleName_ pos ident roleIdentifiers = do
     (Just qname) | length candidates == 1 -> pure qname
     otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
 
+qualifyLocalContextName :: ArcPosition -> String -> Array String -> PhaseThree ContextType
+qualifyLocalContextName pos ident roleIdentifiers = ContextType <$> (qualifyLocalContextName_ pos ident roleIdentifiers)
+
+qualifyLocalContextName_ :: ArcPosition -> String -> Array String -> PhaseThree String
+qualifyLocalContextName_ pos ident roleIdentifiers = do
+  (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) roleIdentifiers
+  case head candidates of
+    Nothing -> throwError $ UnknownContext pos ident
+    (Just qname) | length candidates == 1 -> pure qname
+    otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
+
 ------------------------------------------------------------------------------------
 ------ COMPILING PROPERTY REFERENCES
 ------------------------------------------------------------------------------------

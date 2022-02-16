@@ -79,7 +79,7 @@ data RolePart =
   FunctionalAttribute Boolean |
   MandatoryAttribute Boolean |
   UnlinkedAttribute |
-  FilledByAttribute String |
+  FilledByAttribute String ContextType |
   Calculation Step |
   RoleAspect String ArcPosition |
   IndexedRole String ArcPosition |

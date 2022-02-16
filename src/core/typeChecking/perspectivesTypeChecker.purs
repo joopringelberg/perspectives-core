@@ -109,16 +109,16 @@ checkContext c = do
 -----------------------------------------------------------
 -- CHECKBINDING
 -----------------------------------------------------------
--- | The allowed binding of the given role type must be equal to or more general than the type of the proposed binding.
--- | The type of the proposed binding may not be equal to the given role type (we disallow a role binding to itself).
+-- | The allowed filler of the given role type to be filled must be equal to or more general than the type of the proposed filler.
+-- | The type of the proposed filler may not be equal to the given role type (we disallow a role filling itself).
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 checkBinding :: RoleType -> RoleInstance -> MP Boolean
-checkBinding roletype instanceToBind = do
+checkBinding filledType filler = do
   -- If the model is not available locally, try to get it from the repository.
-  (instanceType :: EnumeratedRoleType) <- roleType_ instanceToBind
-  (instanceType' :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleAspectsBindingADT) instanceType
+  (fillerType :: EnumeratedRoleType) <- roleType_ filler
+  (fillerADT :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleAspectsBindingADT) fillerType
   -- TODO. Voor de rol moet ik alleen de binding ophalen.
   -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRoleAspectsBinding
-  (roleType' :: ADT QT.RoleInContext) <- bindingOfRole roletype
-  b1 <- roleType' `lessThanOrEqualTo` instanceType'
-  pure $ b1 && not (roletype == ENR instanceType)
+  (filledTypeAllowedFiller :: ADT QT.RoleInContext) <- bindingOfRole filledType
+  b1 <- filledTypeAllowedFiller `lessThanOrEqualTo` fillerADT
+  pure $ b1 && not (filledType == ENR fillerType)
