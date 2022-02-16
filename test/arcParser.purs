@@ -174,7 +174,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Right rl@(RE (RoleE{roleParts}))) -> do
         assert "Role should have two FilledBy attributes"
           (2 == (length (filter (case _ of
-            (FilledByAttribute _) -> true
+            (FilledByAttribute _ _) -> true
             otherwise -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
 
