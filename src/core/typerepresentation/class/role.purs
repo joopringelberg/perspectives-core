@@ -157,7 +157,8 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   roleAspectsBindingADT r = do
     ra <- roleAspects r
     bnd <- binding r
-    pure $ product $ cons bnd ((\role -> ST $ RoleInContext {context: (unwrap r).context, role}) <$> ra)
+    adt <- roleADT r
+    pure $ product $ cons adt $ cons bnd ((\role -> ST $ RoleInContext {context: (unwrap r).context, role}) <$> ra)
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
 
