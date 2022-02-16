@@ -360,7 +360,7 @@ compileSimpleStep currentDomain s@(Binder pos binderName membeddingContext) = do
         -- lexicale context nemen voor RoleInContext.
         Nothing -> do
           EnumeratedRole{context} <- lift2 $ getEnumeratedRole qBinderType
-          pure $ SQD currentDomain (QF.DataTypeGetterWithTwoParameters GetRoleBindersF (unwrap qBinderType) "") (RDOM (ST $ RoleInContext{context, role: qBinderType})) True False
+          pure $ SQD currentDomain (QF.DataTypeGetterWithTwoParameters GetRoleBindersF (unwrap qBinderType) (unwrap context)) (RDOM (ST $ RoleInContext{context, role: qBinderType})) True False
         Just context -> if isQualifiedWithDomein context
           then pure $ SQD currentDomain (QF.DataTypeGetterWithTwoParameters GetRoleBindersF (unwrap qBinderType) context) (RDOM $ replaceContext adtOfBinder (ContextType context) ) True False
           -- Try to qualify the name within the Domain.
