@@ -168,7 +168,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should be a composition, the second step of which is 'getRoleBinders'"
             case calculation of
-              (Q (BQD _ _ _ (SQD _ (DataTypeGetterWithParameter GetRoleBindersF "model:Test$Role1") _ _ _) _ _ _)) -> true
+              (Q (BQD _ _ _ (SQD _ (GetRoleBindersF (EnumeratedRoleType "model:Test$Role1") (ContextType "model:Test")) _ _ _) _ _ _)) -> true
               otherwise -> false
               )
 
