@@ -152,11 +152,8 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
       CreateRole {roleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedRoleIdentifier <- qualifyAsEnumeratedTypeWithRespectTo roleIdentifier cte start end
-        -- NOTE that we lose information here in case the currentDomain consists of multiple context types.
-        -- This may cause a loss of accuracy in the query compiler, as the resulting range of this statement is not precise.
-        mContextType <- pure $ head $ leavesInADT $ unsafePartial domain2contextType $ range cte
         -- Because we can use CreateRole in a binding in a letA, we return a meaningful range value.
-        pure $ UQD originDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType originDomain) qualifiedRoleIdentifier)) True True
+        pure $ UQD originDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) qualifiedRoleIdentifier)) True True
       CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
@@ -169,11 +166,11 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                 originDomain
                 (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier)
                 cte
-                (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType originDomain) (EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier)))
+                (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) (EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier)))
                 True
                 True
               else throwError $ CannotCreateCalculatedRole calculatedType start end
-          ENR enumeratedType -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType originDomain) enumeratedType)) True True
+          ENR enumeratedType -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType)) True True
 
       CreateContext_ {contextTypeIdentifier, roleExpression, start, end} -> do
         roleQfd <- ensureRole subjects roleExpression
