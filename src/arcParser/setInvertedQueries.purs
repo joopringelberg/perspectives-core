@@ -143,7 +143,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         CP _ -> pure unit
 
     -- add to fillsInvertedQueries of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
-    QF.DataTypeGetterWithTwoParameters QF.GetRoleBindersF enr ctxt -> do
+    QF.GetRoleBindersF enr ctxt -> do
       -- Compute the keys on the base of the original backwards query.
       modifyDF \dfr@{enumeratedRoles} -> let
         -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to

@@ -165,12 +165,12 @@ findBindingRequests (RoleInstance roleId) = do
 
 -- | Returns CorrelationIdentifiers for requests through the API that have
 -- | the `binder <EnumeratedRoleType> in <ContextType>` step on the `roleId`.
-findBinderRequests :: RoleInstance -> ContextType -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
-findBinderRequests (RoleInstance roleId) (ContextType cType) (EnumeratedRoleType rType) = do
-  r <- queryAssumptionRegister
-  case lookup roleId r of
+findFilledRoleRequests :: RoleInstance -> ContextType -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
+findFilledRoleRequests (RoleInstance fillerId) (ContextType filledContextType) (EnumeratedRoleType filledType) = do
+  r <- queryAssumptionRegister 
+  case lookup fillerId r of
     Nothing -> pure []
-    Just typesForResource -> pure $ maybe [] identity (lookup (cType <> rType) typesForResource)
+    Just typesForResource -> pure $ maybe [] identity (lookup (filledContextType <> filledType) typesForResource)
 
 findContextStateRequests :: ContextInstance -> MP (Array CorrelationIdentifier)
 findContextStateRequests (ContextInstance contextId) = do
@@ -211,7 +211,7 @@ toAssumption (RoleAssumption ci rt) = assumption (unwrap ci) (unwrap rt)
 toAssumption (Me ci) = assumption (unwrap ci) "model:System$Context$Me"
 toAssumption (Binding ri) = assumption (unwrap ri) "model:System$Role$binding"
 -- NOTE that we create a single key out of the ContextType and RoleType by concatenating their String values.
-toAssumption (Binder ri ct rt) = assumption (unwrap ri) ((unwrap ct) <> (unwrap rt))
+toAssumption (FilledRolesAssumption ri ct rt) = assumption (unwrap ri) ((unwrap ct) <> (unwrap rt))
 toAssumption (Property ri pt) = assumption (unwrap ri) (unwrap pt)
 toAssumption (Context ri) = assumption (unwrap ri) "model:System$Role$context"
 toAssumption (External ci) = assumption (unwrap ci) "model:System$Context$external"
@@ -222,7 +222,7 @@ canBeUntypedAssumption :: InformedAssumption -> Boolean
 canBeUntypedAssumption (RoleAssumption _ _) = true
 canBeUntypedAssumption (Me c) = true
 canBeUntypedAssumption (Binding _) = true
-canBeUntypedAssumption (Binder _ _ _) = true
+canBeUntypedAssumption (FilledRolesAssumption _ _ _) = true
 canBeUntypedAssumption (Property _ _) = true
 canBeUntypedAssumption (Context _) = false
 canBeUntypedAssumption (External _) = false

@@ -44,7 +44,7 @@ invertFunction dom qf ran = case qf of
       else Just $ RolGetter $ ENR (unsafePartial $ domain2RoleType dom)
     BindingF -> case ran of
       (RDOM EMPTY) -> Nothing
-      (RDOM (ST (RoleInContext{context,role}))) -> Just $ DataTypeGetterWithTwoParameters GetRoleBindersF (unwrap role) (unwrap context)
+      (RDOM (ST (RoleInContext{context,role}))) -> Just $ GetRoleBindersF role context
       otherwise -> Nothing
     ExternalRoleF -> Just $ DataTypeGetter ContextF
     -- Identity steps add nothing to the query and can be left out.
@@ -69,9 +69,7 @@ invertFunction dom qf ran = case qf of
     -- A lot of cases will never be seen in a regular query.
     _ -> Nothing
 
-  DataTypeGetterWithTwoParameters f _ _ -> case f of
-    GetRoleBindersF -> Just $ DataTypeGetter BindingF
-    _ -> Nothing
+  GetRoleBindersF _ _ -> Just $ DataTypeGetter BindingF
 
   PropertyGetter pt -> Just $ Value2Role pt
 

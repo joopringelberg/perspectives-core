@@ -57,7 +57,7 @@ import Perspectives.Identifiers (buitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
+import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as OG
 import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
@@ -255,7 +255,7 @@ compileAssignmentFromRole (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
         -- We have no information about the ContextType in which these binders of type `roleType` are a member.
         -- Therefore we currently just remove them from the lexical context of roleType.
         -- When we implement the `remove filler` syntax, the modeller can specify the ContextType as well.
-        binders <- lift $ lift (roleId ##= bindingsGetter >=> OG.getRoleBinders role.context roleType)
+        binders <- lift $ lift (roleId ##= bindingsGetter >=> OG.getFilledRoles role.context roleType)
         for_ binders removeBinding
 
 compileAssignmentFromRole (BQD _ QF.Unbind_ bindings binders _ _ _) = do

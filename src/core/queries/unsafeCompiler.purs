@@ -51,7 +51,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRoleBinders, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getFilledRoles, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseBool, parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
@@ -332,11 +332,7 @@ compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
   (f1' :: String ~~> Value) <- unsafeCoerce (compileFunction f1)
   pure (unsafeCoerce $ not f1')
 
-compileFunction (SQD _ (DataTypeGetterWithTwoParameters functionName parameter1 parameter2) _ _ _ ) = do
-  case functionName of
-    GetRoleBindersF -> pure $ unsafeCoerce (getRoleBinders (ContextType parameter2) (EnumeratedRoleType parameter1))
-
-    _ -> throwError (error $ "Unknown function for DataTypeGetterWithTwoParameters: " <> show functionName)
+compileFunction (SQD _ (GetRoleBindersF enumeratedRoleType contextType) _ _ _ ) = pure $ unsafeCoerce (getFilledRoles contextType enumeratedRoleType)
 
 compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ _ ) = do
   case functionName of

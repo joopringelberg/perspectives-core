@@ -62,7 +62,6 @@ data FunctionName =
   | IntersectionF
   | CreateContextF      -- TODO
   | CreateRoleF         -- TODO
-  | GetRoleBindersF
   | GetRoleInstancesForContextFromDatabaseF
   | EqualsF
   | NotEqualsF
@@ -114,7 +113,6 @@ instance showFunctionName :: Show FunctionName where
     show IntersectionF = "both"
     show CreateContextF = "createContext"
     show CreateRoleF = "createRole"
-    show GetRoleBindersF = "binder" -- TODO en dit?
     show GetRoleInstancesForContextFromDatabaseF = "GetRoleInstancesForContextFromDatabaseF"
     show EqualsF = "="
     show NotEqualsF = "/="
@@ -161,7 +159,6 @@ isFunctionalFunction fn = case fn of
   IntersectionF -> False
   CreateContextF -> True
   CreateRoleF -> True
-  GetRoleBindersF -> False
   GetRoleInstancesForContextFromDatabaseF -> False
   EqualsF -> True
   NotEqualsF -> True
@@ -203,7 +200,6 @@ isMandatoryFunction fn = case fn of
   IntersectionF -> False
   CreateContextF -> True
   CreateRoleF -> True
-  GetRoleBindersF -> False
   GetRoleInstancesForContextFromDatabaseF -> False
   EqualsF -> True
   NotEqualsF -> True
@@ -231,7 +227,6 @@ isMandatoryFunction fn = case fn of
 data QueryFunction
   = DataTypeGetter FunctionName
   | DataTypeGetterWithParameter FunctionName String
-  | DataTypeGetterWithTwoParameters FunctionName String String
   | RegExMatch RegExP
   | PropertyGetter PropertyType
   | Value2Role PropertyType
@@ -281,6 +276,9 @@ data QueryFunction
   | TypeTimeOnlyContextF String
   | TypeTimeOnlyEnumeratedRoleF String
   | TypeTimeOnlyCalculatedRoleF String
+
+  | GetRoleBindersF EnumeratedRoleType ContextType
+
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
 

@@ -140,6 +140,6 @@ compiletimeIndexForFillsQueries qfd | isRoleDomain $ domain qfd = (leavesInADT $
     keysForRoleInContext :: RoleInContext -> (Tuple EnumeratedRoleType (Array InvertedQueryKey))
     keysForRoleInContext (RoleInContext{context:startContext, role:startRole}) = case roleRange qfd of
       ST (RoleInContext{context:endContext, role:endRole}) -> case queryFunction qfd of
-        (DataTypeGetterWithTwoParameters GetRoleBindersF _ mContextType) -> case mContextType of
+        (GetRoleBindersF _ (ContextType contextType)) -> case contextType of
           "" -> Tuple startRole [InvertedQueryKey startContext endContext endRole]
           ctype -> Tuple startRole [InvertedQueryKey startContext (ContextType ctype) endRole]

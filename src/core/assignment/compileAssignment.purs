@@ -57,7 +57,7 @@ import Perspectives.Identifiers (buitenRol)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
+import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as OG
 import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
@@ -236,7 +236,7 @@ compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
     Just roleType -> do
       EnumeratedRole role <- getEnumeratedRole roleType
       pure \contextId -> do
-        binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getRoleBinders role.context roleType)
+        binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getFilledRoles role.context roleType)
         for_ binders removeBinding
 
 compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do

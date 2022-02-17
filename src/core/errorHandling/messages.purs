@@ -110,6 +110,7 @@ data PerspectivesError
 
     | RolErrorBoundary String String
     | ContextErrorBoundary String String
+    | TypeErrorBoundary String String
     | DomeinFileErrorBoundary String String
     | ApiErrorBoundary String
     | RuleErrorBoundary String String
@@ -183,6 +184,7 @@ instance showPerspectivesError :: Show PerspectivesError where
 
   show (RolErrorBoundary boundaryName err) = "(RolErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"
   show (ContextErrorBoundary boundaryName err) = "(ContextErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectContext (" <> err <> ")"
+  show (TypeErrorBoundary boundaryName err) = "(TypeErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for type (" <> err <> ")"
   show (DomeinFileErrorBoundary boundaryName err) = "(DomeinFileErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for DomeinFile (" <> err <> ")"
   show (ApiErrorBoundary m) = "(ApiErrorBoundary) An error occurred while processing an API request: " <> show m
   show (RuleErrorBoundary ruleName m) = "(RuleErrorBoundary) An error occurred while running rule " <> ruleName <> ": " <> show m

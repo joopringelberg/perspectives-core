@@ -121,8 +121,8 @@ data InformedAssumption =
 	| Me ContextInstance
   -- Binding = filler role
   | Binding RoleInstance                               -- RoleInstance is the role with a binding
-  -- Binder = filled role
-	| Binder RoleInstance ContextType EnumeratedRoleType
+  -- FilledRolesAssumption fillerId filledContextType filledType
+	| FilledRolesAssumption RoleInstance ContextType EnumeratedRoleType
 	| Property RoleInstance EnumeratedPropertyType
 	| Context RoleInstance
 	| External ContextInstance

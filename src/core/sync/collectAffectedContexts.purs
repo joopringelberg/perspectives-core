@@ -54,7 +54,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, contextIsInState, contextType, getRoleBinders, makeChainGetter, notIsMe, roleIsInState)
+import Perspectives.Instances.ObjectGetters (binding, contextIsInState, contextType, getFilledRoles, makeChainGetter, notIsMe, roleIsInState)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, lookupInvertedQueries, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
@@ -584,17 +584,18 @@ createDeltasFromAssumption users (Binding roleInstance) = do
             Nothing -> pure unit
             Just bd -> addDelta $ DeltaInTransaction {users, delta: bd}
 
-createDeltasFromAssumption users (Binder roleInstance contextType roleType) = do
-  bndrs <- lift2 (roleInstance ##= getRoleBinders contextType roleType)
-  -- There may not be a bndr!
-  case ANE.fromArray bndrs of
+-- FilledRolesAssumption fillerId filledContextType filledType
+createDeltasFromAssumption users (FilledRolesAssumption fillerId filledContextType filledType) = do
+  filledRoles <- lift2 (fillerId ##= getFilledRoles filledContextType filledType)
+  -- There may not be a filledRole!
+  case ANE.fromArray filledRoles of
     Nothing -> pure unit
-    Just someBndrs -> do
-      ctxt <- lift2 (ANE.head someBndrs ##>> OG.context)
-      magic ctxt (SerializableNonEmptyArray someBndrs) roleType users
-  for_ bndrs \bndr -> do
-    (try $ lift2 $ getPerspectRol bndr) >>=
-      handlePerspectRolError "createDeltasFromAssumption.Binder"
+    Just someFilleds -> do
+      filledContext <- lift2 (ANE.head someFilleds ##>> OG.context)
+      magic filledContext (SerializableNonEmptyArray someFilleds) filledType users
+  for_ filledRoles \filledId -> do
+    (try $ lift2 $ getPerspectRol filledId) >>=
+      handlePerspectRolError "createDeltasFromAssumption.FilledRolesAssumption"
         \(PerspectRol{bindingDelta}) -> case bindingDelta of
           Nothing -> pure unit
           Just bd -> addDelta $ DeltaInTransaction {users, delta: bd}

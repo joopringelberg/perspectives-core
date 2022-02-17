@@ -64,7 +64,7 @@ import Perspectives.CollectAffectedContexts (addRoleObservingContexts, usersWith
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
-import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindingRequests, findRoleRequests, findRoleStateRequests)
+import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findResourceDependencies, findRoleRequests, findRoleStateRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
@@ -107,7 +107,7 @@ saveContextInstance id = do
     (PerspectRol{_id, binding, pspType:roleType, filledRoles}) <- lift2 $ saveEntiteit rol
     case binding of
       Nothing -> pure unit
-      Just b -> (lift2 $ findBinderRequests b cType roleType) >>= addCorrelationIdentifiersToTransactie
+      Just fillerId -> (lift2 $ findFilledRoleRequests fillerId cType roleType) >>= addCorrelationIdentifiersToTransactie
     for_ filledRoles \roleMap ->
       for_ roleMap \instances ->
         for_ instances \binder ->
@@ -265,13 +265,13 @@ queryUpdatesForRoleRemoval :: PerspectRol -> MonadPerspectivesTransaction Unit
 queryUpdatesForRoleRemoval role@(PerspectRol{_id:roleId, pspType:roleType, context:contextId}) = do
   cType <- lift2 (contextId ##>> contextType)
   (lift2 $ findRoleRequests contextId roleType) >>= addCorrelationIdentifiersToTransactie
-  (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
-  (lift2 $ findBinderRequests roleId cType roleType) >>= addCorrelationIdentifiersToTransactie
-  (lift2 $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
   if rol_isMe role
     then (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me"))
       >>= addCorrelationIdentifiersToTransactie
     else pure unit
+  -- All requests where roleId is the resource of the assumption (its first member) should be added to
+  -- the transaction. They will be binding requests, filled role requests and state requests.
+  (lift2 $ findResourceDependencies (unwrap roleId)) >>= addCorrelationIdentifiersToTransactie
 
 -- | PERSISTENCE. Remove the role instance from context.
 removeRoleInstanceFromContext :: PerspectRol -> MonadPerspectivesTransaction Unit
@@ -375,7 +375,7 @@ setFirstBinding filled filler msignedDelta = (lift2 $ try $ getPerspectEntiteit 
 
           -- QUERY EVALUATION
           filledContextType <- lift2 (rol_context filledRole ##>> contextType)
-          (lift2 $ findBinderRequests filler filledContextType (rol_pspType filledRole)) >>= addCorrelationIdentifiersToTransactie
+          (lift2 $ findFilledRoleRequests filler filledContextType (rol_pspType filledRole)) >>= addCorrelationIdentifiersToTransactie
           (lift2 $ findBindingRequests filled) >>= addCorrelationIdentifiersToTransactie
 
           -- ISME, ME
@@ -462,12 +462,12 @@ removeBinding roleId = do
 removeBinding_ :: RoleInstance -> Maybe RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
 removeBinding_ filled mFillerId msignedDelta = (lift2 $ try $ getPerspectEntiteit filled) >>=
   handlePerspectRolError' "removeBinding_" []
-    \(originalRole :: PerspectRol) -> case rol_binding originalRole of
+    \(originalFilled :: PerspectRol) -> case rol_binding originalFilled of
       Nothing -> pure []
       Just oldFillerId -> do
-        cType <- lift2 (rol_context originalRole ##>> contextType)
+        filledContextType <- lift2 (rol_context originalFilled ##>> contextType)
         -- QUERY EVALUATION
-        (lift2 $ findBinderRequests oldFillerId cType (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
+        (lift2 $ findFilledRoleRequests oldFillerId filledContextType (rol_pspType originalFilled)) >>= addCorrelationIdentifiersToTransactie
         (lift2 $ findBindingRequests filled) >>= addCorrelationIdentifiersToTransactie
 
         -- STATE EVALUATION
@@ -475,9 +475,9 @@ removeBinding_ filled mFillerId msignedDelta = (lift2 $ try $ getPerspectEntitei
         delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
                       { filled
                       , filler: case mFillerId of
-                          Nothing -> (rol_binding originalRole)
+                          Nothing -> (rol_binding originalFilled)
                           otherwise -> mFillerId
-                      , oldFiller: (rol_binding originalRole)
+                      , oldFiller: (rol_binding originalFilled)
                       -- TODO. Dit moet ook een ReplaceBinding kunnen zijn!
                       , deltaType: case mFillerId of
                         Nothing -> RemoveBinding

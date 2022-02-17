@@ -54,7 +54,7 @@ import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available', not_)
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getRoleBinders, getUnlinkedRoleInstances, roleModelName, roleType)
+import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getFilledRoles, getUnlinkedRoleInstances, roleModelName, roleType)
 import Perspectives.Instances.Values (bool2Value, value2Date, value2Int)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
@@ -374,7 +374,7 @@ interpret qfd a = case a.head of
         (lift2MPQ $ PC.calculation cp) >>= flip interpret a
       (SQD _ (DataTypeGetter ContextF) _ _ _) -> (flip consOnMainPath a) <<< C <$> context rid
       (SQD _ (DataTypeGetter BindingF) _ _ _) -> (flip consOnMainPath a) <<< R <$> binding rid
-      (SQD _ (DataTypeGetterWithTwoParameters GetRoleBindersF roleType contextType) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getRoleBinders (ContextType contextType) (EnumeratedRoleType roleType) rid
+      (SQD _ (GetRoleBindersF roleType contextType) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getFilledRoles contextType roleType rid
 
       otherwise -> throwError (error $ "(head=RoleInstance) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show rid)
 

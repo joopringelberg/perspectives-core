@@ -62,7 +62,7 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getRoleBinders, getRoleName, roleType, roleType_, siblings)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getRoleName, roleType, roleType_, siblings)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.State (getSystemIdentifier)
@@ -73,6 +73,7 @@ import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation, roleKindOfRoleType)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
@@ -148,24 +149,31 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
 
     -- {request: "GetRoleBinders", subject: <RoleInstance>, predicate: <EnumeratedRoleType>, object: Maybe <ContextType>}
     -- The empty string represents Nothing when used as object.
+    -- subject is the Filler.
+    -- predicate is the type of Filled.
+    -- object is the context type of Filled.
     Api.GetRoleBinders -> (try $ getPerspectRol (RoleInstance subject)) >>=
       case _ of
         Left err -> do
           logPerspectivesError $ RolErrorBoundary "Api.GetRoleBinders" (show err)
           sendResponse (Error corrId (show $ RolErrorBoundary "Api.GetRoleBinders" (show err))) setter
-        Right (PerspectRol{pspType, context}) -> case object of
-            "" -> do
-              cType <- context ##>> contextType
-              void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
-              registerSupportedEffect corrId setter (getRoleBinders cType (EnumeratedRoleType predicate)) (RoleInstance subject)
-            contextTypeName -> (try $ getContext (ContextType contextTypeName)) >>=
+        Right (PerspectRol{pspType:fillerType, context:fillerContext}) -> case object of
+            "" -> (try $ getPerspectType (EnumeratedRoleType predicate)) >>=
+              case _ of
+                Left err -> do
+                  logPerspectivesError $ TypeErrorBoundary "Api.GetRoleBinders" (show err)
+                  sendResponse (Error corrId (show $ TypeErrorBoundary "Api.GetRoleBinders" (show err))) setter
+                Right (EnumeratedRole{context:filledContextType}) ->do
+                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap fillerType))
+                  registerSupportedEffect corrId setter (getFilledRoles filledContextType (EnumeratedRoleType predicate)) (RoleInstance subject)
+            filledContextType -> (try $ getContext (ContextType filledContextType)) >>=
               case _ of
                 Left err -> do
                   logPerspectivesError $ ContextErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ ContextErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right cType -> do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
-                  registerSupportedEffect corrId setter (getRoleBinders (ContextType contextTypeName) (EnumeratedRoleType predicate)) (RoleInstance subject)
+                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap fillerType))
+                  registerSupportedEffect corrId setter (getFilledRoles (ContextType filledContextType) (EnumeratedRoleType predicate)) (RoleInstance subject)
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
       registerSupportedEffect corrId setter f (ContextInstance subject)

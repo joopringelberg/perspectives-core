@@ -184,15 +184,16 @@ bottom r = ArrayT do
     Nothing -> pure [r]
     Just b -> runArrayT $ bottom b
 
--- | From the instance of a Role of any kind, find the instances of the Role of the given
--- | type that bind it (that have it as their binding). The type of rname (EnumeratedRoleType) may
+-- | From the instance of a Role (fillerId) of any kind, find the instances of the Role of the given
+-- | type (filledId) that are filled with it. The type of rname (EnumeratedRoleType) may
 -- | be psp:Context$externalRole.
-getRoleBinders :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
-getRoleBinders cType rname r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
-  handlePerspectRolError' "getRoleBinders" []
-    \(role :: IP.PerspectRol) -> do
-      tell $ ArrayWithoutDoubles [Binder r cType rname]
-      pure $ rol_gevuldeRol role cType rname
+-- getFilledRoles
+getFilledRoles :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
+getFilledRoles filledContextType filledType fillerId = ArrayT $ (lift $ try $ getPerspectEntiteit fillerId) >>=
+  handlePerspectRolError' "getFilledRoles" []
+    \(filler :: IP.PerspectRol) -> do
+      tell $ ArrayWithoutDoubles [FilledRolesAssumption fillerId filledContextType filledType]
+      pure $ rol_gevuldeRol filler filledContextType filledType
 
 getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
@@ -275,16 +276,13 @@ allRoleBinders r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
         (\cIndex (vals :: Array RoleInstance) (roleMap :: Object (Array RoleInstance)) -> do
           vals' <- foldWithIndexM
             (\rIndex (cum :: Array RoleInstance) (vals' :: Array RoleInstance) -> do
-              tell $ ArrayWithoutDoubles [Binder r (ContextType cIndex)(EnumeratedRoleType rIndex)]
+              tell $ ArrayWithoutDoubles [FilledRolesAssumption r (ContextType cIndex)(EnumeratedRoleType rIndex)]
               pure (cum <> vals'))
             []
             roleMap
           pure (vals <> vals'))
         []
         filledRoles
-
-      -- for_ (keys filledRoles) (\key -> tell $ ArrayWithoutDoubles [Binder r (EnumeratedRoleType key)])
-      -- pure $ join $ values filledRoles
 
 -- | `isMe` has an internal error boundary. On failure, it returns false.
 isMe :: RoleInstance -> MP Boolean

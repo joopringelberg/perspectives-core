@@ -54,7 +54,7 @@ import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnu
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, functional, mandatory) as RL
 import Perspectives.Representation.Perspective (ModificationSummary)
-import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
 
@@ -141,7 +141,7 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
       -- We do not know whether the binding (filling role) is an Aspect in its embedding context.
       backwards' <- pure $ makeComposition
         (SQD (RDOM adtOfBinding)
-          (DataTypeGetterWithTwoParameters GetRoleBindersF (unwrap role) (unwrap context) )
+          (GetRoleBindersF role context)
           (RDOM $ ST ric)
           (bool2threeValued fun)
           (bool2threeValued man)) <$> bw
