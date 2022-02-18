@@ -64,7 +64,7 @@ import Perspectives.CollectAffectedContexts (addRoleObservingContexts, usersWith
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
-import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findResourceDependencies, findRoleRequests, findRoleStateRequests)
+import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findResourceDependencies, findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Extern.Couchdb (addModelToLocalStore)

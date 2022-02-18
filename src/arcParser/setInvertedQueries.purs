@@ -54,7 +54,7 @@ import Prelude (Unit, flip, identity, pure, unit, ($), (<$>), bind, (==), (<>))
 
 type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
 
-
+-- | Modifies the DomeinFile in PhaseTwoState.
 storeInvertedQuery ::
   QueryWithAKink ->
   Array RoleType ->
@@ -85,13 +85,12 @@ storeInvertedQuery qwk@(ZQ backward forward) users roleStates statesPerProperty 
 
     (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) statesPerProperty selfOnly
 
-    (Just x) -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint x)
-
-    Nothing -> pure unit
+    otherwise -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint otherwise)
 
 -- | The function is partial, because we just handle the SQD case.
 -- | The first argument is the backward path of the second argument.
 -- | This is not a recursive function! It merely adds the QueryWithAKink to a Context, Role or Property type.
+-- | Modifies the DomeinFile in PhaseTwoState.
 setPathForStep :: Partial =>
   QueryFunctionDescription ->
   QueryWithAKink ->
@@ -132,7 +131,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             -- We add the InvertedQuery to the Property, indexed for all role types in the range.
             (foldl
               (\property (RoleInContext{role}) -> addPathToProperty
-                ep
+                property
                 qWithAK
                 modifiesPropertiesOf
                 role)

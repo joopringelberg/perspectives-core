@@ -238,6 +238,7 @@ invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q
 --------------------------------------------------------------------------------------------------------------
 type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
 
+-- | Modifies the DomeinFile in PhaseTwoState.
 setInvertedQueries ::
   Array RoleType ->
   Map PropertyType (Array StateIdentifier) ->

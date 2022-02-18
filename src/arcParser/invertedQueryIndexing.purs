@@ -35,7 +35,7 @@ import Data.Array (concat)
 import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
-import Perspectives.CoreTypes (MonadPerspectives, liftToInstanceLevel, (##=), (###=))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (###=), (##=))
 import Perspectives.Instances.ObjectGetters (contextType, roleType)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo')
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain, isRoleDomain, queryFunction, roleDomain, roleInContext2Role, roleRange)
@@ -46,7 +46,7 @@ import Perspectives.Representation.EnumeratedRole (InvertedQueryKey(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType)
-import Perspectives.Types.ObjectGetters (aspectsOfContext, aspectsOfRole, enumeratedRoleContextType)
+import Perspectives.Types.ObjectGetters (aspectsOfContext, aspectsOfRole, enumeratedRoleContextType, roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Prelude (bind, map, pure, ($), (/=), (<#>), (<$>), (<<<), (>=>), (>>=))
 
@@ -106,13 +106,10 @@ runtimeIndexForContextQueries contextInstance = contextInstance ##= (contextType
 runTimeIndexForRoleQueries :: EnumeratedRoleType -> MonadPerspectives (Array EnumeratedRoleType)
 runTimeIndexForRoleQueries roleType = roleType ###= aspectsOfRole
 
--- | Index member 'onPropertyDelta' of EnumeratedPropertyType with this key computed from a RolePropertyDelta.
--- | Notice that there is no need to scour Aspects of the EnumeratedRoleType. We will find the Aspect that
--- | provided the Property, if indeed the Property is an Aspect Property of the EnumeratedRoleType; but that
--- | will only give us __the same__ inverted queries. Other Aspects of the EnumeratedRoleType will return nothing
--- | we look up inverted queries on the Property. when we
-runtimeIndexForPropertyQueries :: EnumeratedRoleType -> String
-runtimeIndexForPropertyQueries = unwrap
+-- | Index member 'onPropertyDelta' of EnumeratedPropertyType with these keys.
+-- |
+runtimeIndexForPropertyQueries :: EnumeratedRoleType -> MonadPerspectives (Array String)
+runtimeIndexForPropertyQueries eroleType = map unwrap <$> (eroleType ###= roleAspectsClosure)
 
 -----------------------------------------------------------
 -- COMPUTING KEYS IN COMPILE TIME

@@ -72,6 +72,7 @@ import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
 
 type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
 
+-- | Modifies the DomeinFile in PhaseTwoState.
 setInvertedQueriesForUserAndRole :: Partial =>
   QueryFunctionDescription ->
   Array RoleType ->

@@ -34,7 +34,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (head) as List
 import Data.List.NonEmpty (foldM) as LNE
-import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse, traverse_)
@@ -75,7 +75,7 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Utilities (findM)
-import Prelude (Unit, bind, const, discard, identity, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, const, discard, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -662,7 +662,13 @@ aisInPropertyDelta id property eroleType = do
   -- `handleBackwardQuery` just passes on users that have at least one
   -- valid perspective, even if the condition is object state.
   -- We must use all types of the role to look up calculations.
-  allCalculations <- pure $ maybe [] identity (lookup (runtimeIndexForPropertyQueries eroleType) calculations)
+  allKeys <- lift2 $ runtimeIndexForPropertyQueries eroleType
+  allCalculations <- pure $ foldl
+    (\cumulatedCalculations nextKey -> case lookup nextKey calculations of
+      Nothing -> cumulatedCalculations
+      Just c -> c `union` cumulatedCalculations)
+    []
+    allKeys
   (cwu :: Array ContextWithUsers) <- join <$> for allCalculations (handleBackwardQuery id)
   lift2 $ filterA notIsMe (nub $ join $ snd <$> cwu)
   where

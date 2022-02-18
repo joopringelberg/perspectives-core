@@ -413,9 +413,11 @@ handlePostponedStateQualifiedParts = do
     addAll :: forall key value. Ord key => value -> Map.Map key value -> Array key -> Map.Map key value
     addAll value = foldr (\key map -> Map.insert key value map)
 
+    -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart :: Partial => AST.StateQualifiedPart -> PhaseThree Unit
 
     -- Compiles and distributes all expressions in the automatic effect.
+    -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.AE (AST.AutomaticEffectE{subject, object, transition, effect, start, end})) = do
       -- `originDomain` is the type of the origin, expressed as Domain.
       originDomain <- statespec2Domain (transition2stateSpec transition)
@@ -471,6 +473,7 @@ handlePostponedStateQualifiedParts = do
         objectQfd
       where
 
+        -- | Modifies the DomeinFile in PhaseTwoState.
         modifyAllStates :: AutomaticAction -> Array RoleType -> Array StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> PhaseThree Unit
         modifyAllStates automaticAction qualifiedUsers states currentDomain mobjectQfd = for_ states
           (modifyPartOfState start end
@@ -508,6 +511,7 @@ handlePostponedStateQualifiedParts = do
 
     -- Compiles and distributes all expressions in the message.
     -- See extensive comments in the case AutomaticEffectE.
+    -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.N (AST.NotificationE{user, object, transition, message, start, end})) = do
       originDomain <- statespec2Domain (transition2stateSpec transition)
       (qualifiedUsers :: Array RoleType) <- collectRoles user
@@ -532,6 +536,7 @@ handlePostponedStateQualifiedParts = do
         originDomain
         objectQfd
       where
+          -- | Modifies the DomeinFile in PhaseTwoState.
           modifyAllStates :: Notification -> Array RoleType -> Array StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> PhaseThree Unit
           modifyAllStates notification qualifiedUsers states currentDomain mobjectQfd= for_ states
             \stateId -> modifyPartOfState
@@ -576,6 +581,7 @@ handlePostponedStateQualifiedParts = do
                 compiledPart <- compileExpression currentDomain expressionWithEnvironment
                 pure (Sentence.CP (Q compiledPart))
 
+    -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start})) = do
       -- `currentContextDomain` represents the current context, expressed as a Domain.
       currentcontextDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
@@ -633,6 +639,7 @@ handlePostponedStateQualifiedParts = do
         (Action theAction)
         stateSpecs
       where
+        -- | Modifies the DomeinFile in PhaseTwoState.
         -- Add the action for all users to their perspective on the object in all states.
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Action -> Array StateSpec -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd theAction states = for_ qualifiedUsers
@@ -647,6 +654,7 @@ handlePostponedStateQualifiedParts = do
               (unwrap actions)
               states)})
 
+    -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.R (AST.RoleVerbE{subject, object, state, roleVerbs:rv, start})) = do
       -- Add, for all these users...
       qualifiedUsers <- collectRoles subject
@@ -657,11 +665,13 @@ handlePostponedStateQualifiedParts = do
       -- ... the role verbs.
       modifyAllSubjectPerspectives qualifiedUsers objectQfd stateSpecs
       where
+        -- | Modifies the DomeinFile in PhaseTwoState.
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateSpec -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd stateSpecs = for_ qualifiedUsers
           (modifyPerspective objectQfd object start
             (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) stateSpecs}))
 
+    -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.P (AST.PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start, end})) = do
       -- Add, for all these users...
       (qualifiedUsers :: Array RoleType) <- collectRoles subject
@@ -692,6 +702,7 @@ handlePostponedStateQualifiedParts = do
           end)
       where
 
+        -- | Modifies the DomeinFile in PhaseTwoState.
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PropertyVerbs -> Array StateSpec -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' stateSpecs = for_ qualifiedUsers
           (modifyPerspective
@@ -742,6 +753,7 @@ handlePostponedStateQualifiedParts = do
                   Just (View {propertyReferences}) -> pure $ PSet propertyReferences
                 _ -> throwError $ NotUniquelyIdentifying start view candidates
 
+    -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.SO (AST.SelfOnly{subject, object, state, start, end})) = do
       currentDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
       -- Set, for all these users...
@@ -766,11 +778,13 @@ handlePostponedStateQualifiedParts = do
 
       where
 
+        -- | Modifies the DomeinFile in PhaseTwoState.
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd = for_ qualifiedUsers
           (modifyPerspective objectQfd object start
             (\(Perspective pr) -> Perspective pr {selfOnly = true}))
 
+    -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.CA (AST.ContextActionE{id, subject, object:currentContext, state, effect, start})) = do
       -- `currentContextDomain` represents the current context, expressed as a Domain.
       currentcontextDomain <- pure (CDOM $ ST $ currentContext)
@@ -812,6 +826,7 @@ handlePostponedStateQualifiedParts = do
       where
         -- Add the action to the map of StateSpecs to an Object of Action identifier to Action of all user roles.
         -- (Actions are double indexed in user roles: first by StateSpec, then by Action identifier).
+        -- | Modifies the DomeinFile in PhaseTwoState.
         modifyAllSubjectRoles :: Array RoleType -> String -> Action -> Array StateSpec -> PhaseThree Unit
         modifyAllSubjectRoles qualifiedUsers actionId theAction stateSpecs = for_ qualifiedUsers
           \(userRole :: RoleType) -> case userRole of
@@ -840,7 +855,7 @@ handlePostponedStateQualifiedParts = do
               (unwrap actions)
               stateSpecs}
 
-
+    -- | Modifies the DomeinFile in PhaseTwoState.
     modifyStateDependentPerspectives ::
       AST.StateSpecification ->
       (StateDependentPerspective -> StateDependentPerspective) ->
@@ -906,6 +921,7 @@ handlePostponedStateQualifiedParts = do
               perspectivesOnEntry
 
     -- Apply, for this user, the modifier to his perspective on the object (and create a perspective if necessary).
+    -- | Modifies the DomeinFile in PhaseTwoState.
     modifyPerspective :: QueryFunctionDescription -> RoleIdentification -> ArcPosition -> (Perspective -> Perspective) -> RoleType -> PhaseThree Unit
     modifyPerspective objectQfd roleSpec start modifier userRole = do
       (roleTypes :: Array RoleType) <- collectRoles roleSpec
@@ -964,6 +980,7 @@ handlePostponedStateQualifiedParts = do
             calculatedRoles
             }
 
+    -- | Modifies the DomeinFile in PhaseTwoState.
     modifyPartOfState :: ArcPosition -> ArcPosition -> (StateRecord -> PhaseThree StateRecord) -> StateIdentifier -> PhaseThree Unit
     modifyPartOfState start end modifyState stateId = do
       mstate <- State.gets _.dfr >>= pure <<< lookup (unwrap stateId) <<< _.states
