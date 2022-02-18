@@ -63,7 +63,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | context instance to be serialised.
 serialiseFor :: Array RoleType -> RoleInstance -> MPQ Value
 serialiseFor userTypes externalRoleId = ArrayT $ case ARR.head userTypes of
-  Nothing -> empty
+  Nothing -> pure []
   Just u -> do
     lift $ ARR.singleton <$> serialisedAsDeltasForUserType (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId) u
     -- (sers :: Array ContextSerialization) <- lift $ execStateT (serialiseAsJsonFor_ u (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId)) []
