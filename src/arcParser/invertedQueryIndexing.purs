@@ -67,7 +67,7 @@ import Prelude (bind, map, pure, ($), (/=), (<#>), (<$>), (<<<), (>=>), (>>=))
 -- | Index member `fillsInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
 -- | with type SetFirstBinding or ReplaceBinding.
 runtimeIndexForFillsQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
-runtimeIndexForFillsQueries (RoleBindingDelta{filled, filler, deltaType}) | deltaType /= RemoveBinding = runtimeIndexForFillsQueries' filled
+runtimeIndexForFillsQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = runtimeIndexForFillsQueries' filled
 
 runtimeIndexForFillsQueries' :: RoleInstance -> MonadPerspectives (Array InvertedQueryKey)
 runtimeIndexForFillsQueries' filled = do
@@ -82,7 +82,7 @@ runtimeIndexForFillsQueries' filled = do
 -- | Index member `filledByInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
 -- | with type SetFirstBinding or ReplaceBinding.
 runtimeIndexForFilledByQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
-runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) | deltaType /= RemoveBinding = do
+runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = do
   filledTypes <- filled ##= roleType >=> liftToInstanceLevel aspectsOfRole
   concat <$> for filledTypes \(filledType :: EnumeratedRoleType) -> do
     fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< allLeavesInADT <<< _.binding <<< unwrap) filledType
