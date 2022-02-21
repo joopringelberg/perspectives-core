@@ -57,7 +57,7 @@ type EnumeratedRoleRecord =
   , displayName :: String
   , kindOfRole :: RoleKind
 
-  , roleAspects :: Array EnumeratedRoleType
+  , roleAspects :: Array RoleInContext
   , properties :: Array PropertyType
 
   , context :: ContextType

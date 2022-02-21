@@ -35,11 +35,11 @@ import Data.Array (concat)
 import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (###=), (##=))
+import Perspectives.CoreTypes (MonadPerspectives, liftToInstanceLevel, (###=), (##=))
 import Perspectives.Instances.ObjectGetters (contextType, roleType)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo')
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain, isRoleDomain, queryFunction, roleDomain, roleInContext2Role, roleRange)
-import Perspectives.Representation.ADT (ADT(..), leavesInADT)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (binding)
 import Perspectives.Representation.EnumeratedRole (InvertedQueryKey(..))
@@ -60,13 +60,6 @@ import Prelude (bind, map, pure, ($), (/=), (<#>), (<$>), (<<<), (>=>), (>>=))
 -- | and check whether it is a member of the InvertedQueryKeyCollection, collecting InvertedQueries from matched
 -- | keys as we go.
 -- | Or, equivalently, we generate all keys in the collection and index the map with each of them, joining the results.
--- |
--- |
--- |
--- |
--- |
--- data RuntimeInvertedQueryKey = InvertedQueryKey (Array ContextType) (Array ContextType) (Array EnumeratedRoleType)
-
 
 -----------------------------------------------------------
 -- COMPUTING KEYS IN RUN TIME
@@ -80,7 +73,7 @@ runtimeIndexForFillsQueries' :: RoleInstance -> MonadPerspectives (Array Inverte
 runtimeIndexForFillsQueries' filled = do
   filledTypes <- filled ##= roleType >=> liftToInstanceLevel aspectsOfRole
   concat <$> for filledTypes \(filledType :: EnumeratedRoleType) -> do
-    fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< leavesInADT <<< _.binding <<< unwrap) filledType
+    fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< allLeavesInADT <<< _.binding <<< unwrap) filledType
     for fillerTypes \fillerType -> do
       filledContextType <- enumeratedRoleContextType filledType
       fillerContextType <- enumeratedRoleContextType fillerType
@@ -92,7 +85,7 @@ runtimeIndexForFilledByQueries :: Partial => RoleBindingDelta -> MonadPerspectiv
 runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) | deltaType /= RemoveBinding = do
   filledTypes <- filled ##= roleType >=> liftToInstanceLevel aspectsOfRole
   concat <$> for filledTypes \(filledType :: EnumeratedRoleType) -> do
-    fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< leavesInADT <<< _.binding <<< unwrap) filledType
+    fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< allLeavesInADT <<< _.binding <<< unwrap) filledType
     for fillerTypes \fillerType -> do
       filledContextType <- enumeratedRoleContextType filledType
       fillerContextType <- enumeratedRoleContextType fillerType
@@ -118,20 +111,20 @@ runtimeIndexForPropertyQueries eroleType = map unwrap <$> (eroleType ###= roleAs
 -- | Returns a map whose keys identify EnumeratedRoles and whose values are Arrays of keys that the given
 -- | (inverted) query should be stored under.
 compiletimeIndexForFilledByQueries :: Partial => QueryFunctionDescription -> (PhaseTwo' MonadPerspectives) (Array (Tuple EnumeratedRoleType (Array InvertedQueryKey)))
-compiletimeIndexForFilledByQueries qfd | isRoleDomain $ domain qfd = for (leavesInADT $ roleDomain qfd) keysForRoleInContext
+compiletimeIndexForFilledByQueries qfd | isRoleDomain $ domain qfd = for (allLeavesInADT $ roleDomain qfd) keysForRoleInContext
   where
     keysForRoleInContext :: RoleInContext -> (PhaseTwo' MonadPerspectives) (Tuple EnumeratedRoleType (Array InvertedQueryKey))
     keysForRoleInContext (RoleInContext{context:startContext, role:startRole}) = do
       (adtBinding :: ADT RoleInContext) <- lift $ lift $ getEnumeratedRole startRole >>= binding
       case queryFunction qfd of
-        (DataTypeGetter BindingF) -> pure $ Tuple startRole ((leavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext endContext endRole))
-        (DataTypeGetterWithParameter BindingF cType) -> pure $ Tuple startRole ((leavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext (ContextType cType) endRole))
+        (DataTypeGetter BindingF) -> pure $ Tuple startRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext endContext endRole))
+        (DataTypeGetterWithParameter BindingF cType) -> pure $ Tuple startRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext (ContextType cType) endRole))
 
 -- | Compute the keys for the fills (Binder) step.
 -- | Returns a map whose keys identify EnumeratedRoles and whose values are Arrays of keys that the given
 -- | (inverted) query should be stored under.
 compiletimeIndexForFillsQueries :: Partial => QueryFunctionDescription -> (Array (Tuple EnumeratedRoleType (Array InvertedQueryKey)))
-compiletimeIndexForFillsQueries qfd | isRoleDomain $ domain qfd = (leavesInADT $ roleDomain qfd) <#>
+compiletimeIndexForFillsQueries qfd | isRoleDomain $ domain qfd = (allLeavesInADT $ roleDomain qfd) <#>
   keysForRoleInContext
   where
     keysForRoleInContext :: RoleInContext -> (Tuple EnumeratedRoleType (Array InvertedQueryKey))

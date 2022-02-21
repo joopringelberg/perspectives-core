@@ -41,7 +41,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
-import Perspectives.Representation.ADT (leavesInADT)
+import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
@@ -141,7 +141,7 @@ serialisePerspective contextStates subjectStates cid userRoleType p@(Perspective
   roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes)
   -- If the binding of the ADT that is the range of the object QueryFunctionDescription, is an external role,
   -- its context type may be created.
-  contextTypesToCreate <- (lift $ leavesInADT <<< map roleInContext2Role <$> bindingOfADT (unsafePartial domain2roleType (range object)))
+  contextTypesToCreate <- (lift $ allLeavesInADT <<< map roleInContext2Role <$> bindingOfADT (unsafePartial domain2roleType (range object)))
     >>= pure <<< (filter (isExternalRole <<< unwrap))
     >>= lift <<< traverse getEnumeratedRole
     >>= pure <<< map (_.context <<< unwrap)

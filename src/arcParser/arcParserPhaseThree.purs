@@ -69,7 +69,7 @@ import Perspectives.Query.Kinked (completeInversions, setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Query.StatementCompiler (compileStatement)
-import Perspectives.Representation.ADT (ADT(..), leavesInADT, reduce)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, reduce)
 import Perspectives.Representation.Action (AutomaticAction(..), Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -365,7 +365,7 @@ handlePostponedStateQualifiedParts = do
     -- This case MUST represent the current object that holds in the body of `perspective on`. Multiple Enumerated role types can result from this case.
     collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd ->
       case range qfd of
-        RDOM adt -> pure $ map ENR (leavesInADT $ roleInContext2Role <$> adt)
+        RDOM adt -> pure $ map ENR (allLeavesInADT $ roleInContext2Role <$> adt)
         otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
 
     collectRoleInContexts :: RoleIdentification -> PhaseThree (ADT QT.RoleInContext)

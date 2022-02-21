@@ -96,8 +96,8 @@ buildUserGraph = do
     -- expandSourceToBindings t@(Tuple source edges) = case source of
     --   ENR eroleType -> do
     --     rAndb <- getEnumeratedRole eroleType >>= roleAndBinding
-    --     recursiveFillers <- bindingOfADT rAndb >>= pure <<< leavesInADT
-    --     pure $ flip Tuple edges <$> (ENR <$> (recursiveFillers <> leavesInADT rAndb))
+    --     recursiveFillers <- bindingOfADT rAndb >>= pure <<< commonLeavesInADT
+    --     pure $ flip Tuple edges <$> (ENR <$> (recursiveFillers <> commonLeavesInADT rAndb))
     --   CR _ -> pure [t]
 
     -- Apply the Inverted Calculated User Rule: When U1 has a perspective on calculated user role C2,
@@ -121,7 +121,7 @@ buildUserGraph = do
     userRoleToUserNode :: forall r i. RoleClass r i => r -> MonadPerspectives Node
     userRoleToUserNode r = do
         -- retain the user roles in the enumerated role expansion of the perspectives of r.
-        -- edges = nub $ filter isUserNode $ concat $ map (leavesInADT <<< unsafePartial roleRange <<< perspectiveObjectQfd) (perspectives r)
+        -- edges = nub $ filter isUserNode $ concat $ map (commonLeavesInADT <<< unsafePartial roleRange <<< perspectiveObjectQfd) (perspectives r)
         edges <- nub <$> filterA isUserNode (concat (proximalObject <$> perspectives r))
         pure $ Tuple (typeOfRole r) (Edges edges)
       where

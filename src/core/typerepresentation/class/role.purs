@@ -37,7 +37,7 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain2roleInContext, domain2roleType, range, roleInContext2Role)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
-import Perspectives.Representation.ADT (ADT(..), leavesInADT, product, reduce)
+import Perspectives.Representation.ADT (ADT(..), commonLeavesInADT, product, reduce)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Context (contextAspects, roles)
@@ -57,7 +57,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   typeOfRole :: r -> RoleType
   kindOfRole :: r -> RoleKind
   displayName :: r -> String
-  roleAspects :: r -> MonadPerspectives (Array EnumeratedRoleType)
+  roleAspects :: r -> MonadPerspectives (Array RoleInContext)
   context :: r -> MP (ADT ContextType)
   contextOfRepresentation :: r -> ContextType
   binding :: r -> MonadPerspectives (ADT RoleInContext)
@@ -96,7 +96,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   typeOfRole r = CR (unwrap r)._id
   kindOfRole r = (unwrap r).kindOfRole
   displayName r = (unwrap r).displayName
-  roleAspects = rangeOfCalculatedRole >=> pure <<< leavesInADT <<< map roleInContext2Role
+  roleAspects = rangeOfCalculatedRole >=> pure <<< commonLeavesInADT
   context r = (rangeOfCalculatedRole >=> contextOfADT >=> \adt -> pure $ product [ST (unwrap r).context, adt]) r
   contextOfRepresentation r = (unwrap r).context
   binding = rangeOfCalculatedRole >=> bindingOfADT
@@ -153,12 +153,14 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
     st@(ST _) -> PROD [(ST $ RoleInContext {context: (unwrap r).context, role: identifier r}), st]
     sum@(SUM _) -> PROD [(ST $ RoleInContext {context: (unwrap r).context, role: identifier r}), sum]
     UNIVERSAL -> UNIVERSAL
-  roleAspectsADT r@(EnumeratedRole{roleAspects}) = pure $ PROD ((\role -> ST $ RoleInContext {context: (unwrap r).context, role}) <$> (cons (identifier r) roleAspects))
+  roleAspectsADT r@(EnumeratedRole{roleAspects}) = do
+    radt <- roleADT r
+    pure $ PROD (cons radt (map ST roleAspects))
   roleAspectsBindingADT r = do
-    ra <- roleAspects r
-    bnd <- binding r
-    adt <- roleADT r
-    pure $ product $ cons adt $ cons bnd ((\role -> ST $ RoleInContext {context: (unwrap r).context, role}) <$> ra)
+    (ra :: Array RoleInContext) <- roleAspects r
+    (bnd :: ADT RoleInContext) <- binding r
+    (adt :: ADT RoleInContext) <- roleADT r
+    pure $ product [adt, bnd, PROD (ST <$> ra)]
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
 
@@ -206,7 +208,7 @@ allProperties = reduce magic
     magic :: EnumeratedRoleType -> MP (Array PropertyType)
     magic role = do
       EnumeratedRole{roleAspects, binding, properties} <- getEnumeratedRole role
-      x <- pure $ product (cons (roleInContext2Role <$> binding) (ST <$> roleAspects))
+      x <- pure $ product (cons (roleInContext2Role <$> binding) (ST <<< roleInContext2Role <$> roleAspects))
       case x of
         EMPTY -> pure properties
         otherwise -> do
@@ -221,7 +223,7 @@ allLocallyRepresentedProperties = reduce magic
     magic :: EnumeratedRoleType -> MP (Array PropertyType)
     magic role = do
       EnumeratedRole{roleAspects, properties} <- getEnumeratedRole role
-      x <- pure $ product (ST <$> roleAspects)
+      x <- pure $ product (ST <$> (roleInContext2Role <$> roleAspects))
       case x of
         EMPTY -> pure properties
         otherwise -> do
@@ -309,7 +311,7 @@ allViews = reduce magic
     magic :: EnumeratedRoleType -> MP (Array ViewType)
     magic role = do
       EnumeratedRole{roleAspects, binding, views} <- getEnumeratedRole role
-      x <- pure $ product (cons (roleInContext2Role <$> binding) (ST <$> roleAspects))
+      x <- pure $ product (cons (roleInContext2Role <$> binding) (ST <<< roleInContext2Role <$> roleAspects))
       case x of
         EMPTY -> pure views
         otherwise -> do
@@ -371,10 +373,10 @@ contextOfRole (C c) = context c
 
 -- Partial, because of the embedded case and because domain2roleType is Partial because it just handles
 -- RDOM cases.
--- | The same result as roleADT, but not in MonadPerspectives.
+-- | The same result as roleAspects, but not in MonadPerspectives.
 expansionOfRole :: Partial => Role -> Array EnumeratedRoleType
 expansionOfRole (E (EnumeratedRole {_id})) = [_id]
-expansionOfRole (C (CalculatedRole {calculation})) = roleInContext2Role <$> (leavesInADT $ domain2roleType $ range $ (case calculation of Q qd -> qd))
+expansionOfRole (C (CalculatedRole {calculation})) = roleInContext2Role <$> (commonLeavesInADT $ domain2roleType $ range $ (case calculation of Q qd -> qd))
 
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLETYPE

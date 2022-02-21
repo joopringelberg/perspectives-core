@@ -39,7 +39,7 @@ import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInv
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleType, functional, mandatory, range, roleDomain, roleInContext2Role, roleRange)
-import Perspectives.Representation.ADT (ADT(..), leavesInADT)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), InvertedQueryKey, addInvertedQueryIndexedByTripleKeys)
@@ -124,7 +124,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
               })
             -- Maybe add modifiesPropertiesOf here; but do we then need to check on
             -- synchronization on importing a model? I doubt it.
-            (OnPropertyDelta (leavesInADT $ roleInContext2Role <$> domain2roleType ran))
+            (OnPropertyDelta (allLeavesInADT $ roleInContext2Role <$> domain2roleType ran))
             dfr
           Just ep -> dfr {enumeratedProperties = insert
             (unwrap p)
@@ -136,7 +136,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 modifiesPropertiesOf
                 role)
               ep
-              (leavesInADT $ domain2roleType ran))
+              (allLeavesInADT $ domain2roleType ran))
             enumeratedProperties}
         -- CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in setPathForStep."
         CP _ -> pure unit
@@ -154,7 +154,6 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         --  * the bound role may well be in another model, leading to an InvertedQuery for another domain;
         --  * if runtime a role is bound that is a specialisation of the required role, it will still trigger the inverted query.
         oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
-        -- roleNames = unwrap <$> (leavesInADT $ unsafePartial roleRange qfd)
         description = case oneStepLess of
           -- Backward consisted of just a single step and that was GetRoleBindersF.
           -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
@@ -266,7 +265,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 contexts}
               )
             dfr
-            (leavesInADT (roleRange qfd))
+            (allLeavesInADT (roleRange qfd))
       CR _ -> throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
 
     QF.DataTypeGetter QF.ContextF -> modifyDF \dfr@{enumeratedRoles} -> foldl
@@ -294,7 +293,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 context)
               enumeratedRoles})
         dfr
-        (leavesInADT $ unsafePartial roleDomain qfd)
+        (allLeavesInADT $ unsafePartial roleDomain qfd)
 
     -- As there is, by construction, no link from the range (an external role type)
     -- to the domain (a context type), we can not attach an inverted query anywhere

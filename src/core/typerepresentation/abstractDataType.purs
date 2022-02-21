@@ -33,22 +33,23 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (find, intercalate, intersect, length, singleton, uncons, union)
+import Data.Array (concat, intercalate, intersect, length, nub, singleton, uncons, union)
 import Data.Array.Partial (head) as AP
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Identity (Identity)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
+import Data.Set (fromFoldable, subset)
 import Data.Traversable (traverse)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, flip, map, pure, show, ($), (<$>), (<<<), (<>), (==), (>>>))
+import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, flip, map, pure, show, ($), (<$>), (<<<), (<>), (==), (>>>), (/=), (&&), (||))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
@@ -226,29 +227,58 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f UNIVERSAL = pure UNIVERSAL
 
 --------------------------------------------------------------------------------------------------
----- ENUMERATEDTYPESINADT
+---- LEAVESINADT
 --------------------------------------------------------------------------------------------------
 -- | As class Reducible is defined in terms of a Monad, we use Identity.
 -- | Part of the semantics is captured by these two rules:
 -- | SUM (PROD A B) (PROD B C) --> [B]
 -- | PROD A B -> [A, B]
--- | intuitively, the leaves are just the nodes in the ADT tree that occur on any path.
-leavesInADT :: forall a. Eq a => ADT a -> Array a
-leavesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Array a))
+-- | In terms of sets: transform the ADT to Disjunctive Normal Form and then understand it
+-- | as an intersection of unions.
+commonLeavesInADT :: forall a. Eq a => ADT a -> Array a
+commonLeavesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Array a))
+
+--------------------------------------------------------------------------------------------------
+---- ALLLEAVESINADT
+--------------------------------------------------------------------------------------------------
+-- | Collect any leaf occurring in the ADT.
+allLeavesInADT :: forall a. Eq a => Ord a => ADT a -> Array a
+allLeavesInADT (ST a) = [a]
+allLeavesInADT (SUM terms) = nub $ concat $ map allLeavesInADT terms
+allLeavesInADT (PROD terms) = nub $ concat $ map allLeavesInADT terms
+allLeavesInADT EMPTY = []
+allLeavesInADT UNIVERSAL = []
 
 --------------------------------------------------------------------------------------------------
 ---- SPECIALISESADT
 --------------------------------------------------------------------------------------------------
 -- | a1 `equalsOrSpecialisesADT` a2
 -- | intuitively when a1 is built from a2.
-equalsOrSpecialisesADT :: forall a. Eq a => ADT a -> ADT a -> Conj Boolean
-equalsOrSpecialisesADT adt1@(ST a) adt2 = case adt2 of
-  ST b -> Conj (a == b)
-  SUM adts -> foldMap (equalsOrSpecialisesADT adt1) adts
-  PROD adts -> Conj $ isJust $ find (unwrap <<< equalsOrSpecialisesADT adt1) adts
-  UNIVERSAL -> Conj true
-  EMPTY -> Conj false
-equalsOrSpecialisesADT (SUM adts) adt2 = foldMap (flip equalsOrSpecialisesADT adt2) adts
-equalsOrSpecialisesADT (PROD adts) adt2 = Conj $ isJust $ find (unwrap <<< flip equalsOrSpecialisesADT adt2) adts
-equalsOrSpecialisesADT UNIVERSAL _ = Conj false
-equalsOrSpecialisesADT EMPTY _ = Conj true
+-- equalsOrSpecialisesADT :: forall a. Eq a => ADT a -> ADT a -> Conj Boolean
+-- equalsOrSpecialisesADT adt1@(ST a) adt2 = case adt2 of
+--   ST b -> Conj (a == b)
+--   SUM adts -> foldMap (equalsOrSpecialisesADT adt1) adts
+--   PROD adts -> Conj $ isJust $ find (unwrap <<< equalsOrSpecialisesADT adt1) adts
+--   UNIVERSAL -> Conj true
+--   EMPTY -> Conj false
+-- equalsOrSpecialisesADT (SUM adts) adt2 = foldMap (flip equalsOrSpecialisesADT adt2) adts
+-- equalsOrSpecialisesADT (PROD adts) adt2 = Conj $ isJust $ find (unwrap <<< flip equalsOrSpecialisesADT adt2) adts
+-- equalsOrSpecialisesADT UNIVERSAL _ = Conj false
+-- equalsOrSpecialisesADT EMPTY _ = Conj true
+
+-- | a1 `equalsOrGeneralisesADT` a2
+-- | intuitively when a2 is built from a1 (or a2 == a1).
+equalsOrGeneralisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+equalsOrGeneralisesADT adt1 adt2 = let
+  union' = allLeavesInADT adt1
+  intersection' = commonLeavesInADT adt2
+  in subset (fromFoldable union') (fromFoldable intersection')
+
+generalisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+generalisesADT adt1 adt2 = adt1 /= adt2 && adt1 `equalsOrGeneralisesADT` adt2
+
+specialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+specialisesADT = flip generalisesADT
+
+equalsOrSpecialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+equalsOrSpecialisesADT adt1 adt2 = adt1 == adt2 || adt1 `specialisesADT` adt2

@@ -47,7 +47,7 @@ import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWi
 import Perspectives.Instances.Combinators (closure_, conjunction, some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
-import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialisesADT, leavesInADT, reduce)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
 import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
@@ -227,7 +227,7 @@ propertiesOfRole s =
 ------- FUNCTIONS FOR ASPECTS
 ----------------------------------------------------------------------------------------
 aspectsOfRole :: EnumeratedRoleType ~~~> EnumeratedRoleType
-aspectsOfRole = ArrayT <<< (getPerspectType >=> roleAspects)
+aspectsOfRole = ArrayT <<< (getPerspectType >=> map (map roleInContext2Role) <<< roleAspects)
 
 -- | All types of the role, including the root type itself.
 roleAspectsClosure :: EnumeratedRoleType ~~~> EnumeratedRoleType
@@ -322,13 +322,13 @@ specialisesRoleType t1 t2 = lift do
   t1' <- typeIncludingAspects t1
   t2' <- typeIncludingAspects t2
   -- r <- t1' `greaterThanOrEqualTo` t2'
-  pure $ Value $ show $ unwrap (t1' `equalsOrSpecialisesADT` t2')
+  pure $ Value $ show (t1' `equalsOrSpecialisesADT` t2')
 
 specialisesRoleType_ :: RoleType -> (RoleType -> MonadPerspectives Boolean)
 specialisesRoleType_ t1 t2 = do
   t1' <- typeIncludingAspects t1
   t2' <- typeIncludingAspects t2
-  pure $ unwrap (t1' `equalsOrSpecialisesADT` t2')
+  pure $ (t1' `equalsOrSpecialisesADT` t2')
 
 roleTypeModelName :: RoleType ~~~> Value
 roleTypeModelName rt = maybe empty (pure <<< Value) (deconstructModelName (roletype2string rt))
@@ -456,7 +456,7 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
       (allObjects :: Array EnumeratedRoleType) <- roleType ###= roleAspectsClosure
       isJust <$> findPerspective subjectType  -- TODO. GEEFT MAAR één perspectief terug; kunnen er niet meerdere zijn?
         (\perspective@(Perspective{roleVerbs}) -> pure (
-          (not $ null $ intersect allObjects (leavesInADT (roleInContext2Role <$> objectOfPerspective perspective) ))
+          (not $ null $ intersect allObjects (allLeavesInADT (roleInContext2Role <$> objectOfPerspective perspective) ))
           &&
           (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs)))
 
@@ -583,7 +583,7 @@ roleStates (Perspective {roleVerbs}) = stateSpec2StateIdentifier <$> (fromFoldab
 -- | Notice the `equal` case!
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 isAspectOfPerspective :: Partial => Perspective -> Perspective -> Boolean
-isAspectOfPerspective perspectiveAspect perspective = unwrap $ (objectOfPerspective perspective) `equalsOrSpecialisesADT` (objectOfPerspective perspectiveAspect)
+isAspectOfPerspective perspectiveAspect perspective = (objectOfPerspective perspective) `equalsOrSpecialisesADT` (objectOfPerspective perspectiveAspect)
 
 -- | `perspectiveAspect addedToPersective perspective` integreert perspectiveAspect in perspective.
 -- | roleVerbs, propertyVerbs and actions of perspectiveAspect are added to those of perspective.
@@ -606,7 +606,7 @@ addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Per
 isPerspectiveOnSelf :: Partial => QueryFunctionDescription -> (RoleType ~~~> Boolean)
 isPerspectiveOnSelf qfd = some (
   lift <<< typeIncludingAspects >=>
-  (\adt -> pure $ unwrap (roleRange qfd `equalsOrSpecialisesADT` adt)))
+  (\adt -> pure $ (roleRange qfd `equalsOrSpecialisesADT` adt)))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR ACTIONS

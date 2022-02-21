@@ -37,7 +37,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..), range)
-import Perspectives.Representation.ADT (ADT, leavesInADT)
+import Perspectives.Representation.ADT (ADT, commonLeavesInADT)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType, StateIdentifier)
@@ -137,7 +137,7 @@ perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ MAP.
 -- | <perspective> `isPerspectiveOnADT` <adt>
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 isPerspectiveOnADT :: Partial => Perspective -> ADT RoleInContext -> Boolean
-isPerspectiveOnADT p adt = null (leavesInADT adt `difference` (leavesInADT $ objectOfPerspective p))
+isPerspectiveOnADT p adt = null (commonLeavesInADT adt `difference` (commonLeavesInADT $ objectOfPerspective p))
 
 -- | Regardless of state, does the perspective allow for the RoleVerb?
 perspectiveSupportsRoleVerb :: Perspective -> RoleVerb -> Boolean
@@ -186,10 +186,10 @@ newtype PropertyInRole = PropertyInRole { role :: EnumeratedRoleType, property :
 createModificationSummary :: Partial => Perspective -> ModificationSummary
 createModificationSummary p@(Perspective{roleVerbs, propertyVerbs}) =
   { modifiesRoleInstancesOf: if perspectiveSupportsOneOfRoleVerbs p [Remove, Delete, Create, CreateAndFill]
-    then leavesInADT $ objectOfPerspective p
+    then commonLeavesInADT $ objectOfPerspective p
     else []
   , modifiesRoleBindingOf: if perspectiveSupportsOneOfRoleVerbs p [CreateAndFill, Fill, Unbind, RemoveFiller]
-    then leavesInADT $ objectOfPerspective p
+    then commonLeavesInADT $ objectOfPerspective p
     else []
   -- , modifiesPropertiesOf: foldl
   --     (\modifiableProperties (PropertyVerbs props verbs) -> if overlapsPSet (PSet [RemovePropertyValue, DeleteProperty, AddPropertyValue, SetPropertyValue]) verbs
@@ -204,5 +204,5 @@ createModificationSummary p@(Perspective{roleVerbs, propertyVerbs}) =
             else modifiableProperties)
           Empty
           (concat $ fromFoldable $ MAP.values $ unwrap propertyVerbs)
-      in MAP.fromFoldable $ (leavesInADT $ objectOfPerspective p) <#> \(RoleInContext{role}) -> Tuple role props
+      in MAP.fromFoldable $ (commonLeavesInADT $ objectOfPerspective p) <#> \(RoleInContext{role}) -> Tuple role props
   }

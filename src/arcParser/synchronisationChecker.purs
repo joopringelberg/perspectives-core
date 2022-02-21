@@ -258,7 +258,7 @@ checkSynchronization = do
   -- For all EnumeratedProperties, project the UserGraph and construct its subGraphs.
   -- Warn the modeller if there are more than one.
   {contexts, enumeratedRoles} <- lift $ gets _.dfr
-  for_ enumeratedRoles \(EnumeratedRole{_id:roleId, properties}) -> do
+  for_ enumeratedRoles \r@(EnumeratedRole{_id:roleId, properties}) -> do
     allLocalProps <- lift $ lift $ allLocallyRepresentedProperties (ST roleId)
     for_ allLocalProps \propType -> case propType of
       ENP propId -> do

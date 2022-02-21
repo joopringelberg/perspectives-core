@@ -39,7 +39,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup, union, fromFoldable)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
@@ -241,7 +241,9 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     handleParts roleName (EnumeratedRole roleUnderConstruction@{context, roleAspects}) (RoleAspect a pos') = do
       expandedAspect <- expandNamespace a
       if isQualifiedWithDomein expandedAspect
-        then pure (EnumeratedRole $ roleUnderConstruction {roleAspects = cons (EnumeratedRoleType expandedAspect) roleAspects})
+        then pure (EnumeratedRole $ roleUnderConstruction {roleAspects = cons
+          (RoleInContext{context: ContextType (deconstructNamespace_ expandedAspect), role: (EnumeratedRoleType expandedAspect)})
+          roleAspects})
         else throwError $ NotWellFormedName pos' a
 
     -- INDEXEDROLE

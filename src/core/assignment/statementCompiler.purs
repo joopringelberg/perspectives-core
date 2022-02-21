@@ -48,7 +48,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT(..), leavesInADT)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
@@ -145,7 +145,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             EnumeratedRole{kindOfRole} <- lift $ lift $ getEnumeratedRole role
             pure $ isContextRole && (ContextRole == kindOfRole))
           true
-          (leavesInADT $ unsafePartial domain2roleType $ range rle)
+          (allLeavesInADT $ unsafePartial domain2roleType $ range rle)
         if isContextRole
           then pure $ UQD currentcontextDomain QF.RemoveContext rle currentcontextDomain True True
           else throwError $ NotAContextRole start end

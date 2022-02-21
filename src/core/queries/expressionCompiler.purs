@@ -55,9 +55,9 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedC
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Kinked (setInvertedQueries)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2contextType, domain2roleType, functional, mandatory, propertyOfRange, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2roleType, functional, mandatory, propertyOfRange, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
-import Perspectives.Representation.ADT (ADT(..), leavesInADT)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
@@ -469,9 +469,6 @@ compileSimpleStep currentDomain s@(CreateEnumeratedRole pos ident) = case curren
           Nothing -> throwError $ UnknownRole pos ident
           (Just qn) | length qnames == 1 -> pure qn
           otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
-    -- NOTE that we lose information here in case the currentDomain consists of multiple context types.
-    -- This may cause a loss of accuracy in the query compiler, as the resulting range of this statement is not precise.
-    mContextType <- pure $ head $ leavesInADT $ unsafePartial domain2contextType currentDomain
     pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateRoleF (unwrap qroleType)) (RDOM (adtContext2AdtRoleInContext contextADT qroleType)) True True
   otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
