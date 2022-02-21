@@ -48,11 +48,11 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrGeneralisesADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfRole, hasNotMorePropertiesThan, lessThanOrEqualTo, roleKindOfRoleType)
+import Perspectives.Representation.Class.Role (bindingOfRole, lessThanOrEqualTo, roleKindOfRoleType)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
@@ -201,7 +201,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         qualifies <- do
           possibleBinding <- lift $ lift (bindingOfRole (ENR qualifiedRoleIdentifier))
           bindings' <- pure (unsafePartial $ domain2roleType (range bindings))
-          lift2 $ possibleBinding `hasNotMorePropertiesThan` bindings'
+          pure (possibleBinding `equalsOrGeneralisesADT` bindings')
         if qualifies
           -- Create a function description that describes the actual role creating and binding.
           then pure $ BQD originDomain (QF.Bind qualifiedRoleIdentifier) bindings cte originDomain True True

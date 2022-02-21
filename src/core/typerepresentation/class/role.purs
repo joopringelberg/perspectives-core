@@ -37,7 +37,7 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain2roleInContext, domain2roleType, range, roleInContext2Role)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
-import Perspectives.Representation.ADT (ADT(..), commonLeavesInADT, product, reduce)
+import Perspectives.Representation.ADT (ADT(..), commonLeavesInADT, equalsOrGeneralisesADT, product, reduce)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Context (contextAspects, roles)
@@ -262,9 +262,9 @@ allRoles = reduce magic
 -----------------------------------------------------------
 -- | `p lessThanOrEqualTo q` means: p is less specific than q, or equal to q.
 -- | `p lessThanOrEqualTo q` equals: `q greaterThanOrEqualTo p`
--- TODO. Oorspronkelijk betrok ik ook de Actions in de vergelijking.
 lessThanOrEqualTo :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
-lessThanOrEqualTo p q = p `hasNotMorePropertiesThan` q
+lessThanOrEqualTo p q = pure (p `equalsOrGeneralisesADT` q)
+-- lessThanOrEqualTo p q = p `hasNotMorePropertiesThan` q
 -- lessThanOrEqualTo p q = (&&) <$> (p `hasNotMorePropertiesThan` q) <*> (subsetPSet <$> actionSet p <*> actionSet q)
 
 hasNotMorePropertiesThan :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
