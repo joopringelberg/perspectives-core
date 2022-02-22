@@ -25,7 +25,7 @@ module Perspectives.Instances.SerialiseAsJson where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, execStateT, gets, modify)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
-import Control.Plus (empty, void)
+import Control.Plus (void)
 import Data.Array (catMaybes, find, snoc)
 import Data.Array (singleton, head) as ARR
 import Data.Array.NonEmpty (fromArray)

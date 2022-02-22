@@ -176,7 +176,6 @@ enteringRoleState roleId stateId = do
       then do
           oldFrame <- lift2 $ pushFrame
           lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
-          lift2 $ addBinding "origin" [unwrap roleId]
           lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
           updater roleId
           lift2 $ restoreFrame oldFrame
@@ -211,7 +210,6 @@ notify roleId me allowedUser {compiledSentence, contextGetter} = do
     then do
       oldFrame <- lift2 $ pushFrame
       lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
-      lift2 $ addBinding "origin" [unwrap roleId]
       lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
       storeNotificationInContext <- lift2 (currentcontext ##>> (contextType >=> liftToInstanceLevel  (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
       sentenceText <- lift2 $ compiledSentence roleId
@@ -263,9 +261,16 @@ exitingRoleState roleId stateId = do
   -- fills the allowdUser RoleType.
   me <- lift2 getUserIdentifier
   forWithIndex_ automaticOnExit \(allowedUser :: RoleType) {updater, contextGetter} -> do
+    currentcontext <- lift2 $ (roleId ##>> contextGetter)
+    currentactors <- lift2 $ (currentcontext ##= (getRoleInstances allowedUser))
     bools <- lift2 (roleId ##= contextGetter >=> getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
     if ala Conj foldMap bools
-      then updater roleId
+      then do
+        oldFrame <- lift2 $ pushFrame
+        lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
+        lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+        updater roleId
+        lift2 $ restoreFrame oldFrame
       else pure unit
   forWithIndex_ notifyOnExit (notify roleId me)
 

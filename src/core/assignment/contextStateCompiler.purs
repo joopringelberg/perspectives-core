@@ -148,10 +148,7 @@ enteringState contextId stateId = do
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveContextState stateId contextId
-  {automaticOnEntry, objectGetter, perspectivesOnEntry, notifyOnEntry} <- getCompiledState stateId
-  objects <- case objectGetter of
-    Nothing -> pure []
-    Just getter -> lift2 (contextId ##= getter)
+  {automaticOnEntry, perspectivesOnEntry, notifyOnEntry} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction, but only if
   -- the end user fills the allowedUser role in this context.
   -- NOTE that the userRoleType is computed prior to executing the transaction.
@@ -160,18 +157,16 @@ enteringState contextId stateId = do
   -- fills the allowdUser RoleType.
   me <- lift2 getUserIdentifier
   forWithIndex_ automaticOnEntry \(allowedUser :: RoleType) updater -> do
-    bools <- lift2 (contextId ##= getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
+    currentactors <- lift2 $ (contextId ##= (getRoleInstances allowedUser))
+    bools <- lift2 $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
     if ala Conj foldMap bools
       -- Run for each object.
-      then if isJust objectGetter
-        then for_ objects \object -> do
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentobject" [unwrap object]
-          updater contextId
-          lift2 $ restoreFrame oldFrame
-        -- Note we do not push an empty set of values for object, like we did for rules.
-        -- The modeller should not use the 'object' variable.
-        else updater contextId
+      then do
+        oldFrame <- lift2 pushFrame
+        -- no need to add currentcontext for context states; a binding has been added compile time.
+        lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+        updater contextId
+        lift2 $ restoreFrame oldFrame
       else pure unit
   forWithIndex_ notifyOnEntry (notify contextId me)
   -- NOTE. We have a compiled version of the object, too.
@@ -201,9 +196,7 @@ notify contextId me allowedUser compiledSentence = do
   if ala Conj foldMap bools
     then do
       oldFrame <- lift2 $ pushFrame
-      lift2 $ addBinding "currentcontext" [(unwrap contextId)]
-      lift2 $ addBinding "origin" [unwrap contextId]
-      lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+      lift2 $ addBinding "notifieduser" (unwrap <$> currentactors)
       storeNotificationInContext <- lift2 (contextId ##>> (contextType >=> liftToInstanceLevel (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
       sentenceText <- lift2 $ compiledSentence contextId
       mySystem <- lift2 $ getMySystem
@@ -244,10 +237,7 @@ exitingState contextId stateId = do
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
   setInActiveContextState stateId contextId
-  {automaticOnExit, objectGetter, notifyOnExit} <- getCompiledState stateId
-  objects <- case objectGetter of
-    Nothing -> pure []
-    Just getter -> lift2 (contextId ##= getter)
+  {automaticOnExit, notifyOnExit} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction, but only if
   -- the end user fills the allowedUser role in this context.
   -- NOTE that the userRoleType is computed prior to executing the transaction.
@@ -256,16 +246,16 @@ exitingState contextId stateId = do
   -- fills the allowdUser RoleType.
   me <- lift2 getUserIdentifier
   forWithIndex_ automaticOnExit \(allowedUser :: RoleType) updater -> do
-    bools <- lift2 (contextId ##= getRoleInstances allowedUser >=> boundByRole (RoleInstance me))
+    currentactors <- lift2 $ (contextId ##= (getRoleInstances allowedUser))
+    bools <- lift2 $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
     if ala Conj foldMap bools
       -- Run for each object.
-      then if isJust objectGetter
-        then for_ objects \object -> do
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentobject" [unwrap object]
-          updater contextId
-          lift2 $ restoreFrame oldFrame
-        else updater contextId
+      then do
+        oldFrame <- lift2 pushFrame
+        -- no need to add currentcontext for context states; a binding has been added compile time.
+        lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+        updater contextId
+        lift2 $ restoreFrame oldFrame
       else pure unit
   forWithIndex_ notifyOnExit (notify contextId me)
 

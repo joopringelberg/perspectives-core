@@ -132,7 +132,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
         RoleRemoval rid -> log ("Remove role " <> unwrap rid) *> removeRoleInstance rid
         -- TODO: moeten we msignedDelta niet meegeven?
         RoleUnbinding filled mNewFiller msignedDelta -> log ("Remove filler of " <> unwrap filled) *> changeRoleBinding filled mNewFiller
-        ExecuteDestructiveEffect functionName origin values -> executeEffect functionName origin values
+        ExecuteDestructiveEffect functionName origin values -> log ("DestructiveEffect: " <> functionName) *> executeEffect functionName origin values
       -- log ("Will remove these models: " <> show modelsToBeRemoved)
       lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- Now state has changed. Re-evaluate the resources that may change state.

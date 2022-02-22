@@ -525,7 +525,6 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                 do
                   oldFrame <- lift2 $ pushFrame
                   lift2 $ addBinding "currentcontext" [object]
-                  lift2 $ addBinding "origin" [predicate]
                   lift2 $ addBinding "currentactor" [unwrap author]
                   updater <- lift2 $ compileAssignmentFromRole action
                   updater (RoleInstance predicate)
@@ -550,7 +549,6 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             do
               oldFrame <- lift2 $ pushFrame
               lift2 $ addBinding "currentcontext" [object]
-              lift2 $ addBinding "origin" [object]
               lift2 $ addBinding "currentactor" [unwrap user] -- userRoleType??
               updater <- lift2 $ compileAssignment action
               updater (ContextInstance object)

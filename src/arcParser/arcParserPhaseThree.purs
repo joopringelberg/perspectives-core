@@ -435,9 +435,8 @@ handlePostponedStateQualifiedParts = do
       -- origin -> is always included as an identity step.
       -- currentcontext -> For ContextState, equals the origin. For SubjectState or
       -- ObjectState, the role is represented with a RoleIdentification that contains
-      -- its current context.
-      -- currentactor -> It's type is the qualifiedUser computed above.
-      -- All these VarBindings have a computation of type TypeTimeOnly, which instructs the unsafeCompiler to remove them.
+      -- its current context. We include a computation of type TypeTimeOnly, which instructs the unsafeCompiler to remove them. The value has to be supplied in runtime.
+      -- currentactor -> It's type is the qualifiedUser computed above. Again, just a TypeTimeOnly computation.
       (usersInContext :: ADT QT.RoleInContext) <- collectRoleInContexts subject
       effectWithEnvironment <- pure $ addContextualBindingsToStatements
         [ computeOrigin (transition2stateSpec transition) start
@@ -573,8 +572,8 @@ handlePostponedStateQualifiedParts = do
               compilePart cp@(Sentence.CP (Q _)) = pure cp
               compilePart (Sentence.CP (S stp)) = do
                 expressionWithEnvironment <- pure $ addContextualBindingsToExpression
-                  [ makeIdentityStep "currentcontext" start
-                  , makeIdentityStep "origin" start
+                  [ computeOrigin (transition2stateSpec transition) start
+                  , computeCurrentContext (transition2stateSpec transition) start
                   , unsafePartial makeTypeTimeOnlyRoleStep "notifieduser" usersInContext start
                   ]
                   stp
@@ -603,7 +602,7 @@ handlePostponedStateQualifiedParts = do
       (usersInContext :: ADT QT.RoleInContext) <- collectRoleInContexts subject
       effectWithEnvironment <- pure $ addContextualBindingsToStatements
         [ makeIdentityStep "origin" start
-        , makeTypeTimeOnlyContextStep "currentcontext" (roleIdentification2Context syntacticObject) start
+        , computeCurrentContext state start
         , unsafePartial makeTypeTimeOnlyRoleStep "currentactor" usersInContext start
         ]
         effect
