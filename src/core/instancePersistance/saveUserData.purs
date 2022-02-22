@@ -510,7 +510,7 @@ removeBinding_ filled mFillerId msignedDelta = (lift2 $ try $ getPerspectEntitei
 -- | CURRENTUSER for roleId and its context.
 changeRoleBinding :: RoleInstance -> (Maybe RoleInstance) -> MonadPerspectivesTransaction Unit
 changeRoleBinding filledId mNewFiller = (lift2 $ try $ getPerspectEntiteit filledId) >>=
-  handlePerspectRolError "changeRoleBinding"
+  handlePerspectRolError' "changeRoleBinding" unit
     \(filled :: PerspectRol) -> do
       roleWillBeRemoved <- lift $ gets \(Transaction{untouchableRoles}) -> isJust $ elemIndex filledId untouchableRoles
       -- If the role will be removed, we don't modify it (we don't remove its binding).
@@ -613,7 +613,7 @@ roleIsMe roleId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
 -- | PERSISTENCE
 fillerNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 fillerNoLongerPointsTo fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) >>=
-  handlePerspectRolError "fillerNoLongerPointsTo"
+  handlePerspectRolError' "fillerNoLongerPointsTo" unit
     \(filler :: PerspectRol) -> (lift2 $ try $ getPerspectEntiteit filledId) >>=
       handlePerspectRolError "fillerNoLongerPointsTo"
       \(filled :: PerspectRol) -> do
@@ -630,9 +630,9 @@ fillerNoLongerPointsTo fillerId filledId = (lift2 $ try $ getPerspectEntiteit fi
 -- | PERSISTENCE
 fillerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 fillerPointsTo fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) >>=
-  handlePerspectRolError "fillerNoLongerPointsTo"
+  handlePerspectRolError' "fillerNoLongerPointsTo" unit
     \(filler :: PerspectRol) -> (lift2 $ try $ getPerspectEntiteit filledId) >>=
-      handlePerspectRolError "fillerNoLongerPointsTo"
+      handlePerspectRolError' "fillerNoLongerPointsTo" unit
       \(filled :: PerspectRol) -> do
         filledContextType <- lift2 (rol_context filled ##>> contextType)
         filler' <- pure $ (addRol_gevuldeRollen filler filledContextType (rol_pspType filled) filledId)
@@ -645,7 +645,7 @@ fillerPointsTo fillerId filledId = (lift2 $ try $ getPerspectEntiteit fillerId) 
 -- | NOTE: the second argument is currently useless, but we anticipate with it on multiple fillers.
 filledNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 filledNoLongerPointsTo filledId fillerId = (lift2 $ try $ getPerspectEntiteit filledId) >>=
-  handlePerspectRolError "filledNoLongerPointsTo"
+  handlePerspectRolError' "filledNoLongerPointsTo" unit
     \(filled :: PerspectRol) -> cacheAndSave filledId (removeRol_binding filled)
 
 -- | <filledId> `filledPointsTo` <fillerId>
@@ -654,5 +654,5 @@ filledNoLongerPointsTo filledId fillerId = (lift2 $ try $ getPerspectEntiteit fi
 -- | (Insert the binding, in other words: change filled)
 filledPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 filledPointsTo filledId fillerId = (lift2 $ try $ getPerspectEntiteit filledId) >>=
-  handlePerspectRolError "filledNoLongerPointsTo"
+  handlePerspectRolError' "filledPointsTo" unit
     \(filled :: PerspectRol) -> cacheAndSave filledId (changeRol_binding fillerId filled)

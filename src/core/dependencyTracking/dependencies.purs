@@ -106,7 +106,6 @@ registerSupportedEffect corrId ef q arg = do
               {no: vanished} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex assumptions) oldSupports
               for_ vanished (deregisterDependency corrId)
               -- Re-run the effect
-              r <- queryAssumptionRegister
               liftEffect $ ef (Result corrId (map unwrap result))
               pure unit
         else do
@@ -167,7 +166,7 @@ findBindingRequests (RoleInstance roleId) = do
 -- | the `binder <EnumeratedRoleType> in <ContextType>` step on the `roleId`.
 findFilledRoleRequests :: RoleInstance -> ContextType -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
 findFilledRoleRequests (RoleInstance fillerId) (ContextType filledContextType) (EnumeratedRoleType filledType) = do
-  r <- queryAssumptionRegister 
+  r <- queryAssumptionRegister
   case lookup fillerId r of
     Nothing -> pure []
     Just typesForResource -> pure $ maybe [] identity (lookup (filledContextType <> filledType) typesForResource)

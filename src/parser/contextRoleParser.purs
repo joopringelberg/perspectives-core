@@ -777,8 +777,8 @@ userData = do
     addGevuldeRollen :: FO.Object PerspectContext -> FO.Object PerspectRol -> PerspectRol -> PerspectRol
     addGevuldeRollen contexts filledRoles filler = foldl (\filler' filledRole ->
       if rol_binding filledRole == Just (ID.identifier filler)
-        then addRol_gevuldeRollen filler (roleContextType filledRole) (rol_pspType filledRole) (ID.identifier filledRole)
-        else filler)
+        then addRol_gevuldeRollen filler' (roleContextType filledRole) (rol_pspType filledRole) (ID.identifier filledRole)
+        else filler')
       filler
       filledRoles
       where
