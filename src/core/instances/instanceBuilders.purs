@@ -56,7 +56,7 @@ import Perspectives.Assignment.Update (addRoleInstancesToContext, getAuthor, get
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
@@ -76,6 +76,7 @@ import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
+import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, flip, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
 
@@ -283,9 +284,11 @@ constructEmptyRole ::
 constructEmptyRole contextInstance roleType i rolInstanceId = do
   author <- getAuthor
   subject <- getSubject
+  allTypes <- lift2 (roleType ###= roleAspectsClosure)
   role <- pure (PerspectRol defaultRolRecord
     { _id = rolInstanceId
     , pspType = roleType
+    , allTypes = allTypes
     , context = contextInstance
     , occurrence = i
     , universeRoleDelta =

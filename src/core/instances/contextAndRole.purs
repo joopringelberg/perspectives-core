@@ -194,6 +194,7 @@ defaultRolRecord :: RolRecord
 defaultRolRecord =
   { _id: RoleInstance ""
   , pspType: EnumeratedRoleType ""
+  , allTypes: []
   , context: ContextInstance ""
   , _rev: Nothing
   , binding: Nothing

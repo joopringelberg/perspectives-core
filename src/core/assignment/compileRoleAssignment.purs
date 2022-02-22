@@ -27,15 +27,15 @@ module Perspectives.CompileRoleAssignment where
 
 import Prelude
 
-import Control.Monad.AvarMonadAsk (modify)
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, concat, cons, head, nub, union, unsafeIndex)
+import Data.Array (catMaybes, concat, cons, elemIndex, find, head, nub, union, unsafeIndex)
 import Data.Array.NonEmpty (fromArray, head) as ANE
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
@@ -46,26 +46,26 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, MPT, MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>), (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Identifiers (buitenRol)
+import Perspectives.Identifiers (buitenRol, deconstructNamespace_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as OG
-import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, context, getUnlinkedRoleInstances, roleType_)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, getRoleInstances, role2context, role2propertyValue, role2role, role2string, typeTimeOnly)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
@@ -73,23 +73,42 @@ import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, setFirstBinding)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, isDatabaseQueryRole)
+import Perspectives.Types.ObjectGetters (allUnlinkedRoles, computesDatabaseQueryRole, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
+-- | Add the role instance to the end of the roles to exit.
+-- | Add the actual removal instruction to the end of the scheduledAssignments.
+-- | (we build a last-in, last-out stack of destructive effects)
 scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
-scheduleRoleRemoval id = lift $ modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
-  { rolesToExit =  rolesToExit `union` [id]
-  , scheduledAssignments = scheduledAssignments `union` [RoleRemoval id]
-  })
+scheduleRoleRemoval id = do
+  -- If the role's context is scheduled to be removed, don't add its removal to the scheduledAssignments.
+  contextIsScheduledToBeRemoved <- lift $ gets (\(Transaction{scheduledAssignments}) -> let
+    contextOfRole = ContextInstance $ deconstructNamespace_ (unwrap id)
+    in isJust $ find
+      (case _ of
+        ContextRemoval ctxt _ -> ctxt == contextOfRole
+        _ -> false)
+      scheduledAssignments)
+  roleIsUntouchable <- lift $ gets (\(Transaction{untouchableRoles}) -> isJust $ elemIndex id untouchableRoles)
+  if contextIsScheduledToBeRemoved || roleIsUntouchable
+    then pure unit
+    else lift $ modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
+      { rolesToExit = rolesToExit `union` [id]
+      , scheduledAssignments = scheduledAssignments `union` [RoleRemoval id]
+      })
 
--- | Schedule all roles in the context, including its external role, for removal.
+-- | Schedules all roles in the context, including its external role, for removal.
+-- | Add the actual removal instruction to the end of the scheduledAssignments.
+-- | (we build a last-in, last-out stack of destructive effects)
 scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
 scheduleContextRemoval authorizedRole id = (lift2 $ try $ getPerspectContext id) >>=
   handlePerspectContextError "removeContextInstance"
-  \(ctxt@(PerspectContext{rolInContext, buitenRol})) ->
+  \(ctxt@(PerspectContext{rolInContext, buitenRol, pspType:contextType})) -> do
+    unlinkedRoleTypes <- lift2 (contextType ###= allUnlinkedRoles)
+    unlinkedInstances <- lift2 $ concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
     lift $ modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
       { scheduledAssignments = scheduledAssignments `union` [(ContextRemoval id authorizedRole)]
-      , rolesToExit = nub $ cons buitenRol $ rolesToExit <> (concat $ values rolInContext)})
+      , rolesToExit = nub $ rolesToExit <> (cons buitenRol $ unlinkedInstances <> (concat $ values rolInContext))})
 
 -- Deletes, from all contexts, the role instance.
 compileAssignmentFromRole :: QueryFunctionDescription -> MP (Updater RoleInstance)

@@ -70,6 +70,9 @@ import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (<$>
 isUnlinked_ :: EnumeratedRoleType -> MonadPerspectives Boolean
 isUnlinked_ et = getEnumeratedRole et >>= pure <<< _.unlinked <<< unwrap
 
+isUnlinked :: EnumeratedRoleType ~~~> Boolean
+isUnlinked = lift <<< isUnlinked_
+
 -- | The state identifier of the root state of a role has the same string value as the role identifier.
 roleRootState :: EnumeratedRoleType ~~~> StateIdentifier
 roleRootState rtype = pure $ StateIdentifier $ unwrap rtype
@@ -157,6 +160,9 @@ allEnumeratedRoles ct = ArrayT do
     f :: Array EnumeratedRoleType -> RoleType -> Array EnumeratedRoleType
     f roles (ENR r) = cons r roles
     f roles _ = roles
+
+allUnlinkedRoles :: ContextType ~~~> EnumeratedRoleType
+allUnlinkedRoles = COMB.filter allEnumeratedRoles isUnlinked 
 
 allRoleTypesInContext :: ContextType ~~~> RoleType
 allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole userRole'

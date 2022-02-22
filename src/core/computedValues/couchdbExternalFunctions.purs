@@ -101,8 +101,8 @@ models _ = ArrayT do
     getExternalRoles = do
       repo <- publicRepository
       (roles :: Array PerspectRol) <- catchError (getViewOnDatabase repo "defaultViews/modeldescriptions" (Nothing :: Maybe Unit))
-        \_ -> do
-          logPerspectivesError $ Custom "getExternalRoles failed"
+        \e -> do
+          logPerspectivesError $ Custom ("getExternalRoles failed, because: " <> show e)
           pure []
       for roles \r@(PerspectRol{_id}) -> do
         -- If the model is already in use, this role has been saved before.

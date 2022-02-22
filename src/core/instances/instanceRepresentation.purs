@@ -106,6 +106,7 @@ newtype PerspectRol = PerspectRol RolRecord
 type RolRecord =
   { _id :: RoleInstance
   , pspType :: EnumeratedRoleType
+  , allTypes :: Array EnumeratedRoleType
   , context :: ContextInstance
   -- While the fields above occur in every role, those below do not.
   , _rev :: Revision_
