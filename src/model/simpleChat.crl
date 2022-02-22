@@ -11,5 +11,6 @@ chat:Model usr:SimpleChatModel
   sys:Model$IndexedContext =>
     chat:ChatApp chat:MyChats
       extern sys:RootContext$External$Name = "Simple Chat"
+      -- TODO. With the next line, ChatApp cannot be parsed for the first time.
       $Chatter -> sys:Me
     sys:Model$IndexedContext$Name = "SimpleChat$MyChats"
