@@ -534,7 +534,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
             case lookup "model:Feest$Wens" dr'.enumeratedRoles of
               Nothing -> assert "Cannot find the role 'model:Feest$Wens'" false
               (Just (EnumeratedRole{roleAspects})) -> assert "The role 'model:Feest$Wens' should have an aspect 'model:MyAspectModel$MyAspect$MyAspectRole'."
-                (isJust (elemIndex (EnumeratedRoleType "model:MyAspectModel$MyAspect$MyAspectRole") roleAspects))
+                (isJust (elemIndex (RoleInContext{context: ContextType "model:MyAspectModel$MyAspect$MyAspectRole", role: (EnumeratedRoleType "model:MyAspectModel$MyAspect$MyAspectRole")}) roleAspects))
 
   test "Role with binding to Context" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  context Uitje (mandatory) filledBy Speeltuin" ARC.domain
