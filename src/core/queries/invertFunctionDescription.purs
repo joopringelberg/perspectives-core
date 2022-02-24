@@ -42,7 +42,11 @@ invertFunction dom qf ran = case qf of
     ContextF -> if isExternalRole dom
       then Just $ DataTypeGetter ExternalRoleF
       else Just $ RolGetter $ ENR (unsafePartial $ domain2RoleType dom)
-    BindingF -> case ran of
+    -- BindingF is the `filledBy` step. So we have filled `filledBy` filler.
+    -- Its inversion is filler `fills` filled, or: filler GetRoleBindersF filled.
+    -- We must qualify GetRoleBindersF with the type that is filled.
+    -- That is the domain, here!
+    BindingF -> case dom of
       (RDOM EMPTY) -> Nothing
       (RDOM (ST (RoleInContext{context,role}))) -> Just $ GetRoleBindersF role context
       otherwise -> Nothing
