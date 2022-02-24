@@ -46,9 +46,9 @@ import Perspectives.Representation.EnumeratedRole (InvertedQueryKey(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType)
-import Perspectives.Types.ObjectGetters (aspectsOfContext, aspectsOfRole, enumeratedRoleContextType, roleAspectsClosure)
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
-import Prelude (bind, map, pure, ($), (/=), (<#>), (<$>), (<<<), (>=>), (>>=))
+import Perspectives.Types.ObjectGetters (aspectsOfContext, enumeratedRoleContextType, roleAspectsClosure)
+import Perspectives.TypesForDeltas (RoleBindingDelta(..))
+import Prelude (bind, map, pure, ($), (<#>), (<$>), (<<<), (>=>), (>>=))
 
 -- | An InvertedQueryKey is a triplet of types. From a RoleBindingDelta we take the role instances and their
 -- | context instances.
@@ -71,7 +71,7 @@ runtimeIndexForFillsQueries (RoleBindingDelta{filled, filler, deltaType}) {-| de
 
 runtimeIndexForFillsQueries' :: RoleInstance -> MonadPerspectives (Array InvertedQueryKey)
 runtimeIndexForFillsQueries' filled = do
-  filledTypes <- filled ##= roleType >=> liftToInstanceLevel aspectsOfRole
+  filledTypes <- filled ##= roleType >=> liftToInstanceLevel roleAspectsClosure
   concat <$> for filledTypes \(filledType :: EnumeratedRoleType) -> do
     fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< allLeavesInADT <<< _.binding <<< unwrap) filledType
     for fillerTypes \fillerType -> do
@@ -83,7 +83,7 @@ runtimeIndexForFillsQueries' filled = do
 -- | with type SetFirstBinding or ReplaceBinding.
 runtimeIndexForFilledByQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
 runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = do
-  filledTypes <- filled ##= roleType >=> liftToInstanceLevel aspectsOfRole
+  filledTypes <- filled ##= roleType >=> liftToInstanceLevel roleAspectsClosure
   concat <$> for filledTypes \(filledType :: EnumeratedRoleType) -> do
     fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< allLeavesInADT <<< _.binding <<< unwrap) filledType
     for fillerTypes \fillerType -> do
@@ -97,7 +97,7 @@ runtimeIndexForContextQueries contextInstance = contextInstance ##= (contextType
 
 -- | Index member `invertedQueries` of ContextType with this key computed from an EnumeratedRoleType.
 runTimeIndexForRoleQueries :: EnumeratedRoleType -> MonadPerspectives (Array EnumeratedRoleType)
-runTimeIndexForRoleQueries roleType = roleType ###= aspectsOfRole
+runTimeIndexForRoleQueries roleType = roleType ###= roleAspectsClosure
 
 -- | Index member 'onPropertyDelta' of EnumeratedPropertyType with these keys.
 -- |
