@@ -62,8 +62,8 @@ import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
 import Perspectives.Query.QueryTypes (isRoleDomain, range)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier, tryGetState)
-import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord, InvertedQueryMap)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier, cacheInDomeinFile, getEnumeratedRole, tryGetState)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole, InvertedQueryMap)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.State (StateFulObject(..))
 import Perspectives.Representation.State (StateFulObject(..), State(..)) as State
@@ -358,21 +358,21 @@ addRoleObservingContexts ctxtType id roleType roleInstance = do
 -- | instance. This is conditional on the last argument.
 usersWithPerspectiveOnRoleBinding :: RoleBindingDelta -> Boolean -> MonadPerspectivesTransaction (Array RoleInstance)
 usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbinding, oldFiller, deltaType}) runForwards = do
-  -- Type of the filler NEEN FILLED!!
-  binderType <- lift2 (filled ##>> OG.roleType)
+  filledType <- lift2 (filled ##>> OG.roleType)
   case mbinding of
     Nothing -> pure []
     Just filler -> do
-      -- Type of the filled role. NEEN FILLER!!
+      -- TODO. The filler may have many types!
       fillerType <- lift2 (filler ##>> OG.roleType)
-      fillerContextType <- lift2 $ enumeratedRoleContextType fillerType
-      filledContextType <- lift2 $ enumeratedRoleContextType binderType
-      filledByCalculations <- lift2 $ compileInvertedQueryMap _filledByInvertedQueries binderType
+      filledContextType <- lift2 $ enumeratedRoleContextType filledType
+      -- Includes calculations from all types of filledType.
+      filledByCalculations <- lift2 $ compileInvertedQueryMap _filledByInvertedQueries filledType
       filledByKeys <- lift2 $ unsafePartial runtimeIndexForFilledByQueries delta
+      -- `fillsKeys` are computed using all types of filled.
       fillsKeys <- lift2 $ unsafePartial runtimeIndexForFillsQueries delta
       -- We've stored the relevant InvertedQueries with the type of the filled,
       -- so we execute them on any filler that is a specialisation of (or equal to) the required filler type.
-      -- TODO: implement the above!
+      -- Includes calculations from all types of fillerType.
       fillsCalculations <- lift2 $ compileInvertedQueryMap _fillsInvertedQueries fillerType
         -- Index with the embedding context. In filledByInvertedQueries we store (the inverted query that
         -- begins with) the filler step away from filled.
@@ -691,35 +691,34 @@ aisInPropertyDelta id property eroleType = do
         onPropertyDelta (EnumeratedPropertyType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedProperties") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "onPropertyDelta")
 
 _filledByInvertedQueries :: InvertedQueryMapsLens
-_filledByInvertedQueries = prop (SProxy :: SProxy "filledByInvertedQueries")
+_filledByInvertedQueries = _Newtype <<< prop (SProxy :: SProxy "filledByInvertedQueries")
 
 _fillsInvertedQueries :: InvertedQueryMapsLens
-_fillsInvertedQueries = prop (SProxy :: SProxy "fillsInvertedQueries")
+_fillsInvertedQueries = _Newtype <<< prop (SProxy :: SProxy "fillsInvertedQueries")
 
-type InvertedQueryMapsLens = Lens' EnumeratedRoleRecord InvertedQueryMap
+type InvertedQueryMapsLens = Lens' EnumeratedRole InvertedQueryMap
 
 -- | Compiles the two parts of the description for an InvertedQueryMapsLens,
 -- | stores the result in cache.
 compileInvertedQueryMap :: InvertedQueryMapsLens -> EnumeratedRoleType -> MonadPerspectives InvertedQueryMap
 compileInvertedQueryMap lens rt@(EnumeratedRoleType ert) = do
   modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
-  (try $ retrieveDomeinFile modelName) >>=
-    handleDomeinFileError' "compileDescriptions_" EM.empty
-    \(df :: DomeinFile) -> do
-      -- Get the InvertedQueries.
-      (calculations :: InvertedQueryMap) <- pure $ unsafePartial $ fromJust $ preview (onDelta rt) df
-      -- Compile the descriptions.
-      if areCompiled' calculations
-        then pure calculations
-        else do
-          (compiledCalculations :: InvertedQueryMap) <- EncodableMap <$> traverse (traverse compileBoth) (unwrap calculations)
-          -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
-          modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
-          pure compiledCalculations
+  -- Get the InvertedQueries, for all types of rt.
+  allRoletypes <- (rt ###= roleAspectsClosure)
+  foldM (\cumulatedMap roleType -> do
+    role <- getEnumeratedRole roleType
+    calculations <- pure $ unsafePartial fromJust $ preview lens role
+    -- Compile the descriptions.
+    if areCompiled' calculations
+      then pure (cumulatedMap <> calculations)
+      else do
+        (compiledCalculations :: InvertedQueryMap) <- EncodableMap <$> traverse (traverse compileBoth) (unwrap calculations)
+        cacheInDomeinFile roleType (over lens (const compiledCalculations) role)
+        pure (cumulatedMap <> compiledCalculations)
+    )
+    EM.empty
+    allRoletypes
   where
-    onDelta :: EnumeratedRoleType -> Traversal' DomeinFile InvertedQueryMap
-    onDelta (EnumeratedRoleType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedRoles") <<< at x <<< traversed <<< _Newtype <<< lens
-
     areCompiled' :: InvertedQueryMap -> Boolean
     areCompiled' ar = case List.head $ EM.values ar of
       Nothing -> true

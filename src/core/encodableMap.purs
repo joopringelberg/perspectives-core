@@ -86,3 +86,6 @@ empty = EncodableMap Map.empty
 
 keys :: forall k v. EncodableMap k v -> Set k
 keys (EncodableMap mp) = Map.keys mp
+
+instance semigroupEncodableMap :: Ord k => Semigroup (EncodableMap k v) where
+  append (EncodableMap map1) (EncodableMap map2)= EncodableMap (map1 <> map2)
