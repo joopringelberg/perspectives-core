@@ -41,6 +41,8 @@ module Perspectives.SaveUserData
   , replaceBinding
   , handleNewPeer
   , changeRoleBinding
+  , stateEvaluationAndQueryUpdatesForContext
+  , stateEvaluationAndQueryUpdatesForRole
   )
 
   where
@@ -141,14 +143,27 @@ removeContextIfUnbound roleInstance@(RoleInstance rid) rtype = do
 
 -- | Remove the context instance plus roles after detaching all its roles.
 -- | Does NOT remove the context role binding the external role.
+-- | PERSISTENCE
 removeContextInstance :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
 removeContextInstance id authorizedRole = do
   (lift $ lift $ try $ getPerspectContext id) >>=
     handlePerspectContextError "removeContextInstance"
     \(ctxt@(PerspectContext{pspType:contextType, rolInContext, buitenRol})) -> do
-      -- | STATE EVALUATION
-      -- | QUERY UPDATES
-      -- | PERSISTENCE (for role instances).
+      lift2 $ do
+        unlinkedRoleTypes <- contextType ###= allUnlinkedRoles
+        unlinkedInstances <- concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
+        for_ (unlinkedInstances <> (concat $ values rolInContext)) removeEntiteit
+        void $ removeEntiteit buitenRol
+        removeEntiteit id
+
+-- | STATE EVALUATION
+-- | QUERY UPDATES
+-- | SYNCHRONISATION
+stateEvaluationAndQueryUpdatesForContext :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
+stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
+  (lift $ lift $ try $ getPerspectContext id) >>=
+    handlePerspectContextError "removeContextInstance"
+    \(ctxt@(PerspectContext{pspType:contextType, rolInContext, buitenRol})) -> do
       users1 <- concat <$> for (concat $ values rolInContext) handleRoleOnContextRemoval
       users2 <- handleRoleOnContextRemoval buitenRol
       -- SYNCHRONISATION
@@ -167,20 +182,24 @@ removeContextInstance id authorizedRole = do
               , deltaType: RemoveExternalRoleInstance
               , subject
               }}}
-      -- Only now remove all resources.
-      lift2 $ do
-        unlinkedRoleTypes <- contextType ###= allUnlinkedRoles
-        unlinkedInstances <- concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
-        for_ (unlinkedInstances <> (concat $ values rolInContext)) removeEntiteit
-        void $ removeEntiteit buitenRol
-        removeEntiteit id
 
 -- | Modifies the context instance by detaching the given role instances.
 -- | PERSISTENCE of the context instance.
--- | SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
--- | STATE EVALUATION
 removeRoleInstance :: RoleInstance -> MonadPerspectivesTransaction Unit
 removeRoleInstance roleId = (lift2 $ try $ (getPerspectRol roleId)) >>= handlePerspectRolError "removeRoleInstance"
+  \role@(PerspectRol{pspType:roleType, context:contextId, binding}) -> do
+    -- PERSISTENCE (remove role instance from context).
+    removeRoleInstanceFromContext role
+    -- PERSISTENCE (severe the binding links of the incoming FILLS relation).
+    severeBindingLinks role
+    -- PERSISTENCE (finally remove the role instance from cache and database).
+    lift2 $ removeEntiteit roleId
+
+-- | SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
+-- | STATE EVALUATION
+-- | QUERY UPDATES.
+stateEvaluationAndQueryUpdatesForRole :: RoleInstance -> MonadPerspectivesTransaction Unit
+stateEvaluationAndQueryUpdatesForRole roleId = (lift2 $ try $ (getPerspectRol roleId)) >>= handlePerspectRolError "removeRoleInstance"
   \role@(PerspectRol{pspType:roleType, context:contextId, binding}) -> do
     -- STATE EVALUATION
     users <- statesAndPeersForRoleInstanceToRemove role
@@ -188,12 +207,6 @@ removeRoleInstance roleId = (lift2 $ try $ (getPerspectRol roleId)) >>= handlePe
     synchroniseRoleRemoval role users
     -- QUERY UPDATES.
     queryUpdatesForRoleRemoval role
-    -- PERSISTENCE (remove role instance from context).
-    removeRoleInstanceFromContext role
-    -- PERSISTENCE (severe the binding links of the incoming FILLS relation).
-    severeBindingLinks role
-    -- PERSISTENCE (finally remove the role instance from cache and database).
-    lift2 $ removeEntiteit roleId
 
 -- | Handles all responsibilities for the given role instance in the dynamic context
 -- | that it's context is removed:
@@ -217,13 +230,19 @@ handleRoleOnContextRemoval roleId = (lift2 $ try $ (getPerspectRol roleId)) >>= 
 -- | is affected when the role instance is removed.
 -- STATE EVALUATION and computing peers with a perspective on the instance.
 statesAndPeersForRoleInstanceToRemove :: PerspectRol -> MonadPerspectivesTransaction (Array RoleInstance)
-statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, pspType:roleType, binding}) = do
+statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, pspType:roleType, binding, filledRoles}) = do
   -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from adding Deltas to the transaction
   -- for the continuation of the path beyond the given role instance.
   users1 <- usersWithPerspectiveOnRoleInstance roleType roleId false
-  -- Users from the inverted queries on the incoming fills relation:
+  -- Users from the inverted queries on the incoming fills relation (the role that fills this role):
   users2 <- usersWithPerspectiveOnRoleBinding' roleId binding
-  pure $ nub $ users1 <> users2
+  -- Users from the inverted queries on the outgoing fills relation (roles that are filled by this role):
+  -- The first index is the String representation of the ContextType, the second that of the EnumeratedRoleType.
+  users3 <- concat <$> for (values filledRoles)
+    \mapPerRole -> concat <$> for (values mapPerRole)
+      \filledRoles' -> concat <$> for filledRoles'
+        \filledRole -> usersWithPerspectiveOnRoleBinding' filledRole (Just roleId)
+  pure $ nub $ users1 <> users2 <> users3
 
   where
     usersWithPerspectiveOnRoleBinding' :: RoleInstance -> Maybe RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)

@@ -25,7 +25,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (filterA, head, length, null, sort, unsafeIndex)
+import Data.Array (filterA, head, length, null, reverse, sort, unsafeIndex)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (over, unwrap)
@@ -59,9 +59,9 @@ import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
 import Perspectives.PerspectivesState (addBinding, publicRepository, pushFrame, restoreFrame)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getMyType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
-import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance)
+import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance, stateEvaluationAndQueryUpdatesForContext, stateEvaluationAndQueryUpdatesForRole)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRemoved)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
@@ -127,7 +127,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       log "==========RUNNING SCHEDULED ASSIGNMENTS============"
       lift $ void $ AA.modify cloneEmptyTransaction
       -- Detach and remove instances, collecting new information in the fresh Transaction.
-      for_ scheduledAssignments case _ of
+      for_ (reverse scheduledAssignments) case _ of
         ContextRemoval ctxt authorizedRole -> log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole
         RoleRemoval rid -> log ("Remove role " <> unwrap rid) *> removeRoleInstance rid
         -- TODO: moeten we msignedDelta niet meegeven?
@@ -268,7 +268,8 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
           oldFrame <- lift2 pushFrame
           lift2 $ addBinding "currentcontext" [unwrap ctxt]
           -- Error boundary.
-          catchError (for_ states (exitingRoleState rid))
+          -- TODO. Hier al de state evaluation doen?
+          catchError (for_ states (exitRole rid))
             \e -> logPerspectivesError $ Custom ("Cannot exit role state, because " <> show e)
           lift2 $ restoreFrame oldFrame
   -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
@@ -276,7 +277,7 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
       ContextRemoval ctxt _ -> ctxt ##>> exists' getActiveStates
       _ -> pure false)
     scheduledAssignments
-  for_ contextsThatHaveNotExited $ unsafePartial exitContext
+  for_ contextsThatHaveNotExited (unsafePartial exitContext)
     -- First append the collected rolesToExit and ContextRemovals to the untouchableRoles and untouchableContexts
     -- to preserve the invariant.
   lift $ AA.modify (\t -> over Transaction (\tr -> tr
@@ -290,7 +291,8 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
     else pure <<< (<>) previousTransaction =<< runEntryAndExitActions nt
   where
     exitContext :: Partial => ScheduledAssignment -> MonadPerspectivesTransaction Unit
-    exitContext (ContextRemoval ctxt _) = do
+    exitContext (ContextRemoval ctxt authorizedRole) = do
+      stateEvaluationAndQueryUpdatesForContext ctxt authorizedRole
       states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
       if null states
         then pure unit
@@ -302,6 +304,11 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
           catchError (for_ states (exitingState ctxt))
             \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
           lift2 $ restoreFrame oldFrame
+
+    exitRole :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
+    exitRole roleId stateId = do
+      stateEvaluationAndQueryUpdatesForRole roleId
+      exitingRoleState roleId stateId
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift
