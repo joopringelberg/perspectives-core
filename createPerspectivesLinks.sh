@@ -2,7 +2,7 @@
 
 # NOTE: this script should be adapted with each new tagged version!
 
-cd .psc-package/pv0.13.1/aff-sockets
+cd .psc-package/pv0.14.1/aff-sockets
 
 rm -Rf v2.2.0
 
@@ -16,9 +16,9 @@ ln -s ../../../../purescript-affjax pv9.1.0
 
 cd ../perpectives-apitypes
 
-rm -Rf v2.11.0
+rm -Rf v2.12.0
 
-ln -s ../../../../perspectives-apitypes v2.11.0
+ln -s ../../../../perspectives-apitypes v2.12.0
 
 cd ../avar-monadask/
 
