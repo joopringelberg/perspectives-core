@@ -513,7 +513,7 @@ propertyE = do
     -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
     -- a valid property attribute specification.
     propertyAttributes :: IP (List PropertyPart)
-    propertyAttributes = token.parens (((mandatory <|> functional <|> range) <?> "mandatory, relational or a range (Boolean, Number, String or DateTime)") `sepBy` token.symbol ",")
+    propertyAttributes = token.parens (((mandatory <|> functional <|> range) <?> "mandatory, relational or a range (Boolean, Number, String, DateTime, Email)") `sepBy` token.symbol ",")
         where
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
@@ -526,7 +526,9 @@ propertyE = do
           range = (reserved "Boolean" *> (pure $ Ran PBool)
             <|> reserved "Number" *> (pure $ Ran PNumber)
             <|> reserved "String" *> (pure $ Ran PString)
-            <|> reserved "DateTime" *> (pure $ Ran PDate))
+            <|> reserved "DateTime" *> (pure $ Ran PDate)
+            <|> reserved "Email" *> (pure $ Ran PEmail)
+            )
 
 viewE :: IP RolePart
 viewE = do

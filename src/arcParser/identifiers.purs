@@ -24,12 +24,16 @@ module Perspectives.Parsing.Arc.Identifiers where
 
 import Control.Alt (void, (<|>))
 import Data.Array (cons, elemIndex, intercalate, many)
-import Data.Char.Unicode (isLower)
+import Data.Char.Unicode (isLower, isSpace)
 import Data.Maybe (isJust)
 import Data.String.CodeUnits (fromCharArray)
+import Data.String.Regex (Regex, test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Parsing.Arc.Token (token)
-import Prelude (Unit, bind, discard, pure, ($), (/=), (<>), (*>))
+import Prelude (Unit, bind, discard, not, pure, ($), (*>), (/=), (<>), (<<<))
+import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (try, (<?>))
 import Text.Parsing.Parser.String (string, satisfy, whiteSpace)
 
@@ -101,3 +105,14 @@ lower = satisfy isLower <?> "lowercase letter"
 
 boolean :: IP String
 boolean = token.symbol "true" <|> token.symbol "false"
+
+email :: IP String
+email = do
+  chars <- many (satisfy (not <<< isSpace))
+  if (test emailRegExp (fromCharArray chars))
+    then whiteSpace *> pure (fromCharArray chars)
+    else fail "Not a valid email addres."
+  where
+    -- See: https://regexlib.com/REDetails.aspx?regexp_id=26.
+    emailRegExp :: Regex
+    emailRegExp = unsafeRegex "^([a-zA-Z0-9_\\-\\.]+)@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.)|(([a-zA-Z0-9\\-]+\\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\\]?)$" noFlags

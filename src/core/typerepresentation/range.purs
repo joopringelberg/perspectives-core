@@ -36,7 +36,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 -- RANGE
 -----------------------------------------------------------
 -- | PDate is represented as SerializableDateTime.
-data Range = PString | PBool | PNumber | PDate
+data Range = PString | PBool | PNumber | PDate | PEmail
 
 derive instance genericRange :: Generic Range _
 

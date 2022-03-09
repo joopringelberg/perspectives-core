@@ -36,7 +36,7 @@ import Data.String.Regex (parseFlags, regex)
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, regexExpression', regexFlags', reserved)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, regexExpression', regexFlags', reserved)
 import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
@@ -132,6 +132,8 @@ simpleStep = try
   Simple <$> (Value <$> getPosition <*> pure PBool <*> boolean)
   <|>
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
+  <|>
+  Simple <$> (Value <$> getPosition <*> pure PEmail <*> (email))
   <|>
   Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> arcIdentifier))
   <|>

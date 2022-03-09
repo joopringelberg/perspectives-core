@@ -34,6 +34,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
 import Data.Array (elemIndex, findIndex, foldl, head, index, length, null, singleton, unsafeIndex)
+import Data.DateTime (DateTime)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), stripSuffix)
@@ -52,7 +53,7 @@ import Perspectives.Instances.Combinators (available_, exists, filter, logicalAn
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getFilledRoles, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
-import Perspectives.Instances.Values (parseBool, parseInt)
+import Perspectives.Instances.Values (parseBool, parseDate, parseInt)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
@@ -280,13 +281,13 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
   f2' <- compileFunction f2
   pure $ unsafeCoerce $ compare f1' f2' (unsafePartial $ compareFunction g)
 
-compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do
+compileFunction (BQD dom (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   -- NOTE. We now order the string representations of the values. This is OK
   -- for PString, PNumber, PDate and PBool.
   -- Check for each new type added to Range in Perspectives.Representation.Range.
-  pure $ order f1' f2' (unsafePartial $ orderFunction g)
+  pure $ order dom f1' f2' g
 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | g `eq` AndF = do
   (f1' :: String ~~> Value) <- unsafeCoerce $ compileFunction f1
@@ -453,8 +454,49 @@ lookup varName _ = ArrayT do
 -- | not have to deal with missing arguments in the same way. These functions, dealing
 -- | with Booleans, map a missing operator on a `false` result. That we cannot do for
 -- | ordering. Hence we return an empty result if one or both arguments are missing.
-order :: (String ~~> String) -> (String ~~> String) -> (String -> String -> Boolean) -> String ~~> String
-order a b f c = (show <$> (f <$> a c <*> b c))
+order :: Domain -> (String ~~> String) -> (String ~~> String) -> FunctionName -> String ~~> String
+order (VDOM ran _) a b f c = ArrayT do
+  as <- runArrayT $ a c
+  bs <- runArrayT $ b c
+  case head as, head bs of
+    Just a', Just b' -> case ran of
+      RAN.PString -> pure [show $ fString a' b']
+      RAN.PNumber -> singleton <<< show <$> (fInt <$> (parseInt a') <*> (parseInt b'))
+      RAN.PBool ->  singleton <<< show <$> (fBool <$> parseBool a' <*> parseBool b')
+      RAN.PDate -> singleton <<< show <$> (fDate <$> parseDate a' <*> parseDate b')
+      -- Compare email addresses as strings.
+      RAN.PEmail -> pure [show $ fString a' b']
+    _, _ -> pure []
+  where
+    fString :: String -> String -> Boolean
+    fString = unsafePartial case f of
+      LessThanF -> (<)
+      LessThanEqualF -> (<=)
+      GreaterThanF -> (>)
+      GreaterThanEqualF -> (>=)
+
+    fInt :: Int -> Int -> Boolean
+    fInt = unsafePartial case f of
+      LessThanF -> (<)
+      LessThanEqualF -> (<=)
+      GreaterThanF -> (>)
+      GreaterThanEqualF -> (>=)
+
+    fBool :: Boolean -> Boolean -> Boolean
+    fBool = unsafePartial case f of
+      LessThanF -> (<)
+      LessThanEqualF -> (<=)
+      GreaterThanF -> (>)
+      GreaterThanEqualF -> (>=)
+
+    fDate :: DateTime -> DateTime -> Boolean
+    fDate = unsafePartial case f of
+      LessThanF -> (<)
+      LessThanEqualF -> (<=)
+      GreaterThanF -> (>)
+      GreaterThanEqualF -> (>=)
+
+order _ _ _ _ _ = throwError (error "Not a Range type. Cannot order values.")
 
 orderFunction :: forall a. Ord a => Partial => FunctionName -> (a -> a -> Boolean)
 orderFunction fname = case fname of

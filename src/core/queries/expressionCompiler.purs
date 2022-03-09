@@ -739,4 +739,5 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
       "Boolean" -> Just PBool
       "Number" -> Just PNumber
       "DateTime" -> Just PDate
+      "Email" -> Just PEmail
       otherwise -> Nothing

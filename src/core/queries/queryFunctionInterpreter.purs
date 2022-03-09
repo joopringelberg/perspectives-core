@@ -230,6 +230,7 @@ interpret (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g [L
       VDOM PBool _ -> pure [unsafePartial applyValueFunction (functionOnBooleans (orderFunction g)) fr1h fr2h]
       VDOM PNumber _ -> pure [unsafePartial $ applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Int x) (value2Int y))) fr1h fr2h]
       VDOM PDate _ -> pure [unsafePartial applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Date x) (value2Date y))) fr1h fr2h]
+      VDOM PEmail _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
     _, _ -> pure []
 
   -- throwError (error $ "Perspectives.Query.Interpreter: no implementation for LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF")
