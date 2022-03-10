@@ -31,6 +31,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.InvertedQuery (InvertedQuery)
+import Perspectives.Parsing.Arc.AST (PropertyFacet)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Range (Range)
@@ -55,6 +56,8 @@ type EnumeratedPropertyRecord =
   , pos :: ArcPosition
 
   , onPropertyDelta :: Object (Array InvertedQuery)
+
+  , constrainingFacets :: Array PropertyFacet
   }
 
 defaultEnumeratedProperty :: String -> String -> String -> Range -> ArcPosition -> EnumeratedProperty
@@ -68,6 +71,7 @@ defaultEnumeratedProperty id dn role range pos = EnumeratedProperty
   , mandatory: false
   , pos: pos
   , onPropertyDelta: empty
+  , constrainingFacets: []
 }
 
 derive instance genericRepEnumeratedProperty :: Generic EnumeratedProperty _

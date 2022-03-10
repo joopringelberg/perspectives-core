@@ -21,6 +21,12 @@ domain BodiesWithAccounts
     external
       aspect sys:Model$External
 
+  case BodiesWithAccountsApp
+    indexed bwa:App
+    aspect sys:RootContext
+    external
+      aspect sys:RootContext$External
+
   case Body
 
     user Test

@@ -1,0 +1,17 @@
+UserData
+
+import model:System as sys
+import model:TestFields as tf
+
+tf:Model usr:TestFieldsModel
+  extern sys:RootContext$External$Name = "Fields testing"
+  extern sys:Model$External$Description = "Some simple roles for testing fields."
+  extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:TestFields"
+  extern sys:Model$External$ModelIdentification = "model:TestFields"
+  sys:Model$IndexedContext =>
+    tf:TestFieldsApp tf:TheTestFields
+      extern sys:RootContext$External$Name = "Sports TestFields Management"
+      $Tester(tf:Tester) -> sys:Me
+    sys:Model$IndexedContext$Name = "TestFields$TheTestFields"
+  sys:Model$IndexedRole -> tf:Tester
+    sys:Model$IndexedRole$Name = "TestFields$Tester"

@@ -93,6 +93,10 @@ perspectDef = LanguageDef
                   , "Boolean"
                   , "verbs"
 
+                  -- PropertyFacets
+                  , "minLength"
+                  , "maxLength"
+
                   -- Perspectives
                   , "perspective"
                   , "on"

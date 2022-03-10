@@ -125,7 +125,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Parsing") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Parsing: " <> show errs) false
 
-  test "upload model:BodiesWithAccounts to repository from files (without testuser)" $ runP do
+  testOnly "upload model:BodiesWithAccounts to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     errs <- loadCompileAndCacheArcFile "bodiesWithAccounts" modelDirectory
@@ -135,7 +135,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:BodiesWithAccounts") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:BodiesWithAccounts: " <> show errs) false
 
-  testOnly "upload model:Models to repository from files (without testuser)" $ runP do
+  test "upload model:Models to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
@@ -185,7 +185,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:SimpleChat: " <> show errs) false
 
-  testOnly "upload model:Competition to repository from files (without testuser)" $ runP do
+  test "upload model:Competition to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
@@ -198,7 +198,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Competition") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Competition: " <> show errs) false
 
-  testOnly "upload model:CouchdbManagement to repository from files (without testuser)" $ runP do
+  test "upload model:CouchdbManagement to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "utilities" modelDirectory
@@ -213,7 +213,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:CouchdbManagement") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:CouchdbManagement: " <> show errs) false
 
-  testOnly "upload model:WitCoin to repository from files (without testuser)" $ runP do
+  test "upload model:WitCoin to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     errs <- loadCompileAndCacheArcFile "witcoin" modelDirectory

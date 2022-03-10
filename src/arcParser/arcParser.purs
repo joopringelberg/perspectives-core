@@ -26,11 +26,12 @@ import Control.Alt (map, void, (<|>))
 import Data.Array (find, fromFoldable)
 import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
 import Data.Maybe (Maybe(..))
+import Data.String (trim)
 import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reserved, stringUntilNewline)
@@ -493,7 +494,8 @@ propertyE = do
       pure $ PE $ PropertyE
         { id: uname
         , range: Nothing
-        , propertyParts: Cons (Calculation' calc) Nil, pos: pos}
+        , propertyParts: Cons (Calculation' calc) Nil, pos: pos
+        , propertyFacets: Nil}
 
     -- | This parser always succeeds, either with or without consuming part of the input stream.
     enumeratedProperty :: ArcPosition -> String -> IP RolePart
@@ -502,12 +504,14 @@ propertyE = do
       ran <- pure $ (unsafePartial case _ of Ran r -> r) <$> find (case _ of
         Ran r -> true
         _ -> false) attributes
+      facets <- option Nil propertyFacets
       pure $ PE $ PropertyE
         { id: uname
         , range: ran
         , propertyParts: filter (case _ of
             Ran _ -> false
             _ -> true) attributes
+        , propertyFacets: facets
         , pos: pos}
 
     -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
@@ -529,6 +533,17 @@ propertyE = do
             <|> reserved "DateTime" *> (pure $ Ran PDate)
             <|> reserved "Email" *> (pure $ Ran PEmail)
             )
+
+    propertyFacets :: IP (List PropertyFacet)
+    propertyFacets = nestedBlock propertyFacet
+
+    propertyFacet :: IP PropertyFacet
+    propertyFacet = do
+      facet <- reservedIdentifier
+      case facet of
+        "minLength" -> reserved "=" *> (MinLength <$> token.integer)
+        "maxLength" -> reserved "=" *> (MaxLength <$> token.integer)
+        kw -> fail ("Expected `minLength`, `maxLength` but got: " <> kw)
 
 viewE :: IP RolePart
 viewE = do
@@ -1051,7 +1066,7 @@ sentenceE = do
     sentencePart :: IP SentencePart
     sentencePart = do
       chars <- some (satisfy (\c -> not (c == '{') && not (c == '"')))
-      pure $ HR $ fromCharArray $ fromFoldable chars
+      pure $ HR $ trim $ fromCharArray $ fromFoldable chars
 
     exprPart :: IP SentencePart
     exprPart = CP <<< S <$> between (token.symbol "{") (token.symbol "}") step

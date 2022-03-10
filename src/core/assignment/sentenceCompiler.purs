@@ -23,15 +23,17 @@
 module Perspectives.Assignment.SentenceCompiler where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (concat)
-import Data.Traversable (intercalate, traverse)
+import Data.Array (concat, foldl)
+import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..), indexOf)
+import Data.Traversable (class Foldable, traverse)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, evalMonadPerspectivesQuery, type (~~>))
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (context2string, role2string)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
-import Prelude (bind, flip, pure, show, ($), (<$>), (<>), (>>=), (<<<))
+import Prelude (bind, flip, mempty, pure, show, ($), (<$>), (<<<), (<>), (==), (>>=))
 
 type CompiledSentence a = a -> MonadPerspectives String
 
@@ -49,7 +51,18 @@ compileSentence xToString (Sentence parts) = do
         Q calc -> xToString calc >>= pure <<< flip evalMonadPerspectivesQuery
     parts
   pure \roleId ->
-    intercalate "" <<< concat <$> traverse (\p -> p roleId) compiledParts
+    intercalate' " " <<< concat <$> traverse (\p -> p roleId) compiledParts
+  where
+    intercalate' :: forall f. Foldable f => String -> f String -> String
+    intercalate' sep xs = (foldl go { init: true, acc: mempty } xs).acc
+      where
+      go { init: true } x = { init: false, acc: x }
+      go { acc: acc }   x | isDot x = { init: false, acc: acc <> x }
+      go { acc: acc }   x = { init: false, acc: acc <> sep <> x }
+
+      isDot :: String -> Boolean
+      isDot s = indexOf (Pattern ".") s == Just 0
+
 
 -- | From a Sentence, create a function that takes a ContextInstance and produces a String in MonadPerspectives.
 compileContextSentence :: Sentence -> MonadPerspectives (CompiledSentence ContextInstance)

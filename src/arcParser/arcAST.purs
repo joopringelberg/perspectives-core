@@ -29,7 +29,10 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Statements)
 import Perspectives.Representation.Context (ContextKind)
@@ -101,6 +104,7 @@ newtype PropertyE = PropertyE
   { id :: String
   , range :: Maybe Range
   , propertyParts :: List PropertyPart
+  , propertyFacets :: List PropertyFacet
   , pos :: ArcPosition
   }
 
@@ -110,6 +114,26 @@ data PropertyPart =
   | Calculation' Step
   | Ran Range
 
+data PropertyFacet =
+  MinLength Int
+  | MaxLength Int
+  | Pattern RegExP
+  | WhiteSpace WhiteSpaceRegime
+  | Enumeration (Array String)
+	| MaxInclusive String
+	| MinInclusive String
+	| MaxExclusive String
+	| MinExclusive String
+	| TotalDigits Int
+	| FractionDigits Int
+
+data WhiteSpaceRegime =
+  -- No normalization is done, the value is not changed (this is the behavior required by [XML 1.0 (Second Edition)] for element content)
+  Preserve
+  -- All occurrences of #x9 (tab), #xA (line feed) and #xD (carriage return) are replaced with #x20 (space)
+  | Replace
+  -- After the processing implied by replace, contiguous sequences of #x20's are collapsed to a single #x20, and leading and trailing #x20's are removed.
+  | Collapse
 --------------------------------------------------------------------------------
 ---- STATEQUALIFIEDPART
 --------------------------------------------------------------------------------
@@ -316,6 +340,20 @@ instance showPropertyE :: Show PropertyE where show = genericShow
 
 derive instance genericPropertyElement :: Generic PropertyPart _
 instance showPropertyElement :: Show PropertyPart where show = genericShow
+
+derive instance genericPropertyFacet :: Generic PropertyFacet _
+instance showPropertyFacet :: Show PropertyFacet where show = genericShow
+instance decodePropertyFacet :: Decode PropertyFacet where
+  decode = genericDecode defaultOptions
+instance encodePropertyFacet :: Encode PropertyFacet where
+  encode = genericEncode defaultOptions
+
+derive instance genericWhiteSpaceRegime :: Generic WhiteSpaceRegime _
+instance showWhiteSpaceRegime :: Show WhiteSpaceRegime where show = genericShow
+instance decodeWhiteSpaceRegime :: Decode WhiteSpaceRegime where
+  decode = genericDecode defaultOptions
+instance encodeWhiteSpaceRegime :: Encode WhiteSpaceRegime where
+  encode = genericEncode defaultOptions
 
 derive instance genericPropOrView :: Generic PropsOrView _
 instance showPropOrView :: Show PropsOrView where show = genericShow

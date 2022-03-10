@@ -153,7 +153,7 @@ simpleStep = try
   -- VARIABLE MUST BE LAST!
   <|>
   Simple <$> (Variable <$> getPosition <*> lowerCaseName)
-  ) <?> "binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count"
+  ) <?> "binding, binder, context, extern, this, modelname, contextType, roleTypes, specialisesRoleType, a valid variablename (lowercase only) or a number, boolean, string (between double quotes), date (between single quotes), email address or a monoid function (sum, product, minimum, maximum) or count"
 
 -- | Parses just the regular expression; not "matches", which is interpreted like ">>".
 -- | We expect an expression like this: /.../gimyu

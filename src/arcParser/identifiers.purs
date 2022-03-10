@@ -107,7 +107,7 @@ boolean :: IP String
 boolean = token.symbol "true" <|> token.symbol "false"
 
 email :: IP String
-email = do
+email = try do
   chars <- many (satisfy (not <<< isSpace))
   if (test emailRegExp (fromCharArray chars))
     then whiteSpace *> pure (fromCharArray chars)

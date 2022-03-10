@@ -8,3 +8,7 @@ bwa:Model usr:BodiesWithAccountsModel
   extern sys:Model$External$Description = "A pattern for bodies such as organisations that have accounts."
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:BodiesWithAccounts"
   extern sys:Model$External$ModelIdentification = "model:BodiesWithAccounts"
+  sys:Model$IndexedContext =>
+    bwa:BodiesWithAccountsApp bwa:App
+      extern sys:RootContext$External$Name = "Bodies with Accounts"
+    sys:Model$IndexedContext$Name = "BodiesWithAccounts$App"

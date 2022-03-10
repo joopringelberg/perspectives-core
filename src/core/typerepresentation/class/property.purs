@@ -28,6 +28,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Parsing.Arc.AST (PropertyFacet)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..))
 import Perspectives.Query.QueryTypes (range) as QT
 import Perspectives.Representation.ADT (ADT(..))
@@ -53,6 +54,7 @@ class (Identifiable r i) <= PropertyClass r i | r -> i, i -> r where
   functional :: r -> MonadPerspectives Boolean
   isCalculated :: r -> MonadPerspectives Boolean
   calculation :: r -> MonadPerspectives QueryFunctionDescription
+  constrainingFacets :: r -> Array PropertyFacet
 
 instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty CalculatedPropertyType where
   role r = (unwrap r).role
@@ -72,6 +74,7 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty Cal
   calculation r = case (unwrap r).calculation of
     Q calc -> pure calc
     otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedProperty before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedPropertyType))))
+  constrainingFacets r = []
 
 instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty EnumeratedPropertyType where
   role r = (unwrap r).role
@@ -82,6 +85,7 @@ instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty Enu
   calculation r = do
     context <- enumeratedRoleContextType (role r)
     pure $ SQD (RDOM (ST $ RoleInContext {context, role: (role r)})) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range (Just $ ENP (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
+  constrainingFacets r = (unwrap r).constrainingFacets
 
 rangeOfPropertyType :: PropertyType -> MonadPerspectives Range
 rangeOfPropertyType (ENP pt) = getEnumeratedProperty pt >>= range

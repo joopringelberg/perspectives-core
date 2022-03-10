@@ -39,13 +39,14 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, AssumptionTracking
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
+import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
-import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..)) as PROP
+import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..), constrainingFacets) as PROP
 import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleKindOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
@@ -91,6 +92,21 @@ type SerialisedProperty =
   , isCalculated :: Boolean
   , range :: String
   , verbs :: Array String
+  , constrainingFacets :: PropertyFacets
+  }
+
+type PropertyFacets =
+  { minLength :: Maybe Int
+  , maxLength :: Maybe Int
+  , pattern :: Maybe String
+  , whiteSpace :: Maybe String
+  , enumeration :: Maybe (Array String)
+  , maxInclusive :: Maybe String
+  , maxExclusive :: Maybe String
+  , minInclusive :: Maybe String
+  , minExclusive :: Maybe String
+  , totalDigits :: Maybe Int
+  , fractionDigits :: Maybe Int
   }
 
 newtype SerialisedPerspective = SerialisedPerspective String
@@ -230,7 +246,35 @@ serialiseProperties object pverbs = do
           , isCalculated
           , range: show range
           , verbs: show <$> verbs
+          , constrainingFacets: serialisePropertyFacets $ PROP.constrainingFacets propType
           }
+
+        serialisePropertyFacets :: Array PropertyFacet -> PropertyFacets
+        serialisePropertyFacets facets = foldl (\pr facet -> case facet of
+          MinLength x -> pr {minLength = Just x}
+          MaxLength x -> pr {maxLength = Just x}
+          Pattern s -> pr {pattern = Just $ show s}
+          WhiteSpace r -> pr {whiteSpace = Just $ show r}
+          Enumeration items -> pr {enumeration = Just items}
+          MaxInclusive s -> pr {maxInclusive = Just s}
+          MinInclusive s -> pr {minInclusive = Just s}
+          MaxExclusive s -> pr {maxExclusive = Just s}
+          MinExclusive s -> pr {minExclusive = Just s}
+          TotalDigits i -> pr {totalDigits = Just i}
+          FractionDigits i -> pr {fractionDigits = Just i})
+          { minLength: Nothing
+          , maxLength: Nothing
+          , pattern: Nothing
+          , whiteSpace: Nothing
+          , enumeration: Nothing
+          , maxInclusive: Nothing
+          , maxExclusive: Nothing
+          , minInclusive: Nothing
+          , minExclusive: Nothing
+          , totalDigits: Nothing
+          , fractionDigits: Nothing
+          }
+          facets
 
     -- Pair each PropertyType will all PropertyVerbs available for it.
     expandPropertyVerbs :: Array PropertyType -> PropertyVerbs -> Array (Tuple PropertyType (Array PropertyVerb))

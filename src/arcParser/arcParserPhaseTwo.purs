@@ -411,14 +411,15 @@ traversePropertyE r ns = if isCalculatedProperty r
         otherwise -> false) propertyParts))
 
 traverseEnumeratedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
-traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
+traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, propertyFacets, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
   property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns
     (case range of
       Nothing -> PString
       Just r -> r)
     pos
-  property' <- foldM (unsafePartial handleParts) property propertyParts
+  EnumeratedProperty pr <- foldM (unsafePartial handleParts) property propertyParts
+  property' <- pure $ EnumeratedProperty pr {constrainingFacets = ARR.fromFoldable propertyFacets}
   modifyDF (\df -> addPropertyToDomeinFile (Property.E property') df)
   pure (Property.E property')
 
