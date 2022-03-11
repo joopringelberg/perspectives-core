@@ -96,6 +96,15 @@ perspectDef = LanguageDef
                   -- PropertyFacets
                   , "minLength"
                   , "maxLength"
+                  , "enumeration"
+                  , "pattern"
+                  , "whiteSpace"
+                  , "maxInclusive"
+                  , "maxExclusive"
+                  , "minInclusive"
+                  , "minExclusive"
+                  , "totalDigits"
+                  , "fractionDigits"
 
                   -- Perspectives
                   , "perspective"

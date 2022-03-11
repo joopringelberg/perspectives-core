@@ -32,9 +32,9 @@ import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression (step)
+import Perspectives.Parsing.Arc.Expression (parseDate, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reserved, stringUntilNewline)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, reserved, stringUntilNewline)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoReservedWords)
@@ -48,7 +48,7 @@ import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, flip, not, pure, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
@@ -501,10 +501,12 @@ propertyE = do
     enumeratedProperty :: ArcPosition -> String -> IP RolePart
     enumeratedProperty pos uname = do
       attributes <- option Nil propertyAttributes
-      ran <- pure $ (unsafePartial case _ of Ran r -> r) <$> find (case _ of
+      (ran :: Maybe Range) <- pure $ (unsafePartial case _ of Ran r -> r) <$> find (case _ of
         Ran r -> true
         _ -> false) attributes
-      facets <- option Nil propertyFacets
+      facets <- option Nil (propertyFacets (case ran of
+        Just r -> r
+        otherwise -> PString))
       pure $ PE $ PropertyE
         { id: uname
         , range: ran
@@ -534,16 +536,27 @@ propertyE = do
             <|> reserved "Email" *> (pure $ Ran PEmail)
             )
 
-    propertyFacets :: IP (List PropertyFacet)
-    propertyFacets = nestedBlock propertyFacet
+    propertyFacets :: Range -> IP (List PropertyFacet)
+    propertyFacets r = nestedBlock propertyFacet
+      where
 
-    propertyFacet :: IP PropertyFacet
-    propertyFacet = do
-      facet <- reservedIdentifier
-      case facet of
-        "minLength" -> reserved "=" *> (MinLength <$> token.integer)
-        "maxLength" -> reserved "=" *> (MaxLength <$> token.integer)
-        kw -> fail ("Expected `minLength`, `maxLength` but got: " <> kw)
+      propertyFacet :: IP PropertyFacet
+      propertyFacet = do
+        facet <- reservedIdentifier
+        case facet of
+          "minLength" -> reserved "=" *> (MinLength <$> token.integer)
+          "maxLength" -> reserved "=" *> (MaxLength <$> token.integer)
+          "enumeration" -> reserved "=" *> (Enumeration <<< fromFoldable <$> token.parens (token.commaSep1 typedValue))
+          kw -> fail ("Expected `minLength`, `maxLength` but got: " <> kw)
+
+      typedValue :: IP String
+      typedValue = case r of
+        PString -> token.stringLiteral
+        PBool -> boolean
+        PNumber -> show <$> token.integer
+        PDate -> show <$> parseDate
+        PEmail -> email
+
 
 viewE :: IP RolePart
 viewE = do
