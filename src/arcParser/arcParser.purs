@@ -23,16 +23,22 @@
 module Perspectives.Parsing.Arc where
 
 import Control.Alt (map, void, (<|>))
+import Control.Monad.Trans.Class (lift)
 import Data.Array (find, fromFoldable)
+import Data.JSDate (toISOString)
 import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
 import Data.Maybe (Maybe(..))
 import Data.String (trim)
 import Data.String.CodeUnits (fromCharArray)
+import Data.String.Regex (Regex)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
+import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Identifiers (isQualifiedWithDomein)
+import Perspectives.Identifiers (getFirstMatch, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression (parseDate, step)
+import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, reserved, stringUntilNewline)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
@@ -547,15 +553,38 @@ propertyE = do
           "minLength" -> reserved "=" *> (MinLength <$> token.integer)
           "maxLength" -> reserved "=" *> (MaxLength <$> token.integer)
           "enumeration" -> reserved "=" *> (Enumeration <<< fromFoldable <$> token.parens (token.commaSep1 typedValue))
-          kw -> fail ("Expected `minLength`, `maxLength` but got: " <> kw)
+          "pattern" -> reserved "=" *> (Pattern <$> regexExpression <*> token.stringLiteral)
+          "maxInclusive" -> reserved "=" *> (MaxInclusive <$> boundaryValue)
+          "minInclusive" -> reserved "=" *> (MinInclusive <$> boundaryValue)
+          kw -> fail ("Expected `minLength`, `maxLength`, `enumeration` but got: " <> kw <> ". ")
 
       typedValue :: IP String
       typedValue = case r of
         PString -> token.stringLiteral
         PBool -> boolean
         PNumber -> show <$> token.integer
-        PDate -> show <$> parseDate
+        PDate ->  parseDateString
         PEmail -> email
+
+      boundaryValue :: IP String
+      boundaryValue = case r of
+        PNumber -> show <$> token.integer
+        PDate -> parseDateString
+        _ -> fail "minInclusive and maxInclusive can only be applied to numbers and dates. "
+
+      -- Returns a string formatted as YYYY-MM-DD.
+      parseDateString :: IP String
+      parseDateString = do
+        d <- parseJSDate
+        iso <- liftToIP $ toISOString d
+        case getFirstMatch dateRegex iso of
+          Nothing -> fail "Enter a valid date in the form `YYYY-MM-DD`. "
+          Just dstring -> pure dstring
+
+      liftToIP = lift <<< lift <<< liftEffect
+
+      dateRegex :: Regex
+      dateRegex = unsafeRegex "^(.*)T" noFlags
 
 
 viewE :: IP RolePart

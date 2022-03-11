@@ -117,7 +117,7 @@ data PropertyPart =
 data PropertyFacet =
   MinLength Int
   | MaxLength Int
-  | Pattern RegExP
+  | Pattern RegExP String
   | WhiteSpace WhiteSpaceRegime
   | Enumeration (Array String)
 	| MaxInclusive String

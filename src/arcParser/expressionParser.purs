@@ -183,6 +183,7 @@ propertyRange = (reserved "Boolean" *> (pure "Boolean")
   <|> reserved "DateTime" *> (pure "DateTime")) <?> "Boolean, Number, String or DateTime"
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
+-- | Summary: the type must conform to YYYY-MM-DDTHH:mm:ss.sssZ, but time may be left out.
 parseDate :: IP DateTime
 parseDate = try do
   s <- dateTimeLiteral
@@ -190,6 +191,11 @@ parseDate = try do
   case toDateTime d of
     Nothing -> fail "Not a date"
     (Just (dt :: DateTime)) -> pure dt
+
+parseJSDate :: IP JSDate
+parseJSDate = try do
+  s <- dateTimeLiteral
+  pure $ unsafePerformEffect $ parse s
 
 isUnaryKeyword :: String -> Boolean
 isUnaryKeyword kw = isJust $ elemIndex kw ["not", "exists", "binds", "boundBy", "available"]

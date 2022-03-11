@@ -31,8 +31,16 @@ domain TestFields
         maxLength = 200
       property Bool (Boolean)
       property ADateTime (DateTime)
+        minInclusive = '2022-04-15'
       property ANumber (Number)
+        minInclusive = 10
+        maxInclusive = 80
       property AnEmail (Email)
+        minLength = 10
+      property WeekDay (String)
+        enumeration = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+      property Appel (String)
+        pattern = /.*appel.*/ "Any word with the string `appel` in it."
 
     thing TestTable (relational)
       property Text (mandatory, String)

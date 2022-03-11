@@ -98,7 +98,7 @@ type SerialisedProperty =
 type PropertyFacets =
   { minLength :: Maybe Int
   , maxLength :: Maybe Int
-  , pattern :: Maybe String
+  , pattern :: Maybe {regex :: String, label :: String}
   , whiteSpace :: Maybe String
   , enumeration :: Maybe (Array String)
   , maxInclusive :: Maybe String
@@ -253,7 +253,7 @@ serialiseProperties object pverbs = do
         serialisePropertyFacets facets = foldl (\pr facet -> case facet of
           MinLength x -> pr {minLength = Just x}
           MaxLength x -> pr {maxLength = Just x}
-          Pattern s -> pr {pattern = Just $ show s}
+          Pattern s label -> pr {pattern = Just $ {regex: show s, label}}
           WhiteSpace r -> pr {whiteSpace = Just $ show r}
           Enumeration items -> pr {enumeration = Just items}
           MaxInclusive s -> pr {maxInclusive = Just s}
