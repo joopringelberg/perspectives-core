@@ -165,6 +165,13 @@ perspectDef = LanguageDef
                   , "modelname"
                   , "returns"
 
+                  -- Screens
+                  , "screen"
+                  , "row"
+                  , "column"
+                  , "form"
+                  , "table"
+
                   ]
                 , caseSensitive:   true
                 }

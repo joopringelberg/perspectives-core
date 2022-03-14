@@ -24,6 +24,19 @@ domain TestFields
         defaults
       perspective on TestTable
         defaults
+      screen "Test screen"
+        row
+          column
+            form TestRole
+            table "MyTable" TestTable
+              --view Limited
+              props (Text, ADateTime) verbs (Consult)
+          --graph TestTable
+            --y = ANumber
+        --row
+          --masterSlave TestTable
+            --master = ViewX
+            --slave = ViewY
 
     thing TestRole
       property Text (mandatory, String)
@@ -48,3 +61,4 @@ domain TestFields
       property ADateTime (DateTime)
       property ANumber (mandatory, Number)
       property AnEmail (Email)
+      view Limited (Text, ADateTime)

@@ -23,11 +23,13 @@
 module Perspectives.Parsing.Arc where
 
 import Control.Alt (map, void, (<|>))
+import Control.Lazy (defer)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (find, fromFoldable)
 import Data.JSDate (toISOString)
 import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.String (trim)
 import Data.String.CodeUnits (fromCharArray)
 import Data.String.Regex (Regex)
@@ -37,7 +39,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), ContextE(..), ContextPart(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, reserved, stringUntilNewline)
@@ -442,6 +444,7 @@ rolePart = do
     "property", _ -> propertyE
     "view", _ -> viewE
     "action", _ -> SQP <$> actionE
+    "screen", _ -> Screen <$> screenE
     _, _ -> case first of
       "" -> do
         thisWord <- stringUntilNewline
@@ -1120,3 +1123,61 @@ reserved' name = token.reserved name *> pure name
 -- If no reserved word is found, restores the parser state (uses try internally).
 scanIdentifier :: IP String
 scanIdentifier = option "" (lookAhead reservedIdentifier)
+
+--------------------------------------------------------------------------------
+---- SCREENS
+--------------------------------------------------------------------------------
+screenE :: IP ScreenE
+screenE = withPos do
+  reserved "screen"
+  title <- token.stringLiteral
+  keyword <- scanIdentifier
+  subject <- getSubject
+  case keyword of
+    "row" -> do
+      rows <- Just <$> nestedBlock rowE
+      pure $ ScreenE {title, rows, columns: Nothing, subject}
+    "column" -> do
+      columns <- Just <$> nestedBlock columnE
+      pure $ ScreenE {title, columns, rows: Nothing, subject}
+    _ -> fail "Only `row` and `column` are allowed here. "
+
+rowE :: IP RowE
+rowE = reserved "row" *> (RowE <$> nestedBlock (defer \_ -> screenElementE))
+
+columnE :: IP ColumnE
+columnE = reserved "column" *> (ColumnE <$> nestedBlock (defer \_ -> screenElementE))
+
+screenElementE :: IP ScreenElement
+screenElementE = withPos do
+  keyword <- scanIdentifier
+  case keyword of
+    "row" -> RowElement <$> rowE
+    "column" -> ColumnElement <$> columnE
+    "table" -> reserved "table" *> (TableElement <$> tableE)
+    "form" -> reserved "form" *> (FormElement <$> formE)
+    -- NOTE: extend message when a new widget is added.
+    _ -> fail "Only `row`, `column`, `table` and `form` are allowed here. "
+
+widgetCommonFields :: IP WidgetCommonFields
+widgetCommonFields = do
+  title <- optionMaybe token.stringLiteral
+  roleName <- arcIdentifier
+  pos <- getPosition
+  ctxt <- getCurrentContext
+  perspective <- pure (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ roleName) pos)
+  isIndented' <- isIndented
+  protectObject do
+    setObject perspective
+    if isIndented'
+      then do
+        mpropertyVerbs <- optionMaybe propertyVerbs
+        mroleVerbs <- optionMaybe roleVerbs
+        pure {title, perspective, propertyVerbs: mpropertyVerbs, roleVerbs: mroleVerbs}
+      else pure {title, perspective, propertyVerbs: Nothing, roleVerbs: Nothing}
+
+formE :: IP FormE
+formE = FormE <$> widgetCommonFields
+
+tableE :: IP TableE
+tableE = TableE <$> widgetCommonFields

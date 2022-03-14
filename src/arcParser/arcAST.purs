@@ -29,6 +29,7 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
+import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
@@ -86,7 +87,8 @@ data RolePart =
   Calculation Step |
   RoleAspect String ArcPosition |
   IndexedRole String ArcPosition |
-  ROLESTATE StateE
+  ROLESTATE StateE |
+  Screen ScreenE
 
 --------------------------------------------------------------------------------
 ---- STATE
@@ -289,6 +291,51 @@ instance eqStateSpecification :: Eq StateSpecification where eq = genericEq
 instance showStateSpecification :: Show StateSpecification where show = genericShow
 
 --------------------------------------------------------------------------------
+---- SCREEN
+--------------------------------------------------------------------------------
+newtype ScreenE = ScreenE
+  { title :: String
+  , rows :: Maybe (List RowE)
+  , columns :: Maybe (List ColumnE)
+  , subject :: RoleIdentification
+  }
+
+--------------------------------------------------------------------------------
+---- SCREENELEMENT
+--------------------------------------------------------------------------------
+data ScreenElement =
+    RowElement RowE
+  | ColumnElement ColumnE
+  | TableElement TableE
+  | FormElement FormE
+
+--------------------------------------------------------------------------------
+---- ROW, COLUMN
+--------------------------------------------------------------------------------
+newtype RowE = RowE (List ScreenElement)
+newtype ColumnE = ColumnE (List ScreenElement)
+
+--------------------------------------------------------------------------------
+---- FORM
+--------------------------------------------------------------------------------
+newtype FormE = FormE WidgetCommonFields
+
+type WidgetCommonFields =
+  { title :: Maybe String
+  -- Only the ExplicitRole constructor is allowed!
+  , perspective :: RoleIdentification
+  -- Must be a subset of the propertyVerbs of the perspective
+  , propertyVerbs :: Maybe PropertyVerbE
+  -- Must be a subset of the roleVerbs of the perspective
+  , roleVerbs :: Maybe RoleVerbE
+  }
+
+--------------------------------------------------------------------------------
+---- TABLE
+--------------------------------------------------------------------------------
+newtype TableE = TableE WidgetCommonFields
+
+--------------------------------------------------------------------------------
 ---- INSTANCES
 --------------------------------------------------------------------------------
 -- We are only interested in ordering RE dataconstructors.
@@ -366,3 +413,23 @@ instance showContextActionElement :: Show ContextActionE where show = genericSho
 
 derive instance genericViewElement :: Generic ViewE _
 instance showViewElement :: Show ViewE where show = genericShow
+
+derive instance genericScreen :: Generic ScreenE _
+instance showScreen :: Show ScreenE where show = genericShow
+
+derive instance genericScreenElement :: Generic ScreenElement _
+instance showScreenElement :: Show ScreenElement where
+  show e = genericShow e
+
+derive instance genericRow :: Generic RowE _
+instance showRow :: Show RowE where show = genericShow
+
+derive instance genericColumn :: Generic ColumnE _
+instance showColumn :: Show ColumnE where show = genericShow
+
+derive instance genericTable :: Generic TableE _
+instance showTable :: Show TableE where show = genericShow
+derive instance newtypeTableE :: Newtype TableE _
+
+derive instance genericForm :: Generic FormE _
+instance showForm :: Show FormE where show = genericShow

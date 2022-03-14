@@ -40,7 +40,7 @@ import Foreign.Object (insert, lookup, union, fromFoldable)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), StateE(..), StateSpecification(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), ScreenE(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
 import Perspectives.Query.QueryTypes (Calculation(..), RoleInContext(..))
@@ -263,6 +263,9 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       -- However, if not, we should register it with its parent and that need not be available.
       -- Hence, we postpone registering the state to PhaseThree.
       pure e
+
+    -- SCREENE (dummy implementation, just ignoring the parse tree)
+    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (Screen s@(ScreenE{})) = pure e
 
     -- We we add roleName as another disjunct of a sum type.
     -- Notice that we treat roles as units here; not as collections of properties!
