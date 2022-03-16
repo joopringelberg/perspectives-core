@@ -22,14 +22,15 @@
 
 module Perspectives.Query.ExpandPrefix where
 
+import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TableE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
-import Prelude (pure, (<$>), bind, ($), (>>=), (<<<), (<*>))
+import Prelude (bind, pure, ($), (<$>), (<*>), (<<<), (>>=))
 
 class ContainsPrefixes s where
   expandPrefix :: s -> PhaseTwo s
@@ -142,17 +143,8 @@ instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
     pure $ ExternalEffect r {effectName = eeffectName, arguments = earguments}
 
 instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPart where
-  expandPrefix (R (RoleVerbE r@{subject, object, state})) = do
-    subject' <- expandPrefix subject
-    object' <- expandPrefix object
-    state' <- expandPrefix state
-    pure (R (RoleVerbE r {subject = subject', object = object', state = state'}))
-  expandPrefix (P (PropertyVerbE r@{subject, object, state, propsOrView})) = do
-    subject' <- expandPrefix subject
-    object' <- expandPrefix object
-    state' <- expandPrefix state
-    propsOrView' <- expandPrefix propsOrView
-    pure (P (PropertyVerbE r {subject = subject', object = object', state = state', propsOrView = propsOrView'}))
+  expandPrefix (R r) = R <$> (expandPrefix r)
+  expandPrefix (P p) = P <$> (expandPrefix p)
   expandPrefix (AC (ActionE r@{subject, object, state, effect})) = do
     subject' <- expandPrefix subject
     object' <- expandPrefix object
@@ -182,6 +174,21 @@ instance containsPrefixesStateQualifiedPart :: ContainsPrefixes StateQualifiedPa
     effect' <- expandPrefix effect
     pure (AE (AutomaticEffectE r {subject = subject', object = object', transition = transition', effect = effect'}))
   expandPrefix (SUBSTATE s) = SUBSTATE <$> expandPrefix s
+
+instance expandPrefixRoleVerbE :: ContainsPrefixes RoleVerbE where
+  expandPrefix (RoleVerbE r@{subject, object, state}) = do
+    subject' <- expandPrefix subject
+    object' <- expandPrefix object
+    state' <- expandPrefix state
+    pure (RoleVerbE r {subject = subject', object = object', state = state'})
+
+instance expandPrefixPropertyE :: ContainsPrefixes PropertyVerbE where
+  expandPrefix (PropertyVerbE r@{subject, object, state, propsOrView}) = do
+    subject' <- expandPrefix subject
+    object' <- expandPrefix object
+    state' <- expandPrefix state
+    propsOrView' <- expandPrefix propsOrView
+    pure (PropertyVerbE r {subject = subject', object = object', state = state', propsOrView = propsOrView'})
 
 instance containsPrefixesPropsOrView :: ContainsPrefixes PropsOrView where
   expandPrefix (View s) = View <$> (expandNamespace s)
@@ -221,3 +228,37 @@ instance containsPrefixesStateE :: ContainsPrefixes StateE where
 instance containsPrefixesCalculation :: ContainsPrefixes Calculation where
   expandPrefix (S stp) = S <$> expandPrefix stp
   expandPrefix q@(Q _) = pure q
+
+instance containsPrefixesScreenE :: ContainsPrefixes ScreenE where
+  expandPrefix (ScreenE rec@{rows, columns, subject}) = do
+    subject' <- expandPrefix subject
+    rows' <- case rows of
+      Nothing -> pure Nothing
+      Just rws -> Just <$> traverse expandPrefix rws
+    columns' <- case columns of
+      Nothing -> pure Nothing
+      Just cols -> Just <$> traverse expandPrefix cols
+    pure $ ScreenE rec {rows = rows', columns = columns', subject = subject'}
+
+instance containsPrefixesTableE :: ContainsPrefixes TableE where
+  expandPrefix (TableE wcf)= TableE <$> expandPrefixWidgetCommonFields wcf
+
+instance containsPrefixesFormE :: ContainsPrefixes FormE where
+  expandPrefix (FormE wcf)= FormE <$> expandPrefixWidgetCommonFields wcf
+
+expandPrefixWidgetCommonFields :: WidgetCommonFields-> PhaseTwo WidgetCommonFields
+expandPrefixWidgetCommonFields cf@{perspective} = do
+    perspective' <- expandPrefix perspective
+    pure cf {perspective = perspective}
+
+instance containsPrefixesRowE :: ContainsPrefixes RowE where
+  expandPrefix (RowE scrEls) = RowE <$> (traverse expandPrefix scrEls)
+
+instance containsPrefixesColumnE :: ContainsPrefixes ColumnE where
+  expandPrefix (ColumnE scrEls) = ColumnE <$> (traverse expandPrefix scrEls)
+
+instance containsPrefixesScreenElement :: ContainsPrefixes ScreenElement where
+  expandPrefix (RowElement r) = RowElement <$> expandPrefix r
+  expandPrefix (ColumnElement r) = ColumnElement <$> expandPrefix r
+  expandPrefix (TableElement r) = TableElement <$> expandPrefix r
+  expandPrefix (FormElement r) = FormElement <$> expandPrefix r

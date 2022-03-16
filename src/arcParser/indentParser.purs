@@ -105,7 +105,7 @@ getObject = getArcParserState >>= \{object} -> case object of
 
 getSubject :: IP RoleIdentification
 getSubject = getArcParserState >>= \{subject} -> case subject of
-  Nothing -> fail "No object is in scope."
+  Nothing -> fail "No subject is in scope."
   Just s -> pure s
 
 inSubContext :: forall a. String -> IP a -> IP a

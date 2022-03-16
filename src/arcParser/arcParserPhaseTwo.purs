@@ -264,8 +264,13 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       -- Hence, we postpone registering the state to PhaseThree.
       pure e
 
-    -- SCREENE (dummy implementation, just ignoring the parse tree)
-    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (Screen s@(ScreenE{})) = pure e
+    -- SCREENE
+    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole
+      then do
+        screen' <- expandPrefix s
+        void $ lift $ modify \st@{screens} -> st {screens = Cons screen' screens}
+        pure e
+      else throwError (ScreenForUserRoleOnly start end)
 
     -- We we add roleName as another disjunct of a sum type.
     -- Notice that we treat roles as units here; not as collections of properties!
@@ -398,6 +403,13 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
     handleParts (CalculatedRole roleUnderConstruction@{views}) (VE pe) = do
       viewType <- traverseViewE pe (CR roleName)
       pure (CalculatedRole $ roleUnderConstruction {views = cons viewType views})
+
+    -- SCREENE
+    handleParts e@(CalculatedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole
+      then do
+        void $ lift $ modify \st@{screens} -> st {screens = Cons s screens}
+        pure e
+      else throwError (ScreenForUserRoleOnly start end)
 
     handleParts crole p = throwError $ Custom ("Cannot handle part '" <> show p <> "' in PhaseTwo in a CalculatedRole: " <> show roleName)
 

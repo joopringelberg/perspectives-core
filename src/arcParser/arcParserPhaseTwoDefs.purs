@@ -18,7 +18,7 @@
 --
 -- Full text of this license can be found in the LICENSE directory in the projects root.
 
--- END LICENSE
+-- END LICENSE 
 
 module Perspectives.Parsing.Arc.PhaseTwoDefs where
 
@@ -39,7 +39,7 @@ import Perspectives.DomeinFile (DomeinFileId(..), DomeinFileRecord, defaultDomei
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
 import Perspectives.Names (defaultNamespaces, expandNamespaces)
-import Perspectives.Parsing.Arc.AST (ContextPart(..), StateQualifiedPart)
+import Perspectives.Parsing.Arc.AST (ContextPart(..), ScreenE, StateQualifiedPart)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
@@ -63,6 +63,7 @@ type PhaseTwoState =
   -- In PerspectivesState, variables are bound to Strings.
   , variableBindings :: Environment QueryFunctionDescription
   , postponedStateQualifiedParts :: List StateQualifiedPart
+  , screens :: List ScreenE
   , perspectives :: MAP.Map (Tuple RoleType Step) Perspective
 }
 
@@ -91,6 +92,7 @@ runPhaseTwo_' computation dfr indexedContexts indexedRoles postponedParts = runS
   , indexedRoles
   , variableBindings: ENV.empty
   , postponedStateQualifiedParts: postponedParts
+  , screens: Nil
   , perspectives: MAP.empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
@@ -108,6 +110,7 @@ evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExc
   , indexedRoles
   , variableBindings: ENV.empty
   , postponedStateQualifiedParts: Nil
+  , screens: Nil
   , perspectives: MAP.empty
   }
 

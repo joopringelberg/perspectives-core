@@ -35,6 +35,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert, lookup)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
+import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Data.EncodableMap (empty) as EM
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol)
@@ -46,8 +47,9 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), InvertedQueryKey)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.ScreenDefinition (ScreenDefinition, ScreenKey)
 import Perspectives.Representation.State (State) as PEState
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType)
 import Perspectives.Representation.UserGraph (UserGraph(..))
 import Perspectives.Representation.View (View)
 import Perspectives.Utilities (class PrettyPrint)
@@ -74,6 +76,7 @@ type DomeinFileRecord =
   , referredModels :: Array DomeinFileId
   , invertedQueriesInOtherDomains :: Object (Array SeparateInvertedQuery)
   , userGraph :: UserGraph
+  , screens :: EncodableMap ScreenKey ScreenDefinition
   }
 
 derive instance genericDomeinFile :: Generic DomeinFile _
@@ -177,6 +180,7 @@ defaultDomeinFileRecord =
   , referredModels: []
   , invertedQueriesInOtherDomains: empty
   , userGraph: UserGraph $ EM.empty
+  , screens: EM.empty
 }
 
 defaultDomeinFile :: DomeinFile

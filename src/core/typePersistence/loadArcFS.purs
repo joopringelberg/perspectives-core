@@ -90,7 +90,7 @@ loadAndCompileArcFile_ filePath = catchError
           (Left e) -> pure $ Left [e]
           (Right (DomeinFile dr'@{_id})) -> do
             dr'' <- pure dr' {referredModels = state.referredModels}
-            (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr'' state.postponedStateQualifiedParts
+            (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left [e]
               (Right correctedDFR@{referredModels}) -> do

@@ -73,6 +73,8 @@ domain ModelManagement
 
     user Author = extern >> binder Models >> context >> Manager
       perspective on extern
-
+        defaults
       perspective on ModelDescription
+        defaults
       perspective on Repository
+        defaults

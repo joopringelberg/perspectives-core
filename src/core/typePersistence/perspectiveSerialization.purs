@@ -57,8 +57,18 @@ import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb(..), allPropert
 import Prelude (bind, eq, flip, map, not, pure, show, ($), (<$>), (<<<), (>=>), (<>), (>>=), (||))
 import Simple.JSON (writeJSON)
 
+-- | A perspective is serialised for a given context instance, for a particular role.
+-- | It contains all instances of that role.
+-- | The serialisation is for a given (nested) state of the context and each of its
+-- | instances. If state changes, so may the role verbs, properties and their verbs
+-- | and actions.
+-- Implementation note: these structures are serialised to a JSON string with writeJSON.
 type SerialisedPerspective' =
-  { id :: String
+  {
+  ----
+  ---- Type level properties
+  ----
+  id :: String
   , displayName :: String
   , isFunctional :: Boolean
   , isMandatory :: Boolean
@@ -68,15 +78,20 @@ type SerialisedPerspective' =
   -- The RoleType of the object of the Perspective.
   , roleType :: Maybe String
   , roleKind :: Maybe RoleKind
-  -- The ContextInstance in which the roleInstances are embedded as EnumeratedRole instances.
+  , contextTypesToCreate :: Array ContextType
+  , identifyingProperty :: String
+  ----
+  ---- Instance properties
+  ----
   , contextInstance :: ContextInstance
+  , roleInstances :: Object RoleInstanceWithProperties
+  ----
+  ---- State dependent properties
+  ----
   , verbs :: Array String
   -- All properties, including those available to some role instance.
   , properties :: Object SerialisedProperty
   , actions :: Array String
-  , roleInstances :: Object RoleInstanceWithProperties
-  , contextTypesToCreate :: Array ContextType
-  , identifyingProperty :: String
   }
 
 -- | Notice that these SerialisedProperties are just those based on context- and subject
@@ -91,8 +106,11 @@ type SerialisedProperty =
   , isMandatory :: Boolean
   , isCalculated :: Boolean
   , range :: String
-  , verbs :: Array String
   , constrainingFacets :: PropertyFacets
+  ----
+  ---- State dependent properties
+  ----
+  , verbs :: Array String
   }
 
 type PropertyFacets =

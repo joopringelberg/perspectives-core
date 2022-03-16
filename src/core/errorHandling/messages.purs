@@ -35,10 +35,10 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.Expression.AST (PureLetStep(..), Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (LetStep(..))
-import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range, RoleInContext(..))
+import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range, RoleInContext)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Show, show, (<<<), (<>))
@@ -106,6 +106,7 @@ data PerspectivesError
     | UnauthorizedForContext String RoleType ContextType
 
     | MissingPerspective
+    | UserHasNoPerspective RoleType RoleType ArcPosition ArcPosition
     | StateDoesNotExist StateIdentifier ArcPosition ArcPosition
 
     | RolErrorBoundary String String
@@ -117,6 +118,9 @@ data PerspectivesError
     | ParserError String ArcPosition
     | MissingObject ArcPosition ArcPosition
     | NoCalculatedAspect ArcPosition String
+
+    -- Screens
+    | ScreenForUserRoleOnly ArcPosition ArcPosition
 
     | Custom String
 
@@ -142,6 +146,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
   show (NoCalculatedAspect start calculatedRoleName) = "(NoCalculatedAspect) The role '" <> calculatedRoleName <> "' is implied to be an aspect (by providing an explicit context type) but CalculatedRoles cannot be used as an Aspect."
+  show (ScreenForUserRoleOnly start end) = "(ScreenForUserRoleOnly) Only a user role may contain a screen definition!"
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here)."
   show (RoleHasNoProperty rtype qn start end) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "' (between " <> show start <> " and " <> show end <> ")."
   show UniversalRoleHasNoParts = "(UniversalRoleHasNoParts) 'NoBinding' gives no access to properties, aspects, binding, etc."
@@ -180,6 +185,7 @@ instance showPerspectivesError :: Show PerspectivesError where
 
 
   show MissingPerspective = "(MissingPerspective) This should be inside a perspective expression."
+  show (UserHasNoPerspective subject object start end) = "(UserHasNoPerspective) User " <> roletype2string subject <> " has no perspective on " <> roletype2string subject <> " (between " <> show start <> " and " <> show end <> ")."
   show (StateDoesNotExist stateId start end) = "(StateDoesNotExist) The state '" <> show stateId <> "' is not modelled (between " <> show start <> " and " <> show end <> ")."
 
   show (RolErrorBoundary boundaryName err) = "(RolErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"

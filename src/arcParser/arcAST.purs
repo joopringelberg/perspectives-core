@@ -298,6 +298,9 @@ newtype ScreenE = ScreenE
   , rows :: Maybe (List RowE)
   , columns :: Maybe (List ColumnE)
   , subject :: RoleIdentification
+  , context :: ContextType
+  , start :: ArcPosition
+  , end :: ArcPosition
   }
 
 --------------------------------------------------------------------------------
@@ -324,10 +327,13 @@ type WidgetCommonFields =
   { title :: Maybe String
   -- Only the ExplicitRole constructor is allowed!
   , perspective :: RoleIdentification
+  , propsOrView :: Maybe PropsOrView
   -- Must be a subset of the propertyVerbs of the perspective
-  , propertyVerbs :: Maybe PropertyVerbE
+  , propertyVerbs :: Maybe (ExplicitSet PropertyVerb)
   -- Must be a subset of the roleVerbs of the perspective
-  , roleVerbs :: Maybe RoleVerbE
+  , roleVerbs :: Maybe RoleVerbList
+  , start :: ArcPosition
+  , end :: ArcPosition
   }
 
 --------------------------------------------------------------------------------
@@ -375,9 +381,11 @@ instance showAutomaticEffectE :: Show AutomaticEffectE where show = genericShow
 
 derive instance genericRoleVerbE :: Generic RoleVerbE _
 instance showRoleVerbE :: Show RoleVerbE where show = genericShow
+derive instance newtypeRoleVerbE :: Newtype RoleVerbE _
 
 derive instance genericPropertyVerbE :: Generic PropertyVerbE _
 instance showPropertyVerbE :: Show PropertyVerbE where show = genericShow
+derive instance newtypePropertyVerbE :: Newtype PropertyVerbE _
 
 derive instance genericSelfOnly :: Generic SelfOnly _
 instance showSelfOnly :: Show SelfOnly where show = genericShow

@@ -406,6 +406,8 @@ enumeratedRole_ uname knd pos = do
 
 -- | This parser always succeeds.
 -- | If it detects no filledBy clause, it leaves consumed state as it is and returns Nil.
+-- Implementation note: we cannot know, here, whether the filler is Calculated or
+-- Enumerated. This will be fixed in PhaseThree.
 filledBy :: IP (List RolePart)
 filledBy = option Nil (reserved "filledBy" *> (token.commaSep1 filler))
   where
@@ -1129,17 +1131,21 @@ scanIdentifier = option "" (lookAhead reservedIdentifier)
 --------------------------------------------------------------------------------
 screenE :: IP ScreenE
 screenE = withPos do
+  start <- getPosition
   reserved "screen"
   title <- token.stringLiteral
   keyword <- scanIdentifier
   subject <- getSubject
+  context <- getCurrentContext
   case keyword of
     "row" -> do
       rows <- Just <$> nestedBlock rowE
-      pure $ ScreenE {title, rows, columns: Nothing, subject}
+      end <- getPosition
+      pure $ ScreenE {title, rows, columns: Nothing, subject, context, start, end}
     "column" -> do
       columns <- Just <$> nestedBlock columnE
-      pure $ ScreenE {title, columns, rows: Nothing, subject}
+      end <- getPosition
+      pure $ ScreenE {title, columns, rows: Nothing, subject, context, start, end}
     _ -> fail "Only `row` and `column` are allowed here. "
 
 rowE :: IP RowE
@@ -1161,10 +1167,13 @@ screenElementE = withPos do
 
 widgetCommonFields :: IP WidgetCommonFields
 widgetCommonFields = do
+  start <- getPosition
   title <- optionMaybe token.stringLiteral
-  roleName <- arcIdentifier
   pos <- getPosition
+  roleName <- arcIdentifier
   ctxt <- getCurrentContext
+  -- We cannot know, at this point, whether the role is Calculated or Enumerated.
+  -- Like with the filledBy clause, we assume Enumerated and repair that later.
   perspective <- pure (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ roleName) pos)
   isIndented' <- isIndented
   protectObject do
@@ -1173,8 +1182,25 @@ widgetCommonFields = do
       then do
         mpropertyVerbs <- optionMaybe propertyVerbs
         mroleVerbs <- optionMaybe roleVerbs
-        pure {title, perspective, propertyVerbs: mpropertyVerbs, roleVerbs: mroleVerbs}
-      else pure {title, perspective, propertyVerbs: Nothing, roleVerbs: Nothing}
+        end <- getPosition
+        pure
+          { title
+          , perspective
+          , propsOrView: _.propsOrView <<< unwrap <$> mpropertyVerbs
+          , propertyVerbs: _.propertyVerbs <<< unwrap <$> mpropertyVerbs
+          , roleVerbs: _.roleVerbs <<< unwrap <$> mroleVerbs
+          , start
+          , end}
+      else do
+        end <- getPosition
+        pure
+          { title
+          , perspective
+          , propsOrView: Nothing
+          , propertyVerbs: Nothing
+          , roleVerbs: Nothing
+          , start
+          , end}
 
 formE :: IP FormE
 formE = FormE <$> widgetCommonFields

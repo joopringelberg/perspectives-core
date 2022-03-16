@@ -33,12 +33,11 @@ import Control.Monad.Except (throwError)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, elemIndex, filter, findIndex, foldM, foldl, foldr, fromFoldable, head, index, intercalate, length, uncons, union, updateAt)
+import Data.Array (cons, elemIndex, filter, find, findIndex, foldM, foldl, foldr, fromFoldable, head, index, intercalate, length, uncons, union, updateAt)
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
 import Data.List (List, filterM, fromFoldable) as LIST
-import Data.Map (Map, empty, insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), indexOf)
@@ -48,13 +47,13 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives, (###=), (###>>))
-import Perspectives.Data.EncodableMap (EncodableMap(..))
+import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Instances.Combinators (closure)
 import Perspectives.InvertedQuery (RelevantProperties(..))
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..)) as AST
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), ScreenE(..), RowE(..), ColumnE(..), ScreenElement(..), WidgetCommonFields, TableE(..), FormE(..)) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
@@ -75,31 +74,41 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole, tryGetPerspectType)
-import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, roleADT, roleADTOfRoleType)
+import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TableDef(..), WidgetCommonFieldsDef)
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
+import Perspectives.Representation.Verbs (roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (aspectsOfRole, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>))
 
-phaseThree :: DomeinFileRecord -> LIST.List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
-phaseThree df@{_id} postponedParts = do
+phaseThree ::
+  DomeinFileRecord ->
+  LIST.List AST.StateQualifiedPart ->
+  LIST.List AST.ScreenE ->
+  MP (Either PerspectivesError DomeinFileRecord)
+phaseThree df@{_id} postponedParts screens = do
   -- Store the DomeinFile in cache. If a prefix for the domain is defined in the file,
   -- phaseThree_ will try to retrieve it.
   void $ storeDomeinFileInCache _id (DomeinFile df)
-  phaseThree_ df postponedParts <* removeDomeinFileFromCache _id
+  phaseThree_ df postponedParts screens <* removeDomeinFileFromCache _id
 
-phaseThree_ :: DomeinFileRecord -> LIST.List AST.StateQualifiedPart -> MP (Either PerspectivesError DomeinFileRecord)
-phaseThree_ df@{_id, referredModels} postponedParts = do
+phaseThree_ ::
+  DomeinFileRecord ->
+  LIST.List AST.StateQualifiedPart ->
+  LIST.List AST.ScreenE ->
+  MP (Either PerspectivesError DomeinFileRecord)
+phaseThree_ df@{_id, referredModels} postponedParts screens = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
   indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
   indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
@@ -111,6 +120,8 @@ phaseThree_ df@{_id, referredModels} postponedParts = do
       requalifyBindingsToCalculatedRoles
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
+      -- Now all perspectives are available.
+      handleScreens screens
       compileStateQueries
       invertPerspectiveObjects
       -- combinePerspectives
@@ -349,25 +360,6 @@ handlePostponedStateQualifiedParts = do
       for_ postponedStateQualifiedParts (unsafePartial handlePart)
   where
 
-    -- | Qualifies incomplete names and changes RoleType constructor to CalculatedRoleType if necessary.
-    -- | The role type name (parameter `rt`) is always fully qualified, EXCEPT
-    -- | for the current subject that holds in the body of `perspective of`.
-    -- TODO. Nu ook voor perspective on als een enkele identifier is gebruikt!
-    collectRoles :: RoleIdentification -> PhaseThree (Array RoleType)
-    -- A single role type will result from this case, but it may be a calculated role!
-    collectRoles (ExplicitRole ctxt rt pos) = do
-      maximallyQualifiedName <- if isQualifiedWithDomein (roletype2string rt)
-        then pure (roletype2string rt)
-        else pure $ concatenateSegments (unwrap ctxt) (roletype2string rt)
-      r <- (\a -> [a]) <$> qualifyLocalRoleName pos maximallyQualifiedName
-      pure r
-    -- Compile the expression s with respect to context ctxt.
-    -- This case MUST represent the current object that holds in the body of `perspective on`. Multiple Enumerated role types can result from this case.
-    collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd ->
-      case range qfd of
-        RDOM adt -> pure $ map ENR (allLeavesInADT $ roleInContext2Role <$> adt)
-        otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
-
     collectRoleInContexts :: RoleIdentification -> PhaseThree (ADT QT.RoleInContext)
     -- A single role type will result from this case, but it may be a calculated role!
     collectRoleInContexts (ExplicitRole ctxt rt pos) = do
@@ -410,8 +402,8 @@ handlePostponedStateQualifiedParts = do
       AST.SubjectState _ _ -> map SubjectState <$> stateSpec2States spec
       AST.ObjectState _ _ -> map ObjectState <$> stateSpec2States spec
 
-    addAll :: forall key value. Ord key => value -> Map.Map key value -> Array key -> Map.Map key value
-    addAll value = foldr (\key map -> Map.insert key value map)
+    addAll :: forall key value. Ord key => value -> EM.EncodableMap key value -> Array key -> EM.EncodableMap key value
+    addAll value = foldr (\key map -> EM.insert key value map)
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart :: Partial => AST.StateQualifiedPart -> PhaseThree Unit
@@ -497,14 +489,14 @@ handlePostponedStateQualifiedParts = do
                   Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
               case transition of
                 AST.Entry _ -> pure $ sr
-                  { automaticOnEntry = EncodableMap $ addAll
-                      automaticAction                  -- value
-                      (unwrap automaticOnEntry)   -- Map.Map key value
-                      qualifiedUsers              -- Array Key
+                  { automaticOnEntry = addAll
+                      automaticAction                   -- value
+                      automaticOnEntry                  -- EM.EncodableMap key value
+                      qualifiedUsers                    -- Array Key
                   , query = query'
                   , object = mobjectQfd}
                 AST.Exit _ -> pure $ sr
-                  { automaticOnExit = EncodableMap $ addAll automaticAction (unwrap automaticOnExit) qualifiedUsers
+                  { automaticOnExit = addAll automaticAction automaticOnExit qualifiedUsers
                   , query = query'
                   , object = mobjectQfd})
 
@@ -553,12 +545,12 @@ handlePostponedStateQualifiedParts = do
                     Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
                 case transition of
                   AST.Entry _ -> pure $ sr
-                    { notifyOnEntry = EncodableMap $ addAll notification (unwrap notifyOnEntry) qualifiedUsers
+                    { notifyOnEntry = addAll notification notifyOnEntry qualifiedUsers
                     , query = query'
                     , object = mobjectQfd
                     }
                   AST.Exit _ -> pure $ sr
-                    { notifyOnExit = EncodableMap $ addAll notification (unwrap notifyOnExit) qualifiedUsers
+                    { notifyOnExit = addAll notification notifyOnExit qualifiedUsers
                     , query = query'
                     , object = mobjectQfd
                     })
@@ -646,11 +638,11 @@ handlePostponedStateQualifiedParts = do
             objectQfd
             syntacticObject
             start
-            \(Perspective pr@{actions}) -> Perspective $ pr {actions = EncodableMap (foldr
-              (\stateId actionsMap -> case Map.lookup stateId actionsMap of
-                Nothing -> Map.insert stateId (singleton id theAction) actionsMap
-                Just actionsInState -> Map.insert stateId (insert id theAction actionsInState) actionsMap)
-              (unwrap actions)
+            \(Perspective pr@{actions}) -> Perspective $ pr {actions = (foldr
+              (\stateId actionsMap -> case EM.lookup stateId actionsMap of
+                Nothing -> EM.insert stateId (singleton id theAction) actionsMap
+                Just actionsInState -> EM.insert stateId (insert id theAction actionsInState) actionsMap)
+              actions
               states)})
 
     -- | Modifies the DomeinFile in PhaseTwoState.
@@ -668,7 +660,7 @@ handlePostponedStateQualifiedParts = do
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateSpec -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd stateSpecs = for_ qualifiedUsers
           (modifyPerspective objectQfd object start
-            (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EncodableMap $ addAll rv (unwrap roleVerbs) stateSpecs}))
+            (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = addAll rv roleVerbs stateSpecs}))
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.P (AST.PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start, end})) = do
@@ -676,7 +668,7 @@ handlePostponedStateQualifiedParts = do
       (qualifiedUsers :: Array RoleType) <- collectRoles subject
       -- ... to their perspective on this object...
       objectQfd <- roleIdentificationToQueryFunctionDescription object start
-      propertyTypes <- collectPropertyTypes propsOrView
+      propertyTypes <- collectPropertyTypes propsOrView object start
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes propertyVerbs
       -- ... for these states only...
       stateSpecs <- stateSpecificationToStateSpec state
@@ -708,49 +700,12 @@ handlePostponedStateQualifiedParts = do
             objectQfd
             object
             start
-            \(Perspective pr@{propertyVerbs:pverbs}) -> Perspective $ pr {propertyVerbs = EncodableMap (foldr
-              (\stateId pverbsMap -> case Map.lookup stateId pverbsMap of
-                Nothing -> Map.insert stateId [propertyVerbs'] pverbsMap
-                Just propertyVerbsArray -> Map.insert stateId (cons propertyVerbs' propertyVerbsArray) pverbsMap)
-              (unwrap pverbs)
+            \(Perspective pr@{propertyVerbs:pverbs}) -> Perspective $ pr {propertyVerbs = (foldr
+              (\stateId pverbsMap -> case EM.lookup stateId pverbsMap of
+                Nothing -> EM.insert stateId [propertyVerbs'] pverbsMap
+                Just propertyVerbsArray -> EM.insert stateId (cons propertyVerbs' propertyVerbsArray) pverbsMap)
+              pverbs
               stateSpecs)})
-
-        -- We lookup the qualified name of these properties here, for the object of the perspective.
-        collectPropertyTypes :: AST.PropsOrView -> PhaseThree (ExplicitSet PropertyType)
-        collectPropertyTypes AST.AllProperties = pure Universal
-        collectPropertyTypes (AST.Properties ps) = do
-          -- The (partial) names for properties used here may be defined outside
-          -- of the model (due to role filling). So we use functions that rely on the
-          -- model cache and hence we need the current model to be in that cache, too (which it is, here).
-          roleADT <- roleIdentification2rangeADT object
-          PSet <$> for (fromFoldable ps)
-            \localPropertyName -> do
-              candidates <- lift2 (roleADT ###= lookForUnqualifiedPropertyType localPropertyName)
-              case head candidates of
-                Nothing -> throwError $ UnknownProperty start localPropertyName (show roleADT)
-                (Just t) | length candidates == 1 -> pure t
-                _ -> throwError $ NotUniquelyIdentifying start localPropertyName (propertytype2string <$> candidates)
-
-
-          -- pure $ PSet (ENP <<< EnumeratedPropertyType <$> (fromFoldable ps))
-        collectPropertyTypes (AST.View view) = do
-          if isQualifiedWithDomein view
-            then do
-              mview <- lift2 $ tryGetPerspectType (ViewType view)
-              case mview of
-                Just (View {propertyReferences}) -> pure $ PSet propertyReferences
-                Nothing -> throwError $ UnknownView start view
-            else do
-              (views :: Object View) <- getsDF _.views
-              -- As we have postponed handling these parse tree fragments after
-              -- handling all others, there can be no forward references.
-              -- The property references in Views are, by now, qualified.
-              candidates <- pure $ filter (flip endsWithSegments view) (keys views)
-              case length candidates of
-                0 -> throwError $ UnknownView start view
-                1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
-                  Just (View {propertyReferences}) -> pure $ PSet propertyReferences
-                _ -> throwError $ NotUniquelyIdentifying start view candidates
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.SO (AST.SelfOnly{subject, object, state, start, end})) = do
@@ -845,13 +800,13 @@ handlePostponedStateQualifiedParts = do
                 calculatedRoles
                 }
           where
-            addToRoleRecord :: forall f. {actions :: EncodableMap StateSpec (Object Action) | f} -> {actions :: EncodableMap StateSpec (Object Action) | f}
-            addToRoleRecord r@{actions} = r {actions = EncodableMap $ foldl
-              (\accumulatedActions nextState -> case Map.lookup nextState accumulatedActions of
-                Nothing -> Map.insert nextState (singleton actionId theAction) accumulatedActions
-                Just actionsObject -> Map.insert nextState (insert actionId theAction actionsObject) accumulatedActions
+            addToRoleRecord :: forall f. {actions :: EM.EncodableMap StateSpec (Object Action) | f} -> {actions :: EM.EncodableMap StateSpec (Object Action) | f}
+            addToRoleRecord r@{actions} = r {actions = foldl
+              (\accumulatedActions nextState -> case EM.lookup nextState accumulatedActions of
+                Nothing -> EM.insert nextState (singleton actionId theAction) accumulatedActions
+                Just actionsObject -> EM.insert nextState (insert actionId theAction actionsObject) accumulatedActions
               )
-              (unwrap actions)
+              actions
               stateSpecs}
 
     -- | Modifies the DomeinFile in PhaseTwoState.
@@ -879,9 +834,9 @@ handlePostponedStateQualifiedParts = do
             start
             end
             (\(sr@{perspectivesOnEntry}) -> do
-              extendedPerspectives <- foldM (addStateDependentPerspectiveForUser currentContextCalculation) (unwrap perspectivesOnEntry) qualifiedUsers
+              extendedPerspectives <- foldM (addStateDependentPerspectiveForUser currentContextCalculation) perspectivesOnEntry qualifiedUsers
               pure $ sr
-                { perspectivesOnEntry = EncodableMap extendedPerspectives
+                { perspectivesOnEntry = extendedPerspectives
                 , object = Just objectQfd
                 })
             stateId
@@ -889,13 +844,13 @@ handlePostponedStateQualifiedParts = do
         -- NOTE that the selfOnly prop is generated by default to be false.
         addStateDependentPerspectiveForUser ::
           QueryFunctionDescription ->
-          Map.Map RoleType StateDependentPerspective ->
+          EM.EncodableMap RoleType StateDependentPerspective ->
           RoleType ->
-          PhaseThree (Map.Map RoleType StateDependentPerspective)
+          PhaseThree (EM.EncodableMap RoleType StateDependentPerspective)
         addStateDependentPerspectiveForUser currentContextCalculation perspectivesOnEntry qualifiedUser = do
           isSelfPerspective <- (lift $ lift (qualifiedUser ###>> (unsafePartial isPerspectiveOnSelf objectQfd)))
-          case Map.lookup qualifiedUser perspectivesOnEntry of
-            Nothing -> pure $ Map.insert
+          case EM.lookup qualifiedUser perspectivesOnEntry of
+            Nothing -> pure $ EM.insert
               qualifiedUser
               case state of
                 AST.ContextState _ _ -> modifier $ ContextPerspective
@@ -910,11 +865,11 @@ handlePostponedStateQualifiedParts = do
                   , isSelfPerspective
                   }
               perspectivesOnEntry
-            Just p@(ContextPerspective _) -> pure $ Map.insert
+            Just p@(ContextPerspective _) -> pure $ EM.insert
               qualifiedUser
               (modifier p)
               perspectivesOnEntry
-            Just p@(RolePerspective _) -> pure $ Map.insert
+            Just p@(RolePerspective _) -> pure $ EM.insert
               qualifiedUser
               (modifier p)
               perspectivesOnEntry
@@ -938,9 +893,9 @@ handlePostponedStateQualifiedParts = do
                 , isEnumerated: (isQFDofEnumeratedRole objectQfd)
                 , displayName
                 , roleTypes
-                , roleVerbs: EncodableMap Map.empty
-                , propertyVerbs: EncodableMap Map.empty
-                , actions: EncodableMap Map.empty
+                , roleVerbs: EM.empty
+                , propertyVerbs: EM.empty
+                , actions: EM.empty
                 , selfOnly: false
                 , isSelfPerspective
                 }
@@ -964,9 +919,9 @@ handlePostponedStateQualifiedParts = do
                 , isEnumerated: (isQFDofEnumeratedRole objectQfd)
                 , displayName
                 , roleTypes
-                , roleVerbs: EncodableMap Map.empty
-                , propertyVerbs: EncodableMap Map.empty
-                , actions: EncodableMap Map.empty
+                , roleVerbs: EM.empty
+                , propertyVerbs: EM.empty
+                , actions: EM.empty
                 , selfOnly: false
                 , isSelfPerspective
                 }
@@ -1015,6 +970,172 @@ handlePostponedStateQualifiedParts = do
 
         roleKind :: Partial => StateIdentifier -> PhaseThree RoleKind
         roleKind (StateIdentifier s) = State.gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
+
+-- | Qualifies incomplete names and changes RoleType constructor to CalculatedRoleType if necessary.
+-- | The role type name (parameter `rt`) is always fully qualified, EXCEPT
+-- | for the current subject that holds in the body of `perspective of`.
+-- TODO. Nu ook voor perspective on als een enkele identifier is gebruikt!
+collectRoles :: RoleIdentification -> PhaseThree (Array RoleType)
+-- A single role type will result from this case, but it may be a calculated role!
+collectRoles (ExplicitRole ctxt rt pos) = do
+  maximallyQualifiedName <- if isQualifiedWithDomein (roletype2string rt)
+    then pure (roletype2string rt)
+    else pure $ concatenateSegments (unwrap ctxt) (roletype2string rt)
+  r <- (\a -> [a]) <$> qualifyLocalRoleName pos maximallyQualifiedName
+  pure r
+-- Compile the expression s with respect to context ctxt.
+-- This case MUST represent the current object that holds in the body of `perspective on`. Multiple Enumerated role types can result from this case.
+collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd ->
+  case range qfd of
+    RDOM adt -> pure $ map ENR (allLeavesInADT $ roleInContext2Role <$> adt)
+    otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
+
+-- We lookup the qualified name of these properties here, for the object of the perspective.
+collectPropertyTypes ::
+  AST.PropsOrView ->
+  RoleIdentification ->
+  ArcPosition ->
+  PhaseThree (ExplicitSet PropertyType)
+collectPropertyTypes AST.AllProperties _ _ = pure Universal
+collectPropertyTypes (AST.Properties ps) object start = do
+  -- The (partial) names for properties used here may be defined outside
+  -- of the model (due to role filling). So we use functions that rely on the
+  -- model cache and hence we need the current model to be in that cache, too (which it is, here).
+  roleADT <- roleIdentification2rangeADT object
+  PSet <$> for (fromFoldable ps)
+    \localPropertyName -> do
+      candidates <- lift2 (roleADT ###= lookForUnqualifiedPropertyType localPropertyName)
+      case head candidates of
+        Nothing -> throwError $ UnknownProperty start localPropertyName (show roleADT)
+        (Just t) | length candidates == 1 -> pure t
+        _ -> throwError $ NotUniquelyIdentifying start localPropertyName (propertytype2string <$> candidates)
+
+
+  -- pure $ PSet (ENP <<< EnumeratedPropertyType <$> (fromFoldable ps))
+collectPropertyTypes (AST.View view) object start = do
+  if isQualifiedWithDomein view
+    then do
+      mview <- lift2 $ tryGetPerspectType (ViewType view)
+      case mview of
+        Just (View {propertyReferences}) -> pure $ PSet propertyReferences
+        Nothing -> throwError $ UnknownView start view
+    else do
+      (views :: Object View) <- getsDF _.views
+      -- As we have postponed handling these parse tree fragments after
+      -- handling all others, there can be no forward references.
+      -- The property references in Views are, by now, qualified.
+      candidates <- pure $ filter (flip endsWithSegments view) (keys views)
+      case length candidates of
+        0 -> throwError $ UnknownView start view
+        1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
+          Just (View {propertyReferences}) -> pure $ PSet propertyReferences
+        _ -> throwError $ NotUniquelyIdentifying start view candidates
+
+--
+handleScreens :: LIST.List AST.ScreenE -> PhaseThree Unit
+handleScreens screenEs = do
+  df@{_id} <- lift $ State.gets _.dfr
+  -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (handleScreens' df _id)
+  where
+    handleScreens' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
+    handleScreens' {} ns = do
+      screenDefs <- foldM screenDefinition EM.empty (fromFoldable screenEs)
+      modifyDF \dfr -> dfr {screens = screenDefs}
+
+    -- `screenDefMap` is the accumulating map of screens.
+    -- This function adds the ScreenDefinition that we construct from
+    -- the ScreenE to that map.
+    screenDefinition :: ScreenMap -> AST.ScreenE -> PhaseThree ScreenMap
+    screenDefinition screenDefMap (AST.ScreenE{title, rows, columns, subject, context, start, end}) = do
+      -- Add the ScreenDef for each of these roles.
+      -- By construction, the subjects are represented with an
+      -- RoleIdentification.ExplicitRole data constructor.
+      -- This means that a single Enumerated or Calculated role results.
+      -- `collectRoles` will throw an error if it fails, so here we are guaranteed
+      -- to have a RoleType.
+      subjectRoleTypes <- collectRoles subject
+      screenDefinition' (unsafePartial ARRP.head subjectRoleTypes)
+
+      where
+        -- This is how we get `subjectRoleType` in scope for `widgetCommonFields`.
+        screenDefinition' :: RoleType -> PhaseThree ScreenMap
+        screenDefinition' subjectRoleType = do
+          (rows' :: Maybe (LIST.List ScreenElementDef)) <- case rows of
+            Nothing -> pure Nothing
+            Just rs -> Just <$> traverse row rs
+          columns' <- case columns of
+            Nothing -> pure Nothing
+            Just cs -> Just <$> traverse column cs
+          screenDef <- pure $ ScreenDefinition
+            { title
+            , rows: fromFoldable <$> rows'
+            , columns: fromFoldable <$> columns'
+            }
+          pure $ EM.insert (ScreenKey context subjectRoleType) screenDef screenDefMap
+
+          where
+            row :: AST.RowE -> PhaseThree ScreenElementDef
+            row (AST.RowE screenElements) = do
+              screenElementDefs <- traverse screenElementDef screenElements
+              pure $ RowElementD $ RowDef (fromFoldable screenElementDefs)
+
+            column :: AST.ColumnE -> PhaseThree ScreenElementDef
+            column (AST.ColumnE screenElements) = do
+              screenElementDefs <- traverse screenElementDef screenElements
+              pure $ ColumnElementD $ ColumnDef (fromFoldable screenElementDefs)
+
+            screenElementDef :: AST.ScreenElement -> PhaseThree ScreenElementDef
+            screenElementDef (AST.RowElement rowE) = row rowE
+            screenElementDef (AST.ColumnElement colE) = column colE
+            screenElementDef (AST.TableElement tableE) = TableElementD <$> table tableE
+            screenElementDef (AST.FormElement formE) = FormElementD <$> form formE
+
+            table :: AST.TableE -> PhaseThree TableDef
+            table (AST.TableE fields) = TableDef <$> widgetCommonFields fields
+
+            form :: AST.FormE -> PhaseThree FormDef
+            form (AST.FormE fields) = FormDef <$> widgetCommonFields fields
+
+            widgetCommonFields :: AST.WidgetCommonFields -> PhaseThree WidgetCommonFieldsDef
+            widgetCommonFields {title:title', perspective, propsOrView, propertyVerbs, roleVerbs, start:start', end:end'} = do
+              -- From a RoleIdentification that represents the object,
+              -- find the relevant Perspective.
+              -- A ScreenElement can only be defined for a named Enumerated or Calculated Role. This means that `perspective` is constructed with the
+              -- RoleIdentification.ExplicitRole data constructor: a single RoleType.
+              objectRoleType <- unsafePartial ARRP.head <$> collectRoles perspective
+              -- The user must have a perspective on it. This perspective must have that RoleType
+              -- in its member roleTypes.
+              -- So we fetch the user role, get its Perspectives, and find the one that refers to the objectRoleType.
+              perspectives <- lift2 $ perspectivesOfRoleType subjectRoleType
+              case find (\(Perspective{roleTypes}) -> isJust $ elemIndex objectRoleType roleTypes) perspectives of
+                -- This case is probably that the object and user exist, but the latter
+                -- has no perspective on the former!
+                Nothing -> throwError (UserHasNoPerspective subjectRoleType objectRoleType start' end')
+                Just (Perspective{id:perspectiveId}) -> do
+                  case propsOrView, propertyVerbs of
+                    Just pOrV, Just pV -> do
+                      propertyTypes <- collectPropertyTypes pOrV perspective start'
+                      pure
+                        { title:title'
+                        , perspectiveId
+                        , propertyVerbs: Just $ PropertyVerbs propertyTypes pV
+                        , roleVerbs: case roleVerbs of
+                          Nothing -> []
+                          Just rV -> roleVerbList2Verbs rV
+                        }
+                    _, _ -> pure
+                          { title:title'
+                          , perspectiveId
+                          , propertyVerbs: Nothing
+                          , roleVerbs: case roleVerbs of
+                            Nothing -> []
+                            Just rV -> roleVerbList2Verbs rV
+                          }
+
 
 addUserRoleGraph :: PhaseThree Unit
 addUserRoleGraph = do

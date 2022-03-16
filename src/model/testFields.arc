@@ -31,6 +31,7 @@ domain TestFields
             table "MyTable" TestTable
               --view Limited
               props (Text, ADateTime) verbs (Consult)
+              only (Remove)
           --graph TestTable
             --y = ANumber
         --row
