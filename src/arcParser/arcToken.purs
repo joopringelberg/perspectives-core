@@ -167,6 +167,7 @@ perspectDef = LanguageDef
 
                   -- Screens
                   , "screen"
+                  , "tab"
                   , "row"
                   , "column"
                   , "form"

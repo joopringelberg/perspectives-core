@@ -39,7 +39,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, reserved, stringUntilNewline)
@@ -1138,15 +1138,22 @@ screenE = withPos do
   subject <- getSubject
   context <- getCurrentContext
   case keyword of
+    "tab" -> do
+      tabs <- Just <$> nestedBlock tabE
+      end <- getPosition
+      pure $ ScreenE {title, tabs, rows: Nothing, columns: Nothing, subject, context, start, end}
     "row" -> do
       rows <- Just <$> nestedBlock rowE
       end <- getPosition
-      pure $ ScreenE {title, rows, columns: Nothing, subject, context, start, end}
+      pure $ ScreenE {title, tabs: Nothing, rows, columns: Nothing, subject, context, start, end}
     "column" -> do
       columns <- Just <$> nestedBlock columnE
       end <- getPosition
-      pure $ ScreenE {title, columns, rows: Nothing, subject, context, start, end}
-    _ -> fail "Only `row` and `column` are allowed here. "
+      pure $ ScreenE {title, tabs: Nothing, columns, rows: Nothing, subject, context, start, end}
+    _ -> fail "Only `tab`, `row` and `column` are allowed here. "
+
+tabE :: IP TabE
+tabE = reserved "tab" *> (TabE <$> token.stringLiteral <*> nestedBlock (defer \_ -> screenElementE))
 
 rowE :: IP RowE
 rowE = reserved "row" *> (RowE <$> nestedBlock (defer \_ -> screenElementE))

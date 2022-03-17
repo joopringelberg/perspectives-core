@@ -30,7 +30,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.Data.EncodableMap (EncodableMap(..))
+import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
 import Perspectives.Representation.Verbs (RoleVerb)
@@ -47,6 +47,7 @@ import Perspectives.Representation.Verbs (RoleVerb)
 
 newtype ScreenDefinition = ScreenDefinition
   { title :: String
+  , tabs :: Maybe (Array TabDef)
   , rows :: Maybe (Array ScreenElementDef)
   , columns :: Maybe (Array ScreenElementDef)
   -- `subject` and `context` need not to be part of the ScreenDefinition itself.
@@ -54,6 +55,8 @@ newtype ScreenDefinition = ScreenDefinition
   -- so instead we use them as a compound key to store the ScreenDefinition with in
   -- the DomeinFile.
   }
+
+newtype TabDef = TabDef {title :: String, elements :: (Array ScreenElementDef)}
 
 data ScreenElementDef =
   RowElementD RowDef
@@ -88,6 +91,7 @@ newtype FormDef = FormDef WidgetCommonFieldsDef
 -----------------------------------------------------------
 derive instance genericScreenDefinition :: Generic ScreenDefinition _
 derive instance genericScreenElementDef :: Generic ScreenElementDef _
+derive instance genericTabDef :: Generic TabDef _
 derive instance genericRowDef :: Generic RowDef _
 derive instance genericColumnDef :: Generic ColumnDef _
 derive instance genericTableDef :: Generic TableDef _
@@ -98,6 +102,7 @@ derive instance genericFormDef :: Generic FormDef _
 -----------------------------------------------------------
 instance showScreenDefinition :: Show ScreenDefinition where show = genericShow
 instance showScreenElementDef :: Show ScreenElementDef where show = genericShow
+instance showTabDef :: Show TabDef where show x = genericShow x
 instance showRowDef :: Show RowDef where show x = genericShow x
 instance showColumnDef :: Show ColumnDef where show x = genericShow x
 instance showTableDef :: Show TableDef where show = genericShow
@@ -108,6 +113,7 @@ instance showFormDef :: Show FormDef where show = genericShow
 -----------------------------------------------------------
 instance eqScreenDefinition :: Eq ScreenDefinition where eq = genericEq
 instance eqScreenElementDef :: Eq ScreenElementDef where eq = genericEq
+instance eqTabDef :: Eq TabDef where eq a b = genericEq a b
 instance eqRowDef :: Eq RowDef where eq a b = genericEq a b
 instance eqColumnDef :: Eq ColumnDef where eq a b = genericEq a b
 instance eqTableDef :: Eq TableDef where eq = genericEq
@@ -118,6 +124,7 @@ instance eqFormDef :: Eq FormDef where eq = genericEq
 -----------------------------------------------------------
 instance encodeScreenDefinition :: Encode ScreenDefinition where encode = genericEncode $ defaultOptions
 instance encodeScreenElementDef :: Encode ScreenElementDef where encode = genericEncode $ defaultOptions
+instance encodeTabDef :: Encode TabDef where encode x = genericEncode defaultOptions x
 instance encodeRowDef :: Encode RowDef where encode x = genericEncode defaultOptions x
 instance encodeColumnDef :: Encode ColumnDef where encode x = genericEncode defaultOptions x
 instance encodeTableDef :: Encode TableDef where encode = genericEncode $ defaultOptions
@@ -128,6 +135,7 @@ instance encodeFormDef :: Encode FormDef where encode = genericEncode $ defaultO
 -----------------------------------------------------------
 instance decodeScreenDefinition :: Decode ScreenDefinition where decode = genericDecode $ defaultOptions
 instance decodeScreenElementDef :: Decode ScreenElementDef where decode = genericDecode $ defaultOptions
+instance decodeTabDef :: Decode TabDef where decode x = genericDecode defaultOptions x
 instance decodeRowDef :: Decode RowDef where decode x = genericDecode defaultOptions x
 instance decodeColumnDef :: Decode ColumnDef where decode x = genericDecode defaultOptions x
 instance decodeTableDef :: Decode TableDef where decode = genericDecode $ defaultOptions

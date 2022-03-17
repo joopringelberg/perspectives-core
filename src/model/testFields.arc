@@ -25,19 +25,20 @@ domain TestFields
       perspective on TestTable
         defaults
       screen "Test screen"
-        row
-          column
-            form TestRole
-            table "MyTable" TestTable
-              --view Limited
-              props (Text, ADateTime) verbs (Consult)
-              only (Remove)
-          --graph TestTable
-            --y = ANumber
-        --row
-          --masterSlave TestTable
-            --master = ViewX
-            --slave = ViewY
+        tab "Test"
+          row
+            column
+              form TestRole
+              table "MyTable" TestTable
+                --view Limited
+                props (Text, ADateTime) verbs (Consult)
+                only (Remove)
+            --graph TestTable
+              --y = ANumber
+          --row
+            --masterSlave TestTable
+              --master = ViewX
+              --slave = ViewY
 
     thing TestRole
       property Text (mandatory, String)

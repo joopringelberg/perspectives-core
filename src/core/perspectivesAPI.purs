@@ -82,6 +82,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransac
 import Perspectives.SaveUserData (handleNewPeer, removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
+import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
@@ -316,6 +317,19 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
               setter
               (perspectiveForContextAndUser userRoleInstance userRoleType (ENR objectRoleType))
               contextInstance
+
+    -- { request: "GetScreen", subject: UserRoleType, predicate: ContextType, object: ContextInstance }
+    Api.GetScreen -> do
+      userRoleType <- getRoleType subject
+      subjectGetter <- getRoleFunction subject
+      muserRoleInstance <- (ContextInstance object) ##> subjectGetter
+      case muserRoleInstance of
+        Nothing -> sendResponse (Error corrId ("There is no user role instance for role type '" <> subject <> "' in context instance '" <> object <> "'!")) setter
+        Just userRoleInstance -> registerSupportedEffect
+          corrId
+          setter
+          (screenForContextAndUser userRoleType (ContextType predicate))
+          (ContextInstance object)
 
     -- { request: GetContextActions
     -- , subject: RoleType // the user role type

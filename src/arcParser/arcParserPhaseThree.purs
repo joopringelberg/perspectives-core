@@ -53,7 +53,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileReco
 import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Instances.Combinators (closure)
 import Perspectives.InvertedQuery (RelevantProperties(..))
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), ScreenE(..), RowE(..), ColumnE(..), ScreenElement(..), WidgetCommonFields, TableE(..), FormE(..)) as AST
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
@@ -80,7 +80,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TableDef(..), WidgetCommonFieldsDef)
+import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
@@ -1050,7 +1050,7 @@ handleScreens screenEs = do
     -- This function adds the ScreenDefinition that we construct from
     -- the ScreenE to that map.
     screenDefinition :: ScreenMap -> AST.ScreenE -> PhaseThree ScreenMap
-    screenDefinition screenDefMap (AST.ScreenE{title, rows, columns, subject, context, start, end}) = do
+    screenDefinition screenDefMap (AST.ScreenE{title, tabs, rows, columns, subject, context, start, end}) = do
       -- Add the ScreenDef for each of these roles.
       -- By construction, the subjects are represented with an
       -- RoleIdentification.ExplicitRole data constructor.
@@ -1064,6 +1064,9 @@ handleScreens screenEs = do
         -- This is how we get `subjectRoleType` in scope for `widgetCommonFields`.
         screenDefinition' :: RoleType -> PhaseThree ScreenMap
         screenDefinition' subjectRoleType = do
+          (tabs' :: Maybe (LIST.List TabDef)) <- case tabs of
+            Nothing -> pure Nothing
+            Just ts -> Just <$> traverse tab ts
           (rows' :: Maybe (LIST.List ScreenElementDef)) <- case rows of
             Nothing -> pure Nothing
             Just rs -> Just <$> traverse row rs
@@ -1072,12 +1075,18 @@ handleScreens screenEs = do
             Just cs -> Just <$> traverse column cs
           screenDef <- pure $ ScreenDefinition
             { title
+            , tabs: fromFoldable <$> tabs'
             , rows: fromFoldable <$> rows'
             , columns: fromFoldable <$> columns'
             }
           pure $ EM.insert (ScreenKey context subjectRoleType) screenDef screenDefMap
 
           where
+            tab :: AST.TabE -> PhaseThree TabDef
+            tab (AST.TabE tabTitle screenElements) = do
+              screenElementDefs <- traverse screenElementDef screenElements
+              pure $ TabDef {title: tabTitle, elements: (fromFoldable screenElementDefs)}
+
             row :: AST.RowE -> PhaseThree ScreenElementDef
             row (AST.RowE screenElements) = do
               screenElementDefs <- traverse screenElementDef screenElements

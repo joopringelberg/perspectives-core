@@ -295,6 +295,7 @@ instance showStateSpecification :: Show StateSpecification where show = genericS
 --------------------------------------------------------------------------------
 newtype ScreenE = ScreenE
   { title :: String
+  , tabs :: Maybe (List TabE)
   , rows :: Maybe (List RowE)
   , columns :: Maybe (List ColumnE)
   , subject :: RoleIdentification
@@ -313,8 +314,9 @@ data ScreenElement =
   | FormElement FormE
 
 --------------------------------------------------------------------------------
----- ROW, COLUMN
+---- TAB, ROW, COLUMN
 --------------------------------------------------------------------------------
+data TabE = TabE String (List ScreenElement)
 newtype RowE = RowE (List ScreenElement)
 newtype ColumnE = ColumnE (List ScreenElement)
 
@@ -428,6 +430,9 @@ instance showScreen :: Show ScreenE where show = genericShow
 derive instance genericScreenElement :: Generic ScreenElement _
 instance showScreenElement :: Show ScreenElement where
   show e = genericShow e
+
+derive instance genericTabE :: Generic TabE _
+instance showTabE :: Show TabE where show = genericShow
 
 derive instance genericRow :: Generic RowE _
 instance showRow :: Show RowE where show = genericShow
