@@ -328,7 +328,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         Just userRoleInstance -> registerSupportedEffect
           corrId
           setter
-          (screenForContextAndUser userRoleType (ContextType predicate))
+          (screenForContextAndUser userRoleInstance userRoleType (ContextType predicate))
           (ContextInstance object)
 
     -- { request: GetContextActions

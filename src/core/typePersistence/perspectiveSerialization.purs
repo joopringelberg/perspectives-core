@@ -95,13 +95,17 @@ perspectiveForContextAndUserFromId subject userRoleType perspectiveId cid = do
 
 perspectivesForContextAndUser :: RoleInstance -> RoleType -> (ContextInstance ~~> SerialisedPerspective)
 perspectivesForContextAndUser subject userRoleType cid = ArrayT do
+  perspectives <- runArrayT $ perspectivesForContextAndUser' subject userRoleType cid
+  pure $ (SerialisedPerspective <<< writeJSON) <$> perspectives
+
+perspectivesForContextAndUser' :: RoleInstance -> RoleType -> (ContextInstance ~~> SerialisedPerspective')
+perspectivesForContextAndUser' subject userRoleType cid = ArrayT do
   contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
   subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
   -- NOTE that we ignore perspectives that the user role's aspects may have!
   perspectives <- lift $ perspectivesOfRoleType userRoleType
   (traverse (serialisePerspective contextStates subjectStates cid userRoleType) perspectives) >>=
-    (filterA sendToClient) >>=
-      pure <<< map (SerialisedPerspective <<< writeJSON)
+    (filterA sendToClient)
   where
     sendToClient :: SerialisedPerspective' -> AssumptionTracking Boolean
     sendToClient {verbs, roleInstances, properties} = pure $

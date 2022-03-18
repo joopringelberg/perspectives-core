@@ -29,8 +29,9 @@ import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectivesQuery, AssumptionTracking)
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking)
 import Perspectives.Data.EncodableMap (lookup)
+import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (deconstructNamespace_)
@@ -38,76 +39,99 @@ import Perspectives.Query.Interpreter (lift2MPQ)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
-import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUserFromId)
+import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUserFromId, perspectivesForContextAndUser')
+import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
 import Simple.JSON (writeJSON)
 
 newtype SerialisedScreen = SerialisedScreen String
 derive instance newTypeSerialisedScreen :: Newtype SerialisedScreen _
 
-screenForContextAndUser :: RoleType -> ContextType -> (ContextInstance ~~> SerialisedScreen)
-screenForContextAndUser userRoleType contextType contextInstance = do
+screenForContextAndUser :: RoleInstance -> RoleType -> ContextType -> (ContextInstance ~~> SerialisedScreen)
+screenForContextAndUser userRoleInstance userRoleType contextType contextInstance = do
   DomeinFile df <- lift2MPQ $ retrieveDomeinFile (deconstructNamespace_ $ unwrap contextType)
-  screenDefinition <- case lookup (ScreenKey contextType userRoleType) df.screens of
-    Just s -> pure s
-    Nothing -> constructDefaultScreen userRoleType contextType
-  -- Now populate the screen definition with instance data.
-  (screenInstance :: ScreenDefinition) <- lift $ addPerspectives screenDefinition
-  pure $ SerialisedScreen $ writeJSON screenInstance
+  case lookup (ScreenKey contextType userRoleType) df.screens of
+    Just s -> do
+      -- Now populate the screen definition with instance data.
+      (screenInstance :: ScreenDefinition) <- lift $ addPerspectives s userRoleInstance contextInstance
+      pure $ SerialisedScreen $ writeJSON screenInstance
+    Nothing -> do
+      screenInstance <- lift $ constructDefaultScreen userRoleInstance userRoleType contextInstance
+      pure $ SerialisedScreen $ writeJSON screenInstance
 
-  where
-    addPerspectives :: ScreenDefinition -> AssumptionTracking ScreenDefinition
-    addPerspectives sd = pure sd
-
-constructDefaultScreen :: RoleType -> ContextType -> MonadPerspectivesQuery ScreenDefinition
-constructDefaultScreen userRoleType contextType = pure $ ScreenDefinition
-  { title: ""
-  , tabs: Nothing
-  , rows: Nothing
-  , columns: Nothing
-  }
+-- | A screen with a tab for each perspective the user has in this context.
+constructDefaultScreen :: RoleInstance -> RoleType -> ContextInstance -> AssumptionTracking ScreenDefinition
+constructDefaultScreen userRoleInstance userRoleType cid = do
+  (perspectives :: Array SerialisedPerspective') <- runArrayT $ perspectivesForContextAndUser' userRoleInstance userRoleType cid
+  tabs <- pure $ Just $ makeTab <$> perspectives
+  pure $ ScreenDefinition
+    { title: ""
+    , tabs
+    , rows: Nothing
+    , columns: Nothing
+    }
+    where
+      makeTab :: SerialisedPerspective' -> TabDef
+      makeTab p@{displayName, isFunctional} =
+        let
+          widgetCommonFields =
+            { title: Nothing
+            , perspective: Just p
+            , perspectiveId: ""
+            , propertyVerbs: Nothing
+            , roleVerbs: []
+            , userRole: userRoleType
+            }
+          element = if isFunctional
+            then FormElementD $ FormDef widgetCommonFields
+            else TableElementD $ TableDef widgetCommonFields
+        in TabDef
+          { title: displayName
+          , elements: [
+            RowElementD (RowDef [ element ])
+          ]}
 
 -----------------------------------------------------------
 -- CLASS ADDPERSPECTIVES
 -----------------------------------------------------------
 class AddPerspectives a where
-  addPerspectives :: RoleInstance -> ContextInstance -> a -> AssumptionTracking a
+  addPerspectives :: a -> RoleInstance -> ContextInstance -> AssumptionTracking a
 
 instance addPerspectivesScreenDefinition :: AddPerspectives ScreenDefinition where
-  addPerspectives user ctxt (ScreenDefinition r) = do
+  addPerspectives (ScreenDefinition r) user ctxt = do
     tabs <- case r.tabs of
       Nothing -> pure Nothing
-      Just t -> Just <$> traverse (addPerspectives user ctxt) t
+      Just t -> Just <$> traverse (\a -> addPerspectives a user ctxt) t
     rows <- case r.rows of
       Nothing -> pure Nothing
-      Just t -> Just <$> traverse (addPerspectives user ctxt) t
+      Just t -> Just <$> traverse (\a -> addPerspectives a user ctxt) t
     columns <- case r.columns of
       Nothing -> pure Nothing
-      Just t -> Just <$> traverse (addPerspectives user ctxt) t
+      Just t -> Just <$> traverse (\a -> addPerspectives a user ctxt) t
     pure $ ScreenDefinition {title: r.title, tabs, rows, columns}
 
 instance addPerspectivesScreenElementDef  :: AddPerspectives ScreenElementDef where
-  addPerspectives user ctxt (RowElementD re) = RowElementD <$> addPerspectives user ctxt re
-  addPerspectives user ctxt (ColumnElementD re) = ColumnElementD <$> addPerspectives user ctxt re
-  addPerspectives user ctxt (TableElementD re) = TableElementD <$> addPerspectives user ctxt re
-  addPerspectives user ctxt (FormElementD re) = FormElementD <$> addPerspectives user ctxt re
+  addPerspectives (RowElementD re) user ctxt = RowElementD <$> addPerspectives re user ctxt
+  addPerspectives (ColumnElementD re) user ctxt = ColumnElementD <$> addPerspectives re user ctxt
+  addPerspectives (TableElementD re) user ctxt = TableElementD <$> addPerspectives re user ctxt
+  addPerspectives (FormElementD re) user ctxt = FormElementD <$> addPerspectives re user ctxt
 
 instance addPerspectivesTabDef  :: AddPerspectives TabDef where
-  addPerspectives  user ctxt(TabDef r) = do
-    elements <- traverse (addPerspectives user ctxt) r.elements
+  addPerspectives (TabDef r) user ctxt = do
+    elements <- traverse (\a -> addPerspectives a user ctxt) r.elements
     pure $ TabDef {title: r.title, elements}
 
 instance addPerspectivesColumnDef  :: AddPerspectives ColumnDef where
-  addPerspectives user ctxt (ColumnDef cols) = do
-    cols' <- traverse (addPerspectives user ctxt) cols
+  addPerspectives (ColumnDef cols) user ctxt = do
+    cols' <- traverse (\a -> addPerspectives a user ctxt) cols
     pure $ ColumnDef cols'
 
 instance addPerspectivesRowDef  :: AddPerspectives RowDef where
-  addPerspectives user ctxt (RowDef cols) = do
-    cols' <- traverse (addPerspectives user ctxt) cols
+  addPerspectives (RowDef cols) user ctxt = do
+    cols' <- traverse (\a -> addPerspectives a user ctxt) cols
     pure $ RowDef cols'
 
 instance addPerspectivesTableDef  :: AddPerspectives TableDef where
-  addPerspectives user ctxt (TableDef widgetCommonFields) = do
+  addPerspectives (TableDef widgetCommonFields) user ctxt = do
     perspective <- perspectiveForContextAndUserFromId
       user
       widgetCommonFields.userRole
@@ -116,7 +140,7 @@ instance addPerspectivesTableDef  :: AddPerspectives TableDef where
     pure $ TableDef widgetCommonFields {perspective = Just perspective}
 
 instance addPerspectivesFormDef  :: AddPerspectives FormDef where
-  addPerspectives user ctxt (FormDef widgetCommonFields) = do
+  addPerspectives (FormDef widgetCommonFields) user ctxt = do
     perspective <- perspectiveForContextAndUserFromId
       user
       widgetCommonFields.userRole
