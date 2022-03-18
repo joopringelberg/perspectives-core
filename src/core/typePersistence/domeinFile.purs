@@ -49,11 +49,10 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), InvertedQ
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.ScreenDefinition (ScreenDefinition, ScreenKey)
 import Perspectives.Representation.State (State) as PEState
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedRoleType)
 import Perspectives.Representation.UserGraph (UserGraph(..))
 import Perspectives.Representation.View (View)
-import Perspectives.Utilities (class PrettyPrint)
-import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, pure, unit, void, ($), (<<<), (==))
+import Prelude (class Eq, class Show, Unit, bind, pure, unit, void, ($), (<<<))
 
 newtype DomeinFile = DomeinFile DomeinFileRecord
 
@@ -146,20 +145,6 @@ addInvertedQueryForDomain typeName iq collectionConstructor dfr@{invertedQueries
     dfr {invertedQueriesInOtherDomains = invertedQueriesInOtherDomains'}
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
-
-newtype DomeinFileId = DomeinFileId String
-derive instance newtypeDomeinFileId :: Newtype DomeinFileId _
-derive instance genericRepDomeinFileId :: Generic DomeinFileId _
-derive newtype instance encodeDomeinFileId :: Encode DomeinFileId
-derive newtype instance decodeDomeinFileId :: Decode DomeinFileId
-instance showDomeinFileId :: Show DomeinFileId where
-  show = unwrap
-instance eqDomeinFileId :: Eq DomeinFileId where
-  eq (DomeinFileId id1) (DomeinFileId id2) = id1 == id2
-instance ordDomeinFileId :: Ord DomeinFileId where
-  compare (DomeinFileId a) (DomeinFileId b) = compare a b
-instance prettyPrintDomeinFileId :: PrettyPrint DomeinFileId where
-  prettyPrint' t (DomeinFileId n) = n
 
 defaultDomeinFileRecord :: DomeinFileRecord
 defaultDomeinFileRecord =

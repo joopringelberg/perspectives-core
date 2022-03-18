@@ -27,11 +27,10 @@ import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Perspectives.Assignment.SentenceCompiler (CompiledSentence)
 import Perspectives.CoreTypes (Updater, type (~~>))
-import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, filterKeys)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier, DomeinFileId(..))
 import Prelude (Unit, const, unit)
 
 type ContextStateCache = GLStrMap CompiledContextState

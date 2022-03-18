@@ -43,6 +43,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, ov
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
 import Prelude (class Eq, class Ord, class Show, ($), (&&), (<>), (<#>))
+import Simple.JSON (class WriteForeign, write)
 
 -----------------------------------------------------------
 -- PERSPECTIVE
@@ -165,6 +166,9 @@ instance showPropertyVerbs :: Show PropertyVerbs where show = genericShow
 derive instance eqPropertyVerbs :: Eq PropertyVerbs
 instance encodePropertyVerbs :: Encode PropertyVerbs where encode = genericEncode defaultOptions
 instance decodePropertyVerbs :: Decode PropertyVerbs where decode = genericDecode defaultOptions
+
+instance writeForeignPropertyVerbs :: WriteForeign PropertyVerbs where
+  writeImpl (PropertyVerbs props verbs) = write { properties: write props, verbs: write verbs}
 
 -----------------------------------------------------------
 -- MODIFICATIONSUMMARY

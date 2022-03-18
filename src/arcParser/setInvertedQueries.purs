@@ -125,7 +125,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             -- Maybe add modifiesPropertiesOf here; but do we then need to check on
             -- synchronization on importing a model? I doubt it.
             (OnPropertyDelta (allLeavesInADT $ roleInContext2Role <$> domain2roleType ran))
-            dfr
+            dfr 
           Just ep -> dfr {enumeratedProperties = insert
             (unwrap p)
             -- We add the InvertedQuery to the Property, indexed for all role types in the range.

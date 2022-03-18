@@ -31,7 +31,8 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (isJust, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Prelude (class Eq, class Ord, class Semigroup, class Show, compare, not, show, ($), (<>))
+import Prelude (class Eq, class Ord, class Semigroup, class Show, compare, not, show, ($), (<>), (<<<))
+import Simple.JSON (class WriteForeign, write)
 
 -----------------------------------------------------------
 -- ROLEVERB
@@ -48,6 +49,8 @@ data RoleVerb =
   | Move              -- Move an instance from one context to another.
 
 derive instance genericRepRoleVerb :: Generic RoleVerb _
+instance writeForeignRoleVerb :: WriteForeign RoleVerb where
+  writeImpl = write <<< show
 instance encodeRoleVerb :: Encode RoleVerb where
   encode = genericEncode defaultOptions
 instance decodeRoleVerb :: Decode RoleVerb where
@@ -67,6 +70,8 @@ data PropertyVerb =
   | DeleteProperty        -- Remove all values.
   | AddPropertyValue      -- Add a single value.
   | SetPropertyValue      -- Replace all values.
+
+instance writeForeignPropertyVerb :: WriteForeign PropertyVerb where writeImpl = write <<< show
 
 derive instance genericRepPropertyVerb :: Generic PropertyVerb _
 instance encodePropertyVerb :: Encode PropertyVerb where

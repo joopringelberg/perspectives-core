@@ -31,6 +31,7 @@ import Data.Set (subset, fromFoldable)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Partial.Unsafe (unsafePartial)
+import Simple.JSON (class WriteForeign, write)
 
 -----------------------------------------------------------
 -- EXPLICITSET
@@ -49,6 +50,10 @@ instance showExplicitSet :: Show a => Show (ExplicitSet a) where
   show Universal = "Universal"
   show Empty = "Empty"
   show (PSet s) = "PSet " <> show s
+instance writeForeignExplicitSet :: WriteForeign a => WriteForeign (ExplicitSet a) where
+  writeImpl Universal = write "Universal"
+  writeImpl Empty = write "Empty"
+  writeImpl (PSet s) = write s
 instance encodeExplicitSet :: Encode a => Encode (ExplicitSet a) where encode = genericEncode defaultOptions
 instance decodeExplicitSet :: Decode a => Decode (ExplicitSet a) where decode = genericDecode defaultOptions
 

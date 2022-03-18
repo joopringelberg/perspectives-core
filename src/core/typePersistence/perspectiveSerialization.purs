@@ -27,7 +27,7 @@ import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, concat, cons, elemIndex, filter, filterA, find, findIndex, foldl, head, intersect, modifyAt, null, uncons, union)
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -51,81 +51,13 @@ import Perspectives.Representation.Class.Property (getProperty, isCalculated, fu
 import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleKindOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..))
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), PerspectiveId)
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (ContextType, PropertyType, RoleKind, RoleType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
-import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (<$>), (<<<), (<>), (>=>), (>>=), (||))
+import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
+import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (<$>), (<<<), (<>), (>=>), (>>=), (||), (==))
 import Simple.JSON (writeJSON)
-
--- | A perspective is serialised for a given context instance, for a particular role.
--- | It contains all instances of that role.
--- | The serialisation is for a given (nested) state of the context and each of its
--- | instances. If state changes, so may the role verbs, properties and their verbs
--- | and actions.
--- Implementation note: these structures are serialised to a JSON string with writeJSON.
-type SerialisedPerspective' =
-  {
-  ----
-  ---- Type level properties
-  ----
-  id :: String
-  , displayName :: String
-  , isFunctional :: Boolean
-  , isMandatory :: Boolean
-  , isCalculated :: Boolean
-  -- The RoleType having the Perspective.
-  , userRoleType :: String
-  -- The RoleType of the object of the Perspective.
-  , roleType :: Maybe String
-  , roleKind :: Maybe RoleKind
-  , contextTypesToCreate :: Array ContextType
-  , identifyingProperty :: String
-  ----
-  ---- Instance properties
-  ----
-  , contextInstance :: ContextInstance
-  , roleInstances :: Object RoleInstanceWithProperties
-  ----
-  ---- State dependent properties
-  ----
-  , verbs :: Array String
-  -- All properties, including those available to some role instance.
-  -- WORDT:
-  -- All properties that are available given Context and Subject state,
-  -- unified with all properties that are available given the Object states of
-  -- instances.
-  , properties :: Object SerialisedProperty
-  , actions :: Array String
-  }
-
--- | SerialisedProperty is state-independent.
-type SerialisedProperty =
-  { id :: String
-  , displayName :: String
-  , isFunctional :: Boolean
-  , isMandatory :: Boolean
-  , isCalculated :: Boolean
-  , range :: String
-  , constrainingFacets :: PropertyFacets
-  }
-
-type PropertyFacets =
-  { minLength :: Maybe Int
-  , maxLength :: Maybe Int
-  , pattern :: Maybe {regex :: String, label :: String}
-  , whiteSpace :: Maybe String
-  , enumeration :: Maybe (Array String)
-  , maxInclusive :: Maybe String
-  , maxExclusive :: Maybe String
-  , minInclusive :: Maybe String
-  , minExclusive :: Maybe String
-  , totalDigits :: Maybe Int
-  , fractionDigits :: Maybe Int
-  }
-
-newtype SerialisedPerspective = SerialisedPerspective String
-derive instance newtypeSerialisedPerspective :: Newtype SerialisedPerspective _
 
 -- | Get the serialisation of the perspective the user role type has on the object role type,
 -- | in a given context instance.
@@ -143,6 +75,23 @@ perspectiveForContextAndUser subject userRoleType objectRoleType cid = ArrayT do
     (filter
       (isJust <<< elemIndex objectRoleType <<< _.roleTypes <<< unwrap)
       allPerspectives)
+
+-- | Get the serialisation of the perspective the user role type has on the object role type,
+-- | in a given context instance.
+perspectiveForContextAndUserFromId ::
+  RoleInstance ->           -- The user role instance
+  RoleType ->               -- The user role type
+  PerspectiveId ->          -- An object role type, will be matched against the Perspective's roleTypes member.
+  ContextInstance ->
+  AssumptionTracking SerialisedPerspective'
+perspectiveForContextAndUserFromId subject userRoleType perspectiveId cid = do
+  contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
+  subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
+  allPerspectives <- lift $ perspectivesOfRoleType userRoleType
+  perspective <- pure $ unsafePartial fromJust $ head (filter
+    (\(Perspective{id}) -> id == perspectiveId)
+    allPerspectives)
+  serialisePerspective contextStates subjectStates cid userRoleType perspective
 
 perspectivesForContextAndUser :: RoleInstance -> RoleType -> (ContextInstance ~~> SerialisedPerspective)
 perspectivesForContextAndUser subject userRoleType cid = ArrayT do
@@ -356,32 +305,6 @@ makeSerialisedProperty pt = do
 -----------------------------------------------------------------------------------------
 -- INSTANCES
 -----------------------------------------------------------------------------------------
-type RoleInstanceWithProperties =
-  { roleId :: String
-  , objectStateBasedRoleVerbs :: Array String
-  -- keys are the string representation of PropertyType,
-  -- so this map can be read as one from PropertyType to PropertyVerbs, too.
-  , propertyValues :: Object ValuesWithVerbs
-  , actions :: Array String
-  -- This member is not needed on the client side, but we need it to
-  -- compile a complete list of SerialisedProperties.
-  , objectStateBasedProperties :: Array PropertyType
-  }
-
--- | The verbs in this type contain both those based on context- and subject state,
--- | and those based on object state.
-type ValuesWithVerbs =
-  { values :: Array String
-  , propertyVerbs :: Array String
-  }
-
-type PropertyGetter =
-  { propertyName :: String              -- property id
-  , getter :: Getter
-  }
-
-type Getter = RoleInstance ~~> Value
-
 -- | A user may have a perspective on an object role that depends on object state.
 roleInstancesWithProperties ::
   Array PropertyType ->
@@ -450,3 +373,13 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps pvArr cid (Pe
             , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates))
             , objectStateBasedProperties
           }
+
+-- | The verbs in this type contain both those based on context- and subject state,
+-- | and those based on object state.
+
+type PropertyGetter =
+  { propertyName :: String              -- property id
+  , getter :: Getter
+  }
+
+type Getter = RoleInstance ~~> Value

@@ -26,13 +26,12 @@ where
 
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives, (##=))
-import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.Names (getMySystem)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), DomeinFileId(..))
 import Prelude (bind, pure, ($), (<$>), (<<<), (>=>))
 
 modelsInUse :: MonadPerspectives (Array DomeinFileId)

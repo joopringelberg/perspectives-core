@@ -67,12 +67,13 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
-import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
+import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Persistence.API (MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   -- database :: i -> MP String

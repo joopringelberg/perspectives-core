@@ -27,13 +27,16 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe)
-import Foreign.Class (class Decode, class Encode)
+import Data.Maybe (Maybe(..))
+import Foreign (Foreign)
+import Foreign.Class (class Decode, class Encode, encode, decode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
 import Perspectives.Representation.Verbs (RoleVerb)
+import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
+import Simple.JSON (class WriteForeign, write, writeImpl)
 
 -- | These types are part of a DomeinFile.
 -- | Runtime, we generate a simpler structure from them, that has an automatic WriteForeign instance.
@@ -71,20 +74,30 @@ newtype ColumnDef = ColumnDef (Array ScreenElementDef)
 -- WIDGETS
 -----------------------------------------------------------
 -- | All Widgets share these fields.
-type WidgetCommonFieldsDef =
+type WidgetCommonFieldsDef = WidgetCommonFieldsDefWithoutPerspective (perspective :: Maybe SerialisedPerspective')
+
+type WidgetCommonFieldsDefWithoutPerspective f =
   { title :: Maybe String
   -- `perspectiveId` replaces the RoleIdentification from the WidgetCommonFields.
   -- By construction, a screen can only be specified for Perspectives that have a Just value for RoleType.
   , perspectiveId :: PerspectiveId
   -- The runtime  has a perspective serialisation.
-  -- These two fields are not serialised runtime; they are used to
-  -- restrict the serialised perspective.
+  -- These three fields are not serialised runtime; they are used to
+  -- create the restricted serialised perspective.
   , propertyVerbs :: Maybe PropertyVerbs
   , roleVerbs :: Array RoleVerb
+  , userRole :: RoleType
+  | f
   }
 
 newtype TableDef = TableDef WidgetCommonFieldsDef
 newtype FormDef = FormDef WidgetCommonFieldsDef
+
+-- For en- and decoding. This discharges us from implementing a lot of instances for
+-- SerialisedPerspective'.
+newtype TableDef' = TableDef' (WidgetCommonFieldsDefWithoutPerspective ())
+newtype FormDef' = FormDef' (WidgetCommonFieldsDefWithoutPerspective ())
+
 
 -----------------------------------------------------------
 -- GENERIC INSTANCES
@@ -95,7 +108,9 @@ derive instance genericTabDef :: Generic TabDef _
 derive instance genericRowDef :: Generic RowDef _
 derive instance genericColumnDef :: Generic ColumnDef _
 derive instance genericTableDef :: Generic TableDef _
+derive instance genericTableDef' :: Generic TableDef' _
 derive instance genericFormDef :: Generic FormDef _
+derive instance genericFormDef' :: Generic FormDef' _
 
 -----------------------------------------------------------
 -- SHOW INSTANCES
@@ -120,15 +135,55 @@ instance eqTableDef :: Eq TableDef where eq = genericEq
 instance eqFormDef :: Eq FormDef where eq = genericEq
 
 -----------------------------------------------------------
+-- WRITEFOREIGN INSTANCES
+-----------------------------------------------------------
+-- These instances are used to serialise the screen for the client.
+instance writeForeignScreenDefinition :: WriteForeign ScreenDefinition where
+  writeImpl (ScreenDefinition r) = write r
+
+instance writeForeignScreenElementDef :: WriteForeign ScreenElementDef where
+  writeImpl (RowElementD r) = write { row: write r}
+  writeImpl (ColumnElementD c) = write { column: write c}
+  writeImpl (TableElementD t) = write { table: write t}
+  writeImpl (FormElementD f) = write { form: write f}
+
+instance writeForeignTabDef :: WriteForeign TabDef where
+  writeImpl (TabDef widgetCommonFields) = write widgetCommonFields
+
+instance writeForeignRowDef :: WriteForeign RowDef where
+  writeImpl (RowDef screenElements) = write screenElements
+
+instance writeForeignColumnDef :: WriteForeign ColumnDef where
+  writeImpl (ColumnDef screenElements) = write screenElements
+
+instance writeForeignTableDef :: WriteForeign TableDef where
+  writeImpl (TableDef r) = writeWidgetCommonFields r
+
+instance writeForeignFormDef :: WriteForeign FormDef where
+  writeImpl (FormDef r) = writeWidgetCommonFields r
+
+-- | Serialise just the title and perspective field, for the client side.
+writeWidgetCommonFields :: WidgetCommonFieldsDef -> Foreign
+writeWidgetCommonFields {title, perspective} = write
+  { title: write title
+  , perspective: write perspective}
+
+-----------------------------------------------------------
 -- ENCODE INSTANCES
 -----------------------------------------------------------
 instance encodeScreenDefinition :: Encode ScreenDefinition where encode = genericEncode $ defaultOptions
-instance encodeScreenElementDef :: Encode ScreenElementDef where encode = genericEncode $ defaultOptions
+instance encodeScreenElementDef :: Encode ScreenElementDef where encode = writeImpl
 instance encodeTabDef :: Encode TabDef where encode x = genericEncode defaultOptions x
 instance encodeRowDef :: Encode RowDef where encode x = genericEncode defaultOptions x
 instance encodeColumnDef :: Encode ColumnDef where encode x = genericEncode defaultOptions x
-instance encodeTableDef :: Encode TableDef where encode = genericEncode $ defaultOptions
-instance encodeFormDef :: Encode FormDef where encode = genericEncode $ defaultOptions
+instance encodeTableDef' :: Encode TableDef' where encode = genericEncode $ defaultOptions
+instance encodeTableDef :: Encode TableDef where
+  encode (TableDef {title, perspectiveId, propertyVerbs, roleVerbs, userRole}) = encode
+    (TableDef' {title, perspectiveId, propertyVerbs, roleVerbs, userRole})
+instance encodeFormDef' :: Encode FormDef' where encode = genericEncode $ defaultOptions
+instance encodeFormDef :: Encode FormDef where
+  encode (FormDef {title, perspectiveId, propertyVerbs, roleVerbs, userRole}) = encode
+    (FormDef' {title, perspectiveId, propertyVerbs, roleVerbs, userRole})
 
 -----------------------------------------------------------
 -- DECODE INSTANCES
@@ -138,8 +193,16 @@ instance decodeScreenElementDef :: Decode ScreenElementDef where decode = generi
 instance decodeTabDef :: Decode TabDef where decode x = genericDecode defaultOptions x
 instance decodeRowDef :: Decode RowDef where decode x = genericDecode defaultOptions x
 instance decodeColumnDef :: Decode ColumnDef where decode x = genericDecode defaultOptions x
-instance decodeTableDef :: Decode TableDef where decode = genericDecode $ defaultOptions
-instance decodeFormDef :: Decode FormDef where decode = genericDecode $ defaultOptions
+instance decodeTableDef' :: Decode TableDef' where decode = genericDecode $ defaultOptions
+instance decodeTableDef :: Decode TableDef where
+  decode f = do
+    (TableDef' {title, perspectiveId, propertyVerbs, roleVerbs, userRole}) <- decode f
+    pure $ TableDef {title, perspectiveId, propertyVerbs, roleVerbs, userRole, perspective: Nothing}
+instance decodeFormDef' :: Decode FormDef' where decode = genericDecode $ defaultOptions
+instance decodeFormDef :: Decode FormDef where
+  decode f = do
+    (FormDef' {title, perspectiveId, propertyVerbs, roleVerbs, userRole}) <- decode f
+    pure $ FormDef {title, perspectiveId, propertyVerbs, roleVerbs, userRole, perspective: Nothing}
 
 -------------------------------------------------------------------------------
 ---- SCREENKEY

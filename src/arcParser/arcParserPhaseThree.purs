@@ -49,7 +49,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives, (###=), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord, indexedContexts, indexedRoles)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
 import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Instances.Combinators (closure)
 import Perspectives.InvertedQuery (RelevantProperties(..))
@@ -84,7 +84,7 @@ import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..),
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
@@ -1131,18 +1131,22 @@ handleScreens screenEs = do
                       pure
                         { title:title'
                         , perspectiveId
+                        , perspective: Nothing
                         , propertyVerbs: Just $ PropertyVerbs propertyTypes pV
                         , roleVerbs: case roleVerbs of
                           Nothing -> []
                           Just rV -> roleVerbList2Verbs rV
+                        , userRole: subjectRoleType
                         }
                     _, _ -> pure
                           { title:title'
                           , perspectiveId
+                          , perspective: Nothing
                           , propertyVerbs: Nothing
                           , roleVerbs: case roleVerbs of
                             Nothing -> []
                             Just rV -> roleVerbList2Verbs rV
+                          , userRole: subjectRoleType
                           }
 
 

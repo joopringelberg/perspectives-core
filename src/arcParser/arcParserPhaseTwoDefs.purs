@@ -18,7 +18,7 @@
 --
 -- Full text of this license can be found in the LICENSE directory in the projects root.
 
--- END LICENSE 
+-- END LICENSE
 
 module Perspectives.Parsing.Arc.PhaseTwoDefs where
 
@@ -35,7 +35,7 @@ import Foreign.Object (Object, empty, values)
 import Foreign.Object (fromFoldable, union, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinFile (DomeinFileId(..), DomeinFileRecord, defaultDomeinFileRecord)
+import Perspectives.DomeinFile (DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
 import Perspectives.Names (defaultNamespaces, expandNamespaces)
@@ -44,7 +44,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Perspective (Perspective)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedRoleType, RoleType)
 import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=), (<$>))
 
 -- TODO
