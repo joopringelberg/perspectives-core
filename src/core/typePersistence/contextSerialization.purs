@@ -134,8 +134,7 @@ instance addPerspectivesTableDef  :: AddPerspectives TableDef where
   addPerspectives (TableDef widgetCommonFields) user ctxt = do
     perspective <- perspectiveForContextAndUserFromId
       user
-      widgetCommonFields.userRole
-      widgetCommonFields.perspectiveId
+      widgetCommonFields
       ctxt
     pure $ TableDef widgetCommonFields {perspective = Just perspective}
 
@@ -143,7 +142,6 @@ instance addPerspectivesFormDef  :: AddPerspectives FormDef where
   addPerspectives (FormDef widgetCommonFields) user ctxt = do
     perspective <- perspectiveForContextAndUserFromId
       user
-      widgetCommonFields.userRole
-      widgetCommonFields.perspectiveId
+      widgetCommonFields
       ctxt
     pure $ FormDef widgetCommonFields {perspective = Just perspective}

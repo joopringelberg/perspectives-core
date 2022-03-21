@@ -29,9 +29,9 @@ domain TestFields
           row
             column
               form TestRole
+                props (Text, WeekDay) verbs (Consult)
               table "MyTable" TestTable
-                --view Limited
-                props (Text, ADateTime) verbs (Consult)
+                view Limited verbs (Consult)
                 only (Remove)
             --graph TestTable
               --y = ANumber

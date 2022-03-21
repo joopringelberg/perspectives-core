@@ -59,8 +59,6 @@ type SerialisedPerspective' =
   ---- State dependent properties
   ----
   , verbs :: Array String
-  -- All properties, including those available to some role instance.
-  -- WORDT:
   -- All properties that are available given Context and Subject state,
   -- unified with all properties that are available given the Object states of
   -- instances. In a table, we should create a column for each.

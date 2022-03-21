@@ -36,7 +36,7 @@ import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
 import Perspectives.Representation.Verbs (RoleVerb)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
-import Simple.JSON (class WriteForeign, write, writeImpl)
+import Simple.JSON (class WriteForeign, write)
 
 -- | These types are part of a DomeinFile.
 -- | Runtime, we generate a simpler structure from them, that has an automatic WriteForeign instance.
@@ -53,10 +53,6 @@ newtype ScreenDefinition = ScreenDefinition
   , tabs :: Maybe (Array TabDef)
   , rows :: Maybe (Array ScreenElementDef)
   , columns :: Maybe (Array ScreenElementDef)
-  -- `subject` and `context` need not to be part of the ScreenDefinition itself.
-  -- These fields are necessary to find a screen for a particular user and context,
-  -- so instead we use them as a compound key to store the ScreenDefinition with in
-  -- the DomeinFile.
   }
 
 newtype TabDef = TabDef {title :: String, elements :: (Array ScreenElementDef)}
@@ -172,7 +168,7 @@ writeWidgetCommonFields {title, perspective} = write
 -- ENCODE INSTANCES
 -----------------------------------------------------------
 instance encodeScreenDefinition :: Encode ScreenDefinition where encode = genericEncode $ defaultOptions
-instance encodeScreenElementDef :: Encode ScreenElementDef where encode = writeImpl
+instance encodeScreenElementDef :: Encode ScreenElementDef where encode = genericEncode $ defaultOptions
 instance encodeTabDef :: Encode TabDef where encode x = genericEncode defaultOptions x
 instance encodeRowDef :: Encode RowDef where encode x = genericEncode defaultOptions x
 instance encodeColumnDef :: Encode ColumnDef where encode x = genericEncode defaultOptions x

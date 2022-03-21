@@ -51,12 +51,13 @@ import Perspectives.Representation.Class.Property (getProperty, isCalculated, fu
 import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleKindOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), PerspectiveId)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..))
+import Perspectives.Representation.ScreenDefinition (WidgetCommonFieldsDef)
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
-import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (<$>), (<<<), (<>), (>=>), (>>=), (||), (==))
+import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
 import Simple.JSON (writeJSON)
 
 -- | Get the serialisation of the perspective the user role type has on the object role type,
@@ -71,7 +72,7 @@ perspectiveForContextAndUser subject userRoleType objectRoleType cid = ArrayT do
   subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
   allPerspectives <- lift$  perspectivesOfRoleType userRoleType
   traverse
-    ((serialisePerspective contextStates subjectStates cid userRoleType) >=> pure <<< SerialisedPerspective <<< writeJSON)
+    ((serialisePerspective contextStates subjectStates cid userRoleType Nothing []) >=> pure <<< SerialisedPerspective <<< writeJSON)
     (filter
       (isJust <<< elemIndex objectRoleType <<< _.roleTypes <<< unwrap)
       allPerspectives)
@@ -80,18 +81,17 @@ perspectiveForContextAndUser subject userRoleType objectRoleType cid = ArrayT do
 -- | in a given context instance.
 perspectiveForContextAndUserFromId ::
   RoleInstance ->           -- The user role instance
-  RoleType ->               -- The user role type
-  PerspectiveId ->          -- An object role type, will be matched against the Perspective's roleTypes member.
+  WidgetCommonFieldsDef ->
   ContextInstance ->
   AssumptionTracking SerialisedPerspective'
-perspectiveForContextAndUserFromId subject userRoleType perspectiveId cid = do
+perspectiveForContextAndUserFromId subject {perspectiveId, propertyVerbs, roleVerbs, userRole} cid = do
   contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
   subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
-  allPerspectives <- lift $ perspectivesOfRoleType userRoleType
+  allPerspectives <- lift $ perspectivesOfRoleType userRole
   perspective <- pure $ unsafePartial fromJust $ head (filter
     (\(Perspective{id}) -> id == perspectiveId)
     allPerspectives)
-  serialisePerspective contextStates subjectStates cid userRoleType perspective
+  serialisePerspective contextStates subjectStates cid userRole propertyVerbs roleVerbs perspective
 
 perspectivesForContextAndUser :: RoleInstance -> RoleType -> (ContextInstance ~~> SerialisedPerspective)
 perspectivesForContextAndUser subject userRoleType cid = ArrayT do
@@ -104,7 +104,7 @@ perspectivesForContextAndUser' subject userRoleType cid = ArrayT do
   subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
   -- NOTE that we ignore perspectives that the user role's aspects may have!
   perspectives <- lift $ perspectivesOfRoleType userRoleType
-  (traverse (serialisePerspective contextStates subjectStates cid userRoleType) perspectives) >>=
+  (traverse (serialisePerspective contextStates subjectStates cid userRoleType Nothing []) perspectives) >>=
     (filterA sendToClient)
   where
     sendToClient :: SerialisedPerspective' -> AssumptionTracking Boolean
@@ -121,17 +121,31 @@ serialisePerspective ::
   Array StateSpec ->
   ContextInstance ->
   RoleType ->
+  Maybe PropertyVerbs ->
+  Array RoleVerb ->
   Perspective ->
   AssumptionTracking SerialisedPerspective'
-serialisePerspective contextStates subjectStates cid userRoleType p@(Perspective {id, object, isEnumerated, displayName, roleTypes, roleVerbs, propertyVerbs, actions}) = do
+serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs' roleVerbs' p@(Perspective {id, object, isEnumerated, displayName, roleTypes, roleVerbs, propertyVerbs, actions}) = do
   -- All properties available on the object of the perspective.
   (allProps :: Array PropertyType) <- lift $ allProperties (roleInContext2Role <$> (unsafePartial domain2roleType $ range object))
   -- All PropertyVerbs available on the object of the perspective, given context- and subject state.
   (availablePropertyVerbs :: Array PropertyVerbs) <- pure $ concat (catMaybes $ (flip EM.lookup propertyVerbs) <$> (contextStates <> subjectStates))
   -- All PropertyTypes available for the object of the perspective, given context- and subject state.
-  (availableProperties :: Array PropertyType) <- pure (concat $ expandPropSet allProps <<< (\(PropertyVerbs props _) -> props) <$> availablePropertyVerbs)
+  -- Restrict with the given PropertyVerbs.
+  (availableProperties :: Array PropertyType) <- case propertyVerbs' of
+    Nothing -> pure $ (concat $ expandPropSet allProps <<< (\(PropertyVerbs props _) -> props) <$> availablePropertyVerbs)
+    Just (PropertyVerbs restrictedProps _) -> pure $ intersect (expandPropSet allProps restrictedProps) (concat $ expandPropSet allProps <<< (\(PropertyVerbs props _) -> props) <$> availablePropertyVerbs)
   -- Role instances with their property values.
-  roleInstances <- roleInstancesWithProperties allProps availableProperties (verbsPerProperty availablePropertyVerbs allProps) cid p
+  -- TODO. Geef hier de beperkende lijst propertyVerbs uit propertyVerbs' mee!
+  roleInstances <- roleInstancesWithProperties
+    allProps
+    availableProperties
+    (verbsPerProperty availablePropertyVerbs allProps)
+    cid
+    p
+    (case propertyVerbs' of
+      Nothing -> allPropertyVerbs
+      Just (PropertyVerbs _ verbs) -> expandVerbs verbs)
   -- Additional properties available on instances given object state.
   additionalPropertiesOnInstances <- pure $ foldl union [] (propertiesInInstance <$> roleInstances)
   serialisedProps <- lift $ traverse makeSerialisedProperty (availableProperties <> additionalPropertiesOnInstances)
@@ -153,7 +167,9 @@ serialisePerspective contextStates subjectStates cid userRoleType p@(Perspective
     , roleType: roletype2string <$> head roleTypes
     , contextInstance: cid
     , roleKind
-    , verbs: show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))
+    , verbs: show <$> (if null roleVerbs'
+      then concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))
+      else (intersect roleVerbs' $ concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))))
     , properties: fromFoldable ((\r@({id:propId}) -> Tuple propId r) <$> serialisedProps)
     , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
@@ -316,8 +332,9 @@ roleInstancesWithProperties ::
   Object (Array PropertyVerb) ->
   ContextInstance ->
   Perspective ->
+  Array PropertyVerb ->
   AssumptionTracking (Array RoleInstanceWithProperties)
-roleInstancesWithProperties allProps contextSubjectStateBasedProps pvArr cid (Perspective{object, roleVerbs, propertyVerbs, actions}) = do
+roleInstancesWithProperties allProps contextSubjectStateBasedProps pvArr cid (Perspective{object, roleVerbs, propertyVerbs, actions}) restrictingVerbs = do
   (roleGetter :: ContextInstance ~~> RoleInstance) <- lift $ context2role object
   -- These are all instances of the object of the perspective, regardless of their state.
   (roleInstances :: Array RoleInstance) <- runArrayT $ roleGetter cid
@@ -369,7 +386,8 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps pvArr cid (Pe
               vals <- lift (runArrayT $ getter roleId)
               pure $ Tuple (propertytype2string propertyType)
                 { values: unwrap <$> vals
-                , propertyVerbs: show <$> (unsafePartial fromJust $ lookup (propertytype2string propertyType) localVerbsPerProperty)}
+                -- TODO. Filter deze propertyVerbs met de beperkende lijst!
+                , propertyVerbs: show <$> intersect restrictingVerbs (unsafePartial fromJust $ lookup (propertytype2string propertyType) localVerbsPerProperty)}
           pure $ Just
             { roleId: (unwrap roleId)
             , objectStateBasedRoleVerbs
