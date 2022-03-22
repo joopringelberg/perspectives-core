@@ -74,7 +74,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole, tryGetPerspectType)
-import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, typeIncludingAspectsAndBinding)
+import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional, typeIncludingAspectsAndBinding)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs)
@@ -90,7 +90,7 @@ import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (aspectsOfRole, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>))
+import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not)
 
 phaseThree ::
   DomeinFileRecord ->
@@ -1110,20 +1110,34 @@ handleScreens screenEs = do
             screenElementDef (AST.TableElement tableE) = TableElementD <$> table tableE
             screenElementDef (AST.FormElement formE) = FormElementD <$> form formE
 
+            functionalWidget :: Boolean
+            functionalWidget = true
+
+            relationalWidget :: Boolean
+            relationalWidget = false
+
             table :: AST.TableE -> PhaseThree TableDef
-            table (AST.TableE fields) = TableDef <$> widgetCommonFields fields
+            table (AST.TableE fields) = TableDef <$> widgetCommonFields fields relationalWidget
 
             form :: AST.FormE -> PhaseThree FormDef
-            form (AST.FormE fields) = FormDef <$> widgetCommonFields fields
+            form (AST.FormE fields) = FormDef <$> widgetCommonFields fields functionalWidget
 
-            widgetCommonFields :: AST.WidgetCommonFields -> PhaseThree WidgetCommonFieldsDef
-            widgetCommonFields {title:title', perspective, propsOrView, propertyVerbs, roleVerbs, start:start', end:end'} = do
+            widgetCommonFields :: AST.WidgetCommonFields -> Boolean -> PhaseThree WidgetCommonFieldsDef
+            widgetCommonFields {title:title', perspective, propsOrView, propertyVerbs, roleVerbs, start:start', end:end'} isFunctionalWidget = do
               -- From a RoleIdentification that represents the object,
               -- find the relevant Perspective.
               -- A ScreenElement can only be defined for a named Enumerated or Calculated Role. This means that `perspective` is constructed with the
               -- RoleIdentification.ExplicitRole data constructor: a single RoleType.
               -- If no role can be found for the given specification, collectRoles throws an error.
               objectRoleType <- unsafePartial ARRP.head <$> collectRoles perspective
+              -- Check the Cardinality
+              (lift2 $ roleTypeIsFunctional objectRoleType) >>= if _
+                then if isFunctionalWidget
+                  then pure unit
+                  else throwError (WidgetCardinalityMismatch start' end')
+                else if not isFunctionalWidget
+                  then pure unit
+                  else throwError (WidgetCardinalityMismatch start' end')
               -- All properties defined on this object role.
               allProps <- lift2 (typeIncludingAspectsAndBinding objectRoleType >>= allProperties <<< map roleInContext2Role)
               -- The user must have a perspective on it. This perspective must have that RoleType

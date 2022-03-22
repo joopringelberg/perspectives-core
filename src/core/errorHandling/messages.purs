@@ -122,6 +122,7 @@ data PerspectivesError
 
     -- Screens
     | ScreenForUserRoleOnly ArcPosition ArcPosition
+    | WidgetCardinalityMismatch ArcPosition ArcPosition
 
     | Custom String
 
@@ -149,6 +150,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
   show (NoCalculatedAspect start calculatedRoleName) = "(NoCalculatedAspect) The role '" <> calculatedRoleName <> "' is implied to be an aspect (by providing an explicit context type) but CalculatedRoles cannot be used as an Aspect."
   show (ScreenForUserRoleOnly start end) = "(ScreenForUserRoleOnly) Only a user role may contain a screen definition!"
+  show (WidgetCardinalityMismatch start end) = "(WidgetCardinalityMismatch) The cardinality of the Widget and the Role do not suit each other (between " <> show start <> " and " <> show end <> ")."
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here)."
   show (RoleHasNoProperty rtype qn start end) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "' (between " <> show start <> " and " <> show end <> ")."
   show UniversalRoleHasNoParts = "(UniversalRoleHasNoParts) 'NoBinding' gives no access to properties, aspects, binding, etc."
