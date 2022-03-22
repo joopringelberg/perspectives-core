@@ -49,9 +49,8 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..), constrainingFacets) as PROP
 import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleKindOfRoleType)
-import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..))
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), expandPropSet, expandPropertyVerbs, expandVerbs)
 import Perspectives.Representation.ScreenDefinition (WidgetCommonFieldsDef)
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, propertytype2string, roletype2string)
@@ -256,22 +255,6 @@ serialiseProperties object pverbs = do
     add cumulator n@(Tuple prop verbs) = case findIndex (eq prop <<< fst) cumulator of
         Nothing -> cons n cumulator
         Just i -> unsafePartial fromJust $ modifyAt i (\(Tuple _ vs) -> (Tuple prop (union vs verbs))) cumulator
-
--- Pair each PropertyType will all PropertyVerbs available for it.
-expandPropertyVerbs :: Array PropertyType -> PropertyVerbs -> Array (Tuple PropertyType (Array PropertyVerb))
-expandPropertyVerbs allProps (PropertyVerbs props verbs) = let
-  (verbs' :: Array PropertyVerb) = expandVerbs verbs
-  in (flip Tuple verbs') <$> expandPropSet allProps props
-
-expandVerbs ::  ExplicitSet PropertyVerb -> Array PropertyVerb
-expandVerbs Universal = allPropertyVerbs
-expandVerbs Empty = []
-expandVerbs (PSet as) = as
-
-expandPropSet :: Array PropertyType -> ExplicitSet PropertyType -> Array PropertyType
-expandPropSet allProps Universal = allProps
-expandPropSet _ Empty = []
-expandPropSet _ (PSet as) = as
 
 makeSerialisedProperty :: PropertyType -> MonadPerspectives SerialisedProperty
 makeSerialisedProperty pt = do

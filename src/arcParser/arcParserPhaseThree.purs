@@ -33,7 +33,7 @@ import Control.Monad.Except (throwError)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, elemIndex, filter, find, findIndex, foldM, foldl, foldr, fromFoldable, head, index, intercalate, length, uncons, union, updateAt)
+import Data.Array (cons, elemIndex, filter, find, findIndex, foldM, foldl, foldr, fromFoldable, head, index, intercalate, length, null, uncons, union, updateAt)
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
@@ -50,7 +50,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, (###=), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
-import Perspectives.Identifiers (Namespace, concatenateSegments, deconstructNamespace, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedWithDomein, startsWithSegments)
 import Perspectives.Instances.Combinators (closure)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
@@ -74,10 +74,10 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole, tryGetPerspectType)
-import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType)
+import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, typeIncludingAspectsAndBinding)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
@@ -86,7 +86,7 @@ import Perspectives.Representation.State (Notification(..), State(..), StateDepe
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
-import Perspectives.Representation.Verbs (roleVerbList2Verbs)
+import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (aspectsOfRole, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
 import Perspectives.Utilities (prettyPrint)
@@ -668,7 +668,7 @@ handlePostponedStateQualifiedParts = do
       (qualifiedUsers :: Array RoleType) <- collectRoles subject
       -- ... to their perspective on this object...
       objectQfd <- roleIdentificationToQueryFunctionDescription object start
-      propertyTypes <- collectPropertyTypes propsOrView object start
+      propertyTypes <- unsafePartial collectPropertyTypes propsOrView object start
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes propertyVerbs
       -- ... for these states only...
       stateSpecs <- stateSpecificationToStateSpec state
@@ -991,16 +991,17 @@ collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \q
     otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
 
 -- We lookup the qualified name of these properties here, for the object of the perspective.
-collectPropertyTypes ::
+-- The (partial) names for properties used here may be defined outside
+-- of the model (due to role filling). So we use functions that rely on the
+-- model cache and hence we need the current model to be in that cache, too.
+-- Hence the Partial constraint.
+collectPropertyTypes :: Partial =>
   AST.PropsOrView ->
   RoleIdentification ->
   ArcPosition ->
   PhaseThree (ExplicitSet PropertyType)
 collectPropertyTypes AST.AllProperties _ _ = pure Universal
 collectPropertyTypes (AST.Properties ps) object start = do
-  -- The (partial) names for properties used here may be defined outside
-  -- of the model (due to role filling). So we use functions that rely on the
-  -- model cache and hence we need the current model to be in that cache, too (which it is, here).
   roleADT <- roleIdentification2rangeADT object
   PSet <$> for (fromFoldable ps)
     \localPropertyName -> do
@@ -1010,8 +1011,6 @@ collectPropertyTypes (AST.Properties ps) object start = do
         (Just t) | length candidates == 1 -> pure t
         _ -> throwError $ NotUniquelyIdentifying start localPropertyName (propertytype2string <$> candidates)
 
-
-  -- pure $ PSet (ENP <<< EnumeratedPropertyType <$> (fromFoldable ps))
 collectPropertyTypes (AST.View view) object start = do
   if isQualifiedWithDomein view
     then do
@@ -1020,18 +1019,26 @@ collectPropertyTypes (AST.View view) object start = do
         Just (View {propertyReferences}) -> pure $ PSet propertyReferences
         Nothing -> throwError $ UnknownView start view
     else do
+      roles <- allLeavesInADT <$> roleIdentification2rangeADT object
       (views :: Object View) <- getsDF _.views
       -- As we have postponed handling these parse tree fragments after
       -- handling all others, there can be no forward references.
       -- The property references in Views are, by now, qualified.
-      candidates <- pure $ filter (flip endsWithSegments view) (keys views)
-      case length candidates of
-        0 -> throwError $ UnknownView start view
-        1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates) views of
-          Just (View {propertyReferences}) -> pure $ PSet propertyReferences
-        _ -> throwError $ NotUniquelyIdentifying start view candidates
+      -- TODO. Controleer of de view een view op het object is!
+      case filter (areLastSegmentsOf view) (keys views) of
+        noCandidates | null noCandidates -> throwError $ UnknownView start view
+        candidates -> case filter (isViewOfObject roles) candidates of
+          noCandidates' | null noCandidates' -> throwError $ NotAViewOfObject start view
+          candidates' ->
+            case length candidates' of
+              1 -> unsafePartial case lookup (unsafePartial ARRP.head candidates') views of
+                Just (View {propertyReferences}) -> pure $ PSet propertyReferences
+              _ -> throwError $ NotUniquelyIdentifying start view candidates'
+  where
+    isViewOfObject :: Array EnumeratedRoleType -> String -> Boolean
+    -- | "Context" `isLocalNameOf` "model:Perspectives$Context"
+    isViewOfObject roles viewName = isJust $ findIndex (\(EnumeratedRoleType roleName) -> viewName `startsWithSegments` roleName) roles
 
---
 handleScreens :: LIST.List AST.ScreenE -> PhaseThree Unit
 handleScreens screenEs = do
   df@{_id} <- lift $ State.gets _.dfr
@@ -1115,7 +1122,10 @@ handleScreens screenEs = do
               -- find the relevant Perspective.
               -- A ScreenElement can only be defined for a named Enumerated or Calculated Role. This means that `perspective` is constructed with the
               -- RoleIdentification.ExplicitRole data constructor: a single RoleType.
+              -- If no role can be found for the given specification, collectRoles throws an error.
               objectRoleType <- unsafePartial ARRP.head <$> collectRoles perspective
+              -- All properties defined on this object role.
+              allProps <- lift2 (typeIncludingAspectsAndBinding objectRoleType >>= allProperties <<< map roleInContext2Role)
               -- The user must have a perspective on it. This perspective must have that RoleType
               -- in its member roleTypes.
               -- So we fetch the user role, get its Perspectives, and find the one that refers to the objectRoleType.
@@ -1124,18 +1134,22 @@ handleScreens screenEs = do
                 -- This case is probably that the object and user exist, but the latter
                 -- has no perspective on the former!
                 Nothing -> throwError (UserHasNoPerspective subjectRoleType objectRoleType start' end')
-                Just (Perspective{id:perspectiveId}) -> do
+                Just pspve@(Perspective{id:perspectiveId}) -> do
+                  if perspectiveSupportsRoleVerbs pspve (maybe [] roleVerbList2Verbs roleVerbs)
+                    then pure unit
+                    else throwError (UnauthorizedForRole "Auteur" subjectRoleType objectRoleType (maybe [] roleVerbList2Verbs roleVerbs))
                   case propsOrView, propertyVerbs of
                     Just pOrV, Just pV -> do
-                      propertyTypes <- collectPropertyTypes pOrV perspective start'
+                      (propertyTypes :: ExplicitSet PropertyType) <- unsafePartial collectPropertyTypes pOrV perspective start'
+                      -- Check whether the specified View or Properties are within the users' perspective.
+                      -- Check whether the required Verbs are within the users' perspective for the specified properties.
+                      checkVerbsAndProps allProps propertyTypes (maybe [] expandVerbs propertyVerbs) pspve objectRoleType
                       pure
                         { title:title'
                         , perspectiveId
                         , perspective: Nothing
                         , propertyVerbs: Just $ PropertyVerbs propertyTypes pV
-                        , roleVerbs: case roleVerbs of
-                          Nothing -> []
-                          Just rV -> roleVerbList2Verbs rV
+                        , roleVerbs: maybe [] roleVerbList2Verbs roleVerbs
                         , userRole: subjectRoleType
                         }
                     _, _ -> pure
@@ -1143,12 +1157,15 @@ handleScreens screenEs = do
                           , perspectiveId
                           , perspective: Nothing
                           , propertyVerbs: Nothing
-                          , roleVerbs: case roleVerbs of
-                            Nothing -> []
-                            Just rV -> roleVerbList2Verbs rV
+                          , roleVerbs: maybe [] roleVerbList2Verbs roleVerbs
                           , userRole: subjectRoleType
                           }
-
+            checkVerbsAndProps :: Array PropertyType -> ExplicitSet PropertyType -> Array PropertyVerb -> Perspective -> RoleType -> PhaseThree Unit
+            checkVerbsAndProps allProps requiredProps propertyVerbs perspective objectRoleType = for_ (expandPropSet allProps requiredProps)
+              \requiredProp -> for propertyVerbs \requiredVerb ->
+                if perspectiveSupportsPropertyForVerb perspective requiredProp requiredVerb
+                  then pure unit
+                  else throwError (UnauthorizedForProperty "Auteur" subjectRoleType objectRoleType requiredProp requiredVerb)
 
 addUserRoleGraph :: PhaseThree Unit
 addUserRoleGraph = do

@@ -38,7 +38,7 @@ import Perspectives.Parsing.Arc.Statement.AST (LetStep(..))
 import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range, RoleInContext)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleKind, RoleType, StateIdentifier, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedRoleType, PropertyType, RoleKind, RoleType, StateIdentifier, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Show, show, (<<<), (<>))
@@ -65,6 +65,7 @@ data PerspectivesError
     | UnknownRole ArcPosition String
     | UnknownProperty ArcPosition String String
     | UnknownView ArcPosition String
+    | NotAViewOfObject ArcPosition String
     | NotUniquelyIdentifying ArcPosition String (Array String)
     | UnknownElementaryQueryStep
     | IncompatibleQueryArgument ArcPosition Domain Step
@@ -101,7 +102,7 @@ data PerspectivesError
     | CurrentObjectNotAllowed ArcPosition ArcPosition
     | CurrentSubjectNotAllowed ArcPosition ArcPosition
 
-    | UnauthorizedForProperty String RoleType EnumeratedRoleType EnumeratedPropertyType PropertyVerb
+    | UnauthorizedForProperty String RoleType RoleType PropertyType PropertyVerb
     | UnauthorizedForRole String RoleType RoleType (Array RoleVerb)
     | UnauthorizedForContext String RoleType ContextType
 
@@ -138,6 +139,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownProperty pos qname roleType) = "(UnknownProperty) The property '" <> qname <> "' is not defined for role '" <> roleType <> "', at: " <> show pos
   show (UnknownContext pos qname) = "(UnknownContext) The context '" <> qname <> "' is not defined, at: " <> show pos
   show (UnknownView pos qname) = "(UnknownView) The view '" <> qname <> "' is not defined, at: " <> show pos
+  show (NotAViewOfObject pos qname) = "(NotAViewOfObject) The view '" <> qname <> "' is not a view of the current object, at: " <> show pos
   show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos <> ", or choose a resource from another context."
   show (Custom s) = s
   show (ParserError message pos) = "(ParserError) " <> message <> show pos

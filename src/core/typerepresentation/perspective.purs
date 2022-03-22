@@ -41,8 +41,8 @@ import Perspectives.Representation.ADT (ADT, commonLeavesInADT)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType, StateIdentifier)
-import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
-import Prelude (class Eq, class Ord, class Show, ($), (&&), (<>), (<#>))
+import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, allPropertyVerbs, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
+import Prelude (class Eq, class Ord, class Show, flip, ($), (&&), (<#>), (<$>), (<>), (||))
 import Simple.JSON (class WriteForeign, write)
 
 -----------------------------------------------------------
@@ -147,9 +147,9 @@ perspectiveSupportsRoleVerb (Perspective{roleVerbs}) verb = isJust $ LST.findInd
   (MAP.values $ unwrap roleVerbs)
 
 perspectiveSupportsRoleVerbs :: Perspective -> Array RoleVerb -> Boolean
-perspectiveSupportsRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.findIndex
+perspectiveSupportsRoleVerbs (Perspective{roleVerbs}) verbs = null verbs || (isJust $ LST.findIndex
   (\rvs -> hasAllVerbs verbs rvs)
-  (MAP.values $ unwrap roleVerbs)
+  (MAP.values $ unwrap roleVerbs))
 
 perspectiveSupportsOneOfRoleVerbs :: Perspective -> Array RoleVerb -> Boolean
 perspectiveSupportsOneOfRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.findIndex
@@ -169,6 +169,22 @@ instance decodePropertyVerbs :: Decode PropertyVerbs where decode = genericDecod
 
 instance writeForeignPropertyVerbs :: WriteForeign PropertyVerbs where
   writeImpl (PropertyVerbs props verbs) = write { properties: write props, verbs: write verbs}
+
+-- Pair each PropertyType will all PropertyVerbs available for it.
+expandPropertyVerbs :: Array PropertyType -> PropertyVerbs -> Array (Tuple PropertyType (Array PropertyVerb))
+expandPropertyVerbs allProps (PropertyVerbs props verbs) = let
+  (verbs' :: Array PropertyVerb) = expandVerbs verbs
+  in (flip Tuple verbs') <$> expandPropSet allProps props
+
+expandVerbs ::  ExplicitSet PropertyVerb -> Array PropertyVerb
+expandVerbs Universal = allPropertyVerbs
+expandVerbs Empty = []
+expandVerbs (PSet as) = as
+
+expandPropSet :: Array PropertyType -> ExplicitSet PropertyType -> Array PropertyType
+expandPropSet allProps Universal = allProps
+expandPropSet _ Empty = []
+expandPropSet _ (PSet as) = as
 
 -----------------------------------------------------------
 -- MODIFICATIONSUMMARY

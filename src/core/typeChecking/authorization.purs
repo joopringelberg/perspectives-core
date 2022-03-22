@@ -36,7 +36,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Role (adtOfRole, getRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.Perspective (isPerspectiveOnADT, perspectiveSupportsRoleVerb)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType(..))
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Types.ObjectGetters (findPerspective, hasPerspectiveOnPropertyWithVerb, hasPerspectiveOnRoleWithVerbs)
 import Perspectives.TypesForDeltas (SubjectOfAction)
@@ -57,7 +57,7 @@ roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
   (unsafePartial $ hasPerspectiveOnPropertyWithVerb subjectType roleType' property verb') >>=
     if _
       then pure $ Right true
-      else pure $ Left $ UnauthorizedForProperty "Auteur" subjectType roleType' property verb'
+      else pure $ Left $ UnauthorizedForProperty "Auteur" subjectType (ENR roleType') (ENP property) verb'
 
 -- | True if the user role represented by the SubjectOfAction argument has a perspective
 -- | on the role type that includes an Action with the given Verb,

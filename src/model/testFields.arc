@@ -21,7 +21,8 @@ domain TestFields
     user Tester filledBy sys:PerspectivesSystem$User
       indexed com:Tester
       perspective on TestRole
-        defaults
+        props (Text, Bool, ADateTime, ANumber, AnEmail, WeekDay, Appel) verbs (Consult, SetPropertyValue)
+        only (Remove, Create)
       perspective on TestTable
         defaults
       screen "Test screen"
@@ -30,6 +31,7 @@ domain TestFields
             column
               form TestRole
                 props (Text, WeekDay) verbs (Consult)
+                only (Create)
               table "MyTable" TestTable
                 view Limited verbs (Consult)
                 only (Remove)

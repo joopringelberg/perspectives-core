@@ -27,7 +27,7 @@ import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array (intercalate, null, uncons)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.String (Pattern(..), Replacement(..), replaceAll, split, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), replaceAll, split, stripPrefix, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -279,6 +279,12 @@ endsWithSegments whole part = (whole == part) || (isJust $ stripSuffix (Pattern 
 -- | "Second" `areLastSegmentsOf` "model:Model$First$Second$Third" == false
 areLastSegmentsOf :: String -> String -> Boolean
 areLastSegmentsOf = flip endsWithSegments
+
+-- | True iff the second argument is a prefix of the first argument, or if they are equal.
+-- | Does not check whether names are well-formed qualified names.
+-- | "model:Model$First$Second$Third" `startsWithSegments` "model:Model$First$Second" == true
+startsWithSegments :: String -> String -> Boolean
+startsWithSegments whole part = (whole == part) || (isJust $ stripPrefix (Pattern (part <> "$")) whole)
 
 -----------------------------------------------------------
 -- REGEX MATCHING HELPER FUNCTIONS
