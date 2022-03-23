@@ -620,6 +620,7 @@ roleIsMe roleId contextId = (lift2 $ try $ getPerspectContext contextId) >>=
     \ctxt -> (lift2 $ try $ getPerspectRol roleId) >>=
       handlePerspectRolError "roleIsMe"
         \role -> do
+          (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me"))  >>= addCorrelationIdentifiersToTransactie
           cacheAndSave roleId (changeRol_isMe role true)
           cacheAndSave contextId (changeContext_me ctxt (Just roleId))
 

@@ -51,7 +51,9 @@ import Simple.JSON (class WriteForeign, write)
 newtype ScreenDefinition = ScreenDefinition
   { title :: String
   , tabs :: Maybe (Array TabDef)
+  -- Will be an array of ColumnElementD elements.
   , rows :: Maybe (Array ScreenElementDef)
+  -- Will be an array of RowElementD elements.
   , columns :: Maybe (Array ScreenElementDef)
   }
 
