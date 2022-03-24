@@ -69,11 +69,12 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   roleADT :: r -> MonadPerspectives (ADT RoleInContext)
   -- | The type of the Role, combined with its binding type.
   roleAndBinding :: r -> MonadPerspectives (ADT RoleInContext)
-  -- | The type of the Role, including its direct aspects: not their transitive closure!
+  -- | The type of the Role, including its direct aspects, including their transitive closure!
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsADT :: r -> MonadPerspectives (ADT RoleInContext)
-  -- | Includes: the type of the Role, its own binding (not the bindings transitive closure!) and its own aspects (not their transitive closure!).
-  -- | For a CalculatedRole it is the range of its calculation.
+  -- | Includes: the type of the Role, the closure of its binding and the closure of its aspects.
+  -- | For a CalculatedRole it is the range of its calculation. This is the most complete set of types
+  -- | for this role.
   roleAspectsBindingADT :: r -> MonadPerspectives (ADT RoleInContext)
   perspectives :: r -> Array Perspective
   contextActions :: r -> Map StateSpec (Object Action)
@@ -96,8 +97,10 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
     otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
   roleADT r = calculation r >>= pure <<< unsafePartial domain2roleInContext <<< range
   roleAndBinding = rangeOfCalculatedRole
-  roleAspectsADT = rangeOfCalculatedRole
-  roleAspectsBindingADT = rangeOfCalculatedRole
+  -- Include the transitive closure of the aspects.
+  roleAspectsADT = rangeOfCalculatedRole >=> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT)
+  -- Include the transitive closure of aspects and binding.
+  roleAspectsBindingADT = rangeOfCalculatedRole >=> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsBindingADT)
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
 
@@ -144,14 +147,19 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
     UNIVERSAL -> UNIVERSAL
   roleAspectsADT r@(EnumeratedRole{roleAspects}) = do
     radt <- roleADT r
-    pure $ PROD (cons radt (map ST roleAspects))
+    product <<< (flip cons [radt]) <$> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT)
+      (PROD (map ST roleAspects))
   roleAspectsBindingADT r = do
-    (ra :: Array RoleInContext) <- roleAspects r
+    (roleTypes :: ADT RoleInContext) <- roleAspectsADT r
     (bnd :: ADT RoleInContext) <- binding r
-    (adt :: ADT RoleInContext) <- roleADT r
-    pure $ product [adt, bnd, PROD (ST <$> ra)]
+    (bindingTypes :: ADT RoleInContext) <- reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsBindingADT) bnd
+    pure $ product [roleTypes, bindingTypes]
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
+
+-- f :: RoleInContext -> MP (ADT RoleInContext)
+-- f (RoleInContext{role})= getEnumeratedRole role >>= roleAspectsADT
+-- f = getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT
 
 -----------------------------------------------------------
 -- FUNCTIONS OF ADT
