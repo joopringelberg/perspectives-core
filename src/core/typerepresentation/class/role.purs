@@ -78,17 +78,6 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   perspectives :: r -> Array Perspective
   contextActions :: r -> Map StateSpec (Object Action)
 
-rangeOfRoleCalculation' :: String -> MonadPerspectives (ADT EnumeratedRoleType)
-rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> rangeOfRoleCalculation'_ (CalculatedRoleType r)
-  where
-    rangeOfRoleCalculation'_ :: forall r i. RoleClass r i => i -> MonadPerspectives (ADT EnumeratedRoleType)
-    rangeOfRoleCalculation'_ i = getPerspectType i >>= calculation >>= case _ of
-        SQD _ _ (RDOM (ST (RoleInContext{role}))) _ _ -> pure $ ST role
-        UQD _ _ _ (RDOM (ST (RoleInContext{role}))) _ _ -> pure $ ST role
-        BQD _ _ _ _ (RDOM (ST (RoleInContext{role}))) _ _ -> pure $ ST role
-        MQD _ _ _ (RDOM (ST (RoleInContext{role}))) _ _ -> pure $ ST role
-        otherwise -> empty
-
 -----------------------------------------------------------
 -- CALCULATED ROLE INSTANCE
 -----------------------------------------------------------
@@ -389,10 +378,10 @@ getRole (CR c) = getPerspectType c >>= pure <<< C
 -- | Does not include the binding, for (ENR (EnumeratedRoleType e)).
 rangeOfRoleCalculation :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfRoleCalculation = getRole >=> getCalculation >=> case _ of
-    SQD _ _ (RDOM (ST (RoleInContext{role}))) _ _ -> pure $ ST role
-    UQD _ _ _ (RDOM (ST (RoleInContext{role}))) _ _ -> pure $ ST role
-    BQD _ _ _ _ (RDOM (ST (RoleInContext{role}))) _ _ -> pure $ ST role
-    MQD _ _ _ (RDOM (ST (RoleInContext{role}))) _ _ -> pure $ ST role
+    SQD _ _ (RDOM adt) _ _ -> pure $ roleInContext2Role <$> adt
+    UQD _ _ _ (RDOM adt) _ _ -> pure $ roleInContext2Role <$> adt
+    BQD _ _ _ _ (RDOM adt) _ _ -> pure $ roleInContext2Role <$> adt
+    MQD _ _ _ (RDOM adt) _ _ -> pure $ roleInContext2Role <$> adt
     otherwise -> empty -- NB: The Alt instance of Aff throws an error on empty!
 
 typeIncludingAspects :: RoleType -> MonadPerspectives (ADT RoleInContext)
