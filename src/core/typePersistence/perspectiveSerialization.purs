@@ -350,12 +350,12 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps pvArr cid (Pe
           void $ for objectStateBasedProperties (\propertyType -> do
             getters <- get
             if isNothing (lookup (propertytype2string propertyType) getters)
-              then pure unit
-              else do
+              then do
                 getter <- lift $ lift $ getDynamicPropertyGetter
                   (propertytype2string propertyType)
                   (roleInContext2Role <$> (unsafePartial roleRange object))
-                put (insert (propertytype2string propertyType) getter getters))
+                put (insert (propertytype2string propertyType) getter getters)
+              else pure unit)
           -- Get all getters from state.
           (allGetters :: Object Getter) <- get
           -- Add verbs based on state of the role instance to the map of
