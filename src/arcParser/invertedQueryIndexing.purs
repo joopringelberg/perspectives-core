@@ -46,7 +46,7 @@ import Perspectives.Representation.EnumeratedRole (InvertedQueryKey(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType)
-import Perspectives.Types.ObjectGetters (aspectsOfContext, enumeratedRoleContextType, roleAspectsClosure)
+import Perspectives.Types.ObjectGetters (contextAspectsClosure, enumeratedRoleContextType, roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..))
 import Prelude (bind, map, pure, ($), (<#>), (<$>), (<<<), (>=>), (>>=))
 
@@ -93,7 +93,7 @@ runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) {-|
 
 -- | Index member `contextInvertedQueries` of EnumeratedRoleType with this key computed from a ContextDelta.
 runtimeIndexForContextQueries :: ContextInstance -> MonadPerspectives (Array ContextType)
-runtimeIndexForContextQueries contextInstance = contextInstance ##= (contextType >=> liftToInstanceLevel aspectsOfContext)
+runtimeIndexForContextQueries contextInstance = contextInstance ##= (contextType >=> liftToInstanceLevel contextAspectsClosure)
 
 -- | Index member `invertedQueries` of ContextType with this key computed from an EnumeratedRoleType.
 runTimeIndexForRoleQueries :: EnumeratedRoleType -> MonadPerspectives (Array EnumeratedRoleType)
