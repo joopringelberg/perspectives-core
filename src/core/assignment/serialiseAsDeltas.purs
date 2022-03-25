@@ -139,7 +139,7 @@ serialisePerspectiveForUser cid users userRoleType p@(Perspective{object, proper
 serialiseRoleInstancesAndProperties ::
 	ContextInstance ->	                 -- The context instance for which we serialise roles and properties.
 	NA.NonEmptyArray RoleInstance ->		 -- User Role instances to serialise for. These have a single type.
-	QueryFunctionDescription ->          -- Find role instances with this description.
+	QueryFunctionDescription ->          -- Find object role instances with this description.
 	Array PropertyType ->		             -- PropertyTypes whose values on the role instances should be serialised.
   Boolean ->                           -- true iff the perspective is selfonly.
   Boolean ->                           -- true iff the object of the perspective equals its subject.

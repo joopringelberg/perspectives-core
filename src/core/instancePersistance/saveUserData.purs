@@ -418,6 +418,7 @@ setFirstBinding filled filler msignedDelta = (lift2 $ try $ getPerspectEntiteit 
             Just signedDelta -> pure signedDelta
 
           -- SYNCHRONISATION
+          handleNewPeer filled
           addDelta (DeltaInTransaction { users, delta: signedDelta })
           -- Save the SignedDelta as the bindingDelta in the role. Re-fetch filled as it has been changed!
 
@@ -513,6 +514,7 @@ removeBinding_ filled mFillerId msignedDelta = (lift2 $ try $ getPerspectEntitei
                 { author
                 , encryptedDelta: sign $ encodeJSON $ delta}
               Just signedDelta -> pure signedDelta
+            handleNewPeer filled
             addDelta (DeltaInTransaction { users, delta: signedDelta})
 
         pure users

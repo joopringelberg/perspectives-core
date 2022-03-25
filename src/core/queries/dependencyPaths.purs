@@ -58,6 +58,11 @@ domain2Dependency (VDOM _ Nothing) s = V "" $ Value s
 domain2Dependency ContextKind s = CT (ContextType s)
 domain2Dependency RoleKind s = RT (ENR $ EnumeratedRoleType s)
 
+-- | The head of a DependencyPath is the result of a query interpretation.
+-- | The mainPath is the ordered sequence of dependencies whose leftmost element is the head (= the query result)
+-- | and whose rightmost element is the source the query is applied to.
+-- | supportingPaths are paths that are used in the computation but are not part of the mainPath, such
+-- | as the paths to compute boolean values in a filter operation.
 type DependencyPath =
   { head :: Dependency
   , mainPath :: Maybe (NonEmptyList Dependency)
@@ -68,13 +73,15 @@ type DependencyPath =
 singletonPath :: Dependency -> DependencyPath
 singletonPath d = {head: d, mainPath: Just $ singleton d, supportingPaths: []}
 
--- | The new dependency becomes the head and is added to the mainPath.
+-- | The new dependency becomes the head and is added to front of the mainPath (it becomes the first element).
 consOnMainPath :: Dependency -> DependencyPath -> DependencyPath
 consOnMainPath d p@{mainPath} = p {head = d, mainPath = Just $ maybe (singleton d) (cons d) mainPath}
 -- consOnMainPath d p@{mainPath} = p {head = d, mainPath = cons d <$> mainPath}
 
+-- | The new dependency is added to end of the mainPath (it becomes the last element).
+-- | The head is untouched.
 snocOnMainPath :: DependencyPath -> Dependency -> DependencyPath
-snocOnMainPath p@{mainPath} d = p {head = d, mainPath = Just $ maybe (singleton d) (flip snoc d) mainPath}
+snocOnMainPath p@{mainPath} d = p {mainPath = Just $ maybe (singleton d) (flip snoc d) mainPath}
 
 addAsSupportingPaths :: Array (NonEmptyList Dependency) -> DependencyPath -> DependencyPath
 addAsSupportingPaths paths dp@({supportingPaths}) = dp {supportingPaths = paths <> supportingPaths}
@@ -85,9 +92,12 @@ appendPaths :: DependencyPath -> DependencyPath -> DependencyPath
 appendPaths dp1@{supportingPaths} dp2 = dp1 {supportingPaths = supportingPaths <> allPaths dp2}
 
 -- | Compose two DependencyPaths in a way that reflects two consequtive steps in a query:
--- |  - the head is the head of the second DependencyPath (compare composePaths to >>> rather than <<<);
--- |  - the mainPath is the concatenation of the second mainPath and the first;
+-- |  - the head is the head of the second DependencyPath.
+-- |  - the mainPath is the concatenation of the second mainPath and the first (mp2.. mainPath);
 -- |  - the supportingPaths are the concatenation of both supportingPaths.
+-- | Compare composePaths to >>> rather than <<<. That is, the left path (first argument) is followed (left to right)
+-- | by the right path (second argument). As the mainPath gives us dependencies from value to source, the
+-- | second mainPath is put in front (to the left) of the first mainPath to construct the composition mainPath.
 composePaths :: DependencyPath -> DependencyPath -> DependencyPath
 composePaths {mainPath, supportingPaths} {head, mainPath:mp2, supportingPaths:sp2} =
   { head

@@ -41,6 +41,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (empty, join, void)
 import Data.Array (elemIndex, head, length, null, union, unsafeIndex)
 import Data.List (List(..))
+import Data.List.NonEmpty (fromList, tail)
 import Data.List.Types (List, NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
@@ -366,9 +367,22 @@ interpret qfd a = case a.head of
     dep@(R rid) -> case qfd of
       -- TODO. We moeten hier niet de ADT van het domein nemen. We passen immers toe op de dependency. We moeten dus een ADT opstellen voor de dependency!
       (SQD _ (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) -> getDynamicPropertyGetter pt rid >>= \(leadingDependencies :: DependencyPath) -> do
-        -- the leadingDependencies end with (R rid). Append the mainPath of a to the mainPath of leadingDependencies
-        -- and add all supportingPaths of a to those of leadingDependencies.
-        pure $ a #>> leadingDependencies
+        -- We apply the property getter to the head of a. This results in a DependencyPath with or without value.
+        -- Lets call this result PropResult.
+        --  * when with a value, that value is PropResult.head; PropResult.mainPath starts with that value and ends with a.head.
+        --  * when without a value, the PropResult.head is the role bearing the property or the bottom of the chain; PropResult.mainPath starts with that role and ends with a.head.
+        -- Invariant: PropResult.mainPath ends with a.head, which is the source of the 'propertyquery' we apply to it.
+        -- We then would compose a.mainPath with PropResult.mainPath.
+        -- The result is a mainPath whose first part is PropResult.mainPath, which is
+        -- followed by the a.mainPath. The head is the head of PropResult.
+        -- However, this causes a.head to appear twice in the mainPath:
+        --  * once as the head of `a` (and thus the first dependency of a.mainPath)
+        --  * once as the end of PropResult.mainPath.
+        -- Hence, we remove the first dependency from a.mainPath before composing it with PropResult.mainPath.
+        reducedMainPath <- case tail <$> a.mainPath of
+          Just l@(Cons _ _) -> pure $ Just $ unsafePartial fromJust $ fromList l
+          otherwise -> pure Nothing
+        pure ({head: a.head, mainPath: reducedMainPath, supportingPaths: a.supportingPaths} #>> leadingDependencies)
 
       (SQD _ (PropertyGetter (CP pt)) _ _ _) -> do
         (cp :: CalculatedProperty) <- lift2MPQ $ getPerspectType pt

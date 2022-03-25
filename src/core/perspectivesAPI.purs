@@ -79,7 +79,7 @@ import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
-import Perspectives.SaveUserData (handleNewPeer, removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding)
+import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
@@ -484,7 +484,6 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             void $ runMonadPerspectivesTransaction authoringRole
               do
                 void $ setBinding (RoleInstance subject) (RoleInstance object) Nothing
-                handleNewPeer (RoleInstance subject)
             sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- {request: "RemoveBinding", subject: rolID}
