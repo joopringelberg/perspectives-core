@@ -65,7 +65,7 @@ import Prelude (bind, map, pure, ($), (<#>), (<$>), (<<<), (>=>), (>>=))
 -- COMPUTING KEYS IN RUN TIME
 -----------------------------------------------------------
 -- | Index member `fillsInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
--- | with type SetFirstBinding or ReplaceBinding.
+-- | with type SetFirstBinding or ReplaceBinding. We look in the **filled** EnumeratedRoleType!
 runtimeIndexForFillsQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
 runtimeIndexForFillsQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = runtimeIndexForFillsQueries' filled
 
@@ -113,12 +113,16 @@ runtimeIndexForPropertyQueries eroleType = map unwrap <$> (eroleType ###= roleAs
 compiletimeIndexForFilledByQueries :: Partial => QueryFunctionDescription -> (PhaseTwo' MonadPerspectives) (Array (Tuple EnumeratedRoleType (Array InvertedQueryKey)))
 compiletimeIndexForFilledByQueries qfd | isRoleDomain $ domain qfd = for (allLeavesInADT $ roleDomain qfd) keysForRoleInContext
   where
+    -- start is filled, because filledBy goes from filled to filler.
     keysForRoleInContext :: RoleInContext -> (PhaseTwo' MonadPerspectives) (Tuple EnumeratedRoleType (Array InvertedQueryKey))
-    keysForRoleInContext (RoleInContext{context:startContext, role:startRole}) = do
-      (adtBinding :: ADT RoleInContext) <- lift $ lift $ getEnumeratedRole startRole >>= binding
+    keysForRoleInContext (RoleInContext{context:filledContext, role:filledRole}) = do
+      (adtBinding :: ADT RoleInContext) <- lift $ lift $ getEnumeratedRole filledRole >>= binding
       case queryFunction qfd of
-        (DataTypeGetter BindingF) -> pure $ Tuple startRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext endContext endRole))
-        (DataTypeGetterWithParameter BindingF cType) -> pure $ Tuple startRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:endContext, role:endRole}) -> (InvertedQueryKey startContext (ContextType cType) endRole))
+        -- end is the filler role.
+        (DataTypeGetter BindingF) -> pure $ Tuple filledRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:fillerContext, role:fillerRole}) ->
+          (InvertedQueryKey filledContext fillerContext fillerRole))
+        (DataTypeGetterWithParameter BindingF requiredFillerContext) -> pure $ Tuple filledRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:fillerContext, role:fillerRole}) ->
+          (InvertedQueryKey filledContext (ContextType requiredFillerContext) fillerRole))
 
 -- | Compute the keys for the fills (Binder) step.
 -- | Returns a map whose keys identify EnumeratedRoles and whose values are Arrays of keys that the given
@@ -127,9 +131,13 @@ compiletimeIndexForFillsQueries :: Partial => QueryFunctionDescription -> (Array
 compiletimeIndexForFillsQueries qfd | isRoleDomain $ domain qfd = (allLeavesInADT $ roleDomain qfd) <#>
   keysForRoleInContext
   where
+    -- start is the filler, because fills goes from filler to filled.
     keysForRoleInContext :: RoleInContext -> (Tuple EnumeratedRoleType (Array InvertedQueryKey))
-    keysForRoleInContext (RoleInContext{context:startContext, role:startRole}) = case roleRange qfd of
-      ST (RoleInContext{context:endContext, role:endRole}) -> case queryFunction qfd of
-        (GetRoleBindersF _ (ContextType contextType)) -> case contextType of
-          "" -> Tuple startRole [InvertedQueryKey startContext endContext endRole]
-          ctype -> Tuple startRole [InvertedQueryKey startContext (ContextType ctype) endRole]
+    keysForRoleInContext (RoleInContext{context:fillerContext, role:fillerRole}) = case roleRange qfd of
+      -- end is the filled role. It is always an ST, because it derives directly from the filledBy clause of an
+      -- EnumeratedRole - by construction a single type.
+      ST (RoleInContext{context:filledContext, role:filledRole}) -> case queryFunction qfd of
+        (GetRoleBindersF _ (ContextType mrequiredFilledContext)) -> case mrequiredFilledContext of
+          "" -> Tuple filledRole [InvertedQueryKey fillerContext filledContext filledRole] -- FillerContext FilledContext FilledRole
+          requiredFilledContext -> Tuple filledRole
+            [InvertedQueryKey fillerContext (ContextType requiredFilledContext) filledRole]

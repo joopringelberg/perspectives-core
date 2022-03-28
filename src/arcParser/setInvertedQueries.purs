@@ -125,7 +125,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             -- Maybe add modifiesPropertiesOf here; but do we then need to check on
             -- synchronization on importing a model? I doubt it.
             (OnPropertyDelta (allLeavesInADT $ roleInContext2Role <$> domain2roleType ran))
-            dfr 
+            dfr
           Just ep -> dfr {enumeratedProperties = insert
             (unwrap p)
             -- We add the InvertedQuery to the Property, indexed for all role types in the range.
@@ -145,29 +145,33 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
     QF.GetRoleBindersF enr ctxt -> do
       -- Compute the keys on the base of the original backwards query.
       modifyDF \dfr@{enumeratedRoles} -> let
-        -- We remove the first step of the backwards path, because we apply it (runtime) not to the binding, but to
-        -- the binder. We skip the binding step because its cardinality is larger than one. It would cause a fan-out
-        -- while we know, when applying the inverted query when handling a RoleBindingDelta, the exact path to follow.
-        -- The function `usersWithPerspectiveOnRoleBinding` applies the forward part to the binding (not the binder).
-        -- Hence we don't have to adapt the forward part.
-        -- We add the inverted query to the **BINDING ROLE** (filled role), not the bound role. This has two reasons:
-        --  * the bound role may well be in another model, leading to an InvertedQuery for another domain;
-        --  * if runtime a role is bound that is a specialisation of the required role, it will still trigger the inverted query.
+        -- We remove the first step of the backwards path, because we apply it (runtime) not to the filler (binding),
+        -- but to the filled (binder). We skip the fills step because its cardinality is larger than one. It would
+        -- cause a fan-out while we know, when applying the inverted query when handling a RoleBindingDelta, the exact
+        -- path to follow.
+        -- The function `usersWithPerspectiveOnRoleBinding` applies the forward part to the filler (binding) (not the
+        -- binder (filled)). Hence we don't have to adapt the forward part.
+        -- We add the inverted query to the **FILLED** (binder) role, not the filler role (binding).
+        -- This has two reasons:
+        --  * the filler may well be in another model, leading to an InvertedQuery for another domain;
+        --  * if runtime a filler is used that is a specialisation of the required role, it will still trigger
+        --    the inverted query.
         oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
         description = case oneStepLess of
-          -- Backward consisted of just a single step and that was GetRoleBindersF.
+          -- If backwards of oneStepLess is Nothing, the backwards step of qWithAK (== qfd) consisted of just
+          -- a single step and that was GetRoleBindersF.
           -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
-          -- is already the end result we want to obtain. Hence we do with the Identity function, where the domain and
-          -- range are the range of the backward step.
+          -- is already the end result we want to obtain. Hence we put the Identity function in the place of backwards,
+          -- where the domain and range are the range of the backward step.
           ZQ Nothing fwd -> ZQ (Just (SQD ran (QF.DataTypeGetter IdentityF) ran True True)) fwd
           x -> x
         in
           foldl
-            (\dfr' (Tuple roleName keys) ->
-              case lookup (unwrap roleName) enumeratedRoles of
-                Nothing -> addInvertedQueryForDomain (unwrap roleName)
+            (\dfr' (Tuple filledType keys) ->
+              case lookup (unwrap filledType) enumeratedRoles of
+                Nothing -> addInvertedQueryForDomain (unwrap filledType)
                   (InvertedQuery
-                    { description: description
+                    { description
                     , backwardsCompiled: Nothing
                     , forwardsCompiled: Nothing
                     , users
@@ -182,7 +186,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                   dfr'
                 Just en -> do
                   dfr' {enumeratedRoles = insert
-                    (unwrap roleName)
+                    (unwrap filledType)
                     (addPathToFillsInvertedQueries
                       en
                       keys
@@ -191,7 +195,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                     enumeratedRoles }
                 )
             dfr
-            (compiletimeIndexForFillsQueries qfd)
+            (compiletimeIndexForFillsQueries qfd) -- qfd is the ORIGINAL backward query.
     --
     -- add to filledByInvertedQueries of the role that we apply `binding` to (the domain of the step; the role that binds).
     QF.DataTypeGetter QF.BindingF -> do
@@ -199,9 +203,9 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       modifyDF \dfr@{enumeratedRoles} -> case dom of
         (RDOM EMPTY) -> dfr
         _ -> foldl
-              (\dfr' (Tuple role keys) ->
-                case lookup (unwrap role) enumeratedRoles of
-                  Nothing -> addInvertedQueryForDomain (unwrap role)
+              (\dfr' (Tuple filledType keys) ->
+                case lookup (unwrap filledType) enumeratedRoles of
+                  Nothing -> addInvertedQueryForDomain (unwrap filledType)
                     (InvertedQuery
                       { description: qWithAK
                       , backwardsCompiled: Nothing
@@ -217,7 +221,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                     (FilledByInvertedQuery keys)
                     dfr'
                   Just en -> dfr' {enumeratedRoles = insert
-                    (unwrap role)
+                    (unwrap filledType)
                     (addPathToFilledByInvertedQueries
                       en
                       keys
@@ -380,6 +384,8 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
 ------------------------------------------------------------------------------------------
 removeFirstBackwardsStep :: QueryWithAKink ->
   -- A function from domain and range of the step to prepend, and whether it is mandatory.
+  -- For RoleBindersF (fills step) this function always returns Nothing, and thus does not affect the
+  -- forwards part returned from `removeFirstBackwardsStep`.
   (Domain -> Range -> ThreeValuedLogic -> Maybe QueryFunctionDescription) ->
   QueryWithAKink
 removeFirstBackwardsStep q@(ZQ backward forward) originalStepF = case backward, forward of
