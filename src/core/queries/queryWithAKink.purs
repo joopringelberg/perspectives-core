@@ -68,6 +68,7 @@ instance prettyPrintQueryWithAKink_ :: PrettyPrint QueryWithAKink_ where
 --------------------------------------------------------------------------------------------------------------
 ---- COMPLETEINVERSIONS
 --------------------------------------------------------------------------------------------------------------
+-- | Inverted queries without a backwards part contribute nothing to the result of this function.
 completeInversions :: QueryFunctionDescription -> PhaseThree (Array QueryFunctionDescription)
 completeInversions = invert >=> pure <<< catMaybes <<< map f
   where
@@ -94,12 +95,13 @@ completeInversions = invert >=> pure <<< catMaybes <<< map f
 -- | Filters are completely ignored in the code below. On the type level, this does not matter as unfiltered queries
 -- | have the same type as filtered versions. Runtime, things will have impact on performance and sometimes on
 -- | semantics. See the text Filtering Inverted Queries.docx.
-
+-- | INVARIANT: All QueryWithAKink instances will have a backwards part.
 invert :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink)
 invert = invert_ >=> traverse h >=> pure <<< catMaybes
   where
     h :: QueryWithAKink_ -> PhaseThree (Maybe QueryWithAKink)
     h (ZQ_ steps q) = case unsnoc steps of
+      -- Remove candidates without a backwards part.
       Nothing -> pure Nothing
       -- Creates a right-associative composition that preserves the order in steps.
       Just {init, last} -> pure $ Just $ ZQ (Just $ foldr compose last init) q

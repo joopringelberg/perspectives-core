@@ -193,6 +193,7 @@ isForSelfOnly (InvertedQuery{selfOnly}) = selfOnly
 -- | The user role instances have a perspective on roles in their context.
 -- | Perspectives are conditional on states (valid in some states and not in others). The users we return are guaranteed
 -- | to have at least one valid perspective, even in the case of object state.
+-- | INVARIANT TO RESPECT: both the backward- and forward part of the InvertedQuery should have been compiled.
 handleBackwardQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array ContextWithUsers)
 handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompiled, users:userTypes, states, forwardsCompiled}) = do
   if unsafePartial shouldResultInContextStateQuery iq
@@ -373,7 +374,7 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
       -- We've stored the relevant InvertedQueries with the type of the filled,
       -- so we execute them on any filler that is a specialisation of (or equal to) the required filler type.
       -- Includes calculations from all types of fillerType.
-      fillsCalculations <- lift2 $ compileInvertedQueryMap _fillsInvertedQueries fillerType
+      fillsCalculations <- lift2 $ compileInvertedQueryMap _fillsInvertedQueries filledType
         -- Index with the embedding context. In filledByInvertedQueries we store (the inverted query that
         -- begins with) the filler step away from filled.
         -- Its context type we use to index the filledByCalculations.
@@ -704,7 +705,7 @@ compileInvertedQueryMap :: InvertedQueryMapsLens -> EnumeratedRoleType -> MonadP
 compileInvertedQueryMap lens rt@(EnumeratedRoleType ert) = do
   modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
   -- Get the InvertedQueries, for all types of rt.
-  allRoletypes <- (rt ###= roleAspectsClosure)
+  (allRoletypes :: Array EnumeratedRoleType) <- (rt ###= roleAspectsClosure)
   foldM (\cumulatedMap roleType -> do
     role <- getEnumeratedRole roleType
     calculations <- pure $ unsafePartial fromJust $ preview lens role
