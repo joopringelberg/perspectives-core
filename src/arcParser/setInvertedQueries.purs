@@ -144,7 +144,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
     -- add to fillsInvertedQueries of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
     QF.GetRoleBindersF enr ctxt -> do
       -- Compute the keys on the base of the original backwards query.
-      modifyDF \dfr@{enumeratedRoles} -> let
+      modifyDF \dfr -> let
         -- We remove the first step of the backwards path, because we apply it (runtime) not to the filler (binding),
         -- but to the filled (binder). We skip the fills step because its cardinality is larger than one. It would
         -- cause a fan-out while we know, when applying the inverted query when handling a RoleBindingDelta, the exact
@@ -167,7 +167,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
           x -> x
         in
           foldl
-            (\dfr' (Tuple filledType keys) ->
+            (\dfr'@{enumeratedRoles} (Tuple filledType keys) ->
               case lookup (unwrap filledType) enumeratedRoles of
                 Nothing -> addInvertedQueryForDomain (unwrap filledType)
                   (InvertedQuery
