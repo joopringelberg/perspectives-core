@@ -90,7 +90,7 @@ import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (aspectsOfRole, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not)
+import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not, identity)
 
 phaseThree ::
   DomeinFileRecord ->
@@ -454,6 +454,7 @@ handlePostponedStateQualifiedParts = do
       objectQfd <- case object of
         Nothing -> pure Nothing
         Just qfd -> Just <$> roleIdentificationToQueryFunctionDescription qfd start
+      objectMustBeRole objectQfd start end
       modifyAllStates
         (case transition2stateSpec transition of
           AST.ContextState _ _ -> ContextAction sideEffect
@@ -462,6 +463,9 @@ handlePostponedStateQualifiedParts = do
         states
         originDomain
         objectQfd
+      case object, objectQfd of
+        Just object', Just objectQfd' -> for_ qualifiedUsers (modifyPerspective objectQfd' object' start identity)
+        _, _ -> pure unit
       where
 
         -- | Modifies the DomeinFile in PhaseTwoState.
@@ -518,6 +522,7 @@ handlePostponedStateQualifiedParts = do
       objectQfd <- case object of
         Nothing -> pure Nothing
         Just qfd -> Just <$> roleIdentificationToQueryFunctionDescription qfd start
+      objectMustBeRole objectQfd start end
       modifyAllStates
         (case transition2stateSpec transition of
           AST.ContextState _ _ -> ContextNotification compiledMessage
@@ -526,6 +531,9 @@ handlePostponedStateQualifiedParts = do
         states
         originDomain
         objectQfd
+      case object, objectQfd of
+        Just object', Just objectQfd' -> for_ qualifiedUsers (modifyPerspective objectQfd' object' start identity)
+        _, _ -> pure unit
       where
           -- | Modifies the DomeinFile in PhaseTwoState.
           modifyAllStates :: Notification -> Array RoleType -> Array StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> PhaseThree Unit
@@ -573,7 +581,7 @@ handlePostponedStateQualifiedParts = do
                 pure (Sentence.CP (Q compiledPart))
 
     -- | Modifies the DomeinFile in PhaseTwoState.
-    handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start})) = do
+    handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start, end})) = do
       -- `currentContextDomain` represents the current context, expressed as a Domain.
       currentcontextDomain <- pure (CDOM $ ST $ stateSpec2ContextType state)
       -- `subject` is the current subject of lexical analysis. It is represented by
@@ -614,7 +622,7 @@ handlePostponedStateQualifiedParts = do
         (compileExpression
           (CDOM $ ST (roleIdentification2Context syntacticObject))
           syntacticObjectWithEnvironment)
-
+      objectMustBeRole (Just compiledObject) start end
       -- The effect starts with the Perspective object, i.e. the syntacticObject.
       (theAction :: QueryFunctionDescription) <- compileStatement
         states
@@ -646,11 +654,12 @@ handlePostponedStateQualifiedParts = do
               states)})
 
     -- | Modifies the DomeinFile in PhaseTwoState.
-    handlePart (AST.R (AST.RoleVerbE{subject, object, state, roleVerbs:rv, start})) = do
+    handlePart (AST.R (AST.RoleVerbE{subject, object, state, roleVerbs:rv, start, end})) = do
       -- Add, for all these users...
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
       objectQfd <- roleIdentificationToQueryFunctionDescription object start
+      objectMustBeRole (Just objectQfd) start end
       -- ... for these states only...
       stateSpecs <- stateSpecificationToStateSpec state
       -- ... the role verbs.
@@ -668,6 +677,7 @@ handlePostponedStateQualifiedParts = do
       (qualifiedUsers :: Array RoleType) <- collectRoles subject
       -- ... to their perspective on this object...
       objectQfd <- roleIdentificationToQueryFunctionDescription object start
+      objectMustBeRole (Just objectQfd) start end
       propertyTypes <- unsafePartial collectPropertyTypes propsOrView object start
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes propertyVerbs
       -- ... for these states only...
@@ -970,6 +980,12 @@ handlePostponedStateQualifiedParts = do
 
         roleKind :: Partial => StateIdentifier -> PhaseThree RoleKind
         roleKind (StateIdentifier s) = State.gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
+
+objectMustBeRole :: Maybe QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree Unit
+objectMustBeRole qfd start end = case range <$> qfd of
+  Just (RDOM _) -> pure unit
+  Nothing -> pure unit
+  (Just r) -> throwError (NotARoleDomain r start end)
 
 -- | Qualifies incomplete names and changes RoleType constructor to CalculatedRoleType if necessary.
 -- | The role type name (parameter `rt`) is always fully qualified, EXCEPT
