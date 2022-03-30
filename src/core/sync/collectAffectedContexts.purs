@@ -33,7 +33,7 @@ import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (head) as List
-import Data.List.NonEmpty (foldM) as LNE
+import Data.List.NonEmpty (foldM, head, NonEmptyList) as LNE
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
@@ -170,13 +170,16 @@ handleSelfOnlyQuery (InvertedQuery{backwardsCompiled, forwardsCompiled, descript
               for_
                 -- Serialise the ordered dependencies in all paths walked to compute that peer, for that peer only.
                 (allPaths path)
-                (LNE.foldM (serialiseDependency [peer]) Nothing)
+                (\deps -> LNE.foldM (serialiseDependency [peer] (LNE.head deps)) Nothing deps)
               -- Return all peers.
               pure peer
 
     roleAtHead :: Partial => DependencyPath -> RoleInstance
     roleAtHead {head} = case head of
       R r -> r
+
+serialiseDependency' :: Array RoleInstance -> LNE.NonEmptyList Dependency -> MonadPerspectivesTransaction (Maybe Dependency)
+serialiseDependency' users deps = LNE.foldM (serialiseDependency users (LNE.head deps)) Nothing deps
 
 isForSelfOnly :: InvertedQuery -> Boolean
 isForSelfOnly (InvertedQuery{selfOnly}) = selfOnly
@@ -480,7 +483,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
         \stateIdentifier -> (lift2 $ tryGetState stateIdentifier) >>= case _ of
           -- If we deal with a roleInstance of a type for which no state has been defined,
           -- we should carry on as if the state condition was satisfied.
-          Nothing -> for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
+          Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependency' (join $ snd <$> cwus))
           Just (State.State{stateFulObject}) ->
             case stateFulObject of
               -- if the context is in that state,
@@ -488,7 +491,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                 \(Tuple cid users) -> (lift2 $ contextIsInState stateIdentifier cid) >>= if _
                   -- then create deltas for all resources visited by the query (as reflected in
                   -- the assumptions), for all users;
-                  then for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency users) Nothing)
+                  then for_ (join (allPaths <$> rinstances)) (serialiseDependency' users)
                   else pure unit
               -- otherwise, for each user that is that state,
               Srole _ -> for_ cwus
@@ -496,7 +499,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                   \sanctionedUsers ->
                     -- create deltas for all resources visited by the query (as reflected in
                     -- the assumptions);
-                    for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency sanctionedUsers) Nothing)
+                    for_ (join (allPaths <$> rinstances)) (serialiseDependency' sanctionedUsers)
               -- otherwise, for all paths that end in a role that is in that state,
               Orole _ -> (filterA
                 (\{head} -> case head of
@@ -509,7 +512,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                   -- then create deltas for all resources visited by the query (as reflected in
                   -- the assumptions), for all users;
                   >>= pure <<< join <<< (map allPaths)
-                  >>= traverse_ (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
+                  >>= traverse_ (serialiseDependency' (join $ snd <$> cwus))
 
       -- For each property, get its value from the role instances found by the query interpreter,
       -- if the state condition is met. This is similar but not equal to the treatment
@@ -520,7 +523,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
           \stateIdentifier -> (lift2 $ tryGetState stateIdentifier) >>= case _ of
             -- If we deal with a roleInstance of a type for which no state has been defined,
             -- we should carry on as if the state condition was satisfied.
-            Nothing -> for_ (join (allPaths <$> rinstances)) (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
+            Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependency' (join $ snd <$> cwus))
             Just (State.State{stateFulObject}) ->
               -- if the stateful object...
               case stateFulObject of
@@ -532,7 +535,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                     then for_ (_.head <$> rinstances)
                       \(dep :: Dependency) -> do
                         (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
-                        for_ (join (allPaths <$> vals)) (LNE.foldM (serialiseDependency users) Nothing)
+                        for_ (join (allPaths <$> vals)) (serialiseDependency' users)
                     else pure unit
                 -- ... is the subject role, collect each user that is that state,
                 Srole _ -> for_ cwus
@@ -543,7 +546,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                       for_ (_.head <$> rinstances)
                         \(dep :: Dependency) -> do
                           (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
-                          for_ (join (allPaths <$> vals)) (LNE.foldM (serialiseDependency sanctionedUsers) Nothing)
+                          for_ (join (allPaths <$> vals)) (serialiseDependency' sanctionedUsers)
                 -- ... is the object role, then for all paths that end in a role that is in that state,
                 Orole _ -> (filterA
                   (\{head} -> case head of
@@ -556,7 +559,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                     >>= traverse_
                       \(dep :: Dependency) -> do
                         (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
-                        for_ (join (allPaths <$> vals)) (LNE.foldM (serialiseDependency (join $ snd <$> cwus)) Nothing)
+                        for_ (join (allPaths <$> vals)) (serialiseDependency' (join $ snd <$> cwus))
         )
   pure $ join $ snd <$> cwus
 

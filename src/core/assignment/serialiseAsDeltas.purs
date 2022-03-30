@@ -162,25 +162,28 @@ serialiseRoleInstancesAndProperties cid users object properties selfOnly isPersp
         void $ foldM (serialiseDependency
           -- The head will be a user role because of selfOnly.
           (unsafePartial case head dependencies of
-            R r -> [r]))
+            R r -> [r])
+          (head dependencies))
           Nothing
           dependencies
         for_ properties'
           \pt -> for_ (_.head <$> rinstances)
             \(dep ::Dependency) -> do
               (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
-              for_ (join (allPaths <$> vals)) (foldM
+              for_ (join (allPaths <$> vals)) (\deps -> foldM
                 (serialiseDependency
                   (unsafePartial case dep of
-                    R r -> [r]))
-                  Nothing)
+                    R r -> [r])
+                  (head deps))
+                Nothing
+                deps)
     else do
-      for_ (join (allPaths <$> rinstances)) (foldM (serialiseDependency $ toArray users) Nothing)
+      for_ (join (allPaths <$> rinstances)) (\deps -> foldM (serialiseDependency (toArray users) (head deps)) Nothing deps)
       for_ properties'
         \pt -> for_ (_.head <$> rinstances)
           \(dep :: Dependency) -> do
             (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
-            for_ (join (allPaths <$> vals)) (foldM (serialiseDependency $ toArray users) Nothing)
+            for_ (join (allPaths <$> vals)) (\deps -> foldM (serialiseDependency (toArray users) (head deps)) Nothing deps)
 
 getPropertyValues :: PropertyType -> DependencyPath ~~> DependencyPath
 getPropertyValues pt dep = do
@@ -189,11 +192,14 @@ getPropertyValues pt dep = do
 
 -- Always returns the second argument in Maybe.
 -- | `users` will not always be model:System$PerspectivesSystem$User instances.
-serialiseDependency :: Array RoleInstance ->  Maybe Dependency -> Dependency -> MonadPerspectivesTransaction (Maybe Dependency)
-serialiseDependency users mprevious d = do
+serialiseDependency :: Array RoleInstance ->  Dependency -> Maybe Dependency -> Dependency -> MonadPerspectivesTransaction (Maybe Dependency)
+serialiseDependency users queryResult mprevious d = do
   case mprevious, d of
 
-    -- For the first member we have the following 4 possibilities: Nothing + Context, Role and Val.
+    -- Folds through the assumptions in the order they have in a DependencyPath.
+    -- This means that the first assumption is the result of the query; the last assumption represents its origin.
+    -- For the first member we have the following 4 possibilities: Nothing (from the first fold step), Context,
+    -- Role and Val.
     -- For the second member we have just Context, Role and Val.
     -- These combine to 12 possible pairs.
     -- The four cases that end on Role 4 are handled below.
@@ -208,8 +214,15 @@ serialiseDependency users mprevious d = do
     -- As we handle a role, we serialise its context, too.
     -- So the conclusion is that we need not do anything for these other 4 cases.
 
-    Just (R roleId1), (R roleId2) -> do
+    Just first@(R roleId1), (R roleId2) -> do
       addDeltasForRole roleId2
+      -- By comparing the first Role member to the query result, we can establish that this is the final query step.
+      -- We also can deduce it was a `binding` step.
+      -- This means we *have* to add deltas for the first Role member, too.
+      -- Otherwise we'd send a RoleBindingDelta for a role without sending that role and its context itself, too.
+      if first == queryResult
+        then addDeltasForRole roleId1
+        else pure unit
       addBindingDelta roleId1 roleId2 >>= if _
         then pure unit
         else addBindingDelta roleId2 roleId1 >>= if _
