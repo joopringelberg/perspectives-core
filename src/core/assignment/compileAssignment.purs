@@ -70,7 +70,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
-import Perspectives.SaveUserData (handleNewPeer, removeBinding, setBinding, setFirstBinding)
+import Perspectives.SaveUserData (removeBinding, setBinding, setFirstBinding)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, isDatabaseQueryRole)
@@ -223,7 +223,7 @@ compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
     (binder' :: Maybe RoleInstance) <- lift $ lift (contextId ##> binderGetter)
     -- setBinding caches, saves, sets isMe and me.
     void $ case binding', binder' of
-      Just binding'', Just binder'' -> setBinding binder'' binding'' Nothing <* handleNewPeer binder''
+      Just binding'', Just binder'' -> setBinding binder'' binding'' Nothing
       _, _ -> pure []
 
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
