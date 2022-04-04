@@ -88,9 +88,9 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (aspectsOfRole, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
+import Perspectives.Types.ObjectGetters (actionStates, aspectsOfRole, automaticStates, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not, identity)
+import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not)
 
 phaseThree ::
   DomeinFileRecord ->
@@ -464,7 +464,8 @@ handlePostponedStateQualifiedParts = do
         originDomain
         objectQfd
       case object, objectQfd of
-        Just object', Just objectQfd' -> for_ qualifiedUsers (modifyPerspective objectQfd' object' start identity)
+        Just object', Just objectQfd' -> for_ qualifiedUsers (modifyPerspective objectQfd' object' start
+          \(Perspective r) -> Perspective r {automaticStates = union r.automaticStates states})
         _, _ -> pure unit
       where
 
@@ -532,7 +533,8 @@ handlePostponedStateQualifiedParts = do
         originDomain
         objectQfd
       case object, objectQfd of
-        Just object', Just objectQfd' -> for_ qualifiedUsers (modifyPerspective objectQfd' object' start identity)
+        Just object', Just objectQfd' -> for_ qualifiedUsers (modifyPerspective objectQfd' object' start
+          \(Perspective r) -> Perspective r {automaticStates = union r.automaticStates states})
         _, _ -> pure unit
       where
           -- | Modifies the DomeinFile in PhaseTwoState.
@@ -908,6 +910,7 @@ handlePostponedStateQualifiedParts = do
                 , actions: EM.empty
                 , selfOnly: false
                 , isSelfPerspective
+                , automaticStates: []
                 }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
           modifyDF \dfr@{enumeratedRoles} -> dfr {enumeratedRoles = insert
@@ -934,6 +937,7 @@ handlePostponedStateQualifiedParts = do
                 , actions: EM.empty
                 , selfOnly: false
                 , isSelfPerspective
+                , automaticStates: []
                 }
             Just i -> pure (unsafePartial $ fromJust $ index perspectives i)
           modifyDF \dfr@{calculatedRoles} -> dfr {calculatedRoles = insert
@@ -1242,7 +1246,7 @@ invertPerspectiveObjects = do
           -- DomeinFile we keep in PhaseTwoState.
           sPerProp <- lift2 $ statesPerProperty p
           runReaderT
-            (setInvertedQueries [roleType] sPerProp (roleStates p) object selfOnly)
+            (setInvertedQueries [roleType] sPerProp ((roleStates p) `union` (automaticStates p) `union` (actionStates p)) object selfOnly)
             (unsafePartial createModificationSummary p)
 
         explicitSet2RelevantProperties :: ExplicitSet PropertyType -> RelevantProperties

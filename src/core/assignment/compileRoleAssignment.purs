@@ -235,7 +235,7 @@ compileAssignmentFromRole (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = d
             Nothing -> pure unit
             Just role -> try (lift $ lift $ getPerspectEntiteit role) >>=
               handlePerspectRolError "compileAssignmentFromRole, Move"
-                (\((PerspectRol{context, pspType}) :: PerspectRol) ->for roles  (moveRoleInstanceToAnotherContext context c pspType))
+                (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles  (moveRoleInstanceToAnotherContext context c pspType))
 
 compileAssignmentFromRole (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextToBindIn

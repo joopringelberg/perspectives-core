@@ -162,7 +162,7 @@ allEnumeratedRoles ct = ArrayT do
     f roles _ = roles
 
 allUnlinkedRoles :: ContextType ~~~> EnumeratedRoleType
-allUnlinkedRoles = COMB.filter allEnumeratedRoles isUnlinked 
+allUnlinkedRoles = COMB.filter allEnumeratedRoles isUnlinked
 
 allRoleTypesInContext :: ContextType ~~~> RoleType
 allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole userRole'
@@ -583,6 +583,12 @@ propertyVerbs2PropertyArray object (PropertyVerbs pset _) = case pset of
 
 roleStates :: Perspective -> Array StateIdentifier
 roleStates (Perspective {roleVerbs}) = stateSpec2StateIdentifier <$> (fromFoldable $ Map.keys (unwrap roleVerbs))
+
+automaticStates :: Perspective -> Array StateIdentifier
+automaticStates (Perspective {automaticStates:s}) = s
+
+actionStates :: Perspective -> Array StateIdentifier
+actionStates (Perspective {actions}) = stateSpec2StateIdentifier <$> (fromFoldable $ Map.keys (unwrap actions))
 
 -- | perspectiveAspect `isAspectOfPerspective` perspective is true when
 -- | the range of the object of `perspective` equalsOrSpecialisesADT the range of the object of `perspectiveAspect`.

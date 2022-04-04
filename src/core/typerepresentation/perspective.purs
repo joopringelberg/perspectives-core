@@ -66,6 +66,7 @@ type PerspectiveRecord =
 	, actions :: EncodableMap StateSpec (Object Action)
   , selfOnly :: Boolean
   , isSelfPerspective :: Boolean
+  , automaticStates :: Array StateIdentifier
   }
 
 derive instance genericRepPerspective :: Generic Perspective _

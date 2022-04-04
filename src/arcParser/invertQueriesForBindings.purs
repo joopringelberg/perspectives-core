@@ -64,11 +64,12 @@ import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
 -- | NOTE: this function does not handle the inversion of the Perspective Object itself!
 
 -- | If the role, or its filler, adds properties that are in the Map PropertyType (Array StateIdentifier)
--- | provided as third argument, store an InvertedQuery for each of them on the
+-- | provided as third argument, store an InvertedQuery (including the property) for each of them on the
 -- | PropertyType.
 -- | If the filler adds properties, store an InvertedQuery in fillsInvertedQueries of the filler.
 -- | The backwards part of each of these inverted queries is postpended with the backwards part that leads from the
 -- | role.
+-- | This function does not have to handle the RoleVerbs on the root of the filler hiërarchy.
 
 type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
 

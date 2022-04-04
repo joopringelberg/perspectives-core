@@ -241,9 +241,14 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role}) = withFrame 
 -- | It also has a side effect on the DomeinFileRecord that is kept in [PhaseTwoState](Perspectives.Parsing.Arc.PhaseTwoDefs.html#t:PhaseTwoState): it
 -- |  * changes EnumeratedRoles
 -- |  * changes EnumeratedProperties
--- | We only call `compileAndDistributeStep` in the function `compileStates`. This function
--- | also modifies the DomeinFileRecord, but just the CalculatedRole, CalculatedProperty and Action definitions in it.
--- | Hence we do not risk to modify a definition that will be overwritten soon after without including that modification.
+-- | We only call `compileAndDistributeStep` in:
+-- |  - the function `compileStateQueries`. This function also modifies the DomeinFileRecord, but just the
+-- |    State definitions in it.
+-- |  - in the function `handlePart` in PhaseThree, in
+-- |    - casus `AutomaticEffectE`. Here we just modify State definitinons in the DomeinFile.
+-- |    - casus `NotificationE`. Here we just modify State definitinons in the DomeinFile.
+-- | Hence we do not risk to modify a definition that will be overwritten soon after without including that
+-- | modification.
 compileAndDistributeStep ::
   Domain ->
   Step ->
