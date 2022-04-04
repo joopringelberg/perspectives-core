@@ -43,7 +43,7 @@ import Effect.Exception (error)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileRoleAssignment (scheduleRoleRemoval, scheduleContextRemoval)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (##=), (##>), (##>>))
@@ -185,11 +185,11 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
     then pure \contextId -> do
       c <- lift $ lift (contextId ##>> contextGetter)
       (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
-      case ANE.fromArray roles of
+      case head roles of
         Nothing -> pure unit
-        Just roles' ->  try (lift $ lift $ getPerspectEntiteit (ANE.head roles')) >>=
+        Just role ->  try (lift $ lift $ getPerspectEntiteit role) >>=
           handlePerspectRolError "compileAssignment, Move"
-            (\((PerspectRol{context, pspType}) :: PerspectRol) -> moveRoleInstancesToAnotherContext context c pspType roles')
+            (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles (moveRoleInstanceToAnotherContext context c pspType))
 
     else pure \contextId -> do
       ctxt <- lift $ lift (contextId ##> contextGetter)
@@ -197,11 +197,11 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
         Nothing -> pure unit
         Just c -> do
           (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
-          case ANE.fromArray roles of
+          case head roles of
             Nothing -> pure unit
-            Just roles' ->  try (lift $ lift $ getPerspectEntiteit (ANE.head roles')) >>=
+            Just role ->  try (lift $ lift $ getPerspectEntiteit role) >>=
               handlePerspectRolError "compileAssignment, Move"
-                (\((PerspectRol{context, pspType}) :: PerspectRol) -> moveRoleInstancesToAnotherContext context c pspType roles')
+                (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles (moveRoleInstanceToAnotherContext context c pspType))
 
 compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn

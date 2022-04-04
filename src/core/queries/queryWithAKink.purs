@@ -149,12 +149,16 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
       Just {head:(ZQ_ l_ _), tail} -> if null tail
         then do
           -- The inversion of left yielded just a single QueryWithAKink_.
+          -- Now invert the right term of the composition. This will yield all
+          -- possible ways to `kink` the right term.
           zippedQueries <- invert_ r
-          -- Add the kinked query consisting of the first (inverted) step as the left part
-          -- and the (not inverted) rest of the steps as the right part.
+          -- Add the bottom case, consisting of the inverted left term
+          -- and the original right term...
           pure $ cons (ZQ_ l_ (Just r))
-            -- Append the steps found in that single QueryWithAKink_ to the end
-            -- of each series of steps resulting from inverting the right.
+            -- To the rest of the cases. These consist of the combination of the inverted left term
+            -- with all results of the right term.
+            -- Each right-term-inversion-result consists of a backwards- and forwards facing part.
+            -- We must add the inverted left term to THE END of the backwards facing part of each.
             (map (\(ZQ_ r_ q') -> ZQ_ (r_ <> l_) q') zippedQueries)
         -- TODO. In het algemene geval kan de linkerkant wel degelijk meerdere
         -- resultaten opleveren: denk aan een CalculatedRole met een join.

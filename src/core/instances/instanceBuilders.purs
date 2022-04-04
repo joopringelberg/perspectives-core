@@ -40,7 +40,7 @@ where
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (ExceptT)
 import Control.Monad.Writer (WriterT, lift, runWriterT, tell)
-import Data.Array.NonEmpty (NonEmptyArray, singleton, toArray)
+import Data.Array.NonEmpty (NonEmptyArray, toArray)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust)
@@ -52,7 +52,7 @@ import Foreign.Generic (encodeJSON)
 import Foreign.Object (isEmpty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.Update (addRoleInstancesToContext, getAuthor, getSubject, setProperty)
+import Perspectives.Assignment.Update (addRoleInstanceToContext, getAuthor, getSubject, setProperty)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
@@ -78,12 +78,12 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, flip, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setFirstBinding on each role.
 -- | Calls setProperty for each property value.
--- | calls addRoleInstancesToContext on the role instances.
+-- | calls addRoleInstanceToContext on the role instances.
 -- | This function is complete w.r.t. the five responsibilities, for the context and its roles.
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
 constructContext :: Maybe RoleType -> ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
@@ -112,7 +112,11 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
             for_ rolInstances' addBindingToRoleInstance
             -- Add the completed Role instances to the context.
             -- SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
-            lift $ lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) (flip Tuple Nothing <$> (snd <$> rolInstances'))
+            for_ rolInstances'
+              \rolInstance -> lift $ lift $ addRoleInstanceToContext
+                contextInstanceId
+                (EnumeratedRoleType rolTypeId)
+                (Tuple (snd rolInstance) Nothing)
             pure $ toArray (snd <$> rolInstances')
 
           lift $ lift2 $ void $ saveEntiteit contextInstanceId
@@ -257,8 +261,8 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
       -- Then add the new Role instance to the context. Takes care of SYNCHRONISATION by constructing and
       -- adding a ContextDelta. Also adds the UniverseRoleDelta constructed by constructEmptyRole.
       -- We postpone adding the UniverseRoleDelta because we cannot compute the users to distribute it to yet.
-      -- This is done in addRoleInstancesToContext.
-      addRoleInstancesToContext contextInstanceId roleType (singleton (Tuple roleInstance Nothing))
+      -- This is done in addRoleInstanceToContext.
+      addRoleInstanceToContext contextInstanceId roleType (Tuple roleInstance Nothing)
       -- Then add the binding
       case binding of
         Nothing -> pure unit

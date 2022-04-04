@@ -134,7 +134,7 @@ compiletimeIndexForFillsQueries qfd | isRoleDomain $ domain qfd = (allLeavesInAD
     -- start is the filler, because fills goes from filler to filled.
     keysForRoleInContext :: RoleInContext -> (Tuple EnumeratedRoleType (Array InvertedQueryKey))
     keysForRoleInContext (RoleInContext{context:fillerContext, role:fillerRole}) = case roleRange qfd of
-      -- end is the filled role. It is always an ST, because it derives directly from the filledBy clause of an
+      -- The filled role is always an ST, because it derives directly from the filledBy clause of an
       -- EnumeratedRole - by construction a single type.
       ST (RoleInContext{context:filledContext, role:filledRole}) -> case queryFunction qfd of
         (GetRoleBindersF _ (ContextType mrequiredFilledContext)) -> case mrequiredFilledContext of

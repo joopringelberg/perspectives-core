@@ -40,23 +40,22 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, difference, elemIndex, filter, filterA, find, foldM, last, null, union)
+import Data.Array (cons, difference, elemIndex, filterA, find, foldM, last, null)
 import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for)
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple(..), fst)
 import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, lookup)
 import Foreign.Object (union) as OBJ
-import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, lift2, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_id, rol_isMe, rol_pspType, rol_states)
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType, rol_states)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>), (##=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
@@ -67,11 +66,10 @@ import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspe
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
-import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
-import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), singleton)
+import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -103,89 +101,75 @@ setPreferredUserRoleType contextId userRoleTypes = (lift2 $ try $ getPerspectCon
 -----------------------------------------------------------
 type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 
--- | Modifies the context instance by adding the given role instances.
--- | Notice that this function does neither cache nor save the rolInstances themselves.
--- | If all rolInstances are part of the context before the operation, this is a no-op without any effects.
+-- | Modifies the context instance by adding the given role instance.
+-- | Notice that this function does neither cache nor save the rolInstance itself.
+-- | If the rolInstance is part of the context before the operation, this is a no-op without any effects.
 -- | PERSISTENCE of the context instance.
 -- | SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
--- | CURRENTUSER for contextId and one of rolInstances.
--- | To handle incoming ContextDeltas, we include them optionally in the last argument.
-addRoleInstancesToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (NonEmptyArray (Tuple RoleInstance (Maybe SignedDelta))))
-addRoleInstancesToContext contextId rolName instancesAndDeltas = do
-  rolInstances <- pure $ fst <$> instancesAndDeltas
+-- | CURRENTUSER for contextId and the roleInstance.
+-- | To handle an incoming ContextDelta, we include it optionally in the last argument.
+addRoleInstanceToContext :: ContextInstance -> EnumeratedRoleType -> (Updater (Tuple RoleInstance (Maybe SignedDelta)))
+addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
   (lift2 $ try $ getPerspectContext contextId) >>=
     handlePerspectContextError "addRoleInstancesToContext1"
       \(pe :: PerspectContext) -> do
         unlinked <- lift2 $ isUnlinked_ rolName
-        -- Do not add a roleinstance a second time.
-        if unlinked
+        (lift2 $ try $ getPerspectRol roleId) >>= handlePerspectRolError "addRoleInstancesToContext2"
+          \(role@(PerspectRol{contextDelta}) :: PerspectRol) ->
+            -- Do not add a roleinstance a second time.
+            if unlinked
 
-          then do
-            (roles :: Array PerspectRol) <- foldM
-              (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext2" roles (pure <<< (flip cons roles))))
-              []
-              (toArray rolInstances)
-            roles' <- pure $ filter (\(PerspectRol{contextDelta}) -> isDefaultContextDelta contextDelta) roles
-            -- only apply f to those role instances that don't yet have a contextDelta (other than the default one).
-            if null roles'
-              then pure unit
-              else f roles' pe unlinked
+              then if isDefaultContextDelta contextDelta
+                then f role pe unlinked
+                else pure unit
 
-          else if null (toArray rolInstances `difference` context_rolInContext pe rolName)
-            then pure unit
-            else do
-              (roles :: Array PerspectRol) <- foldM
-                (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext3" roles (pure <<< (flip cons roles))))
-                []
-                (toArray rolInstances)
-              f roles pe unlinked
+              else if isJust $ elemIndex roleId (context_rolInContext pe rolName)
+                then pure unit
+                else f role pe unlinked
 
   where
-    f :: Array PerspectRol -> PerspectContext -> Boolean -> MonadPerspectivesTransaction Unit
-    f roles pe unlinked = do
+    f :: PerspectRol -> PerspectContext -> Boolean -> MonadPerspectivesTransaction Unit
+    f role@(PerspectRol r@{_id, universeRoleDelta, isMe}) pe unlinked = do
       changedContext <- if not unlinked
         -- Add the new instance only when the role type is enumerated in the context; hence not for unlinked role types.
-        then lift2 (modifyContext_rolInContext pe rolName (flip union (identifier <$> roles)))
+        then lift2 (modifyContext_rolInContext pe rolName (cons roleId))
         else pure pe
       -- PERSISTENCE
-      -- In the new roleInstances, is one of them filled by me?
-      case find rol_isMe roles of
-        Nothing -> cacheAndSave contextId changedContext
-        Just me -> do
+      -- Is the new role instance filled by me?
+      if isMe
+        then do
           (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
           -- CURRENTUSER
-          cacheAndSave contextId (changeContext_me changedContext (Just (rol_id me)))
+          cacheAndSave contextId (changeContext_me changedContext (Just roleId))
+        else cacheAndSave contextId changedContext
 
       -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
       -- the transaction, too.
       -- Also performs SYNCHRONISATION for paths that lie beyond the roleInstance provided to usersWithPerspectiveOnRoleInstance.
-      -- NOTE: for SYNC to be complete, we should run it on all roles!!!
       -- Notice that even though we compute the users for a single given RoleInstance, we can use that result
       -- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
       -- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
-      users <- usersWithPerspectiveOnRoleInstance rolName (identifier $ unsafePartial $ fromJust $ ARR.head roles) true
+      users <- usersWithPerspectiveOnRoleInstance rolName roleId true
       -- SYNCHRONISATION
       subject <- getSubject
       author <- getAuthor
-      for_ roles \(PerspectRol r@{_id, universeRoleDelta}) -> do
-        addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
-        (receivedDelta :: Maybe (Maybe SignedDelta)) <- pure $ snd <$> find (fst >>> eq _id) instancesAndDeltas
-        delta <- case receivedDelta of
-          Just (Just d) -> pure d
-          otherwise -> pure $ SignedDelta
-            { author
-            , encryptedDelta: sign $ encodeJSON $ ContextDelta
-              { contextInstance : contextId
-              , roleType: rolName
-              , deltaType: AddRoleInstancesToContext
-              , roleInstances: (singleton _id)
-              , destinationContext: Nothing
-              , subject
-              } }
-        addDelta $ DeltaInTransaction {users, delta}
-        cacheAndSave _id $ PerspectRol r { contextDelta = delta }
+      addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
+      delta <- case receivedDelta of
+        Just d -> pure d
+        otherwise -> pure $ SignedDelta
+          { author
+          , encryptedDelta: sign $ encodeJSON $ ContextDelta
+            { contextInstance : contextId
+            , roleType: rolName
+            , deltaType: AddRoleInstancesToContext
+            , roleInstance: _id
+            , destinationContext: Nothing
+            , subject
+            } }
+      addDelta $ DeltaInTransaction {users, delta}
+      cacheAndSave _id $ PerspectRol r { contextDelta = delta }
       -- QUERY UPDATES
       (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
 
@@ -226,7 +210,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
   -- Modify the context: remove the role instances from those recorded with the role type.
   (roles :: Array PerspectRol) <- foldM
-    (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "addRoleInstancesToContext" roles (pure <<< (flip cons roles))))
+    (\roles roleId -> (lift $ lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "removeRoleInstancesFromContext" roles (pure <<< (flip cons roles))))
     []
     (toArray rolInstances)
   (lift2 $ try $ getPerspectContext contextId) >>=
@@ -246,7 +230,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
             cacheAndSave contextId (changeContext_me changedContext Nothing)
 
 -- | Detach the role instances from their current context and attach them to the new context.
--- | This is not just a convenience function. The combination of removeRoleInstancesFromContext and addRoleInstancesToContext would add UniverseRoleDeltas, which we don't need here.
+-- | This is not just a convenience function. The combination of removeRoleInstancesFromContext and addRoleInstanceToContext would add UniverseRoleDeltas, which we don't need here.
 -- | If all rolInstances are part of the destination context before the operation, this is a no-op without any effects.
 -- | PERSISTENCE of both context instances.
 -- | SYNCHRONISATION by two ContextDeltas (no UniverseRoleDeltas needed!).
@@ -254,9 +238,9 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
 -- | QUERY UPDATES
 -- | CURRENTUSER for contextId and one of rolInstances.
 -- TODO. De enige manier om deze functie aan te passen lijkt een nieuwe ContextDelta te maken en mee te nemen in de ContextDelta met MoveRoleInstancesToAnotherContext. Aan de ontvangende kant moet die nieuwe ContextDelta dan in de verplaatste rol worden gezet op de plek van 'contextDelta'.
-moveRoleInstancesToAnotherContext :: ContextInstance -> ContextInstance -> EnumeratedRoleType -> (Updater (NonEmptyArray RoleInstance))
-moveRoleInstancesToAnotherContext originContextId destinationContextId rolName rolInstances = pure unit
--- moveRoleInstancesToAnotherContext originContextId destinationContextId rolName rolInstances = do
+moveRoleInstanceToAnotherContext :: ContextInstance -> ContextInstance -> EnumeratedRoleType -> (Updater RoleInstance)
+moveRoleInstanceToAnotherContext originContextId destinationContextId rolName rolInstance = pure unit
+-- moveRoleInstanceToAnotherContext originContextId destinationContextId rolName rolInstances = do
 --   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
 --   me <- pure $ rol_id <$> find rol_isMe roles
 --   -- me <- pure $ Just $ RoleInstance ""

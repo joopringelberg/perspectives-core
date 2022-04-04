@@ -35,7 +35,7 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign.Generic (decodeJSON)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Assignment.Update (addProperty, addRoleInstancesToContext, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty)
+import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
 import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerb, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.CollectAffectedContexts (lift2)
@@ -72,19 +72,19 @@ import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<
 -- or update to the newer model version (have the end user consent).
 
 executeContextDelta :: ContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
-executeContextDelta (ContextDelta{deltaType, contextInstance, roleType, roleInstances, destinationContext, subject} ) signedDelta = do
-  log (show deltaType <> " to/from " <> show contextInstance <> " and " <> show roleInstances)
+executeContextDelta (ContextDelta{deltaType, contextInstance, roleType, roleInstance, destinationContext, subject} ) signedDelta = do
+  log (show deltaType <> " to/from " <> show contextInstance <> " and " <> show roleInstance)
   case deltaType of
     -- The subject must be allowed to change the role: they must have a perspective on it that includes:
     --  * the verb CreateAndFill, in case a context role is created;
     --  * the verb Create, in case another role is created.
     AddRoleInstancesToContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
       Left e -> handleError e
-      Right _ -> addRoleInstancesToContext contextInstance roleType ((flip Tuple (Just signedDelta)) <$> (unwrap roleInstances))
+      Right _ -> addRoleInstanceToContext contextInstance roleType (Tuple roleInstance (Just signedDelta))
     -- NOTE: the perspective should always include the Delete verb.
     MoveRoleInstancesToAnotherContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
       Left e -> handleError e
-      Right _ -> moveRoleInstancesToAnotherContext contextInstance (unsafePartial $ fromJust destinationContext) roleType (unwrap roleInstances)
+      Right _ -> moveRoleInstanceToAnotherContext contextInstance (unsafePartial $ fromJust destinationContext) roleType roleInstance
 
 executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) signedDelta = do

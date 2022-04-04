@@ -367,8 +367,8 @@ compileSimpleStep currentDomain s@(Binder pos binderName membeddingContext) = do
             (Just qn) | length qnames == 1 -> pure qn
             otherwise -> throwError $ NotUniquelyIdentifying pos binderName (map unwrap qnames)
       case membeddingContext of
-        -- dit klopt niet: moet natuurlijk adt van de binding zijn. Als geen embedding context beschikbaar is,
-        -- lexicale context nemen voor RoleInContext.
+        -- <origin> fills R in <optional context>. Clearly, <optional context> is the context that holds the filled
+        -- role (binder).
         Nothing -> do
           EnumeratedRole{context} <- lift2 $ getEnumeratedRole qBinderType
           pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType context) (RDOM (ST $ RoleInContext{context, role: qBinderType})) True False

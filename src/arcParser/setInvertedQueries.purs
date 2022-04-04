@@ -297,7 +297,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 context)
               enumeratedRoles})
         dfr
-        (allLeavesInADT $ unsafePartial roleDomain qfd)
+        (allLeavesInADT $ unsafePartial roleDomain qfd) -- qfd is the original backwards path.
 
     -- As there is, by construction, no link from the range (an external role type)
     -- to the domain (a context type), we can not attach an inverted query anywhere

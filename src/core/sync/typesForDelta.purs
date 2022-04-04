@@ -161,7 +161,7 @@ instance prettyPrintUniverseRoleDeltaType :: PrettyPrint UniverseRoleDeltaType w
 newtype ContextDelta = ContextDelta (DeltaRecord
   ( contextInstance :: ContextInstance
   , roleType :: EnumeratedRoleType
-  , roleInstances :: SerializableNonEmptyArray RoleInstance
+  , roleInstance :: RoleInstance
   , destinationContext :: Maybe ContextInstance
   , deltaType :: ContextDeltaType
   ))
@@ -173,7 +173,7 @@ instance showContextDelta :: Show ContextDelta where
   show = genericShow
 
 instance eqContextDelta :: Eq ContextDelta where
-  eq (ContextDelta {contextInstance:i1, roleType:r1, roleInstances:ri1, destinationContext: dc1, deltaType:d1}) (ContextDelta {contextInstance:i2, roleType:r2, roleInstances:ri2, destinationContext: dc2, deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && dc1 == dc2 && d1 == d2
+  eq (ContextDelta {contextInstance:i1, roleType:r1, roleInstance:ri1, destinationContext: dc1, deltaType:d1}) (ContextDelta {contextInstance:i2, roleType:r2, roleInstance:ri2, destinationContext: dc2, deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && dc1 == dc2 && d1 == d2
 
 instance encodeContextDelta :: Encode ContextDelta where
   encode = genericEncode defaultOptions

@@ -32,7 +32,6 @@ import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, concat, cons, elemIndex, find, head, nub, union, unsafeIndex)
-import Data.Array.NonEmpty (fromArray, head) as ANE
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -44,7 +43,7 @@ import Effect.Exception (error)
 import Foreign.Object (empty, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstancesToAnotherContext, removeProperty, setProperty)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>), (###=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -220,11 +219,11 @@ compileAssignmentFromRole (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = d
     then pure \roleId -> do
       c <- lift $ lift (roleId ##>> contextGetter)
       (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
-      case ANE.fromArray roles of
+      case head roles of
         Nothing -> pure unit
-        Just roles' ->  try (lift $ lift $ getPerspectEntiteit (ANE.head roles')) >>=
+        Just role -> try (lift $ lift $ getPerspectEntiteit role) >>=
           handlePerspectRolError "compileAssignmentFromRole, Move"
-            (\((PerspectRol{context, pspType}) :: PerspectRol) -> moveRoleInstancesToAnotherContext context c pspType roles')
+            (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles (moveRoleInstanceToAnotherContext context c pspType))
 
     else pure \roleId -> do
       ctxt <- lift $ lift (roleId ##> contextGetter)
@@ -232,11 +231,11 @@ compileAssignmentFromRole (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = d
         Nothing -> pure unit
         Just c -> do
           (roles :: Array RoleInstance) <- lift $ lift (roleId ##= roleGetter)
-          case ANE.fromArray roles of
+          case head roles of
             Nothing -> pure unit
-            Just roles' ->  try (lift $ lift $ getPerspectEntiteit (ANE.head roles')) >>=
+            Just role -> try (lift $ lift $ getPerspectEntiteit role) >>=
               handlePerspectRolError "compileAssignmentFromRole, Move"
-                (\((PerspectRol{context, pspType}) :: PerspectRol) -> moveRoleInstancesToAnotherContext context c pspType roles')
+                (\((PerspectRol{context, pspType}) :: PerspectRol) ->for roles  (moveRoleInstanceToAnotherContext context c pspType))
 
 compileAssignmentFromRole (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextToBindIn
