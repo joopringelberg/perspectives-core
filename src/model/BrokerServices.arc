@@ -98,14 +98,22 @@ domain BrokerServices
       property QueueName (mandatory, String)
       property ConfirmationCode (String)
 
-      view ForAdministrator (AccountName, AccountPassword, QueueName, Achternaam, Voornaam)
       view ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, Achternaam)
 
       perspective on extern
         view External$ForAccountHolder verbs (Consult)
       perspective on AccountHolder
         all roleverbs
-        view AccountHolder$ForAccountHolder verbs (Consult)
+        props (AccountPassword) verbs (SetPropertyValue)
+        props (AccountName, QueueName) verbs (Consult)
+      perspective on BrokerContract$Administrator
+        props (Achternaam) verbs (Consult)
+
+      screen "Broker Contract"
+        column
+          form "BrokerService" External
+          form "Administrator" Administrator
+          form "Account" AccountHolder
 
     user Administrator filledBy bs:BrokerService$Administrator
       aspect sys:Invitation$Inviter
@@ -114,9 +122,11 @@ domain BrokerServices
 
       perspective on AccountHolder
         all roleverbs
-        view AccountHolder$ForAdministrator verbs (Consult)
+        props (AccountName, QueueName, AccountPassword) verbs (Consult, SetPropertyValue)
+        props (Achternaam, Voornaam) verbs (Consult)
       perspective on extern
-        view External$ForAdministrator verbs (Consult)
+        view External$ForAdministrator verbs (Consult, SetPropertyValue)
+
 
     user Guest = sys:Me
       perspective on Administrator

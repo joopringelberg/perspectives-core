@@ -39,6 +39,8 @@ domain System
           PerformUpdate = true
       perspective on IndexedContexts
         defaults
+        action StopUsing
+          remove context origin
       perspective on IndexedContextOfModel
         defaults
       perspective on RootUsers
@@ -51,7 +53,7 @@ domain System
         action StartUsing
           callEffect cdb:AddModelToLocalStore( Url )
           bind origin to ModelsInUse in currentcontext
-        view Modellen$ModelPresentation verbs (Consult)
+        view ModelPresentation verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
 
