@@ -403,7 +403,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         { subject: UserInstance $ RoleInstance me
         , contextInstance: ContextInstance $ show cname
         , roleType: EnumeratedRoleType $ show rname
-        , roleInstances: singleton rolId
+        , roleInstance: rolId
         , destinationContext: Nothing
         , deltaType: AddRoleInstancesToContext
         }
@@ -699,7 +699,7 @@ definition = do
     { subject: UserInstance $ RoleInstance me
     , contextInstance: ContextInstance enclContext
     , roleType: EnumeratedRoleType (show prop)
-    , roleInstances: singleton rolId
+    , roleInstance: rolId
     , destinationContext: Nothing
     , deltaType: AddRoleInstancesToContext
     }
