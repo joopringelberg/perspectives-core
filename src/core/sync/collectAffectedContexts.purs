@@ -33,7 +33,7 @@ import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (head) as List
-import Data.List.NonEmpty (foldM, head, NonEmptyList) as LNE
+import Data.Map (isEmpty)
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
@@ -43,7 +43,7 @@ import Effect.Exception (error)
 import Foreign.Object (Object, empty, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspective.InvertedQuery.Indices (runTimeIndexForRoleQueries, runtimeIndexForContextQueries, runtimeIndexForFilledByQueries, runtimeIndexForFillsQueries, runtimeIndexForPropertyQueries)
-import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependency)
+import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependencies)
 import Perspectives.ContextAndRole (isDefaultContextDelta)
 import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, execMonadPerspectivesQuery, runMonadPerspectivesQuery, (###=), (##=), (##>), (##>>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
@@ -170,16 +170,13 @@ handleSelfOnlyQuery (InvertedQuery{backwardsCompiled, forwardsCompiled, descript
               for_
                 -- Serialise the ordered dependencies in all paths walked to compute that peer, for that peer only.
                 (allPaths path)
-                (\deps -> LNE.foldM (serialiseDependency [peer] (LNE.head deps)) Nothing deps)
+                (serialiseDependencies [peer])
               -- Return all peers.
               pure peer
 
     roleAtHead :: Partial => DependencyPath -> RoleInstance
     roleAtHead {head} = case head of
       R r -> r
-
-serialiseDependency' :: Array RoleInstance -> LNE.NonEmptyList Dependency -> MonadPerspectivesTransaction (Maybe Dependency)
-serialiseDependency' users deps = LNE.foldM (serialiseDependency users (LNE.head deps)) Nothing deps
 
 isForSelfOnly :: InvertedQuery -> Boolean
 isForSelfOnly (InvertedQuery{selfOnly}) = selfOnly
@@ -433,6 +430,13 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
       -- because instances of such a role cannot be shown).
       -- Another case that the roleInstance has just been added as a binding to a role a user has a perspective on.
       -- For each property, get its value from the role instance, if the state condition is met.
+      -- When there are no properties, we add the deltas for the role instance anyway.
+      -- This covers the case of a new binding for a perspective without properties.
+      if (isEmpty (unwrap statesPerProperty))
+        then do
+          PerspectRol{pspType, context} <- lift $ lift $ getPerspectRol roleInstance
+          magic context (SerializableNonEmptyArray $ ANE.singleton roleInstance) pspType (join $ snd <$> cwus)
+        else pure unit
       forWithIndex_ (unwrap statesPerProperty)
         (\prop propStates -> do
           propGetter <- lift2 (makeChainGetter <$> (getterFromPropertyType prop))
@@ -483,7 +487,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
         \stateIdentifier -> (lift2 $ tryGetState stateIdentifier) >>= case _ of
           -- If we deal with a roleInstance of a type for which no state has been defined,
           -- we should carry on as if the state condition was satisfied.
-          Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependency' (join $ snd <$> cwus))
+          Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependencies (join $ snd <$> cwus))
           Just (State.State{stateFulObject}) ->
             case stateFulObject of
               -- if the context is in that state,
@@ -491,7 +495,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                 \(Tuple cid users) -> (lift2 $ contextIsInState stateIdentifier cid) >>= if _
                   -- then create deltas for all resources visited by the query (as reflected in
                   -- the assumptions), for all users;
-                  then for_ (join (allPaths <$> rinstances)) (serialiseDependency' users)
+                  then for_ (join (allPaths <$> rinstances)) (serialiseDependencies users)
                   else pure unit
               -- otherwise, for each user that is that state,
               Srole _ -> for_ cwus
@@ -499,7 +503,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                   \sanctionedUsers ->
                     -- create deltas for all resources visited by the query (as reflected in
                     -- the assumptions);
-                    for_ (join (allPaths <$> rinstances)) (serialiseDependency' sanctionedUsers)
+                    for_ (join (allPaths <$> rinstances)) (serialiseDependencies sanctionedUsers)
               -- otherwise, for all paths that end in a role that is in that state,
               Orole _ -> (filterA
                 (\{head} -> case head of
@@ -512,7 +516,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                   -- then create deltas for all resources visited by the query (as reflected in
                   -- the assumptions), for all users;
                   >>= pure <<< join <<< (map allPaths)
-                  >>= traverse_ (serialiseDependency' (join $ snd <$> cwus))
+                  >>= traverse_ (serialiseDependencies (join $ snd <$> cwus))
 
       -- For each property, get its value from the role instances found by the query interpreter,
       -- if the state condition is met. This is similar but not equal to the treatment
@@ -523,7 +527,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
           \stateIdentifier -> (lift2 $ tryGetState stateIdentifier) >>= case _ of
             -- If we deal with a roleInstance of a type for which no state has been defined,
             -- we should carry on as if the state condition was satisfied.
-            Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependency' (join $ snd <$> cwus))
+            Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependencies (join $ snd <$> cwus))
             Just (State.State{stateFulObject}) ->
               -- if the stateful object...
               case stateFulObject of
@@ -535,7 +539,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                     then for_ (_.head <$> rinstances)
                       \(dep :: Dependency) -> do
                         (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
-                        for_ (join (allPaths <$> vals)) (serialiseDependency' users)
+                        for_ (join (allPaths <$> vals)) (serialiseDependencies users)
                     else pure unit
                 -- ... is the subject role, collect each user that is that state,
                 Srole _ -> for_ cwus
@@ -546,7 +550,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                       for_ (_.head <$> rinstances)
                         \(dep :: Dependency) -> do
                           (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
-                          for_ (join (allPaths <$> vals)) (serialiseDependency' sanctionedUsers)
+                          for_ (join (allPaths <$> vals)) (serialiseDependencies sanctionedUsers)
                 -- ... is the object role, then for all paths that end in a role that is in that state,
                 Orole _ -> (filterA
                   (\{head} -> case head of
@@ -559,7 +563,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
                     >>= traverse_
                       \(dep :: Dependency) -> do
                         (vals :: Array DependencyPath) <- lift2 ((singletonPath dep) ##= getPropertyValues prop)
-                        for_ (join (allPaths <$> vals)) (serialiseDependency' (join $ snd <$> cwus))
+                        for_ (join (allPaths <$> vals)) (serialiseDependencies (join $ snd <$> cwus))
         )
   pure $ join $ snd <$> cwus
 
