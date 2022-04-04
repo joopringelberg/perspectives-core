@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars 2021
+-- Copyright Joop Ringelberg and Cor Baars 2021-2022.
 -- In this file we model financial transactions with Witnesses.
 
 domain WitCoin
@@ -15,10 +15,11 @@ domain WitCoin
   user AccountHolder filledBy sys:PerspectivesSystem$User
     property Prior (Number)
     property Post (Number)
+    property IsInitiator (Boolean)
 
--------------------------------------------------------------------------------
----- WITCOINAPP
--------------------------------------------------------------------------------
+  -------------------------------------------------------------------------------
+  ---- WITCOINAPP
+  -------------------------------------------------------------------------------
   case WitCoinApp
     indexed wit:MyWitCoinApp
     aspect sys:RootContext
@@ -31,7 +32,7 @@ domain WitCoin
     ---- In reality, the user has to top up his account by transferring money
     ---- into the Perspectives Universe.
     -------------------------------------------------------------------------------
-    state NoTransactions = (not exists Transactions) and exists Witnesses
+    state NoTransactions = (not exists Transactions) and exists Witnesses >> binding
       on entry
         do for Manager
           letA
@@ -43,8 +44,9 @@ domain WitCoin
             Post = 100 for cred
             -- Here we create a role instance for LastTransaction.
             bind trans >> binding to LastTransaction
-            -- And we add a Witness.
-            bind Witnesses >> binding to Witness in trans >> binding >> context
+            -- And we add Witnesses.
+            bind Witnesses >> binding to DebitorWitness in trans >> binding >> context
+            bind Witnesses >> binding to CreditorWitness in trans >> binding >> context
 
       perspective of Manager
         perspective on Transactions >> binding >> context >> Creditor
@@ -69,7 +71,7 @@ domain WitCoin
               trans <- create context Transaction bound to Transactions
             in
               bind sys:Me to Debitor in trans >> binding >> context
-              bind sys:Me to Initiator in trans >> binding >> context
+              IsInitiator = true for trans >> binding >> context >> Debitor
 
           -------------------------------------------------------------------------------
           ---- ADD A TRANSACTION AS PAYMENT REQUEST
@@ -79,20 +81,30 @@ domain WitCoin
               trans <- create context Transaction bound to Transactions
             in
               bind sys:Me to Creditor in trans >> binding >> context
-              bind sys:Me to Initiator in trans >> binding >> context
+              IsInitiator = true for trans >> binding >> context >> Creditor
 
       perspective on Transactions >> binding >> context >> Debitor
         only (Create, Fill)
+        props (IsInitiator) verbs (SetPropertyValue)
 
       perspective on Transactions >> binding >> context >> Creditor
         only (Create, Fill)
+        props (IsInitiator) verbs (SetPropertyValue)
 
       perspective on Witnesses
-        only (Create, Fill)
-        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+        only (Create, Fill, Remove)
+        props (Achternaam) verbs (Consult)
 
       perspective on LastTransaction
         only (Create, Fill)
+        props (TransactionPartnerName, MyTransferSum, MyResultingSaldo) verbs (Consult)
+
+      screen "Witcoin Transactions"
+        tab "Witnesses"
+          form Witnesses
+        tab "Transactions"
+          form "Last Transaction" LastTransaction
+          table Transactions
 
     -------------------------------------------------------------------------------
     ---- WITNESSES
@@ -138,9 +150,9 @@ domain WitCoin
       property IAmCreditor = context >> Creditor binds sys:Me
       property IAmDebitorInLastTransaction = wit:MyWitCoinApp >> LastTransaction >> binding >> context >> extern >> IAmDebitor
       property IAmCreditorInLastTransaction = wit:MyWitCoinApp >> LastTransaction >> binding >> context >> extern >> IAmCreditor
-      property IAmInitiator = context >> Initiator binds sys:Me
+      property IAmInitiator = (IAmDebitor and context >> Debitor >> IsInitiator) or (IAmCreditor and context >> Creditor >> IsInitiator)
 
-      perspective of Witness
+      perspective of DebitorWitness
         props (TransferSum, Committed) verbs (Consult)
 
       state DebitorCanSetTransferSum = IAmInitiator and IAmDebitor
@@ -164,17 +176,23 @@ domain WitCoin
         state AcceptOrReject = IAmDebitor
           state DebitorInLastTransaction = IAmDebitorInLastTransaction
             perspective of Debitor
+              -- As I am Debitor in LastTransaction, we need to fill the NextDeb role of that Transaction.
+              -- We then make the current Transaction the LastTransaction.
               action CommitPayment
                 bind origin to NextDeb in wit:MyWitCoinApp >> LastTransaction >> binding >> context
-                -- Here we bind this Transaction to the existing role instance of LastTransaction.
+                -- Create an empty DebitorWitness role. The Witness in LastTransaction sees and fills it.
+                create role DebitorWitness
                 bind_ origin to wit:MyWitCoinApp >> LastTransaction
                 Committed = true
             state Committed = exists Committed
           state CreditorInLastTransaction = IAmCreditorInLastTransaction
             perspective of Debitor
+              -- As I am Creditor in LastTransaction, we need to fill the NextCred role of that Transaction.
+              -- We then make the current Transaction the LastTransaction.
               action CommitPayment
                 bind origin to NextCred in wit:MyWitCoinApp >> LastTransaction >> binding >> context
-                -- Here we bind this Transaction to the existing role instance of LastTransaction.
+                -- Create an empty DebitorWitness role. The Witness in LastTransaction sees and fills it.
+                create role DebitorWitness
                 bind_ origin to wit:MyWitCoinApp >> LastTransaction
                 Committed = true
             state Committed = exists Committed
@@ -198,25 +216,25 @@ domain WitCoin
                   -- Add to Transactions, so Creditor can see it.
                   bind origin to Transactions in wit:MyWitCoinApp
 
-    state TransferFunds = (exists Debitor >> Prior) and exists Creditor >> Prior
-      on entry
-        do for Witness
-          Post = Debitor >> Prior - extern >> TransferSum for Debitor
-          Post = Creditor >> Prior + extern >> TransferSum for Creditor
-
     -------------------------------------------------------------------------------
     ---- DEBITOR
     -------------------------------------------------------------------------------
     user Debitor filledBy sys:PerspectivesSystem$User
       aspect wit:AccountHolder
 
-      state PostCanBeComputed = (exists Prior) and exists context >> extern >> TransferSum
+      -- In state PostCanBeComputed, it is guaranteed that there is a TransferSum, too.
+      state PostCanBeComputed = (exists Prior) and context >> extern >> Committed
 
       perspective on Creditor
         only (Create, Fill)
         view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
 
-      perspective on Witness
+      perspective on DebitorWitness
+        only (Create)
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on CreditorWitness
+        only (Create)
         view sys:PerspectivesSystem$User$SyncId verbs (Consult)
 
       perspective on NextDeb
@@ -239,12 +257,20 @@ domain WitCoin
     user Creditor filledBy sys:PerspectivesSystem$User
       aspect wit:AccountHolder
 
+      -- In state PostCanBeComputed, it is guaranteed that there is a TransferSum, too.
+      state PostCanBeComputed = (exists Prior) and context >> extern >> Committed
+
       perspective on Debitor
         only (Create, Fill)
         view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
 
-      perspective on Witness
-        view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
+      perspective on DebitorWitness
+        only (Create)
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on CreditorWitness
+        only (Create)
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
 
       perspective on NextDeb
         only (Create, Fill)
@@ -261,14 +287,158 @@ domain WitCoin
         view sys:PerspectivesSystem$User$SyncId verbs (Consult)
 
     -------------------------------------------------------------------------------
-    ---- INITIATOR
+    ---- CREDITORWITNESS
+    ---- The Witness set by Witness of the previous Transaction of the Creditor.
     -------------------------------------------------------------------------------
-    user Initiator filledBy sys:PerspectivesSystem$User
+    user CreditorWitness filledBy sys:PerspectivesSystem$User
+      state Unfilled = not exists binding
+
+      -------------------------------------------------------------------------------
+      ---- LINKING TO THE NEXT TRANSACTION(S)
+      ---- As a Witness I have a perspective on several roles in transactions
+      ---- that are chained to the current one.
+      -------------------------------------------------------------------------------
+      -- As soon as this transaction has a successor transaction in NextDeb
+      -- with an (unfilled) Witness role, I as Witness will fill it with myself.
+      perspective on NextDeb >> binding >> context >> CreditorWitness
+        only (Fill)
+        on entry of object state Unfilled
+          do
+            bind_ origin to sys:Me
+
+      -- As soon as this transaction has a successor transaction in NextCred
+      -- with an (unfilled) Witness role, I as Witness will fill it with myself.
+      perspective on NextCred >> binding >> context >> CreditorWitness
+        only (Fill)
+          on entry of object state Unfilled
+            do
+              bind_ origin to sys:Me
+
+      -- I as CreditorWitness need to see the Debitor, DebitorWitness and
+      -- Creditor in the next transactions, in order to be able to tell them
+      -- that I have set myself as the Debitor Witness in those transactions, too.
+      perspective on NextDeb >> binding >> context >> Creditor
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextDeb >> binding >> context >> Debitor
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextDeb >> binding >> context >> DebitorWitness
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextCred >> binding >> context >> Creditor
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextCred >> binding >> context >> Debitor
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextCred >> binding >> context >> DebitorWitness
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      -------------------------------------------------------------------------------
+      ---- COMPUTING PRIOR VALUES
+      -------------------------------------------------------------------------------
+      -- When I am the CreditorWitness in the next Transaction,
+      -- I must set the Prior value of the Creditor in that Transaction.
+
+      -- In this case, it must be equal to the Post value of the Debitor in this Transaction
+      -- (because the next Transaction is stored in NextDeb).
+      perspective on NextDeb >> binding >> context Creditor
+        props (Prior) verbs (SetPropertyValue)
+        on entry
+          do
+            Prior = currentcontext >> Debitor >> Post
+
+      -- In this case, it must be equal to the Post value of the Creditor in this Transaction
+      -- (because the next Transaction is stored in NextCred).
+      perspective on NextCred >> binding >> context Creditor
+        props (Prior) verbs (SetPropertyValue)
+        on entry
+          do
+            Prior = currentcontext >> Creditor >> Post
 
     -------------------------------------------------------------------------------
-    ---- WITNESS
+    ---- DEBITORWITNESS
+    ---- The Witness set by Witness of the previous Transaction of the Debitor.
+
+    ---- The Witness of a Transaction has always been set by the Witness of the
+    ---- previous Transaction of the Debitor, as only the Debitor can commit a
+    ---- Transaction.
     -------------------------------------------------------------------------------
-    user Witness filledBy sys:PerspectivesSystem$User
+    user DebitorWitness filledBy sys:PerspectivesSystem$User
+      state Unfilled = not exists binding
+
+      -------------------------------------------------------------------------------
+      ---- LINKING TO THE NEXT TRANSACTION(S)
+      ---- As a Witness I have a perspective on several roles in transactions
+      ---- that are chained to the current one.
+      -------------------------------------------------------------------------------
+      -- As soon as this transaction has a successor transaction in NextDeb
+      -- with an (unfilled) Witness role, I as Witness will fill it with myself.
+      perspective on NextDeb >> binding >> context >> DebitorWitness
+        only (Fill)
+        on entry of object state Unfilled
+          do
+            bind_ origin to sys:Me
+
+      -- As soon as this transaction has a successor transaction in NextCred
+      -- with an (unfilled) Witness role, I as Witness will fill it with myself.
+      perspective on NextCred >> binding >> context >> DebitorWitness
+        only (Fill)
+          on entry of object state Unfilled
+            do
+              bind_ origin to sys:Me
+
+      -- I as DebitorWitness need to see the Creditor, CreditorWitness and
+      -- Debitor in the next transactions, in order to be able to tell them
+      --  that I have set myself as the Debitor Witness in those transactions, too.
+      perspective on NextDeb >> binding >> context >> Creditor
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextDeb >> binding >> context >> Debitor
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextDeb >> binding >> context >> CreditorWitness
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextCred >> binding >> context >> Creditor
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextCred >> binding >> context >> Debitor
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      perspective on NextCred >> binding >> context >> CreditorWitness
+        view sys:PerspectivesSystem$User$SyncId verbs (Consult)
+
+      -------------------------------------------------------------------------------
+      ---- COMPUTING PRIOR VALUES
+      -------------------------------------------------------------------------------
+      -- When I am the DebitorWitness in the next Transaction,
+      -- I must set the Prior value of the Debitor.
+      -- This is because this Witness is always filled from the Debitor side of the transaction.
+      -- So I have access to the previous Transaction of the Debitor.
+
+      -- In this case, it must be equal to the Post value of the Debitor in this Transaction
+      -- (because the next Transaction is stored in NextDeb).
+      perspective on NextDeb >> binding >> context Debitor
+        props (Prior) verbs (SetPropertyValue)
+        on entry
+          do
+            Prior = currentcontext >> Debitor >> Post
+
+      -- In this case, it must be equal to the Post value of the Creditor in this Transaction
+      -- (because the next Transaction is stored in NextCred).
+      perspective on NextCred >> binding >> context Debitor
+        props (Prior) verbs (SetPropertyValue)
+        on entry
+          do
+            Prior = currentcontext >> Creditor >> Post
+
+      -------------------------------------------------------------------------------
+      ---- COMPUTING POST VALUES
+      ---- Once I am DebitorWitness in this Transaction, and I have all the necessary data,
+      ---- I compute the amount in the account after this Transaction (the Post value).
+      -------------------------------------------------------------------------------
       perspective on Debitor
         props (Prior, Post) verbs (SetPropertyValue)
         -- This is to make sure Witness gets to see the User behind Debitor.
@@ -281,56 +451,13 @@ domain WitCoin
         props (Prior, Post) verbs (SetPropertyValue)
         -- This is to make sure Witness gets to see the User behind Creditor.
         view sys:PerspectivesSystem$User$SyncId verbs (Consult)
-
-      --perspective on NextDebRole
-        --props (Prior) verbs (SetPropertyValue)
-
-      --perspective on NextCredRole
-        --props (Prior) verbs (SetPropertyValue)
-
-      perspective on NextDebWitness
-        only (Create, Fill)
-
-      perspective on NextCredWitness
-        only (Create, Fill)
-
-      perspective on NextDeb >> binding
-        on entry of object state TransactionComplete$AcceptOrReject$DebitorInLastTransaction$Committed
+        on entry of object state PostCanBeComputed
           do
-            -- Set Prior of Debitor in the next transaction, as represented by the object.
-            Prior = currentcontext >> Debitor >> Post for context >> Debitor
-            bind sys:Me to Witness in currentcontext >> NextCred >> binding >> context
-
-        on entry of object state TransactionComplete$WaitForCommitment$DebitorInLastTransaction$Committed
-          do
-            -- Set Prior of Creditor in the next transaction, as represented by the object.
-            Prior = currentcontext >> Debitor >> Post for context >> Creditor
-
-      perspective on NextCred >> binding
-        on entry of object state TransactionComplete$AcceptOrReject$CreditorInLastTransaction$Committed
-          do
-            -- Set Prior of Debitor in the next transaction, as represented by the object.
-            Prior = currentcontext >> Debitor >> Post for context >> Debitor
-            bind sys:Me to Witness in currentcontext >> NextCred >> binding >> context
-
-        on entry of object state TransactionComplete$WaitForCommitment$CreditorInLastTransaction$Committed
-          do
-            -- Set Prior of Creditor in the next transaction, as represented by the object.
-            Prior = currentcontext >> Creditor >> Post for context >> Creditor
-
-    -------------------------------------------------------------------------------
-    ---- ACCOUNTHOLDER
-    -------------------------------------------------------------------------------
-    user Accountholder = sys:Me
-      perspective on Debitor
-        only (Create, Fill)
-        props (Achternaam, Prior, Post) verbs (Consult)
-      perspective on Creditor
-        only (Create, Fill)
-        props (Achternaam, Prior, Post) verbs (Consult)
+            Post = Prior + context >> extern >> TransferSum
 
     -------------------------------------------------------------------------------
     ---- NEXTDEB
+    ---- This is the next Transaction for the Debitor in the current Transaction.
     -------------------------------------------------------------------------------
     context NextDeb filledBy Transaction
       perspective of Debitor
@@ -338,32 +465,11 @@ domain WitCoin
 
     -------------------------------------------------------------------------------
     ---- NEXTCRED
+    ---- This is the next Transaction for the Creditor in the current Transaction.
     -------------------------------------------------------------------------------
     context NextCred filledBy Transaction
       perspective of Creditor
         only (CreateAndFill, Remove)
-
-    -------------------------------------------------------------------------------
-    ---- NEXTDEBROLE
-    -------------------------------------------------------------------------------
-    -- The role the Debitor of this Transaction has in his next Transaction.
-    --user NextDebRole = filter (NextDeb >> binding >> context >> Debitor either NextDeb >> binding >> context >> Creditor) with binds origin >> Debitor >> binding
-
-    -------------------------------------------------------------------------------
-    ---- NEXTCREDROLE
-    -------------------------------------------------------------------------------
-    -- The role the Creditor of this Transaction has in his next Transaction.
-    --user NextCredRole = filter (NextCred >> binding >> context >> Debitor either NextCred >> binding >> context >> Creditor) with binds origin >> Creditor >> binding
-
-    -------------------------------------------------------------------------------
-    ---- NEXTDEBWITNESS
-    -------------------------------------------------------------------------------
-    user NextDebWitness = NextDeb >> binding >> context >> Witness
-
-    -------------------------------------------------------------------------------
-    ---- NEXTCREDWITNESS
-    -------------------------------------------------------------------------------
-    user NextCredWitness = NextCred >> binding >> context >> Witness
 
     -------------------------------------------------------------------------------
     ---- TRANSACTIONPARTNER
