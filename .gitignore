@@ -32,4 +32,6 @@ test.js
 bowerinstall.txt
 package-lock.json
 
+/.spago
+
 /**/~*

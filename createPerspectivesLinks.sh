@@ -2,40 +2,64 @@
 
 # NOTE: this script should be adapted with each new tagged version!
 
-cd .psc-package/pv0.15.0/aff-sockets
+#cd .psc-package/pv0.15.0/aff-sockets
 
-rm -Rf v2.2.0
+##### SPAGO #####
+cd ./.spago
 
-ln -s ../../../../purescript-aff-sockets v2.2.0
+##### AFF-SOCKETS #####
+# cd ./aff-sockets
+#
+# rm -Rf v2.2.1
+#
+# ln -s ../../../../purescript-aff-sockets v2.2.1
+#
+# cd ..
 
-cd ../affjax
+##### AFFJAX #####
 
-rm -Rf pv9.1.0
+cd ./affjax
 
-ln -s ../../../../purescript-affjax pv9.1.0
+rm -Rf v12.0.0-with-xhr-cookies
 
-cd ../perpectives-apitypes
+ln -s ../../../../purescript-affjax v12.0.0-with-xhr-cookies
 
-rm -Rf v2.13.0
+cd ..
 
-ln -s ../../../../perspectives-apitypes v2.13.0
+##### PERSPECTIVES-APITYPES #####
+cd ./perpectives-apitypes
 
-cd ../avar-monadask/
+rm -Rf v2.13.2
+
+ln -s ../../../../perspectives-apitypes v2.13.2
+
+cd ..
+
+##### AVAR-MONADASK #####
+cd ./avar-monadask/
 
 rm -Rf v2.1.0
 
 ln -s ../../../../purescript-avar-monadask v2.1.0
 
-cd ../perspectives-couchdb/
+cd ..
 
-rm -Rf v2.8.4
 
-ln -s ../../../../perspectives-couchdb v2.8.4
+##### PERSPECTIVES-COUCHDB #####
+cd ./perspectives-couchdb/
 
-cd ../../..
+rm -Rf v2.8.5
+
+ln -s ../../../../perspectives-couchdb v2.8.5
+
+cd ..
+
+##### NODE_MODULES #####
+cd ..
 
 cd ./node_modules
 
+##### PERSPECTIVES-PROXY #####
 rm -Rf perspectives-proxy
 
 ln -s ../../perspectives-proxy
