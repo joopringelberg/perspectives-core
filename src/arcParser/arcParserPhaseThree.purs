@@ -225,7 +225,7 @@ qualifyStateNames = (lift $ State.gets _.dfr) >>= qualifyStateNames'
         -- Note that the validity of this depends on the unqualfied name being a reference to a role!
         else qualifyLocalRoleName arcParserStartPosition (unwrap id) >>= pure <<< roletype2string
       pure $ State sr {id = StateIdentifier qid}) >>=
-    \qstates -> modifyDF (\df -> df {states = qstates})
+        \qstates -> modifyDF (\df -> df {states = qstates})
 
 -- | For each (Enumerated) role with a binding to the name of a CalculatedRole (falsely declared to be Enumerated!),
 -- | replace that binding with the ADT of the (now compiled) CalculatedRole.

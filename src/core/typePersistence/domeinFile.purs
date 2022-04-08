@@ -26,8 +26,8 @@ import Control.Monad.State (State, execState, modify)
 import Data.Array (cons)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign (Foreign)
@@ -112,12 +112,12 @@ data SeparateInvertedQuery =
   -- Type of the role instance; Type of the context instance to store on; InvertedQuery
   RoleInvertedQuery EnumeratedRoleType TypeName InvertedQuery |                  -- `role` step
   -- Type of the context of the role instance; Type of the role instance to store on; InvertedQuery
-	ContextInvertedQuery ContextType TypeName InvertedQuery |                      -- `context` step
+  ContextInvertedQuery ContextType TypeName InvertedQuery |                      -- `context` step
   -- Triple keys; Type of the role instance to store on; InvertedQuery
-	FilledByInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |        -- `filledBy` step
-	FillsInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |           -- `fills` step
+  FilledByInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |        -- `filledBy` step
+  FillsInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |           -- `fills` step
   -- EnumeratedRoleTypes to index with; EnumeratedProperty to store on; InvertedQuery
-	OnPropertyDelta (Array EnumeratedRoleType) TypeName InvertedQuery              -- `Value2Role` step.
+  OnPropertyDelta (Array EnumeratedRoleType) TypeName InvertedQuery              -- `Value2Role` step.
 
 type TypeName = String
 

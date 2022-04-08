@@ -5,7 +5,7 @@
 #cd .psc-package/pv0.15.0/aff-sockets
 
 ##### SPAGO #####
-cd ./.spago
+cd .spago
 
 ##### AFF-SOCKETS #####
 # cd ./aff-sockets
@@ -18,46 +18,56 @@ cd ./.spago
 
 ##### AFFJAX #####
 
-cd ./affjax
+cd affjax
 
 rm -Rf v12.0.0-with-xhr-cookies
 
-ln -s ../../../../purescript-affjax v12.0.0-with-xhr-cookies
+ln -s ../../../purescript-affjax v12.0.0-with-xhr-cookies
+
+cd ..
+
+##### KISHIMEN #####
+
+cd kishimen
+
+rm -Rf v1.1.0
+
+ln -s ../../../purescript-kishimen v1.1.0
 
 cd ..
 
 ##### PERSPECTIVES-APITYPES #####
-cd ./perpectives-apitypes
-
-rm -Rf v2.13.2
-
-ln -s ../../../../perspectives-apitypes v2.13.2
-
-cd ..
+# cd perpectives-apitypes
+#
+# rm -Rf v2.13.2
+#
+# ln -s ../../../perspectives-apitypes v2.13.2
+#
+# cd ..
 
 ##### AVAR-MONADASK #####
-cd ./avar-monadask/
+cd avar-monadask/
 
 rm -Rf v2.1.0
 
-ln -s ../../../../purescript-avar-monadask v2.1.0
+ln -s ../../../purescript-avar-monadask v2.1.0
 
 cd ..
 
 
 ##### PERSPECTIVES-COUCHDB #####
-cd ./perspectives-couchdb/
+cd perspectives-couchdb/
 
 rm -Rf v2.8.5
 
-ln -s ../../../../perspectives-couchdb v2.8.5
+ln -s ../../../perspectives-couchdb v2.8.5
 
 cd ..
 
 ##### NODE_MODULES #####
 cd ..
 
-cd ./node_modules
+cd node_modules
 
 ##### PERSPECTIVES-PROXY #####
 rm -Rf perspectives-proxy

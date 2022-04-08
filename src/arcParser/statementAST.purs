@@ -28,8 +28,8 @@ import Prelude
 
 import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -51,9 +51,9 @@ data AssignmentOperator =
 type WithTextRange f = {start :: ArcPosition, end :: ArcPosition | f}
 
 data Assignment =
-	RemoveRole (WithTextRange (roleExpression :: Step))
+  RemoveRole (WithTextRange (roleExpression :: Step))
   | RemoveContext (WithTextRange (roleExpression :: Step))
-	| CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
+  | CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
   | CreateContext (WithTextRange (contextTypeIdentifier :: String, roleTypeIdentifier :: String, contextExpression :: Maybe Step))
   | CreateContext_ (WithTextRange (contextTypeIdentifier :: String, roleExpression :: Step))
   | Move (WithTextRange (roleExpression :: Step, contextExpression :: Maybe Step))

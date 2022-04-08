@@ -96,18 +96,18 @@ foreign import keys :: forall a. GLStrMap a -> Array String
 
 foreign import values :: forall a. GLStrMap a -> Array a
 
-instance indexForeignObject :: Index (GLStrMap v) String v where
-  ix k =
-    wander \coalg m ->
-      peek m k #
-        maybe
-          (pure m)
-          (coalg >>> map \v -> poke m k v)
+-- instance indexForeignObject :: Index (GLStrMap v) String v where
+--   ix k =
+--     wander \coalg m ->
+--       peek m k #
+--         maybe
+--           (pure m)
+--           (coalg >>> map \v -> poke m k v)
 
-instance atForeignGLStrMap :: At (GLStrMap a) String a where
-  at k =
-    lens ((flip peek) k) \m ->
-      maybe (delete' k m) \ v -> poke m k v
+-- instance atForeignGLStrMap :: At (GLStrMap a) String a where
+--   at k =
+--     lens ((flip peek) k) \m ->
+--       maybe (delete' k m) \ v -> poke m k v
 
 delete' :: forall a. String -> GLStrMap a -> GLStrMap a
 delete' k m = let

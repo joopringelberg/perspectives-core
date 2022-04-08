@@ -39,7 +39,7 @@ where
 
 import Prelude
 
-import Affjax (ResponseFormatError, Response, printResponseFormatError)
+import Affjax (Response)
 import Affjax as AJ
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
@@ -65,7 +65,6 @@ import Foreign.Generic (decodeJSON)
 import Foreign.JSON (parseJSON)
 import Foreign.Object (fromFoldable, singleton)
 import Partial.Unsafe (unsafePartial)
-import Payload.Client.Queryable (printResponse)
 import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted', onAccepted_)
 import Perspectives.Identifiers (deconstructUserName)
 import Perspectives.Persistence.Authentication (defaultPerspectRequest, ensureAuthentication)
@@ -108,24 +107,22 @@ ensureSecurityDocument base db = do
   rq <- defaultPerspectRequest
   res <- liftAff $ AJ.request $ rq {method = Left GET, url = (base <> db <> "/_security")}
   onAccepted_
-    \_ _ -> do
+    (\_ _ -> do
       doc <- pure $ SecurityDocument
         { admins: { names: Just [], roles: ["_admin"]}
         , members: { names: Just [], roles: ["_admin"]}
       }
       setSecurityDocument base db doc
-      pure doc
+      pure doc)
     res
     [StatusCode 200]
     "ensureSecurityDocument"
-    \response -> case response.body of
-      Left e -> throwError $ error ("ensureSecurityDocument: error in response: " <> printResponse e)
-      Right (result :: String) -> do
-        (x :: Either MultipleErrors SecurityDocument) <- pure $ runExcept ((parseJSON >=> decode) result)
-        case x of
-          (Left e) -> do
-            throwError $ error ("ensureSecurityDocument: error in decoding result: " <> show e)
-          (Right securityDoc) -> pure securityDoc
+    \response -> do
+      (x :: Either MultipleErrors SecurityDocument) <- pure $ runExcept ((parseJSON >=> decode) response.body)
+      case x of
+        (Left e) -> do
+          throwError $ error ("ensureSecurityDocument: error in decoding result: " <> show e)
+        (Right securityDoc) -> pure securityDoc
 
 -----------------------------------------------------------
 -- REPLICATECONTINUOUSLY
@@ -137,7 +134,7 @@ replicateContinuously couchdbUrl name source target selector = do
   pwd <- getCouchdbPassword
   bvalue <- pure (btoa (usr <> ":" <> pwd))
   case bvalue of
-    Left e -> pure unit
+    Left _ -> pure unit
     Right auth -> setReplicationDocument couchdbUrl (ReplicationDocument
         { _id: name
         , source: ReplicationEndpoint {url: source, headers: singleton "Authorization" ("Basic " <> auth)}
@@ -195,7 +192,7 @@ deleteUser base user = deleteDocument (base <> "_users/org.couchdb.user:" <> use
 setPassword :: forall f. Url -> User -> Password -> MonadPouchdb f Unit
 setPassword base user password = ensureAuthentication do
   rq <- defaultPerspectRequest
-  (res :: Response (Either ResponseFormatError Json)) <- liftAff $ AJ.request $ rq
+  (res :: (Either AJ.Error (Response Json))) <- liftAff $ AJ.request $ rq
     { method = Left GET
     , url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user)
     , responseFormat = ResponseFormat.json
@@ -204,11 +201,9 @@ setPassword base user password = ensureAuthentication do
     res
     [StatusCode 200]
     "setPassword"
-    \response -> case response.body of
-      Left e -> throwError $ error ("setPassword: error in response: " <> printError e)
-      Right (result :: Json) -> do
-        res1 <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user), content = Just $ RequestBody.json (changePassword result password)}
-        onAccepted res [StatusCode 200, StatusCode 201] "createUser" \_ -> pure unit
+    \response -> do
+        res1 <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user), content = Just $ RequestBody.json (changePassword response.body password)}
+        onAccepted res1 [StatusCode 200, StatusCode 201] "createUser" \_ -> pure unit
 
 foreign import changePassword :: Json -> String -> Json
 
@@ -226,7 +221,7 @@ deleteDocument url version' = ensureAuthentication do
     Just rev -> do
       (rq :: (AJ.Request String)) <- defaultPerspectRequest
       res <- liftAff $ AJ.request $ rq {method = Left DELETE, url = (url <> "?rev=" <> rev) }
-      onAccepted
+      onAccepted_
         (\_ _ -> pure false)
         res
         [StatusCode 200, StatusCode 202]
@@ -256,7 +251,7 @@ version :: forall m. MonadError Error m => Array ResponseHeader -> m Revision_
 version headers =  case find (\rh -> toLower (name rh) == "etag") headers of
   Nothing -> throwError $ error ("Perspectives.Instances.version: retrieveDocumentVersion: couchdb returns no ETag header holding a document version number")
   (Just h) -> case runExcept $ decodeJSON (value h) of
-    Left e -> pure Nothing
+    Left _ -> pure Nothing
     Right v -> pure $ Just v
 
 -----------------------------------------------------------

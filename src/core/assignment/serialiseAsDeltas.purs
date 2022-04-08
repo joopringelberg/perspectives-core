@@ -47,7 +47,7 @@ import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Class (encode)
 import Foreign.Object (lookup)
-import Global.Unsafe (unsafeStringify)
+import Simple.JSON (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
 import Perspectives.Deltas (addDelta)
@@ -139,13 +139,13 @@ serialisePerspectiveForUser cid users userRoleType p@(Perspective{object, proper
 -- | model:System. The role model:System$PerspectivesSystem$User should have a property with
 -- | local name "Id". Instances need not have a value for that property.
 serialiseRoleInstancesAndProperties ::
-	ContextInstance ->	                 -- The context instance for which we serialise roles and properties.
-	NA.NonEmptyArray RoleInstance ->		 -- User Role instances to serialise for. These have a single type.
-	QueryFunctionDescription ->          -- Find object role instances with this description.
-	Array PropertyType ->		             -- PropertyTypes whose values on the role instances should be serialised.
+  ContextInstance ->                   -- The context instance for which we serialise roles and properties.
+  NA.NonEmptyArray RoleInstance ->     -- User Role instances to serialise for. These have a single type.
+  QueryFunctionDescription ->          -- Find object role instances with this description.
+  Array PropertyType ->                 -- PropertyTypes whose values on the role instances should be serialised.
   Boolean ->                           -- true iff the perspective is selfonly.
   Boolean ->                           -- true iff the object of the perspective equals its subject.
-	MonadPerspectivesTransaction Unit
+  MonadPerspectivesTransaction Unit
 serialiseRoleInstancesAndProperties cid users object properties selfOnly isPerspectiveOnSelf = do
   -- We know that object has a role range.
   properties' <- if isPerspectiveOnSelf

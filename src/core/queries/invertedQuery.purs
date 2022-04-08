@@ -34,8 +34,8 @@ import Prelude
 
 import Data.Array (cons, delete, null, union, elemIndex)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Data.Map (Map, lookup) as MAP
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (class Newtype, over, unwrap)

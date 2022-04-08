@@ -22,11 +22,13 @@
 
 module Perspectives.Representation.QueryFunction where
 
+import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Ord (genericCompare)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
+import Data.Ord.Generic (genericCompare)
+import Data.Show.Generic (genericShow)
+import Data.Variant (Variant)
+import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
@@ -36,7 +38,7 @@ import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Ord, class Show, map, (<<<))
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl, writeJSON)
 
 type VariableName = String
 
@@ -256,13 +258,13 @@ data QueryFunction
   | CreateContext ContextType RoleType
   | CreateContext_ ContextType
   | CreateRole EnumeratedRoleType
-	| Bind EnumeratedRoleType
+  | Bind EnumeratedRoleType
   | Bind_
-	| Unbind (Maybe EnumeratedRoleType)
+  | Unbind (Maybe EnumeratedRoleType)
   | Unbind_
-	| DeleteRole EnumeratedRoleType
+  | DeleteRole EnumeratedRoleType
   | DeleteContext RoleType
-	| DeleteProperty EnumeratedPropertyType
+  | DeleteProperty EnumeratedPropertyType
   | Move
   | RemoveRole
   | RemoveContext
@@ -297,7 +299,8 @@ instance decodeQueryFunction :: Decode QueryFunction where
   -- decode = readImpl
 
 instance writeForeignQueryFunction :: WriteForeign QueryFunction where
-  writeImpl = writeImpl <<< genericSumToVariant
+  -- writeImpl = writeImpl <<< genericSumToVariant
+  writeImpl a = unsafeToForeign (writeJSON (genericSumToVariant a))
 
 instance readForeignQueryFunction :: ReadForeign QueryFunction where
   readImpl = map variantToGenericSum <<< readImpl

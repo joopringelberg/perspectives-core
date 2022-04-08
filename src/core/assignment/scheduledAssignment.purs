@@ -32,8 +32,8 @@ import Prelude
 
 import Data.Array (filter)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)

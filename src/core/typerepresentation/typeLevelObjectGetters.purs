@@ -30,6 +30,7 @@ import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, foldr, fro
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Map (Map, empty, lookup, insert, keys, unionWith, values) as Map
 import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.List(foldl) as LIST
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
@@ -113,7 +114,7 @@ lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> areLas
 -- | Constructs the set of all roles in the ADT (recursing on aspects of Enumerated roles)
 -- | and then applies a comparison function to the name passed in and the names of all those roles.
 lookForRoleOfADT :: (RoleType -> Boolean) -> String -> ADT ContextType ~~~> RoleType
-lookForRoleOfADT criterium rname adt =  ArrayT (allRoles adt >>= pure <<< filter criterium)
+lookForRoleOfADT criterium _ adt =  ArrayT (allRoles adt >>= pure <<< filter criterium)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A CONTEXTTYPE WORKING FROM STRINGS OR ADT'S
@@ -363,8 +364,8 @@ computesDatabaseQueryRole qfd = do
   case queryFunction qfd of
     (BinaryCombinator SequenceF) -> case queryFunction <$> secondOperand qfd of
       Just (ExternalCoreRoleGetter _) -> isExternal (unsafePartial domain2roleType $ range qfd)
-      otherwise -> pure false
-    otherwise -> pure false
+      _ -> pure false
+    _ -> pure false
   where
     isExternal :: ADT RoleInContext -> MonadPerspectives Boolean
     isExternal = reduce \(RoleInContext{role}) -> pure $ isExternalRole $ unwrap role
@@ -461,7 +462,7 @@ hasPerspectiveWithVerb subjectType roleType verbs = do
       --    * that supports at least one of the requested RoleVerbs.
       (allObjects :: Array EnumeratedRoleType) <- roleType ###= roleAspectsClosure
       isJust <$> findPerspective subjectType  -- TODO. GEEFT MAAR één perspectief terug; kunnen er niet meerdere zijn?
-        (\perspective@(Perspective{roleVerbs}) -> pure (
+        (\perspective -> pure (
           (not $ null $ intersect allObjects (allLeavesInADT (roleInContext2Role <$> objectOfPerspective perspective) ))
           &&
           (null verbs || perspectiveSupportsOneOfRoleVerbs perspective verbs)))
@@ -573,7 +574,7 @@ propertiesInPerspective (Perspective{propertyVerbs, object}) = foldWithIndexM f 
       Array PropertyType ->
       Array PropertyVerbs ->
       MonadPerspectives (Array PropertyType)
-    f _ cum pvArr = concat <$> traverse (propertyVerbs2PropertyArray object) pvArr
+    f _ cum pvArr = append cum <<< concat <$> traverse (propertyVerbs2PropertyArray object) pvArr
 
 propertyVerbs2PropertyArray :: QueryFunctionDescription -> PropertyVerbs -> MonadPerspectives (Array PropertyType)
 propertyVerbs2PropertyArray object (PropertyVerbs pset _) = case pset of
@@ -626,7 +627,7 @@ isPerspectiveOnSelf qfd = some (
 type ActionName = String
 -- | Note that we assume action names are unique over states for the perspective a user role has on an object.
 getAction :: ActionName -> Perspective -> Maybe Action
-getAction actionName (Perspective{actions}) = foldl
+getAction actionName (Perspective{actions}) = LIST.foldl
   (\maction stateDepActions -> case maction of
     Just action -> Just action
     Nothing -> OBJ.lookup actionName stateDepActions)
@@ -637,7 +638,7 @@ getAction actionName (Perspective{actions}) = foldl
 getContextAction :: ActionName -> RoleType -> MonadPerspectives (Maybe Action)
 getContextAction actionName userRoleType = do
   stateActionMap <- actionsOfRoleType userRoleType
-  pure $ foldl
+  pure $ LIST.foldl
     (\maction (stateDepActions :: OBJ.Object Action) -> case maction of
       Just action -> Just action
       Nothing -> OBJ.lookup actionName stateDepActions)

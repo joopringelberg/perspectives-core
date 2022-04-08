@@ -31,8 +31,8 @@ module Perspectives.Representation.SideEffect where
 -- | AST, whether the range of a step complies with the domain of the following step. Moreover, only then can we qualify names used in the expressions.
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment, LetStep)

@@ -61,7 +61,7 @@ type PouchdbState f =
   { userInfo :: PouchdbUser
   , databases :: Object PouchdbDatabase
 
-	-- TODO. De volgende drie kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen:
+  -- TODO. De volgende drie kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen:
   -- , couchdbPassword :: String
   -- , couchdbHost :: String
   -- , couchdbPort :: Int

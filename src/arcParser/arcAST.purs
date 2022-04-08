@@ -25,8 +25,8 @@ module Perspectives.Parsing.Arc.AST where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
@@ -122,12 +122,12 @@ data PropertyFacet =
   | Pattern RegExP String
   | WhiteSpace WhiteSpaceRegime
   | Enumeration (Array String)
-	| MaxInclusive String
-	| MinInclusive String
-	| MaxExclusive String
-	| MinExclusive String
-	| TotalDigits Int
-	| FractionDigits Int
+  | MaxInclusive String
+  | MinInclusive String
+  | MaxExclusive String
+  | MinExclusive String
+  | TotalDigits Int
+  | FractionDigits Int
 
 data WhiteSpaceRegime =
   -- No normalization is done, the value is not changed (this is the behavior required by [XML 1.0 (Second Edition)] for element content)
@@ -247,7 +247,6 @@ newtype AutomaticEffectE = AutomaticEffectE
 data StateTransitionE = Entry StateSpecification | Exit StateSpecification
 
 data PropsOrView = AllProperties | Properties (List String) | View String
-derive instance genericPropsOrView :: Generic PropsOrView _
 instance eqPropsOrView :: Eq PropsOrView where eq = genericEq
 
 --------------------------------------------------------------------------------
@@ -280,9 +279,9 @@ type StateLocalName = String
 -- | A StateSpecification identifies a base which represents either a context- or role type,
 -- | and a path of segments that identify a substate of the (root state of) that type.
 data StateSpecification =
-	  ContextState ContextType (Maybe SegmentedPath)
-	| SubjectState RoleIdentification (Maybe SegmentedPath)
-	| ObjectState RoleIdentification (Maybe SegmentedPath)
+    ContextState ContextType (Maybe SegmentedPath)
+  | SubjectState RoleIdentification (Maybe SegmentedPath)
+  | ObjectState RoleIdentification (Maybe SegmentedPath)
 
 type SegmentedPath = String
 

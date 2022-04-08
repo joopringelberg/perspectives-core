@@ -35,7 +35,6 @@ import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Except (catchJust)
 import Data.Argonaut (fromObject)
-import Data.Array (elemIndex)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
@@ -43,6 +42,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff (Error, error, throwError)
 import Effect.Aff.Class (liftAff)
 import Foreign.Object (fromFoldable)
+import Perspectives.Couchdb (onAccepted_)
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -68,9 +68,12 @@ requestAuthentication = do
     Just base -> do
       (rq :: (AJ.Request String)) <- defaultPerspectRequest
       res <- liftAff $ AJ.request $ rq {method = Left POST, url = (base <> "_session"), content = Just $ RequestBody.json (fromObject (fromFoldable [Tuple "name" (unsafeCoerce usr), Tuple "password" (unsafeCoerce pwd)]))}
-      case elemIndex res.status [StatusCode 200, StatusCode 203] of
-        Nothing -> throwError (error $ "Failure in requestAuthentication. " <> "HTTP statuscode " <> show res.status)
-        otherwise -> pure unit
+      onAccepted_
+        (\response _ -> throwError (error $ "Failure in requestAuthentication. " <> "HTTP statuscode " <> show response.status))
+        res
+        [StatusCode 200, StatusCode 203]
+        "requestAuthentication"
+        \_ -> pure unit
 
 defaultPerspectRequest :: forall f. MonadPouchdb f (AJ.Request String)
 defaultPerspectRequest = pure
@@ -83,4 +86,5 @@ defaultPerspectRequest = pure
   , password: Nothing
   , withCredentials: true
   , responseFormat: ResponseFormat.string
+  , timeout: Nothing
 }

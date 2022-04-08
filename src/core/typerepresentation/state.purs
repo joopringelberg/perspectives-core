@@ -25,8 +25,8 @@ module Perspectives.Representation.State where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
@@ -42,18 +42,18 @@ import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleT
 newtype State = State StateRecord
 
 type StateRecord =
-	{ id :: StateIdentifier
-	, stateFulObject :: StateFulObject
-	, query :: Calculation
-	, object :: Maybe QueryFunctionDescription
-	-- the key in these maps is the subject the effect or notification or perspective is for.
-	, notifyOnEntry :: EncodableMap RoleType Notification
-	, notifyOnExit :: EncodableMap RoleType Notification
-	, automaticOnEntry :: EncodableMap RoleType AutomaticAction
-	, automaticOnExit :: EncodableMap RoleType AutomaticAction
+  { id :: StateIdentifier
+  , stateFulObject :: StateFulObject
+  , query :: Calculation
+  , object :: Maybe QueryFunctionDescription
+  -- the key in these maps is the subject the effect or notification or perspective is for.
+  , notifyOnEntry :: EncodableMap RoleType Notification
+  , notifyOnExit :: EncodableMap RoleType Notification
+  , automaticOnEntry :: EncodableMap RoleType AutomaticAction
+  , automaticOnExit :: EncodableMap RoleType AutomaticAction
   , perspectivesOnEntry :: EncodableMap RoleType StateDependentPerspective
-	, subStates :: Array StateIdentifier
-	}
+  , subStates :: Array StateIdentifier
+  }
 
 data StateDependentPerspective =
   ContextPerspective
@@ -63,10 +63,10 @@ data StateDependentPerspective =
   } |
   RolePerspective
     { currentContextCalculation :: QueryFunctionDescription
-  	, properties :: Array PropertyType
+    , properties :: Array PropertyType
     , selfOnly :: Boolean
     , isSelfPerspective :: Boolean
-  	}
+    }
 
 derive instance genericStateDependentPerspective :: Generic StateDependentPerspective _
 instance showStateDependentPerspective :: Show StateDependentPerspective where show = genericShow
@@ -76,17 +76,17 @@ instance decodeStateDependentPerspective :: Decode StateDependentPerspective whe
 
 constructState :: StateIdentifier -> Calculation -> StateFulObject -> Array StateIdentifier -> State
 constructState id condition stateFulObject subStates = State
-	{id: id
-	, stateFulObject
-	, query: condition
-	, object: Nothing -- used to compute the objects in enteringState, to bind to "currentobject".
-	, notifyOnEntry: empty
-	, notifyOnExit: empty
-	, automaticOnEntry: empty
-	, automaticOnExit: empty
-	, perspectivesOnEntry: empty
-	, subStates
-	}
+  {id: id
+  , stateFulObject
+  , query: condition
+  , object: Nothing -- used to compute the objects in enteringState, to bind to "currentobject".
+  , notifyOnEntry: empty
+  , notifyOnExit: empty
+  , automaticOnEntry: empty
+  , automaticOnExit: empty
+  , perspectivesOnEntry: empty
+  , subStates
+  }
 derive instance newtypeState :: Newtype State _
 
 derive instance genericState :: Generic State _
@@ -121,8 +121,8 @@ instance decodeStateFulObject :: Decode StateFulObject where decode = genericDec
 data Notification = ContextNotification Sentence |
   RoleNotification
     { currentContextCalculation :: QueryFunctionDescription
-  	, sentence :: Sentence
-  	}
+    , sentence :: Sentence
+    }
 
 derive instance genericNotification :: Generic Notification _
 instance showNotification :: Show Notification where show = genericShow

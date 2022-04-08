@@ -28,8 +28,8 @@ import Control.Monad.Writer (WriterT, runWriterT)
 import Data.Array (foldMap, foldl, foldr, head, union)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Tuple (Tuple(..))
@@ -117,15 +117,15 @@ type AssumptionRegister = F.Object (F.Object (Array CorrelationIdentifier))
 -- INFORMED ASSUMPTIONS
 -----------------------------------------------------------
 data InformedAssumption =
-	RoleAssumption ContextInstance EnumeratedRoleType
-	| Me ContextInstance
+  RoleAssumption ContextInstance EnumeratedRoleType
+  | Me ContextInstance
   -- Binding = filler role
   | Binding RoleInstance                               -- RoleInstance is the role with a binding
   -- FilledRolesAssumption fillerId filledContextType filledType
-	| FilledRolesAssumption RoleInstance ContextType EnumeratedRoleType
-	| Property RoleInstance EnumeratedPropertyType
-	| Context RoleInstance
-	| External ContextInstance
+  | FilledRolesAssumption RoleInstance ContextType EnumeratedRoleType
+  | Property RoleInstance EnumeratedPropertyType
+  | Context RoleInstance
+  | External ContextInstance
   | State ContextInstance
   | RoleState RoleInstance
 

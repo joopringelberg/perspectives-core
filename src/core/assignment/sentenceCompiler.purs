@@ -26,7 +26,7 @@ import Control.Monad.Error.Class (throwError)
 import Data.Array (concat, foldl)
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), indexOf)
-import Data.Traversable (class Foldable, traverse)
+import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, evalMonadPerspectivesQuery, type (~~>))
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
@@ -53,7 +53,7 @@ compileSentence xToString (Sentence parts) = do
   pure \roleId ->
     intercalate' " " <<< concat <$> traverse (\p -> p roleId) compiledParts
   where
-    intercalate' :: forall f. Foldable f => String -> f String -> String
+    intercalate' :: String -> Array String -> String
     intercalate' sep xs = (foldl go { init: true, acc: mempty } xs).acc
       where
       go { init: true } x = { init: false, acc: x }

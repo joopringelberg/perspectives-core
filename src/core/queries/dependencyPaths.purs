@@ -26,7 +26,7 @@ import Prelude
 
 import Data.Array (union, cons) as ARR
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
+import Data.Eq.Generic (genericEq)
 import Data.List.NonEmpty (cons, singleton, snoc)
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), maybe)

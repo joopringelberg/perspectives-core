@@ -27,19 +27,20 @@ import Control.Monad.State (StateT, execStateT, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable, insert) as AR
 import Data.Array (dropEnd, foldl, intercalate)
-import Data.Char.Unicode (isLower)
+import Data.CodePoint.Unicode (isLower)
 import Data.Either (Either(..))
 import Data.Foldable (elem, fold, traverse_)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
-import Data.String (Pattern(..), split)
+import Data.String (Pattern(..), codePointFromChar, split)
 import Data.String.CodeUnits (fromCharArray)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..), fst)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
+import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, (###=))
@@ -126,7 +127,7 @@ capitalizedString = f <$> upper <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
 
 lower ::  IP Char
-lower = satisfy isLower <?> "uppercase letter"
+lower = satisfy (isLower <<< codePointFromChar) <?> "uppercase letter"
 
 -- /([a-z]\w*\b)/
 -- /(\b\p{Lowercase}[\p{Alphabetic}\p{Mark}\p{Decimal_Number}\p{Connector_Punctuation}\p{Join_Control}]+\b)/gu
@@ -371,13 +372,13 @@ roleBinding' ::
 roleBinding' cname arrow p = ("rolename => contextName" <??>
   (try do
     -- Parsing
-    cmtBefore <- manyOneLineComments
+    void manyOneLineComments
     withPos do
       rname@(QualifiedName _ localRoleName) <- roleName
       occurrence <- sameLine *> optionMaybe (try roleOccurrence) -- The sequence number in text
       instanceName <- sameLine *> optionMaybe (try roleInstanceName)
       _ <- (sameLine *> reservedOp (show arrow))
-      (Tuple cmt bindng) <- p rname
+      (Tuple _ bindng) <- p rname
       (props :: List (Tuple ID (Array Value))) <- withExtendedTypeNamespace localRoleName $
             option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       _ <- incrementRoleInstances (show rname)
@@ -409,7 +410,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         }
       bindingDelta <- case bindng of
         Nothing -> pure Nothing
-        Just b -> Just <$> (deltaSignedByMe $ encodeJSON $ RoleBindingDelta
+        Just _ -> Just <$> (deltaSignedByMe $ encodeJSON $ RoleBindingDelta
           { subject: UserInstance $ RoleInstance me
           , filled: rolId
           , filler: bindng
@@ -529,7 +530,7 @@ relativeInstanceID = lexeme do
 -- Returns a string that is NOT terminated on a "$".
 -- NOTE: in order to be able to fail, we need do this in IP.
 butLastNNamespaceLevels ::  String -> Int -> IP String
-butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
+butLastNNamespaceLevels _ (-1) = fail "local name starting with '$'."
 butLastNNamespaceLevels ns 0 = pure ns
 butLastNNamespaceLevels ns n = do
   segments <- pure (split (Pattern "$") ns)
@@ -571,9 +572,9 @@ context contextRole = withRoleCounting context' where
   context' :: IP RoleInstance
   context' = do
     -- Parsing
-    cmtBefore <- manyOneLineComments
+    void manyOneLineComments
     withPos do
-      (ContextDeclaration typeName instanceName@(QualifiedName dname localName) cmt) <- contextDeclaration
+      (ContextDeclaration typeName instanceName@(QualifiedName _ localName) _) <- contextDeclaration
 
       -- Naming
       withNamespace (show instanceName) $
@@ -729,7 +730,7 @@ definition = do
 -----------------------------------------------------------
 importExpression ::  IP Unit
 importExpression = do
-  ns@(ModelName mn) <- reserved "import" *> modelName
+  (ModelName mn) <- reserved "import" *> modelName
   mpre <- (optionMaybe (reserved "as" *> prefixNoColon <* whiteSpace))
   case mpre of
     Nothing -> pure unit
@@ -740,7 +741,7 @@ importExpression = do
 -----------------------------------------------------------
 userData ::  IP (Array RoleInstance)
 userData = do
-  cmtBefore <- manyOneLineComments
+  void manyOneLineComments
   withPos do
     _ <- userDataDeclaration
     _ <- AR.many importExpression
@@ -780,7 +781,7 @@ userData = do
         then addRol_gevuldeRollen filler' (roleContextType filledRole) (rol_pspType filledRole) (ID.identifier filledRole)
         else filler')
       filler
-      filledRoles
+      (values filledRoles)
       where
         roleContextType :: PerspectRol -> ContextType
         roleContextType role = case unsafePartial fromJust $ FO.lookup (unwrap $ rol_context role) contexts of
@@ -809,5 +810,5 @@ parseAndCache text = do
   (Tuple parseResult {roleInstances, contextInstances}) <- runIndentParser' text userData
   case parseResult of
     (Left e) -> pure $ Left e
-    (Right r) -> do
+    (Right _) -> do
       pure $ Right $ Tuple contextInstances roleInstances

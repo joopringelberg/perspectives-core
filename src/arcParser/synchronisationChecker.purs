@@ -154,11 +154,11 @@ getRoleFromState rt = do
 type UserType = RoleType
 
 type SubGraphState =
-	{ currentSubGraph :: Array UserType
-	, subGraphs :: Array (Array UserType)
-	, visitedNodes :: Array UserType
-	, unvisitedNodes :: Array UserType
-	}
+  { currentSubGraph :: Array UserType
+  , subGraphs :: Array (Array UserType)
+  , visitedNodes :: Array UserType
+  , unvisitedNodes :: Array UserType
+  }
 
 type UserGroup = Array RoleType
 

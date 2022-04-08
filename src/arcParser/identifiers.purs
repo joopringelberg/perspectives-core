@@ -24,8 +24,9 @@ module Perspectives.Parsing.Arc.Identifiers where
 
 import Control.Alt (void, (<|>))
 import Data.Array (cons, elemIndex, intercalate, many)
-import Data.Char.Unicode (isLower, isSpace)
+import Data.CodePoint.Unicode (isLower, isSpace)
 import Data.Maybe (isJust)
+import Data.String (codePointFromChar)
 import Data.String.CodeUnits (fromCharArray)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
@@ -101,14 +102,14 @@ lowerCaseName = try do
   pure $ fromCharArray (cons f r)
 
 lower ::  IP Char
-lower = satisfy isLower <?> "lowercase letter"
+lower = satisfy (isLower <<< codePointFromChar) <?> "lowercase letter"
 
 boolean :: IP String
 boolean = token.symbol "true" <|> token.symbol "false"
 
 email :: IP String
 email = try do
-  chars <- many (satisfy (not <<< isSpace))
+  chars <- many (satisfy (not <<< isSpace <<< codePointFromChar))
   if (test emailRegExp (fromCharArray chars))
     then whiteSpace *> pure (fromCharArray chars)
     else fail "Not a valid email addres."

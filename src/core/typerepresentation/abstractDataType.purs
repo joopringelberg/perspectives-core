@@ -37,7 +37,7 @@ import Data.Array (concat, intercalate, intersect, length, nub, singleton, uncon
 import Data.Array.Partial (head) as AP
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
+import Data.Eq.Generic (genericEq)
 import Data.Identity (Identity)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))

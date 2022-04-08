@@ -44,7 +44,7 @@ import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (empty)
-import Global.Unsafe (unsafeStringify)
+import Simple.JSON (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
@@ -522,9 +522,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- , predicate: <object of perspective role instance>
     -- , object: <context instance>
     -- , contextDescription:
-    -- 	{ perspectiveId:
-    -- 	, actionName:
-    -- 	}
+    --   { perspectiveId:
+    --   , actionName:
+    --   }
     -- ...}
     Api.Action -> catchError
         (case read contextDescription of

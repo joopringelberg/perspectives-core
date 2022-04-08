@@ -24,8 +24,8 @@ module Perspectives.Representation.Perspective where
 
 import Data.Array (concat, difference, findIndex, foldl, fromFoldable, null)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Ord (genericCompare)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Ord.Generic (genericCompare)
+import Data.Show.Generic (genericShow)
 import Data.List (List)
 import Data.List (findIndex) as LST
 import Data.Map (Map, values, fromFoldable) as MAP
@@ -62,8 +62,8 @@ type PerspectiveRecord =
   , roleTypes :: Array RoleType
   , isEnumerated :: Boolean
   , roleVerbs :: EncodableMap StateSpec RoleVerbList
-	, propertyVerbs :: EncodableMap StateSpec (Array PropertyVerbs)
-	, actions :: EncodableMap StateSpec (Object Action)
+  , propertyVerbs :: EncodableMap StateSpec (Array PropertyVerbs)
+  , actions :: EncodableMap StateSpec (Object Action)
   , selfOnly :: Boolean
   , isSelfPerspective :: Boolean
   , automaticStates :: Array StateIdentifier

@@ -136,9 +136,9 @@ in  upstream
       , "typelevel-prelude"
       ]
     , repo =
-       "https://github.com/justinwoo/purescript-kishimen.git"
+       "https://github.com/joopringelberg/purescript-kishimen.git"
     , version =
-        "v2.0.0"
+        "v1.1.0"
     }
 
   with apitypes =

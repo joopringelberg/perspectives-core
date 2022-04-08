@@ -29,10 +29,12 @@ import Prelude
 
 import Control.Monad.Except (class MonadError)
 import Data.Either (Either(..))
+import Data.Map (empty)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Error, error, message, throwError)
 import Perspectives.Couchdb (handleError)
 import Perspectives.Persistence.Types (DocumentName, PouchError, readPouchError)
+
 -----------------------------------------------------------
 -- HANDLEPOUCHERROR
 -----------------------------------------------------------
@@ -42,13 +44,13 @@ handlePouchError :: forall m a. MonadError Error m => String -> DocumentName -> 
 handlePouchError funcName docName e = parsePouchError funcName docName e >>=
   \({status, message} :: PouchError) -> case status of
     Nothing -> throwError e
-    Just s -> handleError s mempty (funcName <> " for " <> docName <> " (" <> message <> ")")
+    Just s -> handleError s empty (funcName <> " for " <> docName <> " (" <> message <> ")")
 
 handleNotFound :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m (Maybe a)
 handleNotFound funcName docName e = parsePouchError funcName docName e >>=
   \err -> case err.status of
     Just 404 -> pure Nothing
-    Just s -> handleError s mempty ("getAttachment for " <> docName <> " (" <> err.message <> ")")
+    Just s -> handleError s empty ("getAttachment for " <> docName <> " (" <> err.message <> ")")
     Nothing -> throwError e
 
 parsePouchError :: forall m. MonadError Error m => String -> DocumentName -> Error -> m PouchError

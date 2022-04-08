@@ -184,17 +184,17 @@ addCreatedRoleToTransaction rid =
 -- 2. Bepaal of de rol functioneel is.
 -- ZO JA:
 -- 3. Zoek een delta waarvan de id, rolName en DeltaType gelijk zijn aan die van de nieuwe.
--- 	Indien gevonden: vervang die door de nieuwe.
--- 	Indien niet gevonden: zoek een delta waarvan id en rolName overeenkomen.
--- 		Indien gevonden, als geldt:
--- 			het ene DeltaType is Add en het andere Remove, verwijder dan de oude.
--- 			het oude DeltaType is Change en het nieuwe Remove, vervang de oude dan door de nieuwe
--- 			het oude DeltaType is Add en het nieuwe is Change, vervang dan in de oude de rolID door die van de nieuwe.
--- 		Indien niet gevonden: voeg de nieuwe toe.
+--   Indien gevonden: vervang die door de nieuwe.
+--   Indien niet gevonden: zoek een delta waarvan id en rolName overeenkomen.
+--     Indien gevonden, als geldt:
+--       het ene DeltaType is Add en het andere Remove, verwijder dan de oude.
+--       het oude DeltaType is Change en het nieuwe Remove, vervang de oude dan door de nieuwe
+--       het oude DeltaType is Add en het nieuwe is Change, vervang dan in de oude de rolID door die van de nieuwe.
+--     Indien niet gevonden: voeg de nieuwe toe.
 -- ZO NEE:
 -- 4. zoek een delta waarvan id, rolName en rolID gelijk zijn aan die van de nieuwe en het ene DeltaType Add is en het andere Remove.
--- 	Indien gevonden: verwijder de oude.
--- 	Anders: voeg de nieuwe toe.
+--   Indien gevonden: verwijder de oude.
+--   Anders: voeg de nieuwe toe.
 -- | Add a Delta to the Transaction. Tries to keep the Transaction as small as possible, by eliminating and integrating
 -- | Delta's that affect the same Role or Property.
 -- | Modify a Triple that represents a basic fact in the TripleAdministration.

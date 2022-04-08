@@ -451,18 +451,18 @@ modifyInvertedQuery add = modifyInvertedQuery'
         Nothing -> dfr
         -- Just (Context cr@{}) -> dfr
         Just (CTXT.Context cr@{invertedQueries}) ->
-        dfr {contexts = insert
-          contextTypeName
-          (CTXT.Context cr {invertedQueries = if add
-            then addInvertedQueryIndexedByRole
-              invertedQuery
-              roleType
-              invertedQueries
-              []
-              (ContextType contextTypeName)
-            else deleteInvertedQueryIndexedByRole invertedQuery roleType invertedQueries
-            })
-          contexts}
+          dfr {contexts = insert
+            contextTypeName
+            (CTXT.Context cr {invertedQueries = if add
+              then addInvertedQueryIndexedByRole
+                invertedQuery
+                roleType
+                invertedQueries
+                []
+                (ContextType contextTypeName)
+              else deleteInvertedQueryIndexedByRole invertedQuery roleType invertedQueries
+              })
+            contexts}
 
     modifyInvertedQuery' (FillsInvertedQuery keys roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup roleTypeName enumeratedRoles of

@@ -36,6 +36,7 @@ import Prelude
 import Data.Array.Partial (head, tail)
 import Data.List (List)
 import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty, keys) as Map
+import Data.Map (unionWith)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Set (Set)
@@ -54,14 +55,14 @@ instance showEncodableMap :: (Show k, Show v) => Show (EncodableMap k v) where s
 instance eqEncodableMap :: (Eq k, Eq v) => Eq (EncodableMap k v) where eq (EncodableMap m1) (EncodableMap m2) = eq m1 m2
 
 instance encodeEncodableMap :: (Encode k, Encode v) => Encode (EncodableMap k v) where
-	encode (EncodableMap m) = encode ((\(Tuple k v) -> [encode k, encode v]) <$> (Map.toUnfoldable m :: Array (Tuple k v)))
+  encode (EncodableMap m) = encode ((\(Tuple k v) -> [encode k, encode v]) <$> (Map.toUnfoldable m :: Array (Tuple k v)))
 instance decodeEncodableMap :: (Ord k, Decode k, Decode v) => Decode (EncodableMap k v) where
   decode f = EncodableMap <<< Map.fromFoldable <$> (traverse
-		(\pair -> Tuple <$> (unsafePartial $ decode $ head pair) <*> (unsafePartial $ decode (head $ tail pair)))
-		(unsafeFromForeign f :: Array (Array Foreign)))
+    (\pair -> Tuple <$> (unsafePartial $ decode $ head pair) <*> (unsafePartial $ decode (head $ tail pair)))
+    (unsafeFromForeign f :: Array (Array Foreign)))
 
 instance prettyPrintEncodableMap :: (Show k, Show v) => PrettyPrint (EncodableMap k v) where
-	prettyPrint' t (EncodableMap mp) = Map.showTree mp
+  prettyPrint' _ (EncodableMap mp) = Map.showTree mp
 
 -- instance traversableEncodableMap :: Traversable (EncodableMap k) where
 --   traverse f (EncodableMap mp)  = EncodableMap <$> (traverse f mp)
@@ -87,5 +88,5 @@ empty = EncodableMap Map.empty
 keys :: forall k v. EncodableMap k v -> Set k
 keys (EncodableMap mp) = Map.keys mp
 
-instance semigroupEncodableMap :: Ord k => Semigroup (EncodableMap k v) where
-  append (EncodableMap map1) (EncodableMap map2)= EncodableMap (map1 <> map2)
+instance semigroupEncodableMap :: (Ord k, Semigroup v) => Semigroup (EncodableMap k v) where
+  append (EncodableMap map1) (EncodableMap map2)= EncodableMap (unionWith append map1 map2)

@@ -25,9 +25,10 @@ module Perspectives.Parsing.Arc where
 import Control.Alt (map, void, (<|>))
 import Control.Lazy (defer)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (find, fromFoldable)
+import Data.Array (fromFoldable)
 import Data.JSDate (toISOString)
-import Data.List (List(..), concat, filter, many, some, null, singleton, (:))
+import Data.List (find, List(..), concat, filter, many, some, null, singleton, (:))
+import Data.List.NonEmpty (toList)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.String (trim)
@@ -89,12 +90,12 @@ import Text.Parsing.Parser.String (char, satisfy)
 
 
 -- | context =
--- | 	<contextKind> <ident>
--- | 		use <lowercaseName> for <ident>
--- | 		indexed <ident>
--- | 		aspect <ident>+
--- | 		state <state>
--- | 		{<context> | <role>}+
+-- |   <contextKind> <ident>
+-- |     use <lowercaseName> for <ident>
+-- |     indexed <ident>
+-- |     aspect <ident>+
+-- |     state <state>
+-- |     {<context> | <role>}+
 contextE :: IP ContextPart
 contextE = withPos do
   -- | log "contextE"
@@ -248,12 +249,12 @@ domain = do
 -- | role = <calculatedRole> | <enumeratedRole> | <externalRole>
 -- |
 -- | calculatedRole =
--- | 	<roleKind> <ident> = <expression>
--- | 		<rolePart>*
+-- |   <roleKind> <ident> = <expression>
+-- |     <rolePart>*
 -- |
 -- | enumeratedRole =
--- | 	<roleKind> <ident> [(roleAttribute [, roleAttribute])] [filledBy <ident>]
--- | 		<rolePart>*
+-- |   <roleKind> <ident> [(roleAttribute [, roleAttribute])] [filledBy <ident>]
+-- |     <rolePart>*
 -- |
 -- | roleKind = user | thing | context | external
 
@@ -409,7 +410,7 @@ enumeratedRole_ uname knd pos = do
 -- Implementation note: we cannot know, here, whether the filler is Calculated or
 -- Enumerated. This will be fixed in PhaseThree.
 filledBy :: IP (List RolePart)
-filledBy = option Nil (reserved "filledBy" *> (token.commaSep1 filler))
+filledBy = option Nil (reserved "filledBy" *> (toList <$> token.commaSep1 filler))
   where
     filler :: IP RolePart
     filler = do
@@ -421,16 +422,16 @@ filledBy = option Nil (reserved "filledBy" *> (token.commaSep1 filler))
         Just context -> pure $ FilledByAttribute role (ContextType context)
 
 -- | rolePart =
--- | 	<perspectiveOn> |
--- | 	<perspectiveOf> |
--- | 	<inState> |
--- | 	<onEntry> |
--- | 	<onExit> |
--- | 	<state> |
--- | 	<aspect> |
--- | 	<indexed> |
--- | 	<property> |
--- | 	<view>
+-- |   <perspectiveOn> |
+-- |   <perspectiveOf> |
+-- |   <inState> |
+-- |   <onEntry> |
+-- |   <onExit> |
+-- |   <state> |
+-- |   <aspect> |
+-- |   <indexed> |
+-- |   <property> |
+-- |   <view>
 rolePart :: IP RolePart
 rolePart = do
   (Tuple first second) <- twoReservedWords
@@ -597,7 +598,7 @@ viewE = do
   pos <- getPosition
   uname <- reserved "view" *> arcIdentifier
   refs <- sameOrIndented *> (token.parens (token.commaSep1 arcIdentifier))
-  pure $ VE $ ViewE {id: uname, viewParts: refs, pos: pos}
+  pure $ VE $ ViewE {id: uname, viewParts: toList refs, pos: pos}
 
 -- Nothing `appendSegment` s = Just s
 -- Just m `appendSegment` s = Just m$s
@@ -615,12 +616,12 @@ addSubState (SubjectState roleIdent s) localSubStateName = SubjectState roleIden
 addSubState (ObjectState roleIdent s) localSubStateName = ObjectState roleIdent (s `appendSegment` localSubStateName)
 
 -- | state =
--- | 	state <ident> = <expression>
--- | 		<state>*
--- | 		<onEntry>
--- | 		<onExit>
--- | 		<perspectiveOn>
--- | 		<perspectiveOf>
+-- |   state <ident> = <expression>
+-- |     <state>*
+-- |     <onEntry>
+-- |     <onExit>
+-- |     <perspectiveOn>
+-- |     <perspectiveOf>
 stateE :: IP StateE
 stateE = withPos do
   id <- reserved "state" *> token.identifier
@@ -660,9 +661,9 @@ stateE = withPos do
 -- We need to use `try` because this parser will consume "perspective" from the
 -- expression "perspective of".
 -- | perspectiveOn =
--- | 	perspective on <expression>
--- | 		<roleVerbs>
--- | 		<perspectivePart>*
+-- |   perspective on <expression>
+-- |     <roleVerbs>
+-- |     <perspectivePart>*
 perspectiveOn :: IP (List StateQualifiedPart)
 perspectiveOn = try $ withPos do
   pos <- getPosition
@@ -681,8 +682,8 @@ perspectiveOn = try $ withPos do
     -- option Nil (indented' *> (concat <$> entireBlock perspectivePart))
 
 -- | perspectiveOf =
--- | 	perspective of <ident>
--- | 		<perspectivePart>*
+-- |   perspective of <ident>
+-- |     <perspectivePart>*
 -- We need to use `try` because this parser will consume "perspective" from the
 -- expression "perspective of".
 perspectiveOf :: IP (List StateQualifiedPart)
@@ -697,15 +698,15 @@ perspectiveOf = try $ withPos do
     concat <$> nestedBlock perspectivePart
 
 -- | perspectivePart =
--- | 	defaults
--- | 	<propertyVerbs> |
--- | 	<roleVerbs> |
--- | 	<inState> |
--- | 	<onEntry> |
--- | 	<onExit> |
--- | 	<action> |
--- | 	<perspectiveOn> |
--- | 	<perspectiveOf>
+-- |   defaults
+-- |   <propertyVerbs> |
+-- |   <roleVerbs> |
+-- |   <inState> |
+-- |   <onEntry> |
+-- |   <onExit> |
+-- |   <action> |
+-- |   <perspectiveOn> |
+-- |   <perspectiveOf>
 perspectivePart :: IP (List StateQualifiedPart)
 perspectivePart = do
   (Tuple first second) <- twoReservedWords
@@ -732,12 +733,12 @@ perspectivePart = do
 
 -- | inState =
 -- |  in [{subject | object | context}] state [<ident>]
--- | 		defaults
--- | 		<propertyVerbs>
--- | 		<roleVerbs>
--- | 		<perspectiveOn>
--- | 		<perspectiveOf>
--- | 		<action>
+-- |     defaults
+-- |     <propertyVerbs>
+-- |     <roleVerbs>
+-- |     <perspectiveOn>
+-- |     <perspectiveOf>
+-- |     <action>
 inState :: IP (List StateQualifiedPart)
 inState = do
   reserved "in"
@@ -796,7 +797,7 @@ perspectiveOnKeywords = reserved "perspective" *> reserved "on" *> pure "perspec
 
 -- | onEntry =
 -- |  on entry [of {subject | object | context} state [<ident>]]
--- |		{<notification> | <automaticEffect>}*
+-- |    {<notification> | <automaticEffect>}*
 onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do
   void $ onEntryKeywords
@@ -835,8 +836,8 @@ contextState = reserved "context" *> reserved "state" *> do
   pure $ ContextState currentContext msubState
 
 -- | onExit =
--- | 	on exit [ of {subject | object | context} state <ident>]
--- | 		{<notification> | <automaticEffect>}*
+-- |   on exit [ of {subject | object | context} state <ident>]
+-- |     {<notification> | <automaticEffect>}*
 onExitE :: IP (List StateQualifiedPart)
 onExitE = do
   void $ onExitKeywords
@@ -856,13 +857,13 @@ stateTransitionPart = do
     _ -> fail "Expected: do, notify"
 
 -- | automaticEffect =
--- | 	do
--- | 		<statement>*
--- | 		|
--- | 		letA
--- | 			{<lowercaseName> <- <expression>}*
--- | 		in
--- | 			<statement>*
+-- |   do
+-- |     <statement>*
+-- |     |
+-- |     letA
+-- |       {<lowercaseName> <- <expression>}*
+-- |     in
+-- |       <statement>*
 automaticEffectE :: IP (List StateQualifiedPart)
 automaticEffectE = do
   start <- getPosition
@@ -948,9 +949,9 @@ roleAndPropertyDefaults = do
     (Just _), Nothing -> fail "Object of perspective must be given"
 
 -- | roleVerbs =
--- |	only ( <RoleVerb> {, <roleVerb>}+ )
--- |	|
--- |	excluding ( <RoleVerb> {, <roleVerb>}+ )
+-- |  only ( <RoleVerb> {, <roleVerb>}+ )
+-- |  |
+-- |  excluding ( <RoleVerb> {, <roleVerb>}+ )
 -- |  |
 -- |  all roleverbs
 roleVerbs :: IP RoleVerbE
@@ -1012,9 +1013,9 @@ selfOnly = do
     (Just _), Nothing -> fail "Object of perspective must be given"
 
 -- | propertyVerbs =
--- | 	view <ident> [ ( <propertyVerb>{, <propertyVerb>}+ )]
--- | 	|
--- | 	props [(<ident> {, <ident>}+) ] [ verbs ( <propertyVerb>{, <propertyVerb>}+ )]
+-- |   view <ident> [ ( <propertyVerb>{, <propertyVerb>}+ )]
+-- |   |
+-- |   props [(<ident> {, <ident>}+) ] [ verbs ( <propertyVerb>{, <propertyVerb>}+ )]
 propertyVerbs :: IP PropertyVerbE
 propertyVerbs = basedOnView <|> basedOnProps
   where
@@ -1073,13 +1074,13 @@ propertyVerb = do
     _ -> fail "Not a property verb"
 
 -- | action =
--- | 	action <ident>
--- | 		<statement>*
--- | 		|
--- | 		letA
--- | 			{<lowercaseName> <- <expression>}*
--- | 		in
--- | 			<statement>*
+-- |   action <ident>
+-- |     <statement>*
+-- |     |
+-- |     letA
+-- |       {<lowercaseName> <- <expression>}*
+-- |     in
+-- |       <statement>*
 actionE :: IP (List StateQualifiedPart)
 actionE = do
   start <- getPosition

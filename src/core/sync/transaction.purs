@@ -28,7 +28,7 @@ module Perspectives.Sync.Transaction where
 import Data.Array (length, null, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Effect.Aff (Aff)

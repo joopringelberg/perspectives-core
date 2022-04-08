@@ -57,7 +57,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
-import Perspectives.Sync.Channel (endChannelReplication)
+import Perspectives.Sync.Channel (endChannelReplication) 
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>))
 
 -- | Don't do anything. runPDR will actually start the core.

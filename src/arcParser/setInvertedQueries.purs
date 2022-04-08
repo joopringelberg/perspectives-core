@@ -273,7 +273,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       CR _ -> throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
 
     QF.DataTypeGetter QF.ContextF -> modifyDF \dfr@{enumeratedRoles} -> foldl
-      (\dfr' (ric@RoleInContext{context, role}) ->
+      (\dfr' ric@(RoleInContext{context, role}) ->
           case lookup (unwrap role) enumeratedRoles of
             Nothing -> addInvertedQueryForDomain (unwrap role)
               (InvertedQuery

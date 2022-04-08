@@ -23,7 +23,7 @@
 module Perspectives.Syntax (module Perspectives.InstanceRepresentation, module Perspectives.Syntax) where
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Perspectives.Identifiers (QualifiedName, PEIdentifier)
 import Perspectives.InstanceRepresentation
 import Perspectives.EntiteitAndRDFAliases (Comment)

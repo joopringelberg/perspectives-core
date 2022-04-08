@@ -24,25 +24,28 @@ module Perspectives.Instances.Values where
 
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
+
 import Control.Monad.Error.Class (class MonadError, throwError)
-import Control.Monad.Except (runExceptT)
-import Data.DateTime (DateTime)
+import Control.Monad.Except (runExcept, runExceptT)
+import Data.DateTime (DateTime(..), Time(..), canonicalDate)
 import Data.DateTime.Instant (fromDateTime, unInstant)
 import Data.Either (Either(..), either, fromRight)
+import Data.Enum (toEnum)
 import Data.JSDate (JSDate, parse, toDateTime)
-import Data.Maybe (Maybe(..))
+import Data.List.Types (NonEmptyList)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (Error, error, try)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
 import Effect.Unsafe (unsafePerformEffect)
-import Foreign (readInt, unsafeToForeign)
+import Foreign (ForeignError, readInt, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
-import Prelude (bind, ($), pure, (<>), show, (<<<))
+import Prelude (bind, ($), pure, (<>), show, (<<<), (<$>), (<*>))
 
 -- TODO. We gebruiken hier Error, het javascript error type. Liever zou ik een
 -- PerspectivesRuntimeError type gebruiken. Maar dan moeten we MonadPerspectives aanpassen.
@@ -78,8 +81,8 @@ parseBool s = throwError (error $ "Cannot parse a bool from '" <> s <> "'.")
 value2Int' :: Value -> Either Error Int
 value2Int' (Value is) = either
   (Left <<< error <<< show)
-  Right
-  (unwrap $ runExceptT $ readInt $ unsafeToForeign is)
+  Right 
+  ((runExcept $ readInt $ unsafeToForeign is) :: Either (NonEmptyList ForeignError) Int)
 
 -- | An UNSAFE operation!
 value2Int :: Value -> Int
@@ -111,7 +114,12 @@ value2Date' (Value dt) = case unwrap $ runExceptT $ decode $ unsafeToForeign dt 
 
 -- | An UNSAFE operation!
 value2Date :: Value -> SerializableDateTime
-value2Date (Value dt) = unsafePartial $ fromRight $ unwrap $ runExceptT $ decode $ unsafeToForeign dt
+value2Date (Value dt) = fromRight (SerializableDateTime defaultDateTime) $ runExcept $ decode $ unsafeToForeign dt
+
 
 date2Value :: SerializableDateTime -> Value
 date2Value (SerializableDateTime sdt) = Value $ show (unwrap $ unInstant (fromDateTime sdt))
+
+defaultDateTime :: DateTime
+defaultDateTime = unsafePartial fromJust $ DateTime <$> (canonicalDate <$> (toEnum 2022) <*> (toEnum 1) <*> (toEnum 1)) <*>
+  (Time <$> (toEnum 0) <*> (toEnum 0) <*> (toEnum 0) <*> (toEnum 0))

@@ -34,9 +34,9 @@ import Prelude
 
 import Data.Array (cons, delete) as ARR
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Ord (genericCompare)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Ord.Generic (genericCompare)
+import Data.Show.Generic (genericShow)
 import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..))
 import Foreign.Class (class Decode, class Encode)

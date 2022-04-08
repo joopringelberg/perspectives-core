@@ -25,8 +25,8 @@ module Perspectives.Representation.ScreenDefinition where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Eq.Generic (genericEq)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode, encode, decode)
