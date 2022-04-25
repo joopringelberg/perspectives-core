@@ -103,18 +103,18 @@ let upstream =
         sha256:75d0f0719f32456e6bdc3efd41cfc64785655d2b751e3d080bd849033ed053f2
 
 in  upstream
-  with aff-sockets =
-    { dependencies =
-      [ "prelude"
-      , "aff"
-      , "aff-coroutines"
-      , "foreign-generic"
-      ]
-    , repo =
-       "https://github.com/joopringelberg/purescript-aff-sockets.git"
-    , version =
-        "v2.2.1"
-    }
+  -- with aff-sockets =
+  --   { dependencies =
+  --     [ "prelude"
+  --     , "aff"
+  --     , "aff-coroutines"
+  --     , "foreign-generic"
+  --     ]
+  --   , repo =
+  --      "https://github.com/joopringelberg/purescript-aff-sockets.git"
+  --   , version =
+  --       "v2.2.1"
+  --   }
 
   with avar-monadask =
     { dependencies =
@@ -126,7 +126,7 @@ in  upstream
     , repo =
        "https://github.com/joopringelberg/purescript-avar-monadask.git"
     , version =
-        "v2.1.0"
+        "v2.1.1"
     }
 
   with kishimen =

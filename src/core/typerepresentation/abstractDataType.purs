@@ -74,10 +74,10 @@ instance eqADT :: (Eq a) => Eq (ADT a) where
   eq b1 b2 = genericEq b1 b2
 
 instance writeForeignADT :: WriteForeign a => WriteForeign (ADT a) where
-  writeImpl = writeImpl <<< genericSumToVariant
+  writeImpl f = writeImpl( genericSumToVariant f)
 
 instance readForeightADT :: ReadForeign a => ReadForeign (ADT a) where
-  readImpl = map variantToGenericSum <<< readImpl
+  readImpl f = map variantToGenericSum (readImpl f)
 
 instance encodeADT :: (Encode a) => Encode (ADT a) where
   encode q = genericEncode defaultOptions q

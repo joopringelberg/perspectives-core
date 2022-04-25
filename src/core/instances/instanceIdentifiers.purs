@@ -37,7 +37,7 @@ derive newtype instance decodeContextInstance :: Decode ContextInstance
 derive newtype instance writeForeignContextInstance :: WriteForeign ContextInstance
 derive newtype instance readForeignContextInstance :: ReadForeign ContextInstance
 instance showContextInstance :: Show ContextInstance where
-  show = show <<< unwrap
+  show x = show (unwrap x)
 instance eqContextInstance :: Eq ContextInstance where
   eq (ContextInstance id1) (ContextInstance id2) = id1 == id2
 instance ordContextInstance :: Ord ContextInstance where
@@ -54,7 +54,7 @@ derive newtype instance decodeRoleInstance :: Decode RoleInstance
 derive newtype instance writeForeignRoleInstance :: WriteForeign RoleInstance
 derive newtype instance readForeignRoleInstance :: ReadForeign RoleInstance
 instance showRoleInstance :: Show RoleInstance where
-  show = show <<< unwrap
+  show x = show (unwrap x)
 instance eqRoleInstance :: Eq RoleInstance where
   eq (RoleInstance id1) (RoleInstance id2) = id1 == id2
 instance ordRoleInstance :: Ord RoleInstance where
@@ -68,7 +68,7 @@ derive instance genericRepValue :: Generic Value _
 derive newtype instance encodeValue :: Encode Value
 derive newtype instance decodeValue :: Decode Value
 instance showValue :: Show Value where
-  show = show <<< unwrap
+  show x = show (unwrap x)
 instance eqValue :: Eq Value where
   eq (Value id1) (Value id2) = id1 == id2
 instance ordValue :: Ord Value where

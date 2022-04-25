@@ -122,7 +122,7 @@ instance prettyPrintRoleType :: PrettyPrint RoleType where
 instance writeForeignRoleType :: WriteForeign RoleType where
   writeImpl = writeImpl <<< genericSumToVariant
 instance readForeightRoleType :: ReadForeign RoleType where
-  readImpl = map variantToGenericSum <<< readImpl
+  readImpl f = map variantToGenericSum (readImpl f)
 
 
 -- | We have rare occasions where we want to lose the difference between
@@ -225,7 +225,7 @@ instance prettyPrintPropertyType :: PrettyPrint PropertyType where
 instance writeForeignPropertyType :: WriteForeign PropertyType where
   writeImpl = writeImpl <<< genericSumToVariant
 instance readForeightPropertyType :: ReadForeign PropertyType where
-  readImpl = map variantToGenericSum <<< readImpl
+  readImpl f = map variantToGenericSum (readImpl f)
 
 newtype ViewType = ViewType String
 derive instance newtypeViewType :: Newtype ViewType _

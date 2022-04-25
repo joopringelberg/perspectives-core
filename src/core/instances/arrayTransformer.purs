@@ -124,14 +124,14 @@ instance alternativeArrayT :: (Monad m, MonadError e m) => Alternative (ArrayT m
 instance monadZeroArrayT :: (Monad m, MonadError e m) => MonadZero (ArrayT m)
 
 instance monadThrowArrayT :: MonadThrow e m => MonadThrow e (ArrayT m) where
-  throwError = lift <<< throwError
+  throwError e = lift (throwError e)
 
 instance monadErrorArrayT :: MonadError e m => MonadError e (ArrayT m) where
   catchError (ArrayT ma) h =
     ArrayT (catchError ma (\e -> unwrap $ h e))
 
 instance monadEffectArrayT :: MonadEffect m => MonadEffect (ArrayT m) where
-  liftEffect = lift <<< liftEffect
+  liftEffect a = lift (liftEffect a)
 
 instance monadAffArrayT ∷ MonadAff m => MonadAff (ArrayT m) where
-  liftAff = lift <<< liftAff
+  liftAff a = lift (liftAff a)

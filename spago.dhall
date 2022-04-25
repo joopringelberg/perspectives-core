@@ -14,7 +14,7 @@ to generate this file without the comments in this block.
 , dependencies =
   [ "aff"
   , "aff-coroutines"
-  , "aff-sockets"
+  -- , "aff-sockets"
   , "affjax"
   , "apitypes"
   , "argonaut"

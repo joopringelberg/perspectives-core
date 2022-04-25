@@ -137,10 +137,10 @@ instance showFunctionName :: Show FunctionName where
     show SpecialisesRoleTypeF = "SpecialisesRoleTypeF"
 
 instance writeForeignFunctionName :: WriteForeign FunctionName where
-  writeImpl = writeImpl <<< genericSumToVariant
+  writeImpl a = writeImpl( genericSumToVariant a )
 
 instance readForeignFunctionName :: ReadForeign FunctionName where
-  readImpl = map variantToGenericSum <<< readImpl
+  readImpl f = map variantToGenericSum (readImpl f)
 
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
@@ -299,10 +299,10 @@ instance decodeQueryFunction :: Decode QueryFunction where
   -- decode = readImpl
 
 instance writeForeignQueryFunction :: WriteForeign QueryFunction where
-  -- writeImpl = writeImpl <<< genericSumToVariant
-  writeImpl a = unsafeToForeign (writeJSON (genericSumToVariant a))
+  writeImpl f = writeImpl( genericSumToVariant f)
+  -- writeImpl a = unsafeToForeign (writeJSON (genericSumToVariant a))
 
 instance readForeignQueryFunction :: ReadForeign QueryFunction where
-  readImpl = map variantToGenericSum <<< readImpl
+  readImpl f = map variantToGenericSum (readImpl f)
 
 instance ordQueryFunction :: Ord QueryFunction where compare = genericCompare
