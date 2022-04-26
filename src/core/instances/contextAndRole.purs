@@ -24,6 +24,7 @@ module Perspectives.ContextAndRole where
 
 import Data.Array (cons, foldl, null)
 import Data.Array (delete, difference, elemIndex, last, snoc, union, unsnoc) as Arr
+import Data.Foldable (maximum)
 import Data.Int (floor, fromString, toNumber)
 import Data.Lens (Lens', Traversal', _Just, over, set, view)
 import Data.Lens.At (at)
@@ -45,7 +46,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
-import Prelude (flip, identity, pure, show, ($), (+), (/), (<<<), (<>), bind, not, eq)
+import Prelude (flip, identity, pure, show, ($), (+), (/), (<<<), (<>), bind, not, eq, (<#>))
 
 -- CONTEXT
 
@@ -377,12 +378,22 @@ rol_padOccurrence n =  case floor( log( toNumber n) / ln10 ) of
   _ -> show n
 
 -- Assume the Array is sorted alphabetically. Role index numbers follow the (last) underscore ("_") and are left padded with zeroes.
+-- getNextRolIndex :: Array RoleInstance -> Int
+-- getNextRolIndex rolIds = case Arr.last rolIds of
+--   Nothing -> 0
+--   (Just id) -> case lastIndexOf (Pattern "_") (NT.unwrap id) of
+--     Nothing -> 0
+--     (Just n) -> let {after} = splitAt (n + 1) (NT.unwrap id) in
+--       case fromString after of
+--         Nothing -> 0
+--         (Just x) -> x + 1
+
 getNextRolIndex :: Array RoleInstance -> Int
-getNextRolIndex rolIds = case Arr.last rolIds of
+getNextRolIndex rolIds = case (maximum $ rolIds <#> \(RoleInstance id) -> case lastIndexOf (Pattern "_") id of
   Nothing -> 0
-  (Just id) -> case lastIndexOf (Pattern "_") (NT.unwrap id) of
-    Nothing -> 0
-    (Just n) -> let {after} = splitAt (n + 1) (NT.unwrap id) in
-      case fromString after of
-        Nothing -> 0
-        (Just x) -> x + 1
+  Just n -> let {after} = splitAt (n+1) id in
+    case fromString after of
+      Nothing -> 0
+      Just x -> x) of
+  Nothing -> 0
+  Just n -> n + 1

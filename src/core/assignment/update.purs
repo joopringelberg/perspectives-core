@@ -40,7 +40,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, difference, elemIndex, filterA, find, foldM, last, null)
+import Data.Array (cons, difference, elemIndex, filterA, find, foldM, last, null, snoc)
 import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Foldable (for_)
@@ -131,10 +131,10 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
 
   where
     f :: PerspectRol -> PerspectContext -> Boolean -> MonadPerspectivesTransaction Unit
-    f role@(PerspectRol r@{_id, universeRoleDelta, isMe}) pe unlinked = do
+    f (PerspectRol r@{_id, universeRoleDelta, isMe}) pe unlinked = do
       changedContext <- if not unlinked
         -- Add the new instance only when the role type is enumerated in the context; hence not for unlinked role types.
-        then lift2 (modifyContext_rolInContext pe rolName (cons roleId))
+        then lift2 (modifyContext_rolInContext pe rolName (flip snoc roleId))
         else pure pe
       -- PERSISTENCE
       -- Is the new role instance filled by me?
@@ -158,7 +158,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
       addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
       delta <- case receivedDelta of
         Just d -> pure d
-        otherwise -> pure $ SignedDelta
+        _ -> pure $ SignedDelta
           { author
           , encryptedDelta: sign $ encodeJSON $ ContextDelta
             { contextInstance : contextId
