@@ -49,12 +49,15 @@ cd perspectives-utilities
 rm -Rf v v1.0.0
 ln -s ../../../perspectives-utilities v1.0.0
 
+cd ..
+
 ##### SERIALISABLE-NONEMPTY-ARRAYS
-cd serialisable-nonempty-arrays
+cd serializablenonemptyarray
 
 rm -Rf v v1.0.1
 ln -s ../../../serialisable-nonempty-arrays v1.0.1
 
+cd ..
 
 ##### PERSPECTIVES-v2.8.5 #####
 cd perspectives-couchdb/
