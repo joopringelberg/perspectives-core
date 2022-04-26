@@ -27,7 +27,7 @@ in  upstream
     , repo =
        "https://github.com/joopringelberg/purescript-avar-monadask.git"
     , version =
-        "v2.1.1"
+        "AVAR_MONADASK"
     }
 
   with kishimen =
@@ -39,7 +39,7 @@ in  upstream
     , repo =
        "https://github.com/joopringelberg/purescript-kishimen.git"
     , version =
-        "v1.1.0"
+        "KISHIMEN"
     }
 
   with apitypes =
@@ -63,7 +63,7 @@ in  upstream
     , repo =
        "https://github.com/joopringelberg/perspectives-apitypes.git"
     , version =
-        "v2.13.2"
+        "APITYPES"
     }
 
   with perspectives-utilities =
@@ -81,7 +81,7 @@ in  upstream
     , repo =
         "https://github.com/joopringelberg/perspectives-utilities.git"
     , version =
-        "v1.0.0"
+        "UTILITIES"
     }
 
   with serializablenonemptyarray =
@@ -104,7 +104,7 @@ in  upstream
     , repo =
         "https://github.com/joopringelberg/serialisable-nonempty-arrays.git"
     , version =
-        "v1.0.1"
+        "SERIALIZABLENONEMPTYARRAY"
     }
 
   with perspectives-couchdb =
@@ -146,11 +146,11 @@ in  upstream
     , repo =
         "https://github.com/joopringelberg/perspectives-couchdb.git"
     , version =
-        "v2.8.5"
+        "COUCHDB"
     }
 
   with affjax.repo = "https://github.com/joopringelberg/purescript-affjax.git"
-  with affjax.version = "v12.0.0-with-xhr-cookies"
+  with affjax.version = "AFFJAX"
 
   with parsing.repo = "https://github.com/joopringelberg/purescript-parsing.git"
-  with parsing.version = "v7.0.0-transformer-tagged"
+  with parsing.version = "PARSING"

@@ -1,39 +1,33 @@
 perspectives-core
 ======================
 
-The core provides the middleware between Couchd and clients. It can be approached through two channels:
-* an internal channel
-* a TCP (socket-based) channel on port 7777.
-
-Clients communicate with the core on both channels using exactly the same protocol that essentially is querying for roles or properties.
+The core provides the middleware between Couchd and clients. It is used in the browser in InPlace, where it runs in a SharedService.
 
 ### Setting up
-Follow these steps to start developing.
+Follow these steps to set up your development environment.
 
 1. Clone this repository.
-2. Install [Purescript](http://www.purescript.org) version 0.12.5.
+2. Install [Purescript](http://www.purescript.org) version 0.14.9 (we do not yet support higher versions).
 
 ```
-npm install -g purescript@0.12.5
+npm install -g purescript@0.14.9
 ```
 
-3. Install [psc-package](https://github.com/purescript/psc-package) version 0.5.1
+3. Install [spago](https://github.com/purescript/spago)
 
 ```
-npm install -g psc-package@0.5.1
-```
-
-4. Install [pulp](https://github.com/purescript-contrib/pulp) version 12.2.0.
-
-```
-npm install -g pulp@12.2.0
+npm npm install -g spago
 ```
 
 5. Install [Webpack](https://webpack.js.org/)
+```
+npm install --save-dev webpack
+```
+
 5. To install the purescript dependencies, run:
 
 ```
-  $ psc-package install
+  $ spago install
 ```
 
 6. To install the javascript dependencies, run:
@@ -42,29 +36,32 @@ npm install -g pulp@12.2.0
   $ npm install
 ```
 
-6. To compile the .purs source files, run:
+### Developing
+
+To compile the .purs source files, run:
 
 ```
-  $ pulp build
+  $ spago build
 ```
 
-Additionally, install [Atom](https://atom.io/) and two packages to support Purescript:
+Preferrably install [vscode](https://code.visualstudio.com/) and add two extensions:
+  * [Purescript IDE](https://marketplace.visualstudio.com/items?itemName=nwolverson.ide-purescript)
+  * [Purescript Language Support](https://marketplace.visualstudio.com/items?itemName=nwolverson.language-purescript)
+
+Alternatively, install [Atom](https://atom.io/) and two packages to support Purescript:
   * [purescript-contrib/atom-language-purescript](https://github.com/purescript-contrib/atom-language-purescript) provides syntax highlighting
   * [nwolverson/atom-ide-purescript](https://github.com/nwolverson/atom-ide-purescript) provides build support, REPL, and autocomplete etc. via psc-ide
 
+The vscode version has more recent language server support than the Atom version.
 
 ### Develop this interface; construct a bundle
-Assuming code will be changed with Atom (and the Atom-purescript-ide), changes in source code will be immediately compiled into javascript in the `output` directory. Alternatively, execute this command to build the source:
+Execute this command to combine the sources into a bundle, as it is used by InPlace:
 
 ```
-pulp build
+npm run build
 ```
+(which just calls `webpack`)
 
-The project contains a Webpack configuration file. If
-
-`npm run watch`
-
-is executed before changing code, changes will be immediately reflected in the bundled code in `dist/perspectives-core.js`.
 
 ### Program documentation
 The source files have many annotations. Moreover, the compiler can generate standard documentation from the types in the sources. The entrance point to this documentation is [here](https://joopringelberg.github.io/perspectives-core/Perspectives.Docu.Main.html#t:x).
@@ -78,11 +75,11 @@ npm run docs
 __NOTE__ do not use the `pulp docs` command. It [generates documentation](https://github.com/purescript-contrib/pulp#building-documentation) in the directory `generated-docs`, while [Github Pages](https://help.github.com/en/github/working-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site) expects it to be in `docs`.
 
 ### Symlinks for easy updates
-`package.json` contains a run target `symlinks` that will replace the subdirectories
-* aff-sockets
-* perspectives-apitypes
-* avar-monadask
+`package.json` contains a run target `symlinks` that will replace the subdirectories of dependencies that are co-developed with perspectives-core with symlinks to those projects, assuming that they live side-by-side with perspectives-core. Run this script after calling `npm install` or `spago install`. A change in this project is then immediately picked up by webpack (when watching, of course).
 
-in the .psc-package directory with symlinks to projects in ~Code. Run this script after calling `npm install`. A change in this project is then immediately picked up by webpack (when watching, of course).
+## Publishing a new version
+Before publishing a new version (through Github), all dependencies need to be up to date. For this we have an executable script `bumpVersions.sh`. One must edit this script before using it, to make sure all version variables in it have up to date values. Then, running this script will produce up to date versions of
 
-**Note**. If a new version of `psc-0.11.7-perspectives-core3` is created, the script needs to be adapted!
+* package.json
+* packages.dhall
+* createPerspectivesLinks.sh

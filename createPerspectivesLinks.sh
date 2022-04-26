@@ -16,18 +16,16 @@ cd .spago
 #
 # cd ..
 
-##### AFFJAX #####
+##### AVAR-MONADASK #####
+cd avar-monadask/
 
-cd affjax
+rm -Rf v2.1.1
 
-rm -Rf v12.0.0-with-xhr-cookies
-
-ln -s ../../../purescript-affjax v12.0.0-with-xhr-cookies
+ln -s ../../../purescript-avar-monadask v2.1.1
 
 cd ..
 
-##### KISHIMEN #####
-
+##### v1.1.0 #####
 cd kishimen
 
 rm -Rf v1.1.0
@@ -36,26 +34,29 @@ ln -s ../../../purescript-kishimen v1.1.0
 
 cd ..
 
-##### PERSPECTIVES-APITYPES #####
-# cd perpectives-apitypes
-#
-# rm -Rf v2.13.2
-#
-# ln -s ../../../perspectives-apitypes v2.13.2
-#
-# cd ..
+#### PERSPECTIVES-v2.13.2 #####
+cd apitypes
 
-##### AVAR-MONADASK #####
-cd avar-monadask/
+rm -Rf v2.13.2
 
-rm -Rf v2.1.0
-
-ln -s ../../../purescript-avar-monadask v2.1.0
+ln -s ../../../perspectives-apitypes v2.13.2
 
 cd ..
 
+##### PERSPECTIVES-v1.0.0
+cd perspectives-utilities
 
-##### PERSPECTIVES-COUCHDB #####
+rm -Rf v v1.0.0
+ln -s ../../../perspectives-utilities v1.0.0
+
+##### SERIALISABLE-NONEMPTY-ARRAYS
+cd serialisable-nonempty-arrays
+
+rm -Rf v v1.0.1
+ln -s ../../../serialisable-nonempty-arrays v1.0.1
+
+
+##### PERSPECTIVES-v2.8.5 #####
 cd perspectives-couchdb/
 
 rm -Rf v2.8.5
@@ -63,6 +64,25 @@ rm -Rf v2.8.5
 ln -s ../../../perspectives-couchdb v2.8.5
 
 cd ..
+
+##### v12.0.0-with-xhr-cookies #####
+cd affjax
+
+rm -Rf v12.0.0-with-xhr-cookies
+
+ln -s ../../../purescript-affjax v12.0.0-with-xhr-cookies
+
+cd ..
+
+##### v7.0.0-transformer-tagged #####
+cd parsing
+
+rm -Rf v7.0.0-transformer-tagged
+
+ln -s ../../../purescript-parsing v7.0.0-transformer-tagged
+
+cd ..
+
 
 ##### NODE_MODULES #####
 cd ..
