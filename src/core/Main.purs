@@ -90,7 +90,7 @@ main = pure unit
 runPDR :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
 runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
   case decodePouchdbUser' rawPouchdbUser of
-    Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
+    Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
     Right (pdbu :: PouchdbUser) -> do
       (pouchdbUser :: PouchdbUser) <- pure
         { systemIdentifier: pdbu.systemIdentifier
@@ -121,13 +121,13 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
       handler (Left e) = do
         logPerspectivesError $ Custom $ "An error condition in runPDR: " <> (show e)
         callback false
-      handler (Right e) = do
+      handler (Right _) = do
         logPerspectivesError $ Custom $ "Started the PDR for: " <> usr
         callback true
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)
-handleError (Right a) = pure unit
+handleError (Right _) = pure unit
 
 -- | Call this function from the client to initialise the Persistence of Perspectives.
 -- | Implementation notes:
@@ -148,7 +148,7 @@ createUser userName password couchdbUrl = void $ runAff
 createAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
 createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
-    Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
+    Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
     Right (pdbu :: PouchdbUser) -> do
       (pouchdbUser :: PouchdbUser) <- pure
         { systemIdentifier: pdbu.systemIdentifier
@@ -168,7 +168,7 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
     handler (Left e) = do
       logPerspectivesError $ Custom $ "An error condition in createAccount: " <> (show e)
       callback false
-    handler (Right e) = do
+    handler (Right _) = do
       logPerspectivesError $ Custom $ "Created an account " <> usr
       callback true
 
@@ -177,7 +177,7 @@ resetAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect
 resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
-      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
+      Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
         state <- new $ newPerspectivesState pouchdbUser publicRepo
         runPerspectivesWithState
@@ -218,7 +218,7 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
         mcouchdbUrl <- gets (_.userInfo >>> _.couchdbUrl)
         case mcouchdbUrl of
           Nothing -> pure unit
-          otherwise -> do
+          _ -> do
             -- We need to do this because we use the Pouchdb adapter.
             -- Pouchdb actually creates the database only with the first action on it.
             -- As setSecurityDocument is implemented using Affjax, it bypasses Pouchdb
@@ -239,7 +239,7 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
       handler (Left e) = do
         logPerspectivesError $ Custom $ "An error condition in resetAccount: " <> (show e)
         callback false
-      handler (Right e) = do
+      handler (Right _) = do
         logPerspectivesError $ Custom $ "Reset the account " <> usr
         callback true
 
@@ -254,7 +254,7 @@ removeAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effec
 removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
-      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in removeAccount")
+      Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in removeAccount")
       Right (pdbu :: PouchdbUser) -> do
         (pouchdbUser :: PouchdbUser) <- pure
           { systemIdentifier: pdbu.systemIdentifier
@@ -283,7 +283,7 @@ removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
     handler (Left e) = do
       logPerspectivesError $ Custom $ "An error condition in removeAccount: " <> (show e)
       callback false
-    handler (Right e) = do
+    handler (Right _) = do
       logPerspectivesError $ Custom $ "removeAccount an account " <> usr
       callback true
 

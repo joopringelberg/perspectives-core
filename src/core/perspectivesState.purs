@@ -143,19 +143,19 @@ lookupVariableBinding varName = getVariableBindings >>= pure <<< (ENV.lookup var
 withFrame :: forall a. MonadPerspectives a -> MonadPerspectives a
 withFrame computation = do
   old <- getVariableBindings
-  void $ modify \s@{variableBindings} -> s {variableBindings = (ENV._pushFrame old)}
+  void $ modify \s -> s {variableBindings = (ENV._pushFrame old)}
   r <- computation
-  void $ modify \s@{variableBindings} -> s {variableBindings = old}
+  void $ modify \s -> s {variableBindings = old}
   pure r
 
 pushFrame :: MonadPerspectives (ENV.Environment (Array String))
 pushFrame = do
   old <- getVariableBindings
-  void $ modify \s@{variableBindings} -> s {variableBindings = (ENV._pushFrame old)}
+  void $ modify \s -> s {variableBindings = (ENV._pushFrame old)}
   pure old
 
 restoreFrame :: ENV.Environment (Array String) -> MonadPerspectives Unit
-restoreFrame frame = void $ modify \s@{variableBindings} -> s {variableBindings = frame}
+restoreFrame frame = void $ modify \s -> s {variableBindings = frame}
 
 -----------------------------------------------------------
 -- FUNCTIONS TO MODIFY LRUCACHES IN PERSPECTIVESSTATE

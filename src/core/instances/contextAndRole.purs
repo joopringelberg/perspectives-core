@@ -23,7 +23,7 @@
 module Perspectives.ContextAndRole where
 
 import Data.Array (cons, foldl, null)
-import Data.Array (delete, difference, elemIndex, last, snoc, union, unsnoc) as Arr
+import Data.Array (delete, difference, elemIndex, snoc, union, unsnoc) as Arr
 import Data.Foldable (maximum)
 import Data.Int (floor, fromString, toNumber)
 import Data.Lens (Lens', Traversal', _Just, over, set, view)
@@ -127,7 +127,7 @@ _aliases' = _Newtype <<< _aliases
     _aliases = prop (SProxy :: SProxy "aliases")
 
 addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> MonadPerspectives PerspectContext
-addContext_rolInContext ct@(PerspectContext cr@{aliases,rolInContext}) r@(EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
+addContext_rolInContext (PerspectContext cr@{aliases,rolInContext}) r@(EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
   Nothing -> do
     aspects <- r ###= roleAspectsClosure
     pure $ PerspectContext cr
@@ -139,7 +139,7 @@ addContext_rolInContext ct@(PerspectContext cr@{aliases,rolInContext}) r@(Enumer
   Just roles -> pure $ PerspectContext cr {rolInContext = insert rolName (cons rolId roles) rolInContext}
 
 removeContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
-removeContext_rolInContext c@(PerspectContext cr@{aliases, rolInContext}) (EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
+removeContext_rolInContext c@(PerspectContext cr@{rolInContext}) (EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
   Nothing -> c
   Just roles -> PerspectContext cr {rolInContext = insert rolName (Arr.delete rolId roles) rolInContext}
 
@@ -323,7 +323,7 @@ addRol_gevuldeRollen filler cType rolName filled = let
         (Just roles) -> do
           case Arr.elemIndex filled roles of
             Nothing -> cr {filledRoles = insert cIndex (insert rIndex (Arr.union [filled] roles) roleMap) cr.filledRoles}
-            otherwise -> cr
+            _ -> cr
       )
   in f filler
 
@@ -339,7 +339,7 @@ removeRol_gevuldeRollen ct cType rolName rolID = let
         (Just (roles :: Array RoleInstance)) -> do
           case Arr.elemIndex rolID roles of
             Nothing -> cr
-            otherwise -> let
+            _ -> let
               roles' = Arr.delete rolID roles in
                 if null roles'
                   then cr {filledRoles = insert cIndex (delete rIndex roleMap) cr.filledRoles}

@@ -33,7 +33,7 @@ import Control.Plus ((<|>))
 import Data.Array (elemIndex, head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe) 
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
@@ -44,7 +44,7 @@ import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (empty)
-import Simple.JSON (unsafeStringify)
+import Simple.JSON (unsafeStringify, read)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
@@ -86,7 +86,6 @@ import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUse
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
-import Simple.JSON (read)
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -118,7 +117,7 @@ setupApi = runProcess $ (requestProducer $~ (forever (transform decodeRequest)))
         , predicate: (unsafeStringify f)
         , object: ""
         , corrId: -1
-        , reactStateSetter: Just $ unsafeToForeign (\x -> pure unit :: Aff Unit)
+        , reactStateSetter: Just $ unsafeToForeign (\_ -> pure unit :: Aff Unit)
         , contextDescription: unsafeToForeign ""
         , rolDescription: Nothing
         , authoringRole: Nothing}
@@ -158,7 +157,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         Left err -> do
           logPerspectivesError $ RolErrorBoundary "Api.GetRoleBinders" (show err)
           sendResponse (Error corrId (show $ RolErrorBoundary "Api.GetRoleBinders" (show err))) setter
-        Right (PerspectRol{pspType:fillerType, context:fillerContext}) -> case object of
+        Right (PerspectRol{pspType:fillerType}) -> case object of
             "" -> (try $ getPerspectType (EnumeratedRoleType predicate)) >>=
               case _ of
                 Left err -> do
@@ -172,7 +171,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                 Left err -> do
                   logPerspectivesError $ ContextErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ ContextErrorBoundary "Api.GetRoleBinders" (show err))) setter
-                Right cType -> do
+                Right _ -> do
                   void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap fillerType))
                   registerSupportedEffect corrId setter (getFilledRoles (ContextType filledContextType) (EnumeratedRoleType predicate)) (RoleInstance subject)
     Api.GetRol -> do
@@ -254,7 +253,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       roleKind <- roleType_ (RoleInstance subject) >>= getEnumeratedRole >>= pure <<< kindOfRole
       case roleKind of
         ContextRole -> registerSupportedEffect corrId setter (map toRoleType_ <<< (binding >=> context >=> getMyType)) (RoleInstance subject)
-        otherwise -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
+        _ -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
     -- `subject` is an external role instance. Returns all RoleTypes that sys:Me
     -- ultimately fills an instance of in the corresponding context instance.
     Api.GetAllMyRoleTypes -> do
@@ -585,7 +584,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
 
     Api.Unsubscribe -> unregisterSupportedEffect corrId
     Api.WrongRequest -> sendResponse (Error corrId subject) setter
-    otherwise -> sendResponse (Error corrId ("Perspectives could not handle this request: '" <> (showRequestRecord r) <> "'")) (mkApiEffect reactStateSetter)
+    _ -> sendResponse (Error corrId ("Perspectives could not handle this request: '" <> (showRequestRecord r) <> "'")) (mkApiEffect reactStateSetter)
   where
     setter = (mkApiEffect reactStateSetter)
 
@@ -625,6 +624,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
 -----------------------------------------------------------
 type ReactStateSetter = Array String -> Effect Unit
 
+type QueryUnsubscriber :: forall k. k -> Type
 type QueryUnsubscriber e = Effect Unit
 
 -- | Apply an ApiEffect to a Response, in effect sending it through the API to the caller.

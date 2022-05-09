@@ -269,7 +269,7 @@ evalMonadPerspectivesQuery :: forall s o.
   -> (s ~~> o)
   -> (MonadPerspectives (Array o))
 evalMonadPerspectivesQuery a f = do
-    (Tuple result assumptions) <- runMonadPerspectivesQuery a f
+    (Tuple result _) <- runMonadPerspectivesQuery a f
     pure result
 
 infix 0 evalMonadPerspectivesQuery as ##=
@@ -302,7 +302,7 @@ execMonadPerspectivesQuery :: forall s o.
   -> (s ~~> o)
   -> (MonadPerspectives (Array InformedAssumption))
 execMonadPerspectivesQuery a f = do
-    (Tuple result assumptions) <- runMonadPerspectivesQuery a f
+    (Tuple _ assumptions) <- runMonadPerspectivesQuery a f
     pure (unwrap assumptions)
 
 -----------------------------------------------------------

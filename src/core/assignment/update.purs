@@ -223,7 +223,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
         -- PERSISTENCE.
         case find rol_isMe roles of
           Nothing -> cacheAndSave contextId changedContext
-          Just me -> do
+          Just _ -> do
             (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
             -- CURRENTUSER.
             -- TODO. Is dit voldoende? Moet er niet een andere rol gevonden worden?
@@ -239,7 +239,8 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
 -- | CURRENTUSER for contextId and one of rolInstances.
 -- TODO. De enige manier om deze functie aan te passen lijkt een nieuwe ContextDelta te maken en mee te nemen in de ContextDelta met MoveRoleInstancesToAnotherContext. Aan de ontvangende kant moet die nieuwe ContextDelta dan in de verplaatste rol worden gezet op de plek van 'contextDelta'.
 moveRoleInstanceToAnotherContext :: ContextInstance -> ContextInstance -> EnumeratedRoleType -> (Updater RoleInstance)
-moveRoleInstanceToAnotherContext originContextId destinationContextId rolName rolInstance = pure unit
+moveRoleInstanceToAnotherContext _ _ _ _ = pure unit
+-- moveRoleInstanceToAnotherContext originContextId destinationContextId rolName rolInstance = pure unit
 -- moveRoleInstanceToAnotherContext originContextId destinationContextId rolName rolInstances = do
 --   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
 --   me <- pure $ rol_id <$> find rol_isMe roles
@@ -293,7 +294,7 @@ type PropertyUpdater = Array RoleInstance -> EnumeratedPropertyType -> (Updater 
 addProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array (Tuple Value (Maybe SignedDelta))))
 addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
   Nothing -> pure unit
-  Just roleId -> do
+  Just _ -> do
     values <- pure $ fst <$> valuesAndDeltas
     subject <- getSubject
     author <- getAuthor
@@ -354,7 +355,7 @@ setDeltasForProperty propertyName modifier allDeltas = case lookup (unwrap prope
 removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 removeProperty rids propertyName values = case ARR.head rids of
   Nothing -> pure unit
-  Just roleId -> do
+  Just _ -> do
     subject <- getSubject
     for_ rids \rid' -> do
       mrid <- lift2 $ getPropertyBearingRoleInstance propertyName rid'
@@ -393,7 +394,7 @@ removeProperty rids propertyName values = case ARR.head rids of
 deleteProperty :: Array RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction Unit
 deleteProperty rids propertyName = case ARR.head rids of
   Nothing -> pure unit
-  Just roleId -> do
+  Just _ -> do
     subject <- getSubject
     for_ rids \rid' -> do
       mrid <- lift2 $ getPropertyBearingRoleInstance propertyName rid'
