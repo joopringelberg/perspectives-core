@@ -73,6 +73,7 @@ type DomeinFileRecord =
   , indexedContexts :: Array ContextInstance
   , modelDescription :: Maybe PerspectRol
   , referredModels :: Array DomeinFileId
+  -- Keys are DomeinFileIds.
   , invertedQueriesInOtherDomains :: Object (Array SeparateInvertedQuery)
   , userGraph :: UserGraph
   , screens :: EncodableMap ScreenKey ScreenDefinition

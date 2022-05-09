@@ -86,6 +86,14 @@ ln -s ../../../purescript-parsing PARSING
 
 cd ..
 
+##### LRUCACHE #####
+cd lrucache
+
+rm -Rf LRUCACHE
+
+ln -s ../../../purescript-lru-cache LRUCACHE
+
+cd ..
 
 ##### NODE_MODULES #####
 cd ..

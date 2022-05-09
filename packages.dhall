@@ -154,3 +154,9 @@ in  upstream
 
   with parsing.repo = "https://github.com/joopringelberg/purescript-parsing.git"
   with parsing.version = "v7.0.0-transformer-tagged"
+
+  with lrucache =
+    { dependencies =
+      ["prelude"]
+    , repo = "https://github.com/joopringelberg/purescript-lru-cache.git"
+    , version = "v1.0.0"}

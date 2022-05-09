@@ -41,6 +41,7 @@ to generate this file without the comments in this block.
   , "js-date"
   , "kishimen"
   , "lists"
+  , "lrucache"
   , "math"
   , "maybe"
   , "media-types"

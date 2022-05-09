@@ -388,6 +388,7 @@ rol_padOccurrence n =  case floor( log( toNumber n) / ln10 ) of
 --         Nothing -> 0
 --         (Just x) -> x + 1
 
+// TODO #3
 getNextRolIndex :: Array RoleInstance -> Int
 getNextRolIndex rolIds = case (maximum $ rolIds <#> \(RoleInstance id) -> case lastIndexOf (Pattern "_") id of
   Nothing -> 0

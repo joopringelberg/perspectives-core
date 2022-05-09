@@ -86,6 +86,14 @@ ln -s ../../../purescript-parsing v7.0.0-transformer-tagged
 
 cd ..
 
+##### v1.0.0 #####
+cd lrucache
+
+rm -Rf v1.0.0
+
+ln -s ../../../purescript-lru-cache v1.0.0
+
+cd ..
 
 ##### NODE_MODULES #####
 cd ..

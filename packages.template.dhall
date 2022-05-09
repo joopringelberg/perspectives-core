@@ -154,3 +154,9 @@ in  upstream
 
   with parsing.repo = "https://github.com/joopringelberg/purescript-parsing.git"
   with parsing.version = "PARSING"
+
+  with lrucache =
+    { dependencies =
+      ["prelude"]
+    , repo = "https://github.com/joopringelberg/purescript-lru-cache.git"
+    , version = "LRUCACHE"}

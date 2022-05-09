@@ -14,6 +14,7 @@ COUCHDB=v2.8.5
 AFFJAX=v12.0.0-with-xhr-cookies
 PARSING=v7.0.0-transformer-tagged
 PERSPECTIVESPROXY=v1.13.0
+LRUCACHE=v1.0.0
 
 sed "s/AVAR_MONADASK/${AVAR_MONADASK}/g;\
 s/KISHIMEN/${KISHIMEN}/g;\
@@ -23,6 +24,7 @@ s/SERIALIZABLENONEMPTYARRAY/${SERIALIZABLENONEMPTYARRAY}/g;\
 s/COUCHDB/${COUCHDB}/g;\
 s/AFFJAX/${AFFJAX}/g;\
 s/PARSING/${PARSING}/g;\
+s/LRUCACHE/${LRUCACHE}/g;\
 " packages.template.dhall > packages.dhall
 
 sed "s/AVAR_MONADASK/${AVAR_MONADASK}/g;\
@@ -33,6 +35,7 @@ s/SERIALIZABLENONEMPTYARRAY/${SERIALIZABLENONEMPTYARRAY}/g;\
 s/COUCHDB/${COUCHDB}/g;\
 s/AFFJAX/${AFFJAX}/g;\
 s/PARSING/${PARSING}/g;\
+s/LRUCACHE/${LRUCACHE}/g;\
 " createPerspectivesLinks.template.sh > createPerspectivesLinks.sh
 
 sed "s/PERSPECTIVESPROXY/${PERSPECTIVESPROXY}/g;" package.template.json > package.json
