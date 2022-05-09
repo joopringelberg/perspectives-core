@@ -26,23 +26,23 @@ module Perspectives.CoreTypes where
 import Control.Monad.Reader (ReaderT, lift)
 import Control.Monad.Writer (WriterT, runWriterT)
 import Data.Array (foldMap, foldl, foldr, head, union)
+import Data.Eq.Generic (genericEq)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
-import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, throwError)
 import Effect.Aff.AVar (AVar)
 import Effect.Exception (error)
 import Foreign.Object (Object)
 import Foreign.Object as F
+import LRUCache (Cache)
 import Perspectives.AMQP.Stomp (ConnectAndSubscriptionParameters, StompClient)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
 import Perspectives.Persistence.API (PouchdbState)
@@ -55,9 +55,9 @@ import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
 -----------------------------------------------------------
-type ContextInstances = GLStrMap (AVar PerspectContext)
-type RolInstances = GLStrMap (AVar PerspectRol)
-type DomeinCache = GLStrMap (AVar DomeinFile)
+type ContextInstances = Cache (AVar PerspectContext)
+type RolInstances = Cache (AVar PerspectRol)
+type DomeinCache = Cache (AVar DomeinFile)
 
 type BrokerService = ConnectAndSubscriptionParameters ( url :: String )
 

@@ -39,13 +39,14 @@ import Data.Newtype (class Newtype, unwrap)
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar, isEmpty, empty, put, read, status, take)
 import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Effect.Exception (error)
+import LRUCache (Cache, set)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, rev)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.PerspectivesState (insert, lookup, remove)
+import Perspectives.PerspectivesState (lookup, remove)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..), DomeinFileId)
@@ -57,7 +58,7 @@ type Identifier = String
 type Namespace = String
 
 class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i, i -> v where
-  theCache :: MonadPerspectives (GLStrMap (AVar v))
+  theCache :: MonadPerspectives (Cache (AVar v))
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
   representInternally :: i -> MonadPerspectives (AVar v)
   retrieveInternally :: i -> MonadPerspectives (Maybe (AVar v))
@@ -142,7 +143,8 @@ instance cacheablePerspectContext :: Cacheable PerspectContext ContextInstance w
   theCache = gets _.contextInstances
   representInternally c = do
     av <- liftAff empty
-    insert theCache (unwrap c) av
+    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
+    pure av
   retrieveInternally i = lookup theCache (unwrap i)
   removeInternally i = remove theCache (unwrap i)
 
@@ -150,7 +152,8 @@ instance cacheablePerspectRol :: Cacheable PerspectRol RoleInstance where
   theCache = gets _.rolInstances
   representInternally c = do
     av <- liftAff empty
-    insert theCache (unwrap c) av
+    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
+    pure av
   retrieveInternally i = lookup theCache (unwrap i)
   removeInternally i = remove theCache (unwrap i)
 
@@ -158,6 +161,7 @@ instance cacheableDomeinFile :: Cacheable DomeinFile DomeinFileId where
   theCache = gets _.domeinCache
   representInternally c = do
     av <- liftAff empty
-    insert theCache (unwrap c) av
+    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
+    pure av
   retrieveInternally i = lookup theCache (unwrap i)
   removeInternally i = remove theCache (unwrap i)

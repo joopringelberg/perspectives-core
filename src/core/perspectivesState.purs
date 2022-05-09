@@ -25,20 +25,21 @@ module Perspectives.PerspectivesState where
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (AVar)
+import Effect.Class (liftEffect)
 import Foreign.Object (empty)
+import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
 import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState, BrokerService)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
 import Perspectives.Persistence.API (PouchdbUser, Url)
-import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void, (+))
+import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 
 newPerspectivesState :: PouchdbUser -> Url -> PerspectivesState
 newPerspectivesState uinfo publicRepo =
-  { rolInstances: new unit
-  , contextInstances: new unit
-  , domeinCache: new unit
+  { rolInstances: newCache defaultCreateOptions
+  , contextInstances: newCache defaultCreateOptions
+  , domeinCache: newCache defaultCreateOptions
   , queryAssumptionRegister: empty
   , variableBindings: ENV.empty
   , publicRepository: publicRepo
@@ -110,13 +111,14 @@ getWarnings = gets _.warnings
 -- RESETTING CACHES
 -----------------------------------------------------------
 resetDomeinCache :: MonadPerspectives Unit
-resetDomeinCache = modify \s -> s {domeinCache = new unit}
+resetDomeinCache = gets _.domeinCache >>= liftEffect <<< clear
 
 resetRoleInstances :: MonadPerspectives Unit
-resetRoleInstances = modify \s -> s {rolInstances = new unit}
+resetRoleInstances = gets _.rolInstances >>= liftEffect <<< clear
 
 resetContextInstances :: MonadPerspectives Unit
-resetContextInstances = modify \s -> s {contextInstances = new unit}
+-- resetContextInstances = modify \s -> s {contextInstances = new unit}
+resetContextInstances = gets _.contextInstances >>= liftEffect <<< clear
 
 resetCaches :: MonadPerspectives Unit
 resetCaches = do
@@ -156,32 +158,36 @@ restoreFrame :: ENV.Environment (Array String) -> MonadPerspectives Unit
 restoreFrame frame = void $ modify \s@{variableBindings} -> s {variableBindings = frame}
 
 -----------------------------------------------------------
--- FUNCTIONS TO MODIFY GLOBAL UNSAFE STRMAPS IN PERSPECTIVESSTATE
+-- FUNCTIONS TO MODIFY LRUCACHES IN PERSPECTIVESSTATE
 -----------------------------------------------------------
 insert :: forall a.
-  MonadPerspectives (GLStrMap a) ->
+  MonadPerspectives (Cache a) ->
   String ->
   a ->
   MonadPerspectives a
 insert g ns av = do
-  (dc :: (GLStrMap a)) <- g
-  _ <- pure $ (poke dc ns av)
+  (dc :: (Cache a)) <- g
+  _ <- liftEffect $ set ns av Nothing dc
+  -- _ <- pure $ (poke dc ns av)
   pure av
 
 lookup :: forall a.
-  MonadPerspectives (GLStrMap a) ->
+  MonadPerspectives (Cache a) ->
   String ->
   MonadPerspectives (Maybe a)
 lookup g k = do
   dc <- g
-  pure $ peek dc k
+  -- pure $ peek dc k
+  liftEffect $ get k defaultGetOptions dc
 
 remove :: forall a.
-  MonadPerspectives (GLStrMap a) ->
+  MonadPerspectives (Cache a) ->
   String ->
   MonadPerspectives (Maybe a)
 remove g k = do
-  (dc :: (GLStrMap a)) <- g
-  ma <- pure $ peek dc k
-  _ <- pure $ (delete dc k)
+  (dc :: (Cache a)) <- g
+  -- ma <- pure $ peek dc k
+  ma <- liftEffect $ get k defaultGetOptions dc
+  -- _ <- pure $ (delete dc k)
+  _ <- liftEffect $ delete k dc
   pure ma
