@@ -66,6 +66,7 @@ type PerspectivesState = PouchdbState PerspectivesExtraState
 type PerspectivesExtraState =
   -- Caching instances
   ( rolInstances :: RolInstances
+
   , contextInstances :: ContextInstances
 
   -- Caching Domein files
@@ -92,6 +93,8 @@ type PerspectivesExtraState =
   , stompClient :: Maybe StompClient
 
   , warnings :: Array String
+
+  , transactionFlag :: AVar Boolean
 
   )
 

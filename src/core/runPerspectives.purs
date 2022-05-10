@@ -36,6 +36,7 @@ import Prelude (bind, show, ($), (<>))
 runPerspectives :: forall a. String -> String -> String -> String -> Int -> String -> MonadPerspectives a
   -> Aff a
 runPerspectives userName password systemId host port publicRepo mp = do
+  transactionFlag <- new true
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState
         { systemIdentifier: systemId
@@ -43,7 +44,8 @@ runPerspectives userName password systemId host port publicRepo mp = do
         , couchdbUrl: Just (host <> ":" <> show port <> "/")
         -- , userName: UserName userName
         }
-      publicRepo) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
+      publicRepo
+      transactionFlag) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
   runReaderT mp rf
 
 runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a

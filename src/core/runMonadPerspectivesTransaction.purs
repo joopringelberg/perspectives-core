@@ -30,7 +30,7 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
-import Effect.Aff.AVar (new)
+import Effect.Aff.AVar (new, take, put)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (empty)
@@ -56,7 +56,7 @@ import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRole
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
-import Perspectives.PerspectivesState (addBinding, publicRepository, pushFrame, restoreFrame)
+import Perspectives.PerspectivesState (addBinding, publicRepository, pushFrame, restoreFrame, transactionFlag)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getMyType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier, DomeinFileId(..))
@@ -89,6 +89,9 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
   where
     run :: MonadPerspectivesTransaction o
     run = do
+      -- 0. Only execute the transaction when we can take the flag down.
+      t <- lift2 transactionFlag
+      _ <- lift2 $ lift $ take t
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
 
@@ -108,6 +111,8 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
           (Just {runner}) -> do
             -- logShow corrId
             runner unit
+      -- 5. Raise the flag
+      _ <- lift2 $ lift $ put true t
       pure r
 
     runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction

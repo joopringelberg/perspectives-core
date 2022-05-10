@@ -97,7 +97,8 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
         , password: pdbu.password
         , couchdbUrl: pdbu.couchdbUrl
       }
-      state <- new $ newPerspectivesState pouchdbUser publicRepo
+      transactionFlag <- new true
+      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
 
       runPerspectivesWithState (do
         addAllExternalFunctions
@@ -155,7 +156,8 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
         , password: pdbu.password
         , couchdbUrl: pdbu.couchdbUrl
         }
-      state <- new $ newPerspectivesState pouchdbUser publicRepo
+      transactionFlag <- new true
+      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
       runPerspectivesWithState
         (do
           -- TODO. Vermoedelijk is dit overbodig voor Pouchdb.
@@ -179,7 +181,8 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
-        state <- new $ newPerspectivesState pouchdbUser publicRepo
+        transactionFlag <- new true
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
         runPerspectivesWithState
           (do
             (catchError do
@@ -261,7 +264,8 @@ removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
           , password: pdbu.password
           , couchdbUrl: pdbu.couchdbUrl
           }
-        state <- new $ newPerspectivesState pouchdbUser publicRepo
+        transactionFlag <- new true
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
         runPerspectivesWithState
           do
             -- Get all Channels

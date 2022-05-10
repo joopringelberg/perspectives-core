@@ -29,14 +29,14 @@ import Effect.Class (liftEffect)
 import Foreign.Object (empty)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState, BrokerService)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, PerspectivesState, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
 import Perspectives.Persistence.API (PouchdbUser, Url)
 import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 
-newPerspectivesState :: PouchdbUser -> Url -> PerspectivesState
-newPerspectivesState uinfo publicRepo =
+newPerspectivesState :: PouchdbUser -> Url -> AVar Boolean -> PerspectivesState
+newPerspectivesState uinfo publicRepo transFlag =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
@@ -54,6 +54,7 @@ newPerspectivesState uinfo publicRepo =
   , databases: empty
   -- , couchdbUrl: Nothing -- For using Couchdb as backend for Pouchdb.
   , warnings: []
+  , transactionFlag: transFlag
   }
 
 -----------------------------------------------------------
@@ -85,6 +86,9 @@ developmentRepository = gets _.developmentRepository
 
 transactionNumber :: MonadPerspectives Int
 transactionNumber = gets _.transactionNumber
+
+transactionFlag :: MonadPerspectives (AVar Boolean)
+transactionFlag = gets _.transactionFlag
 
 nextTransactionNumber :: MonadPerspectives Int
 nextTransactionNumber = do

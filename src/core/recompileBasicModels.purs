@@ -79,7 +79,8 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
     case decodePouchdbUser' rawPouchdbUser of
       Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
-        state <- new $ newPerspectivesState pouchdbUser publicRepo
+        transactionFlag <- new true
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
         runPerspectivesWithState
           (do
             addAllExternalFunctions
