@@ -24,17 +24,17 @@ module Perspectives.Representation.State where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap (EncodableMap, empty)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription)
-import Perspectives.Representation.Action (AutomaticAction)
+import Perspectives.Representation.Action (AutomaticAction, TimeFacets)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Sentence (Sentence)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
@@ -118,11 +118,10 @@ instance eqStateFulObject :: Eq StateFulObject where eq = genericEq
 instance encodeStateFulObject :: Encode StateFulObject where encode = genericEncode defaultOptions
 instance decodeStateFulObject :: Decode StateFulObject where decode = genericDecode defaultOptions
 
-data Notification = ContextNotification Sentence |
-  RoleNotification
-    { currentContextCalculation :: QueryFunctionDescription
-    , sentence :: Sentence
-    }
+data Notification = 
+  ContextNotification (TimeFacets (sentence :: Sentence) )
+  |
+  RoleNotification (TimeFacets (currentContextCalculation :: QueryFunctionDescription, sentence :: Sentence))
 
 derive instance genericNotification :: Generic Notification _
 instance showNotification :: Show Notification where show = genericShow

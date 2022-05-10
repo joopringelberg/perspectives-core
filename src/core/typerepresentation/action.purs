@@ -24,22 +24,35 @@ module Perspectives.Representation.Action where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Repetition (Duration, Repeater)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 
-data AutomaticAction = ContextAction QueryFunctionDescription |
-  RoleAction
-    { currentContextCalculation :: QueryFunctionDescription
-    , effect :: QueryFunctionDescription
-    }
+data AutomaticAction = 
+  ContextAction (TimeFacets 
+    ( effect :: QueryFunctionDescription )
+    )
+  | 
+  RoleAction (TimeFacets 
+    ( currentContextCalculation :: QueryFunctionDescription
+    , effect :: QueryFunctionDescription )
+    )
+
+type TimeFacets f = 
+  { startMoment :: Maybe Duration
+    , endMoment :: Maybe Duration
+    , repeats :: Repeater
+    | f
+  }
 
 effectOfAction :: AutomaticAction -> QueryFunctionDescription
-effectOfAction (ContextAction effect) = effect
+effectOfAction (ContextAction {effect}) = effect
 effectOfAction (RoleAction action) = action.effect
 
 derive instance genericAutomaticAction :: Generic AutomaticAction _

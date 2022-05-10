@@ -410,7 +410,7 @@ handlePostponedStateQualifiedParts = do
 
     -- Compiles and distributes all expressions in the automatic effect.
     -- | Modifies the DomeinFile in PhaseTwoState.
-    handlePart (AST.AE (AST.AutomaticEffectE{subject, object, transition, effect, start, end})) = do
+    handlePart (AST.AE (AST.AutomaticEffectE{subject, object, transition, effect, startMoment, endMoment, repeats, start, end})) = do
       -- `originDomain` is the type of the origin, expressed as Domain.
       originDomain <- statespec2Domain (transition2stateSpec transition)
       -- `currentContextDomain` represents the current context, expressed as a Domain.
@@ -457,8 +457,19 @@ handlePostponedStateQualifiedParts = do
       objectMustBeRole objectQfd start end
       modifyAllStates
         (case transition2stateSpec transition of
-          AST.ContextState _ _ -> ContextAction sideEffect
-          otherwise -> RoleAction {currentContextCalculation, effect: sideEffect})
+          AST.ContextState _ _ -> ContextAction 
+            { effect: sideEffect
+            , startMoment
+            , endMoment
+            , repeats
+            }
+          otherwise -> RoleAction 
+            { currentContextCalculation
+            , startMoment
+            , endMoment
+            , repeats
+            , effect: sideEffect
+            })
         qualifiedUsers
         states
         originDomain
@@ -508,7 +519,7 @@ handlePostponedStateQualifiedParts = do
     -- Compiles and distributes all expressions in the message.
     -- See extensive comments in the case AutomaticEffectE.
     -- | Modifies the DomeinFile in PhaseTwoState.
-    handlePart (AST.N (AST.NotificationE{user, object, transition, message, start, end})) = do
+    handlePart (AST.N (AST.NotificationE{user, object, transition, message, startMoment, endMoment, repeats, start, end})) = do
       originDomain <- statespec2Domain (transition2stateSpec transition)
       (qualifiedUsers :: Array RoleType) <- collectRoles user
       states <- stateSpec2States (transition2stateSpec transition)
@@ -526,8 +537,19 @@ handlePostponedStateQualifiedParts = do
       objectMustBeRole objectQfd start end
       modifyAllStates
         (case transition2stateSpec transition of
-          AST.ContextState _ _ -> ContextNotification compiledMessage
-          otherwise -> RoleNotification {currentContextCalculation, sentence: compiledMessage})
+          AST.ContextState _ _ -> ContextNotification 
+            { sentence: compiledMessage
+            , startMoment
+            , endMoment
+            , repeats
+            }
+          otherwise -> RoleNotification 
+            { currentContextCalculation
+            , sentence: compiledMessage
+            , startMoment
+            , endMoment
+            , repeats            
+            })
         qualifiedUsers
         states
         originDomain

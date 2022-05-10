@@ -50,6 +50,7 @@ import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoRes
 import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Repetition (Repeater(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Range (Range(..))
@@ -881,16 +882,52 @@ automaticEffectE = do
       {subject, object, onEntry, onExit, currentContext} <- getArcParserState
       case usr of
         Nothing -> case subject, onEntry, onExit of
-          Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
-          Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: sb, object, transition, effect, start, end}
+          Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE 
+            { subject: sb
+            , object
+            , transition
+            , effect
+            , startMoment: Nothing
+            , endMoment: Nothing
+            , repeats: Never
+            , start
+            , end}
+          Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE 
+            { subject: sb
+            , object
+            , transition
+            , effect
+            , startMoment: Nothing
+            , endMoment: Nothing
+            , repeats: Never
+            , start
+            , end}
           Nothing, _, _ -> failWithPosition "A subject is required" (arcPosition2Position start)
           _, Nothing, Nothing -> fail "A state transition is required"
           _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
         Just ident -> case onEntry, onExit of
           -- We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
           -- is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
-          Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE {subject: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start, object, transition, effect, start, end}
-          Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE {subject: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start, object, transition, effect, start, end}
+          Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE 
+            { subject: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start
+            , object
+            , transition
+            , effect
+            , startMoment: Nothing
+            , endMoment: Nothing
+            , repeats: Never
+            , start
+            , end}
+          Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE 
+            { subject: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start
+            , object
+            , transition
+            , effect
+            , startMoment: Nothing
+            , endMoment: Nothing
+            , repeats: Never
+            , start
+            , end}
           Nothing, Nothing -> fail "A state transition is required"
           _, _ -> fail "State transition inside state transition is not allowed"
     else pure Nil
@@ -911,16 +948,52 @@ notificationE = do
   {subject, onEntry, onExit, currentContext, object} <- getArcParserState
   case usr of
     Nothing -> case subject, onEntry, onExit of
-      Just u, Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: u, transition, message, object, start, end}
-      Just u, Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: u, transition, message, object, start, end}
+      Just u, Just transition, Nothing -> pure $ singleton $ N $ NotificationE 
+        { user: u
+        , transition
+        , message
+        , object
+        , startMoment: Nothing
+        , endMoment: Nothing
+        , repeats: Never
+        , start
+        , end}
+      Just u, Nothing, Just transition -> pure $ singleton $ N $ NotificationE 
+        { user: u
+        , transition
+        , message
+        , object
+        , startMoment: Nothing
+        , endMoment: Nothing
+        , repeats: Never
+        , start
+        , end}
       Nothing, _, _ -> fail "A subject is required"
       _, Nothing, Nothing -> fail "A state transition is required"
       _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
     Just ident -> case onEntry, onExit of
       -- | We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
       -- | is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
-      Just transition, Nothing -> pure $ singleton $ N $ NotificationE {user: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start, transition, message, object, start, end}
-      Nothing, Just transition -> pure $ singleton $ N $ NotificationE {user: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start, transition, message, object, start, end}
+      Just transition, Nothing -> pure $ singleton $ N $ NotificationE 
+        { user: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start
+          , transition
+          , message
+          , object
+          , startMoment: Nothing
+          , endMoment: Nothing
+          , repeats: Never
+          , start
+          , end}
+      Nothing, Just transition -> pure $ singleton $ N $ NotificationE 
+        { user: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start
+        , transition
+        , message
+        , object
+        , startMoment: Nothing
+        , endMoment: Nothing
+        , repeats: Never
+        , start
+        , end}
       Nothing, Nothing -> fail "A state transition is required"
       _, _ -> fail "State transition inside state transition is not allowed"
 

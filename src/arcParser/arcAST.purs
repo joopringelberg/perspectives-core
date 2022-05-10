@@ -24,18 +24,19 @@ module Perspectives.Parsing.Arc.AST where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.List (List)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Statements)
+import Perspectives.Repetition (Duration, Repeater)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.ExplicitSet (ExplicitSet)
 import Perspectives.Representation.Range (Range)
@@ -227,6 +228,9 @@ newtype NotificationE = NotificationE
   , message :: Sentence
   -- , level :: NotificationLevel
   , object :: Maybe RoleIdentification
+  , startMoment :: Maybe Duration
+  , endMoment :: Maybe Duration
+  , repeats :: Repeater
   , start :: ArcPosition
   , end :: ArcPosition
   }
@@ -240,6 +244,9 @@ newtype AutomaticEffectE = AutomaticEffectE
   , object :: Maybe RoleIdentification
   , transition :: StateTransitionE
   , effect :: Statements
+  , startMoment :: Maybe Duration
+  , endMoment :: Maybe Duration
+  , repeats :: Repeater
   , start :: ArcPosition
   , end :: ArcPosition
   }
