@@ -47,7 +47,6 @@ import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
 import Perspectives.Assignment.StateCache (clearModelStates)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, rol_binding, rol_context, rol_gevuldeRollen, rol_id, rol_isMe, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>>))
@@ -152,12 +151,12 @@ pendingInvitations _ = ArrayT do
 updateModel :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
 updateModel arrWithurl arrWithModelName arrWithDependencies modelsInUse = case head arrWithModelName of
   Nothing -> do
-    descriptionGetter <- lift2 $ getDynamicPropertyGetter "model:System$Model$External$Description" (ST (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"))
-    description <- lift2 (modelsInUse ##= descriptionGetter)
-    lift $ lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
+    descriptionGetter <- lift $ getDynamicPropertyGetter "model:System$Model$External$Description" (ST (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"))
+    description <- lift (modelsInUse ##= descriptionGetter)
+    lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
   Just modelName -> do
     case head arrWithurl, head arrWithDependencies of
-      Nothing, _ -> lift $ lift $ warnModeller Nothing (ModelLacksUrl modelName)
+      Nothing, _ -> lift $ warnModeller Nothing (ModelLacksUrl modelName)
       Just url, mwithDependencies -> do
         repositoryUrl <- repository url
         updateModel' (maybe false (eq "true") mwithDependencies) repositoryUrl (DomeinFileId modelName)
@@ -166,28 +165,28 @@ updateModel arrWithurl arrWithModelName arrWithDependencies modelsInUse = case h
     -- the repository location of the model supplied in the call to updateModel.
     updateModel' :: Boolean -> String -> DomeinFileId -> MonadPerspectivesTransaction Unit
     updateModel' withDependencies url dfId@(DomeinFileId modelName) = do
-      DomeinFile{invertedQueriesInOtherDomains, referredModels} <- lift2 $ getDomeinFile dfId
+      DomeinFile{invertedQueriesInOtherDomains, referredModels} <- lift $ getDomeinFile dfId
       if withDependencies
         then for_ referredModels (updateModel' withDependencies url)
         else pure unit
         -- Untangle the InvertedQueries of the previous model.
       forWithIndex_ invertedQueriesInOtherDomains
         \domainName queries -> do
-          (lift2 $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
-              lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
+              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
       -- Clear the caches of compiled states.
       void $ pure $ clearModelStates (DomeinFileId modelName)
       -- Install the new model, taking care of outgoing InvertedQueries.
       -- TODO. As soon as model identifiers are URLs, do not concatenate the url to the modelName.
       addModelToLocalStore' (url <> modelName) false
-      DomeinFile dfr <- lift2 $ getDomeinFile $ DomeinFileId modelName
+      DomeinFile dfr <- lift $ getDomeinFile $ DomeinFileId modelName
       -- Find all models in use.
-      models' <- lift2 (Models.modelsInUse >>= traverse getDomeinFile)
+      models' <- lift (Models.modelsInUse >>= traverse getDomeinFile)
       -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
-      lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
+      lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
         forWithIndex_ invertedQueries
           \domainName queries -> if domainName == modelName
             then for_ queries addInvertedQuery
@@ -214,25 +213,25 @@ addModelToLocalStore' url originalLoad = do
       -- Retrieve the DomeinFile from the URL.
       repositoryUrl <- repository url
       docName <- documentName url
-      df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels, invertedQueriesInOtherDomains}) <- lift2 $ getDocument repositoryUrl docName
+      df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels, invertedQueriesInOtherDomains}) <- lift $ getDocument repositoryUrl docName
       -- Add new dependencies.
       for_ referredModels \dfid -> do
-        mmodel <- lift $ lift $ tryGetPerspectEntiteit dfid
+        mmodel <- lift $ tryGetPerspectEntiteit dfid
         case mmodel of
           Nothing -> addModelToLocalStore' (append repositoryUrl (unwrap dfid)) originalLoad
           Just _ -> pure unit
       -- Store the model in Couchdb.
       -- Fetch the local revision before saving: it belongs to the repository,
       -- not the local perspect_models.
-      lift $ lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
-      lift $ lift $ updateRevision(DomeinFileId _id)
-      revision <- lift $ lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
+      lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
+      lift $ updateRevision(DomeinFileId _id)
+      revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
 
       -- Add replacements to PerspectivesState for the new indexed names introduced in this model,
       -- unless we find existing ones left over from a previous installation of the model.
       (iroles :: Object RoleInstance) <- for indexedRoles (\iRole -> do
         -- iRole is the *indexed name* (not the unique name).
-        (mexistingReplacement :: Maybe RoleInstance) <- lift $ lift $ lookupIndexedRole (unwrap iRole)
+        (mexistingReplacement :: Maybe RoleInstance) <- lift $ lookupIndexedRole (unwrap iRole)
         case mexistingReplacement of
           Just existingReplacement -> pure $ Tuple (unwrap iRole) existingReplacement
           Nothing -> do
@@ -240,30 +239,30 @@ addModelToLocalStore' url originalLoad = do
             pure $ Tuple (unwrap iRole) (RoleInstance ("model:User$" <> show g))) >>= pure <<< fromFoldable
 
       (icontexts :: Object ContextInstance) <- for indexedContexts (\iContext -> do
-        (mexistingReplacement :: Maybe ContextInstance) <- lift $ lift $ lookupIndexedContext (unwrap iContext)
+        (mexistingReplacement :: Maybe ContextInstance) <- lift $ lookupIndexedContext (unwrap iContext)
         case mexistingReplacement of
           Just existingReplacement -> pure $ Tuple (unwrap iContext) existingReplacement
           Nothing -> do
             g <- liftEffect guid
             pure $ Tuple (unwrap iContext) (ContextInstance ("model:User$" <> show g))) >>= pure <<< fromFoldable
 
-      mySystem <- lift2 (ContextInstance <$> getMySystem)
-      me <- lift2 (RoleInstance <$> getUserIdentifier)
+      mySystem <- lift (ContextInstance <$> getMySystem)
+      me <- lift (RoleInstance <$> getUserIdentifier)
       -- TODO. Do we really have to reassert Me and MySystem every time? Presumably this is for the
       -- situation where we do not yet have model:System.
-      void $ lift2 $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
+      void $ lift $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
 
       -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
-      crl' <- lift2 $ replaceIndexedNames crl
+      crl' <- lift $ replaceIndexedNames crl
 
       -- Retrieve the modelDescription from cache or database: it may have been changed if the user decided to use it in InPlace.
       (mmodelDescription :: Maybe PerspectRol) <- case modelDescription of
         Nothing -> throwError (error ("A model has no description: " <> url))
-        Just m -> lift2 $ tryGetPerspectEntiteit (identifier (m :: PerspectRol))
+        Just m -> lift $ tryGetPerspectEntiteit (identifier (m :: PerspectRol))
 
       -- Parse the CRL. This will cache all roleInstances, overwriting the modelDescription and any other entities
       -- in cache left over from a previous installation.
-      parseResult <- lift2 $ parseAndCache crl'
+      parseResult <- lift $ parseAndCache crl'
       case parseResult of
         Left e -> throwError (error (show e))
         Right (Tuple contextInstances roleInstances') -> do
@@ -279,10 +278,10 @@ addModelToLocalStore' url originalLoad = do
           -- over the version that came out of the user instances in the crl file.
           case mmodelDescription of
             Nothing -> pure unit
-            Just (m :: PerspectRol) -> void $ lift2 $ cacheEntity (identifier m) m
+            Just (m :: PerspectRol) -> void $ lift $ cacheEntity (identifier m) m
 
           -- Save role instances, overwriting versions left over from a previous installation.
-          (cis :: Object PerspectContext) <- lift2 $ execStateT
+          (cis :: Object PerspectContext) <- lift $ execStateT
             (forWithIndex_
               roleInstances'
               (\i newRole' -> do
@@ -361,24 +360,24 @@ addModelToLocalStore' url originalLoad = do
           forWithIndex_ cis \(i :: String) newVersion -> do
             -- We *must* get the revision from the database. On doing an update, the context will be put into
             -- cache by the CRL parser. It then has no revision.
-            moldCtxt <- lift $ lift $ tryFetchEntiteit (ContextInstance i)
+            moldCtxt <- lift $ tryFetchEntiteit (ContextInstance i)
             case moldCtxt of
-              Nothing -> lift2 $ saveEntiteit_ (ContextInstance i) newVersion
+              Nothing -> lift $ saveEntiteit_ (ContextInstance i) newVersion
               Just oldCtxt  -> do
-                void $ lift2 $ cacheEntity (ContextInstance i) oldCtxt
+                void $ lift $ cacheEntity (ContextInstance i) oldCtxt
                 pure oldCtxt
 
       -- Distribute the SeparateInvertedQueries over the other domains.
       forWithIndex_ invertedQueriesInOtherDomains
         \domainName queries -> do
-          (lift2 $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
             handleDomeinFileError "addModelToLocalStore'"
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
-              lift2 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
 
       -- Copy the attachment
-      lift $ lift $ addA repositoryUrl docName revision
+      lift $ addA repositoryUrl docName revision
   where
 
     -- Sets the `me` property on the role instances. Detects the ultimate bottom case: the user instance of sys:PerspectivesSystem. Note that model user instances should never comprise particular other users!
@@ -531,7 +530,7 @@ uploadToRepository dfId url = do
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
 uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit
-uploadToRepository_ dfId url df = lift $ lift $ do
+uploadToRepository_ dfId url df = lift $ lift do
   -- Get the attachment info
   (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument url (show dfId)
   attachments <- case atts of
@@ -565,7 +564,7 @@ removeModelFromLocalStore rs _ = case head rs of
   Just r -> scheduleDomeinFileRemoval (DomeinFileId r)
 
 scheduleDomeinFileRemoval :: DomeinFileId -> MonadPerspectivesTransaction Unit
-scheduleDomeinFileRemoval id = lift $ AMA.modify (over Transaction \t@{modelsToBeRemoved} -> t {modelsToBeRemoved = cons id modelsToBeRemoved})
+scheduleDomeinFileRemoval id = AMA.modify (over Transaction \t@{modelsToBeRemoved} -> t {modelsToBeRemoved = cons id modelsToBeRemoved})
 
 type Url = String
 -- | The RoleInstance is an instance of CouchdbServer$Repositories.
@@ -574,20 +573,20 @@ type Url = String
 createCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 createCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
-  Just databaseUrl, Just databaseName -> lift2 $ CDB.createDatabase (databaseUrl <> databaseName)
+  Just databaseUrl, Just databaseName -> lift $ CDB.createDatabase (databaseUrl <> databaseName)
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 deleteCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 deleteCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
-  Just databaseUrl, Just databaseName -> lift2 $ CDB.deleteDatabase (databaseUrl <> databaseName)
+  Just databaseUrl, Just databaseName -> lift $ CDB.deleteDatabase (databaseUrl <> databaseName)
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 replicateContinuously :: Array Url -> Array String -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 replicateContinuously databaseUrls names sources targets _ = case head databaseUrls, head names, head sources, head targets of
-  Just databaseUrl, Just name, Just source, Just target -> lift2 $ CDB.replicateContinuously
+  Just databaseUrl, Just name, Just source, Just target -> lift $ CDB.replicateContinuously
     databaseUrl
     name
     (databaseUrl <> source)
@@ -598,7 +597,7 @@ replicateContinuously databaseUrls names sources targets _ = case head databaseU
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 endReplication :: Array Url -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 endReplication databaseUrls sources targets _ = case head databaseUrls, head sources, head targets of
-  Just databaseUrl, Just source, Just target -> void $ lift2 $ CDB.endReplication databaseUrl source target
+  Just databaseUrl, Just source, Just target -> void $ lift $ CDB.endReplication databaseUrl source target
   _, _, _ -> pure unit
 
 type UserName = String
@@ -607,19 +606,19 @@ type Password = String
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts.
 createUser :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
 createUser databaseUrls userNames passwords _ = case head databaseUrls, head userNames, head passwords of
-  Just databaseurl, Just userName, Just password -> lift2 $ CDB.createUser databaseurl userName password []
+  Just databaseurl, Just userName, Just password -> lift $ CDB.createUser databaseurl userName password []
   _, _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts.
 deleteUser :: Array Url -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 deleteUser databaseUrls userNames _ = case head databaseUrls, head userNames of
-  Just databaseurl, Just userName -> lift2 $ void $ CDB.deleteUser databaseurl userName
+  Just databaseurl, Just userName -> lift $ void $ CDB.deleteUser databaseurl userName
   _, _ -> pure unit
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
 updateSecurityDocument :: (String -> SecurityDocument -> SecurityDocument) -> Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 updateSecurityDocument updater databaseUrls databaseNames userNames _ = case head databaseUrls, head databaseNames, head userNames of
-  Just databaseUrl, Just databaseName, Just userName -> lift2 $ do
+  Just databaseUrl, Just databaseName, Just userName -> lift $ do
     sdoc <- CDB.ensureSecurityDocument databaseUrl databaseName
     CDB.setSecurityDocument databaseUrl databaseName (updater userName sdoc)
   _, _, _ -> pure unit
@@ -643,7 +642,7 @@ removeAsMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> Secu
 -- | The RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts
 resetPassword :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
 resetPassword databaseUrls userNames passwords _ = case head databaseUrls, head userNames, head passwords of
-  Just databaseUrl, Just userName, Just password -> lift2 $ CDB.setPassword databaseUrl userName password
+  Just databaseUrl, Just userName, Just password -> lift $ CDB.setPassword databaseUrl userName password
   _, _, _ -> pure unit
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved

@@ -23,7 +23,7 @@
 module Perspectives.Sync.HandleTransaction where
 
 import Control.Monad.Error.Class (catchError)
-import Control.Monad.Except (runExcept)
+import Control.Monad.Except (lift, runExcept)
 import Data.Array.NonEmpty (NonEmptyArray, head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -38,7 +38,6 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
 import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerb, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
@@ -78,19 +77,19 @@ executeContextDelta (ContextDelta{deltaType, contextInstance, roleType, roleInst
     -- The subject must be allowed to change the role: they must have a perspective on it that includes:
     --  * the verb CreateAndFill, in case a context role is created;
     --  * the verb Create, in case another role is created.
-    AddRoleInstancesToContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
+    AddRoleInstancesToContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
       Left e -> handleError e
       Right _ -> addRoleInstanceToContext contextInstance roleType (Tuple roleInstance (Just signedDelta))
     -- NOTE: the perspective should always include the Delete verb.
-    MoveRoleInstancesToAnotherContext -> (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
+    MoveRoleInstancesToAnotherContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
       Left e -> handleError e
       Right _ -> moveRoleInstanceToAnotherContext contextInstance (unsafePartial $ fromJust destinationContext) roleType roleInstance
 
 executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) signedDelta = do
   log (show deltaType <> " of " <> show filled <> " (to) " <> show filler)
-  roleType' <- lift2 (filled ##>> roleType)
-  (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Verbs.Fill, Verbs.CreateAndFill]) >>= case _ of
+  roleType' <- lift (filled ##>> roleType)
+  (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Verbs.Fill, Verbs.CreateAndFill]) >>= case _ of
     Left e -> handleError e
     Right _ -> case deltaType of
       SetFirstBinding -> void $ setFirstBinding filled (unsafePartial $ fromJust filler) (Just signedDelta)
@@ -105,13 +104,13 @@ executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, sub
     AddProperty -> do
       -- we need not check whether the model is known if we assume valid transactions:
       -- a role instance creation delta must have preceded the property delta.
-      (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.AddPropertyValue) >>= case _ of
+      (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.AddPropertyValue) >>= case _ of
         Left e -> handleError e
         Right _ -> addProperty [id] property (flip Tuple (Just signedDelta) <$> values)
-    RemoveProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.RemovePropertyValue) >>= case _ of
+    RemoveProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.RemovePropertyValue) >>= case _ of
       Left e -> handleError e
       Right _ -> removeProperty [id] property values
-    DeleteProperty -> (lift2 $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.DeleteProperty) >>= case _ of
+    DeleteProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.DeleteProperty) >>= case _ of
       Left e -> handleError e
       Right _ -> deleteProperty [id] property
 
@@ -127,11 +126,11 @@ handleError e = liftEffect $ log (show e)
 executeUniverseContextDelta :: UniverseContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, subject}) signedDelta = do
   log (show deltaType <> " with id " <> show id <> " and with type " <> show contextType)
-  externalRoleExists <- lift2 $ entityExists (RoleInstance $ buitenRol $ unwrap id)
+  externalRoleExists <- lift $ entityExists (RoleInstance $ buitenRol $ unwrap id)
   if externalRoleExists
     then case deltaType of
       ConstructEmptyContext -> do
-        (exists :: Maybe PerspectContext) <- lift2 $ tryGetPerspectEntiteit id
+        (exists :: Maybe PerspectContext) <- lift $ tryGetPerspectEntiteit id
         if isNothing exists
           then do
             contextInstance <- pure
@@ -143,12 +142,12 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
                 , universeContextDelta = signedDelta
                 , states = [StateIdentifier $ unwrap contextType]
                 })
-            lift2 $ void $ cacheEntity id contextInstance
-            (lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
+            lift $ void $ cacheEntity id contextInstance
+            (lift $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
             addCreatedContextToTransaction id
           else pure unit
     else do
-      (subjectType :: RoleType) <- lift2 $ typeOfSubjectOfAction subject
+      (subjectType :: RoleType) <- lift $ typeOfSubjectOfAction subject
       logPerspectivesError $ UnauthorizedForContext "auteur" subjectType contextType
 
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
@@ -164,7 +163,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         else do
           -- Check if the author has a perspective on the role to be created that includes
           -- the verb Create.
-          (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
+          (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
             Left e -> handleError e
             Right _ -> constructAnotherRole_
     ConstructExternalRole -> do
@@ -172,23 +171,23 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- QUERY UPDATES, RULE TRIGGERING, PERSISTENCE or CURRENTUSER.
       -- If roleType has the aspect model:System$RootContext$External, it can stand alone. These roles can
       -- be created by any user and usually will be created by parsing a CRL file.
-      lift2 (roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$External")) >>= if _
+      lift (roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$External")) >>= if _
         then constructExternalRole
-        else (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.CreateAndFill) >>= case _ of
+        else (lift $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.CreateAndFill) >>= case _ of
           Left e -> handleError e
           Right _ -> constructExternalRole
     RemoveRoleInstance -> do
-      (lift2 $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove]) >>= case _ of
+      (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove]) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
 
     -- TODO Het lijkt niet nuttig om beide cases te behouden.
     RemoveUnboundExternalRoleInstance -> do
-      (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
+      (lift $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
     RemoveExternalRoleInstance -> do
-      (lift2 $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
+      (lift $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
     where
@@ -200,9 +199,9 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       constructAnotherRole_ :: MonadPerspectivesTransaction Unit
       constructAnotherRole_ = do
         -- find the number of roleinstances in the context.
-        offset <- (lift2 (id ##= getRoleInstances (ENR roleType))) >>= pure <<< getNextRolIndex
+        offset <- (lift (id ##= getRoleInstances (ENR roleType))) >>= pure <<< getNextRolIndex
         forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do
-          (exists :: Maybe PerspectRol) <- lift2 $ tryGetPerspectEntiteit roleInstance
+          (exists :: Maybe PerspectRol) <- lift $ tryGetPerspectEntiteit roleInstance
           if isNothing exists
             then void $ constructEmptyRole_ id (offset + i) roleInstance
             else pure unit
@@ -210,7 +209,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
 
       constructEmptyRole_ :: ContextInstance -> Int -> RoleInstance -> MonadPerspectivesTransaction Boolean
       constructEmptyRole_ contextInstance i rolInstanceId = do
-        (exists :: Maybe PerspectRol) <- lift2 $ tryGetPerspectEntiteit rolInstanceId
+        (exists :: Maybe PerspectRol) <- lift $ tryGetPerspectEntiteit rolInstanceId
         if isNothing exists
           then do
             role <- pure (PerspectRol defaultRolRecord
@@ -222,7 +221,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
                   , states = [StateIdentifier $ unwrap roleType]
                   })
             addCreatedRoleToTransaction rolInstanceId
-            void $ lift2 $ cacheEntity rolInstanceId role
+            void $ lift $ cacheEntity rolInstanceId role
             pure true
           else pure false
 
@@ -231,7 +230,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         externalRole <- pure (head $ toNonEmptyArray roleInstances)
         log ("ConstructExternalRole in " <> show id)
         constructEmptyRole_ id 0 externalRole >>= if _
-          then lift2 $ void $ saveEntiteit externalRole
+          then lift $ void $ saveEntiteit externalRole
           else pure unit
 
 -- | Execute all Deltas in a run that does not distrubute.

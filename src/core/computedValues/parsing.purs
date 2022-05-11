@@ -90,13 +90,13 @@ uploadToRepository ::
   Array RoleInstance -> MonadPerspectivesTransaction Unit
 uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crlSource_, head url_ of
   Just arcSource, Just crlSource, Just url -> do
-    r <- lift $ lift $ loadArcAndCrl' arcSource crlSource
+    r <- lift $ loadArcAndCrl' arcSource crlSource
     case r of
       Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
       Right df@(DomeinFile drf@{_id}) -> do
-        lift $ lift $ void $ storeDomeinFileInCache _id df
+        lift $ void $ storeDomeinFileInCache _id df
         -- construct the url from host and port.
-        lift $ lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) url
+        lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) url
   _, _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved

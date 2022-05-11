@@ -39,7 +39,6 @@ import Foreign.Object (Object, singleton, empty, toUnfoldable, fromFoldable) as 
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasForUserType)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MPQ, MPT, MonadPerspectives, (###>>), (##>>), (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
@@ -156,7 +155,7 @@ serialiseAsJsonFor_ userType cid = do
 -- | in the role PrivateChannel.
 addChannel :: ContextInstance -> MPT Unit
 addChannel invitation = do
-  mCouchdburl <- lift2 $ getCouchdbBaseURL
+  mCouchdburl <- lift $ getCouchdbBaseURL
   case mCouchdburl of
     Nothing -> throwError $ (error "addChannel expects a couchdbUrl.")
     Just url -> createChannel url >>= \channel -> do
@@ -164,14 +163,14 @@ addChannel invitation = do
         (EnumeratedRoleType "model:System$Invitation$PrivateChannel")
         (unwrap invitation)
         (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
-      lift2 $ setChannelReplication url channel
+      lift $ setChannelReplication url channel
 
 -- | Create a database with the given name, if it does not yet exist (it may exist if the Initiator uses the same
 -- | Couchdb installation as the ConnectedPartner).
 -- | Also set up sync with the post database.
 createCopyOfChannelDatabase :: Array String -> ContextInstance -> MPT Unit
 createCopyOfChannelDatabase arrWithChannelName invitation =case ARR.head arrWithChannelName of
-  Just channelName -> void $ lift2 $ withCouchdbUrl \url -> do
+  Just channelName -> void $ lift $ withCouchdbUrl \url -> do
     -- If the database existed prior to this line, nothing is created.
     void $ createDatabase channelName
     mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Invitation$PrivateChannel") >=> binding >=> context)
@@ -186,7 +185,7 @@ addConnectedPartnerToChannel userArr channelArr cid = do
   case ARR.head userArr of
     Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the first argument.")
     Just r -> do
-      sysUser <- lift2 ((RoleInstance r) ##> bottom)
+      sysUser <- lift ((RoleInstance r) ##> bottom)
       case sysUser of
         Nothing -> throwError (error "addConnectedPartnerToChannel: first argument is not a User Role (this error may not occur).")
         Just usr -> case ARR.head channelArr of

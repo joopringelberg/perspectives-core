@@ -39,7 +39,6 @@ import Effect.Exception (error)
 import Foreign.Object (fromFoldable)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (setProperty)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, MPT, (##=), (##>), (##>>), type (~~>))
 import Perspectives.Couchdb (selectOnFieldEqual, selectOnFieldNotEqual)
 import Perspectives.Guid (guid)
@@ -65,7 +64,7 @@ createChannel couchdbUrl = do
   g <- liftEffect guid
   channelName <- pure ("channel_" <> (show g))
   channel <- createChannelContext couchdbUrl channelName
-  lift2 $ ensureAuthentication (createDatabase channelName)
+  lift $ ensureAuthentication (createDatabase channelName)
   pure channel
 
 createChannelContext :: Url -> String -> MonadPerspectivesTransaction ContextInstance
@@ -95,7 +94,7 @@ createChannelContext couchdbUrl channelName = case splitCouchdbUrl couchdbUrl of
 -- | Add the second user to the channel: not the Initiator, but the ConnectedPartner.
 addPartnerToChannel :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
 addPartnerToChannel (RoleInstance usr) (ContextInstance channel) = do
-  couchdbUrl <- lift2 $ getCouchdbBaseURL
+  couchdbUrl <- lift $ getCouchdbBaseURL
   case splitCouchdbUrl <$> couchdbUrl of
     Just (Just (Tuple host port)) -> do
        void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
@@ -144,24 +143,24 @@ setRelayAddress host port rl = do
 -- | Regardless whether I am the Initiator or the ConnectedPartner, set my host and port value.
 setMyAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setMyAddress host port channel = do
-  g <- lift $ lift getMeFromChannel
-  (lift $ lift (channel ##= g)) >>= setAddress host port
+  g <- lift getMeFromChannel
+  (lift (channel ##= g)) >>= setAddress host port
 
 -- | Regardless whether you are the Initiator or the ConnectedPartner, set your host and port value.
 setYourAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setYourAddress host port channel = do
-  g <- lift $ lift getYouFromChannel
-  (lift $ lift (channel ##= g)) >>= setAddress host port
+  g <- lift getYouFromChannel
+  (lift (channel ##= g)) >>= setAddress host port
 
 setMyRelayAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setMyRelayAddress host port channel = do
-  g <- lift $ lift getMeFromChannel
-  (lift $ lift (channel ##= g)) >>= setRelayAddress host port
+  g <- lift getMeFromChannel
+  (lift (channel ##= g)) >>= setRelayAddress host port
 
 setYourRelayAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setYourRelayAddress host port channel = do
-  g <- lift $ lift getYouFromChannel
-  (lift $ lift (channel ##= g)) >>= setRelayAddress host port
+  g <- lift getYouFromChannel
+  (lift (channel ##= g)) >>= setRelayAddress host port
 
 -- | For a channel, set the replication of the local copy to the database found at either Host or RelayHost.
 -- | If host and port are equal for both partners, do not set replication.

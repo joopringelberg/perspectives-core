@@ -139,13 +139,13 @@ transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas}) = do
       )
 
 addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
-addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changedDomeinFiles}) ->
+addDomeinFileToTransactie dfId = AA.modify (over Transaction \(t@{changedDomeinFiles}) ->
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
 -- | Add the delta at the end of the array, unless it is already in the transaction!
 addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
 addDelta dt =
-  lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas =
+  AA.modify (over Transaction \t@{deltas} -> t {deltas =
     if isJust $ elemIndex dt deltas
       then deltas
       else snoc deltas dt})
@@ -153,29 +153,29 @@ addDelta dt =
 -- | Insert the delta at the index, unless it is already in the transaction.
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
 insertDelta dt i =
-  lift $ AA.modify (over Transaction \t@{deltas} -> t {deltas =
+  AA.modify (over Transaction \t@{deltas} -> t {deltas =
     if isJust $ elemIndex dt deltas
       then deltas
       else unsafePartial $ fromJust $ insertAt i dt deltas})
 
 -- | Instrumental for QUERY UPDATES.
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
-addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})
+addCorrelationIdentifiersToTransactie corrIds = AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})
 
 -- | Give the number of SignedDeltas in the Transaction.
 deltaIndex :: MonadPerspectivesTransaction Int
-deltaIndex = lift $ AA.gets \(Transaction{deltas}) -> length deltas
+deltaIndex = AA.gets \(Transaction{deltas}) -> length deltas
 
 addCreatedContextToTransaction :: ContextInstance -> MonadPerspectivesTransaction Unit
 addCreatedContextToTransaction cid =
-  lift $ AA.modify (over Transaction \t@{createdContexts} -> t {createdContexts =
+  AA.modify (over Transaction \t@{createdContexts} -> t {createdContexts =
     if isJust $ elemIndex cid createdContexts
       then createdContexts
       else snoc createdContexts cid})
 
 addCreatedRoleToTransaction :: RoleInstance -> MonadPerspectivesTransaction Unit
 addCreatedRoleToTransaction rid =
-  lift $ AA.modify (over Transaction \t@{createdRoles} -> t {createdRoles =
+  AA.modify (over Transaction \t@{createdRoles} -> t {createdRoles =
     if isJust $ elemIndex rid createdRoles
       then createdRoles
       else snoc createdRoles rid})

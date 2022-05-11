@@ -54,7 +54,6 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addRoleInstanceToContext, getAuthor, getSubject, setProperty)
 import Perspectives.Authenticate (sign)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
@@ -88,11 +87,11 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
 constructContext :: Maybe RoleType -> ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
 constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
-  contextInstanceId <- ContextInstance <$> (lift $ lift2 $ expandDefaultNamespaces id)
+  contextInstanceId <- ContextInstance <$> (lift $ lift $ expandDefaultNamespaces id)
   case (deconstructLocalName $ unwrap contextInstanceId) of
     Nothing -> throwError (NotWellFormedName upperLeft (unwrap contextInstanceId))
     Just localName -> do
-      (mc :: Maybe PerspectContext) <- lift $ lift2 $ tryGetPerspectEntiteit contextInstanceId
+      (mc :: Maybe PerspectContext) <- lift $ lift $ tryGetPerspectEntiteit contextInstanceId
       case mc of
         Just _ -> pure contextInstanceId
         Nothing -> do
@@ -119,12 +118,12 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
                 (Tuple (snd rolInstance) Nothing)
             pure $ toArray (snd <$> rolInstances')
 
-          lift $ lift2 $ void $ saveEntiteit contextInstanceId
+          lift $ lift $ void $ saveEntiteit contextInstanceId
           -- Add a UniverseRoleDelta to the Transaction for the external role.
           -- As we've just constructed the context and its external rol, no need to
           -- catch errors rising from not being able to exchange the identifier for the
           -- resources.
-          PerspectRol{universeRoleDelta} <- lift $ lift $ lift $ getPerspectRol buitenRol
+          PerspectRol{universeRoleDelta} <- lift $ lift $ getPerspectRol buitenRol
           lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i)
           -- Add a UniverseContextDelta to the Transaction with the union of the users of the RoleBindingDeltas.
           lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) (i + 1)
@@ -144,7 +143,7 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
       case (deconstructLocalName $unwrap roleType) of
         Nothing -> throwError $ NotWellFormedName upperLeft "not a valid identifier"
         Just localRoleName -> do
-          binding' <- lift $ lift $ lift2 (traverse expandDefaultNamespaces binding)
+          binding' <- lift  $ lift $ lift (traverse expandDefaultNamespaces binding)
           roleInstanceId <- case mid of
             Nothing -> pure $ RoleInstance (unwrap contextInstanceId <> "$" <> localRoleName <> "_" <> (rol_padOccurrence i))
             Just rid -> pure $ RoleInstance rid
@@ -156,9 +155,9 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
     addBindingToRoleInstance (Tuple (RolSerialization{binding, properties}) roleInstance) = do
       users <- case binding of
         -- the roleInstance is only in cache, save it.
-        Nothing -> lift $ lift $ lift2 $ saveEntiteit roleInstance *> pure []
+        Nothing -> lift $ lift $ lift $ saveEntiteit roleInstance *> pure []
         Just bnd -> do
-          expandedBinding <- RoleInstance <$> (lift $ lift $ lift2 $ expandDefaultNamespaces bnd)
+          expandedBinding <- RoleInstance <$> (lift $ lift $ lift $ expandDefaultNamespaces bnd)
           -- setFirstBinding saves, too.
           lift $ lift $ setFirstBinding roleInstance expandedBinding Nothing
       case properties of
@@ -182,9 +181,9 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
 constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> Maybe RoleType -> ExceptT PerspectivesError MonadPerspectivesTransaction PerspectContext
 constructEmptyContext contextInstanceId ctype localName externeProperties authorizedRole = do
   externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
-  pspType <- ContextType <$> (lift $ lift2 $ expandDefaultNamespaces ctype)
+  pspType <- ContextType <$> (lift $ lift $ expandDefaultNamespaces ctype)
   author <- lift $ getAuthor
-  subject <- lift getSubject
+  subject <- lift $ getSubject
   contextInstance <- pure
     (PerspectContext defaultContextRecord
       { _id = contextInstanceId
@@ -201,8 +200,8 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
           }}
       , states = [StateIdentifier $ unwrap pspType]
       })
-  lift $ lift2 $ void $ cacheEntity contextInstanceId contextInstance
-  _ <- lift $ lift2 $ cacheEntity externalRole
+  lift $ lift  $ void $ cacheEntity contextInstanceId contextInstance
+  _ <- lift $ lift $ cacheEntity externalRole
     (PerspectRol defaultRolRecord
       { _id = externalRole
       , pspType = externalRoleType pspType
@@ -222,7 +221,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       })
   lift $ addCreatedRoleToTransaction externalRole
   -- QUERY UPDATES
-  (lift $ lift2 $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType pspType)) >>= lift <<< addCorrelationIdentifiersToTransactie
+  (lift $ lift $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType pspType)) >>= lift <<< addCorrelationIdentifiersToTransactie
   -- TODO. Op dit moment van constructie aangekomen is nog niet vastgelegd wie 'me' is in de context.
   case externeProperties of
     (PropertySerialization props) -> lift do
@@ -230,7 +229,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
         -- PERSISTENCE of the role instance.
         -- CURRENTUSER: there can be no change to the current user.
         setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
-      if isEmpty props then lift2 $ void $ saveEntiteit externalRole else pure unit
+      if isEmpty props then lift $ void $ saveEntiteit externalRole else pure unit
   pure contextInstance
 
 -- | Construct a Role instance for an existing Context instance.
@@ -241,16 +240,16 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction (Maybe RoleInstance)
 createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSerialization{id: mRoleId, properties, binding}) = case binding of
   Nothing -> go false
-  Just b -> (lift2 $ try $ getPerspectEntiteit (RoleInstance b)) >>=
+  Just b -> (lift $ try $ getPerspectEntiteit (RoleInstance b)) >>=
     handlePerspectRolError' "createAndAddRoleInstance" Nothing
       \(PerspectRol{isMe}) -> go isMe
 
   where
     go :: Boolean -> MonadPerspectivesTransaction (Maybe RoleInstance)
     go isMe = do
-      contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces contextId)
-      rolInstances <- lift2 (contextInstanceId ##= getRoleInstances (ENR roleType))
-      (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole roleType
+      contextInstanceId <- ContextInstance <$> (lift $ expandDefaultNamespaces contextId)
+      rolInstances <- lift (contextInstanceId ##= getRoleInstances (ENR roleType))
+      (EnumeratedRole{kindOfRole}) <- lift $ getEnumeratedRole roleType
       -- SYNCHRONISATION by UniverseRoleDelta
       (PerspectRol r@{_id:roleInstance}) <- case mRoleId of
         Nothing -> do
@@ -267,7 +266,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
       case binding of
         Nothing -> pure unit
         Just bnd -> do
-          expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
+          expandedBinding <- RoleInstance <$> (lift $ expandDefaultNamespaces bnd)
           void $ setFirstBinding roleInstance expandedBinding Nothing
       -- Then add the properties
       case properties of
@@ -288,7 +287,7 @@ constructEmptyRole ::
 constructEmptyRole contextInstance roleType i rolInstanceId = do
   author <- getAuthor
   subject <- getSubject
-  allTypes <- lift2 (roleType ###= roleAspectsClosure)
+  allTypes <- lift (roleType ###= roleAspectsClosure)
   role <- pure (PerspectRol defaultRolRecord
     { _id = rolInstanceId
     , pspType = roleType
@@ -307,6 +306,6 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
             , subject } }
     , states = [StateIdentifier $ unwrap roleType]
     })
-  void $ lift2 $ cacheEntity rolInstanceId role
+  void $ lift $ cacheEntity rolInstanceId role
   addCreatedRoleToTransaction rolInstanceId
   pure role

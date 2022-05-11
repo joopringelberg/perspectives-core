@@ -39,7 +39,6 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), MPT, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.Deltas (distributeTransaction)
-import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -77,42 +76,42 @@ import Unsafe.Coerce (unsafeCoerce)
 runMonadPerspectivesTransaction :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
-  -> (MonadPerspectives (Array o))
+  -> (MonadPerspectives o)
 runMonadPerspectivesTransaction authoringRole a = runMonadPerspectivesTransaction' true authoringRole a
 
 runMonadPerspectivesTransaction' :: forall o.
   Boolean ->
   RoleType ->
   MonadPerspectivesTransaction o
-  -> (MonadPerspectives (Array o))
-runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= lift <<< createTransaction authoringRole >>= lift <<< new >>= runReaderT (runArrayT run)
+  -> (MonadPerspectives o)
+runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= lift <<< createTransaction authoringRole >>= lift <<< new >>= runReaderT run
   where
     run :: MonadPerspectivesTransaction o
     run = do
       -- 0. Only execute the transaction when we can take the flag down.
-      t <- lift2 transactionFlag
-      _ <- lift2 $ lift $ take t
+      t <- lift transactionFlag
+      _ <- lift $ lift $ take t
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
 
       -- 2. Now run all actions.
-      ft@(Transaction{correlationIdentifiers}) <- lift AA.get >>= runAllAutomaticActions
+      ft@(Transaction{correlationIdentifiers}) <- AA.get >>= runAllAutomaticActions
 
       -- 3. Send deltas to other participants, save changed domeinfiles.
-      if share then lift $ lift $ distributeTransaction ft else pure unit
+      if share then lift $ distributeTransaction ft else pure unit
 
       -- 4. Run effects.
       log "==========RUNNING EFFECTS============"
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
-      lift $ lift $ for_ (sort correlationIdentifiers) \corrId -> do
+      for_ (sort correlationIdentifiers) \corrId -> do
         mEffect <- pure $ lookupActiveSupportedEffect corrId
         case mEffect of
           Nothing -> pure unit
           (Just {runner}) -> do
             -- logShow corrId
-            runner unit
+            lift $ runner unit
       -- 5. Raise the flag
-      _ <- lift2 $ lift $ put true t
+      _ <- lift $ lift $ put true t
       pure r
 
     runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction
@@ -120,7 +119,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- Run monotonic actions, after
       --  * adding all ContextRemovals to the untouchableContexts and
       --  * adding rolesToExit to the untouchableRoles.
-      lift $ AA.modify (\t -> over Transaction (\tr -> tr
+      AA.modify (\t -> over Transaction (\tr -> tr
         { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
         , untouchableContexts = tr.untouchableContexts <> (contextsToBeRemoved tr.scheduledAssignments)
         })
@@ -130,7 +129,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- Install a fresh transaction (cloning preserves the untouchableContexts and untouchableRoles
       -- but removes the scheduledAssignments and rolesToExit).
       log "==========RUNNING SCHEDULED ASSIGNMENTS============"
-      lift $ void $ AA.modify cloneEmptyTransaction
+      void $ AA.modify cloneEmptyTransaction
       -- Detach and remove instances, collecting new information in the fresh Transaction.
       for_ (reverse scheduledAssignments) case _ of
         ContextRemoval ctxt authorizedRole -> log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole
@@ -139,32 +138,32 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
         RoleUnbinding filled mNewFiller msignedDelta -> log ("Remove filler of " <> unwrap filled) *> changeRoleBinding filled mNewFiller
         ExecuteDestructiveEffect functionName origin values -> log ("DestructiveEffect: " <> functionName) *> executeEffect functionName origin values
       -- log ("Will remove these models: " <> show modelsToBeRemoved)
-      lift2 $ for_ modelsToBeRemoved tryRemoveEntiteit
+      lift $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- Now state has changed. Re-evaluate the resources that may change state.
-      (stateEvaluations :: Array StateEvaluation) <- lift2 $ join <$> traverse computeStateEvaluations invertedQueryResults
+      (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
       log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
       for_ stateEvaluations \s -> case s of
         ContextStateEvaluation stateId contextId roleType -> do
           -- Provide a new frame for the current context variable binding.
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap contextId]
+          oldFrame <- lift pushFrame
+          lift $ addBinding "currentcontext" [unwrap contextId]
           -- Error boundary.
           catchError (evaluateContextState contextId stateId)
             \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+          lift $ restoreFrame oldFrame
         RoleStateEvaluation stateId roleId roleType -> do
-          cid <- lift2 (roleId ##>> context)
-          oldFrame <- lift2 pushFrame
+          cid <- lift (roleId ##>> context)
+          oldFrame <- lift pushFrame
           -- NOTE. This may not be necessary; we have no analysis in runtime whether these variables occur in
           -- expressions in state.
-          lift2 $ addBinding "currentcontext" [unwrap cid]
+          lift $ addBinding "currentcontext" [unwrap cid]
           -- TODO. add binding for "currentobject" or "currentsubject"?!
           -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
           catchError (evaluateRoleState roleId stateId)
             \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+          lift $ restoreFrame oldFrame
       -- If the new transaction is not empty, run again.
-      nt <- lift AA.get
+      nt <- AA.get
       if isEmptyTransaction nt
         then pure at
         else pure <<< (<>) at =<< runAllAutomaticActions nt
@@ -218,12 +217,12 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
         isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
 
 -- | Run and discard the transaction.
-runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
+runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives o)
 runSterileTransaction a =
   getUserIdentifier
   >>= lift <<< createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
   >>= lift <<< new
-  >>= runReaderT (runArrayT a)
+  >>= runReaderT a
 
 -- | Evaluates state transitions. Executes automatic actions. Notifies users. Collects deltas in a new transaction.
 -- | If any are collected, recursively calls itself.
@@ -236,61 +235,61 @@ runEntryAndExitActions :: Transaction -> MonadPerspectivesTransaction Transactio
 runEntryAndExitActions previousTransaction@(Transaction{createdContexts, createdRoles, scheduledAssignments, rolesToExit}) = do
   log "==========RUNNING ON ENTRY AND ON EXIT ACTIONS============"
   -- Install a fresh transaction, keeping the untouchableRoles and untouchableContexts.
-  lift $ void $ AA.modify cloneEmptyTransaction
+  void $ AA.modify cloneEmptyTransaction
   -- Enter the rootState of new contexts.
   for_ createdContexts
     \ctxt -> do
-      states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+      states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
       -- Provide a new frame for the current context variable binding.
-      oldFrame <- lift2 pushFrame
-      lift2 $ addBinding "currentcontext" [unwrap ctxt]
+      oldFrame <- lift pushFrame
+      lift $ addBinding "currentcontext" [unwrap ctxt]
       -- Error boundary.
       catchError (for_ states (enteringState ctxt))
         \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
-      lift2 $ restoreFrame oldFrame
+      lift $ restoreFrame oldFrame
   -- Enter the rootState of roles that are created.
   for_ createdRoles
     \rid -> do
-      ctxt <- lift2 (rid ##>> context)
-      states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
-      oldFrame <- lift2 pushFrame
-      lift2 $ addBinding "currentcontext" [unwrap ctxt]
+      ctxt <- lift (rid ##>> context)
+      states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+      oldFrame <- lift pushFrame
+      lift $ addBinding "currentcontext" [unwrap ctxt]
       -- Error boundary.
       catchError (for_ states (enteringRoleState rid))
         \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
-      lift2 $ restoreFrame oldFrame
+      lift $ restoreFrame oldFrame
   -- Exit the rootState of roles that are scheduled to be removed, unless we did so before.
   log ("Roles to exit: " <> show rolesToExit)
-  rolesThatHaveNotExited <- lift2 $ filterA (\rid -> rid ##>> exists' getActiveRoleStates) rolesToExit
+  rolesThatHaveNotExited <- lift $ filterA (\rid -> rid ##>> exists' getActiveRoleStates) rolesToExit
   log ("Roles that have not exited: " <> show rolesThatHaveNotExited)
   for_ rolesThatHaveNotExited
     \rid -> do
-      ctxt <- lift2 (rid ##>> context)
-      states <- lift2 (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+      ctxt <- lift (rid ##>> context)
+      states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
       if null states
         then pure unit
         else do
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          oldFrame <- lift pushFrame
+          lift $ addBinding "currentcontext" [unwrap ctxt]
           -- Error boundary.
           -- TODO. Hier al de state evaluation doen?
           catchError (for_ states (exitRole rid))
             \e -> logPerspectivesError $ Custom ("Cannot exit role state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+          lift $ restoreFrame oldFrame
   -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
-  contextsThatHaveNotExited <- lift2 $ filterA (\sa -> case sa of
+  contextsThatHaveNotExited <- lift $ filterA (\sa -> case sa of
       ContextRemoval ctxt _ -> ctxt ##>> exists' getActiveStates
       _ -> pure false)
     scheduledAssignments
   for_ contextsThatHaveNotExited (unsafePartial exitContext)
     -- First append the collected rolesToExit and ContextRemovals to the untouchableRoles and untouchableContexts
     -- to preserve the invariant.
-  lift $ AA.modify (\t -> over Transaction (\tr -> tr
+  AA.modify (\t -> over Transaction (\tr -> tr
     { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
     , untouchableContexts = tr.untouchableContexts <> (contextsToBeRemoved tr.scheduledAssignments)
     })
     t)
-  nt <- lift AA.get
+  nt <- AA.get
   if isEmptyTransaction nt
     then pure previousTransaction
     else pure <<< (<>) previousTransaction =<< runEntryAndExitActions nt
@@ -298,25 +297,22 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
     exitContext :: Partial => ScheduledAssignment -> MonadPerspectivesTransaction Unit
     exitContext (ContextRemoval ctxt authorizedRole) = do
       stateEvaluationAndQueryUpdatesForContext ctxt authorizedRole
-      states <- lift2 (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+      states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
       if null states
         then pure unit
         else do
           -- Provide a new frame for the current context variable binding.
-          oldFrame <- lift2 pushFrame
-          lift2 $ addBinding "currentcontext" [unwrap ctxt]
+          oldFrame <- lift pushFrame
+          lift $ addBinding "currentcontext" [unwrap ctxt]
           -- Error boundary.
           catchError (for_ states (exitingState ctxt))
             \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
-          lift2 $ restoreFrame oldFrame
+          lift $ restoreFrame oldFrame
 
     exitRole :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
     exitRole roleId stateId = do
       stateEvaluationAndQueryUpdatesForRole roleId
       exitingRoleState roleId stateId
-
-lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
-lift2 = lift <<< lift
 
 -----------------------------------------------------------
 -- LOADMODELIFMISSING
@@ -325,16 +321,16 @@ lift2 = lift <<< lift
 -- TODO. This function relies on a repository URL in PerspectivesState. That is a stub.
 loadModelIfMissing :: String -> MonadPerspectivesTransaction Unit
 loadModelIfMissing modelName = do
-  mDomeinFile <- lift2 $ tryRetrieveDomeinFile modelName
+  mDomeinFile <- lift $ tryRetrieveDomeinFile modelName
   if isNothing mDomeinFile
     then do
-      repositoryUrl <- lift2 publicRepository
+      repositoryUrl <- lift publicRepository
       addModelToLocalStore' (repositoryUrl <> modelName) true
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
-      (lift2 $ try $ getDomeinFile (DomeinFileId modelName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId modelName)) >>=
         handleDomeinFileError "loadModelIfMissing"
         \(DomeinFile{modelDescription}) -> do
-          mySys <- lift2 $ getMySystem
+          mySys <- lift $ getMySystem
           case modelDescription of
             Nothing -> pure unit
             Just (PerspectRol{_id}) -> void $ createAndAddRoleInstance

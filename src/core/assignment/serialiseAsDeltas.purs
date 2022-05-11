@@ -34,13 +34,13 @@ import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (StateT, gets, runStateT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, head) as ARR
+import Data.Array (cons) as ARR
 import Data.Array (elemIndex)
 import Data.Array.NonEmpty (NonEmptyArray, singleton) as NA
 import Data.Array.NonEmpty (toArray)
 import Data.Foldable (for_, traverse_)
 import Data.List.NonEmpty (NonEmptyList, foldM, head)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (new)
 import Effect.Class.Console (log)
@@ -51,7 +51,6 @@ import Simple.JSON (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
 import Perspectives.Deltas (addDelta)
-import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType_)
@@ -72,7 +71,7 @@ import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor cid userId = do
-  userType <- lift $ lift $  roleType_ userId
+  userType <- lift $  roleType_ userId
   serialisedAsDeltasFor_ cid userId (ENR userType)
 
 -- | Construct a Transaction that represents a context for a particular user role.
@@ -104,17 +103,16 @@ serialisedAsDeltasForUserType cid userType = do
       getUserIdentifier
       >>= lift <<< createTransaction authoringRole
       >>= lift <<< new
-      >>= runReaderT (runArrayT run)
-      >>= pure <<< unsafePartial fromJust <<< ARR.head
+      >>= runReaderT run
         where
           run :: MonadPerspectivesTransaction Transaction
           run = do
             void a
-            lift AMA.get
+            AMA.get
 
 
 liftToMPT :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
-liftToMPT = lift <<< lift
+liftToMPT = lift
 
 -- | The `userId` must be an instance of the `userType`, otherwise we cannot establish whether
 -- | a perspective is a self-perspective.

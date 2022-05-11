@@ -50,7 +50,6 @@ import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (deleteProperty, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole, scheduleContextRemoval, scheduleRoleRemoval)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>), (###>))
@@ -365,7 +364,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           isDBQ <- isDatabaseQueryRole qrolname
           if isDBQ
             then withNewContext authoringRole (Just qrolname)
-              \(ContextInstance id) -> lift2 $ sendResponse (Result corrId [buitenRol id]) setter
+              \(ContextInstance id) -> lift $ sendResponse (Result corrId [buitenRol id]) setter
             else sendResponse (Error corrId (predicate <> " is Calculated but not a Database Query Role!")) setter
         (ENR eroltype) -> withNewContext authoringRole (Just qrolname)
           \(ContextInstance id) ->  do
@@ -375,7 +374,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
               { id: Nothing
               , properties: PropertySerialization empty
               , binding: Just $ buitenRol id })
-            lift2 $ sendResponse (Result corrId [buitenRol id, unwrap contextRole]) setter
+            lift $ sendResponse (Result corrId [buitenRol id, unwrap contextRole]) setter
     -- {request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype}
     Api.CreateContext_ -> do
       rtype <- roleType_ (RoleInstance subject)
@@ -383,7 +382,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         \(ContextInstance id) -> do
           -- now bind it in the role instance.
           void $ setFirstBinding (RoleInstance subject) (RoleInstance $ buitenRol id) Nothing
-          lift2 $ sendResponse (Result corrId [buitenRol id]) setter
+          lift $ sendResponse (Result corrId [buitenRol id]) setter
     Api.ImportTransaction -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) TransactionForPeer) -> sendResponse (Error corrId (show e)) setter
       (Right tfp@(TransactionForPeer _)) -> do
@@ -401,8 +400,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
               constructContext Nothing ctxt)
             ctxts
           case result of
-            Left e -> lift2 $ sendResponse (Error corrId (show e)) setter
-            Right ids -> lift2 $ sendResponse (Result corrId (unwrap <$> ids)) setter
+            Left e -> lift $ sendResponse (Error corrId (show e)) setter
+            Right ids -> lift $ sendResponse (Result corrId (unwrap <$> ids)) setter
     -- {request: "RemoveRol", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype}
     -- The context type given in object must be described in a locally installed model.
     Api.RemoveRol -> do
@@ -429,7 +428,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         then do
           void $ runMonadPerspectivesTransaction authoringRole do
             scheduleRoleRemoval (RoleInstance subject)
-            contextToBeRemoved <- lift2 ((RoleInstance subject) ##>> binding >=> context)
+            contextToBeRemoved <- lift ((RoleInstance subject) ##>> binding >=> context)
             scheduleContextRemoval (Just autorizedRole) contextToBeRemoved
           sendResponse (Result corrId []) setter
         else sendResponse (Error corrId ("Cannot remove a context from a non-context role kind: " <> show autorizedRole )) setter
@@ -442,8 +441,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       if isQualifiedName predicate
         then do
           -- Notice that createAndAddRoleInstance adds the model describing the eroltype if necessary.
-          (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction authoringRole $ unsafePartial $ fromJust <$> createAndAddRoleInstance (EnumeratedRoleType predicate) subject (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
-          sendResponse (Result corrId (unwrap <$> rolInsts)) setter
+          (rolInst :: RoleInstance) <- runMonadPerspectivesTransaction authoringRole $ unsafePartial $ fromJust <$> createAndAddRoleInstance (EnumeratedRoleType predicate) subject (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+          sendResponse (Result corrId [(unwrap rolInst)]) setter
         else sendResponse (Error corrId ("Could not create a role instance for: " <> predicate <> " in " <> subject)) setter
     -- {request: "Bind", subject: contextinstance, predicate: roleType, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
     -- Provide the binding in the rolDescription!
@@ -462,15 +461,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                 then sendResponse (Error corrId ("Cannot not bind the same role instance twice in the same role type")) setter
                 else do
                   -- Notice that createAndAddRoleInstance adds the model describing the eroltype if necessary.
-                  rolarr <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
-                  case head rolarr of
+                  mrole <- runMonadPerspectivesTransaction authoringRole $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
+                  case mrole of
                     Nothing -> sendResponse (Error corrId ("Could not create role instance of " <> show eroltype)) setter
-                    Just Nothing -> sendResponse (Error corrId ("Could not create role instance of " <> show eroltype)) setter
-                    Just (Just rol) -> sendResponse (Result corrId [(unwrap rol)]) setter
+                    Just rol -> sendResponse (Result corrId [(unwrap rol)]) setter
             Nothing -> do
               -- Notice that createAndAddRoleInstance adds the model describing the eroltype if necessary.
               rol <- runMonadPerspectivesTransaction authoringRole $ unsafePartial fromJust <$> createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
-              sendResponse (Result corrId (unwrap <$> rol)) setter
+              sendResponse (Result corrId [(unwrap rol)]) setter
     -- {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
     Api.Bind_ -> catchError
       do
@@ -535,12 +533,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             case mauthoringRoleInstance, maction of
               Just author, Just (Just (ACTION.Action action)) -> void $ runMonadPerspectivesTransaction authoringRole
                 do
-                  oldFrame <- lift2 $ pushFrame
-                  lift2 $ addBinding "currentcontext" [object]
-                  lift2 $ addBinding "currentactor" [unwrap author]
-                  updater <- lift2 $ compileAssignmentFromRole action
+                  oldFrame <- lift $ pushFrame
+                  lift $ addBinding "currentcontext" [object]
+                  lift $ addBinding "currentactor" [unwrap author]
+                  updater <- lift $ compileAssignmentFromRole action
                   updater (RoleInstance predicate)
-                  lift2 $ restoreFrame oldFrame
+                  lift $ restoreFrame oldFrame
               _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show authoringRole <> "', perspectiveId '" <> perspectiveId <> "' and action name '" <> actionName <> "'.") setter
             )
       (\e -> sendResponse (Error corrId (show e)) setter)
@@ -559,12 +557,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         case muserRoleInstance, maction of
           Just user, Just (ACTION.Action action) -> void $ runMonadPerspectivesTransaction authoringRole
             do
-              oldFrame <- lift2 $ pushFrame
-              lift2 $ addBinding "currentcontext" [object]
-              lift2 $ addBinding "currentactor" [unwrap user] -- userRoleType??
-              updater <- lift2 $ compileAssignment action
+              oldFrame <- lift $ pushFrame
+              lift $ addBinding "currentcontext" [object]
+              lift $ addBinding "currentactor" [unwrap user] -- userRoleType??
+              updater <- lift $ compileAssignment action
               updater (ContextInstance object)
-              lift2 $ restoreFrame oldFrame
+              lift $ restoreFrame oldFrame
           _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show userRoleType <>
             "' and action name '" <> predicate <> "'.") setter
         )
@@ -616,7 +614,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           g <- liftEffect guid
           ctxt <- runExceptT $ constructContext mroleType (ContextSerialization cd {id = "model:User$c" <> (show g)})
           case ctxt of
-            (Left messages) -> lift2 $ sendResponse (Error corrId (show messages)) setter
+            (Left messages) -> lift $ sendResponse (Error corrId (show messages)) setter
             (Right ctxtId) -> effect ctxtId
 
 -----------------------------------------------------------

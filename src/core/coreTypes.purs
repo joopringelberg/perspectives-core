@@ -319,7 +319,7 @@ liftToInstanceLevel f = ArrayT <<< lift <<< runArrayT <<< f
 -----------------------------------------------------------
 -- | The Transaction accumulates Deltas.
 
-type MonadPerspectivesTransaction =  ArrayT (ReaderT (AVar Transaction) MonadPerspectives)
+type MonadPerspectivesTransaction =  ReaderT (AVar Transaction) MonadPerspectives
 
 type MPT = MonadPerspectivesTransaction
 

@@ -50,7 +50,6 @@ import Perspectives.Assignment.SentenceCompiler (CompiledSentence, compileRoleSe
 import Perspectives.Assignment.SerialiseAsDeltas (serialiseRoleInstancesAndProperties)
 import Perspectives.Assignment.StateCache (CompiledAutomaticAction, CompiledNotification, CompiledRoleState, CompiledStateDependentPerspective, cacheCompiledRoleState, retrieveCompiledRoleState)
 import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CompileTimeFacets (addTimeFacets)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
@@ -120,10 +119,10 @@ compileState stateId = do
     
     withAuthoringRole :: forall a. RoleType -> Updater a -> Updater a
     withAuthoringRole aRole updater a = do
-      originalRole <- lift $ gets (_.authoringRole <<< unwrap)
-      lift $ modify (over Transaction \t -> t {authoringRole = aRole})
+      originalRole <- gets (_.authoringRole <<< unwrap)
+      modify (over Transaction \t -> t {authoringRole = aRole})
       updater a
-      lift $ modify (over Transaction \t -> t {authoringRole = originalRole})
+      modify (over Transaction \t -> t {authoringRole = originalRole})
 
 -- | This function is applied without knowing whether state condition is valid.
 -- | Put an error boundary around this function.
@@ -132,15 +131,15 @@ evaluateRoleState roleId stateId = do
   roleIsInState <- conditionSatisfied roleId stateId
   if roleIsInState
     then do
-      roleWasInState <- lift2 $ isActive stateId roleId
+      roleWasInState <- lift $ isActive stateId roleId
       if roleWasInState
         then do
           log ("Already in role state " <> unwrap stateId <> ": " <> unwrap roleId)
-          subStates <- lift2 $ subStates_ stateId
+          subStates <- lift $ subStates_ stateId
           for_ subStates (evaluateRoleState roleId)
         else enteringRoleState roleId stateId
     else do
-      roleWasInState <- lift2 $ isActive stateId roleId
+      roleWasInState <- lift $ isActive stateId roleId
       if roleWasInState
         then exitingRoleState roleId stateId
         else pure unit
@@ -166,38 +165,38 @@ enteringRoleState roleId stateId = do
   -- It may happen that during the transaction, the end user is put into another role (too).
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
-  me <- lift2 getUserIdentifier
-  mySystem <- lift2 $ getMySystem
+  me <- lift getUserIdentifier
+  mySystem <- lift $ getMySystem
   forWithIndex_ automaticOnEntry \(allowedUser :: RoleType) {updater, contextGetter} -> whenRightUser 
     roleId
     contextGetter 
     allowedUser 
     \currentactors cid rid -> do
-      oldFrame <- lift2 pushFrame
+      oldFrame <- lift pushFrame
       -- no need to add currentcontext for context states; a binding has been added compile time.
-      lift2 $ addBinding "currentcontext" [(unwrap cid)]
-      lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+      lift $ addBinding "currentcontext" [(unwrap cid)]
+      lift $ addBinding "currentactor" (unwrap <$> currentactors)
       updater rid
-      lift2 $ restoreFrame oldFrame
+      lift $ restoreFrame oldFrame
 
   forWithIndex_ notifyOnEntry \(allowedUser :: RoleType) ({contextGetter, updater} :: CompiledNotification) -> whenRightUser 
     roleId 
     contextGetter
     allowedUser 
     \notifiedUsers cid rid -> do
-      oldFrame <- lift2 pushFrame
-      lift2 $ addBinding "currentcontext" [(unwrap cid)]
-      lift2 $ addBinding "notifieduser" (unwrap <$> notifiedUsers)
+      oldFrame <- lift pushFrame
+      lift $ addBinding "currentcontext" [(unwrap cid)]
+      lift $ addBinding "notifieduser" (unwrap <$> notifiedUsers)
       updater rid
-      lift2 $ restoreFrame oldFrame
+      lift $ restoreFrame oldFrame
 
 
-  State {object} <- lift2 $ getState stateId
+  State {object} <- lift $ getState stateId
   case object of
     Nothing -> pure unit
     Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly, isSelfPerspective} -> do
-      currentcontext <- lift2 $ (roleId ##>> contextGetter)
-      userInstances <- lift2 (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (boundByRole (RoleInstance me))))
+      currentcontext <- lift $ (roleId ##>> contextGetter)
+      userInstances <- lift (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (boundByRole (RoleInstance me))))
       case fromArray userInstances of
         Nothing -> pure unit
         Just u' -> serialiseRoleInstancesAndProperties
@@ -209,26 +208,26 @@ enteringRoleState roleId stateId = do
           isSelfPerspective
 
   -- Recur.
-  subStates <- lift2 $ subStates_ stateId
+  subStates <- lift $ subStates_ stateId
   for_ subStates (evaluateRoleState roleId)
 
 whenRightUser :: RoleInstance -> (RoleInstance ~~> ContextInstance) -> RoleType -> (Array RoleInstance -> ContextInstance -> Updater RoleInstance) -> MonadPerspectivesTransaction Unit
 whenRightUser roleId contextGetter allowedUser updater = do
-  contextId <- lift2 $ (roleId ##>> contextGetter)
-  me <- lift2 getUserIdentifier
-  currentactors <- lift2 $ (contextId ##= (getRoleInstances allowedUser))
-  bools <- lift2 $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
+  contextId <- lift $ (roleId ##>> contextGetter)
+  me <- lift getUserIdentifier
+  currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
+  bools <- lift $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
   if ala Conj foldMap bools
     then updater currentactors contextId roleId
     else pure unit
 
 notify :: CompiledSentence RoleInstance -> (RoleInstance ~~> ContextInstance) -> RoleInstance -> MonadPerspectivesTransaction Unit
 notify compiledSentence contextGetter roleId = do
-  currentcontext <- lift2 $ (roleId ##>> contextGetter)
-  lift2 $ addBinding "currentcontext" [(unwrap currentcontext)]
-  storeNotificationInContext <- lift2 (currentcontext ##>> (contextType >=> liftToInstanceLevel  (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
-  sentenceText <- lift2 $ compiledSentence roleId
-  mySystem <- lift2 $ getMySystem
+  currentcontext <- lift $ (roleId ##>> contextGetter)
+  lift $ addBinding "currentcontext" [(unwrap currentcontext)]
+  storeNotificationInContext <- lift (currentcontext ##>> (contextType >=> liftToInstanceLevel  (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
+  sentenceText <- lift $ compiledSentence roleId
+  mySystem <- lift $ getMySystem
   void $ createAndAddRoleInstance
     (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
     (if storeNotificationInContext
@@ -256,9 +255,9 @@ exitingRoleState :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransact
 exitingRoleState roleId stateId = do
   log ("Exiting role state " <> unwrap stateId <> " for role " <> unwrap roleId)
   -- Recur. We do this first, because we have to exit the deepest nested substate first.
-  subStates <- lift2 $ subStates_ stateId
+  subStates <- lift $ subStates_ stateId
   for_ subStates \subStateId -> do
-    roleWasInSubState <- lift2 $ isActive subStateId roleId
+    roleWasInSubState <- lift $ isActive subStateId roleId
     if roleWasInSubState
       then exitingRoleState roleId subStateId
       else pure unit
@@ -272,47 +271,47 @@ exitingRoleState roleId stateId = do
   -- It may happen that during the transaction, the end user is put into another role (too).
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
-  me <- lift2 getUserIdentifier
+  me <- lift getUserIdentifier
   forWithIndex_ automaticOnExit \(allowedUser :: RoleType) {updater, contextGetter} -> whenRightUser 
     roleId
     contextGetter 
     allowedUser 
     \currentactors cid rid -> do
-      oldFrame <- lift2 pushFrame
+      oldFrame <- lift pushFrame
       -- no need to add currentcontext for context states; a binding has been added compile time.
-      lift2 $ addBinding "currentcontext" [(unwrap cid)]
-      lift2 $ addBinding "currentactor" (unwrap <$> currentactors)
+      lift $ addBinding "currentcontext" [(unwrap cid)]
+      lift $ addBinding "currentactor" (unwrap <$> currentactors)
       updater rid
-      lift2 $ restoreFrame oldFrame
+      lift $ restoreFrame oldFrame
 
   forWithIndex_ notifyOnExit \(allowedUser :: RoleType) ({contextGetter, updater} :: CompiledNotification) -> whenRightUser 
     roleId 
     contextGetter
     allowedUser 
     \notifiedUsers cid rid -> do
-      oldFrame <- lift2 pushFrame
-      lift2 $ addBinding "currentcontext" [(unwrap cid)]
-      lift2 $ addBinding "notifieduser" (unwrap <$> notifiedUsers)
+      oldFrame <- lift pushFrame
+      lift $ addBinding "currentcontext" [(unwrap cid)]
+      lift $ addBinding "notifieduser" (unwrap <$> notifiedUsers)
       updater rid
-      lift2 $ restoreFrame oldFrame
+      lift $ restoreFrame oldFrame
 
   
   -- (notify roleId me)
 
 -- | Check all substates until one of them is found for which conditionSatisfied holds;
 findSatisfiedSubstate :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
-findSatisfiedSubstate stateId roleId = (lift2 $ subStates_ stateId) >>= findM (conditionSatisfied roleId)
+findSatisfiedSubstate stateId roleId = (lift $ subStates_ stateId) >>= findM (conditionSatisfied roleId)
 
 -- | Absence of a condition result is interpreted as false.
 conditionSatisfied :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Boolean
 conditionSatisfied roleId stateId = do
   compiledState <- getCompiledState stateId
-  (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery roleId compiledState.query
+  (Tuple bools a0 :: WithAssumptions Value) <- lift $ runMonadPerspectivesQuery roleId compiledState.query
   pure $ (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
 
 getCompiledState :: StateIdentifier -> MonadPerspectivesTransaction CompiledRoleState
 getCompiledState stateId = case retrieveCompiledRoleState stateId of
-  Nothing -> lift2 $ unsafePartial $ compileState stateId
+  Nothing -> lift $ unsafePartial $ compileState stateId
   Just c -> pure c
 
 isActive :: StateIdentifier -> RoleInstance -> MonadPerspectives Boolean
@@ -322,4 +321,4 @@ isActive stateId roleId = getActiveRoleStates_ roleId >>= pure <<< isJust <<< el
 -- isExiting :: State -> ContextInstance -> Boolean
 
 getActiveSubstate :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
-getActiveSubstate stateId roleId = (lift $ lift $ getActiveRoleStates_ roleId) >>= \states -> pure $ join ((\i -> index states (i + 1)) <$> (elemIndex stateId states))
+getActiveSubstate stateId roleId = (lift $ getActiveRoleStates_ roleId) >>= \states -> pure $ join ((\i -> index states (i + 1)) <$> (elemIndex stateId states))
