@@ -23,9 +23,47 @@ module Perspectives.CompileTimeFacets where
 
 import Prelude
 
-import Perspectives.CoreTypes (Updater, MP)
+import Control.Monad.Reader (ask)
+import Control.Monad.Rec.Class (forever)
+import Control.Monad.Trans.Class (lift)
+import Data.Maybe (Maybe(..))
+import Effect.AVar (AVar)
+import Effect.Aff (Aff, delay, forkAff)
+import Perspectives.CoreTypes (MP, MonadPerspectivesTransaction, Updater, PerspectivesState)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.Repetition (Duration, Repeater(..), fromDuration)
 import Perspectives.Representation.Action (TimeFacets)
+-- import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.RunPerspectives (runPerspectivesWithState)
 
 addTimeFacets :: forall a f. Partial => Updater a -> TimeFacets f -> MP (Updater a)
 addTimeFacets updater {startMoment, endMoment, repeats} = do
-  pure updater
+--   pure $ after $ repeat repeats updater
+  pure $ after startMoment updater
+  where
+    after :: Maybe Duration -> Updater a -> Updater a
+    after Nothing u = u
+    after (Just d) u = \a -> do
+      lift3 $ delay (fromDuration d)
+      u a
+
+    -- repeat :: Repeater -> Updater a -> Updater a
+    -- repeat Never u = u
+    -- repeat (Forever duration) u = ArrayT <<< \a -> do
+    --     (state :: AVar PerspectivesState) <- ask
+    --     registerRepeater 
+    --         forkAff 
+    --             (runPerspectivesWithState 
+    --                 (runMonadPerspectivesTransaction -- Dit introduceert een cycle in de module dependencies.
+    --                     -- authoringrole
+    --                     (do
+    --                         lift3 $ delay (fromDuration duration)
+    --                         u a)
+    --                         )
+    --                 state)
+
+registerRepeater :: forall a. a -> a
+registerRepeater u = u
+
+lift3 :: forall a. Aff a -> MonadPerspectivesTransaction a
+lift3 = lift <<< lift

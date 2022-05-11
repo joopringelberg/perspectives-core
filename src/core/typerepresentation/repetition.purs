@@ -27,26 +27,23 @@ import Prelude
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
+import Data.Time.Duration (Milliseconds(..))
 import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
-import Perspectives.Data.EncodableMap (EncodableMap)
 
 -- | Types Duration and DurationComponent have been copied from module Data.Interval.Duration,
 -- | because they need to be instances of Encode and Decode.
-newtype Duration = Duration (EncodableMap DurationComponent Number)
-data DurationComponent = Second | Minute | Hour | Day | Week | Month | Year
+data Duration = 
+  Millisecond Number 
+  | Second Number 
+  | Minute Number 
+  | Hour Number 
+  | Day Number
 
 derive instance genericDuration :: Generic Duration _
 instance showDuration :: Show Duration where show = genericShow
 instance eqDuration :: Eq Duration where eq = genericEq
 instance encodeDuration :: Encode Duration where encode = genericEncode defaultOptions
 instance decodeDuration :: Decode Duration where decode = genericDecode defaultOptions
-
-derive instance genericDurationComponent :: Generic DurationComponent _
-instance showDurationComponent :: Show DurationComponent where show = genericShow
-instance eqDurationComponent :: Eq DurationComponent where eq = genericEq
-instance encodeDurationComponent :: Encode DurationComponent where encode = genericEncode defaultOptions
-instance decodeDurationComponent :: Decode DurationComponent where decode = genericDecode defaultOptions
-derive instance ordDurationComponent :: Ord DurationComponent
 
 data Repeater = 
   Never
@@ -58,3 +55,10 @@ instance showRepeater :: Show Repeater where show = genericShow
 instance eqRepeater :: Eq Repeater where eq = genericEq
 instance encodeRepeater :: Encode Repeater where encode = genericEncode defaultOptions
 instance decodeRepeater :: Decode Repeater where decode = genericDecode defaultOptions
+
+fromDuration :: Duration -> Milliseconds
+fromDuration (Millisecond n) = Milliseconds n
+fromDuration (Second n) = Milliseconds (1000.0 * n)
+fromDuration (Minute n) = Milliseconds (60000.0 * n)
+fromDuration (Hour n) = Milliseconds (3600000.0 * n)
+fromDuration (Day n) = Milliseconds (86400000.0 * n)
