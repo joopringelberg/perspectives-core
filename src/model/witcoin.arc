@@ -343,17 +343,17 @@ domain WitCoin
 
       -- In this case, it must be equal to the Post value of the Debitor in this Transaction
       -- (because the next Transaction is stored in NextDeb).
-      perspective on NextDeb >> binding >> context Creditor
+      perspective on NextDeb >> binding >> context >> Creditor
         props (Prior) verbs (SetPropertyValue)
-        on entry
+        on entry of object state
           do
             Prior = currentcontext >> Debitor >> Post
 
       -- In this case, it must be equal to the Post value of the Creditor in this Transaction
       -- (because the next Transaction is stored in NextCred).
-      perspective on NextCred >> binding >> context Creditor
+      perspective on NextCred >> binding >> context >> Creditor
         props (Prior) verbs (SetPropertyValue)
-        on entry
+        on entry of object state
           do
             Prior = currentcontext >> Creditor >> Post
 
@@ -420,17 +420,17 @@ domain WitCoin
 
       -- In this case, it must be equal to the Post value of the Debitor in this Transaction
       -- (because the next Transaction is stored in NextDeb).
-      perspective on NextDeb >> binding >> context Debitor
+      perspective on NextDeb >> binding >> context >> Debitor
         props (Prior) verbs (SetPropertyValue)
-        on entry
+        on entry of object state
           do
             Prior = currentcontext >> Debitor >> Post
 
       -- In this case, it must be equal to the Post value of the Creditor in this Transaction
       -- (because the next Transaction is stored in NextCred).
-      perspective on NextCred >> binding >> context Debitor
+      perspective on NextCred >> binding >> context >> Debitor
         props (Prior) verbs (SetPropertyValue)
-        on entry
+        on entry of object state
           do
             Prior = currentcontext >> Creditor >> Post
 
