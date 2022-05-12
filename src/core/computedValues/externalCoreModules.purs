@@ -32,10 +32,11 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, fromFoldable, lookup)
 import Perspectives.Extern.Couchdb (externalFunctions) as ExternalCouchdb
+import Perspectives.Extern.Parsing (externalFunctions) as Parsing
+import Perspectives.Extern.Sensors (externalFunctions) as Sensor
+import Perspectives.Extern.Utilities (externalFunctions) as Utilities
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
 import Perspectives.Instances.SerialiseAsJson (externalFunctions) as Serialise
-import Perspectives.Extern.Parsing (externalFunctions) as Parsing
-import Perspectives.Extern.Utilities (externalFunctions) as Utilities
 import Prelude (class Monad, Unit, discard, pure, unit, ($))
 
 type ExternalFunctions = Array (Tuple String HiddenFunctionDescription)
@@ -46,6 +47,7 @@ coreModules = fromFoldable
   , Tuple "model:Serialise" Serialise.externalFunctions
   , Tuple "model:Parsing" Parsing.externalFunctions
   , Tuple "model:Utilities" Utilities.externalFunctions
+  , Tuple "model:Sensor" Sensor.externalFunctions
   ]
 
 addAllExternalFunctions :: forall m. Monad m => m Unit
@@ -54,6 +56,7 @@ addAllExternalFunctions = do
   addExternalFunctions Serialise.externalFunctions
   addExternalFunctions Parsing.externalFunctions
   addExternalFunctions Utilities.externalFunctions
+  addExternalFunctions Sensor.externalFunctions
 
 addExternalFunctions :: forall m. Monad m => Array (Tuple String HiddenFunctionDescription) -> m Unit
 addExternalFunctions externalFunctions = for_ externalFunctions \(Tuple n f) -> pure $ hiddenFunctionInsert n f.func f.nArgs
