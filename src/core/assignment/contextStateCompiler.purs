@@ -75,17 +75,17 @@ compileState stateId = do
     (mobjectGetter :: Maybe (ContextInstance ~~> RoleInstance)) <- traverse roleFunctionFromQfd object
     (automaticOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
       (\subject action -> 
-        compileEffect action >>= pure <<< withAuthoringRole subject)
+        compileEffect action subject >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnEntry)
     (automaticOnExit' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
       (\subject action ->
-        compileEffect action >>= pure <<< withAuthoringRole subject)
+        compileEffect action subject >>= pure <<< withAuthoringRole subject)
       (unwrap automaticOnExit)
     (notifyOnEntry' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\_ notification -> compileNotification notification)
+      (\subject notification -> compileNotification notification subject)
       (unwrap notifyOnEntry)
     (notifyOnExit' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
-      (\_ notification -> compileNotification notification)
+      (\subject notification -> compileNotification notification subject)
       (unwrap notifyOnExit)
     (perspectivesOnEntry' :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean, isSelfPerspective :: Boolean }) <- traverseWithIndex
       (\subject (ContextPerspective r) -> pure r)
@@ -103,16 +103,16 @@ compileState stateId = do
       , perspectivesOnEntry: perspectivesOnEntry'
       }
   where
-    compileEffect :: Partial => AutomaticAction -> MP (Updater ContextInstance)
-    compileEffect (ContextAction r@{effect}) = do
+    compileEffect :: Partial => AutomaticAction -> RoleType -> MP (Updater ContextInstance)
+    compileEffect (ContextAction r@{effect}) subject = do
       compiledEffect <- compileAssignment effect
-      addTimeFacets compiledEffect r 
+      addTimeFacets compiledEffect r subject stateId
     
-    compileNotification :: Partial => Notification -> MP (Updater ContextInstance)
-    compileNotification (ContextNotification r@{sentence}) = do
+    compileNotification :: Partial => Notification -> RoleType -> MP (Updater ContextInstance)
+    compileNotification (ContextNotification r@{sentence}) subject = do
       compiledSentence <- compileContextSentence sentence
       updater <- pure $ notify compiledSentence
-      addTimeFacets updater r 
+      addTimeFacets updater r subject stateId
     
     withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
     withAuthoringRole aRole updater a = do

@@ -22,22 +22,24 @@
 module Main
 
 where
-import Main.RecompileBasicModels as RBM
+
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
+import Data.Map (insert)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Data.Tuple (fst)
+import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
-import Effect.Aff (Error, catchError, error, forkAff, joinFiber, runAff, throwError, try)
-import Effect.Aff.AVar (new)
+import Effect.Aff (Aff, Error, Fiber, catchError, error, forkAff, joinFiber, runAff, throwError, try)
+import Effect.Aff.AVar (AVar, empty, new, put, take)
 import Foreign (Foreign)
+import Main.RecompileBasicModels as RBM
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
-import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>>))
+import Perspectives.CoreTypes (MonadPerspectives, TransactionWithTiming(..), PerspectivesState, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -54,10 +56,12 @@ import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
+import Perspectives.Representation.TypeIdentifiers (StateIdentifier)
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
-import Perspectives.Sync.Channel (endChannelReplication) 
+import Perspectives.Sync.Channel (endChannelReplication)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>))
 
 -- | Don't do anything. runPDR will actually start the core.
@@ -98,7 +102,14 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
         , couchdbUrl: pdbu.couchdbUrl
       }
       transactionFlag <- new true
-      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
+      transactionWithTiming <- empty
+      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
+      
+      -- Fork aff to capture transactions to run.
+      void $ forkAff $ forever do
+        TransactionWithTiming {transaction, instanceId, stateId, authoringRole} <- take transactionWithTiming
+        f <- forkAff $ runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
+        registerTransactionFiber f instanceId stateId state
 
       runPerspectivesWithState (do
         addAllExternalFunctions
@@ -118,13 +129,18 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
           \e -> do
             logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
   where
-      handler :: Either Error Unit -> Effect Unit
-      handler (Left e) = do
-        logPerspectivesError $ Custom $ "An error condition in runPDR: " <> (show e)
-        callback false
-      handler (Right _) = do
-        logPerspectivesError $ Custom $ "Started the PDR for: " <> usr
-        callback true
+    registerTransactionFiber :: Fiber Unit -> String -> StateIdentifier -> AVar PerspectivesState -> Aff Unit
+    registerTransactionFiber f instanceId stateId stateAVar = do
+      s@{transactionFibers} <- take stateAVar
+      put s {transactionFibers = insert (Tuple instanceId stateId) f transactionFibers} stateAVar
+
+    handler :: Either Error Unit -> Effect Unit
+    handler (Left e) = do
+      logPerspectivesError $ Custom $ "An error condition in runPDR: " <> (show e)
+      callback false
+    handler (Right _) = do
+      logPerspectivesError $ Custom $ "Started the PDR for: " <> usr
+      callback true
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)
@@ -157,7 +173,8 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
         , couchdbUrl: pdbu.couchdbUrl
         }
       transactionFlag <- new true
-      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
+      transactionWithTiming <- empty
+      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
       runPerspectivesWithState
         (do
           -- TODO. Vermoedelijk is dit overbodig voor Pouchdb.
@@ -182,7 +199,8 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
         transactionFlag <- new true
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
+        transactionWithTiming <- empty
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
         runPerspectivesWithState
           (do
             (catchError do
@@ -265,7 +283,8 @@ removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
           , couchdbUrl: pdbu.couchdbUrl
           }
         transactionFlag <- new true
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
+        transactionWithTiming <- empty
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
         runPerspectivesWithState
           do
             -- Get all Channels

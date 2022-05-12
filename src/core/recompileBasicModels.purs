@@ -25,6 +25,7 @@ module Main.RecompileBasicModels where
 -- | has changed. The local models directory of the user that is provided, will have the freshly compiled
 -- | DomeinFiles, so this user can be booted. The essential models include model:ModelManagement, so that
 -- | using this account, all models can be recompiled from the client.
+
 import Prelude
 
 import Control.Monad.State (execState)
@@ -40,7 +41,7 @@ import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (Error, error, runAff, throwError, try)
-import Effect.Aff.AVar (new)
+import Effect.Aff.AVar (empty, new)
 import Effect.Class.Console (log)
 import Foreign (Foreign)
 import Perspectives.CoreTypes (MonadPerspectives)
@@ -80,7 +81,8 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
       Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
         transactionFlag <- new true
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag
+        transactionWithTiming <- empty
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
         runPerspectivesWithState
           (do
             addAllExternalFunctions

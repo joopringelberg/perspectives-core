@@ -21,7 +21,57 @@
 -- END LICENSE
 
 
-module Perspectives.CoreTypes where
+module Perspectives.CoreTypes
+  ( (###=)
+  , (###>)
+  , (###>>)
+  , (##=)
+  , (##>)
+  , (##>>)
+  , ArrayWithoutDoubles(..)
+  , Assumption
+  , AssumptionRegister
+  , AssumptionTracking
+  , BrokerService
+  , ContextInstances
+  , ContextPropertyValueGetter
+  , InformedAssumption(..)
+  , MP
+  , MPQ
+  , MPT
+  , MonadPerspectives
+  , MonadPerspectivesQuery
+  , MonadPerspectivesTransaction
+  , TransactionWithTiming(..)
+  , ObjectsGetter
+  , OrderedDelta(..)
+  , PerspectivesExtraState
+  , PerspectivesState
+  , PropertyValueGetter
+  , RolInstances
+  , RoleGetter
+  , StateEvaluation(..)
+  , TrackingObjectsGetter
+  , TypeLevelGetter
+  , TypeLevelResults
+  , Updater
+  , WithAssumptions
+  , DomeinCache
+  , assumption
+  , evalMonadPerspectivesQuery
+  , evalMonadPerspectivesQueryToMaybeObject
+  , execMonadPerspectivesQuery
+  , liftToInstanceLevel
+  , runMonadPerspectivesQuery
+  , runMonadPerspectivesQueryToObject
+  , runTypeLevelToArray
+  , runTypeLevelToMaybeObject
+  , runTypeLevelToObject
+  , type (##>)
+  , type (~~>)
+  , type (~~~>)
+  )
+  where
 
 import Control.Monad.Reader (ReaderT, lift)
 import Control.Monad.Writer (WriterT, runWriterT)
@@ -29,11 +79,12 @@ import Data.Array (foldMap, foldl, foldr, head, union)
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
+import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
-import Effect.Aff (Aff, throwError)
+import Effect.Aff (Aff, Fiber, throwError)
 import Effect.Aff.AVar (AVar)
 import Effect.Exception (error)
 import Foreign.Object (Object)
@@ -96,7 +147,18 @@ type PerspectivesExtraState =
 
   , transactionFlag :: AVar Boolean
 
+  , transactionWithTiming :: AVar TransactionWithTiming
+
+  , transactionFibers :: Map (Tuple String StateIdentifier) (Fiber Unit)
+
   )
+
+newtype TransactionWithTiming = TransactionWithTiming
+  { transaction :: MonadPerspectivesTransaction Unit
+  , instanceId :: String
+  , stateId :: StateIdentifier
+  , authoringRole :: RoleType
+  }
 
 -----------------------------------------------------------
 -- ASSUMPTIONS

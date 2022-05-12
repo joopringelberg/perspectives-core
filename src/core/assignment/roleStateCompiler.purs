@@ -79,10 +79,10 @@ compileState stateId = do
     (automaticOnEntry' :: Map RoleType CompiledAutomaticAction) <- traverseWithIndex compileEffect (unwrap automaticOnEntry)
     (automaticOnExit' :: Map RoleType CompiledAutomaticAction) <- traverseWithIndex compileEffect (unwrap automaticOnExit)
     (notifyOnEntry' :: Map RoleType CompiledNotification) <- traverseWithIndex
-      (\_ notification -> compileNotification notification)
+      (\subject notification -> compileNotification notification subject)
       (unwrap notifyOnEntry)
     (notifyOnExit' :: Map RoleType CompiledNotification) <- traverseWithIndex
-      (\_ notification -> compileNotification notification)
+      (\subject notification -> compileNotification notification subject)
       (unwrap notifyOnExit)
     (perspectivesOnEntry' :: Map RoleType CompiledStateDependentPerspective) <- traverseWithIndex
       (\subject (RolePerspective{currentContextCalculation, properties, selfOnly, isSelfPerspective}) -> do
@@ -106,15 +106,15 @@ compileState stateId = do
     compileEffect subject (RoleAction r@{effect, currentContextCalculation}) = do
       contextGetter <- role2context currentContextCalculation
       updater' <- compileAssignmentFromRole effect >>= pure <<< withAuthoringRole subject
-      updater <- addTimeFacets updater' r 
+      updater <- addTimeFacets updater' r subject stateId
       pure {updater, contextGetter}
     
-    compileNotification :: Partial => Notification -> MP CompiledNotification
-    compileNotification (RoleNotification r@{sentence, currentContextCalculation}) = do
+    compileNotification :: Partial => Notification -> RoleType -> MP CompiledNotification
+    compileNotification (RoleNotification r@{sentence, currentContextCalculation}) subject = do
       compiledSentence <- compileRoleSentence sentence
       contextGetter <- role2context currentContextCalculation
       updater' <- pure $ notify compiledSentence contextGetter
-      updater <- addTimeFacets updater' r 
+      updater <- addTimeFacets updater' r subject stateId
       pure {updater, contextGetter}
     
     withAuthoringRole :: forall a. RoleType -> Updater a -> Updater a

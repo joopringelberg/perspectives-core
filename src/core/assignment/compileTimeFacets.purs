@@ -23,47 +23,50 @@ module Perspectives.CompileTimeFacets where
 
 import Prelude
 
-import Control.Monad.Reader (ask)
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe(..))
 import Effect.AVar (AVar)
-import Effect.Aff (Aff, delay, forkAff)
-import Perspectives.CoreTypes (MP, MonadPerspectivesTransaction, Updater, PerspectivesState)
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Effect.Aff (Fiber, delay)
+import Effect.Aff.AVar (put)
+import Perspectives.CoreTypes (MP, MonadPerspectivesTransaction, TransactionWithTiming(..), Updater)
 import Perspectives.Repetition (Duration, Repeater(..), fromDuration)
 import Perspectives.Representation.Action (TimeFacets)
--- import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.RunPerspectives (runPerspectivesWithState)
+import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
+import Unsafe.Coerce (unsafeCoerce)
 
-addTimeFacets :: forall a f. Partial => Updater a -> TimeFacets f -> MP (Updater a)
-addTimeFacets updater {startMoment, endMoment, repeats} = do
---   pure $ after $ repeat repeats updater
-  pure $ after startMoment updater
+addTimeFacets :: forall a f. Partial => Updater a -> TimeFacets f -> RoleType -> StateIdentifier -> MP (Updater a)
+addTimeFacets updater {startMoment, endMoment, repeats} authoringRole stateId = do
+  pure $ after startMoment $ repeat repeats updater
   where
     after :: Maybe Duration -> Updater a -> Updater a
     after Nothing u = u
     after (Just d) u = \a -> do
-      lift3 $ delay (fromDuration d)
+      lift $ lift $ delay (fromDuration d)
       u a
 
-    -- repeat :: Repeater -> Updater a -> Updater a
-    -- repeat Never u = u
-    -- repeat (Forever duration) u = ArrayT <<< \a -> do
-    --     (state :: AVar PerspectivesState) <- ask
-    --     registerRepeater 
-    --         forkAff 
-    --             (runPerspectivesWithState 
-    --                 (runMonadPerspectivesTransaction -- Dit introduceert een cycle in de module dependencies.
-    --                     -- authoringrole
-    --                     (do
-    --                         lift3 $ delay (fromDuration duration)
-    --                         u a)
-    --                         )
-    --                 state)
+    repeat :: Repeater -> Updater a -> Updater a
+    repeat Never u = u
+    repeat (Forever duration) u = \a -> do
+      (av :: AVar TransactionWithTiming) <- lift $ gets _.transactionWithTiming
+      lift $ lift $ put (TransactionWithTiming 
+        { transaction: transaction a
+        , instanceId: unsafeUnwrapResource a
+        , stateId
+        , authoringRole}) 
+        av
+      where 
+        transaction :: a -> MonadPerspectivesTransaction Unit
+        transaction a = forever do
+          lift $ lift $ delay (fromDuration duration)
+          u a
+
+    returnFiber :: Fiber Unit -> Unit
+    returnFiber f = unit
+
+    unsafeUnwrapResource :: a -> String
+    unsafeUnwrapResource = unsafeCoerce
 
 registerRepeater :: forall a. a -> a
 registerRepeater u = u
-
-lift3 :: forall a. Aff a -> MonadPerspectivesTransaction a
-lift3 = lift <<< lift

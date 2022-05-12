@@ -24,19 +24,20 @@ module Perspectives.PerspectivesState where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Data.Maybe (Maybe(..))
+import Data.Map (empty) as Map
 import Effect.Aff.AVar (AVar)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, PerspectivesState, MonadPerspectives)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, MonadPerspectives, PerspectivesState, TransactionWithTiming)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
 import Perspectives.Persistence.API (PouchdbUser, Url)
 import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 
-newPerspectivesState :: PouchdbUser -> Url -> AVar Boolean -> PerspectivesState
-newPerspectivesState uinfo publicRepo transFlag =
+newPerspectivesState :: PouchdbUser -> Url -> AVar Boolean -> AVar TransactionWithTiming -> PerspectivesState
+newPerspectivesState uinfo publicRepo transFlag transactionWithTiming =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
@@ -55,6 +56,8 @@ newPerspectivesState uinfo publicRepo transFlag =
   -- , couchdbUrl: Nothing -- For using Couchdb as backend for Pouchdb.
   , warnings: []
   , transactionFlag: transFlag
+  , transactionWithTiming
+  , transactionFibers: Map.empty
   }
 
 -----------------------------------------------------------

@@ -25,7 +25,7 @@ module Perspectives.RunPerspectives where
 import Control.Monad.Reader (runReaderT)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
-import Effect.Aff.AVar (AVar, new)
+import Effect.Aff.AVar (AVar, empty, new)
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
 import Perspectives.PerspectivesState (newPerspectivesState)
@@ -37,6 +37,7 @@ runPerspectives :: forall a. String -> String -> String -> String -> Int -> Stri
   -> Aff a
 runPerspectives userName password systemId host port publicRepo mp = do
   transactionFlag <- new true
+  transactionWithTiming <- empty
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState
         { systemIdentifier: systemId
@@ -45,7 +46,8 @@ runPerspectives userName password systemId host port publicRepo mp = do
         -- , userName: UserName userName
         }
       publicRepo
-      transactionFlag) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
+      transactionFlag
+      transactionWithTiming) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
   runReaderT mp rf
 
 runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a
