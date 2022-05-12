@@ -10,7 +10,6 @@ import Data.Newtype (unwrap)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes ((##>), (##>>))
 import Perspectives.Instances.ObjectGetters (externalRole)
 import Perspectives.LoadCRL.FS (loadAndSaveCrlFile)
@@ -118,11 +117,11 @@ theSuite = suite "Perspectives.Sync.Channel" do
   test "setChannelReplication" $ runP $ withSystem $ void $ withCouchdbUrl \url -> do
     achannel <- runMonadPerspectivesTransaction do
       channel <- createChannel url
-      void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+      void $ lift $ loadAndSaveCrlFile "userJoop.crl" testDirectory
       addPartnerToChannel (RoleInstance "model:User$joop$User") channel
       setYourAddress "http://127.0.0.1" 5984 channel
       -- We now have a channel with two partners.
-      lift2 $ setChannelReplication url channel
+      lift $ setChannelReplication url channel
       -- Because both partners are local, we just replicate the channel to post.
       pure channel
     -- Now we test whether a document put into the channel appears in the post.

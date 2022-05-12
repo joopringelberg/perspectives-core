@@ -5,6 +5,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
+import Data.List (List(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Foreign.Object (lookup)
@@ -33,27 +34,27 @@ theSuite = suite  "Perspectives.Representation.ADT" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{enumeratedRoles, calculatedRoles}) -> do
-                -- logShow correctedDFR
-                case lookup "model:MyTestDomain$Role" enumeratedRoles of
-                  Nothing -> assert "There should be a role 'model:MyTestDomain$Role'" false
-                  -- otherwise -> assert "" true
-                  Just rl -> do
-                    b <- runP $ binding rl
-                    -- logShow b
-                    assert "binding of 'model:MyTestDomain$Role' is '(ST (EnumeratedRoleType \"model:MyTestDomain$YetAnotherRole\"))'"
-                      -- (b == NOTYPE)
-                      (b == (ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")})))
-                case lookup "model:MyTestDomain$AnotherRole" calculatedRoles of
-                  Nothing -> assert "There should be a role 'model:MyTestDomain$AnotherRole'" false
-                  Just arl -> do
-                    tp <- runP $ roleADT arl
-                    assert "The type of AnotherRole should be equal to YetAnotherRole"
-                      (tp == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")}))
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x of
+                (Left e) -> assert (show e) false
+                (Right correctedDFR@{enumeratedRoles, calculatedRoles}) -> do
+                  -- logShow correctedDFR
+                  case lookup "model:MyTestDomain$Role" enumeratedRoles of
+                    Nothing -> assert "There should be a role 'model:MyTestDomain$Role'" false
+                    -- otherwise -> assert "" true
+                    Just rl -> do
+                      b <- runP $ binding rl
+                      -- logShow b
+                      assert "binding of 'model:MyTestDomain$Role' is '(ST (EnumeratedRoleType \"model:MyTestDomain$YetAnotherRole\"))'"
+                        -- (b == NOTYPE)
+                        (b == (ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")})))
+                  case lookup "model:MyTestDomain$AnotherRole" calculatedRoles of
+                    Nothing -> assert "There should be a role 'model:MyTestDomain$AnotherRole'" false
+                    Just arl -> do
+                      tp <- runP $ roleADT arl
+                      assert "The type of AnotherRole should be equal to YetAnotherRole"
+                        (tp == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")}))

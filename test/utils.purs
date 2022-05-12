@@ -2,19 +2,19 @@ module Test.Perspectives.Utils where
 
 import Prelude
 
+import Data.Array (singleton)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff, error, throwError, try)
 import Effect.Class.Console (log)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
-import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Persistence.API (createDatabase, deleteDatabase)
 import Perspectives.Persistence.State (getCouchdbBaseURL)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectives)
 import Test.Unit.Assert as Assert
@@ -119,4 +119,4 @@ withSimpleChat = withModel (DomeinFileId "model:SimpleChat")
 runMonadPerspectivesTransaction :: forall o.
   MonadPerspectivesTransaction o
   -> (MonadPerspectives (Array o))
-runMonadPerspectivesTransaction a = runMonadPerspectivesTransaction' true (ENR $ EnumeratedRoleType "model:Perspectives$PerspectivesSystem$User") a
+runMonadPerspectivesTransaction a = singleton <$> runMonadPerspectivesTransaction' true (ENR $ EnumeratedRoleType "model:Perspectives$PerspectivesSystem$User") a

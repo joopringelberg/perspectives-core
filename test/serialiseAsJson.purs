@@ -13,7 +13,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Foreign (unsafeToForeign)
 import Foreign.Class (decode, encode)
-import Global.Unsafe (unsafeStringify)
+-- import Global.Unsafe (unsafeStringify)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization, RolSerialization)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
@@ -40,29 +40,26 @@ theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Instances.SerialiseAsJson" do
 
   test "serialiseAsJsonFor" (runP $ withSystem $ void $ withCouchdbUrl \url -> do
-    achannel <- runSterileTransaction $ createChannelContext url "MyTestChannel"
-    case head achannel of
-      Nothing -> liftAff $ assert "Failed to create a channel" false
-      Just channel -> do
-        -- load a second user
-        void $ loadAndCacheCrlFile "userJoop.crl" testDirectory
-        void $ runSterileTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
-        -- Serialise as JSON
-        partners <- channel ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
-        case head partners of
-          Nothing -> liftAff $ assert "There should be a ConnectedPartner in the Channel instance" false
-          Just p -> do
-            (channelSerialiation :: Array ContextSerialization) <- serialiseAsJsonFor p channel
-            log $ unsafeStringify channelSerialiation
-            -- log $ "\n" <> (prettyPrint channelSerialiation)
-            liftAff $ assert "The context 'model:User$test' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$test") channelSerialiation)
-            liftAff $ assert "The context 'model:User$MyTestChannel' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$MyTestChannel") channelSerialiation)
-            encodedChannelSerialization <- pure $ encode channelSerialiation
-            case unwrap $ runExceptT (decode encodedChannelSerialization) of
-              Left e -> liftAff $ assert "Encoded Array ContextSerialization should be decodable" false
-              Right (channelSerialiation' :: Array ContextSerialization) -> liftAff $ assert "encode-decode should roundtrip" (channelSerialiation == channelSerialiation')
-        clearUserDatabase
-        )
+    channel <- runSterileTransaction $ createChannelContext url "MyTestChannel"
+    -- load a second user
+    void $ loadAndCacheCrlFile "userJoop.crl" testDirectory
+    void $ runSterileTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
+    -- Serialise as JSON
+    partners <- channel ##= getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
+    case head partners of
+      Nothing -> liftAff $ assert "There should be a ConnectedPartner in the Channel instance" false
+      Just p -> do
+        (channelSerialiation :: Array ContextSerialization) <- serialiseAsJsonFor p channel
+        -- log $ unsafeStringify channelSerialiation
+        -- log $ "\n" <> (prettyPrint channelSerialiation)
+        liftAff $ assert "The context 'model:User$test' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$test") channelSerialiation)
+        liftAff $ assert "The context 'model:User$MyTestChannel' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$MyTestChannel") channelSerialiation)
+        encodedChannelSerialization <- pure $ encode channelSerialiation
+        case unwrap $ runExceptT (decode encodedChannelSerialization) of
+          Left e -> liftAff $ assert "Encoded Array ContextSerialization should be decodable" false
+          Right (channelSerialiation' :: Array ContextSerialization) -> liftAff $ assert "encode-decode should roundtrip" (channelSerialiation == channelSerialiation')
+    clearUserDatabase
+    )
 
   test "decodeProperties '{}'" (do
     s <- pure $ unsafeToForeign {}

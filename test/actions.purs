@@ -8,7 +8,7 @@ import Data.Either (either)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Perspectives.CoreTypes ((##=))
-import Perspectives.DomeinFile (DomeinFileId(..))
+
 import Perspectives.Instances.ObjectGetters (allRoleBinders, binding, getProperty, getEnumeratedRoleInstances)
 import Perspectives.LoadCRL.FS (loadAndCacheCrlFile, loadAndSaveCrlFile)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)

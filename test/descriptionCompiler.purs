@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
+import Data.List (List(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
@@ -54,14 +55,14 @@ makeTest_ test title source errorHandler theTest = test title do
     (Right ctxt@(ContextE{id})) -> do
       -- logShow ctxt
       runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-      case r of
-        (Left e) -> assert (show e) false
-        (Right (DomeinFile dr')) -> do
-          -- logShow dr'
-          x <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-          case x of
-            (Left e) -> errorHandler e
-            (Right correctedDFR) -> theTest correctedDFR
+        case r of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+            case x of
+              (Left e) -> errorHandler e
+              (Right correctedDFR) -> theTest correctedDFR
 
 makeTest :: String -> String -> (PerspectivesError -> Aff Unit) -> (DomeinFileRecord -> Aff Unit) -> Free TestF Unit
 makeTest = makeTest_ test

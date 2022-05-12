@@ -16,7 +16,6 @@ import Perspectives.CoreTypes (MonadPerspectives, evalMonadPerspectivesQuery, (#
 import Perspectives.Couchdb (designDocumentViews)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
-import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore, createUser, models, uploadToRepository)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Persistence.API (tryGetDocument)
@@ -25,6 +24,7 @@ import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (developmentRepository)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile)
@@ -81,6 +81,15 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Serialise") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Serialise: " <> show errs) false
 
+  testOnly "upload model:Sensor to repository from files" $ runP do
+    errs <- loadCompileAndCacheArcFile "sensor" modelDirectory
+    if null errs
+      then do
+        pure unit
+        cdburl <- developmentRepository
+        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Sensor") cdburl)
+      else liftAff $ assert ("There are instance- or model errors for model:Sensor: " <> show errs) false
+
   test "upload model:Couchdb to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     if null errs
@@ -125,7 +134,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Parsing") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Parsing: " <> show errs) false
 
-  testOnly "upload model:BodiesWithAccounts to repository from files (without testuser)" $ runP do
+  test "upload model:BodiesWithAccounts to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     errs <- loadCompileAndCacheArcFile "bodiesWithAccounts" modelDirectory

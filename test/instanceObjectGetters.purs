@@ -37,10 +37,9 @@ theSuite = suite "Test.Instances.ObjectGetters" do
 
   test "getMyType" (runP $ withSystem $ do
     c <- runSterileTransaction $ runExceptT $ constructEmptyContext (ContextInstance "model:User$c1") "sys:Invitation" "mycontext" (PropertySerialization empty) Nothing
-    case head c of
-      Nothing -> liftAff $ assert "Expected a contextinstance" false
-      Just (Left e) -> liftAff $ assert ("Error on constructing a context: " <> show e) false
-      Just (Right (PerspectContext{_id})) -> do
+    case c of
+      (Left e) -> liftAff $ assert ("Error on constructing a context: " <> show e) false
+      (Right (PerspectContext{_id})) -> do
         mytype <- _id ##> getMyType
         liftAff $ assert "my type should be sys:Invitation$Guest" (case mytype of
           Nothing -> false
@@ -49,10 +48,9 @@ theSuite = suite "Test.Instances.ObjectGetters" do
 
   test "getMyType" (runP $ withSimpleChat $ do
     c <- runSterileTransaction $ runExceptT $ constructEmptyContext (ContextInstance "model:User$ch1") "model:SimpleChat$Chat" "mychat" (PropertySerialization empty) Nothing
-    case head c of
-      Nothing -> liftAff $ assert "Expected a contextinstance" false
-      Just (Left e) -> liftAff $ assert ("Error on constructing a context: " <> show e) false
-      Just (Right (PerspectContext{_id})) -> do
+    case c of
+      (Left e) -> liftAff $ assert ("Error on constructing a context: " <> show e) false
+      (Right (PerspectContext{_id})) -> do
         mytype <- _id ##> getMyType
         liftAff $ assert "my type should be sys:Invitation$Guest" (case mytype of
           Nothing -> false

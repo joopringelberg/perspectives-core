@@ -5,6 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Array (catMaybes, cons, find, head, intercalate, intersect, last, length, null, union)
 import Data.Either (Either(..))
+import Data.List (List(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..), fst)
@@ -12,7 +13,7 @@ import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup, empty)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..), DomeinFileRecord)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.InvertedQuery (QueryWithAKink, backwards)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
@@ -85,22 +86,22 @@ theSuite = suite "Test.Query.Inversion" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{calculatedProperties}) -> do
-                -- logShow correctedDFR
-                case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
-                  Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
-                  (Just (CalculatedProperty{calculation})) -> case calculation of
-                    S _ -> assert "The calculation should have been compiled!" false
-                    Q c -> do
-                      inv <- invertFD c
-                      assert "The inversion of a Constant should be Nothing" (null inv)
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert (show e) false
+                (Right correctedDFR@{calculatedProperties}) -> do
+                  -- logShow correctedDFR
+                  case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
+                    Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
+                    (Just (CalculatedProperty{calculation})) -> case calculation of
+                      S _ -> assert "The calculation should have been compiled!" false
+                      Q c -> do
+                        inv <- invertFD c
+                        assert "The inversion of a Constant should be Nothing" (null inv)
 
   test "Property of another role in the same context (1)" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  case TestCase1\n    thing ARole\n      property Prop1 = context >> AnotherRole >> Prop2\n    thing AnotherRole\n      property Prop2 (mandatory, Boolean)" ARC.domain
@@ -109,32 +110,32 @@ theSuite = suite "Test.Query.Inversion" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{calculatedProperties}) -> do
-                -- logShow correctedDFR
-                case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
-                  Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
-                  (Just (CalculatedProperty{calculation})) -> case calculation of
-                    S _ -> assert "The calculation should have been compiled!" false
-                    Q c -> do
-                      paths <- invertFD c
-                      -- log $ intercalate "\n" (prettyPrint <$> paths)
-                      assert "The inversion of a a property of another role in the same context should run \
-                      \from that property to the role to the context" (not $null paths)
-                      assert "The domain of the inversion should be Prop2."
-                        (isJust $ find (\path -> case path of
-                          (BQD (VDOM PBool (Just (ENP (EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2")))) _ _ _ _ _ _) -> true
-                          otherwise -> false) paths)
-                      assert "The first term of the composition should be Value2Role"
-                        (isJust $ find (\path -> case path of
-                          (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
-                          otherwise -> false) paths)
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert (show e) false
+                (Right correctedDFR@{calculatedProperties}) -> do
+                  -- logShow correctedDFR
+                  case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
+                    Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
+                    (Just (CalculatedProperty{calculation})) -> case calculation of
+                      S _ -> assert "The calculation should have been compiled!" false
+                      Q c -> do
+                        paths <- invertFD c
+                        -- log $ intercalate "\n" (prettyPrint <$> paths)
+                        assert "The inversion of a a property of another role in the same context should run \
+                        \from that property to the role to the context" (not $null paths)
+                        assert "The domain of the inversion should be Prop2."
+                          (isJust $ find (\path -> case path of
+                            (BQD (VDOM PBool (Just (ENP (EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2")))) _ _ _ _ _ _) -> true
+                            otherwise -> false) paths)
+                        assert "The first term of the composition should be Value2Role"
+                          (isJust $ find (\path -> case path of
+                            (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
+                            otherwise -> false) paths)
 
   test "Property of another role in the same context (2)" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  case TestCase1\n    thing ARole\n      property Prop1 = context >> NestedContext >> binding >> context >> AnotherRole >> Prop2\n    context NestedContext filledBy SubCase\n    case SubCase\n      thing AnotherRole\n        property Prop2 (mandatory, Boolean)" ARC.domain
@@ -143,36 +144,36 @@ theSuite = suite "Test.Query.Inversion" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{calculatedProperties}) -> do
-                -- logShow correctedDFR
-                case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
-                  Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
-                  (Just (CalculatedProperty{calculation})) -> case calculation of
-                    S _ -> assert "The calculation should have been compiled!" false
-                    Q c -> do
-                      paths <- invertFD c
-                      -- log $ intercalate "\n" (prettyPrint <$> paths)
-                      assert "The inversion of a a property of another role in the same context should run \
-                      \from that property to the role to the context" (not $ null paths)
-                      assert "The domain of the inversion should be Prop2."
-                        (isJust $ find (\path -> case path of
-                          (BQD (VDOM PBool (Just (ENP (EnumeratedPropertyType "model:Test$TestCase1$SubCase$AnotherRole$Prop2")))) _ _ _ _ _ _) -> true
-                          otherwise -> false) paths)
-                      assert "The first term of the composition should be Value2Role"
-                        (isJust $ find (\path -> case path of
-                          (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
-                          otherwise -> false) paths)
-                      assert "The third term of the composition should be external"
-                        (isJust $ find (\path -> case path of
-                          (BQD _ _ _ (BQD _ _ _ (BQD _ _ (SQD _ (DataTypeGetter ExternalRoleF) _ _ _ ) _ _ _ _ ) _ _ _) _ _ _) -> true
-                          otherwise -> false) paths)
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert (show e) false
+                (Right correctedDFR@{calculatedProperties}) -> do
+                  -- logShow correctedDFR
+                  case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
+                    Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
+                    (Just (CalculatedProperty{calculation})) -> case calculation of
+                      S _ -> assert "The calculation should have been compiled!" false
+                      Q c -> do
+                        paths <- invertFD c
+                        -- log $ intercalate "\n" (prettyPrint <$> paths)
+                        assert "The inversion of a a property of another role in the same context should run \
+                        \from that property to the role to the context" (not $ null paths)
+                        assert "The domain of the inversion should be Prop2."
+                          (isJust $ find (\path -> case path of
+                            (BQD (VDOM PBool (Just (ENP (EnumeratedPropertyType "model:Test$TestCase1$SubCase$AnotherRole$Prop2")))) _ _ _ _ _ _) -> true
+                            otherwise -> false) paths)
+                        assert "The first term of the composition should be Value2Role"
+                          (isJust $ find (\path -> case path of
+                            (BQD _ (BinaryCombinator ComposeF) (SQD _ (Value2Role _) _ _ _) _ _ _ _) -> true
+                            otherwise -> false) paths)
+                        assert "The third term of the composition should be external"
+                          (isJust $ find (\path -> case path of
+                            (BQD _ _ _ (BQD _ _ _ (BQD _ _ (SQD _ (DataTypeGetter ExternalRoleF) _ _ _ ) _ _ _ _ ) _ _ _) _ _ _) -> true
+                            otherwise -> false) paths)
 
   test "A filter expression should yield five inverse queries." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  case TestCase1\n    thing ARole\n      property Prop1 = filter context >> AnotherRole with Prop2 >> Prop3\n    thing AnotherRole\n      property Prop2 (mandatory, Boolean)\n      property Prop3 (mandatory, Boolean)\n" ARC.domain
@@ -181,24 +182,24 @@ theSuite = suite "Test.Query.Inversion" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{calculatedProperties}) -> do
-                -- logShow correctedDFR
-                case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
-                  Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
-                  (Just (CalculatedProperty{calculation})) -> case calculation of
-                    S _ -> assert "The calculation should have been compiled!" false
-                    Q c -> do
-                      -- log (prettyPrint c)
-                      paths <- invertFD c
-                      -- log $ intercalate "\n" (prettyPrint <$> paths)
-                      assert "The inversion of an expression with a filter should yield two inverse queries" (length paths == 5)
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert (show e) false
+                (Right correctedDFR@{calculatedProperties}) -> do
+                  -- logShow correctedDFR
+                  case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
+                    Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
+                    (Just (CalculatedProperty{calculation})) -> case calculation of
+                      S _ -> assert "The calculation should have been compiled!" false
+                      Q c -> do
+                        -- log (prettyPrint c)
+                        paths <- invertFD c
+                        -- log $ intercalate "\n" (prettyPrint <$> paths)
+                        assert "The inversion of an expression with a filter should yield two inverse queries" (length paths == 5)
 
   -- test "Invert a rule condition" (runP do
   --     modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory

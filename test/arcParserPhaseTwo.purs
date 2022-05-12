@@ -144,16 +144,16 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            assert "There should be an external role."
-              (isJust (lookup "model:MyTestDomain$MyCase$External" dr'.enumeratedRoles))
-            assert "The External Role of MyCase should have a property MyProp"
-              case (lookup "model:MyTestDomain$MyCase$External" dr'.enumeratedRoles) of
-                Nothing -> false
-                (Just (EnumeratedRole{properties})) -> isJust (elemIndex (ENP $ EnumeratedPropertyType "model:MyTestDomain$MyCase$External$MyProp") properties)
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              assert "There should be an external role."
+                (isJust (lookup "model:MyTestDomain$MyCase$External" dr'.enumeratedRoles))
+              assert "The External Role of MyCase should have a property MyProp"
+                case (lookup "model:MyTestDomain$MyCase$External" dr'.enumeratedRoles) of
+                  Nothing -> false
+                  (Just (EnumeratedRole{properties})) -> isJust (elemIndex (ENP $ EnumeratedPropertyType "model:MyTestDomain$MyCase$External$MyProp") properties)
 
   -- test "A role with a view" do
   --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext\n      View : View : MyView\n        PropertyRef : MyProp" domain
@@ -195,15 +195,15 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            assert "The DomeinFile should have the role 'model:Test$MyRole' with\
-            \ attribute 'functional' equal to true and 'mandatory' false"
-              case (lookup "model:Test$MyRole" dr'.enumeratedRoles) of
-                Nothing -> false
-                (Just (EnumeratedRole {functional, mandatory})) -> functional == true && mandatory == false
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              assert "The DomeinFile should have the role 'model:Test$MyRole' with\
+              \ attribute 'functional' equal to true and 'mandatory' false"
+                case (lookup "model:Test$MyRole" dr'.enumeratedRoles) of
+                  Nothing -> false
+                  (Just (EnumeratedRole {functional, mandatory})) -> functional == true && mandatory == false
 
   -- test "A role with binding" do
   --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    FilledBy : model:MyTestDomain$MyOtherRole" domain
@@ -227,15 +227,15 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            assert "The DomeinFile should have the role 'model:MyTestDomain$MyUser' that is\
-            \ filled with 'ST EnumeratedRoleType model:System$PerspectivesSystem$User'"
-              case (lookup "model:MyTestDomain$MyUser" dr'.enumeratedRoles) of
-                Nothing -> false
-                (Just (EnumeratedRole {binding})) -> binding == (ST $ RoleInContext {context: ContextType "model:System$PerspectivesSystem", role: EnumeratedRoleType "model:System$PerspectivesSystem$User"})
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              assert "The DomeinFile should have the role 'model:MyTestDomain$MyUser' that is\
+              \ filled with 'ST EnumeratedRoleType model:System$PerspectivesSystem$User'"
+                case (lookup "model:MyTestDomain$MyUser" dr'.enumeratedRoles) of
+                  Nothing -> false
+                  (Just (EnumeratedRole {binding})) -> binding == (ST $ RoleInContext {context: ContextType "model:System$PerspectivesSystem", role: EnumeratedRoleType "model:System$PerspectivesSystem$User"})
 
   -- test "Role has context" do
   --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    FilledBy : model:MyTestDomain$MyOtherRole" domain
@@ -305,15 +305,15 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt) -> do
         -- log "Entering phase two"
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr)) -> do
-            ensureEnumeratedProperty "model:MyTestDomain$MyRoleInContext$MyProp" dr >>= all
-              [ (enumeratedPropertyIsFunctional true)
-              , (enumeratedPropertyIsMandatory false)
-              , (enumeratedPropertyHasRange PString)]
-            ensureERole "model:MyTestDomain$MyRoleInContext" dr >>=
-              ensureEnumeratedRoleHasProperty "model:MyTestDomain$MyRoleInContext$MyProp" >>= exists
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr)) -> do
+              ensureEnumeratedProperty "model:MyTestDomain$MyRoleInContext$MyProp" dr >>= all
+                [ (enumeratedPropertyIsFunctional true)
+                , (enumeratedPropertyIsMandatory false)
+                , (enumeratedPropertyHasRange PString)]
+              ensureERole "model:MyTestDomain$MyRoleInContext" dr >>=
+                ensureEnumeratedRoleHasProperty "model:MyTestDomain$MyRoleInContext$MyProp" >>= exists
 
   -- test "A role with a CalculatedProperty" do
   --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    Property : StringProperty : MyProp\n      Calculation : Prop1 + Prop2" domain
@@ -349,11 +349,11 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right dom) -> do
         -- logShow dom
         evalPhaseTwo (traverseDomain dom "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            assert ("The file '" <> fileName <> "' does not parse") true
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              assert ("The file '" <> fileName <> "' does not parse") true
 
   -- test "An Agent role for a Bot without a ForUser clause" do
   --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot" domain
@@ -487,9 +487,9 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   test "withNamespaces" do
     evalPhaseTwo (unsafePartial $ withNamespaces (Cons (PREFIX "sys" "model:System$System") Nil)
         (expandNamespace "sys:User")) >>=
-    case _ of
-      (Right eu) -> assert "The expansion of 'sys:User' should be 'model:System$System$User'" (eu == "model:System$System$User")
-      (Left e) -> assert (show e) false
+      case _ of
+        (Right eu) -> assert "The expansion of 'sys:User' should be 'model:System$System$User'" (eu == "model:System$System$User")
+        (Left e) -> assert (show e) false
 
   test "Context with Aspect" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  aspect model:MyAspectModel$MyAspect" ARC.domain
@@ -498,16 +498,16 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            assert "The domain 'model:Feest' should have an aspect 'model:MyAspectModel$MyAspect'."
-              (isJust (lookup "model:Feest" dr'.contexts))
-            case (lookup "model:Feest" dr'.contexts) of
-              Nothing -> assert "Cannot find the domain" false
-              (Just (Context{contextAspects})) -> assert "The domain 'model:Feest' should have an aspect 'model:MyAspectModel$MyAspect'."
-                (isJust (elemIndex (ContextType "model:MyAspectModel$MyAspect") contextAspects))
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              assert "The domain 'model:Feest' should have an aspect 'model:MyAspectModel$MyAspect'."
+                (isJust (lookup "model:Feest" dr'.contexts))
+              case (lookup "model:Feest" dr'.contexts) of
+                Nothing -> assert "Cannot find the domain" false
+                (Just (Context{contextAspects})) -> assert "The domain 'model:Feest' should have an aspect 'model:MyAspectModel$MyAspect'."
+                  (isJust (elemIndex (ContextType "model:MyAspectModel$MyAspect") contextAspects))
 
   test "Test well-formedness of a ContextAspect name" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  aspect MyAspectModel$MyAspect" ARC.domain
@@ -516,9 +516,9 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left (NotWellFormedName pos _)) -> assert "The position in the error message should be" (pos == ArcPosition {line: 2, column: 11})
-          otherwise -> assert "The name of the aspect is not well-formed and that should be detected." false
+          case _ of
+            (Left (NotWellFormedName pos _)) -> assert "The position in the error message should be" (pos == ArcPosition {line: 2, column: 11})
+            otherwise -> assert "The name of the aspect is not well-formed and that should be detected." false
 
   test "Role with Aspect" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  thing Wens (mandatory)\n    aspect model:MyAspectModel$MyAspect$MyAspectRole" ARC.domain
@@ -527,14 +527,14 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            case lookup "model:Feest$Wens" dr'.enumeratedRoles of
-              Nothing -> assert "Cannot find the role 'model:Feest$Wens'" false
-              (Just (EnumeratedRole{roleAspects})) -> assert "The role 'model:Feest$Wens' should have an aspect 'model:MyAspectModel$MyAspect$MyAspectRole'."
-                (isJust (elemIndex (RoleInContext{context: ContextType "model:MyAspectModel$MyAspect$MyAspectRole", role: (EnumeratedRoleType "model:MyAspectModel$MyAspect$MyAspectRole")}) roleAspects))
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              case lookup "model:Feest$Wens" dr'.enumeratedRoles of
+                Nothing -> assert "Cannot find the role 'model:Feest$Wens'" false
+                (Just (EnumeratedRole{roleAspects})) -> assert "The role 'model:Feest$Wens' should have an aspect 'model:MyAspectModel$MyAspect$MyAspectRole'."
+                  (isJust (elemIndex (RoleInContext{context: ContextType "model:MyAspectModel$MyAspect$MyAspectRole", role: (EnumeratedRoleType "model:MyAspectModel$MyAspect$MyAspectRole")}) roleAspects))
 
   test "Role with binding to Context" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Feest\n  context Uitje (mandatory) filledBy Speeltuin" ARC.domain
@@ -543,7 +543,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
+          case _ of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr'@{enumeratedRoles})) -> do
             -- logShow dr'
@@ -559,11 +559,11 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr'@{enumeratedRoles})) -> do
-            ensureState "model:Test$Party$SomeState" dr' >>=
-              exists
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr'@{enumeratedRoles})) -> do
+              ensureState "model:Test$Party$SomeState" dr' >>=
+                exists
 
   -- test "Action with Condition" do
   --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory)\n    perspective on: Party\n      Consult with ViewOnGuest\n        subjectView: AnotherView\n        if Prop1 > 10" ARC.domain
@@ -634,15 +634,15 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         evalPhaseTwo (traverseDomain ctxt "model:") >>=
-        case _ of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            assert "The property 'NumberOfGuests' should have a calculation"
-              case lookup "model:Test$Guest$NumberOfGuests" dr'.calculatedProperties of
-                (Just (CalculatedProperty {calculation})) -> case calculation of
-                  (S (Binary (BinaryStep{operator}))) -> case operator of
-                    Sequence _ -> true
+          case _ of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              assert "The property 'NumberOfGuests' should have a calculation"
+                case lookup "model:Test$Guest$NumberOfGuests" dr'.calculatedProperties of
+                  (Just (CalculatedProperty {calculation})) -> case calculation of
+                    (S (Binary (BinaryStep{operator}))) -> case operator of
+                      Sequence _ -> true
+                      _ -> false
                     _ -> false
                   _ -> false
-                _ -> false

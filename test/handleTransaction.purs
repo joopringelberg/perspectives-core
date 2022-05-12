@@ -13,7 +13,6 @@ import Effect.Aff (Milliseconds(..), delay, forkAff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log, logShow)
-import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (PerspectivesState, (##=), (##>), (##>>))
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getEnumeratedRoleInstances, getFilledRoles)
 import Perspectives.LoadCRL.FS (loadAndSaveCrlFile)
@@ -95,7 +94,7 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
     (channelId :: Maybe (Maybe String)) <- runPCor $ withSystem $ withCouchdbUrl \url -> do
       (channelA :: Array ContextInstance) <- runMonadPerspectivesTransaction do
         channel <- createChannel url
-        void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+        void $ lift $ loadAndSaveCrlFile "userJoop.crl" testDirectory
         addPartnerToChannel (RoleInstance "model:User$joop$User") channel
         -- setYourAddress "http://127.0.0.1" 5984 channel
         -- We now have a channel with two partners.

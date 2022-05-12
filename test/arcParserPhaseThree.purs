@@ -5,6 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Array (elemIndex, filter, head, length)
 import Data.Either (Either(..))
+import Data.List (List(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
@@ -63,19 +64,19 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr)) -> do
-            (runP $ phaseThree dr state.postponedStateQualifiedParts) >>=
-              case _ of
-                (Left e) -> assert (show e) false
-                (Right dr') -> do
-                  -- logShow dr'
-                  ensureCRole "model:MyTestDomain$AnotherRole" dr' >>= exists
-                  ensureERole "model:MyTestDomain$SomeUser" dr' >>=
-                    ensurePerspectiveOn "model:MyTestDomain$YetAnotherRole" >>=
-                      objectOfPerspective >>=
-                        isCalculationOf (RDOM (ST $ RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")}))
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr)) -> do
+              (runP $ phaseThree dr state.postponedStateQualifiedParts Nil) >>=
+                case _ of
+                  (Left e) -> assert (show e) false
+                  (Right dr') -> do
+                    -- logShow dr'
+                    ensureCRole "model:MyTestDomain$AnotherRole" dr' >>= exists
+                    ensureERole "model:MyTestDomain$SomeUser" dr' >>=
+                      ensurePerspectiveOn "model:MyTestDomain$YetAnotherRole" >>=
+                        objectOfPerspective >>=
+                          isCalculationOf (RDOM (ST $ RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")}))
 
   test "Testing qualifyActionRoles: External." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  user Driver\n    perspective on External\n      all roleverbs" ARC.domain
@@ -84,18 +85,18 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
-            case _ of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR) -> do
-                -- logShow correctedDFR
-                ensureERole "model:MyTestDomain$Driver" correctedDFR >>=
-                  ensurePerspectiveOn "model:MyTestDomain$External" >>=
-                    exists
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
+                case _ of
+                  (Left e) -> assert (show e) false
+                  (Right correctedDFR) -> do
+                    -- logShow correctedDFR
+                    ensureERole "model:MyTestDomain$Driver" correctedDFR >>=
+                      ensurePerspectiveOn "model:MyTestDomain$External" >>=
+                        exists
 
 
   test "Testing qualifyActionRoles: ContextHasNoRole." do
@@ -105,16 +106,16 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
-            case _ of
-              (Left (ContextHasNoRole _ _)) -> assert "" true
-              otherwise -> do
-                logShow otherwise
-                assert "Expected the 'ContextHasNoRole' error" false
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
+                case _ of
+                  (Left (ContextHasNoRole _ _)) -> assert "" true
+                  otherwise -> do
+                    logShow otherwise
+                    assert "Expected the 'ContextHasNoRole' error" false
 
   test "Testing qualifyBindings: correct reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Binder (mandatory) filledBy Bound\n  thing Bound (mandatory)" ARC.domain
@@ -123,20 +124,20 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
-            case _ of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{enumeratedRoles}) -> do
-                -- logShow correctedDFR
-                case lookup "model:MyTestDomain$Binder" enumeratedRoles of
-                  Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
-                  (Just (EnumeratedRole{binding})) -> assert
-                    "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                    (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
+                case _ of
+                  (Left e) -> assert (show e) false
+                  (Right correctedDFR@{enumeratedRoles}) -> do
+                    -- logShow correctedDFR
+                    case lookup "model:MyTestDomain$Binder" enumeratedRoles of
+                      Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
+                      (Just (EnumeratedRole{binding})) -> assert
+                        "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
+                        (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
 
   test "Testing qualifyBindings: qualified reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Binder (mandatory) filledBy model:MyTestDomain$Bound\n  thing Bound (mandatory)" ARC.domain
@@ -145,20 +146,20 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
-            case _ of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{enumeratedRoles}) -> do
-                -- logShow correctedDFR
-                case lookup "model:MyTestDomain$Binder" enumeratedRoles of
-                  Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
-                  (Just (EnumeratedRole{binding})) -> assert
-                    "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                    (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
+                case _ of
+                  (Left e) -> assert (show e) false
+                  (Right correctedDFR@{enumeratedRoles}) -> do
+                    -- logShow correctedDFR
+                    case lookup "model:MyTestDomain$Binder" enumeratedRoles of
+                      Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
+                      (Just (EnumeratedRole{binding})) -> assert
+                        "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
+                        (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
 
   test "Testing qualifyBindings: prefixed reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  use my for model:MyTestDomain\n  thing Binder (mandatory) filledBy my:Bound\n  thing Bound (mandatory)" ARC.domain
@@ -167,20 +168,20 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
-            case _ of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{enumeratedRoles}) -> do
-                -- logShow correctedDFR
-                case lookup "model:MyTestDomain$Binder" enumeratedRoles of
-                  Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
-                  (Just (EnumeratedRole{binding})) -> assert
-                    "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                    (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
+                case _ of
+                  (Left e) -> assert (show e) false
+                  (Right correctedDFR@{enumeratedRoles}) -> do
+                    -- logShow correctedDFR
+                    case lookup "model:MyTestDomain$Binder" enumeratedRoles of
+                      Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
+                      (Just (EnumeratedRole{binding})) -> assert
+                        "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
+                        (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
 
   test "Testing qualifyBindings: missing reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Binder (mandatory) filledBy Bount\n  thing Bound (mandatory)" ARC.domain
@@ -189,15 +190,15 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
-            case _ of
-              (Left (UnknownRole _ _)) -> assert "" true
-              otherwise -> do
-                assert "The binding of 'Binder' is not defined and that should have been detected." false
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
+                case _ of
+                  (Left (UnknownRole _ _)) -> assert "" true
+                  otherwise -> do
+                    assert "The binding of 'Binder' is not defined and that should have been detected." false
 
   test "Testing qualifyBindings: two candidates for binding." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Binder (mandatory) filledBy Bound\n  thing Bound (mandatory)\n  case Nested\n    thing Bound (mandatory)" ARC.domain
@@ -206,18 +207,18 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
-            -- logShow x'
-            case _ of
-              (Left e@(NotUniquelyIdentifying _ _ _)) -> do
-                -- logShow e
-                assert "" true
-              otherwise -> do
-                assert "The binding of 'Binder' is not defined and that should have been detected." false
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
+              -- logShow x'
+                case _ of
+                  (Left e@(NotUniquelyIdentifying _ _ _)) -> do
+                    -- logShow e
+                    assert "" true
+                  otherwise -> do
+                    assert "The binding of 'Binder' is not defined and that should have been detected." false
 
   test "Testing qualifyPropertyReferences: correct reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Feest (mandatory)\n    property Datum (mandatory, DateTime)\n    view ViewOpFeest (Datum)\n" ARC.domain
@@ -226,22 +227,22 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            (runP $ phaseThree dr' state.postponedStateQualifiedParts) >>=
-            case _ of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{views}) -> do
-                -- logShow correctedDFR
-                case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
-                  Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
-                  (Just (View{propertyReferences})) -> case head (filter (\pref -> propertytype2string pref == "model:MyTestDomain$Feest$Datum") propertyReferences) of
-                    (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$Feest$Datum"))) -> assert "" true
-                    otherwise -> assert "There should be a Property 'model:MyTestDomain$Feest$Datum' in ViewOpFeest" false
-                ensureEnumeratedProperty "model:MyTestDomain$Feest$Datum" correctedDFR >>=
-                  enumeratedPropertyIsFunctional true
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
+                case _ of
+                  (Left e) -> assert (show e) false
+                  (Right correctedDFR@{views}) -> do
+                    -- logShow correctedDFR
+                    case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
+                      Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
+                      (Just (View{propertyReferences})) -> case head (filter (\pref -> propertytype2string pref == "model:MyTestDomain$Feest$Datum") propertyReferences) of
+                        (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$Feest$Datum"))) -> assert "" true
+                        otherwise -> assert "There should be a Property 'model:MyTestDomain$Feest$Datum' in ViewOpFeest" false
+                    ensureEnumeratedProperty "model:MyTestDomain$Feest$Datum" correctedDFR >>=
+                      enumeratedPropertyIsFunctional true
 
 
   test "Testing qualifyPropertyReferences: incorrect reference." do
@@ -251,14 +252,14 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left (UnknownProperty _ _ _)) -> assert "" true
-              otherwise -> assert "The view refers to a non-existing property 'Datu' and that should be detected." false
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left (UnknownProperty _ _ _)) -> assert "" true
+                otherwise -> assert "The view refers to a non-existing property 'Datu' and that should be detected." false
 
   test "Testing qualifyPropertyReferences: reference to property on binding." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Feest (mandatory) filledBy FeestVoorbereiding\n    view ViewOpFeest (Datum)\n  thing FeestVoorbereiding (mandatory)\n    property Datum (mandatory, DateTime)\n" ARC.domain
@@ -267,37 +268,37 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{views}) -> do
-                -- logShow correctedDFR
-                -- Get the references from the view
-                case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
-                  Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
-                  (Just (View{propertyReferences})) -> case elemIndex (ENP $ EnumeratedPropertyType "Datum") propertyReferences of
-                    Nothing -> assert "There should be an unqualified PropertyType 'Datum' in 'model:MyTestDomain$Feest$ViewOpFeest'" true
-                    (Just pr) -> do
-                      candidates <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) ((ENR $ EnumeratedRoleType "model:MyTestDomain$Feest") ###= (lookForUnqualifiedPropertyType_ "Datum"))
-                      case head candidates of
-                        Nothing -> assert "We should be able to find the qualified version of 'Datum'" false
-                        (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum")))  | length candidates == 1 -> assert "" true
-                        otherwise -> assert "There is only one property with local name 'Datum' defined but we've found more?!" false
-                      xx <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) (allProperties (ST (EnumeratedRoleType "model:MyTestDomain$Feest")))
-                      case head xx of
-                        Nothing -> assert "geen properties" false
-                        (Just p) | length xx == 1 -> assert "The properties of 'model:MyTestDomain$Feest' should include 'model:MyTestDomain$FeestVoorbereiding$Datum'" (p == ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))
-                        otherwise -> assert "There is only one property defined for 'Feest'" false
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert (show e) false
+                (Right correctedDFR@{views}) -> do
+                  -- logShow correctedDFR
+                  -- Get the references from the view
+                  case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
+                    Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
+                    (Just (View{propertyReferences})) -> case elemIndex (ENP $ EnumeratedPropertyType "Datum") propertyReferences of
+                      Nothing -> assert "There should be an unqualified PropertyType 'Datum' in 'model:MyTestDomain$Feest$ViewOpFeest'" true
+                      (Just pr) -> do
+                        candidates <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) ((ENR $ EnumeratedRoleType "model:MyTestDomain$Feest") ###= (lookForUnqualifiedPropertyType_ "Datum"))
+                        case head candidates of
+                          Nothing -> assert "We should be able to find the qualified version of 'Datum'" false
+                          (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum")))  | length candidates == 1 -> assert "" true
+                          otherwise -> assert "There is only one property with local name 'Datum' defined but we've found more?!" false
+                        xx <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) (allProperties (ST (EnumeratedRoleType "model:MyTestDomain$Feest")))
+                        case head xx of
+                          Nothing -> assert "geen properties" false
+                          (Just p) | length xx == 1 -> assert "The properties of 'model:MyTestDomain$Feest' should include 'model:MyTestDomain$FeestVoorbereiding$Datum'" (p == ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))
+                          otherwise -> assert "There is only one property defined for 'Feest'" false
 
-                case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
-                  Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
-                  (Just (View{propertyReferences})) -> case head (filter (\pref -> propertytype2string pref == "model:MyTestDomain$FeestVoorbereiding$Datum") propertyReferences) of
-                    (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))) -> assert "" true
-                    otherwise -> assert "There should be a Property 'model:MyTestDomain$FeestVoorbereiding$Datum' in ViewOpFeest" false
+                  case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
+                    Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
+                    (Just (View{propertyReferences})) -> case head (filter (\pref -> propertytype2string pref == "model:MyTestDomain$FeestVoorbereiding$Datum") propertyReferences) of
+                      (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))) -> assert "" true
+                      otherwise -> assert "There should be a Property 'model:MyTestDomain$FeestVoorbereiding$Datum' in ViewOpFeest" false
 
   test "Testing qualifyViewReferences: reference to View on Action." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Feest (mandatory) filledBy FeestVoorbereiding\n    property BigParty = context >> Guest >>= count > 10\n    view ViewOpFeest (Datum, BigParty)\n  thing FeestVoorbereiding (mandatory)\n    property Datum (mandatory, DateTime)\n  user Guest (mandatory)\n    perspective on Feest\n      view ViewOpFeest (Consult)" ARC.domain
@@ -306,18 +307,18 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              Right dfr ->
-                ensureERole "model:MyTestDomain$Guest" dfr >>=
-                  ensurePerspectiveOn "model:MyTestDomain$Feest" >>=
-                    ensurePropertyVerbsInState (SubjectState $ StateIdentifier "model:MyTestDomain$Guest") >>=
-                      Universal `haveVerbs` [Consult]
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert (show e) false
+                Right dfr ->
+                  ensureERole "model:MyTestDomain$Guest" dfr >>=
+                    ensurePerspectiveOn "model:MyTestDomain$Feest" >>=
+                      ensurePropertyVerbsInState (SubjectState $ StateIdentifier "model:MyTestDomain$Guest") >>=
+                        Universal `haveVerbs` [Consult]
 
 
   test "Testing qualifyPropertyReferences: reference to a Calculated Property." do
@@ -327,21 +328,21 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR@{views}) -> do
-                -- logShow correctedDFR
-                -- get the action
-                case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
-                  Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'." false
-                  (Just (View{propertyReferences})) -> case elemIndex (CP (CalculatedPropertyType "model:MyTestDomain$Feest$BigParty")) propertyReferences of
-                    Nothing -> assert "There should be a CalculatedProperty 'BigParty' in the View 'ViewOpFeest'" false
-                    otherwise -> assert "" true
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert (show e) false
+                (Right correctedDFR@{views}) -> do
+                  -- logShow correctedDFR
+                  -- get the action
+                  case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
+                    Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'." false
+                    (Just (View{propertyReferences})) -> case elemIndex (CP (CalculatedPropertyType "model:MyTestDomain$Feest$BigParty")) propertyReferences of
+                      Nothing -> assert "There should be a CalculatedProperty 'BigParty' in the View 'ViewOpFeest'" false
+                      otherwise -> assert "" true
 
   test "A Context with a Computed Role." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing MyRole = callExternal cdb:Models() returns Modellen\n  case SubContext\n    thing Modellen (mandatory)\n" ARC.domain
@@ -350,27 +351,27 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert ("PhaseTwo error:" <> show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert ("PhaseThree error:" <> show e) false
-              (Right correctedDFR@{calculatedRoles}) -> do
-                -- logShow correctedDFR
-                case lookup "model:MyTestDomain$MyRole" calculatedRoles of
-                  Nothing -> assert "There should be a role 'MyRole'" false
-                  Just (CalculatedRole{calculation}) ->
-                  case calculation of
-                    Q c -> do
-                      assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$SubContext$Modellen))' as its Range"
-                        (range c == (RDOM (ST $ RoleInContext {context: (ContextType "model:MyTestDomain$SubContext"), role: (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen")})))
-                      assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter model:Couchdb$Models)'"
-                        case queryFunction c of
-                          (ExternalCoreRoleGetter "model:Couchdb$Models") -> true
-                          otherwise -> false
-                    otherwise -> assert "calculation is not compiled" false
+          case r of
+            (Left e) -> assert ("PhaseTwo error:" <> show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert ("PhaseThree error:" <> show e) false
+                (Right correctedDFR@{calculatedRoles}) -> do
+                  -- logShow correctedDFR
+                  case lookup "model:MyTestDomain$MyRole" calculatedRoles of
+                    Nothing -> assert "There should be a role 'MyRole'" false
+                    Just (CalculatedRole{calculation}) ->
+                      case calculation of
+                        Q c -> do
+                          assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$SubContext$Modellen))' as its Range"
+                            (range c == (RDOM (ST $ RoleInContext {context: (ContextType "model:MyTestDomain$SubContext"), role: (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen")})))
+                          assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter model:Couchdb$Models)'"
+                            case queryFunction c of
+                              (ExternalCoreRoleGetter "model:Couchdb$Models") -> true
+                              otherwise -> false
+                        otherwise -> assert "calculation is not compiled" false
 
 
   test "Perspective in state" do
@@ -380,19 +381,19 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              (Left e) -> assert (show e) false
-              (Right correctedDFR) -> do
-                -- logShow correctedDFR
-                ensureERole "model:Test$Gast" correctedDFR >>=
-                  ensurePerspectiveOn "model:Test$Party" >>=
-                    ensurePropertyVerbsInState (ObjectState $ StateIdentifier "model:Test$Party$LateParty") >>=
-                      exists
+          case r of
+            (Left e) -> assert (show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                (Left e) -> assert (show e) false
+                (Right correctedDFR) -> do
+                  -- logShow correctedDFR
+                  ensureERole "model:Test$Gast" correctedDFR >>=
+                    ensurePerspectiveOn "model:Test$Party" >>=
+                      ensurePropertyVerbsInState (ObjectState $ StateIdentifier "model:Test$Party$LateParty") >>=
+                        exists
 
   test "Automatic effect on entry (two assignments)" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory)\n    property Prop2 (mandatory, Number)\n  thing Party (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do for Gast\n          Prop2 = 10 for Gast\n" ARC.domain
@@ -401,24 +402,24 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert ("PhaseTwo error:" <> show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              Left e -> assert ("PhaseThree error:" <> show e) false
-              Right correctedDFR -> do
-                -- logShow correctedDFR
-                ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
-                  enumeratedPropertyIsFunctional true
-                ensureState "model:Test$Party$SomeState" correctedDFR >>=
-                  stateQuery >>=
-                    ensureDescription >>=
-                      \qfd -> do
-                        case queryFunction qfd of
-                          (BinaryCombinator GreaterThanF) -> pure unit
-                          _ -> failure "The condition should have operator '>'"
+          case r of
+            (Left e) -> assert ("PhaseTwo error:" <> show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                Left e -> assert ("PhaseThree error:" <> show e) false
+                Right correctedDFR -> do
+                  -- logShow correctedDFR
+                  ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
+                    enumeratedPropertyIsFunctional true
+                  ensureState "model:Test$Party$SomeState" correctedDFR >>=
+                    stateQuery >>=
+                      ensureDescription >>=
+                        \qfd -> do
+                          case queryFunction qfd of
+                            (BinaryCombinator GreaterThanF) -> pure unit
+                            _ -> failure "The condition should have operator '>'"
 
   test "Automatic effect on entry (delete property)" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory)\n    property Prop2 (mandatory, Number)\n  thing Party (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do for Gast\n          delete property Prop2 from Gast\n" ARC.domain
@@ -427,24 +428,24 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert ("PhaseTwo error:" <> show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              Left e -> assert ("PhaseThree error:" <> show e) false
-              Right correctedDFR -> do
-                -- logShow correctedDFR
-                ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
-                  enumeratedPropertyIsFunctional true
-                ensureState "model:Test$Party$SomeState" correctedDFR >>=
-                  stateQuery >>=
-                    ensureDescription >>=
-                      \qfd -> do
-                        case queryFunction qfd of
-                          (BinaryCombinator GreaterThanF) -> pure unit
-                          _ -> failure "The condition should have operator '>'"
+          case r of
+            (Left e) -> assert ("PhaseTwo error:" <> show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                Left e -> assert ("PhaseThree error:" <> show e) false
+                Right correctedDFR -> do
+                  -- logShow correctedDFR
+                  ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
+                    enumeratedPropertyIsFunctional true
+                  ensureState "model:Test$Party$SomeState" correctedDFR >>=
+                    stateQuery >>=
+                      ensureDescription >>=
+                        \qfd -> do
+                          case queryFunction qfd of
+                            (BinaryCombinator GreaterThanF) -> pure unit
+                            _ -> failure "The condition should have operator '>'"
 
   test "Automatic effect on entry (use of object state)" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory)\n    property Prop2 (mandatory, Number)\n    perspective on Party\n      on entry of object state SomeState\n        do\n          Prop1 = 10\n  thing Party (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10" ARC.domain
@@ -453,25 +454,25 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
-        case r of
-          (Left e) -> assert ("PhaseTwo error:" <> show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
-            case x' of
-              Left e -> assert ("PhaseThree error:" <> show e) false
-              Right correctedDFR -> do
-                -- logShow correctedDFR
-                ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
-                  enumeratedPropertyIsFunctional true
-                ensureState "model:Test$Party$SomeState" correctedDFR >>=
-                  stateQuery >>=
-                    ensureDescription >>=
-                      \qfd -> do
-                        -- logShow qfd
-                        case queryFunction qfd of
-                          (BinaryCombinator GreaterThanF) -> pure unit
-                          _ -> failure "The condition should have operator '>'"
+          case r of
+            (Left e) -> assert ("PhaseTwo error:" <> show e) false
+            (Right (DomeinFile dr')) -> do
+              -- logShow dr'
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
+              case x' of
+                Left e -> assert ("PhaseThree error:" <> show e) false
+                Right correctedDFR -> do
+                  -- logShow correctedDFR
+                  ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
+                    enumeratedPropertyIsFunctional true
+                  ensureState "model:Test$Party$SomeState" correctedDFR >>=
+                    stateQuery >>=
+                      ensureDescription >>=
+                        \qfd -> do
+                          -- logShow qfd
+                          case queryFunction qfd of
+                            (BinaryCombinator GreaterThanF) -> pure unit
+                            _ -> failure "The condition should have operator '>'"
 
   test "Bot Action with move" do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain Test\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry \n        do for Gast\n          move C1 >> binding >> context >> Employee to C2 >> binding >> context\n  context C1 filledBy Company\n  context C2 filledBy Company\n  party Company\n    user Employee\n" ARC.domain
@@ -484,7 +485,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
               -- logShow dr'
-              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 Left e -> assert ("PhaseThree error:" <> show e) false
                 Right correctedDFR -> do
@@ -515,7 +516,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
               -- logShow dr'
-              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+              x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 Left e -> assert ("PhaseThree error:" <> show e) false
                 Right correctedDFR ->
@@ -844,7 +845,7 @@ expectErrorX theTest testName modelText resultTester = do
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
               -- logShow dr'
-              x <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+              x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               resultTester x
 
 type DomainTester = (DomeinFileRecord -> Aff Unit)
@@ -871,7 +872,7 @@ fileTestOnly testName fileName =
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
               -- logShow dr'
-              x <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+              x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x of
                 Left e -> assert ("PhaseThree error:" <> show e) false
                 Right correctedDFR -> assert "OK" true
@@ -893,7 +894,7 @@ domainTestX theTest testName modelText domainTester = theTest testName do
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
               -- logShow dr'
-              x <- runP $ phaseThree dr' state.postponedStateQualifiedParts
+              x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x of
                 Left e -> assert ("PhaseThree error:" <> show e) false
                 Right correctedDFR -> domainTester correctedDFR
