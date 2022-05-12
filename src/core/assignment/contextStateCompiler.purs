@@ -35,13 +35,14 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, foldMap, null)
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Map (Map)
+import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (ala, alaF, over, unwrap)
 import Data.Traversable (for_, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Aff (error, killFiber)
 import Effect.Class.Console (log)
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
@@ -252,6 +253,13 @@ exitingState contextId stateId = do
   -- Add the state identifier to the path of states in the context instance, triggering query updates
   -- just before running the current Transaction is finished.
   setInActiveContextState stateId contextId
+  
+  -- Stop all repeating processes associated with this state.
+  fibers <- lift $ gets _.transactionFibers
+  case lookup (Tuple (unwrap contextId) stateId) fibers of
+    Nothing -> pure unit
+    Just f -> lift $ lift $ killFiber (error "Stopped execution of repeating action in state") f
+
   {automaticOnExit, notifyOnExit} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction, but only if
   -- the end user fills the allowedUser role in this context.
