@@ -166,6 +166,7 @@ withFrame computation = do
 -- | Cumulates referredModels in PhaseTwoState, too.
 withNamespaces :: forall a. List ContextPart -> PhaseTwo a -> PhaseTwo a
 withNamespaces pairs pt = do
+  -- x is an Object of all models declared with a 'use' statement. All models are qualified, by construction.
   x <- pure $ OBJ.fromFoldable $ map
     (unsafePartial \(PREFIX pre mod) -> Tuple pre mod)
     (filter (case _ of

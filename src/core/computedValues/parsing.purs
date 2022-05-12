@@ -44,7 +44,8 @@ import Perspectives.LoadCRL (loadAndCacheCrlFile')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.RunMonadPerspectivesTransaction (runEmbeddedTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_, loadArcAndCrl')
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -55,7 +56,7 @@ parseAndCompileArc arcSource_ _ = case head arcSource_ of
   Just arcSource -> catchError
     do
       lift $ lift $ resetWarnings
-      r <- lift $ lift $ loadAndCompileArcFile_ arcSource
+      r <- lift $ lift $ runEmbeddedTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (loadAndCompileArcFile_ arcSource)
       case r of
         Left errs -> ArrayT $ pure (Value <<< show <$> errs)
         -- Als er meldingen zijn, geef die dan terug.
@@ -90,7 +91,7 @@ uploadToRepository ::
   Array RoleInstance -> MonadPerspectivesTransaction Unit
 uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crlSource_, head url_ of
   Just arcSource, Just crlSource, Just url -> do
-    r <- lift $ loadArcAndCrl' arcSource crlSource
+    r <- loadArcAndCrl' arcSource crlSource
     case r of
       Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
       Right df@(DomeinFile drf@{_id}) -> do

@@ -56,8 +56,8 @@ import Perspectives.Persistence.API (documentsInDatabase, includeDocs)
 import Perspectives.Persistence.Types (Url, PouchdbUser, decodePouchdbUser')
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.PerspectivesState (newPerspectivesState)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..), DomeinFileId(..))
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.TypePersistence.LoadArc (loadArcAndCrl')
 import Simple.JSON (class ReadForeign, read, read')
@@ -111,7 +111,7 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
       do
         log ("Recompiling " <> _id)
         -- TODO. We moeten de inverse queries verwerken in de andere modellen!
-        r <- lift $ loadArcAndCrl' contents.arc contents.crl
+        r <- lift $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (loadArcAndCrl' contents.arc contents.crl)
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
           Right df@(DomeinFile drf@{invertedQueriesInOtherDomains}) -> lift do

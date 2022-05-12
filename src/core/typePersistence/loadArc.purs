@@ -26,14 +26,15 @@ import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (delete, filterA, findIndex, head)
 import Data.Either (Either(..))
-import Data.Foldable (foldl)
-import Data.List(List(..))
+import Data.Foldable (foldl, for_)
+import Data.List (List(..))
 import Data.Maybe (Maybe(..), isJust)
+import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, keys, lookup, values)
 import Perspectives.ContextRoleParser (userData)
-import Perspectives.CoreTypes (MonadPerspectives, (##=), (###=))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.IndentParser (runIndentParser')
@@ -49,8 +50,9 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..))
+import Perspectives.RunMonadPerspectivesTransaction (loadModelIfMissing)
 import Perspectives.Types.ObjectGetters (aspectsOfRole)
-import Prelude (bind, discard, pure, show, void, ($), (<>), (==), (>=>), (<$>))
+import Prelude (bind, discard, pure, show, void, ($), (<>), (==), (>=>), (<$>), (<<<))
 import Text.Parsing.Parser (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
@@ -65,19 +67,21 @@ import Text.Parsing.Parser (ParseError(..))
 
 type Source = String
 
-loadAndCompileArcFile_ :: Source -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadAndCompileArcFile_ :: Source -> MonadPerspectivesTransaction (Either (Array PerspectivesError) DomeinFile)
 loadAndCompileArcFile_ text = catchError
   do
-    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} lift $ runIndentParser text domain
+    (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} lift $ lift $ runIndentParser text domain
     case r of
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
       (Right ctxt) -> do
-        (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
+        (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
         case result of
           (Left e) -> pure $ Left [e]
           (Right (DomeinFile dr'@{_id})) -> do
-            dr'' <- pure dr' {referredModels = state.referredModels}
-            (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr'' state.postponedStateQualifiedParts state.screens
+            dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
+            -- We should load referred models if they are missing.
+            for_ referredModels (loadModelIfMissing <<< unwrap)
+            (x' :: (Either PerspectivesError DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left [e]
               (Right correctedDFR@{referredModels}) -> do
@@ -86,7 +90,7 @@ loadAndCompileArcFile_ text = catchError
                   { referredModels = delete (DomeinFileId _id) referredModels
                   , arc = text
                   }
-                void $ storeDomeinFileInCache _id df
+                void $ lift $ storeDomeinFileInCache _id df
                 pure $ Right df
   \e -> pure $ Left [Custom (show e)]
 
@@ -95,15 +99,15 @@ type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesEr
 type ArcSource = String
 type CrlSource = String
 
-loadArcAndCrl' :: ArcSource -> CrlSource -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadArcAndCrl' :: ArcSource -> CrlSource -> MonadPerspectivesTransaction (Either (Array PerspectivesError) DomeinFile)
 loadArcAndCrl' arcSource crlSource = do
   r <- loadAndCompileArcFile_ arcSource
   case r of
     Left m -> pure $ Left m
     Right df@(DomeinFile drf@{_id}) -> do
-      void $ storeDomeinFileInCache _id df
-      x <- addModelDescriptionAndCrl drf
-      removeDomeinFileFromCache _id
+      void $ lift $ storeDomeinFileInCache _id df
+      x <- lift $ addModelDescriptionAndCrl drf
+      lift $ removeDomeinFileFromCache _id
       case x of
         (Left e) -> pure $ Left e
         (Right withInstances) -> do

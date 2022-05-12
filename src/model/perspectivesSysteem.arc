@@ -3,6 +3,7 @@ domain System
   use sys for model:System
   use cdb for model:Couchdb
   use ser for model:Serialise
+  use sensor for model:Sensor
 
   case PerspectivesSystem
     indexed sys:MySystem
@@ -118,6 +119,14 @@ domain System
 
     -- A calculated role representing all available Notifications (from any context).
     thing AllNotifications = callExternal cdb:RoleInstances( "model:System$ContextWithNotification$Notifications" ) returns sys:ContextWithNotification$Notifications
+
+    context SystemCaches (mandatory) filledBy Caches
+
+  -- A Collection of System Caches.
+  case Caches
+    thing Cache (relational)
+      property Name (String)
+      property Size = callExternal sensor:ReadSensor ( Name, "size" ) returns Number
 
   -- Use this as an aspect in contexts that should store their own notifications.
   case ContextWithNotification

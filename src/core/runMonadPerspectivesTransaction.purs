@@ -30,7 +30,7 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
-import Effect.Aff.AVar (new, take, put)
+import Effect.Aff.AVar (new, put, take, tryRead)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (empty)
@@ -223,6 +223,24 @@ runSterileTransaction a =
   >>= lift <<< createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
   >>= lift <<< new
   >>= runReaderT a
+
+runEmbeddedTransaction :: forall o.
+  RoleType ->
+  MonadPerspectivesTransaction o
+  -> (MonadPerspectives o)
+runEmbeddedTransaction authoringRole a = do
+  t <- transactionFlag
+  flagEmpty <- lift $ tryRead t
+  case flagEmpty of
+    Nothing -> do
+      -- 1. Raise the flag
+      _ <- lift $ put true t
+      -- 2. Run the transaction (this will lower and raise the flag again).
+      result <- runMonadPerspectivesTransaction authoringRole a
+      -- 2. Lower it again.
+      _ <- lift $ take t
+      pure result
+    _ -> throwError (error "runEmbeddedTransaction is not run inside another transaction.")
 
 -- | Evaluates state transitions. Executes automatic actions. Notifies users. Collects deltas in a new transaction.
 -- | If any are collected, recursively calls itself.
