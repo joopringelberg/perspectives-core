@@ -65,9 +65,6 @@ import Simple.JSON (class ReadForeign, read, read')
 modelDescription :: EnumeratedRoleType
 modelDescription = EnumeratedRoleType "model:ModelManagement$ManagedModel$ModelDescription"
 
-modelsInUse :: EnumeratedRoleType
-modelsInUse = EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"
-
 -- | Recompiles a number of essential models. Use this function when the definition of the DomeinFile
 -- | has changed. The local models directory of the user that is provided, will have the freshly compiled
 -- | DomeinFiles, so this user can be booted. The essential models include model:ModelManagement, so that

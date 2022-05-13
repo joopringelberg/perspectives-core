@@ -52,6 +52,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (exists')
 import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, roleType)
+import Perspectives.Models (modelsInUseRole)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
@@ -352,7 +353,7 @@ loadModelIfMissing modelName = do
           case modelDescription of
             Nothing -> pure unit
             Just (PerspectRol{_id}) -> void $ createAndAddRoleInstance
-              (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse")
+              modelsInUseRole
               mySys
               (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just $ unwrap _id})
     else pure unit

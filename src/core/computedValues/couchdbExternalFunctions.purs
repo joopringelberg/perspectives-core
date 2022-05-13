@@ -65,7 +65,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (contextType, isMe)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
-import Perspectives.Models (modelsInUse) as Models
+import Perspectives.Models (modelsInUse, modelsInUseRole) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
@@ -151,7 +151,7 @@ pendingInvitations _ = ArrayT do
 updateModel :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
 updateModel arrWithurl arrWithModelName arrWithDependencies modelsInUse = case head arrWithModelName of
   Nothing -> do
-    descriptionGetter <- lift $ getDynamicPropertyGetter "model:System$Model$External$Description" (ST (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"))
+    descriptionGetter <- lift $ getDynamicPropertyGetter "model:System$Model$External$Description" (ST Models.modelsInUseRole)
     description <- lift (modelsInUse ##= descriptionGetter)
     lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
   Just modelName -> do

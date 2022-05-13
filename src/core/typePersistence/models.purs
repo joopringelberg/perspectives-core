@@ -34,11 +34,14 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), DomeinFileId(..))
 import Prelude (bind, pure, ($), (<$>), (<<<), (>=>))
 
+modelsInUseRole :: EnumeratedRoleType
+modelsInUseRole = EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"
+
 modelsInUse :: MonadPerspectives (Array DomeinFileId)
 modelsInUse = do
   system <- getMySystem
   propertyGetter <- getDynamicPropertyGetter
     "model:System$Model$External$ModelIdentification"
-    (ST $ EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse")
-  values <- (ContextInstance system) ##= (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse") >=> propertyGetter)
+    (ST modelsInUseRole)
+  values <- (ContextInstance system) ##= (getEnumeratedRoleInstances modelsInUseRole >=> propertyGetter)
   pure $ DomeinFileId <<< unwrap <$> values
