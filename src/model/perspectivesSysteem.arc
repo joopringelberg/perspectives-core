@@ -10,6 +10,11 @@ domain System
     aspect sys:RootContext
     aspect sys:ContextWithNotification
 
+    state NoCaches = not exists SystemCaches
+      on entry
+        do for User
+          create context Caches bound to SystemCaches
+
     external
       aspect sys:RootContext$External
       property ConnectedToAMQPBroker (Boolean)
@@ -126,6 +131,18 @@ domain System
 
   -- A Collection of System Caches.
   case Caches
+    state NoCaches = not exists Cache
+      on entry 
+        do for Manager
+          letA
+            contextcache <- create role Cache
+            rolecache <- create role Cache
+            domeincache <- create role Cache
+          in
+            Name = "contextcache" for contextcache
+            Name = "rolecache" for rolecache
+            Name = "domeincache" for domeincache
+
     user Manager = sys:Me
       perspective on Cache
         defaults

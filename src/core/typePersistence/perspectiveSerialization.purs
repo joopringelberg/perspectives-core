@@ -33,7 +33,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..), fst)
-import Foreign.Object (Object, empty, fromFoldable, insert, isEmpty, keys, values, lookup)
+import Foreign.Object (Object, empty, fromFoldable, insert, isEmpty, keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, AssumptionTracking)
 import Perspectives.Data.EncodableMap (lookup) as EM
@@ -56,7 +56,7 @@ import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
-import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
+import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
 import Simple.JSON (writeJSON)
 
 -- | Get the serialisation of the perspective the user role type has on the object role type,
@@ -110,10 +110,7 @@ perspectivesForContextAndUser' subject userRoleType cid = ArrayT do
     sendToClient {verbs, roleInstances, properties} = pure $
       if isEmpty roleInstances
         then (isJust $ elemIndex (show Create) verbs) || (isJust $ elemIndex (show CreateAndFill) verbs)
-        else (not $ isEmpty properties) ||
-          case head $ values roleInstances of
-            Nothing -> false
-            Just {objectStateBasedProperties} -> not $ null objectStateBasedProperties
+        else (not $ isEmpty properties) || (not $ isEmpty roleInstances)
 
 serialisePerspective ::
   Array StateSpec ->
@@ -339,45 +336,42 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps pvArr cid (Pe
       (roleStates :: Array StateSpec) <- lift $ map ObjectState <$> (runArrayT $ getActiveRoleStates roleId)
       -- PropertyVerbs based on the states of the RoleInstance.
       (objectStateBasedPropertyVerbs :: Array PropertyVerbs) <- pure $ (concat (catMaybes $ (flip EM.lookup propertyVerbs) <$> roleStates))
-      if ((isEmpty pvArr) && (null objectStateBasedPropertyVerbs))
-        then pure Nothing
-        else do
-          -- RoleVerbs based on the states of the RoleInstance.
-          objectStateBasedRoleVerbs <- pure $ show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> roleStates))
-          -- PropertyTypes based on the states of the RoleInstance.
-          (objectStateBasedProperties :: Array PropertyType) <- pure (concat $ expandPropSet allProps <<< (\(PropertyVerbs props _) -> props) <$> objectStateBasedPropertyVerbs)
-          -- Add getters that we not yet have
-          void $ for objectStateBasedProperties (\propertyType -> do
-            getters <- get
-            if isNothing (lookup (propertytype2string propertyType) getters)
-              then do
-                getter <- lift $ lift $ getDynamicPropertyGetter
-                  (propertytype2string propertyType)
-                  (roleInContext2Role <$> (unsafePartial roleRange object))
-                put (insert (propertytype2string propertyType) getter getters)
-              else pure unit)
-          -- Get all getters from state.
-          (allGetters :: Object Getter) <- get
-          -- Add verbs based on state of the role instance to the map of
-          -- property to verbs based on context- and subject state.
-          (localVerbsPerProperty :: Object (Array PropertyVerb)) <- pure $ verbsPerProperty' objectStateBasedPropertyVerbs allProps pvArr
-          -- Apply for each property available based on context, subject or object
-          -- state, the getter to the role instance.
-          (valuesAndVerbs :: Array (Tuple String ValuesWithVerbs)) <- for (objectStateBasedProperties <> contextSubjectStateBasedProps)
-            \propertyType -> do
-              getter <- pure $ unsafePartial fromJust $ lookup (propertytype2string propertyType) allGetters
-              vals <- lift (runArrayT $ getter roleId)
-              pure $ Tuple (propertytype2string propertyType)
-                { values: unwrap <$> vals
-                -- TODO. Filter deze propertyVerbs met de beperkende lijst!
-                , propertyVerbs: show <$> intersect restrictingVerbs (unsafePartial fromJust $ lookup (propertytype2string propertyType) localVerbsPerProperty)}
-          pure $ Just
-            { roleId: (unwrap roleId)
-            , objectStateBasedRoleVerbs
-            , propertyValues: fromFoldable valuesAndVerbs
-            , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates))
-            , objectStateBasedProperties
-          }
+      -- RoleVerbs based on the states of the RoleInstance.
+      objectStateBasedRoleVerbs <- pure $ show <$> concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> roleStates))
+      -- PropertyTypes based on the states of the RoleInstance.
+      (objectStateBasedProperties :: Array PropertyType) <- pure (concat $ expandPropSet allProps <<< (\(PropertyVerbs props _) -> props) <$> objectStateBasedPropertyVerbs)
+      -- Add getters that we not yet have
+      void $ for objectStateBasedProperties (\propertyType -> do
+        getters <- get
+        if isNothing (lookup (propertytype2string propertyType) getters)
+          then do
+            getter <- lift $ lift $ getDynamicPropertyGetter
+              (propertytype2string propertyType)
+              (roleInContext2Role <$> (unsafePartial roleRange object))
+            put (insert (propertytype2string propertyType) getter getters)
+          else pure unit)
+      -- Get all getters from state.
+      (allGetters :: Object Getter) <- get
+      -- Add verbs based on state of the role instance to the map of
+      -- property to verbs based on context- and subject state.
+      (localVerbsPerProperty :: Object (Array PropertyVerb)) <- pure $ verbsPerProperty' objectStateBasedPropertyVerbs allProps pvArr
+      -- Apply for each property available based on context, subject or object
+      -- state, the getter to the role instance.
+      (valuesAndVerbs :: Array (Tuple String ValuesWithVerbs)) <- for (objectStateBasedProperties <> contextSubjectStateBasedProps)
+        \propertyType -> do
+          getter <- pure $ unsafePartial fromJust $ lookup (propertytype2string propertyType) allGetters
+          vals <- lift (runArrayT $ getter roleId)
+          pure $ Tuple (propertytype2string propertyType)
+            { values: unwrap <$> vals
+            -- TODO. Filter deze propertyVerbs met de beperkende lijst!
+            , propertyVerbs: show <$> intersect restrictingVerbs (unsafePartial fromJust $ lookup (propertytype2string propertyType) localVerbsPerProperty)}
+      pure $ Just
+        { roleId: (unwrap roleId)
+        , objectStateBasedRoleVerbs
+        , propertyValues: fromFoldable valuesAndVerbs
+        , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates))
+        , objectStateBasedProperties
+      }
 
 -- | The verbs in this type contain both those based on context- and subject state,
 -- | and those based on object state.
