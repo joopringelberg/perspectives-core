@@ -307,6 +307,10 @@ addModelToLocalStore' url originalLoad = do
                         -- This code is a temporary solution. For now we choose to restore the binding relations.
                         -- As a consequence, a model update cannot undo binding relations on model instances.
                         -- Give the new role the binding the old role has.
+                        -- Note that we asssume the fillers have their administration intact! This might not be true
+                        -- when the filler comes from the model, as well.
+                        -- Finally note that the state administration is overwritten.
+                        -- This causes, in the case of model:System, state Update for ModelsInUse to exit silently, as it were.
                         Just oldBindingId -> do
                           saveRoleInstance i $ changeRevision (rev oldRole) (changeRol_binding oldBindingId newRole)
                       Just newBindingId -> case rol_binding oldRole of
