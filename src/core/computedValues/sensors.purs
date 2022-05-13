@@ -58,26 +58,29 @@ type DeviceSensorMap = Map (Tuple Device Sensor) SensorFunction
 
 sensorFunctions :: DeviceSensorMap
 sensorFunctions = fromFoldable
-  [ Tuple (Tuple "contextinstances" "size") (unsafePartial cacheSize)]
+  [ Tuple (Tuple "contextcache" "size") (unsafePartial cacheSize)
+  , Tuple (Tuple "rolecache" "size") (unsafePartial cacheSize)
+  , Tuple (Tuple "domeincache" "size") (unsafePartial cacheSize)
+  ]
 
 cacheSize :: Partial => SensorFunction
 cacheSize device sensor = case device, sensor of 
-  "contextinstances", "size" -> do
+  "contextcache", "size" -> do
     cache <- gets _.contextInstances
     liftEffect $ size cache
-  "roleinstances", "size" -> do
+  "rolecache", "size" -> do
     cache <- gets _.rolInstances
     liftEffect $ size cache
-  "models", "size" -> do
+  "domeincache", "size" -> do
     cache <- gets _.domeinCache
     liftEffect $ size cache
 
 -- | Read a value from a Sensor on a Device.
-readSensor :: Array Device -> Array Sensor -> RoleInstance -> MonadPerspectivesQuery Int
+readSensor :: Array Device -> Array Sensor -> RoleInstance -> MonadPerspectivesQuery String
 readSensor device' sensor' _ = case head device', head sensor' of
   Just device, Just sensor -> ArrayT case lookup (Tuple device sensor) sensorFunctions of
     Nothing -> pure []
-    Just f -> lift $ singleton <$> f device sensor
+    Just f -> lift $ singleton <<< show <$> f device sensor
   _, _ -> ArrayT $ pure []
 
 
