@@ -77,7 +77,7 @@ domain BodiesWithAccounts
       state IsFilled = exists binding
         -- Use this state to inform the applicant that his case is in
         -- consideration.
-        state Waiting = not IsRejected and not IsAccepted
+        state Waiting = (not IsRejected) and not IsAccepted
           perspective on Accounts
             -- Account can see he is not yet rejected,
             -- but not accepted either.

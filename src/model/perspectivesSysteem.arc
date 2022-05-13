@@ -57,6 +57,8 @@ domain System
         view ModelPresentation verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
+      perspective on SystemCaches
+        defaults
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
 
@@ -93,7 +95,7 @@ domain System
             IncludingDependencies = false
           notify User
             "Model {ModelIdentification} has been updated."
-      state NotInIndexedContexts = not HasBeenInstalled and exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
+      state NotInIndexedContexts = (not HasBeenInstalled) and exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
         -- Create an entry in IndexedContexts if its model has been taken in use.
         on entry
           do for User
@@ -124,6 +126,9 @@ domain System
 
   -- A Collection of System Caches.
   case Caches
+    user Manager = sys:Me
+      perspective on Cache
+        defaults
     thing Cache (relational)
       property Name (String)
       property Size = callExternal sensor:ReadSensor ( Name, "size" ) returns Number
