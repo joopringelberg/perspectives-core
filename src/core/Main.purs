@@ -177,6 +177,7 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
       state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
       runPerspectivesWithState
         (do
+          addAllExternalFunctions
           -- TODO. Vermoedelijk is dit overbodig voor Pouchdb.
           getSystemIdentifier >>= createUserDatabases
           setupUser
@@ -219,6 +220,7 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
             clearPostDatabase
             -- clear the caches, otherwise nothing happens.
             resetCaches
+            addAllExternalFunctions
             setupUser)
           state
     where
