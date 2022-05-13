@@ -35,7 +35,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, foldMap, null)
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Map (Map, lookup)
+import Data.Map (Map, lookup, delete)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (ala, alaF, over, unwrap)
@@ -258,7 +258,9 @@ exitingState contextId stateId = do
   fibers <- lift $ gets _.transactionFibers
   case lookup (Tuple (unwrap contextId) stateId) fibers of
     Nothing -> pure unit
-    Just f -> lift $ lift $ killFiber (error "Stopped execution of repeating action in state") f
+    Just f -> do 
+      lift $ lift $ killFiber (error "Stopped execution of repeating action in state") f
+      lift $ modify \s@{transactionFibers} -> s {transactionFibers = delete (Tuple (unwrap contextId) stateId) transactionFibers}
 
   {automaticOnExit, notifyOnExit} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction, but only if

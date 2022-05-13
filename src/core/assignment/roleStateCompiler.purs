@@ -35,13 +35,14 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, foldMap, index, null)
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Map (Map)
+import Data.Map (Map, delete, lookup)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (ala, alaF, over, unwrap)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Aff (error, killFiber)
 import Effect.Class.Console (log)
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
@@ -264,6 +265,15 @@ exitingRoleState roleId stateId = do
   -- Remove the state identifier from the states in the role instance, triggering query updates
   -- just before running the current Transaction is finished.
   setInActiveRoleState stateId roleId
+  
+  -- Stop all repeating processes associated with this state.
+  fibers <- lift $ gets _.transactionFibers
+  case lookup (Tuple (unwrap roleId) stateId) fibers of
+    Nothing -> pure unit
+    Just f -> do 
+      lift $ lift $ killFiber (error "Stopped execution of repeating action in state") f
+      lift $ modify \s@{transactionFibers} -> s {transactionFibers = delete (Tuple (unwrap roleId) stateId) transactionFibers}
+
   {automaticOnExit, notifyOnExit} <- getCompiledState stateId
   -- Run automatic actions in the current Transaction, but only if
   -- the end user fills the allowedUser role in this context.
