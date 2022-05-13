@@ -43,7 +43,7 @@ import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWi
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), ScreenE(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
-import Perspectives.Query.QueryTypes (Calculation(..), RoleInContext(..))
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
@@ -53,8 +53,10 @@ import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.State (State(..), StateFulObject(..), constructState)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.View (View(..)) as VIEW
@@ -79,14 +81,22 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     do
       contextParts' <- case (head (filter (case _ of
         RE (RoleE{id:rid}) -> rid == "External"
-        otherwise -> false) contextParts)) of
-          Nothing -> pure $ Cons (RE (RoleE{id: "External", kindOfRole: TI.ExternalRole, roleParts: Nil, pos})) contextParts
+        otherwise -> false) contextParts)) of          
+          Nothing -> do
+            -- Add a default state for the external role.
+            state <- pure $ constructState (StateIdentifier $ (addNamespace ns id) <> "$External") (Q $ trueCondition (CDOM $ ST (ContextType (addNamespace ns id)))) (Cnt (ContextType (addNamespace ns id))) []
+            modifyDF (\domeinFile -> addStatesToDomeinFile [state] domeinFile)
+            -- Add a definition for the external role; it apparently hasn't been declared in the source.
+            pure $ Cons (RE (RoleE{id: "External", kindOfRole: TI.ExternalRole, roleParts: Nil, pos})) contextParts
           otherwise -> pure contextParts
       context' <- foldM handleParts context contextParts'
       modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
       pure context'
 
   where
+
+    trueCondition :: Domain -> QueryFunctionDescription
+    trueCondition dom = SQD dom (Constant PBool "true") (VDOM PBool Nothing) True True
 
     -- Construct members for the new Context type according to the type of
     -- parts found in the ContextE AST type. Insert these members into the new Context.
