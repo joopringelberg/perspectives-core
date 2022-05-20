@@ -24,49 +24,48 @@ module Perspectives.CompileTimeFacets where
 import Prelude
 
 import Control.Monad.AvarMonadAsk (gets)
-import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
-import Data.Maybe (Maybe(..))
 import Effect.AVar (AVar)
-import Effect.Aff (Fiber, delay)
+import Effect.Aff (Fiber)
 import Effect.Aff.AVar (put)
-import Perspectives.CoreTypes (MP, MonadPerspectivesTransaction, TransactionWithTiming(..), Updater)
-import Perspectives.Repetition (Duration, Repeater(..), fromDuration)
+import Perspectives.CoreTypes (MP, RepeatingTransaction(..), Updater)
+import Perspectives.Repetition (Repeater(..))
 import Perspectives.Representation.Action (TimeFacets)
 import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
 import Unsafe.Coerce (unsafeCoerce)
 
 addTimeFacets :: forall a f. Partial => Updater a -> TimeFacets f -> RoleType -> StateIdentifier -> MP (Updater a)
 addTimeFacets updater {startMoment, endMoment, repeats} authoringRole stateId = do
-  pure $ after startMoment $ repeat repeats updater
+  pure $ repeat repeats updater
   where
-    after :: Maybe Duration -> Updater a -> Updater a
-    after Nothing u = u
-    after (Just d) u = \a -> do
-      lift $ lift $ delay (fromDuration d)
-      u a
-
     repeat :: Repeater -> Updater a -> Updater a
     repeat Never u = u
     repeat (Forever duration) u = \a -> do
-      (av :: AVar TransactionWithTiming) <- lift $ gets _.transactionWithTiming
-      lift $ lift $ put (TransactionWithTiming 
-        { transaction: transaction a
+      (av :: AVar RepeatingTransaction) <- lift $ gets _.transactionWithTiming
+      lift $ lift $ put (TransactionWithTiming
+        { transaction: u a
+        , interval: duration
         , instanceId: unsafeUnwrapResource a
         , stateId
-        , authoringRole}) 
+        , authoringRole
+        , startMoment
+        , endMoment}) 
         av
-      where 
-        transaction :: a -> MonadPerspectivesTransaction Unit
-        transaction a = forever do
-          lift $ lift $ delay (fromDuration duration)
-          u a
+    repeat (RepeatFor nrOfTimes duration) u = \a -> do
+      (av :: AVar RepeatingTransaction) <- lift $ gets _.transactionWithTiming
+      lift $ lift $ put (RepeatNtimes
+        { transaction: u a
+        , interval: duration
+        , nrOfTimes
+        , instanceId: unsafeUnwrapResource a
+        , stateId
+        , authoringRole
+        , startMoment
+        , endMoment}) 
+        av
 
     returnFiber :: Fiber Unit -> Unit
     returnFiber f = unit
 
     unsafeUnwrapResource :: a -> String
     unsafeUnwrapResource = unsafeCoerce
-
-registerRepeater :: forall a. a -> a
-registerRepeater u = u

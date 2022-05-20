@@ -131,6 +131,16 @@ domain System
 
   -- A Collection of System Caches.
   case Caches
+    aspect sys:ContextWithScreenState
+
+    state ContextOnScreen = extern >> IsOnScreen
+      on entry
+        do for Manager
+          StartReading = true for Cache
+      on exit
+        do for Manager
+          StartReading = false for Cache
+
     state NoCaches = not exists Cache
       on entry 
         do for Manager
@@ -141,14 +151,32 @@ domain System
           in
             Name = "contextcache" for contextcache
             Name = "rolecache" for rolecache
-            Name = "domeincache" for domeincache
+            Name = "domaincache" for domeincache
+
+    external
+      aspect sys:ContextWithScreenState$External
 
     user Manager = sys:Me
       perspective on Cache
         defaults
+
     thing Cache (relational)
       property Name (String)
-      property Size = callExternal sensor:ReadSensor ( Name, "size" ) returns Number
+      property StartReading (Boolean)
+      property Size (Number)
+      property NrOfTicks (Number)
+
+      state InitTicks = not exists NrOfTicks
+        on entry
+          do for Manager
+            NrOfTicks = 0
+      
+      state StartReading = StartReading
+        on entry
+          do for Manager after 10 Seconds every 3 Seconds maximally 2 times
+            NrOfTicks = NrOfTicks + 1
+            Size = callExternal sensor:ReadSensor ( Name, "size" ) returns Number
+
 
   -- Use this as an aspect in contexts that should store their own notifications.
   case ContextWithNotification
@@ -159,6 +187,10 @@ domain System
       perspective on Notifications
         action DeleteNotifications
           delete role Notifications
+
+  case ContextWithScreenState
+    external 
+      property IsOnScreen (Boolean)
 
   case PhysicalContext
     user UserWithAddress

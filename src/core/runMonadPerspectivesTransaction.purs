@@ -66,7 +66,7 @@ import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRe
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (roleRootStates, contextRootStates)
-import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (*>))
+import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (*>), (+))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -91,7 +91,8 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
     run = do
       -- 0. Only execute the transaction when we can take the flag down.
       t <- lift transactionFlag
-      _ <- lift $ lift $ take t
+      transactionNumber <- lift $ lift $ take t
+      log ("Starting transaction " <> show transactionNumber)
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
 
@@ -112,7 +113,8 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
             -- logShow corrId
             lift $ runner unit
       -- 5. Raise the flag
-      _ <- lift $ lift $ put true t
+      log ("Ending transaction " <> show transactionNumber)
+      _ <- lift $ lift $ put (transactionNumber + 1) t
       pure r
 
     runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction
@@ -235,10 +237,12 @@ runEmbeddedTransaction authoringRole a = do
   case flagEmpty of
     Nothing -> do
       -- 1. Raise the flag
-      _ <- lift $ put true t
+      _ <- lift $ put 0 t
+      log "Starting embedded transaction."
       -- 2. Run the transaction (this will lower and raise the flag again).
       result <- runMonadPerspectivesTransaction authoringRole a
       -- 2. Lower it again.
+      log "Ending embedded transaction."
       _ <- lift $ take t
       pure result
     _ -> throwError (error "runEmbeddedTransaction is not run inside another transaction.")

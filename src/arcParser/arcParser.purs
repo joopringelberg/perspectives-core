@@ -26,6 +26,7 @@ import Control.Alt (map, void, (<|>))
 import Control.Lazy (defer)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (fromFoldable)
+import Data.Int (toNumber)
 import Data.JSDate (toISOString)
 import Data.List (find, List(..), concat, filter, many, some, null, singleton, (:))
 import Data.List.NonEmpty (toList)
@@ -50,7 +51,7 @@ import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoRes
 import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
-import Perspectives.Repetition (Repeater(..))
+import Perspectives.Repetition (Duration(..), Repeater(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Range (Range(..))
@@ -58,7 +59,7 @@ import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<*), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
@@ -858,7 +859,7 @@ stateTransitionPart = do
     _ -> fail "Expected: do, notify"
 
 -- | automaticEffect =
--- |   do
+-- |   do [for <Identifier>]
 -- |     <statement>*
 -- |     |
 -- |     letA
@@ -871,66 +872,97 @@ automaticEffectE = do
   reserved "do"
   -- User role either specified here or taken from state.
   usr <- optionMaybe (reserved "for" *> arcIdentifier)
-  isIndented >>= if _
-    then do
-      keyword <- scanIdentifier
-      effect <- case keyword of
-        "letE" -> fail "letE does not allow assignment operators, so this will not have an effect. Did you mean 'letA'?"
-        "letA" -> Let <$> letWithAssignment
-        _ -> Statements <<< fromFoldable <$> nestedBlock assignment
-      end <- getPosition
-      {subject, object, onEntry, onExit, currentContext} <- getArcParserState
-      case usr of
-        Nothing -> case subject, onEntry, onExit of
-          Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE 
-            { subject: sb
-            , object
-            , transition
-            , effect
-            , startMoment: Nothing
-            , endMoment: Nothing
-            , repeats: Never
-            , start
-            , end}
-          Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE 
-            { subject: sb
-            , object
-            , transition
-            , effect
-            , startMoment: Nothing
-            , endMoment: Nothing
-            , repeats: Never
-            , start
-            , end}
-          Nothing, _, _ -> failWithPosition "A subject is required" (arcPosition2Position start)
-          _, Nothing, Nothing -> fail "A state transition is required"
-          _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
-        Just ident -> case onEntry, onExit of
-          -- We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
-          -- is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
-          Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE 
-            { subject: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start
-            , object
-            , transition
-            , effect
-            , startMoment: Nothing
-            , endMoment: Nothing
-            , repeats: Never
-            , start
-            , end}
-          Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE 
-            { subject: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start
-            , object
-            , transition
-            , effect
-            , startMoment: Nothing
-            , endMoment: Nothing
-            , repeats: Never
-            , start
-            , end}
-          Nothing, Nothing -> fail "A state transition is required"
-          _, _ -> fail "State transition inside state transition is not allowed"
-    else pure Nil
+  startMoment <- optionMaybe (reserved "after" *> duration)
+  endMoment <- optionMaybe (reserved "until" *> duration)
+  repeats <- repeatsE
+  case endMoment, repeats of
+    Just _, Never -> fail "`until` must be followed by `every`."
+    _, _ -> do
+      isIndented >>= if _
+        then do
+          keyword <- scanIdentifier
+          effect <- case keyword of
+            "letE" -> fail "letE does not allow assignment operators, so this will not have an effect. Did you mean 'letA'?"
+            "letA" -> Let <$> letWithAssignment
+            _ -> Statements <<< fromFoldable <$> nestedBlock assignment
+          end <- getPosition
+          {subject, object, onEntry, onExit, currentContext} <- getArcParserState
+          case usr of
+            Nothing -> case subject, onEntry, onExit of
+              Just sb, Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE 
+                { subject: sb
+                , object
+                , transition
+                , effect
+                , startMoment
+                , endMoment
+                , repeats
+                , start
+                , end}
+              Just sb, Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE 
+                { subject: sb
+                , object
+                , transition
+                , effect
+                , startMoment
+                , endMoment
+                , repeats
+                , start
+                , end}
+              Nothing, _, _ -> failWithPosition "A subject is required" (arcPosition2Position start)
+              _, Nothing, Nothing -> fail "A state transition is required"
+              _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
+            Just ident -> case onEntry, onExit of
+              -- We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
+              -- is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
+              Just transition, Nothing -> pure $ singleton $ AE $ AutomaticEffectE 
+                { subject: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start
+                , object
+                , transition
+                , effect
+                , startMoment
+                , endMoment
+                , repeats
+                , start
+                , end}
+              Nothing, Just transition -> pure $ singleton $ AE $ AutomaticEffectE 
+                { subject: ExplicitRole currentContext (ENR $ EnumeratedRoleType ident) start
+                , object
+                , transition
+                , effect
+                , startMoment
+                , endMoment
+                , repeats
+                , start
+                , end}
+              Nothing, Nothing -> fail "A state transition is required"
+              _, _ -> fail "State transition inside state transition is not allowed"
+        else pure Nil
+
+-- [every N Milliseconds|Seconds|Minutes|Hours|Days [maximally N times]]
+repeatsE :: IP Repeater
+repeatsE = option Never
+  do
+    interval <- reserved "every" *> duration
+    max <- optionMaybe (reserved "maximally" *> token.integer <* reserved "times")
+    case max of
+      Nothing -> pure $ Forever interval
+      Just m -> pure $ RepeatFor m interval
+
+
+-- | <integer> Milliseconds|Seconds|Minutes|Hours|Days
+duration :: IP Duration
+duration = do
+  interval <- toNumber <$> token.integer
+  nomination <- reservedIdentifier
+  case nomination of
+    "Milliseconds" -> pure $ Millisecond interval
+    "Seconds" -> pure $ Second interval
+    "Minutes" -> pure $ Minute interval
+    "Hours" -> pure $ Hour interval
+    "Days" -> pure $ Day interval
+    _ -> fail "Expected `Milliseconds`, `Seconds`, `Minutes`, `Hours` or `Days`."
+
 
 -- | notification =
 -- |  notify [<ident>] sentence

@@ -36,7 +36,7 @@ import Prelude (bind, show, ($), (<>))
 runPerspectives :: forall a. String -> String -> String -> String -> Int -> String -> MonadPerspectives a
   -> Aff a
 runPerspectives userName password systemId host port publicRepo mp = do
-  transactionFlag <- new true
+  transactionFlag <- new 0
   transactionWithTiming <- empty
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState

@@ -42,7 +42,7 @@ module Perspectives.CoreTypes
   , MonadPerspectives
   , MonadPerspectivesQuery
   , MonadPerspectivesTransaction
-  , TransactionWithTiming(..)
+  , RepeatingTransaction(..)
   , ObjectsGetter
   , OrderedDelta(..)
   , PerspectivesExtraState
@@ -98,6 +98,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
 import Perspectives.Persistence.API (PouchdbState)
 import Perspectives.Persistent.ChangesFeed (EventSource)
+import Perspectives.Repetition (Duration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction)
@@ -145,21 +146,34 @@ type PerspectivesExtraState =
 
   , warnings :: Array String
 
-  , transactionFlag :: AVar Boolean
+  , transactionFlag :: AVar Int
 
-  , transactionWithTiming :: AVar TransactionWithTiming
+  , transactionWithTiming :: AVar RepeatingTransaction
 
   , transactionFibers :: Map (Tuple String StateIdentifier) (Fiber Unit)
 
   )
 
-newtype TransactionWithTiming = TransactionWithTiming
+data RepeatingTransaction = TransactionWithTiming
   { transaction :: MonadPerspectivesTransaction Unit
+  , interval :: Duration
   , instanceId :: String
   , stateId :: StateIdentifier
   , authoringRole :: RoleType
+  , startMoment :: Maybe Duration
+  , endMoment :: Maybe Duration
   }
-
+  |
+  RepeatNtimes 
+  { transaction :: MonadPerspectivesTransaction Unit
+  , interval :: Duration
+  , nrOfTimes :: Int
+  , instanceId :: String
+  , stateId :: StateIdentifier
+  , authoringRole :: RoleType
+  , startMoment :: Maybe Duration
+  , endMoment :: Maybe Duration
+  }
 -----------------------------------------------------------
 -- ASSUMPTIONS
 -----------------------------------------------------------

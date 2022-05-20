@@ -30,13 +30,13 @@ import Effect.Class (liftEffect)
 import Foreign.Object (empty)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, MonadPerspectives, PerspectivesState, TransactionWithTiming)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, MonadPerspectives, PerspectivesState, RepeatingTransaction)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
 import Perspectives.Persistence.API (PouchdbUser, Url)
 import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 
-newPerspectivesState :: PouchdbUser -> Url -> AVar Boolean -> AVar TransactionWithTiming -> PerspectivesState
+newPerspectivesState :: PouchdbUser -> Url -> AVar Int -> AVar RepeatingTransaction -> PerspectivesState
 newPerspectivesState uinfo publicRepo transFlag transactionWithTiming =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
@@ -90,7 +90,7 @@ developmentRepository = gets _.developmentRepository
 transactionNumber :: MonadPerspectives Int
 transactionNumber = gets _.transactionNumber
 
-transactionFlag :: MonadPerspectives (AVar Boolean)
+transactionFlag :: MonadPerspectives (AVar Int)
 transactionFlag = gets _.transactionFlag
 
 nextTransactionNumber :: MonadPerspectives Int

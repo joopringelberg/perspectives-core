@@ -60,7 +60,7 @@ sensorFunctions :: DeviceSensorMap
 sensorFunctions = fromFoldable
   [ Tuple (Tuple "contextcache" "size") (unsafePartial cacheSize)
   , Tuple (Tuple "rolecache" "size") (unsafePartial cacheSize)
-  , Tuple (Tuple "domeincache" "size") (unsafePartial cacheSize)
+  , Tuple (Tuple "domaincache" "size") (unsafePartial cacheSize)
   ]
 
 cacheSize :: Partial => SensorFunction
@@ -71,7 +71,7 @@ cacheSize device sensor = case device, sensor of
   "rolecache", "size" -> do
     cache <- gets _.rolInstances
     liftEffect $ size cache
-  "domeincache", "size" -> do
+  "domaincache", "size" -> do
     cache <- gets _.domeinCache
     liftEffect $ size cache
 

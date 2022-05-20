@@ -129,6 +129,16 @@ perspectDef = LanguageDef
                   , "object"
                   , "subject"
 
+                  -- Repeating
+                  , "every"
+                  , "maximally"
+                  , "times"
+                  , "Milliseconds"
+                  , "Seconds"
+                  , "Minutes"
+                  , "Hours"
+                  , "Days"
+
 
                   -- Queries
                   , "filter"

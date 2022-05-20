@@ -33,13 +33,13 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
-import Effect.Aff (Aff, Error, Fiber, catchError, error, forkAff, joinFiber, runAff, throwError, try)
+import Effect.Aff (Aff, Error, Fiber, catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
 import Effect.Aff.AVar (AVar, empty, new, put, take)
 import Foreign (Foreign)
 import Main.RecompileBasicModels as RBM
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
-import Perspectives.CoreTypes (MonadPerspectives, TransactionWithTiming(..), PerspectivesState, (##=), (##>>))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -55,14 +55,15 @@ import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
+import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>), (>), (-))
 
 -- | Don't do anything. runPDR will actually start the core.
 main :: Effect Unit
@@ -101,15 +102,12 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
         , password: pdbu.password
         , couchdbUrl: pdbu.couchdbUrl
       }
-      transactionFlag <- new true
+      transactionFlag <- new 0
       transactionWithTiming <- empty
       state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
       
       -- Fork aff to capture transactions to run.
-      void $ forkAff $ forever do
-        TransactionWithTiming {transaction, instanceId, stateId, authoringRole} <- take transactionWithTiming
-        f <- forkAff $ runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
-        registerTransactionFiber f instanceId stateId state
+      void $ forkAff $ forkTimedTransactions transactionWithTiming state
 
       runPerspectivesWithState (do
         addAllExternalFunctions
@@ -129,6 +127,41 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
           \e -> do
             logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
   where
+    forkTimedTransactions :: AVar RepeatingTransaction -> AVar PerspectivesState -> Aff Unit
+    forkTimedTransactions repeatingTransactionAVar state = do
+      repeatingTransaction <- take repeatingTransactionAVar
+      case repeatingTransaction of
+        (TransactionWithTiming t@{instanceId, stateId, startMoment}) -> do
+          f <- forkAff (do 
+            case startMoment of
+              Nothing -> pure unit
+              Just d -> delay (fromDuration d)
+            repeatUnlimited t)
+          registerTransactionFiber f instanceId stateId state
+          forkTimedTransactions repeatingTransactionAVar state
+        RepeatNtimes t@{instanceId, stateId, nrOfTimes, startMoment} -> do
+          f <- forkAff (do 
+            case startMoment of
+              Nothing -> pure unit
+              Just d -> delay (fromDuration d)
+            repeatN t nrOfTimes)
+          registerTransactionFiber f instanceId stateId state
+          forkTimedTransactions repeatingTransactionAVar state
+      where
+        repeatUnlimited :: forall f. {transaction :: MonadPerspectivesTransaction Unit, authoringRole :: RoleType, interval :: Duration | f} -> Aff Unit
+        repeatUnlimited t@{transaction, authoringRole, interval} = do
+          delay (fromDuration interval)
+          _ <- runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
+          repeatUnlimited t
+
+        repeatN :: forall f. {transaction :: MonadPerspectivesTransaction Unit, authoringRole :: RoleType, interval :: Duration | f} -> Int -> Aff Unit
+        repeatN t@{transaction, authoringRole, interval} counter = do
+          delay (fromDuration interval)
+          _ <- runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
+          if counter > 0
+            then repeatN t (counter - 1)
+            else pure unit
+
     registerTransactionFiber :: Fiber Unit -> String -> StateIdentifier -> AVar PerspectivesState -> Aff Unit
     registerTransactionFiber f instanceId stateId stateAVar = do
       s@{transactionFibers} <- take stateAVar
@@ -172,7 +205,7 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
         , password: pdbu.password
         , couchdbUrl: pdbu.couchdbUrl
         }
-      transactionFlag <- new true
+      transactionFlag <- new 0
       transactionWithTiming <- empty
       state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
       runPerspectivesWithState
@@ -199,7 +232,7 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
-        transactionFlag <- new true
+        transactionFlag <- new 0
         transactionWithTiming <- empty
         state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
         runPerspectivesWithState
@@ -284,7 +317,7 @@ removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
           , password: pdbu.password
           , couchdbUrl: pdbu.couchdbUrl
           }
-        transactionFlag <- new true
+        transactionFlag <- new 0
         transactionWithTiming <- empty
         state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
         runPerspectivesWithState
