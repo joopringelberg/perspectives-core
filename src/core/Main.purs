@@ -26,15 +26,19 @@ where
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
+import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Map (insert)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
+import Data.Time (Millisecond)
 import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
-import Effect.Aff (Aff, Error, Fiber, catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
+import Effect.Aff (Aff, Error, Fiber, Milliseconds(..), catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
 import Effect.Aff.AVar (AVar, empty, new, put, take)
+import Effect.Class (liftEffect)
+import Effect.Now (now)
 import Foreign (Foreign)
 import Main.RecompileBasicModels as RBM
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
@@ -63,7 +67,7 @@ import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>), (>), (-))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>), (>), (-), (+), (<*>), (<))
 
 -- | Don't do anything. runPDR will actually start the core.
 main :: Effect Unit
@@ -131,36 +135,80 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
     forkTimedTransactions repeatingTransactionAVar state = do
       repeatingTransaction <- take repeatingTransactionAVar
       case repeatingTransaction of
-        (TransactionWithTiming t@{instanceId, stateId, startMoment}) -> do
+        (TransactionWithTiming t@{instanceId, stateId, startMoment, endMoment}) -> do
           f <- forkAff (do 
             case startMoment of
               Nothing -> pure unit
               Just d -> delay (fromDuration d)
-            repeatUnlimited t)
+            -- Calculate the end moment on the clock and pass on to repeatUnlimited
+            mendMoment <- computeEndMoment endMoment
+            repeatUnlimited t mendMoment)
           registerTransactionFiber f instanceId stateId state
           forkTimedTransactions repeatingTransactionAVar state
-        RepeatNtimes t@{instanceId, stateId, nrOfTimes, startMoment} -> do
+        RepeatNtimes t@{instanceId, stateId, nrOfTimes, startMoment, endMoment} -> do
           f <- forkAff (do 
             case startMoment of
               Nothing -> pure unit
               Just d -> delay (fromDuration d)
-            repeatN t nrOfTimes)
+            -- Calculate the end moment on the clock and pass on to repeatN
+            mendMoment <- computeEndMoment endMoment
+            repeatN t nrOfTimes mendMoment)
           registerTransactionFiber f instanceId stateId state
           forkTimedTransactions repeatingTransactionAVar state
       where
-        repeatUnlimited :: forall f. {transaction :: MonadPerspectivesTransaction Unit, authoringRole :: RoleType, interval :: Duration | f} -> Aff Unit
-        repeatUnlimited t@{transaction, authoringRole, interval} = do
+        repeatUnlimited :: forall f. 
+          {transaction :: MonadPerspectivesTransaction Unit, authoringRole :: RoleType, interval :: Duration | f} 
+          -> Maybe Instant
+          -> Aff Unit
+        repeatUnlimited t@{transaction, authoringRole, interval} mendMoment = do
           delay (fromDuration interval)
-          _ <- runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
-          repeatUnlimited t
+          case mendMoment of 
+            Nothing -> do 
+              _ <- runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
+              repeatUnlimited t mendMoment
+            Just endMoment -> do 
+              n <- liftEffect $ now
+              -- If not past the endMoment:
+              if n < endMoment
+                then do
+                  _ <- runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
+                  repeatUnlimited t mendMoment
+                else pure unit
 
-        repeatN :: forall f. {transaction :: MonadPerspectivesTransaction Unit, authoringRole :: RoleType, interval :: Duration | f} -> Int -> Aff Unit
-        repeatN t@{transaction, authoringRole, interval} counter = do
+        repeatN :: forall f. 
+          {transaction :: MonadPerspectivesTransaction Unit, authoringRole :: RoleType, interval :: Duration | f} 
+          -> Int 
+          -> Maybe Instant
+          -> Aff Unit
+        repeatN t@{transaction, authoringRole, interval} counter mendMoment = do
           delay (fromDuration interval)
-          _ <- runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
-          if counter > 0
-            then repeatN t (counter - 1)
-            else pure unit
+          case mendMoment of 
+            Nothing -> do 
+              if counter > 0
+                then do 
+                  -- If not past the endMoment:
+                  _ <- runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
+                  repeatN t (counter - 1) mendMoment
+                else pure unit
+            Just endMoment -> do
+              n <- liftEffect $ now
+              -- If not past the endMoment:
+              if n < endMoment
+                then do
+                  if counter > 0
+                    then do 
+                      -- If not past the endMoment:
+                      _ <- runPerspectivesWithState (runMonadPerspectivesTransaction authoringRole transaction) state
+                      repeatN t (counter - 1) mendMoment
+                    else pure unit
+                else pure unit
+
+        computeEndMoment :: Maybe Duration -> Aff (Maybe Instant)
+        computeEndMoment Nothing = pure Nothing
+        computeEndMoment (Just d) = do 
+          (Milliseconds start) <- liftEffect $ unInstant <$> now
+          (Milliseconds interval) <- pure $ fromDuration d
+          pure $ instant $ Milliseconds (start + interval)
 
     registerTransactionFiber :: Fiber Unit -> String -> StateIdentifier -> AVar PerspectivesState -> Aff Unit
     registerTransactionFiber f instanceId stateId stateAVar = do
