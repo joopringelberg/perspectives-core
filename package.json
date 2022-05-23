@@ -8,8 +8,7 @@
     "@stomp/stompjs": "^6.0.0",
     "eventsource": "^1.0.7",
     "fuzzysort": "^1.1.4",
-    "lru-cache": "^7.9.0",
-    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.13.0",
+    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.14.0",
     "pouchdb": "^7.2.2",
     "pouchdb-browser": "^7.2.2",
     "xhr2-cookies": "^1.1.0"

@@ -155,30 +155,8 @@ in  upstream
   with parsing.repo = "https://github.com/joopringelberg/purescript-parsing.git"
   with parsing.version = "v7.0.0-transformer-tagged"
 
-  with iterable =
-    { dependencies =
-      [ "prelude"
-      ]
-    , repo =
-       "https://github.com/Risto-Stevcev/purescript-iterable.git"
-    , version =
-        "v2.0.0"
-    }
-
   with lrucache =
     { dependencies =
-      [ "console"
-      , "effect"
-      , "foreign"
-      , "free"
-      , "iterable"
-      , "maybe"
-      , "prelude"
-      , "simple-json"
-      , "strings"
-      , "test-unit"
-      , "tuples"
-      , "unsafe-coerce"
-      ]
+      ["prelude"]
     , repo = "https://github.com/joopringelberg/purescript-lru-cache.git"
     , version = "v1.0.0"}

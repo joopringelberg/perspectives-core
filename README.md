@@ -20,20 +20,19 @@ The PDR is being intensively developed by the core team. We appreciate feedback 
 * purescript-avar-monadask
 * purescript-aff-sockets
 * perspectives-apitypes
-* package-sets
+* perspectives-lru-cache
+* perspectives-utilities
+* serialisable-nonempty-arrays
 
 #### On cloned Purescript packages
 * purescript-affjax
 * purescript-parsing
+* kishimen
 
 #### On Node packages belonging to the Perspectives Project
 * perspectives-proxy
 
-#### On third party Node packages
-* xhr2-cookies
-
 ### Packages belonging to the project but no core dependencies
-* perspectives-proxy
 * perspectives-react
 * perspectives-react-integrated-client
 * perspectives-documentation
