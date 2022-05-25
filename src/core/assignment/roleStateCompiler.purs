@@ -219,6 +219,7 @@ whenRightUser roleId contextGetter allowedUser updater = do
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
   bools <- lift $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
   if ala Conj foldMap bools
+    -- TODO. #5 Run the updater only with the subset of currentactors that are actually filled with `me`. Currently, we check whether one of them is me and then execute the action for all of them.
     then updater currentactors contextId roleId
     else pure unit
 

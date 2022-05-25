@@ -84,10 +84,10 @@ loadAndCompileArcFile_ text = catchError
             (x' :: (Either PerspectivesError DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left [e]
-              (Right correctedDFR@{referredModels}) -> do
+              (Right correctedDFR@{referredModels:refModels}) -> do
                 -- Remove the self-referral and add the source.
                 df <- pure $ DomeinFile correctedDFR
-                  { referredModels = delete (DomeinFileId _id) referredModels
+                  { referredModels = delete (DomeinFileId _id) refModels
                   , arc = text
                   }
                 void $ lift $ storeDomeinFileInCache _id df

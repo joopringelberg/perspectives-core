@@ -249,6 +249,7 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role}) = withFrame 
 -- |    - casus `NotificationE`. Here we just modify State definitinons in the DomeinFile.
 -- | Hence we do not risk to modify a definition that will be overwritten soon after without including that
 -- | modification.
+-- TODO. #8 Parameter users should have type Maybe RoleType.
 compileAndDistributeStep ::
   Domain ->
   Step ->

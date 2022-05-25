@@ -35,10 +35,10 @@ import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Role (adtOfRole, getRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.Perspective (isPerspectiveOnADT, perspectiveSupportsRoleVerb)
+import Perspectives.Representation.Perspective (perspectiveSupportsRoleVerb)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType(..))
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
-import Perspectives.Types.ObjectGetters (findPerspective, hasPerspectiveOnPropertyWithVerb, hasPerspectiveOnRoleWithVerbs)
+import Perspectives.Types.ObjectGetters (findPerspective, hasPerspectiveOnPropertyWithVerb, hasPerspectiveOnRoleWithVerbs, isPerspectiveOnADT)
 import Perspectives.TypesForDeltas (SubjectOfAction)
 
 type Found a = StateT Boolean MonadPerspectives a
@@ -72,7 +72,8 @@ roleHasPerspectiveOnRoleWithVerb subject roleType verbs = do
 
 -- | This function differs from `roleHasPerspectiveOnRoleWithVerb` in that it uses an
 -- | `authorizedRole` (second parameter). This is the role that binds the external role that we scrutinize,
--- | or it is the Calculated role that results in external roles.
+-- | or it is the Calculated role that results in external roles. It is this contextrole (or calculated role)
+-- | that the subject is authorized for.
 roleHasPerspectiveOnExternalRoleWithVerb :: SubjectOfAction -> Maybe RoleType -> RoleVerb -> MonadPerspectives (Either PerspectivesError Boolean)
 roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleType of
   Nothing -> do
@@ -90,5 +91,7 @@ roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleTyp
       hasPerspectiveWithVerb subjectType authorizedRoleType = do
         adtOfAuthorizedRoleType <- getRole authorizedRoleType >>= adtOfRole
         isJust <$> findPerspective subjectType
-          \perspective -> pure (perspectiveSupportsRoleVerb perspective verb' &&
-            unsafePartial (perspective `isPerspectiveOnADT` adtOfAuthorizedRoleType))
+          \perspective -> do
+            s <- pure $ perspectiveSupportsRoleVerb perspective verb'
+            p <- unsafePartial (perspective `isPerspectiveOnADT` adtOfAuthorizedRoleType)
+            pure (s && p)

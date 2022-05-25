@@ -24,19 +24,19 @@ module Perspectives.Representation.Perspective where
 
 import Data.Array (concat, difference, findIndex, foldl, fromFoldable, null)
 import Data.Generic.Rep (class Generic)
-import Data.Ord.Generic (genericCompare)
-import Data.Show.Generic (genericShow)
 import Data.List (List)
 import Data.List (findIndex) as LST
 import Data.Map (Map, values, fromFoldable) as MAP
 import Data.Maybe (isJust)
 import Data.Newtype (class Newtype, unwrap)
+import Data.Ord.Generic (genericCompare)
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object)
 import Perspectives.Data.EncodableMap (EncodableMap)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..), range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..), range, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT, commonLeavesInADT)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
@@ -132,14 +132,6 @@ perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ MAP.
         (\(PropertyVerbs pset pverbs) -> isElementOf property pset)
         pva)
       pvs
-
--- | The object of the perspective must cover the given ADT in the sense that its
--- | EnumeratedRoleTypes form a superset of those of the ADT, those nodes being
--- | the types that occur on each path through the ADT tree (the 'union' of the paths, as it were).
--- | <perspective> `isPerspectiveOnADT` <adt>
--- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-isPerspectiveOnADT :: Partial => Perspective -> ADT RoleInContext -> Boolean
-isPerspectiveOnADT p adt = null (commonLeavesInADT adt `difference` (commonLeavesInADT $ objectOfPerspective p))
 
 -- | Regardless of state, does the perspective allow for the RoleVerb?
 perspectiveSupportsRoleVerb :: Perspective -> RoleVerb -> Boolean

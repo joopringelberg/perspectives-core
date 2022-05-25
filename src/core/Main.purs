@@ -31,8 +31,7 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Map (insert)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (over, unwrap)
-import Data.Time (Millisecond)
+import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
 import Effect.Aff (Aff, Error, Fiber, Milliseconds(..), catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
@@ -67,7 +66,7 @@ import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>), (>), (-), (+), (<*>), (<))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>), (>), (-), (+), (<))
 
 -- | Don't do anything. runPDR will actually start the core.
 main :: Effect Unit

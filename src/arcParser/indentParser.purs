@@ -66,6 +66,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 type ArcParserState =
   { currentContext :: ContextType
+  -- TODO. #7 subject in ArcParserState is always an ExplicitRole.
   , subject :: Maybe RoleIdentification
   , object :: Maybe RoleIdentification
   , state :: StateSpecification

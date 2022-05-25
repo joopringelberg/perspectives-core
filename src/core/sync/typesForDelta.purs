@@ -112,7 +112,9 @@ instance prettyPrintUniverseContextDeltaType :: PrettyPrint UniverseContextDelta
 newtype UniverseRoleDelta = UniverseRoleDelta (DeltaRecord
   ( id :: ContextInstance
   , roleType :: EnumeratedRoleType
-  -- To be provided when deltaType is ConstructExternalRole or RemoveUnboundExternalRoleInstance
+  -- To be provided when deltaType is ConstructExternalRole or RemoveUnboundExternalRoleInstance or RemoveExternalRoleInstance.
+  -- It is the context role type that binds the external role; this is the role type that the user is authorized to construct and fill.
+  -- It can also be a calculated rol that results in external roles (usually taken from the database).
   , authorizedRole :: Maybe RoleType
   , roleInstances :: SerializableNonEmptyArray RoleInstance
   , deltaType :: UniverseRoleDeltaType

@@ -37,7 +37,7 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain2roleInContext, domain2roleType, range, roleInContext2Role)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
-import Perspectives.Representation.ADT (ADT(..), commonLeavesInADT, equalsOrGeneralisesADT, product, reduce)
+import Perspectives.Representation.ADT (ADT(..), commonLeavesInADT, product, reduce)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Context (contextAspects, roles)
@@ -253,27 +253,17 @@ allRoles = reduce magic
           rs <- reduce magic (PROD (ST <$> contextAspects c))
           pure (roles c <> rs)
 
-
 -----------------------------------------------------------
 -- LESSTHANOREQUALTO
 -----------------------------------------------------------
 -- | `p lessThanOrEqualTo q` means: p is less specific than q, or equal to q.
 -- | `p lessThanOrEqualTo q` equals: `q greaterThanOrEqualTo p`
-lessThanOrEqualTo :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
-lessThanOrEqualTo p q = pure (p `equalsOrGeneralisesADT` q)
+-- lessThanOrEqualTo :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
 -- lessThanOrEqualTo p q = p `hasNotMorePropertiesThan` q
 -- lessThanOrEqualTo p q = (&&) <$> (p `hasNotMorePropertiesThan` q) <*> (subsetPSet <$> actionSet p <*> actionSet q)
 
 hasNotMorePropertiesThan :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
 hasNotMorePropertiesThan p q = subset <$> (allProperties >=> pure <<< fromFoldable) (roleInContext2Role <$> p) <*> (allProperties >=> pure <<< fromFoldable) (roleInContext2Role <$> q)
-
--- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
--- | If you use `less specific` instead of `more specific`, flip the arguments.
--- | If you use `more general` instead of `more specific`, flip them, too.
--- | So `less specific` instead of `more general` means flipping twice and is a no-op.
--- | Therefore `less specific` equals `more general`.
-greaterThanOrEqualTo :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
-greaterThanOrEqualTo = flip lessThanOrEqualTo
 
 -----------------------------------------------------------
 -- CONTEXTOFADT

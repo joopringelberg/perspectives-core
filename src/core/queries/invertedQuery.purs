@@ -56,7 +56,7 @@ newtype InvertedQuery = InvertedQuery
   { description :: QueryWithAKink
   , backwardsCompiled :: (Maybe HiddenFunction)
   , forwardsCompiled :: (Maybe HiddenFunction)
-  -- TODO dit kan er maar één zijn.
+  -- TODO #9 There is only a single user in InvertedQuery.
   , users :: Array RoleType
   -- True iff the user can modify the structural element where the InvertedQuery is attached.
   , modifies :: Boolean

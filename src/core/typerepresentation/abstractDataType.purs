@@ -227,7 +227,7 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f UNIVERSAL = pure UNIVERSAL
 
 --------------------------------------------------------------------------------------------------
----- LEAVESINADT
+---- COMMONLEAVESINADT
 --------------------------------------------------------------------------------------------------
 -- | As class Reducible is defined in terms of a Monad, we use Identity.
 -- | Part of the semantics is captured by these two rules:
@@ -242,6 +242,8 @@ commonLeavesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Ar
 ---- ALLLEAVESINADT
 --------------------------------------------------------------------------------------------------
 -- | Collect any leaf occurring in the ADT.
+-- | In terms of sets: transform the ADT to Disjunctive Normal Form and then understand it
+-- | as an union of unions.
 allLeavesInADT :: forall a. Eq a => Ord a => ADT a -> Array a
 allLeavesInADT (ST a) = [a]
 allLeavesInADT (SUM terms) = nub $ concat $ map allLeavesInADT terms
@@ -268,6 +270,7 @@ allLeavesInADT UNIVERSAL = []
 
 -- | a1 `equalsOrGeneralisesADT` a2
 -- | intuitively when a2 is built from a1 (or a2 == a1).
+-- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
 equalsOrGeneralisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
 equalsOrGeneralisesADT adt1 adt2 = let
   union' = allLeavesInADT adt1
@@ -281,4 +284,4 @@ specialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
 specialisesADT = flip generalisesADT
 
 equalsOrSpecialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
-equalsOrSpecialisesADT adt1 adt2 = adt1 == adt2 || adt1 `specialisesADT` adt2
+equalsOrSpecialisesADT = flip equalsOrGeneralisesADT
