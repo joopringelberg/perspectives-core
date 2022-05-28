@@ -26,7 +26,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (map, (<|>), empty)
-import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, foldr, fromFoldable, intersect, null, singleton, filterA)
+import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, foldr, fromFoldable, null, singleton, filterA)
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.List (foldl) as LIST
 import Data.Map (Map, empty, lookup, insert, keys, unionWith, values) as Map
@@ -64,7 +64,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier(..), propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||), (*>), (/=))
+import Prelude (Unit, append, bind, flip, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||), (*>), (/=))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES

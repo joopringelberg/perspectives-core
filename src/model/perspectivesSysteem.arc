@@ -133,14 +133,6 @@ domain System
   case Caches
     aspect sys:ContextWithScreenState
 
-    state ContextOnScreen = extern >> IsOnScreen
-      on entry
-        do for Manager
-          StartReading = true for Cache
-      on exit
-        do for Manager
-          StartReading = false for Cache
-
     state NoCaches = not exists Cache
       on entry 
         do for Manager
@@ -162,19 +154,11 @@ domain System
 
     thing Cache (relational)
       property Name (String)
-      property StartReading (Boolean)
       property Size (Number)
-      property NrOfTicks (Number)
 
-      state InitTicks = not exists NrOfTicks
+      state StartReading = context >> extern >> IsOnScreen
         on entry
-          do for Manager
-            NrOfTicks = 0
-      
-      state StartReading = StartReading
-        on entry
-          do for Manager after 10 Seconds until 20 Seconds every 5 Seconds maximally 4 times
-            NrOfTicks = NrOfTicks + 1
+          do for Manager every 2 Seconds
             Size = callExternal sensor:ReadSensor ( Name, "size" ) returns Number
 
 

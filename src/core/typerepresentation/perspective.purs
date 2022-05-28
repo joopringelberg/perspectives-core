@@ -22,7 +22,7 @@
 
 module Perspectives.Representation.Perspective where
 
-import Data.Array (concat, difference, findIndex, foldl, fromFoldable, null)
+import Data.Array (concat, findIndex, foldl, fromFoldable, null)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
 import Data.List (findIndex) as LST
@@ -36,7 +36,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object)
 import Perspectives.Data.EncodableMap (EncodableMap)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..), range, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..), range)
 import Perspectives.Representation.ADT (ADT, commonLeavesInADT)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
@@ -56,6 +56,8 @@ newtype Perspective = Perspective PerspectiveRecord
 
 type PerspectiveRecord =
   { id :: PerspectiveId
+  -- This is underconstrained: the domain of the QueryFunctionDescription should be a CDOM (ADT ContextType),
+  -- its range an RDOM (ADT RoleInContext).
   , object :: QueryFunctionDescription
   , displayName :: String
   -- The RoleTypes of the object of the perspective.

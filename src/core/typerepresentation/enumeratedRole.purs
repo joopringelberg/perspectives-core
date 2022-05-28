@@ -56,23 +56,20 @@ type EnumeratedRoleRecord =
   , _rev :: Revision_
   , displayName :: String
   , kindOfRole :: RoleKind
+  , context :: ContextType
+  , views :: Array ViewType
+  , pos :: ArcPosition
+
+  , perspectives :: Array Perspective
+  , actions :: EncodableMap StateSpec (OBJ.Object Action)
 
   , roleAspects :: Array RoleInContext
   , properties :: Array PropertyType
 
-  , context :: ContextType
   , binding :: ADT RoleInContext
-
-  , views :: Array ViewType
-
-  , perspectives :: Array Perspective
-
-  , actions :: EncodableMap StateSpec (OBJ.Object Action)
 
   , functional :: Boolean
   , mandatory :: Boolean
-
-  , pos :: ArcPosition
 
   -- The keys in these objects are the String representations of context types.
   , filledByInvertedQueries :: InvertedQueryMap

@@ -50,17 +50,14 @@ type CalculatedRoleRecord =
   , _rev :: Revision_
   , displayName :: String
   , kindOfRole :: RoleKind
-
-  , calculation :: Calculation
   , context :: ContextType
-
   , views :: Array ViewType
+  , pos :: ArcPosition
 
   , perspectives :: Array Perspective
-
   , actions :: EncodableMap StateSpec (Object Action)
 
-  , pos :: ArcPosition
+  , calculation :: Calculation
   }
 
 defaultCalculatedRole :: String -> String -> RoleKind -> String -> ArcPosition -> CalculatedRole
