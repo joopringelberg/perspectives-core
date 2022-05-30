@@ -51,8 +51,8 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Context (allContextTypes, contextAspects)
-import Perspectives.Representation.Class.Context (contextRole, roleInContext, userRole, contextAspectsADT) as ContextClass
+import Perspectives.Representation.Class.Context (contextAspects)
+import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
 import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
@@ -99,14 +99,14 @@ string2RoleType qualifiedRoleName = getEnumeratedRole (EnumeratedRoleType qualif
 -- | If a role with the given qualified name is available in the Context or its (in)direct aspects,
 -- | return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
-lookForRoleType s c = (lift $ getContext c) >>= pure <<< ContextClass.contextAspectsADT >>= lookForRoleTypeOfADT s
+lookForRoleType s c = (lift $ getContext c) >>= pure <<< ContextClass.contextADT >>= lookForRoleTypeOfADT s
 
 lookForRoleTypeOfADT :: String -> (ADT ContextType ~~~> RoleType)
 lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s)) s
 
 -- | As lookForRoleType, but then with a local name that should string-match the end of the qualified name.
 lookForUnqualifiedRoleType :: String -> ContextType ~~~> RoleType
-lookForUnqualifiedRoleType s c = (lift $ getContext c) >>= pure <<< ContextClass.contextAspectsADT >>= lookForUnqualifiedRoleTypeOfADT s
+lookForUnqualifiedRoleType s c = (lift $ getContext c) >>= pure <<< ContextClass.contextADT >>= lookForUnqualifiedRoleTypeOfADT s
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleTypeOfADT :: String -> ADT ContextType ~~~> RoleType
@@ -116,14 +116,6 @@ lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> areLas
 -- | and then applies a comparison function to the name passed in and the names of all those roles.
 lookForRoleOfADT :: (RoleType -> Boolean) -> String -> ADT ContextType ~~~> RoleType
 lookForRoleOfADT criterium _ adt =  ArrayT (allRoles adt >>= pure <<< filter criterium)
-
-----------------------------------------------------------------------------------------
-------- FUNCTIONS TO FIND A CONTEXTTYPE WORKING FROM STRINGS OR ADT'S
-----------------------------------------------------------------------------------------
--- | Returns all qualified context types whose names end with the given input.
--- | Candidates are retrieved from the nested contexts of the given ADT ContextType, closed under Aspect.
-lookForUnqualifiedSubContextType :: String -> ADT ContextType ~~~> ContextType
-lookForUnqualifiedSubContextType s c = ArrayT (allContextTypes c >>= pure <<< filter ((areLastSegmentsOf s) <<< unwrap))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON CONTEXT TYPE

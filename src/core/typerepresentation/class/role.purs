@@ -24,7 +24,7 @@ module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (cons, foldMap, null)
+import Data.Array (cons, foldMap)
 import Data.Map (Map)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap)
@@ -40,7 +40,7 @@ import Perspectives.Query.QueryTypes (functional, mandatory) as QT
 import Perspectives.Representation.ADT (ADT(..), commonLeavesInADT, product, reduce)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.Context (contextAspects, roles)
+import Perspectives.Representation.Class.Context (roles)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -247,11 +247,7 @@ allRoles = reduce magic
     magic :: ContextType -> MP (Array RoleType)
     magic ct = do
       c <-  getContext ct
-      if null (contextAspects c)
-        then pure $ roles c
-        else do
-          rs <- reduce magic (PROD (ST <$> contextAspects c))
-          pure (roles c <> rs)
+      pure $ roles c
 
 -----------------------------------------------------------
 -- LESSTHANOREQUALTO

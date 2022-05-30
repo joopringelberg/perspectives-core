@@ -25,15 +25,13 @@ module Perspectives.Representation.Class.Context where
 import Data.Array (cons, null)
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Representation.ADT (ADT(..), product, reduce)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (getContext)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, externalRoleType)
-import Prelude ((<<<), (<>), (<$>), ($), bind, pure)
+import Prelude (($), (<$>), (<<<), (<>))
 
 -----------------------------------------------------------
 -- CONTEXT TYPE CLASS
@@ -45,7 +43,6 @@ class ContextClass c where
   contextRole :: c -> Array RoleType
   externalRole :: c -> EnumeratedRoleType
   userRole :: c -> Array RoleType
-  aspects :: c -> Array ContextType
   nestedContexts :: c -> Array ContextType
   position :: c -> ArcPosition
   roles :: c -> Array RoleType
@@ -60,7 +57,6 @@ instance contextContextClass :: ContextClass Context where
   contextRole = _.contextRol <<< unwrap
   externalRole (Context{_id}) = externalRoleType _id
   userRole = _.gebruikerRol <<< unwrap
-  aspects = _.contextAspects <<< unwrap
   nestedContexts = _.nestedContexts <<< unwrap
   position = _.pos <<< unwrap
   roles r = roleInContext r <> contextRole r <> userRole r
@@ -71,18 +67,3 @@ instance contextContextClass :: ContextClass Context where
         then ST $ identifier c
         else PROD (cons (ST $ identifier c) aspects)
 
------------------------------------------------------------
--- ALL NESTED CONTEXT TYPES
------------------------------------------------------------
--- | All nested context types in the context, computed recursively Aspects, of the Context ADT.
-allContextTypes :: ADT ContextType -> MonadPerspectives (Array ContextType)
-allContextTypes = reduce magic
-  where
-    magic :: ContextType -> MonadPerspectives (Array ContextType)
-    magic ct = do
-      ctxt@(Context{contextAspects, nestedContexts}) <- getContext ct
-      if null contextAspects
-        then pure $ cons ct nestedContexts
-        else do
-          types <- reduce magic (product (ST <$> contextAspects))
-          pure $ cons ct (nestedContexts <> types)

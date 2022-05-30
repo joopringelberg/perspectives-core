@@ -44,7 +44,7 @@ import Perspectives.Identifiers (getFirstMatch, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, qualifiedName, reserved, stringUntilNewline)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, prefixedName, qualifiedName, reserved, stringUntilNewline)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoReservedWords)
@@ -118,8 +118,8 @@ contextE = withPos do
             (withPos do
               uses <- many $ checkIndent *> useE
               ind <- option Nil $ checkIndent *> contextIndexedE
-              aspects <- many $ checkIndent *> contextAspectE   -- TODO. Dit kan weg.
-              otherContextParts <- if null uses && null ind -- && null aspects
+              aspects <- many $ checkIndent *> contextAspectE
+              otherContextParts <- if null uses && null ind && null aspects
                 then entireBlock1 contextPart
                 else entireBlock contextPart
               -- The parts nested below `on entry` or `on exit`:
@@ -218,7 +218,7 @@ contextE = withPos do
     aspectRole = do
       roleKind <- reserved "aspect" *> kind
       pos <- getPosition
-      roleId <- qualifiedName
+      roleId <- qualifiedName <|> prefixedName
       pure $ AspectRole roleId roleKind pos
 
       where
@@ -229,10 +229,10 @@ contextE = withPos do
 
 
     contextAspectE :: IP ContextPart
-    contextAspectE = do
+    contextAspectE = try do
       void $ reserved "aspect"
       pos <-getPosition
-      aspect <- qualifiedName
+      aspect <- qualifiedName <|> prefixedName
       pure $ ContextAspect aspect pos
 
     contextIndexedE :: IP (List ContextPart)
