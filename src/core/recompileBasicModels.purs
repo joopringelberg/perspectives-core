@@ -108,7 +108,7 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
       do
         log ("Recompiling " <> _id)
         -- TODO. We moeten de inverse queries verwerken in de andere modellen!
-        r <- lift $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (loadArcAndCrl' contents.arc contents.crl)
+        r <- loadArcAndCrl' contents.arc contents.crl
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
           Right df@(DomeinFile drf@{invertedQueriesInOtherDomains}) -> lift do
