@@ -65,7 +65,8 @@ data ContextPart =
   PREFIX Prefix ModelName |
   ContextAspect String ArcPosition |
   IndexedContext String ArcPosition |
-  CSQP (List StateQualifiedPart)
+  CSQP (List StateQualifiedPart) |
+  AspectRole String RoleKind ArcPosition
 
 --------------------------------------------------------------------------------
 ---- ROLE

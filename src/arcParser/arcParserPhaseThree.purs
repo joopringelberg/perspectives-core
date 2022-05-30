@@ -75,6 +75,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole, tryGetPerspectType)
 import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, kindOfRole, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional, typeIncludingAspectsAndBinding)
+import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs)
@@ -88,7 +89,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (actionStates, aspectsOfRole, automaticStates, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty)
+import Perspectives.Types.ObjectGetters (actionStates, aspectsOfRole, automaticStates, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, perspectivesOfRole, roleStates, statesPerProperty, string2RoleType)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not)
 
@@ -114,6 +115,7 @@ phaseThree_ df@{_id, referredModels} postponedParts screens = do
   indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
   (Tuple ei {dfr}) <- runPhaseTwo_'
     (do
+      checkAspectRoleReferences
       qualifyBindings
       qualifyStateNames
       compileCalculatedRolesAndProperties
@@ -145,6 +147,29 @@ withDomeinFile ns df mpa = do
   r <- mpa
   lift2 $ removeDomeinFileFromCache ns
   pure r
+
+-- | Aspect roles are added by default as Enumerated to their context. However, they may be Calculated and only now can we check.
+-- | Switch RoleType for those aspect roles.
+checkAspectRoleReferences :: PhaseThree Unit
+checkAspectRoleReferences = do
+  df@{_id} <- lift $ State.gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (checkAspectRoles' df)
+  where
+    checkAspectRoles' :: DomeinFileRecord -> PhaseThree Unit
+    checkAspectRoles' {contexts} = do 
+      contexts' <- for contexts
+        \(CTXT.Context r@{contextRol, rolInContext, gebruikerRol}) -> do
+          contextRol' <- traverse check contextRol
+          rolInContext' <- traverse check rolInContext
+          gebruikerRol' <- traverse check gebruikerRol
+          pure $ CTXT.Context $ r {contextRol = contextRol', rolInContext = rolInContext', gebruikerRol = gebruikerRol'}
+      modifyDF \dfr -> dfr {contexts = contexts'}
+      where
+        check :: RoleType -> PhaseThree RoleType
+        check rt = lift $ lift $ string2RoleType $ roletype2string rt
 
 -- | Qualifies the identifiers used in the filledBy part of an EnumeratedRole declaration.
 -- | A binding is represented as an ADT. We transform all elements of the form `ST segmentedName` in the tree

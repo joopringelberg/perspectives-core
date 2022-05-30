@@ -46,25 +46,25 @@ colon = token.colon
 
 arcIdentifier :: IP String
 arcIdentifier = (qualifiedName <|> prefixedName <|> segmentedName) <?> "a capitalized name, a prefixed name, or a fully qualified name"
-  where
-    qualifiedName :: IP String
-    qualifiedName = try do
-      m <- (string "model:")
-      i <- segmentedName
-      pure $ m <> i
 
-    prefixedName :: IP String
-    prefixedName = try do
-      pre <- lowerCaseName
-      void token.colon
-      i <- segmentedName
-      pure (pre <> ":" <> i)
+qualifiedName :: IP String
+qualifiedName = try do
+  m <- (string "model:")
+  i <- segmentedName
+  pure $ m <> i
 
-    segmentedName :: IP String
-    segmentedName = try do
-      first <- token.identifier
-      rest <- many (string "$" *> token.identifier)
-      pure (intercalate "$" (cons first rest))
+prefixedName :: IP String
+prefixedName = try do
+  pre <- lowerCaseName
+  void token.colon
+  i <- segmentedName
+  pure (pre <> ":" <> i)
+
+segmentedName :: IP String
+segmentedName = try do
+  first <- token.identifier
+  rest <- many (string "$" *> token.identifier)
+  pure (intercalate "$" (cons first rest))
 
 -- | Parses /.../
 regexExpression' :: IP String
