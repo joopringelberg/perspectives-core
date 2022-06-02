@@ -38,10 +38,12 @@ import Data.Symbol (SProxy(..))
 import Foreign.Object (Object, delete, empty, filter, insert, lookup, singleton)
 import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, (###=))
+import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
 import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
+import Perspectives.Representation.Class.PersistentType (getContext)
+import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -89,12 +91,14 @@ context_buitenRol (PerspectContext{buitenRol})= buitenRol
 context_iedereRolInContext :: PerspectContext -> Object (Array RoleInstance)
 context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
 
-context_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance
-context_rolInContext (PerspectContext{aliases, rolInContext}) (EnumeratedRoleType rn) = case lookup rn aliases of
-  Nothing -> []
-  Just s -> case lookup s rolInContext of
-    Nothing -> []
-    Just rs -> rs
+context_rolInContext :: PerspectContext -> EnumeratedRoleType -> MP (Array RoleInstance)
+context_rolInContext (PerspectContext{pspType, rolInContext}) (EnumeratedRoleType rn) = do
+  Context{roleAliases} <- getContext pspType
+  case lookup rn roleAliases of
+    Nothing -> pure []
+    Just s -> case lookup (NT.unwrap s) rolInContext of
+      Nothing -> pure []
+      Just rs -> pure rs
 
 context_me :: PerspectContext -> Maybe RoleInstance
 context_me (PerspectContext{me}) = me
@@ -126,17 +130,11 @@ _aliases' = _Newtype <<< _aliases
     _aliases :: forall a r. Lens' { aliases :: a | r } a
     _aliases = prop (SProxy :: SProxy "aliases")
 
-addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> MonadPerspectives PerspectContext
+addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 addContext_rolInContext (PerspectContext cr@{aliases,rolInContext}) r@(EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
-  Nothing -> do
-    aspects <- r ###= roleAspectsClosure
-    pure $ PerspectContext cr
-      { rolInContext = insert rolName [rolId] rolInContext
-      -- Add all Aspects of the role as its aliases to the context.
-      -- Note this does too much work when there is more than one aspect.
-      , aliases = foldl (\als aspect -> insert (NT.unwrap aspect) rolName als) aliases aspects
-      }
-  Just roles -> pure $ PerspectContext cr {rolInContext = insert rolName (cons rolId roles) rolInContext}
+  Nothing -> PerspectContext cr
+      { rolInContext = insert rolName [rolId] rolInContext }
+  Just roles -> PerspectContext cr {rolInContext = insert rolName (cons rolId roles) rolInContext}
 
 removeContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 removeContext_rolInContext c@(PerspectContext cr@{rolInContext}) (EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of

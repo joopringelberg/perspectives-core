@@ -23,9 +23,9 @@
 module Perspectives.Representation.Context where
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
@@ -34,7 +34,7 @@ import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType, RoleType)
 import Prelude (class Eq, class Show, map, (<<<), (==))
 
 -----------------------------------------------------------
@@ -62,6 +62,8 @@ type ContextRecord =
 
   , invertedQueries :: Object (Array InvertedQuery)
 
+  , roleAliases :: Object (EnumeratedRoleType)
+
   , pos :: ArcPosition
   }
 
@@ -88,6 +90,8 @@ defaultContext id dname kind context pos = Context { _id: (ContextType id)
   , indexedContext: Nothing
 
   , invertedQueries: empty
+
+  , roleAliases: empty
   }
 
 derive instance genericRepContext :: Generic Context _

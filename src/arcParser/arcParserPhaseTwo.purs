@@ -26,7 +26,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets, modify)
-import Data.Array (cons, elemIndex)
+import Data.Array (cons, elemIndex, foldl)
 import Data.Array (fromFoldable) as ARR
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
@@ -109,7 +109,12 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     -- Construct a Role
     handleParts contextUnderConstruction (RE r) = do
       role <- traverseRoleE r (addNamespace ns id)
-      pure (role `insertRoleInto` contextUnderConstruction)
+      context' <- pure (role `insertRoleInto` contextUnderConstruction)
+      case role of 
+        E (EnumeratedRole {_id, roleAspects}) -> do
+          case context' of 
+            Context cr@{roleAliases} -> pure $ Context $ cr { roleAliases = foldl (\als (RoleInContext{role:role'}) -> insert (unwrap role') _id als) roleAliases roleAspects }
+        _ -> pure context'
 
     -- Prefixes are handled earlier, so this can be a no-op
     handleParts contextUnderConstruction (PREFIX pre model) = pure contextUnderConstruction

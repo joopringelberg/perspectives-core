@@ -65,7 +65,7 @@ externalRole ci = ArrayT $ (try $ lift $ getContextMember IP.externalRole ci) >>
     \erole -> (tell $ ArrayWithoutDoubles [External ci]) *> pure [erole]
 
 getEnumeratedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
-getEnumeratedRoleInstances rn c = ArrayT $ (lift $ try $ getContextMember (flip context_rolInContext rn) c) >>=
+getEnumeratedRoleInstances rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c >>= flip context_rolInContext rn) >>=
   handlePerspectContextError' "getEnumeratedRoleInstances" []
     \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
 

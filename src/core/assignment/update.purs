@@ -125,9 +125,10 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
                 then f role pe unlinked
                 else pure unit
 
-              else if isJust $ elemIndex roleId (context_rolInContext pe rolName)
-                then pure unit
-                else f role pe unlinked
+              else (lift $ context_rolInContext pe rolName) >>= \roles -> 
+                if isJust $ elemIndex roleId roles
+                  then pure unit
+                  else f role pe unlinked
 
   where
     f :: PerspectRol -> PerspectContext -> Boolean -> MonadPerspectivesTransaction Unit
