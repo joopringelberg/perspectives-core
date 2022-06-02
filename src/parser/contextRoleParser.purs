@@ -26,7 +26,7 @@ import Control.Alt (void, (<|>))
 import Control.Monad.State (StateT, execStateT, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable, insert) as AR
-import Data.Array (dropEnd, foldl, intercalate)
+import Data.Array (dropEnd, foldM, foldl, intercalate)
 import Data.CodePoint.Unicode (isLower)
 import Data.Either (Either(..))
 import Data.Foldable (elem, fold, traverse_)
@@ -43,7 +43,7 @@ import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
 import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectives, (###=))
+import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
 import Perspectives.IndentParser (IP, ContextRoleParserMonad, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
@@ -750,7 +750,8 @@ userData = do
     (roles :: FO.Object PerspectRol) <- getRoleInstances
     (contexts :: FO.Object PerspectContext) <- getContextInstances
     -- Set the inverse bindings.
-    setRoleInstances $ addGevuldeRollen contexts roles <$> roles
+    roles' <- lift $ lift $ lift (traverse (addGevuldeRollen contexts roles) roles) 
+    setRoleInstances roles'
     -- Check each role instance for binding to a role with isMe == true. Then set 'me' on their contexts.
     x <- getRoleInstances >>= traverseWithIndex
       (\id role -> do
@@ -775,11 +776,11 @@ userData = do
 
     -- Find all Filled roles that bind (are filled by) r.
     -- Add them as the value of filledRoles to filler, each under the type of its context and its own type as keys.
-    addGevuldeRollen :: FO.Object PerspectContext -> FO.Object PerspectRol -> PerspectRol -> PerspectRol
-    addGevuldeRollen contexts filledRoles filler = foldl (\filler' filledRole ->
+    addGevuldeRollen :: FO.Object PerspectContext -> FO.Object PerspectRol -> PerspectRol -> MP PerspectRol
+    addGevuldeRollen contexts filledRoles filler = foldM (\filler' filledRole ->
       if rol_binding filledRole == Just (ID.identifier filler)
         then addRol_gevuldeRollen filler' (roleContextType filledRole) (rol_pspType filledRole) (ID.identifier filledRole)
-        else filler')
+        else pure filler')
       filler
       (values filledRoles)
       where

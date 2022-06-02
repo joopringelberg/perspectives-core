@@ -324,7 +324,7 @@ addModelToLocalStore' url originalLoad = do
                               "addModelToLocalStore'"
                               -- set the inverse binding if not already there.
                               \newBinding -> do
-                                void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole) (RoleInstance i))
+                                void $ lift ((addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole) (RoleInstance i)) >>= cacheEntity newBindingId )
                                 void $ lift $ saveEntiteit newBindingId
                                 saveRoleInstance i $ changeRevision (rev oldRole) newRole
                         Just oldBindingId -> if newBindingId == oldBindingId
@@ -352,7 +352,7 @@ addModelToLocalStore' url originalLoad = do
                           "addModelToLocalStore'"
                           -- set the inverse binding if not already there.
                           \newBinding -> do
-                            void $ lift $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole') (RoleInstance i))
+                            void $ lift ((addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole') (RoleInstance i)) >>= cacheEntity newBindingId )
                             void $ lift $ saveEntiteit newBindingId
                             saveRoleInstance i newRole'
                             -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.

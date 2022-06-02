@@ -657,7 +657,7 @@ fillerPointsTo fillerId filledId = (lift $ try $ getPerspectEntiteit fillerId) >
       handlePerspectRolError' "fillerNoLongerPointsTo" unit
       \(filled :: PerspectRol) -> do
         filledContextType <- lift (rol_context filled ##>> contextType)
-        filler' <- pure $ (addRol_gevuldeRollen filler filledContextType (rol_pspType filled) filledId)
+        filler' <- lift (addRol_gevuldeRollen filler filledContextType (rol_pspType filled) filledId)
         cacheAndSave fillerId filler'
 
 -- | <filledId> `filledNoLongerPointsTo` <fillerId>
