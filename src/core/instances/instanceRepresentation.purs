@@ -64,7 +64,6 @@ type ContextRecord =
   , pspType :: ContextType
   , buitenRol :: RoleInstance
   , rolInContext :: F.Object (Array RoleInstance)
-  , aliases :: F.Object String
   , me :: Maybe RoleInstance
   , preferredUserRoleType :: Maybe RoleType
   , universeContextDelta :: SignedDelta

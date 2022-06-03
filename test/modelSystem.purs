@@ -79,7 +79,7 @@ theSuite = suiteSkip  "Model:System" do
           (RolSerialization{ id: Nothing, properties: PropertySerialization empty, binding: Just descriptionId})
         role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head (catMaybes roleIds))
         b <- getPerspectRol (RoleInstance descriptionId)
-        void $ cacheEntity (RoleInstance descriptionId) (addRol_gevuldeRollen b binderContextType binder _id)
+        void $ (addRol_gevuldeRollen b binderContextType binder _id) >>= cacheEntity (RoleInstance descriptionId)
         void $ saveEntiteit (RoleInstance descriptionId)
 
         -- Check if model:TestBotActie is in perspect_models

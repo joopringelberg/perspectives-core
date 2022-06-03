@@ -35,7 +35,7 @@ import Data.Newtype (unwrap, over) as NT
 import Data.Ord (Ordering, compare)
 import Data.String (Pattern(..), lastIndexOf, splitAt)
 import Data.Symbol (SProxy(..))
-import Foreign.Object (Object, delete, empty, filter, insert, lookup, singleton)
+import Foreign.Object (Object, delete, empty, insert, lookup, singleton)
 import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
@@ -48,7 +48,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
-import Prelude (flip, identity, pure, show, ($), (+), (/), (<<<), (<>), bind, not, eq, (<#>), (<$>))
+import Prelude (bind, eq, flip, identity, pure, show, ($), (+), (/), (<#>), (<$>), (<<<), (<>))
 
 -- CONTEXT
 
@@ -92,13 +92,15 @@ context_iedereRolInContext :: PerspectContext -> Object (Array RoleInstance)
 context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
 
 context_rolInContext :: PerspectContext -> EnumeratedRoleType -> MP (Array RoleInstance)
-context_rolInContext (PerspectContext{pspType, rolInContext}) (EnumeratedRoleType rn) = do
-  Context{roleAliases} <- getContext pspType
-  case lookup rn roleAliases of
-    Nothing -> pure []
-    Just s -> case lookup (NT.unwrap s) rolInContext of
+context_rolInContext (PerspectContext{pspType, rolInContext}) (EnumeratedRoleType rn) = case lookup rn rolInContext of
+  Nothing -> do
+    Context{roleAliases} <- getContext pspType
+    case lookup rn roleAliases of
       Nothing -> pure []
-      Just rs -> pure rs
+      Just s -> case lookup (NT.unwrap s) rolInContext of
+        Nothing -> pure []
+        Just rs -> pure rs
+  Just rs -> pure rs
 
 context_me :: PerspectContext -> Maybe RoleInstance
 context_me (PerspectContext{me}) = me
@@ -124,14 +126,8 @@ _roleInstances' (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t
     _rolInContext :: forall a r. Lens' { rolInContext :: a | r } a
     _rolInContext = prop (SProxy :: SProxy "rolInContext")
 
-_aliases' :: Traversal' PerspectContext (Object String)
-_aliases' = _Newtype <<< _aliases
-  where
-    _aliases :: forall a r. Lens' { aliases :: a | r } a
-    _aliases = prop (SProxy :: SProxy "aliases")
-
 addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
-addContext_rolInContext (PerspectContext cr@{aliases,rolInContext}) r@(EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
+addContext_rolInContext (PerspectContext cr@{rolInContext}) r@(EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
   Nothing -> PerspectContext cr
       { rolInContext = insert rolName [rolId] rolInContext }
   Just roles -> PerspectContext cr {rolInContext = insert rolName (cons rolId roles) rolInContext}
@@ -142,21 +138,18 @@ removeContext_rolInContext c@(PerspectContext cr@{rolInContext}) (EnumeratedRole
   Just roles -> PerspectContext cr {rolInContext = insert rolName (Arr.delete rolId roles) rolInContext}
 
 deleteContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> PerspectContext
-deleteContext_rolInContext (PerspectContext ct@{rolInContext, aliases}) (EnumeratedRoleType rolName) = PerspectContext (ct
+deleteContext_rolInContext (PerspectContext ct@{rolInContext}) (EnumeratedRoleType rolName) = PerspectContext (ct
   { rolInContext = delete rolName rolInContext
-  , aliases = filter (not <<< eq rolName) aliases
   })
 
 type Modifier = Array RoleInstance -> Array RoleInstance
 
 modifyContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Modifier -> MonadPerspectives PerspectContext
-modifyContext_rolInContext ct@(PerspectContext cr@{rolInContext, aliases}) r@(EnumeratedRoleType rolName) f = case view (_roleInstances' r) ct of
+modifyContext_rolInContext ct@(PerspectContext cr@{rolInContext}) r@(EnumeratedRoleType rolName) f = case view (_roleInstances' r) ct of
   Nothing -> do
     aspects <- r ###= roleAspectsClosure
     pure $ PerspectContext cr
-      { rolInContext = insert rolName (f []) rolInContext
-      , aliases = foldl (\als aspect -> insert (NT.unwrap aspect) rolName als) aliases aspects
-      }
+      { rolInContext = insert rolName (f []) rolInContext}
   Just roles -> pure $ set (_roleInstances' r) (Just (f roles)) ct
 
 context_states :: PerspectContext -> Array StateIdentifier
@@ -182,7 +175,6 @@ defaultContextRecord =
   , pspType: ContextType ""
   , buitenRol: RoleInstance ""
   , rolInContext: empty
-  , aliases: empty
   , me: Nothing
   , preferredUserRoleType: Nothing
   , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord"}

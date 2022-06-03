@@ -73,7 +73,7 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty Cal
   isCalculated _ = pure true
   calculation r = case (unwrap r).calculation of
     Q calc -> pure calc
-    otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedProperty before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedPropertyType))))
+    otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedProperty before the expression has been compiled. This counts as a system programming error. For property: " <> (unwrap $ (identifier r :: CalculatedPropertyType))))
   constrainingFacets r = []
 
 instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty EnumeratedPropertyType where
