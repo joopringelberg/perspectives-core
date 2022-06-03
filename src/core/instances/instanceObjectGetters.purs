@@ -36,7 +36,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (Object, keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, context_rolInContext_, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -66,6 +66,11 @@ externalRole ci = ArrayT $ (try $ lift $ getContextMember IP.externalRole ci) >>
 
 getEnumeratedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getEnumeratedRoleInstances rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c >>= flip context_rolInContext rn) >>=
+  handlePerspectContextError' "getEnumeratedRoleInstances" []
+    \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
+
+getEnumeratedRoleInstances_ :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
+getEnumeratedRoleInstances_ rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c >>= flip context_rolInContext_ rn) >>=
   handlePerspectContextError' "getEnumeratedRoleInstances" []
     \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
 

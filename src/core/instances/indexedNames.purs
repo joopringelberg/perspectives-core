@@ -52,10 +52,6 @@ replaceIndexedNames s = do
   s' <- pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unwrap $ unsafeIndex roleReplacements iname) crl_) s (keys roleReplacements)
   pure $ foldl (\(crl_ :: String) iname -> replaceAll (Pattern iname) (Replacement $ unwrap $ unsafeIndex contextReplacements iname) crl_) s' (keys contextReplacements)
 
--- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
-indexedRoles :: RoleInstance -> MonadPerspectives (Object RoleInstance)
-indexedRoles modelDescription = (modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedRole")) >>= indexedRoles_
-
 indexedRoles_ :: Array RoleInstance -> MonadPerspectives (Object RoleInstance)
 indexedRoles_ roleIds = do
   rows <- foldM

@@ -102,6 +102,12 @@ context_rolInContext (PerspectContext{pspType, rolInContext}) (EnumeratedRoleTyp
         Just rs -> pure rs
   Just rs -> pure rs
 
+-- This version does no model reflection. 
+context_rolInContext_ :: PerspectContext -> EnumeratedRoleType -> MP (Array RoleInstance)
+context_rolInContext_ (PerspectContext{pspType, rolInContext}) (EnumeratedRoleType rn) = case lookup rn rolInContext of
+  Nothing -> pure []
+  Just rs -> pure rs
+
 context_me :: PerspectContext -> Maybe RoleInstance
 context_me (PerspectContext{me}) = me
 

@@ -39,7 +39,7 @@ import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCac
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.IndentParser (runIndentParser')
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances)
+import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances_)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
@@ -145,8 +145,10 @@ loadArcAndCrl' arcSource crlSource = do
 
     collectIndexedNames :: RoleInstance -> MonadPerspectives (Tuple (Array RoleInstance) (Array ContextInstance))
     collectIndexedNames modelDescription = do
-      iroles <- modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedRole") >=> binding
-      icontexts <- modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedContext") >=> binding >=> context
+      -- Notice that we MUST use the function that does no model reflection to get role instances from a context!
+      -- This is because on compiling model:System, these roles are not yet defined.
+      iroles <- modelDescription ##= context >=> getEnumeratedRoleInstances_ (EnumeratedRoleType "model:System$Model$IndexedRole") >=> binding
+      icontexts <- modelDescription ##= context >=> getEnumeratedRoleInstances_ (EnumeratedRoleType "model:System$Model$IndexedContext") >=> binding >=> context
       pure $ Tuple iroles icontexts
 
 parseError2PerspectivesError :: ParseError -> PerspectivesError
