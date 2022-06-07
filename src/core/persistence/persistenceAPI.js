@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // TODO. Webpack switch voor pouchdb-browser?
-// var PouchDB = require('pouchdb-browser').default;
-var PouchDB = require('pouchdb');
+var PouchDB = require('pouchdb-browser').default;
+// var PouchDB = require('pouchdb');
 
 // TODO. Zodra we een encoding toepassen waarbij _rev en _id bewaard blijven, is deze functie overbodig.
 exports.addNameAndVersionHack = function( doc, name, rev)

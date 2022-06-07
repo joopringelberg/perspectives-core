@@ -178,6 +178,7 @@ includeDocs = true
 excludeDocs :: Boolean
 excludeDocs = false
 
+-- | Argument `dbName` may be an url identifying a Couchdb database.
 documentsInDatabase :: forall f. DatabaseName -> Boolean -> MonadPouchdb f PouchdbAllDocs
 documentsInDatabase dbName include_docs = withDatabase dbName
   \db -> catchError

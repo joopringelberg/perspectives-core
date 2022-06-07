@@ -26,12 +26,14 @@ where
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
+import Data.Array (catMaybes)
 import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Map (insert)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
 import Effect.Aff (Aff, Error, Fiber, Milliseconds(..), catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
@@ -39,7 +41,7 @@ import Effect.Aff.AVar (AVar, empty, new, put, take)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Foreign (Foreign)
-import Main.RecompileBasicModels as RBM
+import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), (##=), (##>>))
@@ -52,7 +54,7 @@ import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase)
+import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, includeDocs)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
@@ -60,13 +62,14 @@ import Perspectives.PerspectivesState (newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..), StateIdentifier)
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>), (>), (-), (+), (<))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>), (>), (-), (+), (<), (*>))
+import Simple.JSON (read)
 
 -- | Don't do anything. runPDR will actually start the core.
 main :: Effect Unit
@@ -402,5 +405,44 @@ addIndexedNames = do
   iContexts <- indexedContexts_ contextInstances
   modify \ps -> ps {indexedRoles = iRoles, indexedContexts = iContexts}
 
+-- | Recompiles a number of essential models. Use this function when the definition of the DomeinFile
+-- | has changed. The local models directory of the user that is provided, will have the freshly compiled
+-- | DomeinFiles, so this user can be booted. The essential models include model:ModelManagement, so that
+-- | using this account, all models can be recompiled from the client.
+-- | These functions depend heavily on the Perspectives types in model:System and
+-- | model:ModelManagement.
 recompileBasicModels :: Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-recompileBasicModels = RBM.recompileBasicModels
+recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
+  do
+    case decodePouchdbUser' rawPouchdbUser of
+      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
+      Right (pouchdbUser :: PouchdbUser) -> do
+        transactionFlag <- new 0
+        transactionWithTiming <- empty
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
+        runPerspectivesWithState
+          (do
+            addAllExternalFunctions
+            modelsDb <- modelsDatabaseName
+            {rows:allModels} <- documentsInDatabase modelsDb includeDocs
+            uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case read <$> doc of
+              Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
+              Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
+              Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
+            executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel'
+          )
+          state
+  where
+    handler :: Either Error Unit -> Effect Unit
+    handler (Left e) = do
+      logPerspectivesError $ Custom $ "An error condition in recompileBasicModels: " <> (show e)
+      callback false
+    handler (Right e) = do
+      logPerspectivesError $ Custom $ "Basic models recompiled!"
+      callback true
+    
+    recompileModel' :: UninterpretedDomeinFile -> MonadPerspectives Unit
+    recompileModel' df= void $ runMonadPerspectivesTransaction'
+      false
+      (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+      (recompileModel df)

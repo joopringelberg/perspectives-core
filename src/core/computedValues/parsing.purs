@@ -33,6 +33,7 @@ import Data.Array (cons, head, intercalate)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Main.RecompileBasicModels (recompileModelsAtUrl)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, type (~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (storeDomeinFileInCache)
@@ -100,6 +101,14 @@ uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crl
         lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) url
   _, _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
+-- | Parse and compile all models found at the URL.
+compileRepositoryModels ::
+  Array Url ->
+  Array RoleInstance -> MonadPerspectivesTransaction Unit
+compileRepositoryModels url_ _ = case head url_ of
+  Just url -> recompileModelsAtUrl url
+  _ -> logPerspectivesError $ Custom ("compileRepositoryModels lacks arguments")
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -107,4 +116,5 @@ externalFunctions =
   [ Tuple "model:Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1}
   , Tuple "model:Parsing$ParseAndCompileCrl" {func: unsafeCoerce parseAndCompileCrl, nArgs: 1}
   , Tuple "model:Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 3}
+  , Tuple "model:Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1}
 ]

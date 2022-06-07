@@ -39,90 +39,54 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
-import Effect (Effect)
-import Effect.Aff (Error, error, runAff, throwError, try)
-import Effect.Aff.AVar (empty, new)
+import Effect.Aff (try)
 import Effect.Class.Console (log)
-import Foreign (Foreign)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (addInvertedQuery, modelsDatabaseName)
-import Perspectives.External.CoreModules (addAllExternalFunctions)
+import Perspectives.Extern.Couchdb (addInvertedQuery)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (documentsInDatabase, includeDocs)
-import Perspectives.Persistence.Types (Url, PouchdbUser, decodePouchdbUser')
+import Perspectives.Persistence.Types (Url)
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.PerspectivesState (newPerspectivesState)
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
-import Perspectives.RunPerspectives (runPerspectivesWithState)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadArcAndCrl')
 import Simple.JSON (class ReadForeign, read, read')
 
 modelDescription :: EnumeratedRoleType
 modelDescription = EnumeratedRoleType "model:ModelManagement$ManagedModel$ModelDescription"
 
--- | Recompiles a number of essential models. Use this function when the definition of the DomeinFile
--- | has changed. The local models directory of the user that is provided, will have the freshly compiled
--- | DomeinFiles, so this user can be booted. The essential models include model:ModelManagement, so that
--- | using this account, all models can be recompiled from the client.
--- | These functions depend heavily on the Perspectives types in model:System and
--- | model:ModelManagement.
-recompileBasicModels :: Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
+recompileModelsAtUrl :: Url -> MonadPerspectivesTransaction Unit
+recompileModelsAtUrl repository = do
+  {rows:allModels} <- lift $ documentsInDatabase repository includeDocs
+  uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case read <$> doc of
+    Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
+    Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
+    Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
+  executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel
+
+recompileModel :: UninterpretedDomeinFile -> MonadPerspectivesTransaction Unit
+recompileModel (UninterpretedDomeinFile{_id, _rev, contents}) =
   do
-    case decodePouchdbUser' rawPouchdbUser of
-      Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
-      Right (pouchdbUser :: PouchdbUser) -> do
-        transactionFlag <- new 0
-        transactionWithTiming <- empty
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
-        runPerspectivesWithState
-          (do
-            addAllExternalFunctions
-            modelsDb <- modelsDatabaseName
-            {rows:allModels} <- documentsInDatabase modelsDb includeDocs
-            uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case read <$> doc of
-              Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
-              Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
-              Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
-            executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel
-          )
-          state
-  where
-    handler :: Either Error Unit -> Effect Unit
-    handler (Left e) = do
-      logPerspectivesError $ Custom $ "An error condition in recompileBasicModels: " <> (show e)
-      callback false
-    handler (Right e) = do
-      logPerspectivesError $ Custom $ "Basic models recompiled!"
-      callback true
+    log ("Recompiling " <> _id)
+    -- TODO. We moeten de inverse queries verwerken in de andere modellen!
+    r <- loadArcAndCrl' contents.arc contents.crl
+    case r of
+      Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
+      Right df@(DomeinFile drf@{invertedQueriesInOtherDomains}) -> lift do
+        log $  "Recompiled '" <> _id <> "' succesfully!"
+        storeDomeinFileInCouchdbPreservingAttachments df
 
-    recompileModel :: UninterpretedDomeinFile -> MonadPerspectives Unit
-    recompileModel (UninterpretedDomeinFile{_id, _rev, contents}) = void $ runMonadPerspectivesTransaction'
-      false
-      (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
-      do
-        log ("Recompiling " <> _id)
-        -- TODO. We moeten de inverse queries verwerken in de andere modellen!
-        r <- loadArcAndCrl' contents.arc contents.crl
-        case r of
-          Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
-          Right df@(DomeinFile drf@{invertedQueriesInOtherDomains}) -> lift do
-            log $  "Recompiled '" <> _id <> "' succesfully!"
-            storeDomeinFileInCouchdbPreservingAttachments df
-
-            -- Distribute the SeparateInvertedQueries over the other domains.
-            forWithIndex_ invertedQueriesInOtherDomains
-              \domainName queries -> do
-                (try $ getDomeinFile (DomeinFileId domainName)) >>=
-                  handleDomeinFileError "addModelToLocalStore'"
-                  \(DomeinFile dfr) -> do
-                    -- Here we must take care to preserve the screens.js attachment.
-                    (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+        -- Distribute the SeparateInvertedQueries over the other domains.
+        forWithIndex_ invertedQueriesInOtherDomains
+          \domainName queries -> do
+            (try $ getDomeinFile (DomeinFileId domainName)) >>=
+              handleDomeinFileError "addModelToLocalStore'"
+              \(DomeinFile dfr) -> do
+                -- Here we must take care to preserve the screens.js attachment.
+                (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
 
 
 --------------------------------------------------------------------------------------------

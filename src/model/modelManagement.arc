@@ -32,6 +32,8 @@ domain ModelManagement
         props (SourcesChanged) verbs (Consult, SetPropertyValue)
       perspective on Repository
         defaults
+        action CompileRepositoryModels
+          callEffect p:CompileRepositoryModels( Url )
 
   case ManagedModel
     aspect sys:ContextWithNotification
