@@ -19,6 +19,12 @@ import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction, runM
 import Perspectives.RunPerspectives (runPerspectives)
 import Test.Unit.Assert as Assert
 
+developmentRepository :: MonadPerspectives String
+developmentRepository = pure "http://localhost:5984/repository"
+
+developmentRepository_ :: String
+developmentRepository_ = "http://localhost:5984/repository"
+
 couchdbHost :: String
 couchdbHost = "http://127.0.0.1"
 
@@ -26,7 +32,7 @@ couchdbPort :: Int
 couchdbPort = 5984
 
 runP_ :: forall a. String -> MonadPerspectives a -> Aff a
-runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort "http://localhost:5984/repository"
+runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort developmentRepository_
 -- "http://joopringelberg.nl/cbd/repository"
 
 runP :: forall a. MonadPerspectives a -> Aff a

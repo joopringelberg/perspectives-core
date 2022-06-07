@@ -368,6 +368,8 @@ addModelToLocalStore' url originalLoad = do
             case moldCtxt of
               Nothing -> lift $ saveEntiteit_ (ContextInstance i) newVersion
               Just oldCtxt  -> do
+                -- We could retrieve the context from the database.
+                -- As tryFetchEntiteit does not cache, we do it now.
                 void $ lift $ cacheEntity (ContextInstance i) oldCtxt
                 pure oldCtxt
 
