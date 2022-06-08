@@ -8,3 +8,7 @@ ta:Model usr:TestAliasesModel
   extern sys:Model$External$Description = "Test the contextualisation of queries."
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:TestAliases"
   extern sys:Model$External$ModelIdentification = "model:TestAliases"
+  sys:Model$IndexedContext =>
+    ta:TestAliasesApp ta:App
+      extern sys:RootContext$External$Name = "Test Aliases App"
+    sys:Model$IndexedContext$Name = "TestAliases$App"

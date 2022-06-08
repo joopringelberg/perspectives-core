@@ -134,8 +134,7 @@ _roleInstances' (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t
 
 addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 addContext_rolInContext (PerspectContext cr@{rolInContext}) r@(EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
-  Nothing -> PerspectContext cr
-      { rolInContext = insert rolName [rolId] rolInContext }
+  Nothing -> PerspectContext cr { rolInContext = insert rolName [rolId] rolInContext }
   Just roles -> PerspectContext cr {rolInContext = insert rolName (cons rolId roles) rolInContext}
 
 removeContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext

@@ -102,9 +102,8 @@ setPreferredUserRoleType contextId userRoleTypes = (lift $ try $ getPerspectCont
 type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 
 -- | Modifies the context instance by adding the given role instance.
--- | Notice that this function does neither cache nor save the rolInstance itself.
 -- | If the rolInstance is part of the context before the operation, this is a no-op without any effects.
--- | PERSISTENCE of the context instance.
+-- | PERSISTENCE of the context instance and of the role instance (a ContextDelta is added and saved).
 -- | SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
@@ -137,7 +136,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
         -- Add the new instance only when the role type is enumerated in the context; hence not for unlinked role types.
         then lift (modifyContext_rolInContext pe rolName (flip snoc roleId))
         else pure pe
-      -- PERSISTENCE
+      -- CONTEXT PERSISTENCE
       -- Is the new role instance filled by me?
       if isMe
         then do

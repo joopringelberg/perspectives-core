@@ -10,3 +10,9 @@ domain TestAliases
     aspect sys:Model
     external
       aspect sys:Model$External
+
+  case TestAliasesApp
+    indexed ta:App
+    aspect sys:RootContext
+    external
+      aspect sys:RootContext$External
