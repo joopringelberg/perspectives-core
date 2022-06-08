@@ -5,7 +5,7 @@ domain CouchdbManagement
   use mod for model:Models
   use acc for model:BodiesWithAccounts
   use cdb for model:Couchdb
-  use utl for model:Utilities
+  use util for model:Utilities
 
   -- The model description case.
   -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
@@ -99,7 +99,7 @@ domain CouchdbManagement
         on entry
           do for Admin
             letA
-                pw <- callExternal utl:GenSym() returns String
+                pw <- callExternal util:GenSym() returns String
             in
               callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
               -- The Password property comes from the aspect acc:Body$Accounts.
@@ -118,7 +118,7 @@ domain CouchdbManagement
             -- After CouchdbServer$Admin provides the first password, he no longer
             -- has a perspective on it. The new value provided below is thus really private.
             letA
-              pw <- callExternal utl:GenSym() returns String
+              pw <- callExternal util:GenSym() returns String
             in
               callEffect cdb:ResetPassword( context >> extern >> Url, UserName, pw )
               PasswordReset = true

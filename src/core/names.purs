@@ -71,6 +71,7 @@ defaultNamespaces = OBJ.fromFoldable
   , Tuple "usr" "model:User"
   , Tuple "ser" "model:Serialise"
   , Tuple "p" "model:Parsing"
+  , Tuple "util" "model:Utilities"
   ]
 
 defaultIndexedNames :: MonadPerspectives (OBJ.Object String)
