@@ -4,6 +4,11 @@ domain System
   use cdb for model:Couchdb
   use ser for model:Serialise
   use sensor for model:Sensor
+  use util for model:Utilities
+
+  -- Used as model:System$RoleWithId$Id in the PDR code.
+  thing RoleWithId
+    property Id = callExternal util:RoleIdentifier() returns String
 
   case PerspectivesSystem
     indexed sys:MySystem

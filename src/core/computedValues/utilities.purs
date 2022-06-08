@@ -27,7 +27,7 @@ module Perspectives.Extern.Utilities where
 import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Prelude (pure)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -35,9 +35,13 @@ import Unsafe.Coerce (unsafeCoerce)
 genSym :: RoleInstance -> MonadPerspectivesQuery String
 genSym _ = pure "geheim"
 
+roleIdentifier :: RoleInstance -> MonadPerspectivesQuery String
+roleIdentifier (RoleInstance id) = pure id
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model:Utilities$GenSym" {func: unsafeCoerce genSym, nArgs: 0}
+  , Tuple "model:Utilities$RoleIdentifier" {func: unsafeCoerce roleIdentifier, nArgs: 0}
   ]

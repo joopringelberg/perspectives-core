@@ -54,6 +54,7 @@ import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as 
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getFilledRoles, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseBool, parseDate, parseInt)
+import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
@@ -74,7 +75,7 @@ import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', isUnlinked_, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>))
+import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||), (==))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -693,7 +694,8 @@ getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> MP (RoleInstance
 getDynamicPropertyGetter p adt = do
   (pt :: PropertyType) <- getProperType p
   allProps <- allLocallyRepresentedProperties adt
-  if (isJust $ elemIndex pt allProps)
+  -- Special case for the 'property of last resort' that is inserted in serialised perspectives for roles without properties.
+  if (isJust $ elemIndex pt allProps) || pt == (CP $ CalculatedPropertyType roleWithId)
     then getterFromPropertyType pt
     else pure (binding >=> f)
 

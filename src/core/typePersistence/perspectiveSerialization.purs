@@ -40,6 +40,7 @@ import Perspectives.Data.EncodableMap (lookup) as EM
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
+import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
@@ -49,12 +50,13 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..), constrainingFacets) as PROP
 import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleKindOfRoleType)
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), expandPropSet, expandPropertyVerbs, expandVerbs)
 import Perspectives.Representation.ScreenDefinition (WidgetCommonFieldsDef)
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, propertytype2string, roletype2string)
-import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), PropertyType(..), RoleType, propertytype2string, roletype2string)
+import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
 import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
 import Simple.JSON (writeJSON)
@@ -135,8 +137,8 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
   -- TODO. Geef hier de beperkende lijst propertyVerbs uit propertyVerbs' mee!
   roleInstances <- roleInstancesWithProperties
     allProps
-    availableProperties
-    (verbsPerProperty availablePropertyVerbs allProps)
+    (maybeAddIdentifier availableProperties)
+    (verbsPerProperty (maybeAddPropertyVerbs availablePropertyVerbs) (maybeAddIdentifier allProps))
     cid
     p
     (case propertyVerbs' of
@@ -144,7 +146,8 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
       Just (PropertyVerbs _ verbs) -> expandVerbs verbs)
   -- Additional properties available on instances given object state.
   additionalPropertiesOnInstances <- pure $ foldl union [] (propertiesInInstance <$> roleInstances)
-  serialisedProps <- lift $ traverse makeSerialisedProperty (availableProperties <> additionalPropertiesOnInstances)
+  -- If no properties are available, we'd like to add roleWithId as property. Otherwise, no table can be built.
+  serialisedProps <- lift $ traverse makeSerialisedProperty ((maybeAddIdentifier availableProperties) <> additionalPropertiesOnInstances)
   roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes)
   -- If the binding of the ADT that is the range of the object QueryFunctionDescription, is an external role,
   -- its context type may be created.
@@ -173,6 +176,13 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     , identifyingProperty
     }
   where
+    maybeAddIdentifier :: Array PropertyType -> Array PropertyType
+    maybeAddIdentifier props = if null props then [CP $ CalculatedPropertyType roleWithId] else props
+
+    maybeAddPropertyVerbs :: Array PropertyVerbs -> Array PropertyVerbs
+    maybeAddPropertyVerbs pverbs = if null pverbs then [PropertyVerbs (PSet [CP $ CalculatedPropertyType roleWithId]) (PSet [Consult])] else pverbs
+
+
     nameRegex :: Regex
     nameRegex = unsafeRegex "Name" noFlags
 
@@ -185,31 +195,33 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
       AssumptionTracking String
     computeIdentifyingProperty serialisedProps roleInstances = case find (\property -> test nameRegex property.id) serialisedProps of
         Just n -> pure n.id
-        _ -> do
-          -- Otherwise, compute the intersection of the props per role instance
-          (commonProps :: Array String) <- case uncons (propNames <$> roleInstances) of
-            Nothing -> pure []
-            Just {head, tail} -> pure $ foldl intersect head tail
-          -- Then find an element that matches "Name"
-          case find (test nameRegex) commonProps of
-            Just n -> pure n
-            -- There may be no property shared by all instances that matches "Name";
-            Nothing -> case head serialisedProps of
-              -- Then we just return the first property that is available because of context- or subject state;
-              Just s -> pure s.id
-              -- Lacking that,
-              Nothing -> case head commonProps of
-                -- we return the first common property;
-                Just c -> pure c
-                -- lacking that we look for the first roleInstance with properties and return the first of those.
-                -- Notice that other instances may not have that property in scope because of their state.
-                -- This is no problem; the client will just display an un-editable cell.
-                Nothing -> case find (not <<< null) (_.objectStateBasedProperties <$> roleInstances) of
-                  Just obj -> pure $ propertytype2string $ unsafePartial fromJust $ head obj
-                  -- Finally, if no role instance has a property, we return the empty string.
-                  -- This perspective will only make it to the client to be shown as a Create button, so we
-                  -- will not miss the identifying property.
-                  Nothing -> pure ""
+        _ -> if isJust $ find (\property -> property.id == roleWithId) serialisedProps
+          then pure roleWithId
+          else do
+            -- Otherwise, compute the intersection of the props per role instance
+            (commonProps :: Array String) <- case uncons (propNames <$> roleInstances) of
+              Nothing -> pure []
+              Just {head, tail} -> pure $ foldl intersect head tail
+            -- Then find an element that matches "Name"
+            case find (test nameRegex) commonProps of
+              Just n -> pure n
+              -- There may be no property shared by all instances that matches "Name";
+              Nothing -> case head serialisedProps of
+                -- Then we just return the first property that is available because of context- or subject state;
+                Just s -> pure s.id
+                -- Lacking that,
+                Nothing -> case head commonProps of
+                  -- we return the first common property;
+                  Just c -> pure c
+                  -- lacking that we look for the first roleInstance with properties and return the first of those.
+                  -- Notice that other instances may not have that property in scope because of their state.
+                  -- This is no problem; the client will just display an un-editable cell.
+                  Nothing -> case find (not <<< null) (_.objectStateBasedProperties <$> roleInstances) of
+                    Just obj -> pure $ propertytype2string $ unsafePartial fromJust $ head obj
+                    -- Finally, if no role instance has a property, we return the empty string.
+                    -- This perspective will only make it to the client to be shown as a Create button, so we
+                    -- will not miss the identifying property.
+                    Nothing -> pure ""
 
     propNames :: RoleInstanceWithProperties -> Array String
     propNames {objectStateBasedProperties} = propertytype2string <$> objectStateBasedProperties
