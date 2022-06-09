@@ -46,6 +46,7 @@ import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder) as TOP
 import Perspectives.Extern.Couchdb (addInvertedQuery)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (documentsInDatabase, includeDocs)
@@ -107,32 +108,11 @@ executeInTopologicalOrder :: forall m. Monad m =>
   ToSort ->
   (UninterpretedDomeinFile -> m Unit) ->
   m Unit
-executeInTopologicalOrder toSort action = void $ execWriterT (executeInTopologicalOrder' toSort [])
-  where
-    executeInTopologicalOrder' ::
-      ToSort ->
-      SortedLabels ->
-      WriterT Skipped m SortedLabels
-    executeInTopologicalOrder' toSort' sorted = do
-      Tuple sortedLabels skipped <- lift $ runWriterT (foldM executeInTopologicalOrder'' sorted toSort')
-      if null skipped
-        then pure sortedLabels
-        else executeInTopologicalOrder' skipped sortedLabels
-
-    executeInTopologicalOrder'' ::
-      SortedLabels ->
-      UninterpretedDomeinFile ->
-      WriterT Skipped m SortedLabels
-    executeInTopologicalOrder'' sortedLabels df@(UninterpretedDomeinFile{_id}) = if zeroInDegrees df
-      then do
-        lift $ action df
-        pure $ cons _id sortedLabels
-      else do
-        tell [df]
-        pure sortedLabels
-      where
-        zeroInDegrees :: UninterpretedDomeinFile -> Boolean
-        zeroInDegrees (UninterpretedDomeinFile{contents})= null $ contents.referredModels `difference` sortedLabels
+executeInTopologicalOrder toSort action = void $ TOP.executeInTopologicalOrder
+  (\(UninterpretedDomeinFile{_id}) -> _id)
+  (\(UninterpretedDomeinFile{contents}) -> contents.referredModels)
+  toSort
+  action
 
 newtype UninterpretedDomeinFile = UninterpretedDomeinFile
   { _id :: String

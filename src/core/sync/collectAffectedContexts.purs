@@ -78,6 +78,7 @@ import Perspectives.Utilities (findM)
 import Prelude (Unit, bind, const, discard, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
+-- TODO. #12 Check the way state-conditional verbs are combined to establish whether a peer should receive a delta.
 -----------------------------------------------------------
 -- USERSWITHPERSPECTIVEONROLEINSTANCE
 -----------------------------------------------------------

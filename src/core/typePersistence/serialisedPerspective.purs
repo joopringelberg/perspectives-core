@@ -58,6 +58,7 @@ type SerialisedPerspective' =
   ----
   ---- State dependent properties
   ----
+  -- RoleVerbs
   , verbs :: Array String
   -- All properties that are available given Context and Subject state,
   -- unified with all properties that are available given the Object states of

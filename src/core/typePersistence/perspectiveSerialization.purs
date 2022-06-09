@@ -134,7 +134,6 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     Nothing -> pure $ (concat $ expandPropSet allProps <<< (\(PropertyVerbs props _) -> props) <$> availablePropertyVerbs)
     Just (PropertyVerbs restrictedProps _) -> pure $ intersect (expandPropSet allProps restrictedProps) (concat $ expandPropSet allProps <<< (\(PropertyVerbs props _) -> props) <$> availablePropertyVerbs)
   -- Role instances with their property values.
-  -- TODO. Geef hier de beperkende lijst propertyVerbs uit propertyVerbs' mee!
   roleInstances <- roleInstancesWithProperties
     allProps
     (maybeAddIdentifier availableProperties)
@@ -168,6 +167,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     , roleKind
     , verbs: show <$> (if null roleVerbs'
       then concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))
+      -- else combine the verbs from all active states.
       else (intersect roleVerbs' $ concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))))
     , properties: fromFoldable ((\r@({id:propId}) -> Tuple propId r) <$> serialisedProps)
     , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
@@ -321,12 +321,13 @@ makeSerialisedProperty pt = do
 roleInstancesWithProperties ::
   Array PropertyType ->
   Array PropertyType ->
+  -- PropertyVerbs that are applicable given the context- and subject state.
   Object (Array PropertyVerb) ->
   ContextInstance ->
   Perspective ->
   Array PropertyVerb ->
   AssumptionTracking (Array RoleInstanceWithProperties)
-roleInstancesWithProperties allProps contextSubjectStateBasedProps pvArr cid (Perspective{object, roleVerbs, propertyVerbs, actions}) restrictingVerbs = do
+roleInstancesWithProperties allProps contextSubjectStateBasedProps subjectContextStateBasedPropertyVerbs cid (Perspective{object, roleVerbs, propertyVerbs, actions}) restrictingVerbs = do
   (roleGetter :: ContextInstance ~~> RoleInstance) <- lift $ context2role object
   -- These are all instances of the object of the perspective, regardless of their state.
   (roleInstances :: Array RoleInstance) <- runArrayT $ roleGetter cid
@@ -366,16 +367,16 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps pvArr cid (Pe
       (allGetters :: Object Getter) <- get
       -- Add verbs based on state of the role instance to the map of
       -- property to verbs based on context- and subject state.
-      (localVerbsPerProperty :: Object (Array PropertyVerb)) <- pure $ verbsPerProperty' objectStateBasedPropertyVerbs allProps pvArr
+      (localVerbsPerProperty :: Object (Array PropertyVerb)) <- pure $ verbsPerProperty' objectStateBasedPropertyVerbs allProps subjectContextStateBasedPropertyVerbs
       -- Apply for each property available based on context, subject or object
       -- state, the getter to the role instance.
+      -- The first Tuple member is the string representation of the property id.
       (valuesAndVerbs :: Array (Tuple String ValuesWithVerbs)) <- for (objectStateBasedProperties <> contextSubjectStateBasedProps)
         \propertyType -> do
           getter <- pure $ unsafePartial fromJust $ lookup (propertytype2string propertyType) allGetters
           vals <- lift (runArrayT $ getter roleId)
           pure $ Tuple (propertytype2string propertyType)
             { values: unwrap <$> vals
-            -- TODO. Filter deze propertyVerbs met de beperkende lijst!
             , propertyVerbs: show <$> intersect restrictingVerbs (unsafePartial fromJust $ lookup (propertytype2string propertyType) localVerbsPerProperty)}
       pure $ Just
         { roleId: (unwrap roleId)
