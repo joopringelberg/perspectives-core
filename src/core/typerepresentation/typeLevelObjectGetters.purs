@@ -45,14 +45,14 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError')
-import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole)
-import Perspectives.Instances.Combinators (closure_, conjunction, some)
+import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole, startsWithSegments)
+import Perspectives.Instances.Combinators (closure_, conjunction, filter', some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
+import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
 import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
@@ -61,10 +61,10 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, StateIdentifier(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (Unit, append, bind, flip, pure, show, unit, ($), (&&), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||), (*>), (/=))
+import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -163,6 +163,13 @@ allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole user
   where
     userRole' :: ContextType ~~~> RoleType
     userRole' = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< ContextClass.userRole)
+
+aspectRoles :: ContextType ~~~> RoleType
+aspectRoles ct@(ContextType contextName) = filter' allRoleTypesInContext 
+  (\rt -> case rt of
+    (ENR (EnumeratedRoleType roleName)) -> not (roleName `startsWithSegments` contextName)
+    _ -> true)
+  ct
 
 -- | Returns the name of the model that defines the role type as a String Value.
 contextTypeModelName :: ContextType ~~~> Value

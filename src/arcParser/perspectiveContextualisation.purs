@@ -4,27 +4,30 @@ import Prelude
 
 import Control.Monad.State as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, filter, foldM, null)
+import Control.Monad.Writer (WriterT, execWriterT, tell)
+import Data.Array (catMaybes, filter, foldM, intersect, null)
 import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for_, traverse)
 import Foreign.Object (insert, values, lookup)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes ((###=))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, modifyDF, withDomeinFile)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Query.QueryTypes (domain2roleType, range)
+import Perspectives.Query.QueryTypes (domain2roleInContext, domain2roleType, range, roleInContext2Role)
+import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs, StateSpec)
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
 import Perspectives.Representation.Verbs (RoleVerbList)
-import Perspectives.Types.ObjectGetters (lessThanOrEqualTo)
+import Perspectives.Types.ObjectGetters (aspectRoles, lessThanOrEqualTo)
 
 contextualisePerspectives :: PhaseThree Unit
 contextualisePerspectives = do
@@ -46,7 +49,7 @@ contextualisePerspectives = do
 
     -- Stores the EnumeratedRole in PhaseTwoState.
     contextualisePerspectives'' :: EnumeratedRole -> PhaseThree Unit
-    contextualisePerspectives'' (EnumeratedRole r@{perspectives, roleAspects}) = if null roleAspects
+    contextualisePerspectives'' (EnumeratedRole r@{perspectives, roleAspects, context}) = if null roleAspects
       then pure unit
       else do
         -- As contextualising requires other EnumeratedRoles that may by now have been 
@@ -54,13 +57,27 @@ contextualisePerspectives = do
         -- Only the current role has not yet been modified and can be used as is.
         aspects <- catMaybes <$> traverse getRole roleAspects
         perspectives' <- traverse (contextualisePerspective aspects) perspectives
-        saveRole (EnumeratedRole r {perspectives = perspectives'})
+        -- If an Aspect user role has a perspective on an (Aspect) role that has
+        -- been added as is to the user's context, add that perspective to the 
+        -- user's perspectives.
+        aspectRolesInContext <- lift $ lift (context ###= aspectRoles)
+        aspectPerspectives <- execWriterT (for_ aspects (writePerspectiveOnAddedRole aspectRolesInContext))
+        saveRole (EnumeratedRole r {perspectives = perspectives' <> aspectPerspectives})
     
     saveRole :: EnumeratedRole -> PhaseThree Unit
     saveRole r = modifyDF \(dfr@{enumeratedRoles}) -> dfr {enumeratedRoles = insert (identifier_ r) r enumeratedRoles}
 
     getRole :: QT.RoleInContext -> PhaseThree (Maybe EnumeratedRole)
     getRole (QT.RoleInContext{role}) = getsDF \{enumeratedRoles} -> lookup (unwrap role) enumeratedRoles
+
+    writePerspectiveOnAddedRole :: Array RoleType -> EnumeratedRole -> WriterT (Array Perspective) PhaseThree Unit
+    writePerspectiveOnAddedRole potentialObjects (EnumeratedRole{perspectives:aspectUserPerspectives}) = do
+      for_ aspectUserPerspectives \(p@(Perspective{object})) -> let
+        perspectiveObjectRoles = allLeavesInADT $ map roleInContext2Role $ unsafePartial domain2roleInContext $ range object
+        in 
+          if null (potentialObjects `intersect` (ENR <$> perspectiveObjectRoles))
+            then pure unit
+            else tell [p]
 
     contextualisePerspective :: Array EnumeratedRole -> Perspective -> PhaseThree Perspective
     contextualisePerspective aspects p = foldM contextualiseWithAspect p aspects
