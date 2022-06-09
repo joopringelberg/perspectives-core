@@ -34,25 +34,26 @@
 -- | correct version, and an inner one that is always one step behind.
 
 module Perspectives.Persistent
-( saveEntiteit
-, saveEntiteit_
-, removeEntiteit
-, tryRemoveEntiteit
-, getPerspectEntiteit
-, fetchEntiteit
-, getPerspectContext
-, getPerspectRol
-, getDomeinFile
-, tryGetPerspectEntiteit
-, class Persistent
-, dbLocalName
-, entitiesDatabaseName
-, postDatabaseName
-, updateRevision
-, entityExists
-, tryFetchEntiteit
+  ( class Persistent
+  , dbLocalName
+  , entitiesDatabaseName
+  , entityExists
+  , fetchEntiteit
+  , getDomeinFile
+  , getPerspectContext
+  , getPerspectEntiteit
+  , getPerspectRol
+  , modelDatabaseName
+  , postDatabaseName
+  , removeEntiteit
+  , saveEntiteit
+  , saveEntiteit_
+  , tryFetchEntiteit
+  , tryGetPerspectEntiteit
+  , tryRemoveEntiteit
+  , updateRevision
   )
-where
+  where
 
 import Prelude
 
@@ -66,14 +67,14 @@ import Effect.Exception (error)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, MP)
+import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Persistence.API (MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   -- database :: i -> MP String
@@ -121,6 +122,9 @@ entitiesDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_entities")
 
 postDatabaseName :: forall f. MonadPouchdb f String
 postDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_post")
+
+modelDatabaseName :: MonadPerspectives String
+modelDatabaseName = dbLocalName (DomeinFileId "model:System")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit

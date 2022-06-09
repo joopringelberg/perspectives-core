@@ -24,12 +24,12 @@ module Perspectives.SetupUser where
 
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.Persistent (entitiesDatabaseName, modelDatabaseName)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SetupCouchdb (setContextView, setPendingInvitationView, setRoleFromContextView, setRoleView)
+import Perspectives.SetupCouchdb (setContextSpecialisationsView, setContextView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
 import Prelude (Unit, bind, void, ($), discard, (<>), (>>=))
 
 modelDirectory :: String
@@ -47,3 +47,5 @@ setupUser = do
   entitiesDatabaseName >>= setRoleFromContextView
   entitiesDatabaseName >>= setPendingInvitationView
   entitiesDatabaseName >>= setContextView
+  modelDatabaseName >>= setRoleSpecialisationsView
+  modelDatabaseName >>= setContextSpecialisationsView

@@ -40,3 +40,36 @@ exports.roleFromContextView = (function (doc)
      );
    }
  }.toString())
+
+exports.roleSpecialisations = (function( doc )
+ {
+   var eroles = doc.contents.enumeratedRoles;
+   Object.values( eroles ).forEach(
+     function(erole)
+     {
+      var aspects = erole.contents.roleAspects;
+      aspects.forEach(
+        function( aspectRoleInContext )
+        {
+          emit( aspectRoleInContext.role, erole.contents._id );
+        }
+      );
+     }
+   );
+ }.toString());
+
+ exports.contextSpecialisations = (function( doc )
+ {
+   Object.values( doc.contents.contexts ).forEach(
+     function(context)
+     {
+      var aspects = context.contents.contextAspects;
+      aspects.forEach(
+        function( aspectContext )
+        {
+          emit( aspectContext, context.contents._id );
+        }
+      );
+     }
+   );
+ }.toString());

@@ -44,10 +44,12 @@ import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Error.Boundaries (handleDomeinFileError')
+import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectRolError')
 import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole, startsWithSegments)
 import Perspectives.Instances.Combinators (closure_, conjunction, filter', some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
+import Perspectives.Persistence.API (getViewOnDatabase)
+import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce)
 import Perspectives.Representation.Action (Action)
@@ -268,6 +270,16 @@ hasAspectWithLocalName :: String -> (EnumeratedRoleType ~~~> Boolean)
 hasAspectWithLocalName localAspectName roleType = ArrayT do
   aspects <- roleType ###= roleAspectsClosure
   pure [isJust $ findIndex (test (unsafeRegex (localAspectName <> "$") noFlags)) (unwrap <$> aspects)]
+
+getRoleAspectSpecialisations :: EnumeratedRoleType  ~~~> EnumeratedRoleType
+getRoleAspectSpecialisations rn = ArrayT $ try (modelDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/roleSpecialisationsView" (Just $ unwrap rn)) >>=
+  handlePerspectRolError' "getAspectSpecialisations" []
+    \(roles :: Array EnumeratedRoleType) -> pure roles
+
+getContextAspectSpecialisations :: ContextType  ~~~> ContextType
+getContextAspectSpecialisations cn = ArrayT $ try (modelDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/contextSpecialisationsView" (Just $ unwrap cn)) >>=
+  handlePerspectRolError' "getContextAspectSpecialisations" []
+    \(contexts :: Array ContextType) -> pure contexts
 
 ----------------------------------------------------------------------------------------
 ------- GET A PERSPECTIVE

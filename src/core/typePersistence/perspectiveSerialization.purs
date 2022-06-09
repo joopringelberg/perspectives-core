@@ -58,7 +58,8 @@ import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), PropertyType(..), RoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
-import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
+import Perspectives.Types.ObjectGetters (getContextAspectSpecialisations)
+import Prelude (append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
 import Simple.JSON (writeJSON)
 
 -- | Get the serialisation of the perspective the user role type has on the object role type,
@@ -154,6 +155,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     >>= pure <<< (filter (isExternalRole <<< unwrap))
     >>= lift <<< traverse getEnumeratedRole
     >>= pure <<< map (_.context <<< unwrap)
+    >>= \as -> lift $ ((append as) <<< concat <$> (for as (runArrayT <<< getContextAspectSpecialisations)))
   identifyingProperty <- computeIdentifyingProperty serialisedProps roleInstances
   pure { id
     , displayName
@@ -176,6 +178,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     , identifyingProperty
     }
   where
+
     maybeAddIdentifier :: Array PropertyType -> Array PropertyType
     maybeAddIdentifier props = if null props then [CP $ CalculatedPropertyType roleWithId] else props
 

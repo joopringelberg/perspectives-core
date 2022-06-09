@@ -163,3 +163,27 @@ setContextView dbname = do
 
 -- | Import the view definition as a String.
 foreign import contextView :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'SETROLESPECIALISATIONVIEW'
+-- This view collects instances of a particular context type.
+-----------------------------------------------------------
+-- | Add a view to the couchdb installation in the 'repository' db.
+setRoleSpecialisationsView :: forall f. String -> MonadPouchdb f Unit
+setRoleSpecialisationsView dbname = do
+  void $ addViewToDatabase dbname "defaultViews" "roleSpecialisationsView" ({map: roleSpecialisations, reduce: Nothing})
+
+-- | Import the view definition as a String.
+foreign import roleSpecialisations :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'SETROLESPECIALISATIONVIEW'
+-- This view collects instances of a particular context type.
+-----------------------------------------------------------
+-- | Add a view to the couchdb installation in the 'repository' db.
+setContextSpecialisationsView :: forall f. String -> MonadPouchdb f Unit
+setContextSpecialisationsView dbname = do
+  void $ addViewToDatabase dbname "defaultViews" "contextSpecialisationsView" ({map: contextSpecialisations, reduce: Nothing})
+
+-- | Import the view definition as a String.
+foreign import contextSpecialisations :: String
