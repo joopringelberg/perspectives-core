@@ -35,7 +35,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
 import Perspectives.Persistent (getPerspectContext)
-import Perspectives.Query.QueryTypes (RoleInContext) as QT
+import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
@@ -43,7 +43,7 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (bindingOfRole, kindOfRole, roleAspectsBindingADT)
 import Perspectives.Representation.Context (Context)
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleKind(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lessThanOrEqualTo)
@@ -91,10 +91,17 @@ checkContext c = do
 
     checkEnumeratedRole :: RoleKind -> EnumeratedRoleType -> PF Unit
     checkEnumeratedRole kind r = do
-      (rr :: EnumeratedRole) <- lift $ getPerspectType r
+      rr@(EnumeratedRole{roleAspects, binding, pos, displayName}) <- lift $ getPerspectType r
       if (kindOfRole rr == kind)
         then pure unit
         else fail $ WrongRoleKind (ENR r) kind (kindOfRole rr)
+      -- The restrictions on filling this role must be equal to or a specialisation of 
+      -- that of its aspects.
+      for_ roleAspects \(QT.RoleInContext{role}) -> do
+        EnumeratedRole{binding:aspectBinding, pos:aspectPos, displayName:aspectDisplayName} <- lift $ getEnumeratedRole role
+        (lift $ aspectBinding `lessThanOrEqualTo` binding) >>= if _
+          then pure unit
+          else fail $ FillerRestrictionNotAnAspectSubtype pos aspectPos displayName aspectDisplayName
 
     throwOnCycle :: Array ContextType -> Context -> MP Unit
     throwOnCycle path next = if (isJust $ elemIndex (identifier next) path)

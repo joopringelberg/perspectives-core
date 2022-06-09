@@ -24,7 +24,7 @@ module Perspectives.TypePersistence.LoadArc where
 
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (delete, filterA, findIndex, head)
+import Data.Array (delete, filterA, findIndex, head, null)
 import Data.Either (Either(..))
 import Data.Foldable (foldl, for_)
 import Data.List (List(..))
@@ -33,6 +33,7 @@ import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, keys, lookup, values)
+import Perspectives.Checking.PerspectivesTypeChecker (checkDomeinFile)
 import Perspectives.ContextRoleParser (userData)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
@@ -85,13 +86,18 @@ loadAndCompileArcFile_ text = catchError
             case x' of
               (Left e) -> pure $ Left [e]
               (Right correctedDFR@{referredModels:refModels}) -> do
-                -- Remove the self-referral and add the source.
-                df <- pure $ DomeinFile correctedDFR
-                  { referredModels = delete (DomeinFileId _id) refModels
-                  , arc = text
-                  }
-                void $ lift $ storeDomeinFileInCache _id df
-                pure $ Right df
+                -- Run the type checker
+                typeCheckErrors <- lift $ checkDomeinFile (DomeinFile correctedDFR)
+                if null typeCheckErrors
+                  then do
+                    -- Remove the self-referral and add the source.
+                    df <- pure $ DomeinFile correctedDFR
+                      { referredModels = delete (DomeinFileId _id) refModels
+                      , arc = text
+                      }
+                    void $ lift $ storeDomeinFileInCache _id df
+                    pure $ Right df
+                  else pure $ Left typeCheckErrors
   \e -> pure $ Left [Custom (show e)]
 
 type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)

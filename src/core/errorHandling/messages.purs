@@ -101,6 +101,7 @@ data PerspectivesError
     | NoPropertyTypeWithValue ArcPosition ArcPosition
     | CurrentObjectNotAllowed ArcPosition ArcPosition
     | CurrentSubjectNotAllowed ArcPosition ArcPosition
+    | FillerRestrictionNotAnAspectSubtype ArcPosition ArcPosition String String
 
     | UnauthorizedForProperty String RoleType RoleType PropertyType PropertyVerb
     | UnauthorizedForRole String RoleType RoleType (Array RoleVerb)
@@ -155,7 +156,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (RoleHasNoProperty rtype qn start end) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "' (between " <> show start <> " and " <> show end <> ")."
   show UniversalRoleHasNoParts = "(UniversalRoleHasNoParts) 'NoBinding' gives no access to properties, aspects, binding, etc."
   show (RoleHasNoBinding pos rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding " <> show pos
-  show (RoleCannotHaveBinding start end roletype) = "(RoleCannotHaveBinding) Bot Roles and External Roles cannot have a binding. " <> roletype <> ", from " <> show start <> " to " <> show end
+  show (RoleCannotHaveBinding start end roletype) = "(RoleCannotHaveBinding) External Roles cannot have a binding. " <> roletype <> ", from " <> show start <> " to " <> show end
   show (IncompatibleDomainsForJunction dom1 dom2) = "(IncompatibleDomainsForJunction) These two domains cannot be joined in a disjunction of conjunction: '" <> show dom1 <> "', '" <> show dom2 <> "'."
   show (RoleDoesNotBind pos rtype adt) = "(RoleDoesNotBind) The role '" <> show rtype <> "' does not bind roles of type '" <> show adt <> "', at: " <> show pos
   show (LocalRoleDoesNotBind start end lname adt) = "(LocalRoleDoesNotBind) The roles that name '" <> lname <> "' (from " <> show start <> " to " <> show end <> ") can be matched to, do not bind '" <> show adt <> "'."
@@ -183,6 +184,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NoPropertyTypeWithValue start end) = "(NoPropertyTypeWithValue) The property value computed by this expression is not associated with a Property Type (this throws up a problem in combination with, for example, `modelname`)"
   show (CurrentObjectNotAllowed start end) = "(CurrentObjectNotAllowed) The variable `currentobject` is illegal in the expression between " <> show start <> " and " <> show end <> "."
   show (CurrentSubjectNotAllowed start end) = "(CurrentSubjectNotAllowed) The variable `currentsubject` is illegal in the expression between " <> show start <> " and " <> show end <> "."
+  show (FillerRestrictionNotAnAspectSubtype rolePos aspectPos roleName aspectName) = "(FillerRestrictionNotAnAspectSubtype) The role " <> roleName <> " (at " <> show rolePos <> ") has a value for the filledBy clause that is not a subtype of that of its aspect " <> aspectName <> "(at " <> show aspectPos <> ")."
   show (UnauthorizedForProperty author userRole role property verb) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> "."
   show (UnauthorizedForRole author userRole role verbs) = "(UnauthorizedForRole) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes at least one of " <> show verbs
   show (UnauthorizedForContext author userRole contextType) = "(UnauthorizedForContext) User " <> author <> " in role " <> show userRole <> " has no perspective on context " <> show contextType
