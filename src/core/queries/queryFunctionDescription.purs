@@ -225,7 +225,7 @@ propertyOfRange qfd = case range qfd of
   otherwise -> Nothing
 
 -----------------------------------------------------------------------------------------
----- REPLACE DOMAIN
+---- REPLACE DOMAIN, RANGE
 -----------------------------------------------------------------------------------------
 replaceDomain :: QueryFunctionDescription -> Domain -> QueryFunctionDescription
 replaceDomain (SQD dom f ran fun man) d = (SQD d f ran fun man)
@@ -235,6 +235,15 @@ replaceDomain (BQD dom f qfd1 qfd2 ran fun man) d = case f of
   (BinaryCombinator ComposeF) -> (BQD d f (replaceDomain qfd1 d) qfd2 ran fun man)
   otherwise -> (BQD d f (replaceDomain qfd1 d) (replaceDomain qfd2 d) ran fun man)
 replaceDomain (MQD dom f qfds ran fun man) d = (MQD d f (flip replaceDomain d <$> qfds) ran fun man)
+
+replaceRange :: QueryFunctionDescription -> Domain -> QueryFunctionDescription
+replaceRange (SQD dom f ran fun man) r = (SQD dom f r fun man)
+replaceRange (UQD dom f qfd ran fun man) r = (UQD dom f (replaceRange qfd r) r fun man)
+replaceRange (BQD dom f qfd1 qfd2 ran fun man) r = case f of
+  (BinaryCombinator FilterF) -> (BQD dom f (replaceRange qfd1 r) qfd2 r fun man)
+  (BinaryCombinator ComposeF) -> (BQD dom f (replaceRange qfd1 r) qfd2 r fun man)
+  otherwise -> (BQD dom f (replaceRange qfd1 r) (replaceRange qfd2 r) r fun man)
+replaceRange (MQD dom f qfds ran fun man) r = (MQD dom f (flip replaceRange r <$> qfds) ran fun man)
 
 -----------------------------------------------------------------------------------------
 ---- ROLEINCONTEXT

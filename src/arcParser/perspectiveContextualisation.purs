@@ -2,36 +2,42 @@ module Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation where
 
 import Prelude
 
-import Control.Monad.State as State
+import Control.Monad.Except (Except, runExcept, throwError)
+import Control.Monad.State (StateT, evalStateT, execStateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Writer (WriterT, execWriterT, tell)
-import Data.Array (catMaybes, filter, foldM, intersect, null)
+import Control.Monad.Writer (Writer, execWriter, tell)
+import Data.Array (catMaybes, concat, difference, filter, find, findIndex, foldM, fromFoldable, intercalate, intersect, length, many, modifyAt, null)
+import Data.Array.Partial (tail, head) as AP
+import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
-import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Map (Map, empty, fromFoldable, insert, lookup, values) as Map
+import Data.Map (toUnfoldable)
+import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
+import Data.Tuple (Tuple(..), snd)
 import Foreign.Object (insert, values, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder)
-import Perspectives.Identifiers (Namespace)
+import Perspectives.Identifiers (Namespace, deconstructLocalName_)
+import Perspectives.Instances.Combinators (closure)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, modifyDF, withDomeinFile)
+import Perspectives.Query.QueryTypes (Domain(..), RoleInContext, domain2roleInContext, domain2roleType, range, replaceRange, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Query.QueryTypes (domain2roleInContext, domain2roleType, range, roleInContext2Role)
-import Perspectives.Representation.ADT (allLeavesInADT)
+import Perspectives.Representation.ADT (ADT, allLeavesInADT, equalsOrGeneralisesADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs, StateSpec)
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind(..), RoleType(..), roletype2string)
 import Perspectives.Representation.Verbs (RoleVerbList)
-import Perspectives.Types.ObjectGetters (aspectRoles, lessThanOrEqualTo)
+import Perspectives.Types.ObjectGetters (allEnumeratedRoles, aspectRoles, aspectsOfRole, lessThanOrEqualTo)
 
 contextualisePerspectives :: PhaseThree Unit
 contextualisePerspectives = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{_id} <- lift $ gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
     _id
@@ -46,7 +52,7 @@ contextualisePerspectives = do
       (filter (\(EnumeratedRole{kindOfRole}) -> kindOfRole == UserRole) (values enumeratedRoles))
       contextualisePerspectives''
       
-
+    -- The EnumeratedRole has kind UserRole by virtue of the filtering above.
     -- Stores the EnumeratedRole in PhaseTwoState.
     contextualisePerspectives'' :: EnumeratedRole -> PhaseThree Unit
     contextualisePerspectives'' (EnumeratedRole r@{perspectives, roleAspects, context}) = if null roleAspects
@@ -55,14 +61,23 @@ contextualisePerspectives = do
         -- As contextualising requires other EnumeratedRoles that may by now have been 
         -- changed in PhaseTwoState, always retrieve the aspects again from PhaseTwoState!
         -- Only the current role has not yet been modified and can be used as is.
-        aspects <- catMaybes <$> traverse getRole roleAspects
-        perspectives' <- traverse (contextualisePerspective aspects) perspectives
+        userRoleAspects <- catMaybes <$> traverse getRole roleAspects
+        -- Enrich the user role's perspectives with the perspectives of his aspects.
+        perspectives' <- traverse (contextualisePerspective userRoleAspects) perspectives
+        -- The roles in the context that are taken as is from context aspects.
+        aspectObjectRolesInContext <- lift $ lift (context ###= aspectRoles)
         -- If an Aspect user role has a perspective on an (Aspect) role that has
         -- been added as is to the user's context, add that perspective to the 
         -- user's perspectives.
-        aspectRolesInContext <- lift $ lift (context ###= aspectRoles)
-        aspectPerspectives <- execWriterT (for_ aspects (writePerspectiveOnAddedRole aspectRolesInContext))
-        saveRole (EnumeratedRole r {perspectives = perspectives' <> aspectPerspectives})
+        aspectPerspectives <- pure $ execWriter (for_ userRoleAspects (writePerspectiveOnAddedRole aspectObjectRolesInContext))
+        rolesWithAspects <- collectRolesWithAspects context
+        -- If an Aspect user role has a perspective on an Aspect Object that is 
+        -- specialised in the context, where the user does not have a perspective on that 
+        -- specialisation, contextualise the perspective (replace its object with the specialised role(s))
+        -- and add it to the user role.
+        contextualisedAspectPerspectives <- pure $ execWriter (for_ userRoleAspects (writeContextualisedPerspective context perspectives rolesWithAspects))
+        
+        saveRole (EnumeratedRole r {perspectives = perspectives' <> aspectPerspectives <> contextualisedAspectPerspectives})
     
     saveRole :: EnumeratedRole -> PhaseThree Unit
     saveRole r = modifyDF \(dfr@{enumeratedRoles}) -> dfr {enumeratedRoles = insert (identifier_ r) r enumeratedRoles}
@@ -70,7 +85,8 @@ contextualisePerspectives = do
     getRole :: QT.RoleInContext -> PhaseThree (Maybe EnumeratedRole)
     getRole (QT.RoleInContext{role}) = getsDF \{enumeratedRoles} -> lookup (unwrap role) enumeratedRoles
 
-    writePerspectiveOnAddedRole :: Array RoleType -> EnumeratedRole -> WriterT (Array Perspective) PhaseThree Unit
+    -- Write an aspect user role perspective (unmodified) if its object roles have overlap with the aspect roles that are added as is to the context (potentialObjects).
+    writePerspectiveOnAddedRole :: Array RoleType -> EnumeratedRole -> Writer (Array Perspective) Unit
     writePerspectiveOnAddedRole potentialObjects (EnumeratedRole{perspectives:aspectUserPerspectives}) = do
       for_ aspectUserPerspectives \(p@(Perspective{object})) -> let
         perspectiveObjectRoles = allLeavesInADT $ map roleInContext2Role $ unsafePartial domain2roleInContext $ range object
@@ -78,6 +94,58 @@ contextualisePerspectives = do
           if null (potentialObjects `intersect` (ENR <$> perspectiveObjectRoles))
             then pure unit
             else tell [p]
+
+    -- Write an aspect user role perspective (contextualised) if its object is specialised in the context,
+    -- but only if the user role's own perspectives do not cover that specialisation.
+    writeContextualisedPerspective :: ContextType -> Array Perspective -> RolesWithAspects -> EnumeratedRole -> Writer (Array Perspective) Unit
+    writeContextualisedPerspective context ownPerspectives rolesWithAspects (EnumeratedRole{perspectives:aspectUserPerspectives}) = for_ aspectUserPerspectives
+      \(Perspective precord@{object}) -> if null (allLeavesInADT (roleInContext2Role <$> (unsafePartial domain2roleInContext $ range object)) `difference` (concat <$> fromFoldable $ Map.values rolesWithAspects) )
+        -- all role types in the aspect object can be substituted with role types in the context we contextualise in.
+        then do
+          (substitutions :: Array Substitution) <- pure $ createSubstitutions rolesWithAspects
+          for_ substitutions \substitution -> let
+            (contextualisedObject :: ADT RoleInContext) = contextualiseADT (unsafePartial domain2roleInContext $ range object) context substitution
+            (roleTypes :: Array RoleType) = (ENR <$> allLeavesInADT (roleInContext2Role <$> contextualisedObject))
+            in 
+              if notCoveredByOwnPerspectives contextualisedObject
+                then 
+                  tell [Perspective precord 
+                    { object = replaceRange object (RDOM contextualisedObject)
+                    , roleTypes = roleTypes
+                    , displayName = (intercalate ", " (deconstructLocalName_ <<< roletype2string <$> roleTypes))
+                    }]
+                else pure unit
+        else pure unit
+
+      where
+        -- None of the perspectives in `ownPerspectives` (those of the specialised user role) is on an object (whose range) equals (or is a generalisation of, 
+        -- which is unlikely to happen) the contextualised object ADT.
+        notCoveredByOwnPerspectives :: ADT QT.RoleInContext -> Boolean
+        notCoveredByOwnPerspectives objectADT = isNothing $ find
+          (\ownPerspectiveObjectADT -> ownPerspectiveObjectADT `equalsOrGeneralisesADT` objectADT)
+          (ownPerspectives <#> (\(Perspective{object}) -> unsafePartial domain2roleInContext $ range object))
+
+        createSubstitutions :: RolesWithAspects -> Array Substitution
+        createSubstitutions rwas = case runExcept $ evalStateT (many createSubstitution) (Just (toUnfoldable rwas)) of
+          Left _ -> []
+          Right ss -> ss
+
+          where
+          createSubstitution :: StateT (Maybe (Array (Tuple EnumeratedRoleType (Array EnumeratedRoleType)))) (Except String) Substitution
+          createSubstitution = do
+            x <- get
+            case x of 
+              Nothing -> throwError "We're done"
+              Just (x' :: (Array (Tuple EnumeratedRoleType (Array EnumeratedRoleType)))) -> do
+                case findIndex ((>) 1 <<< length <<< snd) x' of
+                  -- In this case, none of the substitution arrays holds more than one element. 
+                  -- That means that the current substitution is the last one.
+                  Nothing -> put Nothing
+                  -- In this case, the substitution Tuple at i holds more than one element.
+                  -- We'll pop that element and store the resulting substitutions in state.
+                  Just i -> put $ modifyAt i (\(Tuple e as) -> Tuple e (unsafePartial AP.tail as)) x'
+                -- Create a map from the array of tuples consisting of the role type and its first replacement
+                pure $ Map.fromFoldable $ (\(Tuple e as) -> Tuple (unsafePartial AP.head as) e) <$> x'
 
     contextualisePerspective :: Array EnumeratedRole -> Perspective -> PhaseThree Perspective
     contextualisePerspective aspects p = foldM contextualiseWithAspect p aspects
@@ -127,3 +195,27 @@ contextualisePerspectives = do
           )
           roleMap
           aspectRoleMap
+
+type AspectRole = EnumeratedRoleType
+type RolesWithAspects = Map.Map EnumeratedRoleType (Array AspectRole)
+
+collectRolesWithAspects :: ContextType -> PhaseThree RolesWithAspects
+collectRolesWithAspects ct = do
+  allEnumeratedRolesInContext <- lift $ lift (ct ###= allEnumeratedRoles)
+  execStateT (for_ allEnumeratedRolesInContext getAspects) Map.empty
+  where
+    getAspects :: EnumeratedRoleType -> StateT RolesWithAspects PhaseThree Unit
+    getAspects erole = do
+      aspects <- lift $ lift $ lift (erole ###= closure aspectsOfRole)
+      if null aspects
+        then pure unit
+        else void $ modify \m -> Map.insert erole aspects m
+
+-- Replace the first type (Aspect role) by the second type (role in context that is being contextualised).
+type Substitution = Map.Map EnumeratedRoleType EnumeratedRoleType
+
+contextualiseADT :: ADT QT.RoleInContext -> ContextType -> Substitution -> ADT QT.RoleInContext
+contextualiseADT adt context substitution = adt <#> \ric@(QT.RoleInContext{role}) -> case Map.lookup role substitution of
+  -- This should not happen.
+  Nothing -> ric
+  Just s -> QT.RoleInContext{context, role: s}
