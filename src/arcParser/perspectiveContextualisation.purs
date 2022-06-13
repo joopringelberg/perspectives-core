@@ -6,32 +6,33 @@ import Control.Monad.Except (Except, runExcept, throwError)
 import Control.Monad.State (StateT, evalStateT, execStateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (catMaybes, concat, difference, filter, find, findIndex, foldM, fromFoldable, intercalate, intersect, length, many, modifyAt, null)
+import Data.Array (catMaybes, concat, cons, difference, filter, find, findIndex, foldM, fromFoldable, intercalate, length, many, modifyAt, null)
 import Data.Array.Partial (tail, head) as AP
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Map (Map, empty, fromFoldable, insert, lookup, values) as Map
 import Data.Map (toUnfoldable)
-import Data.Maybe (Maybe(..), isNothing)
+import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..), snd)
-import Foreign.Object (insert, values, lookup)
+import Foreign.Object (Object, insert, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder)
-import Perspectives.Identifiers (Namespace, deconstructLocalName_)
+import Perspectives.Identifiers (Namespace, buitenRol, deconstructBuitenRol, deconstructLocalName_, isExternalRole)
 import Perspectives.Instances.Combinators (closure)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, modifyDF, withDomeinFile)
 import Perspectives.Query.QueryTypes (Domain(..), RoleInContext, domain2roleInContext, domain2roleType, range, replaceRange, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT, allLeavesInADT, equalsOrGeneralisesADT)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrGeneralisesADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
+import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs, StateSpec)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind(..), RoleType(..), roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType, roletype2string)
 import Perspectives.Representation.Verbs (RoleVerbList)
 import Perspectives.Types.ObjectGetters (allEnumeratedRoles, aspectRoles, aspectsOfRole, lessThanOrEqualTo)
 
@@ -44,7 +45,7 @@ contextualisePerspectives = do
     (DomeinFile df)
     (contextualisePerspectives' df _id)
   where
-    -- Notice that only EnumeratedRoles have Aspects.
+    -- Notice that only EnumeratedRoles have Aspects (this includes external roles).
     contextualisePerspectives' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
     contextualisePerspectives' {enumeratedRoles} ns = void $ executeInTopologicalOrder 
       identifier_
@@ -85,15 +86,14 @@ contextualisePerspectives = do
     getRole :: QT.RoleInContext -> PhaseThree (Maybe EnumeratedRole)
     getRole (QT.RoleInContext{role}) = getsDF \{enumeratedRoles} -> lookup (unwrap role) enumeratedRoles
 
-    -- Write an aspect user role perspective (unmodified) if its object roles have overlap with the aspect roles that are added as is to the context (potentialObjects).
-    writePerspectiveOnAddedRole :: Array RoleType -> EnumeratedRole -> Writer (Array Perspective) Unit
+    -- Write an aspect user role perspective (unmodified) if its object generalises (or is equal to) one of the aspect roles that were added to the context (potentalObjects).
+    writePerspectiveOnAddedRole :: Array EnumeratedRoleType -> EnumeratedRole -> Writer (Array Perspective) Unit
     writePerspectiveOnAddedRole potentialObjects (EnumeratedRole{perspectives:aspectUserPerspectives}) = do
-      for_ aspectUserPerspectives \(p@(Perspective{object})) -> let
-        perspectiveObjectRoles = allLeavesInADT $ map roleInContext2Role $ unsafePartial domain2roleInContext $ range object
-        in 
-          if null (potentialObjects `intersect` (ENR <$> perspectiveObjectRoles))
-            then pure unit
-            else tell [p]
+      for_ aspectUserPerspectives \(p@(Perspective{object:aspectUserPerspectiveObject})) -> if isJust $ find 
+          (\potentialObject -> (roleInContext2Role <$> (unsafePartial domain2roleInContext $ range aspectUserPerspectiveObject)) `equalsOrGeneralisesADT` ST potentialObject) 
+          potentialObjects
+        then tell [p]
+        else pure unit
 
     -- Write an aspect user role perspective (contextualised) if its object is specialised in the context,
     -- but only if the user role's own perspectives do not cover that specialisation.
@@ -202,7 +202,7 @@ type RolesWithAspects = Map.Map EnumeratedRoleType (Array AspectRole)
 collectRolesWithAspects :: ContextType -> PhaseThree RolesWithAspects
 collectRolesWithAspects ct = do
   allEnumeratedRolesInContext <- lift $ lift (ct ###= allEnumeratedRoles)
-  execStateT (for_ allEnumeratedRolesInContext getAspects) Map.empty
+  execStateT (for_ (cons (externalRoleType ct) allEnumeratedRolesInContext) getAspects) Map.empty
   where
     getAspects :: EnumeratedRoleType -> StateT RolesWithAspects PhaseThree Unit
     getAspects erole = do
@@ -219,3 +219,21 @@ contextualiseADT adt context substitution = adt <#> \ric@(QT.RoleInContext{role}
   -- This should not happen.
   Nothing -> ric
   Just s -> QT.RoleInContext{context, role: s}
+
+----------------------------------------------------------------------------------------
+------- ADDASPECTSTOEXTERNALROLES
+----------------------------------------------------------------------------------------
+
+addAspectsToExternalRoles :: PhaseThree Unit
+addAspectsToExternalRoles = do
+  df@{enumeratedRoles, contexts} <- lift $ gets _.dfr
+  enumeratedRoles' <- pure ((addAspectToExternalRole contexts) <$> enumeratedRoles)
+  modifyDF \dfr -> dfr {enumeratedRoles = enumeratedRoles'}
+  where
+    addAspectToExternalRole :: Object CONTEXT.Context -> EnumeratedRole -> EnumeratedRole
+    addAspectToExternalRole ctxts erole@(EnumeratedRole erecord@{_id}) = if isExternalRole (unwrap _id)
+      then case lookup (deconstructBuitenRol (unwrap _id)) ctxts of
+        -- we can safely ignore this case: it is not going to happen.
+        Nothing -> erole
+        Just (CONTEXT.Context{contextAspects}) -> EnumeratedRole $ erecord {roleAspects = (\context@(ContextType aspect) -> QT.RoleInContext{context, role: EnumeratedRoleType $ buitenRol aspect}) <$> contextAspects}
+      else erole

@@ -121,6 +121,8 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
 
     handleParts (Context contextUnderConstruction@{contextAspects}) (ContextAspect contextName pos') = do
       expandedAspect <- expandNamespace contextName
+      -- TODO. This is strange: surely the unqualified name should be REPLACED by the qualified one!?
+      -- Probably we currently just allow fully qualified aspect names.
       if isQualifiedWithDomein expandedAspect
         then pure (Context $ contextUnderConstruction {contextAspects = cons (ContextType expandedAspect) contextAspects})
         else throwError $ NotWellFormedName pos' contextName
@@ -141,11 +143,13 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     -- Add the aspect role in the appropriate category.
     -- We don't know yet if this aspect role is calculated or enumerated.
     -- Hence, we add it as enumerated and repair later.
-    handleParts c@(Context cr@{rolInContext, contextRol,gebruikerRol}) (AspectRole ident kind _) = case kind of
-      TI.RoleInContext -> pure $ Context $ cr {rolInContext = cons (ENR $ EnumeratedRoleType ident) rolInContext}
-      TI.ContextRole -> pure $ Context $ cr {contextRol = cons (ENR $ EnumeratedRoleType ident) contextRol}
-      TI.UserRole -> pure $ Context $ cr {gebruikerRol = cons (ENR $ EnumeratedRoleType ident) gebruikerRol}
-      _ -> pure c
+    handleParts c@(Context cr@{rolInContext, contextRol,gebruikerRol}) (AspectRole ident kind _) = do 
+      expandedName <- expandNamespace ident
+      case kind of
+        TI.RoleInContext -> pure $ Context $ cr {rolInContext = cons (ENR $ EnumeratedRoleType expandedName) rolInContext}
+        TI.ContextRole -> pure $ Context $ cr {contextRol = cons (ENR $ EnumeratedRoleType expandedName) contextRol}
+        TI.UserRole -> pure $ Context $ cr {gebruikerRol = cons (ENR $ EnumeratedRoleType expandedName) gebruikerRol}
+        _ -> pure c
 
     -- We can safely ignore nested lists of StateQualifiedParts here, as they are already removed by the parser.
     handleParts c (CSQP _) = pure c

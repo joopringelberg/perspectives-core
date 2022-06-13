@@ -58,7 +58,7 @@ import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as S
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
-import Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation (contextualisePerspectives)
+import Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation (addAspectsToExternalRoles, contextualisePerspectives)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withDomeinFile, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition, arcParserStartPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -125,6 +125,7 @@ phaseThree_ df@{_id, referredModels} postponedParts screens = do
       -- Now all perspectives are available.
       handleScreens screens
       compileStateQueries
+      addAspectsToExternalRoles
       contextualisePerspectives
       invertPerspectiveObjects
       -- combinePerspectives

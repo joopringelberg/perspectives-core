@@ -166,12 +166,9 @@ allRoleTypesInContext = conjunction roleInContext $ conjunction contextRole user
     userRole' :: ContextType ~~~> RoleType
     userRole' = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< ContextClass.userRole)
 
-aspectRoles :: ContextType ~~~> RoleType
-aspectRoles ct@(ContextType contextName) = filter' allRoleTypesInContext 
-  (\rt -> case rt of
-    (ENR (EnumeratedRoleType roleName)) -> not (roleName `startsWithSegments` contextName)
-    _ -> true)
-  ct
+aspectRoles :: ContextType ~~~> EnumeratedRoleType
+aspectRoles ct@(ContextType contextName) = filter' allEnumeratedRoles
+  (\(EnumeratedRoleType roleName) -> not (roleName `startsWithSegments` contextName)) ct
 
 -- | Returns the name of the model that defines the role type as a String Value.
 contextTypeModelName :: ContextType ~~~> Value
