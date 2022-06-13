@@ -40,7 +40,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, difference, elemIndex, filterA, find, foldM, last, null, snoc)
+import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, last, null, snoc)
 import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Foldable (for_)
@@ -53,13 +53,16 @@ import Foreign.Generic (encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, lookup)
 import Foreign.Object (union) as OBJ
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType, rol_states)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>), (##=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>), (##=), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
+import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
+import Perspectives.Identifiers (startsWithSegments)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, contextType, getPropertyFromTelescope, roleType)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
@@ -73,7 +76,7 @@ import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (isUnlinked_)
+import Perspectives.Types.ObjectGetters (getRoleAspectSpecialisations, hasPerspectiveOnRole, isUnlinked_)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 
 -----------------------------------------------------------
@@ -577,3 +580,25 @@ withAuthoringRole authoringRole mp = do
   a <- mp
   modify (over Transaction \t -> t {authoringRole = originalAuthor})
   pure a
+
+
+-----------------------------------------------------------
+-- ROLECONTEXTUALISATIONS
+-- Get the contextualised versions of a role type in a specific context,
+-- under the additional condition that the authoring user (in the Transaction)
+-- has a perspective on it.
+-----------------------------------------------------------
+roleContextualisations :: ContextInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction (Array EnumeratedRoleType)
+roleContextualisations ctxt qualifiedRoleIdentifier = do 
+  -- Get the context type.
+  cType <- lift (ctxt ##>> contextType)
+  -- If the qualifiedRoleIdentifier is defined in this context type, create an instance of just that role type.
+  roleTypesToCreate <- if (unwrap qualifiedRoleIdentifier) `startsWithSegments` (unwrap cType)
+    then pure [qualifiedRoleIdentifier]
+    -- Else get the specialisations of qualifiedRoleIdentifier.
+    else lift (qualifiedRoleIdentifier ###= getRoleAspectSpecialisations) 
+      >>= pure <<< filter \(EnumeratedRoleType r) -> r `startsWithSegments` (unwrap cType)
+  -- Get the user role type that is executing.
+  (user :: RoleType) <- gets (_.authoringRole <<< unwrap)
+  -- Filter the object role types, keeping only those that the user role type has a perspective on.
+  lift $ concat <$> runArrayT (filterA (unsafePartial hasPerspectiveOnRole user) roleTypesToCreate)

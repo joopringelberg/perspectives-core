@@ -260,7 +260,7 @@ hasAspect aspect roleType = ArrayT do
   pure [isJust $ findIndex ((==) aspect) aspects]
 
 -- aspect `hasContextAspect` contextType
--- roleType ##>>> hasContextAspect aspect
+-- contextType ##>>> hasContextAspect aspect
 hasContextAspect :: ContextType -> (ContextType ~~~> Boolean)
 hasContextAspect aspect contextType = ArrayT do
   aspects <- contextType ###= contextAspectsClosure

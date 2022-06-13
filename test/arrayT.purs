@@ -4,15 +4,12 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (singleton)
 import Data.Int (odd)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
-import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Instances.Combinators (filter)
-import Test.Unit (TestF, suite, suiteOnly, test)
+import Test.Unit (TestF, suite, test)
 import Test.Unit.Assert (assert)
 
 theSuite :: Free TestF Unit

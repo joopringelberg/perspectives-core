@@ -19,8 +19,7 @@ domain TestAliases
     
     user Manager = sys:Me
       perspective on Transports
-        -- Ideally (but not planned) we expect a choice of specialisations 
-        -- to be offered when Manager wants to create a Transport.
+        -- A choice of specialisations is offered when Manager wants to create a Transport.
         defaults
       -- Manager needs this perspective in order to be able to 
       -- create instances of Driver rightfully.
@@ -30,8 +29,8 @@ domain TestAliases
     context Transports  (relational) filledBy Transport
       on entry
         do for Manager
-          -- With contextualisation of actions, we expect a Pilot to be created 
-          -- in a Plane.
+          -- With contextualisation of actions, a Pilot will be created 
+          -- in a Plane (instead of a Driver).
           bind sys:Me to Driver in binding >> context
 
   case Transport

@@ -31,7 +31,7 @@ import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, concat, cons, elemIndex, filter, find, head, nub, union, unsafeIndex, filterA)
+import Data.Array (catMaybes, concat, cons, elemIndex, filterA, find, head, nub, union, unsafeIndex)
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -43,35 +43,37 @@ import Effect.Exception (error)
 import Foreign.Object (empty, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, setProperty)
-import Perspectives.CoreTypes (type (~~>), MP, MPT, MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>), (###=))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, setProperty, roleContextualisations)
+import Perspectives.CoreTypes (type (~~>), MP, MPT, MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>), (###=), (###>>))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Identifiers (buitenRol, deconstructNamespace_, startsWithSegments)
+import Perspectives.Identifiers (buitenRol, deconstructNamespace_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as OG
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getUnlinkedRoleInstances, roleType_)
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol)
+import Perspectives.Instances.ObjectGetters (binding, context, getUnlinkedRoleInstances, roleType_)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, getRoleInstances, role2context, role2propertyValue, role2role, role2string, typeTimeOnly)
+import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.Class.Role (bindingOfRole, contextOfADT)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (removeBinding, setBinding, setFirstBinding)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (allEnumeratedRoles, allUnlinkedRoles, computesDatabaseQueryRole, getRoleAspectSpecialisations, hasPerspectiveOnRole, isDatabaseQueryRole, roleIsInPerspectiveOf)
+import Perspectives.Types.ObjectGetters (allUnlinkedRoles, computesDatabaseQueryRole, hasContextAspect, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Add the role instance to the end of the roles to exit.
@@ -167,49 +169,68 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifie
   pure \(roleId :: RoleInstance) -> do
     ctxts <- lift (roleId ##= contextGetter)
     for_ ctxts \ctxt -> do
-      g <- liftEffect guid
       case qualifiedRoleIdentifier of
         -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.
         -- Create a context without binding contextrole.
-        CR calculatedType -> void $ runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
-          { id = "model:User$c" <> (show g)
-          , ctype = unwrap qualifiedContextTypeIdentifier
-          })
-
-        ENR enumeratedType -> do
+        -- Calculated Roles cannot be specialised, and there is no way to model a specialised embedded context type.
+        CR calculatedType -> do 
+          g <- liftEffect guid
           void $ runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
             { id = "model:User$c" <> (show g)
             , ctype = unwrap qualifiedContextTypeIdentifier
             })
-          void $ createAndAddRoleInstance enumeratedType (unwrap roleId) (RolSerialization
-            { id: Nothing
-            , properties: PropertySerialization empty
-            , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+
+        ENR enumeratedType -> do
+          -- Get the contextualised versions of the role type that we should create.
+          roleTypesToCreate <- roleContextualisations ctxt enumeratedType
+          -- Now, each of these role types may have a more restricted filler.
+          for_ roleTypesToCreate \roleTypeToCreate -> do
+            -- Get the context types whose external roles may be bound to this role type we're about to create.
+            -- Keep only those that are a specialisation of qualifiedContextTypeIdentifier.
+            contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToCreate) >>= contextOfADT >>= pure <<< allLeavesInADT)
+              >>= filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier)
+            for contextTypesToCreate \contextTypeToCreate -> do 
+              g <- liftEffect guid
+              void $ runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
+                { id = "model:User$c" <> (show g)
+                , ctype = unwrap contextTypeToCreate
+                })
+              void $ createAndAddRoleInstance enumeratedType (unwrap roleId) (RolSerialization
+                { id: Nothing
+                , properties: PropertySerialization empty
+                , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
 
 compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleGetterDescription
   pure \(roleId :: RoleInstance) -> do
     roles <- lift (roleId ##= roleGetter)
     for_ roles \roleInstance -> do
-      -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
-      rtype <- lift $ roleType_ roleInstance
-      g <- liftEffect guid
-      newContextId <- pure $ "model:User$c" <> (show g)
-      newContext <- runExceptT $ constructContext (Just $ ENR rtype) (ContextSerialization defaultContextSerializationRecord
-        { id = newContextId
-        , ctype = unwrap qualifiedContextTypeIdentifier
-        })
-      -- now bind it in the role instance.
-      void $ setFirstBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
+      roleTypeToFill <- lift $ roleType_ roleInstance
+      -- Get the context types whose external roles may be bound to this role type we're about to fill.
+      -- Keep only those that are a specialisation of qualifiedContextTypeIdentifier.
+      contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToFill) >>= contextOfADT >>= pure <<< allLeavesInADT)
+        >>= filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier)
+      -- We can only create one context instance for this roleInstance. 
+      -- Arbitrarily, we choose the first context type:
+      case head contextTypesToCreate of
+        Nothing -> pure unit
+        Just contextTypeToCreate -> do 
+          g <- liftEffect guid
+          newContextId <- pure $ "model:User$c" <> (show g)
+          newContext <- runExceptT $ constructContext (Just $ ENR roleTypeToFill) (ContextSerialization defaultContextSerializationRecord
+            { id = newContextId
+            , ctype = unwrap contextTypeToCreate
+            })
+          -- now bind it in the role instance.
+          void $ setFirstBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
 
 compileAssignmentFromRole (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
   pure \roleId -> do
     ctxts <- lift (roleId ##= contextGetter)
     for_ ctxts \ctxt -> do
-      roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
-      -- No need to handle retrieval errors as we've just created the role.
-      lift $ getPerspectRol roleIdentifier
+      roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
+      for_ roleTypesToCreate \objectType -> unsafePartial $ fromJust <$> createAndAddRoleInstance objectType (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
 
 compileAssignmentFromRole (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextToMoveTo
@@ -243,22 +264,8 @@ compileAssignmentFromRole (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings cont
     ctxts <- lift (roleId ##= contextGetter)
     (bindings' :: Array RoleInstance) <- lift (roleId ##= bindingsGetter)
     for_ ctxts \ctxt -> do
-      -- Get the context type.
-      cType <- lift (ctxt ##>> contextType)
-      -- Get the specialisations of qualifiedRoleIdentifier in that context type.
-      localSpecialisations <- lift (qualifiedRoleIdentifier ###= getRoleAspectSpecialisations) 
-        >>= pure <<< filter \(EnumeratedRoleType r) -> r `startsWithSegments` (unwrap cType)
-      contextHasAspect <- lift (cType ###= allEnumeratedRoles) >>= pure <<< isJust <<< elemIndex qualifiedRoleIdentifier
-      -- Add the qualifiedRoleIdentifier if it is one of the (aspect) roles of that context type.
-      localSpecialisations' <- if contextHasAspect
-        then pure $ cons qualifiedRoleIdentifier localSpecialisations
-        else pure localSpecialisations
-      -- Get the user role type that is executing.
-      (user :: RoleType) <- gets (_.authoringRole <<< unwrap)
-      -- Filter the object role types, keeping only those that the user role type has a perspective on.
-      (specialisedObjects :: Array EnumeratedRoleType) <- lift $ concat <$> runArrayT (filterA (unsafePartial hasPerspectiveOnRole user) localSpecialisations')
-      -- For each of the remaining object role types, create and add a role instance.
-      for_ specialisedObjects \objectType ->
+      roleTypesToCreate' <- roleContextualisations ctxt qualifiedRoleIdentifier    
+      for_ roleTypesToCreate' \objectType ->
         for_ bindings' \bndg -> createAndAddRoleInstance
           objectType
           (unwrap ctxt)
