@@ -47,7 +47,7 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
-import Perspectives.Types.ObjectGetters (roleAspectsClosure)
+import Perspectives.Types.ObjectGetters (contextAspectsClosure, roleAspectsClosure)
 import Prelude (bind, eq, flip, identity, pure, show, ($), (+), (/), (<#>), (<$>), (<<<), (<>))
 
 -- CONTEXT
@@ -203,7 +203,8 @@ defaultRolRecord =
   , bindingDelta: Nothing
   , propertyDeltas: empty
   , states: []
-  , aliases: empty
+  , roleAliases: empty
+  , contextAliases: empty
   }
 
 isDefaultContextDelta :: SignedDelta -> Boolean
@@ -298,11 +299,13 @@ setRol_gevuldeRollen :: PerspectRol -> Object (Object (Array RoleInstance)) -> P
 setRol_gevuldeRollen (PerspectRol r) grollen = PerspectRol (r {filledRoles = grollen})
 
 rol_gevuldeRol :: PerspectRol -> ContextType -> EnumeratedRoleType -> Array RoleInstance
-rol_gevuldeRol  (PerspectRol{filledRoles, aliases}) cType rn = case lookup (NT.unwrap cType) filledRoles of
-  Nothing -> []
-  Just roleMap -> case lookup (NT.unwrap rn) aliases of
-    Nothing -> maybe [] identity (lookup (NT.unwrap rn) roleMap)
-    Just alias -> maybe [] identity (lookup alias roleMap)
+rol_gevuldeRol  (PerspectRol{filledRoles, roleAliases, contextAliases}) cType rn = case lookup (NT.unwrap cType) contextAliases of
+    Nothing -> []
+    Just contextAlias -> case lookup contextAlias filledRoles of
+      Nothing -> []
+      Just roleMap -> case lookup (NT.unwrap rn) roleAliases of
+        Nothing -> []
+        Just alias -> maybe [] identity (lookup alias roleMap)
 
 -- | The first argument is the role Filler instance that receives a new inverse link to a role that binds it.
 -- | The fourth argument represents the Filled role instance that binds the role of the first argument.
@@ -313,17 +316,25 @@ addRol_gevuldeRollen :: PerspectRol -> ContextType -> EnumeratedRoleType -> Role
 addRol_gevuldeRollen filler cType rolName filled = do
   cIndex <- pure $ NT.unwrap cType
   rIndex <- pure $ NT.unwrap rolName
-  aspects <- rolName ###= roleAspectsClosure
+  roleAspects <- rolName ###= roleAspectsClosure
+  contextAspects <- cType ###= contextAspectsClosure
   f <- pure $ NT.over PerspectRol (\cr -> let
-    aliases' = foldl (\als alias -> insert alias rIndex als) cr.aliases (NT.unwrap <$> aspects)
+    roleAliases' = foldl (\als alias -> insert alias rIndex als) cr.roleAliases (NT.unwrap <$> roleAspects)
+    contextAliases' = foldl (\als alias -> insert alias cIndex als) cr.contextAliases (NT.unwrap <$> contextAspects)
     in 
     case lookup cIndex cr.filledRoles of
-      Nothing -> cr {filledRoles = insert cIndex (singleton rIndex [filled]) cr.filledRoles, aliases = aliases'}
+      Nothing -> cr { filledRoles = insert cIndex (singleton rIndex [filled]) cr.filledRoles
+                    , roleAliases = roleAliases'
+                    , contextAliases = contextAliases'}
       Just (roleMap :: Object (Array RoleInstance)) -> case lookup rIndex roleMap of
-        Nothing -> cr {filledRoles = insert cIndex (insert rIndex [filled] roleMap) cr.filledRoles, aliases = aliases'}
+        Nothing -> cr { filledRoles = insert cIndex (insert rIndex [filled] roleMap) cr.filledRoles
+                      , roleAliases = roleAliases'
+                      , contextAliases = contextAliases'}
         (Just roles) -> do
           case Arr.elemIndex filled roles of
-            Nothing -> cr {filledRoles = insert cIndex (insert rIndex (Arr.union [filled] roles) roleMap) cr.filledRoles, aliases = aliases'}
+            Nothing -> cr { filledRoles = insert cIndex (insert rIndex (Arr.union [filled] roles) roleMap) cr.filledRoles
+                          , roleAliases = roleAliases'
+                          , contextAliases = contextAliases'}
             _ -> cr
       )
   pure $ f filler
