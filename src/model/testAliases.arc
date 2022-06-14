@@ -42,11 +42,13 @@ domain TestAliases
   case Transport
     external 
       property Name (String)
+
     user Driver filledBy sys:PerspectivesSystem$User
       property VehicleName = context >> Vehicle >> Name
       perspective on Vehicle
-        only (Create, Remove)
+        only (Create)
         props (Name) verbs (SetPropertyValue)
+        props (NumberOfPassengers) verbs (Consult)
       perspective on Driver
         props (VehicleName, Voornaam, Achternaam) verbs (Consult)
       perspective on extern
@@ -57,6 +59,7 @@ domain TestAliases
 
     thing Vehicle
       property Name (String)
+      property NumberOfPassengers (Number)
 
     context Schedules (relational) filledBy Schedule
 
@@ -129,3 +132,22 @@ domain TestAliases
     user Chauffeur
       aspect ta:Transport$Driver
     
+  case ShippingVoyage
+    aspect ta:Transport
+      user Captain
+        aspect ta:Transport$Driver
+        perspective on Ship
+        -- The Driver can create a Vehicle, but not remove it.
+        -- Captain can remove a Ship.
+        -- TESTS: ROLE VERB ADDITION
+        -- The test fails if you cannot remove the Ship from a ShippingVoyage.
+        -- As a corrolary, we don't expect you to be able to remove a Plane from a Flight.
+          only (Remove)
+          -- The Driver can consult the number of passengers, but not change it.
+          -- The Captain can.
+          -- TESTS: PROPERTY VERB ADDITION
+          -- Fails if the Captain cannot set it.
+          props (NumberOfPassengers) verbs (SetPropertyValue)
+      
+      thing Ship
+        aspect ta:Transport$Vehicle
