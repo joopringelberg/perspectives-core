@@ -44,12 +44,12 @@ import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
-import Perspectives.Representation.ADT (allLeavesInADT)
+import Perspectives.Representation.ADT (allLeavesInADT, reduce)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..), constrainingFacets) as PROP
-import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleKindOfRoleType)
+import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, perspectivesOfRoleType, roleAspectsADT, roleKindOfRoleType)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), expandPropSet, expandPropertyVerbs, expandVerbs)
@@ -151,7 +151,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
   roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes)
   -- If the binding of the ADT that is the range of the object QueryFunctionDescription, is an external role,
   -- its context type may be created.
-  contextTypesToCreate <- (lift $ allLeavesInADT <<< map roleInContext2Role <$> bindingOfADT (unsafePartial domain2roleType (range object)))
+  contextTypesToCreate <- (lift $ allLeavesInADT <<< map roleInContext2Role <$> ((reduce (getEnumeratedRole >=> roleAspectsADT) >=> bindingOfADT) (roleInContext2Role <$> unsafePartial domain2roleType (range object))))
     >>= pure <<< (filter (isExternalRole <<< unwrap))
     >>= lift <<< traverse getEnumeratedRole
     >>= pure <<< map (_.context <<< unwrap)

@@ -253,7 +253,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case roleKind of
         ContextRole -> registerSupportedEffect corrId setter (map toRoleType_ <<< (binding >=> context >=> getMyType)) (RoleInstance subject)
         _ -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
-    -- `subject` is an external role instance. Returns all RoleTypes that sys:Me
+    -- `subject` is a role instance. Returns all RoleTypes that sys:Me
     -- ultimately fills an instance of in the corresponding context instance.
     Api.GetAllMyRoleTypes -> do
       allUserRoleTypes <- (RoleInstance subject) ##= (context >=> getAllMyRoleTypes)
@@ -568,7 +568,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         )
       (\e -> sendResponse (Error corrId (show e)) setter)
 
-    -- `subject` is an external role, object is a role type identifier (either
+    -- `subject` is a role, object is a role type identifier (either
     -- enumerated or calculated).
     Api.SetPreferredUserRoleType -> catchError
       (do
