@@ -41,13 +41,13 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (bindingOfRole, kindOfRole, roleAspectsBindingADT)
+import Perspectives.Representation.Class.Role (bindingOfADT, kindOfRole, roleAspectsBindingADT, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleKind(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (lessThanOrEqualTo)
-import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (==), (>=>), (>>=), (&&), not)
+import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (==), (>=>), (>>=))
 
 checkDomeinFile :: DomeinFile -> MonadPerspectives (Array PerspectivesError)
 checkDomeinFile df = pure []
@@ -117,16 +117,19 @@ checkContext c = do
 -----------------------------------------------------------
 -- CHECKBINDING
 -----------------------------------------------------------
--- | The allowed filler of the given role type to be filled must be equal to or more general than the type of the proposed filler.
+-- | The allowed filler of the given role type to be filled (including those of its Aspects!) must be equal to or more general than the type of the proposed filler.
 -- | The type of the proposed filler may not be equal to the given role type (we disallow a role filling itself).
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding filledType filler = do
   -- If the model is not available locally, try to get it from the repository.
   (fillerType :: EnumeratedRoleType) <- roleType_ filler
-  (fillerADT :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleAspectsBindingADT) fillerType
-  -- TODO. Voor de rol moet ik alleen de binding ophalen.
-  -- roleType' <- (getEnumeratedRoleInstances roletype) >>= adtOfRoleAspectsBinding
-  (filledTypeAllowedFiller :: ADT QT.RoleInContext) <- bindingOfRole filledType
-  b1 <- filledTypeAllowedFiller `lessThanOrEqualTo` fillerADT
-  pure $ b1 && not (filledType == ENR fillerType)
+  if filledType == ENR fillerType
+    then pure false
+    else do
+      (fillerADT :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleAspectsBindingADT) fillerType
+      -- The filledType has restrictions on the fillers that it allows.
+      -- These restrictions can be modeled with the filledType itself, but
+      -- the restrictions of all of its Aspects count as well.
+      (filledTypeAllowedFiller :: ADT QT.RoleInContext) <- (typeIncludingAspects >=> bindingOfADT) filledType
+      filledTypeAllowedFiller `lessThanOrEqualTo` fillerADT

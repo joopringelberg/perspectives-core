@@ -52,14 +52,14 @@ import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfRole, roleKindOfRoleType)
+import Perspectives.Representation.Class.Role (bindingOfADT, bindingOfRole, roleAspectsADT, roleKindOfRoleType)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, isDatabaseQueryRole, lessThanOrEqualTo, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=), (<<<), (>), (&&))
+import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isDatabaseQueryRole, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
+import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=), (<<<), (>), (&&), (>=>))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -366,8 +366,10 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             -- EnumeratedRoles in the model with (end)matching name.
             (enumeratedRoles :: Object EnumeratedRole) <- getsDF _.enumeratedRoles
             (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{_id:roleId}) -> (unwrap roleId) `endsWithSegments` ident) (values enumeratedRoles))
-            -- EnumeratedRoles that can bind `bindings`.
-            (candidates :: Array EnumeratedRole) <-(filterA (\(EnumeratedRole{binding}) -> lift2 $ lessThanOrEqualTo binding bindings) nameMatches)
+            -- EnumeratedRoles that can bind `bindings`. Notice that we must apply restrictions found on Aspects as well.
+            (candidates :: Array EnumeratedRole) <- (filterA 
+              (lift <<< lift <<< (roleAspectsADT >=> bindingOfADT >=> greaterThanOrEqualTo bindings))
+              nameMatches)
             case head candidates of
               Nothing -> if null nameMatches
                 then throwError $ UnknownRole start ident
