@@ -25,26 +25,27 @@ module Perspectives.TypePersistence.PerspectiveSerialisation where
 
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Writer (execWriterT, tell)
 import Data.Array (catMaybes, concat, cons, elemIndex, filter, filterA, find, findIndex, foldl, head, intersect, modifyAt, null, uncons, union)
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Data.Traversable (for, traverse)
+import Data.Traversable (for, for_, traverse)
 import Data.Tuple (Tuple(..), fst)
 import Foreign.Object (Object, empty, fromFoldable, insert, isEmpty, keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, AssumptionTracking)
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectives, MP, (###=))
 import Perspectives.Data.EncodableMap (lookup) as EM
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
-import Perspectives.Representation.ADT (allLeavesInADT, reduce)
+import Perspectives.Representation.ADT (ADT, allLeavesInADT, equalsOrGeneralisesADT, reduce)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
@@ -55,10 +56,10 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), expandPropSet, expandPropertyVerbs, expandVerbs)
 import Perspectives.Representation.ScreenDefinition (WidgetCommonFieldsDef)
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), PropertyType(..), RoleType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedRoleType, PropertyType(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
-import Perspectives.Types.ObjectGetters (getContextAspectSpecialisations)
+import Perspectives.Types.ObjectGetters (getContextAspectSpecialisations, perspectivesOfRole, roleAspectsClosure)
 import Prelude (append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
 import Simple.JSON (writeJSON)
 
@@ -105,6 +106,7 @@ perspectivesForContextAndUser' subject userRoleType cid = ArrayT do
   contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
   subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
   -- NOTE that we ignore perspectives that the user role's aspects may have!
+  -- These have been added in compile time.
   perspectives <- lift $ perspectivesOfRoleType userRoleType
   (traverse (serialisePerspective contextStates subjectStates cid userRoleType Nothing []) perspectives) >>=
     (filterA sendToClient)
@@ -157,6 +159,11 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     >>= pure <<< map (_.context <<< unwrap)
     >>= \as -> lift $ ((append as) <<< concat <$> (for as (runArrayT <<< getContextAspectSpecialisations)))
   identifyingProperty <- computeIdentifyingProperty serialisedProps roleInstances
+  allActions <- case userRoleType of 
+    CR _ -> pure $ concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
+    ENR rt -> do
+      objectADT <- lift $ reduce (getEnumeratedRole >=> roleAspectsADT) (roleInContext2Role <$> (unsafePartial domain2roleType $ range object))
+      lift $ hasActionsOn (contextStates <> subjectStates) rt objectADT
   pure { id
     , displayName
     , isFunctional: pessimistic $ functional object
@@ -172,12 +179,22 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
       -- else combine the verbs from all active states.
       else (intersect roleVerbs' $ concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))))
     , properties: fromFoldable ((\r@({id:propId}) -> Tuple propId r) <$> serialisedProps)
-    , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
+    , actions: allActions
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
     , contextTypesToCreate
     , identifyingProperty
     }
   where
+
+    -- The user role (userRoleType) may have aspect user roles that have perspectives on the same object. Include the actions defined in those perspectives!
+    hasActionsOn :: Array StateSpec -> EnumeratedRoleType -> ADT RoleInContext -> MP (Array String)
+    hasActionsOn activeStates eUserRole objectADT = eUserRole ###= roleAspectsClosure >>= \userAspects -> 
+      execWriterT (for_ userAspects \userAspect ->
+      -- Deze test is niet precies genoeg. We vergelijken op een gegeven moment Passenger met BoatPassenger en die zijn niet gelijk. Het gaat hier ook om de vraag of de eerste een Aspect is van de tweede.
+        (lift $ userAspect ###= perspectivesOfRole) >>= \perspectives -> for_ perspectives \(Perspective{actions:aspectActions, object:aspectObject}) -> if (unsafePartial domain2roleType (range aspectObject)) `equalsOrGeneralisesADT` objectADT
+          then tell $ concat (keys <$> (catMaybes $ (flip EM.lookup aspectActions) <$> activeStates))
+          else pure unit
+        ) 
 
     maybeAddIdentifier :: Array PropertyType -> Array PropertyType
     maybeAddIdentifier props = if null props then [CP $ CalculatedPropertyType roleWithId] else props
