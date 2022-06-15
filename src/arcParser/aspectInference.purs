@@ -23,6 +23,7 @@ module Perspectives.Parsing.Arc.AspectInference  where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Control.Alternative (guard)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, evalStateT)
@@ -39,7 +40,7 @@ import Perspectives.Query.QueryTypes (roleInContext2Role)
 import Perspectives.Representation.Class.Role (roleAspects)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Perspectives.Types.ObjectGetters (isFunctional_)
+import Perspectives.Types.ObjectGetters (isMandatory_, isRelational_)
 
 -- Modify EnumeratedRoles by inferring the following from their aspects:
 --    * If an Aspect is relational, make the role relational, too.
@@ -53,26 +54,14 @@ inferFromAspectRoles = do
   where
     inferFromAspectRoles' :: DomeinFileRecord -> PhaseThree Unit
     inferFromAspectRoles' df@{enumeratedRoles} = do
-      enumeratedRoles' <- for enumeratedRoles inferCardinality
+      enumeratedRoles' <- for enumeratedRoles (inferCardinality >=> inferMandatoriness)
       modifyDF \dfr -> dfr { enumeratedRoles = enumeratedRoles'}
 
     inferCardinality :: EnumeratedRole -> PhaseThree EnumeratedRole
     inferCardinality r = do
       aspects <- lift $ lift (roleAspects r)
-      isFunctional <- null <$> evalStateT (some aspectIsRelational) (roleInContext2Role <$> aspects)
+      isFunctional <- null <$> evalStateT (some aspectIsRelational) (roleInContext2Role <$> aspects) <|> pure true
       pure $ over EnumeratedRole (\rr -> rr {functional = isFunctional}) r
-
-    -- aspectIsRelational :: StateT (Array EnumeratedRoleType) PhaseThree EnumeratedRoleType
-    -- aspectIsRelational = do
-    --   maspect <- State.gets uncons
-    --   case maspect of 
-    --     Nothing -> throwError $ singleton (Custom "Not found") 
-    --     Just {head, tail} -> do
-    --       State.put tail
-    --       (lift $ lift $ lift $ isFunctional_ head) >>= 
-    --         if _ 
-    --           then throwError $ singleton (Custom "Not this one")
-    --           else pure head
 
     aspectIsRelational :: StateT (Array EnumeratedRoleType) PhaseThree EnumeratedRoleType
     aspectIsRelational = do
@@ -81,5 +70,23 @@ inferFromAspectRoles = do
         Nothing -> throwError $ singleton (Custom "Not found") 
         Just {head, tail} -> do
           State.put tail
-          (lift $ lift $ lift $ isFunctional_ head) >>= guard
+          -- fail if head is functional; only pass through when head is relational.
+          (lift $ lift $ lift $ isRelational_ head) >>= guard
+          pure head
+
+    inferMandatoriness :: EnumeratedRole -> PhaseThree EnumeratedRole
+    inferMandatoriness r = do
+      aspects <- lift $ lift (roleAspects r)
+      isMandatory <- not <<< null <$> evalStateT (some aspectIsMandatory) (roleInContext2Role <$> aspects) <|> pure false
+      pure $ over EnumeratedRole (\rr -> rr {mandatory = isMandatory}) r
+
+    aspectIsMandatory :: StateT (Array EnumeratedRoleType) PhaseThree EnumeratedRoleType
+    aspectIsMandatory = do
+      maspect <- State.gets uncons
+      case maspect of 
+        Nothing -> throwError $ singleton (Custom "Not found") 
+        Just {head, tail} -> do
+          State.put tail
+          -- fail if head is optional; only pass through when head is mandatory.
+          (lift $ lift $ lift $ isMandatory_ head) >>= guard
           pure head
