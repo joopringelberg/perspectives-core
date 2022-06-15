@@ -31,7 +31,7 @@ module Perspectives.Query.ExpressionCompiler where
 -- | and distribute it throughout the domain.
 
 import Control.Monad.Error.Class (catchError, try)
-import Control.Monad.Except (lift, throwError)
+import Control.Monad.Except (lift)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets)
 import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, uncons)
@@ -51,7 +51,7 @@ import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpr
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, throwError, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Kinked (setInvertedQueries)

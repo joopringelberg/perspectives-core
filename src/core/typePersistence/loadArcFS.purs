@@ -50,7 +50,7 @@ import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentPar
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
-import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), DomeinFileId(..))
@@ -70,14 +70,14 @@ import Text.Parsing.Parser (ParseError(..))
 
 -- | Load an Arc file from a directory relative to the active process. Parse the file completely.
 -- | Does neither cache nor save the model.
-loadAndCompileArcFile :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadAndCompileArcFile :: String -> String -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFile)
 loadAndCompileArcFile fileName directoryName = do
   procesDir <- liftEffect cwd
   loadAndCompileArcFile_ (Path.concat [procesDir, directoryName, fileName <> ".arc"])
 
 type FilePath = String
 
-loadAndCompileArcFile_ :: FilePath -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadAndCompileArcFile_ :: FilePath -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFile)
 loadAndCompileArcFile_ filePath = catchError
   do
     text <- lift $ readTextFile UTF8 filePath
@@ -85,14 +85,14 @@ loadAndCompileArcFile_ filePath = catchError
     case r of
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
       (Right ctxt) -> do
-        (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
+        (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
         case result of
-          (Left e) -> pure $ Left [e]
+          (Left e) -> pure $ Left e
           (Right (DomeinFile dr'@{_id})) -> do
             dr'' <- pure dr' {referredModels = state.referredModels}
-            (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr'' state.postponedStateQualifiedParts state.screens
+            (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
-              (Left e) -> pure $ Left [e]
+              (Left e) -> pure $ Left e
               (Right correctedDFR@{referredModels}) -> do
                 -- Remove the self-referral and add the source.
                 pure $ Right $ DomeinFile correctedDFR
@@ -101,12 +101,12 @@ loadAndCompileArcFile_ filePath = catchError
                   }
   \e -> pure $ Left [Custom (show e)]
 
-type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)
+type Persister = String -> DomeinFile -> MonadPerspectives MultiplePerspectivesErrors
 
 -- | Loads an .arc file and expects a .crl file with the same name. Adds the .crl
 -- | file to the DomeinFile. Adds the model description instance to the DomeinFile.
 -- | NOTICE that the model instances are added to cache!
-loadArcAndCrl :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadArcAndCrl :: String -> String -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFile)
 loadArcAndCrl fileName directoryName = do
   procesDir <- liftEffect cwd
   loadArcAndCrl'
@@ -116,7 +116,7 @@ loadArcAndCrl fileName directoryName = do
 type ArcPath = String
 type CrlPath = String
 
-loadArcAndCrl' :: ArcPath -> CrlPath -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadArcAndCrl' :: ArcPath -> CrlPath -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFile)
 loadArcAndCrl' arcPath crlPath = do
   r <- loadAndCompileArcFile_ arcPath
   case r of
@@ -130,7 +130,7 @@ loadArcAndCrl' arcPath crlPath = do
         (Right withInstances) -> do
           pure $ Right (DomeinFile withInstances)
   where
-    addModelDescriptionAndCrl :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
+    addModelDescriptionAndCrl :: DomeinFileRecord -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFileRecord)
     addModelDescriptionAndCrl df = do
       procesDir <- liftEffect cwd
       source <- lift $ readTextFile UTF8 crlPath
@@ -172,7 +172,7 @@ loadArcAndCrl' arcPath crlPath = do
 
 -- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl
 -- | file to the DomeinFile. Adds the model description instance. Persists that DomeinFile.
-loadAndPersistArcFile :: Boolean -> Persister -> String -> String -> MonadPerspectives (Array PerspectivesError)
+loadAndPersistArcFile :: Boolean -> Persister -> String -> String -> MonadPerspectives MultiplePerspectivesErrors
 loadAndPersistArcFile loadCRL persist fileName directoryName = do
   r <- if loadCRL
     then loadArcAndCrl fileName directoryName
@@ -183,22 +183,22 @@ loadAndPersistArcFile loadCRL persist fileName directoryName = do
 
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.
 -- | Loads an instance file, too. If not present, throws an error. Instances are added to the cache.
-loadCompileAndCacheArcFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
+loadCompileAndCacheArcFile :: String -> String -> MonadPerspectives MultiplePerspectivesErrors
 loadCompileAndCacheArcFile = loadAndPersistArcFile true \id df -> storeDomeinFileInCache id df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.
 -- | Does not try to load an instance file.
-loadCompileAndCacheArcFile' :: String -> String -> MonadPerspectives (Array PerspectivesError)
+loadCompileAndCacheArcFile' :: String -> String -> MonadPerspectives MultiplePerspectivesErrors
 loadCompileAndCacheArcFile' = loadAndPersistArcFile false \id df -> storeDomeinFileInCache id df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Store in Couchdb.
 -- | Loads an instance file, too. If not present, throws an error. Instances are added to the cache.
-loadCompileAndSaveArcFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
+loadCompileAndSaveArcFile :: String -> String -> MonadPerspectives MultiplePerspectivesErrors
 loadCompileAndSaveArcFile = loadAndPersistArcFile true \_ df -> storeDomeinFileInCouchdb df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Store in Couchdb.
 -- | Does not try to load an instance file.
-loadCompileAndSaveArcFile' :: String -> String -> MonadPerspectives (Array PerspectivesError)
+loadCompileAndSaveArcFile' :: String -> String -> MonadPerspectives MultiplePerspectivesErrors
 loadCompileAndSaveArcFile' = loadAndPersistArcFile false \_ df -> storeDomeinFileInCouchdb df *> pure []
 
 parseError2PerspectivesError :: ParseError -> PerspectivesError

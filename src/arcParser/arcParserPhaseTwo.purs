@@ -24,9 +24,9 @@ module Perspectives.Parsing.Arc.PhaseTwo where
 
 import Perspectives.Parsing.Arc.PhaseTwoDefs
 
-import Control.Monad.Except (lift, throwError)
+import Control.Monad.Except (lift)
 import Control.Monad.State (gets, modify)
-import Data.Array (cons, elemIndex, foldl)
+import Data.Array (cons, elemIndex, foldl, singleton)
 import Data.Array (fromFoldable) as ARR
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)

@@ -26,7 +26,6 @@ module Perspectives.Query.StatementCompiler
   (compileStatement)
 where
 
-import Control.Monad.Except (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, filterA, foldM, head, length, null, uncons)
 import Data.Maybe (Maybe(..), fromJust)
@@ -41,7 +40,7 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (areLastSegmentsOf, buitenRol, deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame, throwError)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))

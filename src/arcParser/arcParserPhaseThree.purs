@@ -29,7 +29,6 @@ module Perspectives.Parsing.Arc.PhaseThree where
 -- |
 
 import Control.Monad.Error.Class (try)
-import Control.Monad.Except (throwError)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
@@ -54,14 +53,15 @@ import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegmen
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
+import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
 import Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation (addAspectsToExternalRoles, contextualisePerspectives)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', withDomeinFile, withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', throwError, withDomeinFile, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition, arcParserStartPosition)
-import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName, qualifyLocalContextName)
 import Perspectives.Query.Kinked (completeInversions, setInvertedQueries)
@@ -97,7 +97,7 @@ phaseThree ::
   DomeinFileRecord ->
   LIST.List AST.StateQualifiedPart ->
   LIST.List AST.ScreenE ->
-  MP (Either PerspectivesError DomeinFileRecord)
+  MP (Either MultiplePerspectivesErrors DomeinFileRecord)
 phaseThree df@{_id} postponedParts screens = do
   -- Store the DomeinFile in cache. If a prefix for the domain is defined in the file,
   -- phaseThree_ will try to retrieve it.
@@ -108,7 +108,7 @@ phaseThree_ ::
   DomeinFileRecord ->
   LIST.List AST.StateQualifiedPart ->
   LIST.List AST.ScreenE ->
-  MP (Either PerspectivesError DomeinFileRecord)
+  MP (Either MultiplePerspectivesErrors DomeinFileRecord)
 phaseThree_ df@{_id, referredModels} postponedParts screens = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
   indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
@@ -116,6 +116,7 @@ phaseThree_ df@{_id, referredModels} postponedParts screens = do
   (Tuple ei {dfr}) <- runPhaseTwo_'
     (do
       checkAspectRoleReferences
+      inferFromAspectRoles
       qualifyBindings
       qualifyStateNames
       compileCalculatedRolesAndProperties
@@ -190,42 +191,44 @@ qualifyBindings = (lift $ State.gets _.dfr) >>= qualifyBindings'
           -- Try to qualify as an EnumeratedRole in the current domain.
           q <- try $ ST <$> qualifyLocalEnumeratedRoleName pos (unwrap role) (keys eroles)
           unsafePartial case q of
-            Left (UnknownRole _ _) -> do
-              -- Otherwise, try to qualify as a CalculatedRole in the current domain.
-              -- We continue an intentional semantic error introduced while parsing here by attempting to qualify the binding, that we know not
-              -- to be an EnumeratedRole, as an EnumeratedRole. However, with requalifyBindingsToCalculatedRoles we will
-              -- correct that error. We cannot do otherwise because at this state we don't have compiled the expressions
-              -- of the CalculatedRoles yet.
-              (q' :: Either PerspectivesError (ADT EnumeratedRoleType)) <- try $ ST <$> qualifyLocalEnumeratedRoleName pos (unwrap role) (keys croles)
-              -- By construction we have a Simple ADT or an error.
-              unsafePartial case q' of
-                Left (UnknownRole _ _) -> do
-                  -- If we cannot find the identifier in the Calculated roles, it may be in another namespace.
-                  -- But then the name must be fully qualified; we're not going to try just any model.
-                  if isQualifiedWithDomein (unwrap role)
-                    then do
-                      rl <- lift $ lift $ getRoleType (unwrap role) >>= getRole
-                      case rl of
-                        E (EnumeratedRole{_id, context:lexicalContext}) -> do
-                          qualifiedContext <- case context of
-                            ContextType s | s == "" -> pure lexicalContext
-                            ContextType contextName -> qualifyLocalContextName pos contextName (keys contexts)
-                          pure $ ST $ QT.RoleInContext {context: qualifiedContext, role: _id}
-                        C r -> case context of
-                          ContextType empty | empty == "" -> lift2 $ roleADT r
-                          ContextType contextName -> do
-                            qualifiedContext <- qualifyLocalContextName pos contextName (keys contexts)
-                            (flip replaceContext qualifiedContext) <$> (lift2 $ roleADT r)
-                    else throwError $ NotWellFormedName pos (unwrap role)
-                Left e -> throwError e
-                -- qualifiedRoleType is a CalculatedRole defined in the current domain.
-                -- A CalculatedRole cannot be used as an Aspect. Context must be empty.
-                Right (ST qualifiedRoleType) -> case context of
-                  ContextType empty | empty == "" -> pure $ ST $ QT.RoleInContext{context, role:qualifiedRoleType}
-                    -- Note that this is not yet correct, as the role in the RoleInContext should be
-                    -- an EnumeratedRole. But we've not yet compiled the CalculatedRoles so we leave it for now.
-                  ContextType contextName -> throwError $ NoCalculatedAspect pos (unwrap qualifiedRoleType)
-            Left e -> throwError e
+            Left (errs :: Array PerspectivesError) -> case unsafePartial fromJust $ head errs of 
+              (UnknownRole _ _) -> do
+                -- Otherwise, try to qualify as a CalculatedRole in the current domain.
+                -- We continue an intentional semantic error introduced while parsing here by attempting to qualify the binding, that we know not
+                -- to be an EnumeratedRole, as an EnumeratedRole. However, with requalifyBindingsToCalculatedRoles we will
+                -- correct that error. We cannot do otherwise because at this state we don't have compiled the expressions
+                -- of the CalculatedRoles yet.
+                (q' :: Either (Array PerspectivesError) (ADT EnumeratedRoleType)) <- try $ ST <$> qualifyLocalEnumeratedRoleName pos (unwrap role) (keys croles)
+                -- By construction we have a Simple ADT or an error.
+                unsafePartial case q' of
+                  Left (errs' :: Array PerspectivesError) -> case unsafePartial fromJust $ head errs' of 
+                    (UnknownRole _ _) -> do
+                      -- If we cannot find the identifier in the Calculated roles, it may be in another namespace.
+                      -- But then the name must be fully qualified; we're not going to try just any model.
+                      if isQualifiedWithDomein (unwrap role)
+                        then do
+                          rl <- lift $ lift $ getRoleType (unwrap role) >>= getRole
+                          case rl of
+                            E (EnumeratedRole{_id, context:lexicalContext}) -> do
+                              qualifiedContext <- case context of
+                                ContextType s | s == "" -> pure lexicalContext
+                                ContextType contextName -> qualifyLocalContextName pos contextName (keys contexts)
+                              pure $ ST $ QT.RoleInContext {context: qualifiedContext, role: _id}
+                            C r -> case context of
+                              ContextType empty | empty == "" -> lift2 $ roleADT r
+                              ContextType contextName -> do
+                                qualifiedContext <- qualifyLocalContextName pos contextName (keys contexts)
+                                (flip replaceContext qualifiedContext) <$> (lift2 $ roleADT r)
+                        else throwError $ NotWellFormedName pos (unwrap role)
+                    e -> throwError e
+                    -- qualifiedRoleType is a CalculatedRole defined in the current domain.
+                    -- A CalculatedRole cannot be used as an Aspect. Context must be empty.
+                  Right (ST qualifiedRoleType) -> case context of
+                    ContextType empty | empty == "" -> pure $ ST $ QT.RoleInContext{context, role:qualifiedRoleType}
+                      -- Note that this is not yet correct, as the role in the RoleInContext should be
+                      -- an EnumeratedRole. But we've not yet compiled the CalculatedRoles so we leave it for now.
+                    ContextType contextName -> throwError $ NoCalculatedAspect pos (unwrap qualifiedRoleType)
+              e -> throwError e
             Right (ST qualifiedRoleType) -> case context of
               ContextType empty | empty == "" -> unsafePartial case lookup (unwrap qualifiedRoleType) eroles of
                 Just (EnumeratedRole{context:lexicalContext}) -> pure $ ST $ QT.RoleInContext{context:lexicalContext, role:qualifiedRoleType}

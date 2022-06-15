@@ -81,6 +81,8 @@ checkContext c = do
   for_ (userRole c) (checkRoleKind UserRole)
   checkEnumeratedRole ExternalRole (externalRole c)
 
+  -- TODO. #13 Check Aspect restrictions
+
   where
     checkRoleKind :: RoleKind -> RoleType -> PF Unit
     checkRoleKind kind (r :: RoleType) = do

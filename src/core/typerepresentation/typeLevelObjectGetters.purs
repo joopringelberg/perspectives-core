@@ -77,6 +77,9 @@ isUnlinked_ et = getEnumeratedRole et >>= pure <<< _.unlinked <<< unwrap
 isUnlinked :: EnumeratedRoleType ~~~> Boolean
 isUnlinked = lift <<< isUnlinked_
 
+isFunctional_ :: EnumeratedRoleType -> MonadPerspectives Boolean
+isFunctional_ et = getEnumeratedRole et >>= pure <<< _.functional <<< unwrap
+
 -- | The state identifier of the root state of a role has the same string value as the role identifier.
 roleRootState :: EnumeratedRoleType ~~~> StateIdentifier
 roleRootState rtype = pure $ StateIdentifier $ unwrap rtype

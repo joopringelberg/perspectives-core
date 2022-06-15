@@ -22,7 +22,7 @@
 
 module Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries where
 
-import Control.Monad.Except (lift, throwError)
+import Control.Monad.Except (lift)
 import Control.Monad.Reader (ReaderT, ask)
 import Data.Array (foldl, union, concat, fromFoldable)
 import Data.Map (Map, lookup, values) as Map
@@ -36,7 +36,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF, throwError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleType, functional, mandatory, range, roleDomain, roleInContext2Role, roleRange)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
@@ -85,7 +85,7 @@ storeInvertedQuery qwk@(ZQ backward forward) users roleStates statesPerProperty 
 
     (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) statesPerProperty selfOnly
 
-    otherwise -> throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint otherwise)
+    otherwise -> lift $ throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint otherwise)
 
 -- | The function is partial, because we just handle the SQD case.
 -- | The first argument is the backward path of the second argument.
@@ -270,7 +270,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
               )
             dfr
             (allLeavesInADT (roleRange qfd))
-      CR _ -> throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
+      CR _ -> lift $ throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
 
     QF.DataTypeGetter QF.ContextF -> modifyDF \dfr@{enumeratedRoles} -> foldl
       (\dfr' ric@(RoleInContext{context, role}) ->
@@ -315,7 +315,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
     -- for the External role.
     QF.DataTypeGetter QF.IdentityF -> pure unit
 
-    _ -> throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
+    _ -> lift $ throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
 
   where
     addPathToProperty :: EnumeratedProperty ->

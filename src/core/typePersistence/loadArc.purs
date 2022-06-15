@@ -47,7 +47,7 @@ import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentPar
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
-import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..))
@@ -75,16 +75,16 @@ loadAndCompileArcFile_ text = catchError
     case r of
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
       (Right ctxt) -> do
-        (Tuple result state :: Tuple (Either PerspectivesError DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
+        (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
         case result of
-          (Left e) -> pure $ Left [e]
+          (Left e) -> pure $ Left e
           (Right (DomeinFile dr'@{_id})) -> do
             dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
             -- We should load referred models if they are missing.
             for_ referredModels (loadModelIfMissing <<< unwrap)
-            (x' :: (Either PerspectivesError DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
+            (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
-              (Left e) -> pure $ Left [e]
+              (Left e) -> pure $ Left e
               (Right correctedDFR@{referredModels:refModels}) -> do
                 -- Run the type checker
                 typeCheckErrors <- lift $ checkDomeinFile (DomeinFile correctedDFR)

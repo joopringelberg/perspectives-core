@@ -410,14 +410,18 @@ enumeratedRole_ uname knd pos = do
     -- | it will cause looping as long as it is used
     -- | both in userRoleE and thingRoleE. I do not understand why.
     roleAttributes :: IP (List RolePart)
-    roleAttributes = token.parens (((mandatory <|> functional <|> unlinked) <?> "mandatory, functional, unlinked.") `sepBy` token.symbol ",")
+    roleAttributes = token.parens (((mandatory <|> functional <|> relational <|> unlinked) <?> "mandatory, functional/relational, unlinked.") `sepBy` token.symbol ",")
 
     mandatory :: IP RolePart
     mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute true)))
 
     -- | Roles are by default functional.
     functional :: IP RolePart
-    functional = (reserved "relational" *> (pure (FunctionalAttribute false)))
+    functional = (reserved "functional" *> (pure (FunctionalAttribute true)))
+
+    -- | Roles are by default functional.
+    relational :: IP RolePart
+    relational = (reserved "relational" *> (pure (FunctionalAttribute false)))
 
     unlinked :: IP RolePart
     unlinked = (reserved "unlinked" *> (pure UnlinkedAttribute))

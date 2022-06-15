@@ -27,9 +27,8 @@ module Perspectives.Parsing.Messages where
 -- | During all three phases of transformation, errors may be detected.
 -- | This module defines the structure and kind of these errors.
 
-import Control.Monad.Except (ExceptT, throwError)
-import Data.List.Lazy.NonEmpty (singleton)
-import Data.List.Lazy.Types (NonEmptyList)
+import Control.Monad.Except (ExceptT, throwError) as Except
+import Data.Array (singleton)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.Expression.AST (PureLetStep(..), Step)
@@ -203,15 +202,15 @@ instance showPerspectivesError :: Show PerspectivesError where
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
-type MultiplePerspectivesErrors = NonEmptyList PerspectivesError
+type MultiplePerspectivesErrors = Array PerspectivesError
 
 -- | An error monad, used in this library to encode possible failures when
 -- | checking a Perspectives model data.
 -- |
 -- | The `Alt` instance for `Except` allows us to accumulate errors,
 -- | unlike `Either`, which preserves only the last error.
-type PF = ExceptT MultiplePerspectivesErrors MonadPerspectives
+type PF = Except.ExceptT MultiplePerspectivesErrors MonadPerspectives
 
 -- | Throws a failure error in `F`.
 fail :: forall a. PerspectivesError -> PF a
-fail = throwError <<< singleton
+fail = Except.throwError <<< singleton

@@ -22,7 +22,6 @@
 
 module Perspectives.Query.Kinked where
 
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, cons, elemIndex, foldr, intercalate, null, uncons, unsnoc)
@@ -36,7 +35,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (makeComposition, storeInvertedQuery)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, PhaseTwo', addBinding, lift2, lookupVariableBinding, withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, PhaseTwo', addBinding, lift2, lookupVariableBinding, withFrame, throwError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (compose, queryFunctionIsFunctional, queryFunctionIsMandatory, invertFunction)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, domain, range, replaceDomain, roleInContext2Role)

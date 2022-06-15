@@ -22,9 +22,10 @@
 
 module Perspectives.Parsing.Arc.PhaseTwoDefs where
 
-import Control.Monad.Except (ExceptT, lift, runExceptT)
+import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
+import Control.Monad.Except (throwError) as EXCEPT
 import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, runStateT)
-import Data.Array (union)
+import Data.Array (singleton, union)
 import Data.Either (Either)
 import Data.List (List(..), filter)
 import Data.Map (Map, empty, lookup) as MAP
@@ -43,7 +44,7 @@ import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
 import Perspectives.Names (defaultNamespaces, expandNamespaces)
 import Perspectives.Parsing.Arc.AST (ContextPart(..), ScreenE, StateQualifiedPart)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
-import Perspectives.Parsing.Messages (PerspectivesError)
+import Perspectives.Parsing.Messages (PerspectivesError, MultiplePerspectivesErrors)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Perspective (Perspective)
 import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedRoleType, RoleType)
@@ -72,10 +73,13 @@ type PhaseTwoState =
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot,
 -- | and allows exceptions.
 -- | It allows for a variable bottom of the monadic stack.
-type PhaseTwo' m = ExceptT PerspectivesError (StateT PhaseTwoState m)
+type PhaseTwo' m = ExceptT MultiplePerspectivesErrors (StateT PhaseTwoState m)
+
+throwError :: forall a m. Monad m => PerspectivesError -> PhaseTwo' m a
+throwError = EXCEPT.throwError <<< singleton
 
 -- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
-runPhaseTwo' :: forall a m. PhaseTwo' m a -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo' :: forall a m. PhaseTwo' m a -> m (Tuple (Either MultiplePerspectivesErrors a) PhaseTwoState)
 runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord empty empty Nil
 
 runPhaseTwo_' :: forall a m.
@@ -84,7 +88,7 @@ runPhaseTwo_' :: forall a m.
   Object ContextType ->
   Object EnumeratedRoleType ->
   List StateQualifiedPart ->
-  m (Tuple (Either PerspectivesError a) PhaseTwoState)
+  m (Tuple (Either MultiplePerspectivesErrors a) PhaseTwoState)
 runPhaseTwo_' computation dfr indexedContexts indexedRoles postponedParts = runStateT (runExceptT computation)
   { bot: false
   , dfr: dfr
@@ -99,10 +103,10 @@ runPhaseTwo_' computation dfr indexedContexts indexedRoles postponedParts = runS
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 -- | Used in the test modules.
-evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' m a -> m (Either PerspectivesError a)
+evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' m a -> m (Either MultiplePerspectivesErrors a)
 evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord empty empty
 
-evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' m a -> DomeinFileRecord -> Object ContextType -> Object EnumeratedRoleType -> m (Either PerspectivesError a)
+evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' m a -> DomeinFileRecord -> Object ContextType -> Object EnumeratedRoleType -> m (Either MultiplePerspectivesErrors a)
 evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExceptT computation)
   { bot: false
   , dfr: drf
