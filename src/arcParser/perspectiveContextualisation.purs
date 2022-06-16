@@ -55,9 +55,9 @@ contextualisePerspectives = do
       
     -- The EnumeratedRole has kind UserRole by virtue of the filtering above.
     -- Stores the EnumeratedRole in PhaseTwoState.
-    contextualisePerspectives'' :: EnumeratedRole -> PhaseThree Unit
-    contextualisePerspectives'' (EnumeratedRole r@{perspectives, roleAspects, context}) = if null roleAspects
-      then pure unit
+    contextualisePerspectives'' :: EnumeratedRole -> PhaseThree EnumeratedRole
+    contextualisePerspectives'' role@(EnumeratedRole r@{perspectives, roleAspects, context}) = if null roleAspects
+      then pure role
       else do
         -- As contextualising requires other EnumeratedRoles that may by now have been 
         -- changed in PhaseTwoState, always retrieve the aspects again from PhaseTwoState!
@@ -80,8 +80,8 @@ contextualisePerspectives = do
         
         saveRole (EnumeratedRole r {perspectives = perspectives' <> aspectPerspectives <> contextualisedAspectPerspectives})
     
-    saveRole :: EnumeratedRole -> PhaseThree Unit
-    saveRole r = modifyDF \(dfr@{enumeratedRoles}) -> dfr {enumeratedRoles = insert (identifier_ r) r enumeratedRoles}
+    saveRole :: EnumeratedRole -> PhaseThree EnumeratedRole
+    saveRole r = (modifyDF \(dfr@{enumeratedRoles}) -> dfr {enumeratedRoles = insert (identifier_ r) r enumeratedRoles}) *> pure r
 
     getRole :: QT.RoleInContext -> PhaseThree (Maybe EnumeratedRole)
     getRole (QT.RoleInContext{role}) = getsDF \{enumeratedRoles} -> lookup (unwrap role) enumeratedRoles

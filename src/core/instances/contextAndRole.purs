@@ -22,7 +22,7 @@
 
 module Perspectives.ContextAndRole where
 
-import Data.Array (cons, foldl, null)
+import Data.Array (cons, foldl, null) 
 import Data.Array (delete, difference, elemIndex, snoc, union, unsnoc) as Arr
 import Data.Foldable (maximum)
 import Data.Int (floor, fromString, toNumber)
@@ -149,10 +149,10 @@ deleteContext_rolInContext (PerspectContext ct@{rolInContext}) (EnumeratedRoleTy
 
 type Modifier = Array RoleInstance -> Array RoleInstance
 
+-- TODO. This function need not be in MonadPerspectives.
 modifyContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Modifier -> MonadPerspectives PerspectContext
 modifyContext_rolInContext ct@(PerspectContext cr@{rolInContext}) r@(EnumeratedRoleType rolName) f = case view (_roleInstances' r) ct of
   Nothing -> do
-    aspects <- r ###= roleAspectsClosure
     pure $ PerspectContext cr
       { rolInContext = insert rolName (f []) rolInContext}
   Just roles -> pure $ set (_roleInstances' r) (Just (f roles)) ct

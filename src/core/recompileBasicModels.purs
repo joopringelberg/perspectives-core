@@ -50,6 +50,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (documentsInDatabase, includeDocs)
 import Perspectives.Persistence.Types (Url)
 import Perspectives.Persistent (getDomeinFile)
+import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadArcAndCrl')
 import Simple.JSON (class ReadForeign, read, read')
@@ -66,8 +67,8 @@ recompileModelsAtUrl repository = do
     Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
   executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel
 
-recompileModel :: UninterpretedDomeinFile -> MonadPerspectivesTransaction Unit
-recompileModel (UninterpretedDomeinFile{_id, _rev, contents}) =
+recompileModel :: UninterpretedDomeinFile -> MonadPerspectivesTransaction UninterpretedDomeinFile
+recompileModel model@(UninterpretedDomeinFile{_id, _rev, contents}) =
   do
     log ("Recompiling " <> _id)
     -- TODO. We moeten de inverse queries verwerken in de andere modellen!
@@ -86,6 +87,7 @@ recompileModel (UninterpretedDomeinFile{_id, _rev, contents}) =
               \(DomeinFile dfr) -> do
                 -- Here we must take care to preserve the screens.js attachment.
                 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+    pure model
 
 
 --------------------------------------------------------------------------------------------
@@ -94,9 +96,6 @@ recompileModel (UninterpretedDomeinFile{_id, _rev, contents}) =
 -- two models to be equal if they don't use each other, the resulting order does not respect
 -- the basic requirement that a model should be to the right of its used models.
 -- The models form a directed graph.
--- A topological sort (see e.g. https://www.interviewcake.com/concept/java/topological-sort) of such
--- a graph produces the required order.
--- There is a module Graph in Pursuit, but we cannot use it because our package set is too old.
 --------------------------------------------------------------------------------------------
 type ToSort = Array UninterpretedDomeinFile
 type SortedLabels = Array String
@@ -104,7 +103,7 @@ type Skipped = Array UninterpretedDomeinFile
 
 executeInTopologicalOrder :: forall m. Monad m =>
   ToSort ->
-  (UninterpretedDomeinFile -> m Unit) ->
+  (UninterpretedDomeinFile -> m UninterpretedDomeinFile) ->
   m Unit
 executeInTopologicalOrder toSort action = void $ TOP.executeInTopologicalOrder
   (\(UninterpretedDomeinFile{_id}) -> _id)

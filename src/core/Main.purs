@@ -441,8 +441,8 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
       logPerspectivesError $ Custom $ "Basic models recompiled!"
       callback true
     
-    recompileModel' :: UninterpretedDomeinFile -> MonadPerspectives Unit
-    recompileModel' df= void $ runMonadPerspectivesTransaction'
+    recompileModel' :: UninterpretedDomeinFile -> MonadPerspectives UninterpretedDomeinFile
+    recompileModel' df= runMonadPerspectivesTransaction'
       false
       (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
       (recompileModel df)

@@ -29,21 +29,30 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, evalStateT)
 import Control.Monad.State as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (null, singleton, some, uncons)
+import Data.Array (cons, filter, null, singleton, some, uncons)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (over)
+import Data.Newtype (over, unwrap)
 import Data.Traversable (for)
+import Foreign.Object (values)
+import Perspectives.DomeinCache (modifyEnumeratedRoleInDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
+import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder)
+import Perspectives.Identifiers (startsWithSegments)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, withDomeinFile)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Query.QueryTypes (roleInContext2Role)
-import Perspectives.Representation.Class.Role (roleAspects)
+import Perspectives.Representation.ADT (product)
+import Perspectives.Representation.Class.Identifiable (identifier_)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.Class.Role (binding, roleAspects)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType)
 import Perspectives.Types.ObjectGetters (isMandatory_, isRelational_)
 
 -- Modify EnumeratedRoles by inferring the following from their aspects:
 --    * If an Aspect is relational, make the role relational, too.
+--    * If an Aspect is mandatory, make the role relational, too.
 inferFromAspectRoles :: PhaseThree Unit
 inferFromAspectRoles = do
   df@{_id} <- lift $ State.gets _.dfr
@@ -53,9 +62,16 @@ inferFromAspectRoles = do
     (inferFromAspectRoles' df)
   where
     inferFromAspectRoles' :: DomeinFileRecord -> PhaseThree Unit
-    inferFromAspectRoles' df@{enumeratedRoles} = do
-      enumeratedRoles' <- for enumeratedRoles (inferCardinality >=> inferMandatoriness)
-      modifyDF \dfr -> dfr { enumeratedRoles = enumeratedRoles'}
+    inferFromAspectRoles' df@{_id:namespace, enumeratedRoles} = do
+      -- We have to execute in topological order, so aspects are handled before they are applied.
+      enumeratedRoles' <- executeInTopologicalOrder
+        identifier_
+        -- Only count aspects defined in this namespace as dependencies for the sorting!
+        (filter (flip startsWithSegments namespace) <<< (map (unwrap <<< roleInContext2Role) <<< _.roleAspects <<< unwrap))
+        (values enumeratedRoles)
+        (inferCardinality >=> inferMandatoriness >=> inferBinding >=> lift <<< lift <<< modifyEnumeratedRoleInDomeinFile namespace)
+      (DomeinFile dfr') <- lift $ lift $ getPerspectEntiteit (DomeinFileId namespace)
+      modifyDF \_ -> dfr'
 
     inferCardinality :: EnumeratedRole -> PhaseThree EnumeratedRole
     inferCardinality r@(EnumeratedRole{functional}) = do
@@ -90,3 +106,13 @@ inferFromAspectRoles = do
           -- fail if head is optional; only pass through when head is mandatory.
           (lift $ lift $ lift $ isMandatory_ head) >>= guard
           pure head
+
+    -- The restriction on role fillers is the PRODUCT of the restrictions of the aspects (including that modelled with the role itself)
+    -- Assuming we've inferred bindings for all aspects _before_ we infer bindings for the role itself, we just have to deal 
+    -- with the direct aspects.
+    inferBinding :: EnumeratedRole -> PhaseThree EnumeratedRole
+    inferBinding r = lift $ lift $ do
+      ownBinding <- binding r
+      aspects <- roleAspects r
+      completeBinding <- product <<< cons ownBinding <$> for (roleInContext2Role <$> aspects) (getEnumeratedRole >=> binding)
+      pure $ over EnumeratedRole (\rr -> rr {binding = completeBinding}) r

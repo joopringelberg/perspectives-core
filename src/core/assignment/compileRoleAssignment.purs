@@ -195,7 +195,7 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifie
                 { id = "model:User$c" <> (show g)
                 , ctype = unwrap contextTypeToCreate
                 })
-              void $ createAndAddRoleInstance enumeratedType (unwrap roleId) (RolSerialization
+              void $ createAndAddRoleInstance roleTypeToCreate (unwrap ctxt) (RolSerialization
                 { id: Nothing
                 , properties: PropertySerialization empty
                 , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
@@ -419,21 +419,21 @@ compileAssignmentFromRole (MQD dom (ExternalDestructiveFunction functionName) ar
 -- Catchall, remove when all cases have been covered.
 compileAssignmentFromRole otherwise = throwError (error ("Found unknown case for compileAssignmentFromRole: " <> show otherwise))
 
--- | This is a special way to compile Creating assignment statements, that result in a function that actually returns
+-- | This is a special way to compile Creating assignment statements, that results in a function that actually returns
 -- | something, as opposed to ordinary assignment statements (including Creating statements) that return nothing.
--- | For a context, the role that binds the external role of the newly created context is returned.
+-- | For a context, the roles that bind the external role of the newly created contexts is returned.
 compileCreatingAssignments :: QueryFunctionDescription -> MP (RoleInstance -> MonadPerspectivesTransaction (Array String))
 compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
   pure \(roleId :: RoleInstance) -> do
     ctxts <- lift (roleId ##= contextGetter)
-    results <- for ctxts \ctxt -> do
+    results <- concat <$> for ctxts \ctxt -> do
       -- TODO. Breid qualifiedRoleIdentifier uit naar RoleType: nu hanteren we alleen EnumeratedRoleType.
-      g <- liftEffect guid
       case qualifiedRoleIdentifier of
         -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.
         -- Create a context without binding contextrole.
         CR calculatedType -> do
+          g <- liftEffect guid
           r <- runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
             { id = "model:User$c" <> (show g)
             , ctype = unwrap qualifiedContextTypeIdentifier
@@ -441,24 +441,35 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
           case r of
             Left e -> do
               logPerspectivesError e
-              pure $ Left e
-            Right ci -> pure $ Right $ unwrap ci
+              pure $ [Left e]
+            Right ci -> pure $ [Right $ unwrap ci]
 
         ENR enumeratedType -> do
-          r <- runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
-            { id = "model:User$c" <> (show g)
-            , ctype = unwrap qualifiedContextTypeIdentifier
-            })
-          case r of
-            Left e -> do
-              logPerspectivesError e
-              pure $ Left e
-            Right _ -> (Right <<< unwrap <<< unsafePartial fromJust) <$> createAndAddRoleInstance
-              enumeratedType (unwrap ctxt)
-              (RolSerialization
-                { id: Nothing
-                , properties: PropertySerialization empty
-                , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+          -- Get the contextualised versions of the role type that we should create.
+          roleTypesToCreate <- roleContextualisations ctxt enumeratedType
+          -- Now, each of these role types may have a more restricted filler.
+          concat <$> for roleTypesToCreate \roleTypeToCreate -> do
+            -- Get the context types whose external roles may be bound to this role type we're about to create.
+            -- Keep only those that are a specialisation of qualifiedContextTypeIdentifier.
+            contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToCreate) >>= contextOfADT >>= pure <<< allLeavesInADT)
+              >>= filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier)
+            for contextTypesToCreate \contextTypeToCreate -> do
+              g <- liftEffect guid
+              r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
+                { id = "model:User$c" <> (show g)
+                , ctype = unwrap contextTypeToCreate
+                })
+              case r of
+                Left e -> do
+                  logPerspectivesError e
+                  pure $ Left e
+                Right _ -> (Right <<< unwrap <<< unsafePartial fromJust) <$> createAndAddRoleInstance
+                  roleTypeToCreate 
+                  (unwrap ctxt)
+                  (RolSerialization
+                    { id: Nothing
+                    , properties: PropertySerialization empty
+                    , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
     pure $ catMaybes (hush <$> results)
 
 compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
