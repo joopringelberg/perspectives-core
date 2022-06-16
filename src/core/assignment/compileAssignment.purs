@@ -392,11 +392,11 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
   pure \(contextId :: ContextInstance) -> do
     ctxts <- lift (contextId ##= contextGetter)
     results <- concat <$> for ctxts \ctxt -> do
-      g <- liftEffect guid
       case qualifiedRoleIdentifier of
         -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.
         -- Create a context without binding contextrole.
         CR calculatedType -> do
+          g <- liftEffect guid
           r <- runExceptT $ constructContext
             Nothing
             (ContextSerialization defaultContextSerializationRecord

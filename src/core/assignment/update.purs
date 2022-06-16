@@ -127,7 +127,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
                 then f role pe unlinked
                 else pure unit
 
-              else (lift $ context_rolInContext pe rolName) >>= \roles -> 
+              else (lift $ context_rolInContext pe rolName) >>= \(Tuple _ roles) -> 
                 if isJust $ elemIndex roleId roles
                   then pure unit
                   else f role pe unlinked

@@ -34,6 +34,7 @@ import Data.Newtype (unwrap, ala)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, context_rolInContext_, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
@@ -67,7 +68,7 @@ externalRole ci = ArrayT $ (try $ lift $ getContextMember IP.externalRole ci) >>
 getEnumeratedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getEnumeratedRoleInstances rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c >>= flip context_rolInContext rn) >>=
   handlePerspectContextError' "getEnumeratedRoleInstances" []
-    \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
+    \(Tuple rn' instances) -> (tell $ ArrayWithoutDoubles [RoleAssumption c (EnumeratedRoleType rn')]) *> pure instances
 
 getEnumeratedRoleInstances_ :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getEnumeratedRoleInstances_ rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c >>= flip context_rolInContext_ rn) >>=
@@ -196,9 +197,10 @@ bottom r = ArrayT do
 getFilledRoles :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
 getFilledRoles filledContextType filledType fillerId = ArrayT $ (lift $ try $ getPerspectEntiteit fillerId) >>=
   handlePerspectRolError' "getFilledRoles" []
-    \(filler :: IP.PerspectRol) -> do
-      tell $ ArrayWithoutDoubles [FilledRolesAssumption fillerId filledContextType filledType]
-      pure $ rol_gevuldeRol filler filledContextType filledType
+    \(filler :: IP.PerspectRol) -> case rol_gevuldeRol filler filledContextType filledType of
+      {context:ct, role, instances} -> do
+        tell $ ArrayWithoutDoubles [FilledRolesAssumption fillerId ct role]
+        pure instances
 
 getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=

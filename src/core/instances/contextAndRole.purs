@@ -22,7 +22,7 @@
 
 module Perspectives.ContextAndRole where
 
-import Data.Array (cons, foldl, null) 
+import Data.Array (cons, foldl, null)
 import Data.Array (delete, difference, elemIndex, snoc, union, unsnoc) as Arr
 import Data.Foldable (maximum)
 import Data.Int (floor, fromString, toNumber)
@@ -35,6 +35,7 @@ import Data.Newtype (unwrap, over) as NT
 import Data.Ord (Ordering, compare)
 import Data.String (Pattern(..), lastIndexOf, splitAt)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, delete, empty, insert, lookup, singleton)
 import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
@@ -91,16 +92,16 @@ context_buitenRol (PerspectContext{buitenRol})= buitenRol
 context_iedereRolInContext :: PerspectContext -> Object (Array RoleInstance)
 context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
 
-context_rolInContext :: PerspectContext -> EnumeratedRoleType -> MP (Array RoleInstance)
+context_rolInContext :: PerspectContext -> EnumeratedRoleType -> MP (Tuple String (Array RoleInstance))
 context_rolInContext (PerspectContext{pspType, rolInContext}) (EnumeratedRoleType rn) = case lookup rn rolInContext of
   Nothing -> do
     Context{roleAliases} <- getContext pspType
     case lookup rn roleAliases of
-      Nothing -> pure []
-      Just s -> case lookup (NT.unwrap s) rolInContext of
-        Nothing -> pure []
-        Just rs -> pure rs
-  Just rs -> pure rs
+      Nothing -> pure $ Tuple rn []
+      Just (EnumeratedRoleType s) -> case lookup s rolInContext of
+        Nothing -> pure $ Tuple s []
+        Just rs -> pure $ Tuple s rs
+  Just rs -> pure $ Tuple rn rs
 
 -- This version does no model reflection. 
 context_rolInContext_ :: PerspectContext -> EnumeratedRoleType -> MP (Array RoleInstance)
@@ -298,14 +299,17 @@ rol_gevuldeRollen (PerspectRol{filledRoles}) = filledRoles
 setRol_gevuldeRollen :: PerspectRol -> Object (Object (Array RoleInstance)) -> PerspectRol
 setRol_gevuldeRollen (PerspectRol r) grollen = PerspectRol (r {filledRoles = grollen})
 
-rol_gevuldeRol :: PerspectRol -> ContextType -> EnumeratedRoleType -> Array RoleInstance
+rol_gevuldeRol :: PerspectRol -> ContextType -> EnumeratedRoleType -> {context :: ContextType, role :: EnumeratedRoleType, instances :: Array RoleInstance}
 rol_gevuldeRol  (PerspectRol{filledRoles, roleAliases, contextAliases}) cType rn = case lookup (NT.unwrap cType) contextAliases of
-    Nothing -> []
-    Just contextAlias -> case lookup contextAlias filledRoles of
-      Nothing -> []
-      Just roleMap -> case lookup (NT.unwrap rn) roleAliases of
-        Nothing -> []
-        Just alias -> maybe [] identity (lookup alias roleMap)
+  Nothing -> {context: cType, role: rn, instances: []}
+  Just contextAlias -> case lookup contextAlias filledRoles of
+    Nothing -> {context: ContextType contextAlias, role: rn, instances: []}
+    Just roleMap -> case lookup (NT.unwrap rn) roleAliases of
+      Nothing -> {context: ContextType contextAlias, role: rn, instances: []}
+      Just alias -> maybe 
+        {context: ContextType contextAlias, role: (EnumeratedRoleType alias), instances: []} 
+        (\instances -> {context: ContextType contextAlias, role: (EnumeratedRoleType alias), instances}) 
+        (lookup alias roleMap)
 
 -- | The first argument is the role Filler instance that receives a new inverse link to a role that binds it.
 -- | The fourth argument represents the Filled role instance that binds the role of the first argument.
