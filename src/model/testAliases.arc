@@ -56,6 +56,8 @@ domain TestAliases
       perspective on Schedules
         only (Remove, CreateAndFill, Create)
         props (VehicleName) verbs (Consult)
+        action CreateASchedule
+          create context Schedule bound to Schedules
       perspective on Passengers
         props (Name) verbs (SetPropertyValue)
         only (Create, Remove)
@@ -108,12 +110,20 @@ domain TestAliases
       -- TESTS: ROLE STEP CONTEXTUALISATION
       -- Fails if Plane does have a value for the Name property,
       -- but Pilot does not have a VehicleName value.
+      --
+      -- Pilot aquires the action CreateASchedule from Driver
+      -- TESTS: ADD ASPECT ACTIONS
+      -- The test fails if the actions is not visible on the schedules tab.
+      
+      -- TESTS: CREATE CONTEXT CONTEXTUALISATION
+      -- The test fails if the created schedule doesn't have property IsInternational.
     
     thing Plane
       aspect ta:Transport$Vehicle
     
     context FlightSchedules
       aspect ta:Transport$Schedules
+      property IsInternational (Boolean)
 
   case Car
     aspect ta:Transport
