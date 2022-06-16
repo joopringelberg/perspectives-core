@@ -56,10 +56,18 @@ domain TestAliases
       perspective on Schedules
         only (Remove, CreateAndFill, Create)
         props (VehicleName) verbs (Consult)
+      perspective on Passengers
+        props (Name) verbs (SetPropertyValue)
+        only (Create, Remove)
+        action CreateAPassenger
+          create role Passengers
 
     thing Vehicle
       property Name (String)
       property NumberOfPassengers (Number)
+    
+    thing Passengers (relational)
+      property Name (String)
 
     context Schedules (relational) filledBy Schedule
 
@@ -148,6 +156,23 @@ domain TestAliases
           -- TESTS: PROPERTY VERB ADDITION
           -- Fails if the Captain cannot set it.
           props (NumberOfPassengers) verbs (SetPropertyValue)
+        
+        perspective on BoatPassenger
+          props (Hut) verbs (Consult)
       
       thing Ship
         aspect ta:Transport$Vehicle
+      
+      thing BoatPassenger
+        -- We expect that not an instance of Passengers, but an instance
+        -- of BoatPassenger is made by the action CreatePassenger.
+        -- TESTS: CREATE ROLE CONTEXTUALISATION
+        -- fails if Hut is not visible.
+        -- Also, we expect action CreateAPassenger to be available.
+        -- TESTS: ADD ASPECT ACTIONS
+        -- Fails if the action is not visible on the BoatPassenger tab.
+        aspect ta:Transport$Passengers
+        property Hut (Number)
+        on entry
+          do for Captain
+            Hut = 0
