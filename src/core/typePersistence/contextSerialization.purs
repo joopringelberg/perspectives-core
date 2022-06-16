@@ -34,7 +34,7 @@ import Perspectives.Data.EncodableMap (lookup)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (deconstructNamespace_)
+import Perspectives.Identifiers (unsafeDeconstructModelName)
 import Perspectives.Query.Interpreter (lift2MPQ)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..))
@@ -48,7 +48,7 @@ derive instance newTypeSerialisedScreen :: Newtype SerialisedScreen _
 
 screenForContextAndUser :: RoleInstance -> RoleType -> ContextType -> (ContextInstance ~~> SerialisedScreen)
 screenForContextAndUser userRoleInstance userRoleType contextType contextInstance = do
-  DomeinFile df <- lift2MPQ $ retrieveDomeinFile (deconstructNamespace_ $ unwrap contextType)
+  DomeinFile df <- lift2MPQ $ retrieveDomeinFile (unsafeDeconstructModelName $ unwrap contextType)
   case lookup (ScreenKey contextType userRoleType) df.screens of
     Just s -> do
       -- Now populate the screen definition with instance data.
