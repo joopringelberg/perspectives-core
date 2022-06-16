@@ -58,9 +58,9 @@ inferFromAspectRoles = do
       modifyDF \dfr -> dfr { enumeratedRoles = enumeratedRoles'}
 
     inferCardinality :: EnumeratedRole -> PhaseThree EnumeratedRole
-    inferCardinality r = do
+    inferCardinality r@(EnumeratedRole{functional}) = do
       aspects <- lift $ lift (roleAspects r)
-      isFunctional <- null <$> evalStateT (some aspectIsRelational) (roleInContext2Role <$> aspects) <|> pure true
+      isFunctional <- null <$> evalStateT (some aspectIsRelational) (roleInContext2Role <$> aspects) <|> pure functional
       pure $ over EnumeratedRole (\rr -> rr {functional = isFunctional}) r
 
     aspectIsRelational :: StateT (Array EnumeratedRoleType) PhaseThree EnumeratedRoleType
@@ -75,9 +75,9 @@ inferFromAspectRoles = do
           pure head
 
     inferMandatoriness :: EnumeratedRole -> PhaseThree EnumeratedRole
-    inferMandatoriness r = do
+    inferMandatoriness r@(EnumeratedRole{mandatory}) = do
       aspects <- lift $ lift (roleAspects r)
-      isMandatory <- not <<< null <$> evalStateT (some aspectIsMandatory) (roleInContext2Role <$> aspects) <|> pure false
+      isMandatory <- not <<< null <$> evalStateT (some aspectIsMandatory) (roleInContext2Role <$> aspects) <|> pure mandatory
       pure $ over EnumeratedRole (\rr -> rr {mandatory = isMandatory}) r
 
     aspectIsMandatory :: StateT (Array EnumeratedRoleType) PhaseThree EnumeratedRoleType
