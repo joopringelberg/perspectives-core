@@ -389,6 +389,7 @@ commonTypesInRoleADT = ArrayT <$> reduce (runArrayT <<< roleAspectsClosure)
 -- | That function treats each leaf as atomic; here we expand it to the transitive closure of its aspects.
 -- | In terms of sets: transform the ADT to Disjunctive Normal Form and then understand it
 -- | as an union of unions.
+-- | An alternative to this function is allLeavesInADT <<< roleInContext2role <$> roleAspectsADT 
 allTypesInRoleADT :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
 allTypesInRoleADT = ArrayT <<< pure <<< allLeavesInADT >=> roleAspectsClosure
 
@@ -401,6 +402,7 @@ allTypesInRoleADT = ArrayT <<< pure <<< allLeavesInADT >=> roleAspectsClosure
 -- | Compares with equalsOrGeneralisesADT (module Perspectives.Representation.ADT)
 -- | However, that function works for any a (Ord a, Eq a).
 -- | This function works for EnumeratedRoleTypes and takes Aspects into account.
+-- | For a function that works with ADT RoleInContext, see: `lessThanOrEqualTo`.
 -- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
 equalsOrGeneralisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 equalsOrGeneralisesRoleADT adt1 adt2 = do
@@ -417,6 +419,7 @@ generalisesRoleADT adt1 adt2 = do
 specialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 specialisesRoleADT = flip generalisesRoleADT
 
+-- | For a function that works with ADT RoleInContext, see: `greaterThanOrEqualTo`.
 equalsOrSpecialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 equalsOrSpecialisesRoleADT = flip equalsOrGeneralisesRoleADT
 

@@ -31,8 +31,10 @@ import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), domain, functional, range)
 import Perspectives.Repetition (Duration, Repeater)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.ThreeValuedLogic as THREE
 
 data AutomaticAction = 
   ContextAction (TimeFacets 
@@ -68,3 +70,9 @@ instance showAction :: Show Action where show = genericShow
 instance eqAction :: Eq Action where eq = genericEq
 instance encodeAction :: Encode Action where encode = genericEncode defaultOptions
 instance decodeAction :: Decode Action where decode = genericDecode defaultOptions
+
+instance Semigroup Action where
+  append (Action qfd1) (Action qfd2)= Action $ makeSequence qfd1 qfd2
+    where
+    makeSequence :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
+    makeSequence left right = BQD (domain left) (BinaryCombinator SequenceF) left right (range right) (THREE.and (functional left) (functional right)) (THREE.or (functional left) (functional right))

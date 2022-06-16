@@ -157,16 +157,16 @@ contextualisePerspectives = do
 
         contextualiseWithAspectPerspective :: Perspective -> Perspective -> PhaseThree Perspective
         contextualiseWithAspectPerspective 
-          perspective@(Perspective r@{object, roleVerbs, propertyVerbs}) 
-          (Perspective{object:aspectObject, roleVerbs:aspectRoleVerbs, propertyVerbs:aspectPropertyVerbs}) = do
+          perspective@(Perspective r@{object, roleVerbs, propertyVerbs, actions}) 
+          (Perspective{actions:aspectActions, object:aspectObject, roleVerbs:aspectRoleVerbs, propertyVerbs:aspectPropertyVerbs}) = do
           -- is the object of the perspective a specialisation of the object of the aspect perspective?
           isASpecialisation <- lift $ lift ((unsafePartial domain2roleType $ range aspectObject) `lessThanOrEqualTo` (unsafePartial domain2roleType $ range object))
           if isASpecialisation 
             then 
-              -- add aspect RoleVerbs (EncodableMap StateSpec RoleVerbList)
               pure $ Perspective r 
                 { roleVerbs = addAspectRoleVerbs roleVerbs aspectRoleVerbs
                 , propertyVerbs = addAspectPropertyVerbs propertyVerbs aspectPropertyVerbs
+                , actions = actions <> aspectActions
                 }
             -- We cannot establish here that the aspect perspective should be added to the role.
             else pure perspective
