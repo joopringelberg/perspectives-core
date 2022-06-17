@@ -31,7 +31,7 @@ import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, concat, cons, elemIndex, filterA, find, head, nub, union, unsafeIndex)
+import Data.Array (catMaybes, concat, cons, elemIndex, filter, filterA, find, head, length, nub, union, unsafeIndex)
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -189,7 +189,11 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifie
             -- Keep only those that are a specialisation of qualifiedContextTypeIdentifier.
             contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToCreate) >>= contextOfADT >>= pure <<< allLeavesInADT)
               >>= filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier)
-            for contextTypesToCreate \contextTypeToCreate -> do 
+            -- If there are specialisations, do not create the aspect type.
+            contextTypesToCreate' <- if length contextTypesToCreate > 1 
+              then pure $ filter ((notEq) qualifiedContextTypeIdentifier) contextTypesToCreate
+              else pure contextTypesToCreate
+            for contextTypesToCreate' \contextTypeToCreate -> do 
               g <- liftEffect guid
               void $ runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
                 { id = "model:User$c" <> (show g)
@@ -453,7 +457,10 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
             -- Keep only those that are a specialisation of qualifiedContextTypeIdentifier.
             contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToCreate) >>= contextOfADT >>= pure <<< allLeavesInADT)
               >>= filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier)
-            for contextTypesToCreate \contextTypeToCreate -> do
+            contextTypesToCreate' <- if length contextTypesToCreate > 1 
+              then pure $ filter ((notEq) qualifiedContextTypeIdentifier) contextTypesToCreate
+              else pure contextTypesToCreate
+            for contextTypesToCreate' \contextTypeToCreate -> do
               g <- liftEffect guid
               r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
                 { id = "model:User$c" <> (show g)
@@ -476,8 +483,14 @@ compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contex
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
   pure \roleId -> do
     ctxts <- lift (roleId ##= contextGetter)
-    for ctxts \ctxt -> do
-      roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
-      -- No need to handle retrieval errors as we've just created the role.
-      pure (unwrap roleIdentifier)
+    concat <$> for ctxts \ctxt -> do
+      roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
+      for roleTypesToCreate
+        \roleTypeToCreate -> do 
+          roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance 
+            roleTypeToCreate 
+            (unwrap ctxt) 
+            (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+          -- No need to handle retrieval errors as we've just created the role.
+          pure (unwrap roleIdentifier)
 compileCreatingAssignments qfd = pure \ci -> pure []

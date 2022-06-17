@@ -58,6 +58,16 @@ domain TestAliases
         props (VehicleName) verbs (Consult)
         action CreateASchedule
           create context Schedule bound to Schedules
+        -- Action CreateScheduleInSteps has the same effect as CreateASchedule, but creates the role instance
+        -- first and then creates a context instance in it.
+        -- TESTS: CREATE ROLE CONTEXTUALISATION
+        -- TESTS: CREATE_ CONTEXT CONTEXTUALISATION
+        -- Test in Flight; fails if the result is not equal to that of CreateASchedule.
+        action CreateScheduleInSteps
+          letA
+            role <- create role Schedules
+          in
+            create_ context Schedule bound to role
       perspective on Passengers
         props (Name) verbs (SetPropertyValue)
         only (Create, Remove)
@@ -116,14 +126,21 @@ domain TestAliases
       -- The test fails if the actions is not visible on the schedules tab.
       
       -- TESTS: CREATE CONTEXT CONTEXTUALISATION
-      -- The test fails if the created schedule doesn't have property IsInternational.
+      -- The test fails if the created schedule doesn't have properties IsInternational and IsCargoFlight.
+      perspective on FlightSchedules
+        props (IsInternational, IsCargoFlight) verbs (SetPropertyValue)
     
     thing Plane
       aspect ta:Transport$Vehicle
     
-    context FlightSchedules
+    context FlightSchedules filledBy FlightSchedule
       aspect ta:Transport$Schedules
       property IsInternational (Boolean)
+    
+    case FlightSchedule
+      aspect ta:Transport$Schedule
+      external 
+        property IsCargoFlight (Boolean)
 
   case Car
     aspect ta:Transport
@@ -186,3 +203,5 @@ domain TestAliases
         on entry
           do for Captain
             Hut = 0
+      
+      

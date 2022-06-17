@@ -266,6 +266,7 @@ hasAspect aspect roleType = ArrayT do
 
 -- aspect `hasContextAspect` contextType
 -- contextType ##>>> hasContextAspect aspect
+-- Notice that `X hasContextAspect X` is true.
 hasContextAspect :: ContextType -> (ContextType ~~~> Boolean)
 hasContextAspect aspect contextType = ArrayT do
   aspects <- contextType ###= contextAspectsClosure
