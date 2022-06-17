@@ -56,7 +56,7 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, adtOfRoleAspectsBinding, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -206,10 +206,6 @@ subStates_ = tryGetState >=> pure <<< (maybe [] _.subStates <<< map unwrap)
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A PROPERTYTYPE WORKING FROM STRINGS OR ADT'S
 ----------------------------------------------------------------------------------------
--- | Look for a Property on a given EnumeratedRoleType (including its own aspects - not
--- | recursively - and its own binding - not recursively), using a criterium.
-lookForPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
-lookForPropertyType_ s i = (lift $ getRole (ENR i)) >>= lift <<< adtOfRoleAspectsBinding >>= lookForProperty (propertytype2string >>> ((==) s)) <<< map roleInContext2Role
 
 -- | Look for an unqualified Property on a given RoleType
 -- | (recursing on aspects and on the binding of Enumerated Roles), using a criterium.

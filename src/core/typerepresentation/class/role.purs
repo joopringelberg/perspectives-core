@@ -72,10 +72,6 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   -- | The type of the Role, including its direct aspects, including their transitive closure!
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsADT :: r -> MonadPerspectives (ADT RoleInContext)
-  -- | Includes: the type of the Role, the closure of its binding and the closure of its aspects.
-  -- | For a CalculatedRole it is the range of its calculation. This is the most complete set of types
-  -- | for this role.
-  roleAspectsBindingADT :: r -> MonadPerspectives (ADT RoleInContext)
   perspectives :: r -> Array Perspective
   contextActions :: r -> Map StateSpec (Object Action)
 
@@ -99,8 +95,6 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   roleAndBinding = rangeOfCalculatedRole
   -- Include the transitive closure of the aspects.
   roleAspectsADT = rangeOfCalculatedRole >=> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT)
-  -- Include the transitive closure of aspects and binding.
-  roleAspectsBindingADT = rangeOfCalculatedRole >=> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsBindingADT)
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
 
@@ -149,11 +143,6 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
     radt <- roleADT r
     product <<< (flip cons [radt]) <$> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT)
       (PROD (map ST roleAspects))
-  roleAspectsBindingADT r = do
-    (roleTypes :: ADT RoleInContext) <- roleAspectsADT r
-    (bnd :: ADT RoleInContext) <- binding r
-    (bindingTypes :: ADT RoleInContext) <- reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsBindingADT) bnd
-    pure $ product [roleTypes, bindingTypes]
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
 
@@ -302,29 +291,6 @@ allViews = reduce magic
           pure $ vws <> views
 
 -----------------------------------------------------------
--- TRANSITIVEROLEASPECTSOFADT
------------------------------------------------------------
--- | The result will never be a SUM.
--- transitiveClosureOfRoleADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
--- transitiveClosureOfRoleADT (ST r) = getEnumeratedRole r >>= roleAspectsBindingADT >>= \adt -> case adt of
---   s@(ST _) -> pure s
---   otherwise -> transitiveClosureOfRoleADT otherwise
--- transitiveClosureOfRoleADT EMPTY = pure EMPTY
--- transitiveClosureOfRoleADT UNIVERSAL = pure UNIVERSAL
--- -- hoe weet je dat dit geen sum is?
--- transitiveClosureOfRoleADT (PROD terms) = traverse transitiveClosureOfRoleADT terms >>= pure <<< foldl unionOfADT EMPTY
--- transitiveClosureOfRoleADT (SUM terms) = traverse transitiveClosureOfRoleADT terms >>= pure <<< foldl intersectionOfADT UNIVERSAL
-
------------------------------------------------------------
--- GREATESTCOMMONANCESTOROFROLES
------------------------------------------------------------
--- greatestCommonAncestorOfRoles :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
--- greatestCommonAncestorOfRoles a b = do
---   a' <- transitiveClosureOfRoleADT a
---   b' <- transitiveClosureOfRoleADT b
---   pure $ intersectionOfADT a' b'
-
------------------------------------------------------------
 -- FUNCTIONS ON ROLE
 -----------------------------------------------------------
 data Role = E EnumeratedRole | C CalculatedRole
@@ -335,12 +301,6 @@ id = identifier
 getCalculation :: Role -> MonadPerspectives QueryFunctionDescription
 getCalculation (E r) = calculation r
 getCalculation (C r) = calculation r
-
--- | Includes: the type of the Role, its own binding (not the bindings transitive closure!) and its own aspects (not their transitive closure!).
--- | For a CalculatedRole it is the range of its calculation.
-adtOfRoleAspectsBinding :: Role -> MP (ADT RoleInContext)
-adtOfRoleAspectsBinding (E e) = roleAspectsBindingADT e
-adtOfRoleAspectsBinding (C c) = roleAspectsBindingADT c
 
 adtOfRole :: Role -> MP (ADT RoleInContext)
 adtOfRole (E e) = roleADT e
@@ -382,11 +342,6 @@ typeIncludingAspects :: RoleType -> MonadPerspectives (ADT RoleInContext)
 typeIncludingAspects = getRole >=> (case _ of
   E r -> roleAspectsADT r
   C r -> roleAspectsADT r)
-
-typeIncludingAspectsAndBinding :: RoleType -> MonadPerspectives (ADT RoleInContext)
-typeIncludingAspectsAndBinding = getRole >=> (case _ of
-  E r -> roleAspectsBindingADT r
-  C r -> roleAspectsBindingADT r)
 
 roleTypeIsFunctional :: RoleType -> MonadPerspectives Boolean
 roleTypeIsFunctional = getRole >=> (case _ of

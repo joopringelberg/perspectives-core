@@ -74,7 +74,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole, tryGetPerspectType)
-import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional, typeIncludingAspectsAndBinding)
+import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -1194,7 +1194,7 @@ handleScreens screenEs = do
               -- A ScreenElement can only be defined for a named Enumerated or Calculated Role. This means that `perspective` is constructed with the
               -- RoleIdentification.ExplicitRole data constructor: a single RoleType.
               -- If no role can be found for the given specification, collectRoles throws an error.
-              objectRoleType <- unsafePartial ARRP.head <$> collectRoles perspective
+              (objectRoleType :: RoleType) <- unsafePartial ARRP.head <$> collectRoles perspective
               -- Check the Cardinality
               (lift2 $ roleTypeIsFunctional objectRoleType) >>= if _
                 then if isFunctionalWidget
@@ -1204,7 +1204,7 @@ handleScreens screenEs = do
                   then pure unit
                   else throwError (WidgetCardinalityMismatch start' end')
               -- All properties defined on this object role.
-              allProps <- lift2 (typeIncludingAspectsAndBinding objectRoleType >>= allProperties <<< map roleInContext2Role)
+              allProps <- lift2 ((roleADTOfRoleType objectRoleType >>= allProperties <<< map roleInContext2Role))
               -- The user must have a perspective on it. This perspective must have that RoleType
               -- in its member roleTypes.
               -- So we fetch the user role, get its Perspectives, and find the one that refers to the objectRoleType.
