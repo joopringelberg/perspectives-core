@@ -43,7 +43,7 @@ domain Competition
       perspective on SubCompetitions
         defaults
       perspective on Captains
-        props (Achternaam, Budget) verbs (Consult)
+        props (LastName, Budget) verbs (Consult)
       perspective on extern
 
     -- The SubCompetitions I manage.
@@ -52,10 +52,10 @@ domain Competition
     -- Captains come from the Teams in the SubCompetitions. A Captain can only see himself and the Manager.
     user Captains = SubCompetitions >> binding >> context >> Teams >> binding >> context >> Captain
       perspective on Captains
-        props (Achternaam, Budget) verbs (Consult)
+        props (LastName, Budget) verbs (Consult)
         selfonly
       perspective on Manager
-        props (Achternaam) verbs (Consult)
+        props (LastName) verbs (Consult)
       perspective on extern
         props (Name) verbs (Consult)
 

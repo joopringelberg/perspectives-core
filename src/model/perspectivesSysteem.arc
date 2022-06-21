@@ -29,14 +29,14 @@ domain System
       view ShowLibraries (ShowLibraries)
 
     user User (mandatory)
-      property Achternaam (mandatory, relational, String)
-      property Voornaam (mandatory, relational, String)
+      property LastName (mandatory, relational, String)
+      property FirstName (mandatory, relational, String)
       property Channel = (binder Initiator either binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       -- User instances need not have a value for this property. It is used in the PDR to
       -- ensure serialisation of the User role.
       property Id (String)
       indexed sys:Me
-      view VolledigeNaam (Voornaam, Achternaam)
+      view VolledigeNaam (FirstName, LastName)
       view SyncId (Id)
       perspective on User
         defaults
@@ -57,18 +57,41 @@ domain System
       perspective on RootUsers
         defaults
       perspective on Contacts
-        props (Voornaam, Achternaam) verbs (Consult)
+        props (FirstName, LastName) verbs (Consult)
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
       perspective on Modellen
         action StartUsing
           callEffect cdb:AddModelToLocalStore( Url )
           bind origin to ModelsInUse in currentcontext
-        view ModelPresentation verbs (Consult)
+        --view ModelPresentation verbs (Consult)
+        props (Description, Name) verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
       perspective on SystemCaches
         defaults
+
+      screen "Home"
+        tab "SystemCaches"
+          row
+            column
+              form SystemCaches
+        tab "Manage models"
+          row
+            table Modellen
+              props (Name, Description) verbs (Consult)
+          row 
+            table ModelsInUse
+              props (Name) verbs (Consult)
+        tab "Start contexts"
+          row
+            table IndexedContexts
+              props (Name) verbs (Consult)
+        tab "User"
+          row
+            form User
+              props (FirstName, LastName) verbs (SetPropertyValue)
+
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
 
@@ -238,7 +261,7 @@ domain System
       property IWantToInviteAnUnconnectedUser (Boolean)
       property SerialisedInvitation (String)
       property Message (String)
-      property InviterLastName = context >> Inviter >> Achternaam
+      property InviterLastName = context >> Inviter >> LastName
       state InviteUnconnectedUser = IWantToInviteAnUnconnectedUser and exists Message
         on entry
           do for Inviter
@@ -248,11 +271,11 @@ domain System
 
     user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
       perspective on Invitee
-        props (Voornaam, Achternaam) verbs (Consult)
+        props (FirstName, LastName) verbs (Consult)
 
     user Invitee (mandatory) filledBy Guest
       perspective on Inviter
-        props (Voornaam, Achternaam) verbs (Consult)
+        props (FirstName, LastName) verbs (Consult)
       perspective on extern
         view ForInvitee verbs (Consult)
 

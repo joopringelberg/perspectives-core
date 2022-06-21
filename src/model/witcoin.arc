@@ -93,7 +93,7 @@ domain WitCoin
 
       perspective on Witnesses
         only (Create, Fill, Remove)
-        props (Achternaam) verbs (Consult)
+        props (LastName) verbs (Consult)
 
       perspective on LastTransaction
         only (Create, Fill)
@@ -143,7 +143,7 @@ domain WitCoin
       -------------------------------------------------------------------------------
       ---- PROPERTIES RELATIVE TO THE OWN USER
       -------------------------------------------------------------------------------
-      property TransactionPartnerName = context >> TransactionPartner >> Achternaam
+      property TransactionPartnerName = context >> TransactionPartner >> LastName
       property MyTransferSum = context >> MeInTransaction >> (Post - Prior)
       property MyResultingSaldo = context >> MeInTransaction >> Post
       property IAmDebitor = context >> Debitor binds sys:Me

@@ -7,8 +7,8 @@ sys:PerspectivesSystem usr:MySystem
 	extern $ModelOphaalTeller = 0
 	extern sys:NamedContext$External$Name = "Mijn Systeem"
 	$User(1) => ()
-		$Voornaam = "Joop"
-		$Achternaam = "Ringelberg"
+		$FirstName = "Joop"
+		$LastName = "Ringelberg"
 	$TheTrustedCluster =>
 		sys:TrustedCluster $MijnCluster
 			extern $Naam = "Het cluster van Joop"

@@ -3,10 +3,10 @@ UserData
 import model:System as sys
 
 sys:PerspectivesSystem sys:MySystem
-	extern sys:RootContext$External$Name = "Mijn Systeem"
+	extern sys:RootContext$External$Name = "My System"
 	$User(sys:Me) => ()
-		$Voornaam = "First name"
-		$Achternaam = "Last name"
+		$FirstName = "First name"
+		$LastName = "Last name"
 	--$TheTrustedCluster =>
 		--sys:TrustedCluster $MijnCluster
 			--extern $Naam = "My cluster"

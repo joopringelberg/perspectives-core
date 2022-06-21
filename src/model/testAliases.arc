@@ -50,7 +50,7 @@ domain TestAliases
         props (Name) verbs (SetPropertyValue)
         props (NumberOfPassengers) verbs (Consult)
       perspective on Driver
-        props (VehicleName, Voornaam, Achternaam) verbs (Consult)
+        props (VehicleName, FirstName, LastName) verbs (Consult)
       perspective on extern
         props (Name) verbs (SetPropertyValue)
       perspective on Schedules

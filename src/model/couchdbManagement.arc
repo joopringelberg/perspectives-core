@@ -247,7 +247,7 @@ domain CouchdbManagement
       -- we can remove the Author from the write-db.
       property ToBeRemoved (Boolean)
 
-      view AuthorForAdmin (Voornaam, Achternaam, ToBeRemoved)
+      view AuthorForAdmin (FirstName, LastName, ToBeRemoved)
 
       -- The Authors can, of course, consult all models that are stored locally
       -- or in contributing Repositories.

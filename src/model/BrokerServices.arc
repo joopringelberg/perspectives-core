@@ -84,8 +84,8 @@ domain BrokerServices
       property Url = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url
       property Exchange = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Exchange
       property Name = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Name
-      property FirstNameOfAccountHolder = context >> AccountHolder >> Voornaam
-      property LastNameOfAccountHolder = context >> AccountHolder >> Achternaam
+      property FirstNameOfAccountHolder = context >> AccountHolder >> FirstName
+      property LastNameOfAccountHolder = context >> AccountHolder >> LastName
 
       view ForAccountHolder (Url, Exchange)
       view ForAdministrator (IWantToInviteAnUnconnectedUser, Message, SerialisedInvitation)
@@ -98,7 +98,7 @@ domain BrokerServices
       property QueueName (mandatory, String)
       property ConfirmationCode (String)
 
-      view ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, Achternaam)
+      view ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, LastName)
 
       perspective on extern
         view External$ForAccountHolder verbs (Consult)
@@ -107,7 +107,7 @@ domain BrokerServices
         props (AccountPassword) verbs (SetPropertyValue)
         props (AccountName, QueueName) verbs (Consult)
       perspective on BrokerContract$Administrator
-        props (Achternaam) verbs (Consult)
+        props (LastName) verbs (Consult)
 
       screen "Broker Contract"
         column
@@ -123,7 +123,7 @@ domain BrokerServices
       perspective on AccountHolder
         all roleverbs
         props (AccountName, QueueName, AccountPassword) verbs (Consult, SetPropertyValue)
-        props (Achternaam, Voornaam) verbs (Consult)
+        props (LastName, FirstName) verbs (Consult)
       perspective on extern
         view External$ForAdministrator verbs (Consult, SetPropertyValue)
 

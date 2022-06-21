@@ -38,7 +38,7 @@ domain BodiesWithAccounts
 
       perspective on Accounts
         only (Create, Fill, CreateAndFill, Remove)
-        props (UserName, Voornaam, Achternaam) verbs (SetPropertyValue, Consult)
+        props (UserName, FirstName, LastName) verbs (SetPropertyValue, Consult)
 
         -- We limit visibility of the Password to the situation that it
         -- does not exist.
@@ -72,7 +72,7 @@ domain BodiesWithAccounts
       -- We add this perspective to enable synchronisation between
       -- Admin and Accounts.
       perspective on Admin
-        props (Voornaam, Achternaam) verbs (Consult)
+        props (FirstName, LastName) verbs (Consult)
 
       state IsFilled = exists binding
         -- Use this state to inform the applicant that his case is in

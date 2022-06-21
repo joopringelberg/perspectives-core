@@ -10,7 +10,7 @@ domain: System
       view: Kaartje (Naam)
     user: ClusterGenoot (not mandatory, not functional) filledBy: User
       property: Url (mandatory, functional, String)
-      view: Adressering (Url, Voornaam)
+      view: Adressering (Url, FirstName)
       perspective on: ClusterGenoot (Adressering) Consult
 
   case: PerspectivesSystem
@@ -23,11 +23,11 @@ domain: System
     context: TheTrustedCluster (not mandatory, functional) filledBy: TrustedCluster
 
     user: User (mandatory, functional)
-      property: Achternaam (mandatory, not functional, String)
-      property: Voornaam (mandatory, not functional, String)
+      property: LastName (mandatory, not functional, String)
+      property: FirstName (mandatory, not functional, String)
       property: Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       indexed: sys:Me
-      view: VolledigeNaam (Voornaam, Achternaam)
+      view: VolledigeNaam (FirstName, LastName)
       perspective on: User
       perspective on: ModelsInUse
       perspective on: IndexedContextOfModel
