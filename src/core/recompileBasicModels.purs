@@ -28,6 +28,8 @@ module Main.RecompileBasicModels where
 
 import Prelude
 
+import Control.Monad.Error.Class (class MonadThrow)
+import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.State (execState)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes)
@@ -46,7 +48,7 @@ import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder) as TOP
 import Perspectives.Extern.Couchdb (addInvertedQuery)
-import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Persistence.API (documentsInDatabase, includeDocs)
 import Perspectives.Persistence.Types (Url)
 import Perspectives.Persistent (getDomeinFile)
@@ -64,17 +66,20 @@ recompileModelsAtUrl repository = do
     Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
     Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
     Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
-  executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel
+  r <- runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel)
+  case r of 
+    Left errors -> logPerspectivesError (Custom ("recompileModelsAtUrl: " <> show errors)) 
+    _ -> pure unit
 
-recompileModel :: UninterpretedDomeinFile -> MonadPerspectivesTransaction UninterpretedDomeinFile
+recompileModel :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
 recompileModel model@(UninterpretedDomeinFile{_id, _rev, contents}) =
   do
     log ("Recompiling " <> _id)
     -- TODO. We moeten de inverse queries verwerken in de andere modellen!
-    r <- loadArcAndCrl' contents.arc contents.crl
+    r <- lift $ loadArcAndCrl' contents.arc contents.crl
     case r of
       Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
-      Right df@(DomeinFile drf@{invertedQueriesInOtherDomains}) -> lift do
+      Right df@(DomeinFile drf@{invertedQueriesInOtherDomains}) -> lift $ lift do
         log $  "Recompiled '" <> _id <> "' succesfully!"
         storeDomeinFileInCouchdbPreservingAttachments df
 
@@ -100,7 +105,7 @@ type ToSort = Array UninterpretedDomeinFile
 type SortedLabels = Array String
 type Skipped = Array UninterpretedDomeinFile
 
-executeInTopologicalOrder :: forall m. Monad m =>
+executeInTopologicalOrder :: forall m. MonadThrow MultiplePerspectivesErrors m =>
   ToSort ->
   (UninterpretedDomeinFile -> m UninterpretedDomeinFile) ->
   m Unit

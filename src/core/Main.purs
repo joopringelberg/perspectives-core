@@ -24,6 +24,7 @@ module Main
 where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
+import Control.Monad.Except (ExceptT, lift, runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
 import Data.Array (catMaybes)
@@ -53,7 +54,7 @@ import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.Names (getMySystem)
-import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, includeDocs)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
@@ -429,7 +430,13 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
               Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
               Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
               Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
-            executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel'
+            r <- runMonadPerspectivesTransaction'
+              false
+              (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+              (runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel))
+            case r of 
+              Left errors -> logPerspectivesError (Custom ("recompileModelsAtUrl: " <> show errors)) 
+              _ -> pure unit
           )
           state
   where
@@ -440,9 +447,3 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
     handler (Right e) = do
       logPerspectivesError $ Custom $ "Basic models recompiled!"
       callback true
-    
-    recompileModel' :: UninterpretedDomeinFile -> MonadPerspectives UninterpretedDomeinFile
-    recompileModel' df= runMonadPerspectivesTransaction'
-      false
-      (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
-      (recompileModel df)
