@@ -59,7 +59,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
 import Perspectives.Types.ObjectGetters (getContextAspectSpecialisations)
-import Prelude (bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
+import Prelude (append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
 import Simple.JSON (writeJSON)
 
 -- | Get the serialisation of the perspective the user role type has on the object role type,
@@ -157,7 +157,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     >>= pure <<< (filter (isExternalRole <<< unwrap))
     >>= lift <<< traverse getEnumeratedRole
     >>= pure <<< map (_.context <<< unwrap)
-    >>= \as -> lift $ ( concat <$> (for as (runArrayT <<< getContextAspectSpecialisations)))
+    >>= \as -> lift $ ( (append as) <<< concat <$> (for as (runArrayT <<< getContextAspectSpecialisations)))
   identifyingProperty <- computeIdentifyingProperty serialisedProps roleInstances
       
   pure { id
