@@ -41,7 +41,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (binding, bindingOfRole, kindOfRole)
+import Perspectives.Representation.Class.Role (bindingOfRole, kindOfRole, roleADT)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -129,7 +129,7 @@ checkBinding filledType filler = do
   if filledType == ENR fillerType
     then pure false
     else do
-      (fillerADT :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> binding) fillerType
+      (fillerADT :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleADT) fillerType 
       -- The filledType has restrictions on the fillers that it allows.
       -- These restrictions can be modeled with the filledType itself, but
       -- the restrictions of all of its Aspects count as well.
