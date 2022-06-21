@@ -22,7 +22,7 @@ import Perspectives.CoreTypes ((###=))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder)
-import Perspectives.Identifiers (Namespace, buitenRol, deconstructBuitenRol, deconstructLocalName_, isExternalRole)
+import Perspectives.Identifiers (Namespace, buitenRol, deconstructBuitenRol, deconstructLocalName_, isExternalRole, startsWithSegments)
 import Perspectives.Instances.Combinators (closure)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, modifyDF, withDomeinFile)
 import Perspectives.Query.QueryTypes (Domain(..), RoleInContext, domain2roleInContext, domain2roleType, range, replaceRange, roleInContext2Role)
@@ -47,9 +47,10 @@ contextualisePerspectives = do
   where
     -- Notice that only EnumeratedRoles have Aspects (this includes external roles).
     contextualisePerspectives' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
-    contextualisePerspectives' {enumeratedRoles} ns = void $ executeInTopologicalOrder 
+    contextualisePerspectives' {enumeratedRoles} namespace = void $ executeInTopologicalOrder 
       identifier_
-      (\(EnumeratedRole{roleAspects}) -> unwrap <<< _.role <<< unwrap <$> roleAspects)
+      -- Only count aspects defined in this namespace as dependencies for the sorting!
+      (\(EnumeratedRole{roleAspects}) -> filter (flip startsWithSegments namespace) (unwrap <<< _.role <<< unwrap <$> roleAspects))
       (filter (\(EnumeratedRole{kindOfRole}) -> kindOfRole == UserRole) (values enumeratedRoles))
       contextualisePerspectives''
       

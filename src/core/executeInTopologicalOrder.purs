@@ -26,21 +26,20 @@ executeInTopologicalOrder :: forall m item label. MonadThrow MultiplePerspective
   ToSort item ->
   (item -> m item) ->
   m (Array item)
-executeInTopologicalOrder getLabel getDependencies toSort action = snd <$> runWriterT (executeInTopologicalOrder' toSort [] 0)
+executeInTopologicalOrder getLabel getDependencies toSort action = snd <$> runWriterT (executeInTopologicalOrder' toSort [])
   where
     executeInTopologicalOrder' ::
       ToSort item ->
       Sorted item->
-      Int ->
       WriterT (Skipped item) m (Sorted item)
-    executeInTopologicalOrder' toSort' sortedItems nrOfSortedItems = do
+    executeInTopologicalOrder' toSort' sortedItems = do
       Tuple sortedItems' skipped <- lift $ runWriterT (foldM executeInTopologicalOrder'' sortedItems toSort')
       if null skipped
         then pure sortedItems'
-        else if nrOfSortedItems == length sortedItems
+        else if length sortedItems == length sortedItems'
           then throwError [(Custom ("Cannot topologically sort these items: " <> show (getLabel <$> skipped)))]
           -- If not done, rinse and repeat!
-          else executeInTopologicalOrder' skipped sortedItems' (length sortedItems)
+          else executeInTopologicalOrder' skipped sortedItems'
 
     executeInTopologicalOrder'' ::
       Sorted item ->
