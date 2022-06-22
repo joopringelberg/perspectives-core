@@ -461,6 +461,7 @@ greaterThanOrEqualTo = flip lessThanOrEqualTo
 -- | for the perspective to apply to the ADT.
 -- | <perspective> `isPerspectiveOnADT` <adt>
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
+-- TODO. #15 Check whether either of the comparants must be extended with its binding.
 isPerspectiveOnADT :: Partial => Perspective -> ADT RoleInContext -> MP Boolean
 isPerspectiveOnADT p adt = (roleInContext2Role <$> objectOfPerspective p) `equalsOrGeneralisesRoleADT` (roleInContext2Role <$> adt)
 

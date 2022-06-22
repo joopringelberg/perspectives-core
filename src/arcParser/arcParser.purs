@@ -40,7 +40,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Identifiers (getFirstMatch, isQualifiedWithDomein)
+import Perspectives.Identifiers (getFirstMatch, isQualifiedName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
@@ -767,11 +767,12 @@ inState = do
   mstateId <- reserved "state" *> optionMaybe arcIdentifier
   currentState <- getCurrentState
   stateSpec <- case mspecifier, mstateId of
-    Nothing, Just stateId -> pure $ addSubState currentState stateId
     Nothing, Nothing -> pure currentState
+    -- These may be fully qualified aspect state names. We must check later whether they belong to the object, subject or context.
     Just "object", _ -> ObjectState <$> getObject <*> pure mstateId
     Just "subject", _ -> SubjectState <$> getSubject <*> pure mstateId
     Just "context", _ -> ContextState <$> getCurrentContext <*> pure mstateId
+    Nothing, Just stateId -> pure $ addSubState currentState stateId
     -- This case will never occur.
     _, _ -> fail "This will never occur"
   -- We can use withArcParserState here. It will concatenate the local

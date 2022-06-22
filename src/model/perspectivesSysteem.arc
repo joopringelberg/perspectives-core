@@ -91,6 +91,10 @@ domain System
           row
             form User
               props (FirstName, LastName) verbs (SetPropertyValue)
+        tab "Invitations"
+          row
+            table PendingInvitations
+              props (InviterLastName, Message) verbs (Consult)
 
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me

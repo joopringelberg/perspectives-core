@@ -28,7 +28,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 -- | a role that is 'later' in the source text).
 -- |
 
-import Control.Monad.Error.Class (try)
+import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
@@ -49,7 +49,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, (###=), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
-import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedWithDomein, startsWithSegments)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedName, isQualifiedWithDomein, startsWithSegments)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
@@ -73,7 +73,7 @@ import Perspectives.Representation.Action (AutomaticAction(..), Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedRole, tryGetPerspectType)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getContext, getEnumeratedRole, tryGetPerspectType)
 import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -89,9 +89,9 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (actionStates, automaticStates, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
+import Perspectives.Types.ObjectGetters (actionStates, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not)
+import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not, (*>))
 
 phaseThree ::
   DomeinFileRecord ->
@@ -211,14 +211,21 @@ qualifyBindings = (lift $ State.gets _.dfr) >>= qualifyBindings'
                           case rl of
                             E (EnumeratedRole{_id, context:lexicalContext}) -> do
                               qualifiedContext <- case context of
+                                -- No context was explicitly declared with the binding. We take the lexical context of the role.
                                 ContextType s | s == "" -> pure lexicalContext
-                                ContextType contextName -> qualifyLocalContextName pos contextName (keys contexts)
+                                -- A name was specified, fully qualified. Just accept it. TEST!!
+                                -- ContextType contextName -> pure context
+                                -- A name was specified, fully qualified. Check whether it exists, but not as a local name.
+                                ContextType contextName -> catchError
+                                  (lift2 $ getContext context *> pure context)
+                                  (\e -> throwError $ UnknownContext pos (unwrap context))
                               pure $ ST $ QT.RoleInContext {context: qualifiedContext, role: _id}
                             C r -> case context of
                               ContextType empty | empty == "" -> lift2 $ roleADT r
-                              ContextType contextName -> do
-                                qualifiedContext <- qualifyLocalContextName pos contextName (keys contexts)
-                                (flip replaceContext qualifiedContext) <$> (lift2 $ roleADT r)
+                              ContextType contextName ->
+                                try (lift2 $ getContext context) >>= case _ of 
+                                  Left e -> throwError $ UnknownContext pos (unwrap context)
+                                  Right _ -> (flip replaceContext context) <$> (lift2 $ roleADT r)
                         else throwError $ NotWellFormedName pos (unwrap role)
                     e -> throwError e
                     -- qualifiedRoleType is a CalculatedRole defined in the current domain.
@@ -408,6 +415,7 @@ handlePostponedStateQualifiedParts = do
         else pure (StateIdentifier <<< flip append p <<< flip append "$" <<< roletype2string <$> roles)
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications that may occur in the SubjectState case.
+    -- TODO: handle possibly fully qualified segmented path!
     stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
@@ -438,6 +446,8 @@ handlePostponedStateQualifiedParts = do
       originDomain <- statespec2Domain (transition2stateSpec transition)
       -- `currentContextDomain` represents the current context, expressed as a Domain.
       currentcontextDomain <- pure (CDOM $ ST $ stateSpec2ContextType (transition2stateSpec transition))
+      -- Check whether the state specification is coherent
+      isCoherentStateSpecification (transition2stateSpec transition)
       -- `subject` is the current subject of lexical analysis. It is represented by
       -- an ExplicitRole data constructor.
       -- The current subject is always a single role type, but it may be calculated
@@ -1432,7 +1442,7 @@ stateSpec2ContextType (AST.ObjectState (ImplicitRole c _) _) = c
 statespec2Domain :: Partial => AST.StateSpecification -> PhaseThree Domain
 statespec2Domain (AST.ContextState ctype _) = pure $ CDOM (ST ctype)
 statespec2Domain (AST.SubjectState roleIdentification _) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
-statespec2Domain (AST.ObjectState roleIdentification ctype) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
+statespec2Domain (AST.ObjectState roleIdentification _) = range <$> compileStep (CDOM (ST (roleIdentification2Context roleIdentification))) (roleIdentification2Step roleIdentification)
 
 roleIdentification2rangeADT :: RoleIdentification -> PhaseThree (ADT EnumeratedRoleType)
 roleIdentification2rangeADT roleIdentification = map roleInContext2Role <$> unsafePartial domain2roleType <<< range <$> compileStep
@@ -1501,3 +1511,24 @@ isEnumeratedRoleState :: StateIdentifier -> PhaseThree Boolean
 isEnumeratedRoleState (StateIdentifier s) = do
   eroles <- State.gets _.dfr.enumeratedRoles
   pure $ isJust $ findIndex (\erole -> isJust $ indexOf (Pattern erole) s) (keys eroles)
+
+-- TODO: denk aan prefix expansie in het SegmentedPath!
+-- If the second part of the StateIdentification is a qualified name, it is the combination of some
+-- base type and a segmented path identifying a state for that type.
+-- The first part of the StateIdentification identifies some type. The State base type should be compatible with that.
+-- ContextState provides the simplest case: here the first part is a ContextType, of which one of the types of its
+-- aspect closure should be the base state type.
+-- Throws an error if not.
+isCoherentStateSpecification :: AST.StateSpecification -> PhaseThree Unit
+isCoherentStateSpecification stateSpec = case stateSpec of 
+  AST.ContextState cType mident -> case mident of 
+    Just ident ->  if isQualifiedName ident
+      then do
+        aspects <- lift2 ((ContextType ident) ###= contextAspectsClosure)
+        if isJust $ find (\aspect -> ident `startsWithSegments` (unwrap aspect)) aspects
+          then pure unit
+          else throwError (Custom "bla")
+      else pure unit
+    _ -> pure unit
+  -- TODO 
+  _ ->  pure unit

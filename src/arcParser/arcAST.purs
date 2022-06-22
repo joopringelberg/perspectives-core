@@ -286,6 +286,7 @@ type StateLocalName = String
 
 -- | A StateSpecification identifies a base which represents either a context- or role type,
 -- | and a path of segments that identify a substate of the (root state of) that type.
+-- | NOTE: since we allow reference to aspect states, the SegmentedPath may be a qualified name, too (possibly a prefixed name).
 data StateSpecification =
     ContextState ContextType (Maybe SegmentedPath)
   | SubjectState RoleIdentification (Maybe SegmentedPath)

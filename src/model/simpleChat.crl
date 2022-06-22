@@ -4,13 +4,13 @@ import model:System as sys
 import model:SimpleChat as chat
 
 chat:Model usr:SimpleChatModel
-  extern sys:RootContext$External$Name = "My Chats"
+  extern sys:RootContext$External$Name = "Simple Chat"
   extern sys:Model$External$Description = "A (very) simple chat application."
   extern sys:Model$External$Url = "http://127.0.0.1:5984/repository/model:SimpleChat"
   extern sys:Model$External$ModelIdentification = "model:SimpleChat"
   sys:Model$IndexedContext =>
     chat:ChatApp chat:MyChats
-      extern sys:RootContext$External$Name = "Simple Chat"
+      extern sys:RootContext$External$Name = "My Chats"
       -- TODO. With the next line, ChatApp cannot be parsed for the first time.
       $Chatter -> sys:Me
     sys:Model$IndexedContext$Name = "SimpleChat$MyChats"
