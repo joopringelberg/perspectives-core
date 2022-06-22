@@ -18,7 +18,7 @@ domain BrokerServices
       aspect sys:RootContext$External
 
     -- The BrokerServices I manage.
-    context ManagedBrokers filledBy BrokerService
+    context ManagedBrokers (relational) filledBy BrokerService
 
     -- The BrokerServices I use (have a contract with).
     context Contracts = sys:Me >> binder AccountHolder >> context >> extern
@@ -28,7 +28,7 @@ domain BrokerServices
 
     user Guest = sys:Me
       perspective on ManagedBrokers
-        only (CreateAndFill)
+        only (CreateAndFill, Remove)
         props (Name) verbs (Consult)
       perspective on Contracts
         view BrokerContract$External$ForAccountHolder verbs (Consult)
@@ -53,7 +53,8 @@ domain BrokerServices
       view Admin (RegistryTopic, GuestRolePassword)
 
       perspective on Accounts
-        defaults
+        only (CreateAndFill, Remove)
+        props(LastNameOfAccountHolder) verbs (Consult)
       perspective on Administrator
         defaults
       perspective on extern
@@ -66,7 +67,7 @@ domain BrokerServices
       perspective on Administrator
         only (Fill, Create)
 
-    context Accounts filledBy BrokerContract
+    context Accounts (relational) filledBy BrokerContract
 
   -- The contract between an end user and a BrokerService.
   case BrokerContract
