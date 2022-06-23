@@ -40,7 +40,7 @@ domain SimpleChat
       on entry
         do for Creator
           bind sys:Me to Initiator
-    state NotBound = not exists extern >> binder Chats
+    state NotBound = (not exists extern >> binder Chats) and (exists Partner)
       on entry
         do for Partner
           bind extern to Chats in cht:MyChats
@@ -77,6 +77,8 @@ domain SimpleChat
 
     user Me = filter (Initiator either Partner) with binds sys:Me
     user You = filter (Initiator either Partner) with not binds sys:Me
+
+    aspect user sys:Invitation$Guest
 
   case WithText
     user TextWriter filledBy sys:PerspectivesSystem$User
