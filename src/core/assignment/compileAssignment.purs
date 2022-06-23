@@ -31,7 +31,7 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, concat, filter, filterA, head, length, union, unsafeIndex)
+import Data.Array (catMaybes, concat, cons, filter, filterA, head, length, union, unsafeIndex)
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
@@ -148,7 +148,7 @@ compileAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualif
             })
         ENR enumeratedType -> do
           -- Get the contextualised versions of the role type that we should create.
-          roleTypesToCreate <- roleContextualisations ctxt enumeratedType
+          roleTypesToCreate <- cons enumeratedType <$> roleContextualisations ctxt enumeratedType
           -- Now, each of these role types may have a more restricted filler.
           for_ roleTypesToCreate \roleTypeToCreate -> do
             -- Get the context types whose external roles may be bound to this role type we're about to create.
@@ -199,7 +199,7 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
   pure \contextId -> do
     ctxts <- lift (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
-      roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
+      roleTypesToCreate <- cons qualifiedRoleIdentifier <$> roleContextualisations ctxt qualifiedRoleIdentifier
       for_ roleTypesToCreate \objectType -> unsafePartial $ fromJust <$> createAndAddRoleInstance objectType (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
@@ -234,7 +234,7 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
     ctxts <- lift (contextId ##= contextGetter)
     (bindings' :: Array RoleInstance) <- lift (contextId ##= bindingsGetter)
     for_ ctxts \ctxt -> do
-      roleTypesToCreate' <- roleContextualisations ctxt qualifiedRoleIdentifier    
+      roleTypesToCreate' <- cons qualifiedRoleIdentifier <$> roleContextualisations ctxt qualifiedRoleIdentifier    
       for_ roleTypesToCreate' \objectType ->
         for_ bindings' \bndg -> createAndAddRoleInstance
           objectType
@@ -414,7 +414,7 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
 
         ENR enumeratedType -> do
           -- Get the contextualised versions of the role type that we should create.
-          roleTypesToCreate <- roleContextualisations ctxt enumeratedType
+          roleTypesToCreate <- cons enumeratedType <$> roleContextualisations ctxt enumeratedType
           -- Now, each of these role types may have a more restricted filler.
           concat <$> for roleTypesToCreate \roleTypeToCreate -> do
             -- Get the context types whose external roles may be bound to this role type we're about to create.
@@ -448,7 +448,7 @@ compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contex
   pure \contextId -> do
     ctxts <- lift (contextId ##= contextGetter)
     concat <$> for ctxts \ctxt -> do
-      roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
+      roleTypesToCreate <- cons qualifiedRoleIdentifier <$> roleContextualisations ctxt qualifiedRoleIdentifier
       for roleTypesToCreate
         \roleTypeToCreate -> do 
           roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
