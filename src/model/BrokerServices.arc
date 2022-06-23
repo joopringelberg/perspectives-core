@@ -74,7 +74,7 @@ domain BrokerServices
     aspect sys:Invitation
     state NoAdministrator = not exists Administrator
       on entry
-        do for BrokerContract$Guest
+        do for Guest
           bind extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
     state NoAccountHolder = (exists Administrator) and (not exists AccountHolder)
       on entry
@@ -128,6 +128,7 @@ domain BrokerServices
       perspective on extern
         view External$ForAdministrator verbs (Consult, SetPropertyValue)
 
+    aspect user sys:Invitation$Guest
 
     user Guest = sys:Me
       perspective on Administrator
