@@ -25,7 +25,7 @@ module Perspectives.Parsing.Arc.PhaseTwo where
 import Perspectives.Parsing.Arc.PhaseTwoDefs
 
 import Control.Monad.Except (lift)
-import Control.Monad.State (gets, modify)
+import Control.Monad.State (modify)
 import Data.Array (cons, elemIndex, foldl)
 import Data.Array (fromFoldable) as ARR
 import Data.Lens (over) as LN
@@ -36,7 +36,7 @@ import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, lookup, union, fromFoldable)
+import Foreign.Object (fromFoldable, insert, union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
@@ -358,9 +358,6 @@ addStatesToDomeinFile :: Array State -> DomeinFileRecord -> DomeinFileRecord
 addStatesToDomeinFile extraStates dfr@{states} = dfr { states =
   -- TODO. Controleer op dubbele definities.
   states `union` (fromFoldable $ (\s@(State{id}) -> Tuple (unwrap id) s) <$> extraStates) }
-
-getState :: StateIdentifier -> PhaseTwo (Maybe State)
-getState id = gets _.dfr >>= \{states} -> pure $ lookup (unwrap id) states
 
 -- Traverse the members of ViewE to construct a new View type and insert it into the
 -- DomeinFileRecord.
