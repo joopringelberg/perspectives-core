@@ -23,7 +23,7 @@
 module Perspectives.ContextAndRole where
 
 import Data.Array (cons, foldl, null)
-import Data.Array (delete, difference, elemIndex, snoc, union, unsnoc) as Arr
+import Data.Array (delete, difference, elemIndex, snoc, union) as Arr
 import Data.Foldable (maximum)
 import Data.Int (floor, fromString, toNumber)
 import Data.Lens (Lens', Traversal', _Just, over, set, view)
@@ -169,7 +169,7 @@ pushContext_state (PerspectContext cr@{states}) stateId = PerspectContext cr {st
     Just _ -> states
   }
 
--- | Remove the last state.
+-- | Remove a state.
 popContext_state :: PerspectContext -> StateIdentifier -> PerspectContext
 popContext_state (PerspectContext cr) stateId = PerspectContext cr { states = Arr.delete stateId cr.states}
 
@@ -373,14 +373,9 @@ pushRol_state (PerspectRol cr@{states}) stateId = PerspectRol cr {states =
     Just _ -> states
   }
 
--- | Remove the last state but only if it equals the given state.
+-- | Remove a state.
 popRol_state :: PerspectRol -> StateIdentifier -> PerspectRol
-popRol_state (PerspectRol cr) stateId = case Arr.unsnoc cr.states of
-  Nothing -> PerspectRol cr
-  Just {init, last} -> if eq stateId last
-    then PerspectRol cr {states = init}
-    else PerspectRol cr
-
+popRol_state (PerspectRol cr) stateId = PerspectRol cr { states = Arr.delete stateId cr.states}
 
 compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
 compareOccurrences a b = compare (rol_occurrence a) (rol_occurrence b)

@@ -40,7 +40,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, last, null, snoc)
+import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, null, snoc)
 import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Foldable (for_)
@@ -56,7 +56,7 @@ import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType, rol_states)
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>), (##=), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -552,8 +552,7 @@ setDefaultRoleRootState rid = (lift (rid ##>> roleType)) >>= \rtype -> setActive
 -----------------------------------------------------------
 -- SETINACTIVEROLESTATE
 -----------------------------------------------------------
--- | Remove the state identifier from the array of state identifiers in the context instance, iff it is actually
--- | the last one.
+-- | Remove the state identifier from the array of state identifiers in the context instance.
 -- | The five responsibilities are adressed as follows:
 -- | PERSISTENCE of the context instance.
 -- | SYNCHRONISATION is not applicable: state is not synchronised between participants but recomputed by each PDR.
@@ -566,11 +565,9 @@ setDefaultRoleRootState rid = (lift (rid ##>> roleType)) >>= \rtype -> setActive
 setInActiveRoleState :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction Unit
 setInActiveRoleState stateId roleId = (lift $ try $ getPerspectRol roleId) >>=
     handlePerspectContextError "setInActiveRoleState"
-      \(pe :: PerspectRol) -> if isJust $ last (rol_states pe)
-        then do
-          cacheAndSave roleId $ popRol_state pe stateId
-          (lift $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
-        else pure unit
+      \(pe :: PerspectRol) -> do
+        cacheAndSave roleId $ popRol_state pe stateId
+        (lift $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
 
 -- | Set the the authoringRole in the Transaction for the duration of the monadic action.
 withAuthoringRole :: forall a. RoleType -> MonadPerspectivesTransaction a -> MonadPerspectivesTransaction a
