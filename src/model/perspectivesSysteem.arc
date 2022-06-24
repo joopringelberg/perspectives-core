@@ -64,8 +64,7 @@ domain System
         action StartUsing
           callEffect cdb:AddModelToLocalStore( Url )
           bind origin to ModelsInUse in currentcontext
-        --view ModelPresentation verbs (Consult)
-        props (Description, Name) verbs (Consult)
+        view Modellen$ModelPresentation verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
       perspective on SystemCaches

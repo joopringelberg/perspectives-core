@@ -32,7 +32,7 @@ import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets) as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, elemIndex, filter, find, findIndex, foldM, foldl, foldr, fromFoldable, head, index, intercalate, length, null, uncons, union, updateAt)
+import Data.Array (cons, elemIndex, filter, find, findIndex, foldM, foldl, foldr, fromFoldable, head, index, intercalate, length, nub, null, uncons, union, updateAt)
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
@@ -49,7 +49,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, (###=), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
-import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedName, isQualifiedWithDomein, startsWithSegments)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedName, isQualifiedWithDomein, qualifyWith, startsWithSegments)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
@@ -1094,15 +1094,23 @@ collectPropertyTypes (AST.View view) object start = do
         Just (View {propertyReferences}) -> pure $ PSet propertyReferences
         Nothing -> throwError $ UnknownView start view
     else do
-      roles <- allLeavesInADT <$> roleIdentification2rangeADT object
+      -- If the RoleIdentification is of a single role type (not an expression), add that role
+      -- to the types we get from expanding the role specification as an expression.
+      -- This causes a calculated role type to be included along with the types of its range.
+      -- It does not matter if that added role is still described as Enumerated while it is actually Calculated.
+      roles <- map ENR <$> (allLeavesInADT <$> roleIdentification2rangeADT object)
+      roles' <- case object of
+        ExplicitRole (ContextType ctxt) r pos -> case r of 
+          ENR (EnumeratedRoleType er) -> pure $ nub $ cons (ENR $ EnumeratedRoleType (qualifyWith ctxt er)) roles
+          CR (CalculatedRoleType er) -> pure $ nub $ cons (CR $ CalculatedRoleType (qualifyWith ctxt er)) roles
+        _ -> pure roles
       (views :: Object View) <- getsDF _.views
       -- As we have postponed handling these parse tree fragments after
       -- handling all others, there can be no forward references.
       -- The property references in Views are, by now, qualified.
-      -- TODO. Controleer of de view een view op het object is!
       case filter (areLastSegmentsOf view) (keys views) of
         noCandidates | null noCandidates -> throwError $ UnknownView start view
-        candidates -> case filter (isViewOfObject roles) candidates of
+        candidates -> case filter (isViewOfObject roles') candidates of
           noCandidates' | null noCandidates' -> throwError $ NotAViewOfObject start view
           candidates' ->
             case length candidates' of
@@ -1110,9 +1118,9 @@ collectPropertyTypes (AST.View view) object start = do
                 Just (View {propertyReferences}) -> pure $ PSet propertyReferences
               _ -> throwError $ NotUniquelyIdentifying start view candidates'
   where
-    isViewOfObject :: Array EnumeratedRoleType -> String -> Boolean
+    isViewOfObject :: Array RoleType -> String -> Boolean
     -- | "Context" `isLocalNameOf` "model:Perspectives$Context"
-    isViewOfObject roles viewName = isJust $ findIndex (\(EnumeratedRoleType roleName) -> viewName `startsWithSegments` roleName) roles
+    isViewOfObject roles viewName = isJust $ findIndex (\rType -> viewName `startsWithSegments` (roletype2string rType)) roles
 
 handleScreens :: LIST.List AST.ScreenE -> PhaseThree Unit
 handleScreens screenEs = do
