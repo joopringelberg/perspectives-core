@@ -52,7 +52,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContext
 import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedName, isQualifiedWithDomein, qualifyWith, startsWithSegments)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
-import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (RoleIdentification(..), StateTransitionE(..), SegmentedPath)
 import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
@@ -419,13 +419,17 @@ handlePostponedStateQualifiedParts = do
     stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
-      AST.ContextState ctx mpath -> pure [(StateIdentifier $ (maybe (unwrap ctx) (append (unwrap ctx) <<< append "$") mpath))]
+      AST.ContextState ctx mpath -> pure [(StateIdentifier $ (maybe (unwrap ctx) (maybeQualifyWith (unwrap ctx)) mpath))]
       -- Execute the effect for each qualifiedUser in each of the subject states.
       -- Note that the subjects in whose states we execute, do not need be the qualified users we execute for:
       -- 'do this automatically for me when you are at home' illustrates this independence.
       AST.SubjectState ridentification mpath -> collectStates mpath ridentification
       -- Execute the effect for all subjects in all object states.
       AST.ObjectState ridentification mpath -> collectStates mpath ridentification
+
+      where
+        maybeQualifyWith :: Namespace -> SegmentedPath -> String
+        maybeQualifyWith ns path = if isQualifiedWithDomein path then path else qualifyWith ns path
 
     stateSpecificationToStateSpec :: AST.StateSpecification -> PhaseThree (Array StateSpec)
     stateSpecificationToStateSpec spec = case spec of

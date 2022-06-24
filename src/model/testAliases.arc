@@ -45,12 +45,19 @@ domain TestAliases
 
     user Driver filledBy sys:PerspectivesSystem$User
       property VehicleName = context >> Vehicle >> Name
+
+      -- Property License is used to define state HasLicense. 
+      -- In specialisation Pilot we add to the Pilots' perspective on Plane (a specialisation of Vehicle)
+      -- that is dependent on this (aspect) state.
+      property License (String)
+      state HasLicense = exists License
       perspective on Vehicle
         only (Create)
         props (Name) verbs (SetPropertyValue)
         props (NumberOfPassengers) verbs (Consult)
       perspective on Driver
         props (VehicleName, FirstName, LastName) verbs (Consult)
+        props (License) verbs (SetPropertyValue)
       perspective on extern
         props (Name) verbs (SetPropertyValue)
       perspective on Schedules
@@ -129,6 +136,12 @@ domain TestAliases
       -- The test fails if the created schedule doesn't have properties IsInternational and IsCargoFlight.
       perspective on FlightSchedules
         props (IsInternational, IsCargoFlight) verbs (SetPropertyValue)
+      
+      -- TESTS: ASPECT STATE DEPENDENT PROPERTY VERBS
+      -- Fails: ff Pilot cannot set NumberOfPassengers after he has a value for License.
+      in state ta:Transport$Driver$HasLicense
+        perspective on Plane
+          props (NumberOfPassengers) verbs (SetPropertyValue)
     
     thing Plane
       aspect ta:Transport$Vehicle
