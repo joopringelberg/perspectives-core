@@ -23,7 +23,7 @@
 module Perspectives.CollectAffectedContexts where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
-import Control.Monad.Error.Class (throwError, try)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
 import Data.Array (concat, difference, filterA, foldM, foldl, head, nub, null, singleton, union)
 import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
@@ -52,11 +52,13 @@ import Perspectives.Deltas (addDelta)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding, contextIsInState, contextType, getFilledRoles, makeChainGetter, notIsMe, roleIsInState)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, lookupInvertedQueries, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
@@ -74,7 +76,7 @@ import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
-import Perspectives.Utilities (findM)
+import Perspectives.Utilities (findM, prettyPrint)
 import Prelude (Unit, bind, const, discard, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -195,13 +197,18 @@ isForSelfOnly (InvertedQuery{selfOnly}) = selfOnly
 -- | Perspectives are conditional on states (valid in some states and not in others). The users we return are guaranteed
 -- | to have at least one valid perspective, even in the case of object state.
 -- | INVARIANT TO RESPECT: both the backward- and forward part of the InvertedQuery should have been compiled.
+-- TODO. Fix the error that backwardsCompiled can be Nothing.
 handleBackwardQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array ContextWithUsers)
-handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompiled, users:userTypes, states, forwardsCompiled}) = do
+handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompiled, users:userTypes, states, forwardsCompiled}) = catchError
+  (do
   if unsafePartial shouldResultInContextStateQuery iq
     then createContextStateQuery
     else if unsafePartial shouldResultInRoleStateQuery iq
       then createRoleStateQuery
-      else usersWithAnActivePerspective
+        else usersWithAnActivePerspective)
+  (\e -> do
+    logPerspectivesError (Custom $ show e)
+    pure [])
   where
     -- | The InvertedQuery is based on a Context state condition.
     -- | This function adds, as a side effect, an InvertedQueryResult to the current transaction.
@@ -794,6 +801,10 @@ compileBoth ac@(InvertedQuery iqr@{description, backwardsCompiled, forwardsCompi
   Nothing -> do
     backwards' <- traverse getHiddenFunction (backwards description)
     forwards' <- traverse getHiddenFunction (forwards description)
+    -- It is an error if backwards' is Nothing.
+    if isNothing backwards'
+      then logPerspectivesError (Custom $ "compileBoth: backwards is nothing for \n" <> prettyPrint description)
+      else pure unit
     pure $ InvertedQuery iqr{backwardsCompiled = (map unsafeCoerce backwards'), forwardsCompiled = (map unsafeCoerce forwards')}
 
 lookupInvertedPropertyQueries :: EnumeratedRoleType -> Object (Array InvertedQuery) -> MonadPerspectivesTransaction (Array InvertedQuery)
