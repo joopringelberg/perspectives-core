@@ -595,10 +595,14 @@ roleContextualisations ctxt qualifiedRoleIdentifier = do
   -- If the qualifiedRoleIdentifier is defined in this context type, create an instance of just that role type.
   roleTypesToCreate <- if (unwrap qualifiedRoleIdentifier) `startsWithSegments` (unwrap cType)
     then pure [qualifiedRoleIdentifier]
-    -- Else get the specialisations of qualifiedRoleIdentifier.
+    -- Else just get the specialisations of qualifiedRoleIdentifier.
     else lift (qualifiedRoleIdentifier ###= getRoleAspectSpecialisations) 
       >>= pure <<< filter \(EnumeratedRoleType r) -> r `startsWithSegments` (unwrap cType)
+  -- Then, if we have no type, use the qualifiedRoleIdentifier anyway.
+  roleTypesToCreate' <- if null roleTypesToCreate
+    then pure [qualifiedRoleIdentifier]
+    else pure roleTypesToCreate
   -- Get the user role type that is executing.
   (user :: RoleType) <- gets (_.authoringRole <<< unwrap)
   -- Filter the object role types, keeping only those that the user role type has a perspective on.
-  lift $ concat <$> runArrayT (filterA (unsafePartial hasPerspectiveOnRole user) roleTypesToCreate)
+  lift $ concat <$> runArrayT (filterA (unsafePartial hasPerspectiveOnRole user) roleTypesToCreate')
