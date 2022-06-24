@@ -45,6 +45,15 @@ domain ModelManagement
         notify Author
           "Model {ModelDescription >> ModelIdentification} has been uploaded to the repository {Repository >> Name}."
     external
+      state ReadyToCompile = (exists ArcSource) and exists CrlSource
+        perspective of Author
+          action RestoreState
+            ArcFeedback = "Explicitly restoring state"
+            CrlFeedback = "Explicitly restoring state"
+          action CompileArc
+            delete property ArcFeedback
+          action CompileCrl
+            delete property CrlFeedback
       state ProcessArc = (exists ArcSource) and not exists ArcFeedback
         on entry
           do for Author
