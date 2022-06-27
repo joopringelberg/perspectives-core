@@ -110,7 +110,8 @@ domain TestAliases
           props (VehicleName) verbs (Consult)
     
   case Flight
-    aspect ta:Transport      
+    aspect ta:Transport     
+    aspect sys:ContextWithNotification 
     user Pilot
       aspect ta:Transport$Driver
       -- A perspective on Plane is not necessary (other than for properties of Plane
@@ -142,6 +143,10 @@ domain TestAliases
       in state ta:Transport$Driver$HasLicense
         perspective on Plane
           props (NumberOfPassengers) verbs (SetPropertyValue)
+
+      on entry of ta:Transport$Driver$HasLicense
+        notify Pilot
+          "You now have a license!"
     
     thing Plane
       aspect ta:Transport$Vehicle

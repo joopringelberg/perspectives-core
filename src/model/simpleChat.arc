@@ -47,6 +47,10 @@ domain SimpleChat
     external
       aspect sys:Invitation$External
       property Title (String)
+      ---- THIS action can be used to test upstream state based notification.
+      -- on entry of sys:Invitation$External$InviteUnconnectedUser
+      --   notify Initiator
+      --     "Your invitation is being prepared."
 
     user Initiator (mandatory) filledBy sys:PerspectivesSystem$User
       aspect sys:Invitation$Inviter
