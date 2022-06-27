@@ -32,24 +32,26 @@ import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.State (execState)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes)
+import Data.Array (catMaybes, filter)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
+import Data.MediaType (MediaType(..))
 import Data.Traversable (for)
 import Effect.Aff (try)
 import Effect.Class.Console (log)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
-import Perspectives.DomeinFile (DomeinFile(..))
+import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, addDownStreamNotification, setRevision)
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder) as TOP
 import Perspectives.Extern.Couchdb (addInvertedQuery)
+import Perspectives.Identifiers (isModelName)
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
-import Perspectives.Persistence.API (documentsInDatabase, includeDocs)
+import Perspectives.Persistence.API (addAttachment, addDocument, documentsInDatabase, getAttachment, includeDocs)
 import Perspectives.Persistence.Types (Url)
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..))
@@ -62,24 +64,40 @@ modelDescription = EnumeratedRoleType "model:ModelManagement$ManagedModel$ModelD
 recompileModelsAtUrl :: Url -> MonadPerspectivesTransaction Unit
 recompileModelsAtUrl repository = do
   {rows:allModels} <- lift $ documentsInDatabase repository includeDocs
-  uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case read <$> doc of
+  uninterpretedDomeinFiles <- for (filter (isModelName <<< _.id) allModels) \({id, doc}) -> case read <$> doc of
     Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
     Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
     Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
-  r <- runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel)
+  r <- runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModelAtUrl)
   case r of 
     Left errors -> logPerspectivesError (Custom ("recompileModelsAtUrl: " <> show errors)) 
     _ -> pure unit
+  where
+    recompileModelAtUrl :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
+    recompileModelAtUrl model@(UninterpretedDomeinFile{_id, _rev, contents}) =
+      do
+        log ("Recompiling " <> _id)
+        r <- lift $ loadArcAndCrl' contents.arc contents.crl
+        case r of
+          Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
+          Right df@(DomeinFile dfr) -> lift $ lift do
+            log $  "Recompiled '" <> _id <> "' succesfully!"
+            -- storeDomeinFileInCouchdbPreservingAttachments df
+            mattachment <- getAttachment repository _id "screens.js"
+            _rev' <- addDocument repository (setRevision _rev df) _id
+            case mattachment of 
+              Nothing -> pure unit
+              Just attachment -> void $ addAttachment repository _id _rev' "screens.js" attachment (MediaType "text/exmascript")
+        pure model
 
 recompileModel :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
 recompileModel model@(UninterpretedDomeinFile{_id, _rev, contents}) =
   do
     log ("Recompiling " <> _id)
-    -- TODO. We moeten de inverse queries verwerken in de andere modellen!
     r <- lift $ loadArcAndCrl' contents.arc contents.crl
     case r of
       Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
-      Right df@(DomeinFile drf@{invertedQueriesInOtherDomains}) -> lift $ lift do
+      Right df@(DomeinFile drf@{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects}) -> lift $ lift do
         log $  "Recompiled '" <> _id <> "' succesfully!"
         storeDomeinFileInCouchdbPreservingAttachments df
 
@@ -91,6 +109,22 @@ recompileModel model@(UninterpretedDomeinFile{_id, _rev, contents}) =
               \(DomeinFile dfr) -> do
                 -- Here we must take care to preserve the screens.js attachment.
                 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+        -- Distribute upstream state notifications over the other domains.
+        forWithIndex_ upstreamStateNotifications
+          \domainName notifications -> do
+            (try $ getDomeinFile (DomeinFileId domainName)) >>=
+              handleDomeinFileError "addModelToLocalStore'"
+              \(DomeinFile dfr) -> do
+                -- Here we must take care to preserve the screens.js attachment.
+                (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications addDownStreamNotification) dfr))
+        -- Distribute upstream automatic effects over the other domains.
+        forWithIndex_ upstreamAutomaticEffects
+          \domainName automaticEffects -> do
+            (try $ getDomeinFile (DomeinFileId domainName)) >>=
+              handleDomeinFileError "addModelToLocalStore'"
+              \(DomeinFile dfr) -> do
+                -- Here we must take care to preserve the screens.js attachment.
+                (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
     pure model
 
 

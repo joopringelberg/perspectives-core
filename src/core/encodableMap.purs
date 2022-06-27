@@ -21,18 +21,21 @@
 -- END LICENSE
 
 module Perspectives.Data.EncodableMap
-
-( EncodableMap(..)
-, insert
-, delete
-, lookup
-, values
-, empty
-, keys)
-where
+  ( EncodableMap(..)
+  , addAll
+  , delete
+  , empty
+  , insert
+  , keys
+  , lookup
+  , removeAll
+  , values
+  )
+  where
 
 import Prelude
 
+import Data.Array (foldr)
 import Data.Array.Partial (head, tail)
 import Data.List (List)
 import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty, keys) as Map
@@ -90,3 +93,9 @@ keys (EncodableMap mp) = Map.keys mp
 
 instance semigroupEncodableMap :: (Ord k, Semigroup v) => Semigroup (EncodableMap k v) where
   append (EncodableMap map1) (EncodableMap map2)= EncodableMap (unionWith append map1 map2)
+
+addAll :: forall key value. Ord key => value -> EncodableMap key value -> Array key -> EncodableMap key value
+addAll value = foldr (\key map -> insert key value map)
+
+removeAll :: forall key value. Ord key => value -> EncodableMap key value -> Array key -> EncodableMap key value
+removeAll value = foldr (\key map -> delete key map)

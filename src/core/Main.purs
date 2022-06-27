@@ -24,10 +24,10 @@ module Main
 where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Control.Monad.Except (ExceptT, lift, runExceptT)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (catMaybes)
+import Data.Array (catMaybes, filter)
 import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -51,10 +51,11 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
+import Perspectives.Identifiers (isModelName)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.Names (getMySystem)
-import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, includeDocs)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
@@ -426,7 +427,7 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
             addAllExternalFunctions
             modelsDb <- modelsDatabaseName
             {rows:allModels} <- documentsInDatabase modelsDb includeDocs
-            uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case read <$> doc of
+            uninterpretedDomeinFiles <- for (filter (isModelName <<< _.id) allModels) \({id, doc}) -> case read <$> doc of
               Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
               Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
               Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df

@@ -80,8 +80,8 @@ loadAndCompileArcFile_ text = catchError
           (Left e) -> pure $ Left e
           (Right (DomeinFile dr'@{_id})) -> do
             dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
-            -- We should load referred models if they are missing.
-            for_ referredModels (loadModelIfMissing <<< unwrap)
+            -- We should load referred models if they are missing (but not the model we're compiling!).
+            for_ (delete (DomeinFileId _id) state.referredModels) (loadModelIfMissing <<< unwrap)
             (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left e

@@ -55,7 +55,7 @@ import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvertedQuery(..))
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvertedQuery(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
 import Perspectives.Error.Boundaries (handleDomeinFileError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
@@ -165,7 +165,7 @@ updateModel arrWithurl arrWithModelName arrWithDependencies modelsInUse = case h
     -- the repository location of the model supplied in the call to updateModel.
     updateModel' :: Boolean -> String -> DomeinFileId -> MonadPerspectivesTransaction Unit
     updateModel' withDependencies url dfId@(DomeinFileId modelName) = do
-      DomeinFile{invertedQueriesInOtherDomains, referredModels} <- lift $ getDomeinFile dfId
+      DomeinFile{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects, referredModels} <- lift $ getDomeinFile dfId
       if withDependencies
         then for_ referredModels (updateModel' withDependencies url)
         else pure unit
@@ -177,6 +177,20 @@ updateModel arrWithurl arrWithModelName arrWithDependencies modelsInUse = case h
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
+      forWithIndex_ upstreamStateNotifications
+        \domainName notifications -> do
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+            handleDomeinFileError "updateModel'"
+            \(DomeinFile dfr) -> do
+              -- Here we must take care to preserve the screens.js attachment.
+              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications removeDownStreamNotification) dfr))
+      forWithIndex_ upstreamAutomaticEffects
+        \domainName automaticEffects -> do
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+            handleDomeinFileError "updateModel'"
+            \(DomeinFile dfr) -> do
+              -- Here we must take care to preserve the screens.js attachment.
+              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects removeDownStreamAutomaticEffect) dfr))
       -- Clear the caches of compiled states.
       void $ pure $ clearModelStates (DomeinFileId modelName)
       -- Install the new model, taking care of outgoing InvertedQueries.
@@ -213,7 +227,17 @@ addModelToLocalStore' url originalLoad = do
       -- Retrieve the DomeinFile from the URL.
       repositoryUrl <- repository url
       docName <- documentName url
-      df@(DomeinFile{_id, modelDescription, crl, indexedRoles, indexedContexts, referredModels, invertedQueriesInOtherDomains}) <- lift $ getDocument repositoryUrl docName
+      df@(DomeinFile
+        { _id
+        , modelDescription
+        , crl
+        , indexedRoles
+        , indexedContexts
+        , referredModels
+        , invertedQueriesInOtherDomains
+        , upstreamStateNotifications
+        , upstreamAutomaticEffects}) <- 
+        lift $ getDocument repositoryUrl docName
       -- Add new dependencies.
       for_ referredModels \dfid -> do
         mmodel <- lift $ tryGetPerspectEntiteit dfid
@@ -389,6 +413,24 @@ addModelToLocalStore' url originalLoad = do
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
+      
+      -- Distribute upstream state notifications over the other domains.
+      forWithIndex_ upstreamStateNotifications
+        \domainName notifications -> do
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+            handleDomeinFileError "addModelToLocalStore'"
+            \(DomeinFile dfr) -> do
+              -- Here we must take care to preserve the screens.js attachment.
+              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications addDownStreamNotification) dfr))
+
+      -- Distribute upstream automatic effects over the other domains.
+      forWithIndex_ upstreamAutomaticEffects
+        \domainName automaticEffects -> do
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+            handleDomeinFileError "addModelToLocalStore'"
+            \(DomeinFile dfr) -> do
+              -- Here we must take care to preserve the screens.js attachment.
+              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
 
       -- Copy the attachment
       lift $ addA repositoryUrl docName revision

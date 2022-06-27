@@ -20,26 +20,30 @@
 
 -- END LICENSE
 
-module Perspectives.DomeinFile where
+module Perspectives.DomeinFile
+
+  where
 
 import Control.Monad.State (State, execState, modify)
 import Data.Array (cons)
+import Data.Eq.Generic (genericEq)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
-import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype, over, unwrap)
+import Data.Show.Generic (genericShow)
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert, lookup)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
-import Perspectives.Data.EncodableMap (EncodableMap)
+import Perspectives.Data.EncodableMap (EncodableMap, addAll, removeAll)
 import Perspectives.Data.EncodableMap (empty) as EM
 import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InvertedQuery (InvertedQuery)
+import Perspectives.Representation.Action (AutomaticAction)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -48,8 +52,8 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), InvertedQueryKey)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.ScreenDefinition (ScreenDefinition, ScreenKey)
-import Perspectives.Representation.State (State) as PEState
-import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedRoleType)
+import Perspectives.Representation.State (State(..), Notification) as PEState
+import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedRoleType, RoleType, StateIdentifier(..))
 import Perspectives.Representation.UserGraph (UserGraph(..))
 import Perspectives.Representation.View (View)
 import Prelude (class Eq, class Show, Unit, bind, pure, unit, void, ($), (<<<))
@@ -75,6 +79,8 @@ type DomeinFileRecord =
   , referredModels :: Array DomeinFileId
   -- Keys are DomeinFileIds.
   , invertedQueriesInOtherDomains :: Object (Array SeparateInvertedQuery)
+  , upstreamStateNotifications :: Object (Array UpstreamStateNotification)
+  , upstreamAutomaticEffects :: Object (Array UpstreamAutomaticEffect)
   , userGraph :: UserGraph
   , screens :: EncodableMap ScreenKey ScreenDefinition
   }
@@ -105,6 +111,38 @@ instance identifiableDomeinFile :: Identifiable DomeinFile DomeinFileId where
 instance revisionDomeinFile :: Revision DomeinFile where
   rev = _._rev <<< unwrap
   changeRevision s = over DomeinFile (\vr -> vr {_rev = s})
+
+-------------------------------------------------------------------------------
+---- UPSTREAMSTATENOTIFICATION
+-------------------------------------------------------------------------------
+newtype UpstreamStateNotification = UpstreamStateNotification
+  { stateId :: StateIdentifier
+  , isOnEntry :: Boolean
+  , notification :: PEState.Notification
+  , qualifiedUsers :: Array RoleType
+  }
+
+derive instance Generic UpstreamStateNotification _
+instance Show UpstreamStateNotification where show = genericShow
+instance Eq UpstreamStateNotification where eq = genericEq
+instance Encode  UpstreamStateNotification where encode = genericEncode defaultOptions
+instance Decode  UpstreamStateNotification where decode = genericDecode defaultOptions
+
+-------------------------------------------------------------------------------
+---- UPSTREAMAUTOMATICEFFECT
+-------------------------------------------------------------------------------
+newtype UpstreamAutomaticEffect = UpstreamAutomaticEffect
+  { stateId :: StateIdentifier
+  , isOnEntry :: Boolean
+  , automaticAction :: AutomaticAction
+  , qualifiedUsers :: Array RoleType
+  }
+
+derive instance Generic UpstreamAutomaticEffect _
+instance Show UpstreamAutomaticEffect where show = genericShow
+instance Eq UpstreamAutomaticEffect where eq = genericEq
+instance Encode  UpstreamAutomaticEffect where encode = genericEncode defaultOptions
+instance Decode  UpstreamAutomaticEffect where decode = genericDecode defaultOptions
 
 -------------------------------------------------------------------------------
 ---- INVERTEDQUERYCOLLECTION
@@ -165,6 +203,8 @@ defaultDomeinFileRecord =
   , modelDescription: Nothing
   , referredModels: []
   , invertedQueriesInOtherDomains: empty
+  , upstreamStateNotifications: empty
+  , upstreamAutomaticEffects: empty
   , userGraph: UserGraph $ EM.empty
   , screens: EM.empty
 }
@@ -194,3 +234,66 @@ indexedRoles (DomeinFile{enumeratedRoles}) = execState indexedRoles_ empty
     indexedRoles_ = for_ enumeratedRoles \(EnumeratedRole{_id, indexedRole}) -> case indexedRole of
       Nothing -> pure unit
       Just i -> void $ modify \table -> insert (unwrap i) _id table
+
+addUpstreamNotification :: UpstreamStateNotification -> StateIdentifier -> DomeinFileRecord -> DomeinFileRecord
+addUpstreamNotification notification (StateIdentifier s) dfr@{upstreamStateNotifications} = let 
+    domeinName = unsafePartial fromJust $ deconstructModelName s
+  in 
+    dfr 
+      {upstreamStateNotifications = case lookup domeinName upstreamStateNotifications of
+        Nothing -> insert domeinName [notification] upstreamStateNotifications
+        Just ns -> insert domeinName (cons notification ns) upstreamStateNotifications}
+
+addUpstreamAutomaticEffect :: UpstreamAutomaticEffect -> StateIdentifier -> DomeinFileRecord -> DomeinFileRecord
+addUpstreamAutomaticEffect effect (StateIdentifier s) dfr@{upstreamAutomaticEffects} = let 
+    domeinName = unsafePartial fromJust $ deconstructModelName s
+  in 
+    dfr 
+      {upstreamAutomaticEffects = case lookup domeinName upstreamAutomaticEffects of
+        Nothing -> insert domeinName [effect] upstreamAutomaticEffects
+        Just ns -> insert domeinName (cons effect ns) upstreamAutomaticEffects}
+
+addDownStreamNotification :: UpstreamStateNotification -> State DomeinFileRecord Unit
+addDownStreamNotification = modifyDownstreamNotification true
+
+removeDownStreamNotification :: UpstreamStateNotification -> State DomeinFileRecord Unit
+removeDownStreamNotification = modifyDownstreamNotification false
+
+modifyDownstreamNotification :: Boolean -> UpstreamStateNotification -> State DomeinFileRecord Unit
+modifyDownstreamNotification add (UpstreamStateNotification{stateId, isOnEntry, notification, qualifiedUsers}) = void $ modify \dfr@{states} ->
+  case lookup (unwrap stateId) states of 
+    Nothing -> dfr
+    Just s -> dfr {states = insert (unwrap stateId) (modifyState s) states}
+    where
+    modifyState :: PEState.State -> PEState.State
+    modifyState (PEState.State sr@{notifyOnEntry, notifyOnExit}) = 
+      if isOnEntry 
+        then if add
+          then PEState.State sr {notifyOnEntry = addAll notification notifyOnEntry qualifiedUsers}
+          else PEState.State sr {notifyOnEntry = removeAll notification notifyOnEntry qualifiedUsers}
+        else if add
+          then PEState.State sr {notifyOnExit = addAll notification notifyOnExit qualifiedUsers}
+          else PEState.State sr {notifyOnExit = removeAll notification notifyOnExit qualifiedUsers}
+
+addDownStreamAutomaticEffect :: UpstreamAutomaticEffect -> State DomeinFileRecord Unit
+addDownStreamAutomaticEffect = modifyDownstreamAutomaticEffect true
+
+removeDownStreamAutomaticEffect :: UpstreamAutomaticEffect -> State DomeinFileRecord Unit
+removeDownStreamAutomaticEffect = modifyDownstreamAutomaticEffect false
+
+modifyDownstreamAutomaticEffect :: Boolean -> UpstreamAutomaticEffect -> State DomeinFileRecord Unit
+modifyDownstreamAutomaticEffect add (UpstreamAutomaticEffect{stateId, isOnEntry, automaticAction, qualifiedUsers}) = void $ modify \dfr@{states} ->
+  case lookup (unwrap stateId) states of 
+    Nothing -> dfr
+    Just s -> dfr {states = insert (unwrap stateId) (modifyState s) states}
+    where
+    modifyState :: PEState.State -> PEState.State
+    modifyState (PEState.State sr@{automaticOnEntry, automaticOnExit}) = 
+      if isOnEntry 
+        then if add
+          then PEState.State sr {automaticOnEntry = addAll automaticAction automaticOnEntry qualifiedUsers}
+          else PEState.State sr {automaticOnEntry = removeAll automaticAction automaticOnEntry qualifiedUsers}
+        else if add
+          then PEState.State sr {automaticOnExit = addAll automaticAction automaticOnExit qualifiedUsers}
+          else PEState.State sr {automaticOnExit = removeAll automaticAction automaticOnExit qualifiedUsers}
+

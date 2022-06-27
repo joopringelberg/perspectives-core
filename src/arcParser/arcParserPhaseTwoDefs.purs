@@ -22,7 +22,7 @@
 
 module Perspectives.Parsing.Arc.PhaseTwoDefs where
 
-import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
+import Control.Monad.Except (ExceptT, lift, runExceptT)
 import Control.Monad.Except (throwError) as EXCEPT
 import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, runStateT)
 import Data.Array (singleton, union)

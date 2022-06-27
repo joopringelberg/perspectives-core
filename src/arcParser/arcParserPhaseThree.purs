@@ -47,8 +47,9 @@ import Foreign.Object (Object, insert, keys, lookup, singleton, unions)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives, (###=), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
+import Perspectives.Data.EncodableMap (addAll)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, indexedContexts, indexedRoles)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutomaticEffect(..), UpstreamStateNotification(..), addUpstreamAutomaticEffect, addUpstreamNotification, indexedContexts, indexedRoles)
 import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedName, isQualifiedWithDomein, qualifyWith, startsWithSegments)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
@@ -91,7 +92,7 @@ import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (actionStates, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Ord, Unit, append, bind, discard, eq, flip, map, pure, show, unit, void, ($), (&&), (<$>), (<*), (<<<), (==), (>=>), (>>=), (<>), not, (*>))
+import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (*>), (<$>), (<*), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree ::
   DomeinFileRecord ->
@@ -415,7 +416,6 @@ handlePostponedStateQualifiedParts = do
         else pure (StateIdentifier <<< flip append p <<< flip append "$" <<< roletype2string <$> roles)
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications that may occur in the SubjectState case.
-    -- TODO: handle possibly fully qualified segmented path!
     stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
@@ -436,9 +436,6 @@ handlePostponedStateQualifiedParts = do
       AST.ContextState _ _ -> map ContextState <$> stateSpec2States spec
       AST.SubjectState _ _ -> map SubjectState <$> stateSpec2States spec
       AST.ObjectState _ _ -> map ObjectState <$> stateSpec2States spec
-
-    addAll :: forall key value. Ord key => value -> EM.EncodableMap key value -> Array key -> EM.EncodableMap key value
-    addAll value = foldr (\key map -> EM.insert key value map)
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart :: Partial => AST.StateQualifiedPart -> PhaseThree Unit
@@ -520,38 +517,54 @@ handlePostponedStateQualifiedParts = do
         -- | Modifies the DomeinFile in PhaseTwoState.
         modifyAllStates :: AutomaticAction -> Array RoleType -> Array StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> PhaseThree Unit
         modifyAllStates automaticAction qualifiedUsers states currentDomain mobjectQfd = for_ states
-          (modifyPartOfState start end
-            \(sr@{automaticOnEntry, automaticOnExit, query}) -> do
-              query' <- case query of
-                Q q -> pure $ Q q
-                S stp -> do
-                  -- This is the state query (condition). It can belong to either a role- or a context state.
-                  -- A context state may have:
-                  --    * origin, for which we may specify an identity step.
-                  --    * currentcontext == origin.
-                  -- Role states are only defined in the lexical scope of enumerated roles! Consequently, we'll just
-                  -- have to deal with the ExplicitRole constructor of RoleIdentification and we know that its RoleType
-                  -- must be enumerated.
-                  -- A role state may have:
-                  --    * origin, to be derived from the RoleIdentification in either SubjectState or ObjectState,
-                  --    * currentcontext = origin >> context but which can be read directly from the RoleIdentification.
-                  expressionWithEnvironment <- pure $ addContextualBindingsToExpression
-                    [ computeCurrentContext (transition2stateSpec transition) start
-                    , computeOrigin (transition2stateSpec transition) start]
-                    stp
-                  Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
-              case transition of
-                AST.Entry _ -> pure $ sr
-                  { automaticOnEntry = addAll
-                      automaticAction                   -- value
-                      automaticOnEntry                  -- EM.EncodableMap key value
-                      qualifiedUsers                    -- Array Key
-                  , query = query'
-                  , object = mobjectQfd}
-                AST.Exit _ -> pure $ sr
-                  { automaticOnExit = addAll automaticAction automaticOnExit qualifiedUsers
-                  , query = query'
-                  , object = mobjectQfd})
+          \stateId -> isUpstreamModelState stateId >>= if _
+          -- TODO. #16 Make the effect conditional on the specialised stateful object, rather than the general object.
+            then modifyDF 
+              (addUpstreamAutomaticEffect 
+                (UpstreamAutomaticEffect
+                  { stateId
+                  , automaticAction
+                  , qualifiedUsers
+                  , isOnEntry: 
+                    case transition of 
+                      AST.Entry _ -> true
+                      _ -> false
+                  }) stateId)
+            else (modifyPartOfState 
+              start 
+              end
+              (\(sr@{automaticOnEntry, automaticOnExit, query}) -> do
+                query' <- case query of
+                  Q q -> pure $ Q q
+                  S stp -> do
+                    -- This is the state query (condition). It can belong to either a role- or a context state.
+                    -- A context state may have:
+                    --    * origin, for which we may specify an identity step.
+                    --    * currentcontext == origin.
+                    -- Role states are only defined in the lexical scope of enumerated roles! Consequently, we'll just
+                    -- have to deal with the ExplicitRole constructor of RoleIdentification and we know that its RoleType
+                    -- must be enumerated.
+                    -- A role state may have:
+                    --    * origin, to be derived from the RoleIdentification in either SubjectState or ObjectState,
+                    --    * currentcontext = origin >> context but which can be read directly from the RoleIdentification.
+                    expressionWithEnvironment <- pure $ addContextualBindingsToExpression
+                      [ computeCurrentContext (transition2stateSpec transition) start
+                      , computeOrigin (transition2stateSpec transition) start]
+                      stp
+                    Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
+                case transition of
+                  AST.Entry _ -> pure $ sr
+                    { automaticOnEntry = addAll
+                        automaticAction                   -- value
+                        automaticOnEntry                  -- EM.EncodableMap key value
+                        qualifiedUsers                    -- Array Key
+                    , query = query'
+                    , object = mobjectQfd}
+                  AST.Exit _ -> pure $ sr
+                    { automaticOnExit = addAll automaticAction automaticOnExit qualifiedUsers
+                    , query = query'
+                    , object = mobjectQfd})
+              stateId)
 
     -- Compiles and distributes all expressions in the message.
     -- See extensive comments in the case AutomaticEffectE.
@@ -599,31 +612,39 @@ handlePostponedStateQualifiedParts = do
           -- | Modifies the DomeinFile in PhaseTwoState.
           modifyAllStates :: Notification -> Array RoleType -> Array StateIdentifier -> Domain -> Maybe QueryFunctionDescription -> PhaseThree Unit
           modifyAllStates notification qualifiedUsers states currentDomain mobjectQfd= for_ states
-            \stateId -> modifyPartOfState
-              start
-              end
-              (\(sr@{notifyOnEntry, notifyOnExit, query}) -> do
-                -- Compile the query if we've not done it before.
-                query' <- case query of
-                  Q q -> pure $ Q q
-                  S stp -> do
-                    expressionWithEnvironment <- pure $ addContextualBindingsToExpression
-                      [ computeCurrentContext (transition2stateSpec transition) start
-                      , computeOrigin (transition2stateSpec transition) start]
-                      stp
-                    Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
-                case transition of
-                  AST.Entry _ -> pure $ sr
-                    { notifyOnEntry = addAll notification notifyOnEntry qualifiedUsers
-                    , query = query'
-                    , object = mobjectQfd
-                    }
-                  AST.Exit _ -> pure $ sr
-                    { notifyOnExit = addAll notification notifyOnExit qualifiedUsers
-                    , query = query'
-                    , object = mobjectQfd
-                    })
-              stateId
+            \stateId -> isUpstreamModelState stateId >>= if _
+              then modifyDF (addUpstreamNotification 
+                (UpstreamStateNotification{stateId, notification, qualifiedUsers, isOnEntry: 
+                  case transition of 
+                    AST.Entry _ -> true
+                    _ -> false
+                  }) 
+                stateId)
+              else modifyPartOfState
+                start
+                end
+                (\(sr@{notifyOnEntry, notifyOnExit, query}) -> do
+                  -- Compile the query if we've not done it before.
+                  query' <- case query of
+                    Q q -> pure $ Q q
+                    S stp -> do
+                      expressionWithEnvironment <- pure $ addContextualBindingsToExpression
+                        [ computeCurrentContext (transition2stateSpec transition) start
+                        , computeOrigin (transition2stateSpec transition) start]
+                        stp
+                      Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
+                  case transition of
+                    AST.Entry _ -> pure $ sr
+                      { notifyOnEntry = addAll notification notifyOnEntry qualifiedUsers
+                      , query = query'
+                      , object = mobjectQfd
+                      }
+                    AST.Exit _ -> pure $ sr
+                      { notifyOnExit = addAll notification notifyOnExit qualifiedUsers
+                      , query = query'
+                      , object = mobjectQfd
+                      })
+                stateId
 
           compileSentence :: Domain -> Sentence.Sentence -> ADT QT.RoleInContext -> Array StateIdentifier -> AST.StateSpecification -> PhaseThree Sentence.Sentence
           compileSentence currentDomain (Sentence.Sentence parts) usersInContext states stateSpec = Sentence.Sentence <$> traverse compilePart parts
@@ -1008,6 +1029,7 @@ handlePostponedStateQualifiedParts = do
             }
 
     -- | Modifies the DomeinFile in PhaseTwoState.
+    -- | If the state is not in the Domain, adds a modification for an upstream DomeinFiloe.
     modifyPartOfState :: ArcPosition -> ArcPosition -> (StateRecord -> PhaseThree StateRecord) -> StateIdentifier -> PhaseThree Unit
     modifyPartOfState start end modifyState stateId = do
       mstate <- State.gets _.dfr >>= pure <<< lookup (unwrap stateId) <<< _.states
@@ -1043,6 +1065,15 @@ handlePostponedStateQualifiedParts = do
 
         roleKind :: Partial => StateIdentifier -> PhaseThree RoleKind
         roleKind (StateIdentifier s) = State.gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
+
+isUpstreamModelState :: StateIdentifier -> PhaseThree Boolean
+isUpstreamModelState (StateIdentifier s) = do
+  thisModel <- State.gets (_._id <<< _.dfr)
+  if s `startsWithSegments` thisModel
+    then pure false
+    else do
+      upstreamModels <- State.gets (map unwrap <<< _.referredModels <<< _.dfr)      
+      pure $ isJust $ find (startsWithSegments s) upstreamModels
 
 objectMustBeRole :: Maybe QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree Unit
 objectMustBeRole qfd start end = case range <$> qfd of
