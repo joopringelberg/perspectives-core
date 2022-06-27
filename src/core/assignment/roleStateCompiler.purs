@@ -55,6 +55,7 @@ import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CompileTimeFacets (addTimeFacets)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
 import Perspectives.Instances.ObjectGetters (boundByRole, contextType, getActiveRoleStates_)
@@ -239,8 +240,7 @@ notify compiledSentence contextGetter roleId = do
       { id: Nothing
       , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
         [sentenceText]
-          -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
-      , binding: Just $ unwrap roleId})
+      , binding: Just $ buitenRol (unwrap currentcontext)})
 
 -- | This function is only called on states that the role was in before. Moreover, it (the role) is no longer in
 -- | the parent state of this state, hence we should exit it. We do not check the condition.

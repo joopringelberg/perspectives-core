@@ -227,7 +227,6 @@ notify compiledSentence contextId = do
       { id: Nothing
       , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
         [sentenceText]
-      -- TODO. Dit is niet zeker. Moeten we niet hier de externe rol van de context van de roleId geven?
       , binding: Just $ unwrap $ externalRole contextId})
 
 -- | This function is only called on states that the context was in before. Moreover, it (the context) is no longer in
