@@ -84,7 +84,7 @@ getUnlinkedRoleInstances rn c = ArrayT $ try ((lift entitiesDatabaseName) >>= \d
 -- | to track it as a dependency.
 contextType :: ContextInstance ~~> ContextType
 contextType cid  = ArrayT $ (lift $ try $ getContextMember (\c -> [context_pspType c]) cid) >>=
-  handlePerspectRolError' "contextType" [] (pure <<< identity)
+  handlePerspectContextError' "contextType" [] (pure <<< identity)
 
 -- TODO. Fix the issue that an unlinked role does not show up for
 -- a public context.

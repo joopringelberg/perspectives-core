@@ -265,14 +265,17 @@ requalifyBindingsToCalculatedRoles = (lift $ State.gets _.dfr) >>= qualifyBindin
   where
     qualifyBindings' :: DomeinFileRecord -> PhaseThree Unit
     qualifyBindings' {enumeratedRoles:eroles, calculatedRoles:croles} = for_ eroles
-      (\(EnumeratedRole rr@{_id, binding, pos}) -> case binding of
-        -- If the binding is to a calculated role, replace it with the roleADT of that calculated role.
-        ST ric -> case lookup (unwrap $ roleInContext2Role ric) croles of
-          Nothing -> pure unit
-          Just crole -> do
-            adt <- lift2 $ roleADT crole
-            modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {binding = adt}) enumeratedRoles})
-        otherwise -> pure unit)
+      (\(EnumeratedRole rr@{_id, binding, pos}) -> do 
+        qbinding <- reduce (qualifyBinding pos) binding
+        if binding == qbinding
+          then pure unit
+          else -- change the role in the domain
+            modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {binding = qbinding}) enumeratedRoles}))
+      where
+        qualifyBinding :: ArcPosition -> QT.RoleInContext -> PhaseThree (ADT QT.RoleInContext)
+        qualifyBinding pos original@(QT.RoleInContext{context,role}) = case lookup (unwrap role) croles of
+          Nothing -> pure $ ST original
+          Just crole -> lift2 $ roleADT crole
 
 -- | Qualify the references to Properties in each View.
 -- | Note that we need the DomeinFile with qualified bindings in the cache
