@@ -29,18 +29,15 @@ domain BodiesWithAccounts
 
   case Body
 
-    user Test
-      property UserName (String)
-
     -- Admin can always create and fill Accounts and see the UserName.
     user Admin filledBy sys:PerspectivesSystem$User
       aspect bwa:WithCredentials
 
       perspective on Accounts
-        only (Create, Fill, CreateAndFill, Remove)
-        props (UserName, FirstName, LastName) verbs (SetPropertyValue, Consult)
+        only (Create, Fill, Remove)
+        props (UserName, FirstName, LastName) verbs (SetPropertyValue)
 
-        -- We limit visibility of the Password to the situation that it
+        -- We limit visibility of the Password to the (initial) situation that it
         -- does not exist.
         -- When Accounts reset their password, Admin is duly not informed.
         in object state IsFilled$NoPassword
@@ -94,7 +91,7 @@ domain BodiesWithAccounts
 
         -- Use this state to provide perspectives on the various
         -- things that are hidden for non-members.
-        -- This has to be done in the specialisations of this User role.
+        -- This has to be done in the specialisations of Accounts.
         state Accepted = IsAccepted
           -- An Account can see just himself and can decide to be no longer
           -- a member, by removing himself from the role.
@@ -103,10 +100,6 @@ domain BodiesWithAccounts
             props (IsAccepted, UserName, Password) verbs (Consult)
             selfonly
 
-        -- Specialise this state to allow the Admin to set the password.
-        -- (Copy it and give it a body)
         state NoPassword = not exists Password
 
-        -- Specialise this state to make Accounts reset their password.
-        -- (Copy it and give it a body)
         state ResetPassword = not PasswordReset
