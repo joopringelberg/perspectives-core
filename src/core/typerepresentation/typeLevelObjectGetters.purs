@@ -244,6 +244,7 @@ aspectsOfRole :: EnumeratedRoleType ~~~> EnumeratedRoleType
 aspectsOfRole = ArrayT <<< (getPerspectType >=> map (map roleInContext2Role) <<< roleAspects)
 
 -- | All types of the role, including the root type itself.
+-- | No doubles.
 roleAspectsClosure :: EnumeratedRoleType ~~~> EnumeratedRoleType
 roleAspectsClosure = closure_ aspectsOfRole
 

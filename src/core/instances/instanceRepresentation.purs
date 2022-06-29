@@ -102,6 +102,7 @@ instance revisionPerspectContext :: Revision PerspectContext where
 -----------------------------------------------------------
 newtype PerspectRol = PerspectRol RolRecord
 
+-- TODO. #17 Represent the closure of aspects directly on the type.
 type RolRecord =
   { _id :: RoleInstance
   , pspType :: EnumeratedRoleType
