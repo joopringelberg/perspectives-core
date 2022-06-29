@@ -24,12 +24,14 @@ module Perspectives.Deltas where
 
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (elemIndex, insertAt, length, nub, snoc, union)
+import Data.Array (catMaybes, elemIndex, foldl, insertAt, length, nub, snoc, union)
 import Data.DateTime.Instant (toDateTime)
+import Data.Map (insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (over)
-import Data.Traversable (for_)
+import Data.Traversable (for, for_)
 import Data.TraversableWithIndex (forWithIndex)
+import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Foreign.Generic (encodeJSON)
@@ -37,13 +39,11 @@ import Foreign.Object (Object, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.Stomp (sendToTopic)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##=))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.Combinators (filter)
-import Perspectives.Instances.ObjectGetters (bottom, getProperty, hasType, roleType_)
+import Perspectives.Instances.ObjectGetters (bottom_, getProperty, roleType_)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Url, addDocument)
 import Perspectives.Persistent (postDatabaseName)
@@ -51,14 +51,14 @@ import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), DomeinFileId(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (>=>), (>>>), not, eq, (==))
+import Prelude (Unit, bind, discard, eq, flip, not, pure, show, unit, void, ($), (<$>), (<>), (==), (>>>))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -120,10 +120,10 @@ type TransactionPerUser = Object TransactionForPeer
 -- | This function builds a custom version of the Transaction for each such user.
 -- | `users` in DeltaInTransaction will not always be model:System$PerspectivesSystem$User instances.
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
-transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas}) = do
+transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas, userRoleBottoms}) = do
   execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do
-      sysUsers <- lift (unit ##= filter ((\_ -> ArrayT (pure users)) >=> bottom) (hasType (EnumeratedRoleType "model:System$PerspectivesSystem$User")) )
-      addDeltaToCustomisedTransactie delta (nub sysUsers))
+    sysUsers <- pure $ catMaybes (flip Map.lookup userRoleBottoms <$> users)
+    addDeltaToCustomisedTransactie delta (nub sysUsers))
     empty
   where
     addDeltaToCustomisedTransactie :: SignedDelta -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
@@ -144,19 +144,26 @@ addDomeinFileToTransactie dfId = AA.modify (over Transaction \(t@{changedDomeinF
 
 -- | Add the delta at the end of the array, unless it is already in the transaction!
 addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
-addDelta dt =
-  AA.modify (over Transaction \t@{deltas} -> t {deltas =
-    if isJust $ elemIndex dt deltas
-      then deltas
-      else snoc deltas dt})
+addDelta dt@(DeltaInTransaction{users}) = do
+  newUserBottoms <- lift (for users \user -> Tuple user <$> bottom_ user)  
+  AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
+    { deltas =
+      if isJust $ elemIndex dt deltas
+        then deltas
+        else snoc deltas dt
+    , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms
+    })
 
 -- | Insert the delta at the index, unless it is already in the transaction.
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
-insertDelta dt i =
-  AA.modify (over Transaction \t@{deltas} -> t {deltas =
-    if isJust $ elemIndex dt deltas
-      then deltas
-      else unsafePartial $ fromJust $ insertAt i dt deltas})
+insertDelta dt@(DeltaInTransaction{users}) i = do
+  newUserBottoms <- lift (for users \user -> Tuple user <$> bottom_ user)  
+  AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
+    { deltas =
+      if isJust $ elemIndex dt deltas
+        then deltas
+        else unsafePartial $ fromJust $ insertAt i dt deltas
+    , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms})
 
 -- | Instrumental for QUERY UPDATES.
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit

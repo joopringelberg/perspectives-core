@@ -25,21 +25,23 @@ module Perspectives.Sync.Transaction where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
+
 import Data.Array (length, null, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
+import Data.Map (Map, empty)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import Foreign.Class (class Decode, class Encode, decode, encode)
+import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..), DomeinFileId)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId, RoleType)
 import Perspectives.ScheduledAssignment (ScheduledAssignment)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
@@ -65,6 +67,7 @@ newtype Transaction = Transaction (TransactionRecord
   -- resources in the next two members.
   , untouchableContexts :: Array ContextInstance
   , untouchableRoles :: Array RoleInstance
+  , userRoleBottoms :: Map RoleInstance RoleInstance
   ))
 
 type TransactionRecord f =
@@ -85,16 +88,16 @@ derive instance newtypeTransactie :: Newtype Transaction _
 instance showTransactie :: Show Transaction where
   show = genericShow
 
-instance encodeTransactie :: Encode Transaction where
-  encode (Transaction{author, timeStamp, deltas, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, deltas, changedDomeinFiles})
+-- instance encodeTransactie :: Encode Transaction where
+--   encode (Transaction{author, timeStamp, deltas, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, deltas, changedDomeinFiles})
 
 instance encodeTransactie' :: Encode Transaction' where
   encode = genericEncode defaultOptions
 
-instance decodeTransactie :: Decode Transaction where
-  decode f = do
-    ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- decode f
-    pure $ Transaction{author, timeStamp, deltas, changedDomeinFiles, scheduledAssignments: [], invertedQueryResults: [], correlationIdentifiers: [], authoringRole: ENR $ EnumeratedRoleType "model:System$PerspectivesContext$User", rolesToExit: [], modelsToBeRemoved: [], createdContexts: [], createdRoles: [], untouchableRoles: [], untouchableContexts: []}
+-- instance decodeTransactie :: Decode Transaction where
+--   decode f = do
+--     ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- decode f
+--     pure $ Transaction{author, timeStamp, deltas, changedDomeinFiles, scheduledAssignments: [], invertedQueryResults: [], correlationIdentifiers: [], authoringRole: ENR $ EnumeratedRoleType "model:System$PerspectivesContext$User", rolesToExit: [], modelsToBeRemoved: [], createdContexts: [], createdRoles: [], untouchableRoles: [], untouchableContexts: []}
 
 instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
@@ -116,6 +119,7 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , createdRoles: createdRoles <> cr
       , untouchableRoles: if length untouchableRoles > length ur then untouchableRoles else ur
       , untouchableContexts: if length untouchableContexts > length uc then untouchableContexts else uc
+      , userRoleBottoms: empty
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
@@ -145,6 +149,7 @@ createTransaction authoringRole author =
       , createdRoles: []
       , untouchableContexts: []
       , untouchableRoles: []
+      , userRoleBottoms: empty
     }
 
 cloneEmptyTransaction :: Transaction -> Transaction
@@ -163,6 +168,7 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchabl
   , createdRoles: []
   , untouchableRoles
   , untouchableContexts
+  , userRoleBottoms: empty
 }
 
 -- | We consider a Transaction to be 'empty' when it shows no difference to the clone of the original.

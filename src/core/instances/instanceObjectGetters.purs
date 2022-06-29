@@ -190,6 +190,13 @@ bottom r = ArrayT do
     Nothing -> pure [r]
     Just b -> runArrayT $ bottom b
 
+bottom_ :: RoleInstance -> MP RoleInstance
+bottom_ r = do
+  (mbinding :: Maybe RoleInstance) <- binding_ r
+  case mbinding of
+    Nothing -> pure r
+    Just b -> bottom_ b
+
 -- | From the instance of a Role (fillerId) of any kind, find the instances of the Role of the given
 -- | type (filledId) that are filled with it. The type of rname (EnumeratedRoleType) may
 -- | be psp:Context$externalRole.
