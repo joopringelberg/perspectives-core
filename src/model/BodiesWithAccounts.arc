@@ -64,7 +64,6 @@ domain BodiesWithAccounts
       aspect bwa:WithCredentials
       property IsAccepted (Boolean)
       property IsRejected (Boolean)
-      property PasswordReset (Boolean)
 
       -- We add this perspective to enable synchronisation between
       -- Admin and Accounts.
@@ -101,5 +100,3 @@ domain BodiesWithAccounts
             selfonly
 
         state NoPassword = not exists Password
-
-        state ResetPassword = not PasswordReset

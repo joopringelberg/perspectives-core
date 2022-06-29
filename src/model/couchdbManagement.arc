@@ -30,12 +30,13 @@ domain CouchdbManagement
         only (CreateAndFill)
         props (Name, Url) verbs (Consult)
       -- Manager needs this perspective for others to accept Admins created in state NoAdmin.
+      -- NOTE that model:TopContext can be used as Aspect instead.
       perspective on CouchdbServers >> binding >> context >> CouchdbServer$Admin
         only (Create, Fill)
 
     -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
     -- filled with CouchdbManagementApp$Admin.
-    context CouchdbServers filledBy CouchdbServer
+    context CouchdbServers (relational) filledBy CouchdbServer
       state NoAdmin = not exists binding >> context >> CouchdbServer$Admin
         on entry
           do for Manager
@@ -60,6 +61,7 @@ domain CouchdbManagement
             bind origin to CouchdbServers in cm:MyCouchdbApp
           notify Accounts
             "You now have an account with CouchdbServer {Name}"
+
     -- This role should be in private space.
     -- Admin in Couchdb of a particular server.
     user Admin filledBy CouchdbManagementApp$Manager
@@ -69,13 +71,11 @@ domain CouchdbManagement
       -- TODO. Remove this as soon as we do not need the view anymore for the GUI.
       view AdminProps (UserName, Password)
 
-      perspective on CouchdbServer$Accounts
-        props (ToBeRemoved) verbs (Consult, SetPropertyValue)
-
       perspective on Repositories
         defaults
 
       -- The Admin should be able to create and fill the Repository$Admin.
+      -- NOTE that model:TopContext can be used as Aspect instead.
       perspective on Repositories >> binding >> context >> Repository$Admin
         defaults
 
@@ -86,6 +86,15 @@ domain CouchdbManagement
 
       perspective on extern
         defaults
+      
+      screen "Couchdb Server"
+        tab "Extern"
+          row
+            form External
+        tab "Repositories"
+          row 
+            table Repositories
+
 
     -- Note that the aspect acc:Body introduces a Guest role
     -- with a perspective that allows it to create an Account.
@@ -94,37 +103,32 @@ domain CouchdbManagement
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       aspect acc:Body$Accounts
 
-      -- We want to be able to use the state acc:Body$Accounts$IsFilled.
-      state IsFilled = exists binding
-        on entry
-          do for Admin
-            letA
-                pw <- callExternal util:GenSym() returns String
-            in
-              callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
-              -- The Password property comes from the aspect acc:Body$Accounts.
-              Password = pw
-              --IsAccepted = true
+      -- Our execution model allows us to query the entire intact structure in the 
+      -- actions on exit, before the role is actually detached and removed.
+      on exit of acc:Body$Accounts$IsFilled
+        do for Admin
+          callEffect cdb:DeleteUser( context >> extern >> Url, binding )
 
-      state Remove = ToBeRemoved
-        on entry
-          do for Admin
-            callEffect cdb:DeleteUser( context >> extern >> Url, binding )
-            remove role origin
-
-      state Resetpassword = PasswordReset
-        on entry
-          do
-            -- After CouchdbServer$Admin provides the first password, he no longer
-            -- has a perspective on it. The new value provided below is thus really private.
-            letA
+      -- Currently, we automatically accept an applicant.
+      on entry of subject state acc:Body$Accounts$IsFilled
+        do for Admin
+          letA
               pw <- callExternal util:GenSym() returns String
-            in
-              callEffect cdb:ResetPassword( context >> extern >> Url, UserName, pw )
-              PasswordReset = true
-              Password = pw
+          in
+            callEffect cdb:CreateUser( context >> extern >> Url, binding, pw )
+            -- The Password property comes from the aspect acc:Body$Accounts.
+            Password = pw
+            IsAccepted = true
 
-      property ToBeRemoved (Boolean)
+      perspective on Accounts
+        action ResetPassword
+          -- After CouchdbServer$Admin provides the first password, he no longer
+          -- has a perspective on it. The new value provided below is thus really private.
+          letA
+            pw <- callExternal util:GenSym() returns String
+          in
+            callEffect cdb:ResetPassword( context >> extern >> Url, UserName, pw )
+            Password = pw
 
       action RequestRepository
         letA
@@ -147,8 +151,13 @@ domain CouchdbManagement
     -- Moreover, as a side effect, both a read- and write database are created
     -- in Couchdb and the write database replicates to the read database.
     context Repositories (relational) filledBy Repository
-      --storage public
-      property ToBeRemoved (Boolean)
+      on exit of IsNamed
+        do for Admin
+          callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
+          callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
+          callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
+          remove role binding >> context >> Repository$Admin
+
       -- Note that as it stands, an Account can unconditionally create a new
       -- Repository. Add a Boolean that represents the Admin's consent.
       state IsNamed = exists Name
@@ -162,13 +171,6 @@ domain CouchdbManagement
           on entry
             do for Admin
               create role Admin in binding >> context
-      state Remove = ToBeRemoved
-        on entry
-          do for Admin
-            callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
-            callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
-            callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
-            remove role binding >> context >> Repository$Admin
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -189,25 +191,25 @@ domain CouchdbManagement
       -- Should also be able to give them read access to the repo,
       -- and to retract that again.
       aspect acc:Body$Admin
-      state IsFilled = (exists binding) and exists context >> extern >> Url
-        on entry
-          do for ServerAdmin
-            -- Only the CouchdbServer$Admin has a Create and Fill perspective on
-            -- Repository$Admin. So when this state arises, we can be sure that
-            -- the current user is, indeed, a CouchdbServer$Admin.
-            -- Hence the PDR will authenticate with Server Admin credentials.
-            letA
-              url <- context >> extern >> binder Repositories >> context >> extern >> Url
-            in
-              callEffect cdb:MakeAdminOfDb( url, context >> extern >> Name + "_write", UserName )
-              callEffect cdb:MakeAdminOfDb( url, context >> extern >> Name + "_read", UserName )
-      state Remove = ToBeRemoved
-        on entry
-          do for ServerAdmin
-            callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
-            callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
-            remove role origin
-      property ToBeRemoved (Boolean)
+
+      on exit of acc:Body$Accounts$IsFilled
+        do for ServerAdmin
+          callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
+          callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
+          remove role origin
+
+      -- state IsFilled = (exists binding) and exists context >> extern >> Url
+      on entry of acc:Body$Accounts$IsFilled
+        do for ServerAdmin
+          -- Only the CouchdbServer$Admin has a Create and Fill perspective on
+          -- Repository$Admin. So when this state arises, we can be sure that
+          -- the current user is, indeed, a CouchdbServer$Admin.
+          -- Hence the PDR will authenticate with Server Admin credentials.
+          letA
+            url <- context >> extern >> binder Repositories >> context >> extern >> Url
+          in
+            callEffect cdb:MakeAdminOfDb( url, context >> extern >> Name + "_write", UserName )
+            callEffect cdb:MakeAdminOfDb( url, context >> extern >> Name + "_read", UserName )
 
       -- The admin can also create an Author and give him/her the right to add and
       -- remove models to the repo.
@@ -221,7 +223,16 @@ domain CouchdbManagement
     -- This role should be stored in private space.
     -- TODO. Is het mogelijk ook deze rol het aspect acc:Body$Accounts te geven?
     -- Guest kan dan kiezen of hij een Account wil, of een Author wil worden.
-    user Authors filledBy CouchdbServer$Accounts, CouchdbServer$Admin
+    user Authors (relational) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
+      on exit of IsFilled
+        do for Admin
+          letA
+            url <- context >> extern >> binder Repositories >> context >> extern >> Url
+          in
+            callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_write", binding >> UserName)
+            callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_read", binding >> UserName)
+            remove role origin
+
       state IsFilled = exists binding
         on entry
           do for Admin
@@ -232,22 +243,6 @@ domain CouchdbManagement
             in
               callEffect cdb:MakeMemberOf( url, context >> extern >> Name + "_write", binding >> UserName )
               callEffect cdb:MakeMemberOf( url, context >> extern >> Name + "_read", binding >> UserName )
-      state Remove = ToBeRemoved
-        on entry
-          do for Admin
-            letA
-              url <- context >> extern >> binder Repositories >> context >> extern >> Url
-            in
-              callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_write", binding >> UserName)
-              callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_read", binding >> UserName)
-              remove role origin
-
-      -- Admin can set this to true to remove the Author from the Repository.
-      -- By using this mechanism instead of directly removing the role,
-      -- we can remove the Author from the write-db.
-      property ToBeRemoved (Boolean)
-
-      view AuthorForAdmin (FirstName, LastName, ToBeRemoved)
 
       -- The Authors can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
@@ -258,20 +253,20 @@ domain CouchdbManagement
     -- No further credentials are needed to access a Repository.
     -- This is because, in Couchdb, access to a database can be determined
     -- through (Couchdb database) roles or by membership.
-    user Accounts filledBy CouchdbServer$Accounts, CouchdbServer$Admin
+    user Accounts (relational) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
       aspect acc:Body$Accounts
-      property ToBeRemoved (Boolean)
+      on exit of IsFilled
+        do for Admin
+          callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
+          remove role origin
+      
       state IsFilled = exists binding
         on entry
           do for Admin
             -- As only the PDR of a user with role Repository$Admin will execute this,
             -- and Repository$Admin is a Db Admin, this will be allowed.
             callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName )
-      state Remove = ToBeRemoved
-        on entry
-          do for Admin
-            callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
-            remove role origin
+      
       state Accepted = IsAccepted
         -- An account that is accepted has a perspective on available models.
         perspective on AvailableModels
