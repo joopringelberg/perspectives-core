@@ -90,6 +90,8 @@ domain System
           row
             form User
               props (FirstName, LastName) verbs (SetPropertyValue)
+          row 
+            table Contacts
         tab "Invitations"
           row
             table PendingInvitations
