@@ -53,6 +53,7 @@ import Perspectives.Types.ObjectGetters (isMandatory_, isRelational_)
 -- Modify EnumeratedRoles by inferring the following from their aspects:
 --    * If an Aspect is relational, make the role relational, too.
 --    * If an Aspect is mandatory, make the role relational, too.
+--    * Add the restrictions on fillers from Aspects to that of the role.
 inferFromAspectRoles :: PhaseThree Unit
 inferFromAspectRoles = do
   df@{_id} <- lift $ State.gets _.dfr

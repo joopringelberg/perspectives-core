@@ -2,6 +2,7 @@ module Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Control.Monad.Except (Except, runExcept, throwError)
 import Control.Monad.State (StateT, evalStateT, execStateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
@@ -29,6 +30,7 @@ import Perspectives.Query.QueryTypes (Domain(..), RoleInContext, domain2roleInCo
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrGeneralisesADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs, StateSpec)
@@ -62,14 +64,14 @@ contextualisePerspectives = do
       else do
         -- As contextualising requires other EnumeratedRoles that may by now have been 
         -- changed in PhaseTwoState, always retrieve the aspects again from PhaseTwoState!
-        -- Only the current role has not yet been modified and can be used as is.
+        -- Only the current role has not yet been modified and can be used as is (because of topological ordering).
         userRoleAspects <- catMaybes <$> traverse getRole roleAspects
         -- Enrich the user role's perspectives with the perspectives of his aspects.
         perspectives' <- traverse (contextualisePerspective userRoleAspects) perspectives
         -- The roles in the context that are taken as is from context aspects.
         aspectObjectRolesInContext <- lift $ lift (context ###= aspectRoles)
         -- If an Aspect user role has a perspective on an (Aspect) role that has
-        -- been added as is to the user's context, add that perspective to the 
+        -- been added _as is_ to the user's context, add that perspective to the 
         -- user's perspectives.
         aspectPerspectives <- pure $ execWriter (for_ userRoleAspects (writePerspectiveOnAddedRole aspectObjectRolesInContext))
         rolesWithAspects <- collectRolesWithAspects context
@@ -77,6 +79,7 @@ contextualisePerspectives = do
         -- specialised in the context, where the user does not have a perspective on that 
         -- specialisation, contextualise the perspective (replace its object with the specialised role(s))
         -- and add it to the user role.
+        -- We can safely use `perspectives` instead of the enriched `perspectives'`, because we only use the object and that hasn't changed.
         contextualisedAspectPerspectives <- pure $ execWriter (for_ userRoleAspects (writeContextualisedPerspective context perspectives rolesWithAspects))
         
         saveRole (EnumeratedRole r {perspectives = perspectives' <> aspectPerspectives <> contextualisedAspectPerspectives})
@@ -85,7 +88,11 @@ contextualisePerspectives = do
     saveRole r = (modifyDF \(dfr@{enumeratedRoles}) -> dfr {enumeratedRoles = insert (identifier_ r) r enumeratedRoles}) *> pure r
 
     getRole :: QT.RoleInContext -> PhaseThree (Maybe EnumeratedRole)
-    getRole (QT.RoleInContext{role}) = getsDF \{enumeratedRoles} -> lookup (unwrap role) enumeratedRoles
+    getRole (QT.RoleInContext{role}) = do
+      mRole <- (getsDF \{enumeratedRoles} -> lookup (unwrap role) enumeratedRoles) 
+      case mRole of 
+        Nothing -> lift $ lift $ Just <$> getEnumeratedRole role
+        _ -> pure mRole
 
     -- Write an aspect user role perspective (unmodified) if its object generalises (or is equal to) one of the aspect roles that were added to the context (potentalObjects).
     writePerspectiveOnAddedRole :: Array EnumeratedRoleType -> EnumeratedRole -> Writer (Array Perspective) Unit
@@ -200,6 +207,7 @@ contextualisePerspectives = do
 type AspectRole = EnumeratedRoleType
 type RolesWithAspects = Map.Map EnumeratedRoleType (Array AspectRole)
 
+-- A Map of EnumeratedRoleTypes in the context (including the external role) and each of their Aspect roles.
 collectRolesWithAspects :: ContextType -> PhaseThree RolesWithAspects
 collectRolesWithAspects ct = do
   allEnumeratedRolesInContext <- lift $ lift (ct ###= allEnumeratedRoles)
