@@ -74,7 +74,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
-import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||), (<#>))
+import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||), (<#>), (<=))
 import Unsafe.Coerce (unsafeCoerce)
 
 lift2MPQ :: forall a. MP a -> MPQ a
@@ -195,7 +195,7 @@ interpret (BQD _ (BinaryCombinator BindsF) sourceOfBindingRoles sourceOfBoundRol
   (boundRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfBindingRoles a
   -- bindingRoles and boundRoles must be functional.
   case head bindingRoles, head boundRoles of
-    Just bindingRolesh, Just boundRolesh | length bindingRoles == 1 && length boundRoles == 1 ->
+    Just bindingRolesh, Just boundRolesh | length bindingRoles <= 1 && length boundRoles <= 1 ->
       case bindingRolesh.head, boundRolesh.head of
         R bindingRole, R boundRole -> do
           result <- lift (boundRole ##>> (bindsRole bindingRole))
@@ -204,7 +204,11 @@ interpret (BQD _ (BinaryCombinator BindsF) sourceOfBindingRoles sourceOfBoundRol
                 , supportingPaths: allPaths bindingRolesh `union` allPaths boundRolesh
                 }]
         _, _ -> throwError (error $ "'binds' expects two roles, but got: " <> show bindingRolesh.head <> " and " <> show boundRolesh.head)
-    _, _ -> throwError (error $ "'binds' expects a single role instance on both the left and right side")
+    Just bindingRolesh, Just boundRolesh -> throwError (error $ "'binds' expects at most a single role instance on both the left and right side")
+    _, _ -> pure [{ head: (V "" (Value "false"))
+                , mainPath: Nothing
+                , supportingPaths: []
+                }]
 
 -- The compiler only allows f1 and f2 if they're functional.
 interpret (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [EqualsF, NotEqualsF] = ArrayT do
@@ -239,7 +243,7 @@ interpret (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g [L
 interpret (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [AndF, OrF] = ArrayT do
   -- Both are singleton arrays, or empty.
   (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
-  fr2 <- runArrayT (interpret f1 a)
+  fr2 <- runArrayT (interpret f2 a)
   case head fr1, head fr2 of
     Just fr1h, Just fr2h -> do
       bfunction <- if g == AndF then pure (&&) else pure (||)
@@ -453,6 +457,7 @@ getDynamicPropertyGetter p rid = do
         Nothing -> empty
         Just bnd' -> (flip snocOnMainPath (R roleInstance)) <$> getDynamicPropertyGetter p bnd'
 
+-- NOTE. HOW do we handle no results?
 -- | From a PropertyType, retrieve or construct a function to get values for that Property from a Role instance.
 -- | Returns a List with (R roleId) as its last dependency, (V "SomeProperty" "value") as its first dependency.
 getterFromPropertyType :: PropertyType -> RoleInstance ~~> DependencyPath
@@ -460,7 +465,7 @@ getterFromPropertyType :: PropertyType -> RoleInstance ~~> DependencyPath
 getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) roleId = ArrayT do
   (vals :: Array Value) <- lift (roleId ##= getProperty ep)
   case head vals of
-    Nothing -> pure $ [singletonPath $ R roleId]
+    Nothing -> pure []
     otherwise -> pure ((V id <$> vals) <#> \dep -> consOnMainPath dep (singletonPath $ R roleId))
 getterFromPropertyType (CP cp@(CalculatedPropertyType id)) roleId =
   (lift $ lift $ getPerspectType cp) >>=

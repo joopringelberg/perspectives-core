@@ -76,8 +76,8 @@ domain CouchdbManagement
 
       -- The Admin should be able to create and fill the Repository$Admin.
       -- NOTE that model:TopContext can be used as Aspect instead.
-      perspective on Repositories >> binding >> context >> Repository$Admin
-        defaults
+      -- perspective on Repositories >> binding >> context >> Repository$Admin
+      --   defaults
 
       -- The CouchdbServer$Admin has to be able to enter the credentials that
       -- make him Server admin of the Couchdb installation.
@@ -87,10 +87,17 @@ domain CouchdbManagement
       perspective on extern
         defaults
       
+      perspective on Accounts
+        only (Create, Fill, Remove)
+        props (FirstName, LastName) verbs (Consult)
+      
       screen "Couchdb Server"
         tab "Extern"
           row
             form External
+        tab "Accounts"
+          row
+            table Accounts
         tab "Repositories"
           row 
             table Repositories
@@ -167,10 +174,11 @@ domain CouchdbManagement
             callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_write" )
             callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
         -- Ad Admin may exist already if the Repository is created by Accounts.
-        state NoAdmin = not exists binding >> context >> Repository$Admin
-          on entry
-            do for Admin
-              create role Admin in binding >> context
+        -- state NoAdmin = not exists binding >> context >> Repository$Admin
+        --   on entry
+        --     do for Admin
+        --       -- create role Admin in binding >> context
+        --       bind context >> Admin to Admin in binding >> context
 
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
@@ -185,6 +193,9 @@ domain CouchdbManagement
 
     -- We need the ServerAdmin in this context in order to configure the local Admin.
     user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin
+      perspective on Admin
+        only (Create, Fill, RemoveFiller, Remove)
+        props (FirstName, LastName) verbs (Consult)
 
     user Admin filledBy CouchdbServer$Accounts, CouchdbServer$Admin
       -- As Admin, has a full perspective on Accounts.
