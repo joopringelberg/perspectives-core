@@ -234,6 +234,9 @@ rol_occurrence (PerspectRol{occurrence}) = occurrence
 rol_pspType :: PerspectRol -> EnumeratedRoleType
 rol_pspType (PerspectRol{pspType}) = pspType
 
+rol_allTypes :: PerspectRol -> Array EnumeratedRoleType
+rol_allTypes (PerspectRol{allTypes}) = allTypes
+
 changeRol_type :: String -> PerspectRol -> PerspectRol
 changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = EnumeratedRoleType tp}
 

@@ -125,6 +125,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
 
               then if isDefaultContextDelta contextDelta
                 then f role pe unlinked
+                -- Apparently we've constructed a real ContextDelta before, so do not add a second time.
                 else pure unit
 
               else (lift $ context_rolInContext pe rolName) >>= \(Tuple _ roles) -> 

@@ -25,22 +25,25 @@ module Perspectives.DependencyTracking.Dependency where
 -- | A Dependency is a combination of a resource (ContextInstance or RoleInstance) and a type
 -- | (EnumeratedRoleType, CalculatedRoleType, EnumeratedPropertyType or CalculatedPropertyType).
 -- | However, in the dependency administration we omit these newtypes.
+
 import Prelude
 
-import Data.Array (delete, elemIndex, filter, partition, (:))
+import Data.Array (concat, delete, elemIndex, filter, partition, (:))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
+import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Foreign.Object (Object, insert, lookup, singleton, values)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery, (###=))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.Persistent (class Persistent, entityExists)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..))
+import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
 -- | the computation of the query that delivers the results to the ApiEffect, has changed.
@@ -147,7 +150,10 @@ findResourceDependencies resource = do
 
 -- Find all correlation identifiers for requests of the form `role <TypeOfRole>`.
 findRoleRequests :: ContextInstance -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
-findRoleRequests resource tpe = findDependencies (Tuple (unwrap resource) (unwrap tpe)) >>= \ma -> pure $ maybe [] identity ma
+findRoleRequests resource ert = do
+  allTypes <- ert ###= roleAspectsClosure
+  concat <$> for allTypes \tpe -> 
+    findDependencies (Tuple (unwrap resource) (unwrap tpe)) >>= \ma -> pure $ maybe [] identity ma
 
 -- Find all correlation identifiers for requests of the form `property <TypeOfProperty`
 findPropertyRequests :: RoleInstance -> EnumeratedPropertyType -> MP (Array CorrelationIdentifier)

@@ -37,7 +37,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, context_rolInContext_, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -267,7 +267,10 @@ roleType :: RoleInstance ~~> EnumeratedRoleType
 roleType = ArrayT <<< lift <<< (getRolMember \r -> [rol_pspType r])
 
 roleType_ :: RoleInstance -> MP EnumeratedRoleType
-roleType_ = (getRolMember \r -> rol_pspType r)
+roleType_ = getRolMember rol_pspType
+
+allRoleTypes_ :: RoleInstance -> MP (Array EnumeratedRoleType)
+allRoleTypes_ = getRolMember rol_allTypes
 
 hasType :: EnumeratedRoleType -> RoleInstance ~~> Boolean
 hasType rt rid = ArrayT do

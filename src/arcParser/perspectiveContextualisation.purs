@@ -2,7 +2,6 @@ module Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation where
 
 import Prelude
 
-import Control.Alt ((<|>))
 import Control.Monad.Except (Except, runExcept, throwError)
 import Control.Monad.State (StateT, evalStateT, execStateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
