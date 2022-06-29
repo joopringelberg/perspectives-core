@@ -48,6 +48,7 @@ type SerialisedPerspective' =
   -- The RoleType of the object of the Perspective.
   , roleType :: Maybe String
   , roleKind :: Maybe RoleKind
+  , contextType :: ContextType
   , contextTypesToCreate :: Array ContextType
   , identifyingProperty :: String
   ----

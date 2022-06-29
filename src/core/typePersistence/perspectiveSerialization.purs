@@ -35,11 +35,11 @@ import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..), fst)
 import Foreign.Object (Object, empty, fromFoldable, insert, isEmpty, keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectives)
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectives, (##>>))
 import Perspectives.Data.EncodableMap (lookup) as EM
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (isExternalRole)
-import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
+import Perspectives.Instances.ObjectGetters (contextType, getActiveRoleStates, getActiveStates)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
@@ -159,6 +159,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     >>= pure <<< map (_.context <<< unwrap)
     >>= \as -> lift $ ( (append as) <<< concat <$> (for as (runArrayT <<< getContextAspectSpecialisations)))
   identifyingProperty <- computeIdentifyingProperty serialisedProps roleInstances
+  cType <- lift (cid ##>> contextType)
       
   pure { id
     , displayName
@@ -178,6 +179,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
     , contextTypesToCreate
+    , contextType: cType
     , identifyingProperty
     }
   where
