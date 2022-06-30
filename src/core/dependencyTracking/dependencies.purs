@@ -36,7 +36,7 @@ import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Foreign.Object (Object, insert, lookup, singleton, values)
-import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
+import Perspectives.ApiTypes (ApiEffect, Response(..), CorrelationIdentifier)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery, (###=))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.Persistent (class Persistent, entityExists)
@@ -147,6 +147,9 @@ findResourceDependencies resource = do
   case lookup resource r of
     Nothing -> pure []
     Just typesForResource -> pure $ join $ values typesForResource
+
+findMeRequests :: ContextInstance -> MP (Array CorrelationIdentifier)
+findMeRequests resource = findDependencies (Tuple (unwrap resource) "model:System$Context$Me") >>= \ma -> pure $ maybe [] identity ma
 
 -- Find all correlation identifiers for requests of the form `role <TypeOfRole>`.
 findRoleRequests :: ContextInstance -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)

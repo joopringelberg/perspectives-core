@@ -60,7 +60,7 @@ import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeCon
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>), (##=), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
+import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findMeRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Identifiers (startsWithSegments)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
@@ -97,7 +97,7 @@ setPreferredUserRoleType contextId userRoleTypes = (lift $ try $ getPerspectCont
         Nothing -> cacheAndSave contextId $ changeContext_preferredUserRoleType pe Nothing
         Just ut -> cacheAndSave contextId $ changeContext_preferredUserRoleType pe (Just ut)
       -- QUERY UPDATES.
-      (lift $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+      (lift $ findMeRequests contextId) >>= addCorrelationIdentifiersToTransactie
 
 -----------------------------------------------------------
 -- UPDATE A CONTEXT (ADDING OR REMOVING ROLE INSTANCES)
@@ -144,7 +144,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
       -- Is the new role instance filled by me?
       if isMe
         then do
-          (lift $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+          (lift $ findMeRequests contextId) >>= addCorrelationIdentifiersToTransactie
           -- CURRENTUSER
           cacheAndSave contextId (changeContext_me changedContext (Just roleId))
         else cacheAndSave contextId changedContext
@@ -228,7 +228,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
         case find rol_isMe roles of
           Nothing -> cacheAndSave contextId changedContext
           Just _ -> do
-            (lift $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+            (lift $ findMeRequests contextId) >>= addCorrelationIdentifiersToTransactie
             -- CURRENTUSER.
             -- TODO. Is dit voldoende? Moet er niet een andere rol gevonden worden?
             cacheAndSave contextId (changeContext_me changedContext Nothing)
@@ -470,7 +470,7 @@ setMe cid me = do
     handlePerspectContextError "setMe"
       \ctxt -> do
         cacheAndSave cid (changeContext_me ctxt me)
-        (lift $ findRoleRequests cid (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+        (lift $ findMeRequests cid) >>= addCorrelationIdentifiersToTransactie
 
 getSubject :: MonadPerspectivesTransaction SubjectOfAction
 getSubject = UserType <$> gets (_.authoringRole <<< unwrap)

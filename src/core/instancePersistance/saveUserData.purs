@@ -66,7 +66,7 @@ import Perspectives.CollectAffectedContexts (addRoleObservingContexts, usersWith
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
-import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findResourceDependencies, findRoleRequests)
+import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findMeRequests, findResourceDependencies, findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
@@ -282,7 +282,7 @@ queryUpdatesForRoleRemoval role@(PerspectRol{_id:roleId, pspType:roleType, conte
   cType <- lift (contextId ##>> contextType)
   (lift $ findRoleRequests contextId roleType) >>= addCorrelationIdentifiersToTransactie
   if rol_isMe role
-    then (lift $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me"))
+    then (lift $ findMeRequests contextId)
       >>= addCorrelationIdentifiersToTransactie
     else pure unit
   -- All requests where roleId is the resource of the assumption (its first member) should be added to
@@ -622,7 +622,7 @@ roleIsMe roleId contextId = (lift $ try $ getPerspectContext contextId) >>=
     \ctxt -> (lift $ try $ getPerspectRol roleId) >>=
       handlePerspectRolError "roleIsMe"
         \role -> do
-          (lift $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me"))  >>= addCorrelationIdentifiersToTransactie
+          (lift $ findMeRequests contextId)  >>= addCorrelationIdentifiersToTransactie
           cacheAndSave roleId (changeRol_isMe role true)
           cacheAndSave contextId (changeContext_me ctxt (Just roleId))
 
