@@ -87,8 +87,12 @@ incomingPost = do
             TypeMismatch "receipt" docId -> void $ lift $ deleteDocument postDB docId Nothing
             otherwise -> log ("Perspectives.AMQP.IncomingPost.transactionConsumer: " <> show me)
           Right {body, ack} -> do
-            lift $ executeTransaction body
+            -- NOTE. Transaction execution seems to be so slow, that the connection can be last before we acknowledge.
+            -- In that case, the broker resends the message.
+            -- That is why we acknowledge first.
+            -- The risk is that the PDR may not handle the message fully and then it is lost.
             lift $ acknowledge ack
+            lift $ executeTransaction body
 
     setConnectionState :: Boolean -> MonadPerspectives Unit
     setConnectionState c = do
