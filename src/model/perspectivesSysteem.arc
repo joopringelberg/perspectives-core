@@ -98,7 +98,7 @@ domain System
               props (InviterLastName, Message) verbs (Consult)
 
 
-    user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
+    user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
     context IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
 
@@ -234,8 +234,8 @@ domain System
       aspect sys:PhysicalContext$UserWithAddress
       perspective on Initiator
       perspective on ConnectedPartner
-    user Me = filter (Initiator either ConnectedPartner) with binds sys:Me
-    user You = filter (Initiator either ConnectedPartner) with not binds sys:Me
+    user Me = filter (Initiator either ConnectedPartner) with filledBy sys:Me
+    user You = filter (Initiator either ConnectedPartner) with not filledBy sys:Me
 
   -- This will become obsolete when we start using model:CouchdbManagement.
   case Model
@@ -285,6 +285,6 @@ domain System
         view ForInvitee verbs (Consult)
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
-    user Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
+    user Guest = filter sys:Me with not fills (currentcontext >> Inviter)
       perspective on Invitee
         only (Fill, Create)

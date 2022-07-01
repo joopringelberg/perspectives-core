@@ -511,16 +511,16 @@ compileUnaryStep currentDomain st@(Exists pos s) = do
     CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
     otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs (VDOM PBool Nothing) True True
 
-compileUnaryStep currentDomain st@(Binds pos s) = do
+compileUnaryStep currentDomain st@(FilledBy pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator BindsF) descriptionOfs (VDOM PBool Nothing) True True
+    RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator FilledByF) descriptionOfs (VDOM PBool Nothing) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
 
-compileUnaryStep currentDomain st@(BoundBy pos s) = do
+compileUnaryStep currentDomain st@(Fills pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator BoundByF) descriptionOfs (VDOM PBool Nothing) True True
+    RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator FillsF) descriptionOfs (VDOM PBool Nothing) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
 
 compileUnaryStep currentDomain st@(Available pos s) = do
@@ -567,7 +567,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
           then case (range f1), (range f2) of
             (RDOM _), (RDOM _) -> pure $ BQD
               currentDomain
-              (QF.BinaryCombinator BindsF)
+              (QF.BinaryCombinator FilledByF)
               f1
               f2
               (VDOM PBool Nothing)

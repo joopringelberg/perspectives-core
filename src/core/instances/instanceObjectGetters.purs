@@ -314,67 +314,78 @@ isMe ri = (try $ getPerspectRol ri) >>=
 notIsMe :: RoleInstance -> MP Boolean
 notIsMe = isMe >=> pure <<< not
 
--- | Binding `boundBy` Binder is true,
--- | iff either Binding is the direct binding of Binder, or (binding Binder) `binds` Binding is true.
-boundBy :: (RoleInstance ~~> RoleInstance) ->
-  (RoleInstance ~~> Value)
-boundBy sourceOfBoundRoles binder = ArrayT do
-  (bools :: Array Boolean) <- runArrayT $ (sourceOfBoundRoles >=> bindsRole binder) binder
-  -- If there are no boundRoles, this function must return false.
-  if null bools
-    then pure [Value $ show false]
-    else pure [Value $ show $ ala Conj foldMap bools]
+type Filler = RoleInstance
+type Filled = RoleInstance
 
-boundByOperator :: (RoleInstance ~~> RoleInstance) ->
-  (RoleInstance ~~> RoleInstance) ->
-  (RoleInstance ~~> Value)
-boundByOperator sourceOfBoundRoles sourceOfBindingRoles originRole = ArrayT do
-  boundRoles <- runArrayT (sourceOfBoundRoles originRole)
-  bindingRoles <- runArrayT (sourceOfBindingRoles originRole)
-  case head boundRoles, head bindingRoles of
-    Just boundRole, Just bindingRole | length boundRoles == 1 && length bindingRoles == 1 -> do
-      result <- (unsafePartial fromJust <<< head) <$> (runArrayT $ (bindsRole bindingRole) boundRole)
-      pure [Value $ show result]
-    _, _ -> pure [Value $ show false]
-
-bindsOperator :: (RoleInstance ~~> RoleInstance) ->
-  (RoleInstance ~~> RoleInstance) ->
-  (RoleInstance ~~> Value)
-bindsOperator sourceOfBindingRoles sourceOfBoundRoles = boundByOperator sourceOfBoundRoles sourceOfBindingRoles
-
--- role `bindsRole` bnd'
-bindsRole :: RoleInstance -> RoleInstance ~~> Boolean
-bindsRole role bnd' = ArrayT $
-  if role == bnd'
-    then pure [true]
+-- | filled `filledBy_` filler
+filledBy_ :: Filled -> Filler -> MP Boolean
+filledBy_ filled filler =
+  if filled == filler
+    then pure true
     else do
-      (bs :: Array RoleInstance) <- runArrayT $ binding role
-      case head bs of
-        Nothing -> pure [false]
-        Just b -> runArrayT $ bindsRole b bnd'
+      -- NOTE: binding is: get the filler
+      mfiller <- binding_ filled
+      case mfiller of 
+        Nothing -> pure false
+        Just nextFilled -> nextFilled `filledBy_` filler
 
--- | Binder `binds` Binding is true,
--- | iff either Binding is the direct binding of Binder, or (binding Binder) `binds` Binding is true.
--- | Query syntax: {step-that-produces-binder} >> binds {step-that-produces-binding}
-binds :: (RoleInstance ~~> RoleInstance) ->
+-- | filled ##= filledBy filler
+-- | equals:
+-- | filled `filledBy_` filler
+filledBy :: Filler -> Filled ~~> Boolean
+filledBy filler filled = ArrayT $ do
+  b <- lift (filled `filledBy_` filler)
+  pure [b]
+
+filledByOperator :: (RoleInstance ~~> RoleInstance) ->
+  (RoleInstance ~~> RoleInstance) ->
   (RoleInstance ~~> Value)
-binds sourceOfBindingRoles bnd = ArrayT do
-  (bools :: Array Boolean) <- runArrayT $ (sourceOfBindingRoles >=> boundByRole bnd) bnd
+filledByOperator sourceOfFilledRoles sourceOfFillerRoles = fillsOperator sourceOfFillerRoles sourceOfFilledRoles
+
+
+-- Filler ##= (fillsCombinator (RoleInstance ~~> Filled)) RoleInstance
+fillsCombinator :: (RoleInstance ~~> Filled) ->
+  (Filler ~~> Value)
+fillsCombinator sourceOfFilledRoles filler = ArrayT do
+  (bools :: Array Boolean) <- runArrayT $ (sourceOfFilledRoles >=> filledBy filler) filler
   -- If there are no bindingRoles, this function must return false.
   if null bools
     then pure [Value $ show false]
     else pure [Value $ show $ ala Conj foldMap bools]
 
--- bnd' `boundByRole` role
-boundByRole :: RoleInstance -> RoleInstance ~~> Boolean
-boundByRole bnd' role = ArrayT $
-  if role == bnd'
-    then pure [true]
-    else do
-      (bs :: Array RoleInstance) <- runArrayT $ binding role
-      case head bs of
-        Nothing -> pure [false]
-        Just b -> runArrayT $ boundByRole bnd' b
+-- | filler `fills_` filled
+fills_ :: Filler -> Filled -> MP Boolean
+fills_ = flip filledBy_
+
+-- | filler ##= fills filled
+-- | equals:
+-- | fillef `fills` filled
+fills :: Filler -> Filled ~~> Boolean
+fills filler filled = ArrayT $ do
+  b <- lift (filled `fills_` filler)
+  pure [b]
+  
+fillsOperator :: (RoleInstance ~~> Filled) ->
+  (RoleInstance ~~> Filler) ->
+  (RoleInstance ~~> Value)
+fillsOperator sourceOfFillerRoles sourceOfFilledRoles originRole = ArrayT do
+  fillerRoles <- runArrayT (sourceOfFillerRoles originRole)
+  filledRoles <- runArrayT (sourceOfFilledRoles originRole)
+  case head fillerRoles, head filledRoles of
+    Just fillerRole, Just filledRole | length fillerRoles == 1 && length filledRoles == 1 -> do
+      result <- (unsafePartial fromJust <<< head) <$> (runArrayT $ (fills filledRole) fillerRole)
+      pure [Value $ show result]
+    _, _ -> pure [Value $ show false]
+
+-- Filled ##= (filledByCombinator (RoleInstance ~~> Filler)) RoleInstance
+filledByCombinator :: (RoleInstance ~~> Filled) ->
+  (Filler ~~> Value)
+filledByCombinator sourceOfFillerRoles filled = ArrayT do
+  (bools :: Array Boolean) <- runArrayT $ (sourceOfFillerRoles >=> fills filled) filled
+  -- If there are no bindingRoles, this function must return false.
+  if null bools
+    then pure [Value $ show false]
+    else pure [Value $ show $ ala Conj foldMap bools]
 
 -- subjectForContextInstance :: ContextInstance -> MonadPerspectivesTransaction SubjectOfAction
 -- subjectForContextInstance contextId = do

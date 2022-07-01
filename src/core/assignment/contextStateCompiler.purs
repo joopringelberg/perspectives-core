@@ -57,7 +57,7 @@ import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, Updater, WithA
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
-import Perspectives.Instances.ObjectGetters (boundByRole, contextType, getActiveStates_)
+import Perspectives.Instances.ObjectGetters (filledBy, contextType, getActiveStates_)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -189,7 +189,7 @@ enteringState contextId stateId = do
   case object of
     Nothing -> pure unit
     Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {properties, selfOnly, isSelfPerspective} -> do
-      userInstances <- lift (contextId ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (boundByRole (RoleInstance me))))
+      userInstances <- lift (contextId ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (filledBy (RoleInstance me))))
       case fromArray userInstances of
         Nothing -> pure unit
         Just u' -> serialiseRoleInstancesAndProperties
@@ -208,7 +208,7 @@ whenRightUser :: ContextInstance -> RoleType -> (Array RoleInstance -> Updater C
 whenRightUser contextId allowedUser updater = do
   me <- lift getUserIdentifier
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
-  bools <- lift $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> boundByRole (RoleInstance me)))
+  bools <- lift $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> filledBy (RoleInstance me)))
   if ala Conj foldMap bools
     then updater currentactors contextId
     else pure unit

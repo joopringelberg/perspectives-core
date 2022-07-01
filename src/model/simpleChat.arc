@@ -77,10 +77,10 @@ domain SimpleChat
 
     user Creator = filter sys:Me with not exists currentcontext >> Initiator
 
-    thing PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not binds sys:Me
+    thing PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
-    user Me = filter (Initiator either Partner) with binds sys:Me
-    user You = filter (Initiator either Partner) with not binds sys:Me
+    user Me = filter (Initiator either Partner) with filledBy sys:Me
+    user You = filter (Initiator either Partner) with not filledBy sys:Me
 
     aspect user sys:Invitation$Guest
 

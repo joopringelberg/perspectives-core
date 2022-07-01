@@ -52,7 +52,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, binds, bindsOperator, boundBy, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getFilledRoles, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, externalRole, filledByCombinator, fillsCombinator, fillsOperator, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseBool, parseDate, parseInt)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
@@ -266,10 +266,10 @@ compileFunction (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) = do
   f2' <- compileFunction f2
   pure $ Combinators.disjunction f1' f2'
 
-compileFunction (BQD _ (BinaryCombinator BindsF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) = do
-  sourceOfBindingRoles' <- compileFunction sourceOfBindingRoles
-  sourceOfBoundRoles' <- compileFunction sourceOfBoundRoles
-  pure $ (unsafeCoerce bindsOperator (unsafeCoerce sourceOfBindingRoles') (unsafeCoerce sourceOfBoundRoles'))
+compileFunction (BQD _ (BinaryCombinator FilledByF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) = do
+  sourceOfFilledRoles' <- compileFunction sourceOfBindingRoles
+  sourceOfFillerRoles' <- compileFunction sourceOfBoundRoles
+  pure $ (unsafeCoerce fillsOperator (unsafeCoerce sourceOfFilledRoles') (unsafeCoerce sourceOfFillerRoles'))
 
 compileFunction (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
@@ -318,13 +318,13 @@ compileFunction (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) = do
   f1' <- compileFunction f1
   pure (unsafeCoerce $ exists f1')
 
-compileFunction (UQD _ (UnaryCombinator BindsF) sourceOfBoundRoles _ _ _) = do
+compileFunction (UQD _ (UnaryCombinator FilledByF) sourceOfBoundRoles _ _ _) = do
   sourceOfBoundRoles' <- compileFunction sourceOfBoundRoles
-  pure (unsafeCoerce $ boundBy (unsafeCoerce sourceOfBoundRoles'))
+  pure (unsafeCoerce $ filledByCombinator (unsafeCoerce sourceOfBoundRoles'))
 
-compileFunction (UQD _ (UnaryCombinator BoundByF) f1 _ _ _) = do
+compileFunction (UQD _ (UnaryCombinator FillsF) f1 _ _ _) = do
   f1' <- compileFunction f1
-  pure (unsafeCoerce $ binds (unsafeCoerce f1'))
+  pure (unsafeCoerce $ fillsCombinator (unsafeCoerce f1'))
 
 compileFunction (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) = do
   f1' <- compileFunction f1

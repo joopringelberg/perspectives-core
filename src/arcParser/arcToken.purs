@@ -78,7 +78,6 @@ perspectDef = LanguageDef
                   , "context"
                   , "external"
                   , "properties"
-                  , "filledBy"
                   , "for"
 
                   -- Properties
@@ -160,8 +159,8 @@ perspectDef = LanguageDef
                   , "letA"
                   , "callExternal"
                   , "exists"
-                  , "binds"
-                  , "boundBy"
+                  , "filledBy"
+                  , "fills"
                   , "available"
                   , "with"
                   , "from"

@@ -198,18 +198,18 @@ parseJSDate = try do
   pure $ unsafePerformEffect $ parse s
 
 isUnaryKeyword :: String -> Boolean
-isUnaryKeyword kw = isJust $ elemIndex kw ["not", "exists", "binds", "boundBy", "available"]
+isUnaryKeyword kw = isJust $ elemIndex kw ["not", "exists", "filledBy", "fills", "available"]
 
 unaryStep :: IP Step
 unaryStep = do
-  keyword <- lookAhead reservedIdentifier <?> "not, exists, binds, boundBy or available."
+  keyword <- lookAhead reservedIdentifier <?> "not, exists, filledBy, fills or available."
   case keyword of
     "not" -> (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step))))
     "exists" -> Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
-    "binds" -> Unary <$> (Binds <$> getPosition <*> (reserved "binds" *> (defer \_ -> step)))
-    "boundBy" -> Unary <$> (BoundBy <$> getPosition <*> (reserved "boundBy" *> (defer \_ -> step)))
+    "filledBy" -> Unary <$> (FilledBy <$> getPosition <*> (reserved "filledBy" *> (defer \_ -> step)))
+    "fills" -> Unary <$> (Fills <$> getPosition <*> (reserved "fills" *> (defer \_ -> step)))
     "available" -> Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step)))
-    s -> fail ("Expected not, exists, binds, boundBy or available, but found: '" <> s <> "'.")
+    s -> fail ("Expected not, exists, filledBy, fills or available, but found: '" <> s <> "'.")
 
 operator :: IP Operator
 operator =
@@ -247,12 +247,12 @@ operator =
   <|>
   (Intersection <$> (getPosition <* token.reservedOp "both"))
   <|>
-  (BindsOp <$> (getPosition <* token.reserved "binds"))
+  (BindsOp <$> (getPosition <* token.reserved "filledBy"))
   <|>
   -- NOTICE the trick here: we map "matches" to Compose, so we can use it as an infix operator while it
   -- builds on the result of the previous step.
   (Compose <$> (getPosition <* token.reserved "matches"))
-  ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, either, both, binds"
+  ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, either, both, filledBy"
 
 operatorPrecedence :: Operator -> Int
 operatorPrecedence (Compose _) = 9
@@ -279,7 +279,7 @@ operatorPrecedence (Matches _) = 3
 operatorPrecedence (LogicalAnd _) = 2
 operatorPrecedence (LogicalOr _) = 2
 
--- not, exists, available, binds, boundBy 1
+-- not, exists, available, filledBy, fills 1
 
 operatorPrecedence (Filter _) = 0
 
@@ -315,8 +315,8 @@ startOf stp = case stp of
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
-    startOfUnary (Binds p _) = p
-    startOfUnary (BoundBy p _) = p
+    startOfUnary (FilledBy p _) = p
+    startOfUnary (Fills p _) = p
     startOfUnary (Available p _) = p
 
 
@@ -353,8 +353,8 @@ endOf stp = case stp of
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}
     endOfUnary (Exists (ArcPosition{line, column}) step') = endOf step'
-    endOfUnary (Binds (ArcPosition{line, column}) step') = endOf step'
-    endOfUnary (BoundBy (ArcPosition{line, column}) step') = endOf step'
+    endOfUnary (FilledBy (ArcPosition{line, column}) step') = endOf step'
+    endOfUnary (Fills (ArcPosition{line, column}) step') = endOf step'
     endOfUnary (Available (ArcPosition{line, column}) step') = endOf step'
 
     col_ :: ArcPosition -> Int

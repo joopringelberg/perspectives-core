@@ -55,7 +55,7 @@ import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available', not_)
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, bindsRole, boundByRole, context, contextModelName, contextType, externalRole, getEnumeratedRoleInstances, getProperty, getFilledRoles, getUnlinkedRoleInstances, roleModelName, roleType)
+import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, externalRole, fills, getEnumeratedRoleInstances, getFilledRoles, getProperty, getUnlinkedRoleInstances, roleModelName, roleType)
 import Perspectives.Instances.Values (bool2Value, value2Date, value2Int)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
@@ -98,29 +98,29 @@ interpret (UQD _ WithFrame f1 _ _ _) a = do
 interpret (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) a = ArrayT do
   (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   pure $ (consOnMainPath (V "ExistsF" $ Value (show $ null r))) <$> r
-interpret (UQD _ (UnaryCombinator BindsF) f1 _ _ _) a = do
+interpret (UQD _ (UnaryCombinator FilledByF) f1 _ _ _) a = do
   (boundRoleL :: DependencyPath) <- interpret f1 a
   -- If the head boundRole is a RoleInstance and (a `bindsRole` head boundRole) is true,
   -- add V (Value "true") to boundRole
   case a.head, boundRoleL.head of
     (R bindingRole), (R boundRole) -> do
-      b <- lift $ lift (boundRole ##>> bindsRole bindingRole)
+      b <- lift $ lift (boundRole ##>> fills bindingRole)
       if b
-        then pure (consOnMainPath (V "BindsF" (Value "true")) boundRoleL)
-        else pure (consOnMainPath (V "BindsF" (Value "false")) boundRoleL)
-    _, _ -> pure (consOnMainPath (V "BindsF" (Value "false")) boundRoleL)
+        then pure (consOnMainPath (V "FilledByF" (Value "true")) boundRoleL)
+        else pure (consOnMainPath (V "FilledByF" (Value "false")) boundRoleL)
+    _, _ -> pure (consOnMainPath (V "FilledByF" (Value "false")) boundRoleL)
 
-interpret (UQD _ (UnaryCombinator BoundByF) f1 _ _ _) a =  do
+interpret (UQD _ (UnaryCombinator FillsF) f1 _ _ _) a =  do
   (boundRoleL :: DependencyPath) <- interpret f1 a
   -- If the head boundRole is a RoleInstance and a `bindsRole` head boundRole is true,
   -- cons V (Value "true") op boundRole
   case a.head, boundRoleL.head of
     (R bindingRole), (R boundRole) -> do
-      b <- lift $ lift (boundRole ##>> boundByRole bindingRole)
+      b <- lift $ lift (boundRole ##>> fills bindingRole)
       if b
-        then pure (consOnMainPath (V "BoundByF" (Value "true")) boundRoleL)
-        else pure (consOnMainPath (V "BoundByF" (Value "false")) boundRoleL)
-    _, _ -> pure (consOnMainPath (V "BoundByF" (Value "false")) boundRoleL)
+        then pure (consOnMainPath (V "FillsF" (Value "true")) boundRoleL)
+        else pure (consOnMainPath (V "FillsF" (Value "false")) boundRoleL)
+    _, _ -> pure (consOnMainPath (V "FillsF" (Value "false")) boundRoleL)
 
 interpret (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) a = ArrayT do
   (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
@@ -190,15 +190,15 @@ interpret (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) a = ArrayT do
   (r :: Array DependencyPath) <- runArrayT $ interpret f2 a
   pure (l `union` r)
 
-interpret (BQD _ (BinaryCombinator BindsF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) a = ArrayT do
+interpret (BQD _ (BinaryCombinator FilledByF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) a = ArrayT do
   (bindingRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfBindingRoles a
   (boundRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfBindingRoles a
   -- bindingRoles and boundRoles must be functional.
   case head bindingRoles, head boundRoles of
     Just bindingRolesh, Just boundRolesh | length bindingRoles <= 1 && length boundRoles <= 1 ->
       case bindingRolesh.head, boundRolesh.head of
-        R bindingRole, R boundRole -> do
-          result <- lift (boundRole ##>> (bindsRole bindingRole))
+        R filled, R filler -> do
+          result <- lift (filler ##>> (fills filled))
           pure [{ head: (V "" (Value $ show result))
                 , mainPath: Nothing
                 , supportingPaths: allPaths bindingRolesh `union` allPaths boundRolesh

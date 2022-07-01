@@ -90,8 +90,8 @@ domain: System
       aspect: sys:PhysicalContext$UserWithAddress
       perspective on: Initiator
       perspective on: ConnectedPartner
-    user: Me = filter (Initiator union ConnectedPartner) with binds sys:Me
-    user: You = filter (Initiator union ConnectedPartner) with not binds sys:Me
+    user: Me = filter (Initiator union ConnectedPartner) with filledBy sys:Me
+    user: You = filter (Initiator union ConnectedPartner) with not filledBy sys:Me
 
   case: Model
     external:
@@ -138,12 +138,12 @@ domain: System
       -- TODO. als de uitnodiging wordt weggegooid en er is geen partner in het kanaal, verwijder dan het kanaal en de kanaaldatabase!
       perspective on: External
         if extern >> IWantToInviteAnUnconnectedUser and exists (extern >> Message) then
-          -- Creates a Channel, binds it to PrivateChannel.
+          -- Creates a Channel, filledBy it to PrivateChannel.
           callEffect ser:AddChannel()
           SerialisedInvitation = extern >> callExternal ser:SerialiseFor( filter context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns: String
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
-    user: Guest = filter sys:Me with not boundBy (currentcontext >> Inviter)
+    user: Guest = filter sys:Me with not fills (currentcontext >> Inviter)
       perspective on: Invitee
     bot: for Guest
       perspective on: PrivateChannel

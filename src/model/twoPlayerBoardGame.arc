@@ -117,8 +117,8 @@ domain TwoPlayerBoardGame
     external 
       property GameState (String)
 
-    user Self = filter GamePlayer with binds sys:Me
-    user Other = filter GamePlayer with not binds sys:Me
+    user Self = filter GamePlayer with filledBy sys:Me
+    user Other = filter GamePlayer with not filledBy sys:Me
 
     user GamePlayer filledBy sys:PerspectivesSystem$User
       aspect tc:SubContext$CreatingUser

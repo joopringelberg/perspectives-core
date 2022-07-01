@@ -55,8 +55,8 @@ data FunctionName =
   | SequenceF
   | NotF
   | ExistsF
-  | BindsF
-  | BoundByF
+  | FilledByF
+  | FillsF
   | FilterF
   | ComposeF
   | ComposeSequenceF
@@ -106,8 +106,8 @@ instance showFunctionName :: Show FunctionName where
     show SequenceF = "sequence"
     show NotF = "not"
     show ExistsF = "exists"
-    show BindsF = "binds"
-    show BoundByF = "boundBy"
+    show FilledByF = "filledBy"
+    show FillsF = "fills"
     show FilterF = "filter"
     show ComposeF = "compose"
     show ComposeSequenceF = "composeSequence"
@@ -152,8 +152,8 @@ isFunctionalFunction fn = case fn of
   SequenceF -> Unknown
   NotF -> True
   ExistsF -> True
-  BindsF -> True
-  BoundByF -> True
+  FilledByF -> True
+  FillsF -> True
   FilterF -> Unknown
   ComposeF -> Unknown
   ComposeSequenceF -> True
@@ -193,8 +193,8 @@ isMandatoryFunction fn = case fn of
   SequenceF -> True
   NotF -> True
   ExistsF -> True
-  BindsF -> True
-  BoundByF -> True
+  FilledByF -> True
+  FillsF -> True
   FilterF -> False
   ComposeF -> Unknown
   ComposeSequenceF -> Unknown

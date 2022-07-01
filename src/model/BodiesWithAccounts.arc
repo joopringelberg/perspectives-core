@@ -71,6 +71,9 @@ domain BodiesWithAccounts
         props (FirstName, LastName) verbs (Consult)
 
       state IsFilled = exists binding
+        perspective on Accounts
+          props (FirstName, LastName) verbs (Consult)
+
         -- Use this state to inform the applicant that his case is in
         -- consideration.
         state Waiting = (not IsRejected) and not IsAccepted

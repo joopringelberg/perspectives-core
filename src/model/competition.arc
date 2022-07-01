@@ -38,7 +38,7 @@ domain Competition
     -- The Manager can manage the Competition. But the end user cannot be the Manager of a competition
     -- if he is also a Captain in a Team. This is a weak way of ensuring that one cannot manage a competition
     -- created by another.
-    user Manager = filter com:CompetitionManager with not exists filter currentcontext >> Captains with binds sys:Me
+    user Manager = filter com:CompetitionManager with not exists filter currentcontext >> Captains with filledBy sys:Me
     -- if not exists Captains then com:CompetitionManager
       perspective on SubCompetitions
         defaults

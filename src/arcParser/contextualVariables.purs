@@ -52,8 +52,8 @@ stepContainsVariableReference varName (Binary (BinaryStep{left, right} )) = step
 
 stepContainsVariableReference varName (Unary (LogicalNot _ s)) = stepContainsVariableReference varName s
 stepContainsVariableReference varName (Unary (Exists _ s)) = stepContainsVariableReference varName s
-stepContainsVariableReference varName (Unary (Binds _ s)) = stepContainsVariableReference varName s
-stepContainsVariableReference varName (Unary (BoundBy _ s)) = stepContainsVariableReference varName s
+stepContainsVariableReference varName (Unary (FilledBy _ s)) = stepContainsVariableReference varName s
+stepContainsVariableReference varName (Unary (Fills _ s)) = stepContainsVariableReference varName s
 stepContainsVariableReference varName (Unary (Available _ s)) = stepContainsVariableReference varName s
 
 stepContainsVariableReference varName (PureLet (PureLetStep{bindings, body})) = stepContainsVariableReference varName body ||

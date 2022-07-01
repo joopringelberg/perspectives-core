@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars 2021
+-- Copyright Joop Ringelberg and Cor Baars 2021 - 2022
 domain CouchdbManagement
   use sys for model:System
   use cm for model:CouchdbManagement
@@ -52,9 +52,14 @@ domain CouchdbManagement
     external
       property Url (mandatory, String)
       property Name (mandatory, String)
+
       -- If we do not refer to my indexed version of the CouchdbApp, this condition will fail because another user
       -- will have shared his App, too!
-      state NotBound = not boundBy cm:MyCouchdbApp >> CouchdbServers
+      state NotBound = not fills cm:MyCouchdbApp >> CouchdbServers
+        -- Accounts needs this perspective to be able to add the CouchdbServer to his cm:MyCouchdbApp!
+        perspective of Accounts 
+          perspective on extern >> binder CouchdbServers
+            only (Create, Fill)
         on entry
           -- When a peer assigns the current user to the Accounts role,
           -- we make sure that the current user has the CouchdbServer bound
@@ -129,10 +134,6 @@ domain CouchdbManagement
             Password = pw
             IsAccepted = true
 
-      -- Accounts needs this perspective to be able to add the CouchdbServer to his cm:MyCouchdbApp!
-      perspective on extern >> binder CouchdbServers
-        only (Create, Fill)
-
       perspective on Accounts
         action ResetPassword
           -- After CouchdbServer$Admin provides the first password, he no longer
@@ -151,7 +152,7 @@ domain CouchdbManagement
           bind_ currentactor to measadmin
 
       -- As an Account, one can see both public repositories and repositories managed by oneself (as Admin).
-      perspective on filter Repositories with IsPublic or binding >> context >> Repository$Admin binds sys:Me
+      perspective on filter Repositories with IsPublic or binding >> context >> Repository$Admin filledBy sys:Me
         only (CreateAndFill)
         verbs (Consult)
         props (Name) verbs (SetPropertyValue)

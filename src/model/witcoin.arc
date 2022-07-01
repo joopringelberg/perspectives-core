@@ -146,8 +146,8 @@ domain WitCoin
       property TransactionPartnerName = context >> TransactionPartner >> LastName
       property MyTransferSum = context >> MeInTransaction >> (Post - Prior)
       property MyResultingSaldo = context >> MeInTransaction >> Post
-      property IAmDebitor = context >> Debitor binds sys:Me
-      property IAmCreditor = context >> Creditor binds sys:Me
+      property IAmDebitor = context >> Debitor filledBy sys:Me
+      property IAmCreditor = context >> Creditor filledBy sys:Me
       property IAmDebitorInLastTransaction = wit:MyWitCoinApp >> LastTransaction >> binding >> context >> extern >> IAmDebitor
       property IAmCreditorInLastTransaction = wit:MyWitCoinApp >> LastTransaction >> binding >> context >> extern >> IAmCreditor
       property IAmInitiator = (IAmDebitor and context >> Debitor >> IsInitiator) or (IAmCreditor and context >> Creditor >> IsInitiator)
@@ -474,9 +474,9 @@ domain WitCoin
     -------------------------------------------------------------------------------
     ---- TRANSACTIONPARTNER
     -------------------------------------------------------------------------------
-    user TransactionPartner = filter (Debitor either Creditor) with not binds sys:Me
+    user TransactionPartner = filter (Debitor either Creditor) with not filledBy sys:Me
 
     -------------------------------------------------------------------------------
     ---- MEINTRANSACTION
     -------------------------------------------------------------------------------
-    user MeInTransaction = filter (Debitor either Creditor) with binds sys:Me
+    user MeInTransaction = filter (Debitor either Creditor) with filledBy sys:Me
