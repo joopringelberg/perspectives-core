@@ -27,7 +27,7 @@ domain CouchdbManagement
     -- Becoming a Couchdb Server Admin should be managed outside Perspectives.
     user Manager = sys:Me
       perspective on CouchdbServers
-        only (CreateAndFill)
+        only (CreateAndFill, Remove)
         props (Name, Url) verbs (Consult)
       -- Manager needs this perspective for others to accept Admins created in state NoAdmin.
       -- NOTE that model:TopContext can be used as Aspect instead.
@@ -55,7 +55,7 @@ domain CouchdbManagement
 
       -- If we do not refer to my indexed version of the CouchdbApp, this condition will fail because another user
       -- will have shared his App, too!
-      state NotBound = not fills cm:MyCouchdbApp >> CouchdbServers
+      state NotBound = not exists filter cm:MyCouchdbApp >> CouchdbServers with filledBy origin
         -- Accounts needs this perspective to be able to add the CouchdbServer to his cm:MyCouchdbApp!
         perspective of Accounts 
           perspective on extern >> binder CouchdbServers

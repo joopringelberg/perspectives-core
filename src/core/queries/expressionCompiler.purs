@@ -592,9 +592,11 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 
         LogicalAnd pos -> binOp pos f1 f2 [PBool] AndF
         LogicalOr pos -> binOp pos f1 f2 [PBool] OrF
+        -- Possibly allow PBool
         Add pos -> binOp pos f1 f2 [PNumber, PString] AddF
         Subtract pos -> binOp pos f1 f2 [PNumber, PString] SubtractF
         Divide pos -> binOp pos f1 f2 [PNumber] DivideF
+        -- Possibly allow PBool
         Multiply pos -> binOp pos f1 f2 [PNumber] MultiplyF
 
         Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Compose"
