@@ -52,7 +52,9 @@ domain CouchdbManagement
     external
       property Url (mandatory, String)
       property Name (mandatory, String)
-      state NotBound = not exists binder CouchdbServers
+      -- If we do not refer to my indexed version of the CouchdbApp, this condition will fail because another user
+      -- will have shared his App, too!
+      state NotBound = not boundBy cm:MyCouchdbApp >> CouchdbServers
         on entry
           -- When a peer assigns the current user to the Accounts role,
           -- we make sure that the current user has the CouchdbServer bound
@@ -126,6 +128,10 @@ domain CouchdbManagement
             -- The Password property comes from the aspect acc:Body$Accounts.
             Password = pw
             IsAccepted = true
+
+      -- Accounts needs this perspective to be able to add the CouchdbServer to his cm:MyCouchdbApp!
+      perspective on extern >> binder CouchdbServers
+        only (Create, Fill)
 
       perspective on Accounts
         action ResetPassword

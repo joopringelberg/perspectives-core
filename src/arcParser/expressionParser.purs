@@ -209,7 +209,7 @@ unaryStep = do
     "binds" -> Unary <$> (Binds <$> getPosition <*> (reserved "binds" *> (defer \_ -> step)))
     "boundBy" -> Unary <$> (BoundBy <$> getPosition <*> (reserved "boundBy" *> (defer \_ -> step)))
     "available" -> Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step)))
-    s -> fail ("Expected not, exists, binds or available, but found: '" <> s <> "'.")
+    s -> fail ("Expected not, exists, binds, boundBy or available, but found: '" <> s <> "'.")
 
 operator :: IP Operator
 operator =
