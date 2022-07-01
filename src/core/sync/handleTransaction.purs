@@ -39,7 +39,7 @@ import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, de
 import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerb, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>), (##>>))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>), (##>>), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -58,7 +58,7 @@ import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeR
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (hasAspect)
+import Perspectives.Types.ObjectGetters (hasAspect, roleAspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<<), (<>), (>>=), (<$>), (==))
 
@@ -213,9 +213,11 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         (exists :: Maybe PerspectRol) <- lift $ tryGetPerspectEntiteit rolInstanceId
         if isNothing exists
           then do
+            allTypes <- lift (roleType ###= roleAspectsClosure)
             role <- pure (PerspectRol defaultRolRecord
                   { _id = rolInstanceId
                   , pspType = roleType
+                  , allTypes = allTypes
                   , context = contextInstance
                   , occurrence = i
                   , universeRoleDelta = s
