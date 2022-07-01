@@ -751,7 +751,7 @@ getMyType ctxt = getPreferredUserRoleType ctxt
     findMeInCalculatedRoles = (contextType >=> Combinators.filter (liftToInstanceLevel calculatedUserRole) (computesMe ctxt))
 
     findMeInUnlinkedRoles ::  ContextInstance ~~> RoleType
-    findMeInUnlinkedRoles = Combinators.filter (Combinators.filter (contextType >=> liftToInstanceLevel calculatedUserRole) isUnlinked) (computesMe ctxt)
+    findMeInUnlinkedRoles = Combinators.filter (Combinators.filter (contextType >=> liftToInstanceLevel enumeratedUserRole) isUnlinked) (computesMe ctxt)
       where
         isUnlinked :: RoleType ~~> Boolean
         isUnlinked (ENR rt) = lift $ lift $ isUnlinked_ rt
