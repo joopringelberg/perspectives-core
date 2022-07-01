@@ -143,6 +143,7 @@ removeContextIfUnbound roleInstance@(RoleInstance rid) rtype = do
 
 -- | Remove the context instance plus roles after detaching all its roles.
 -- | Does NOT remove the context role binding the external role.
+-- | Logs an error if the context does not exist, but does not break.
 -- | PERSISTENCE
 removeContextInstance :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
 removeContextInstance id authorizedRole = do
@@ -290,6 +291,7 @@ queryUpdatesForRoleRemoval role@(PerspectRol{_id:roleId, pspType:roleType, conte
   (lift $ findResourceDependencies (unwrap roleId)) >>= addCorrelationIdentifiersToTransactie
 
 -- | PERSISTENCE. Remove the role instance from context.
+-- | Logs an error if the role doesn't exist but does not break.
 removeRoleInstanceFromContext :: PerspectRol -> MonadPerspectivesTransaction Unit
 removeRoleInstanceFromContext role@(PerspectRol{_id:roleId, pspType:roleType, context:contextId}) = do
   (lift $ try $ getPerspectContext contextId) >>=
@@ -377,56 +379,59 @@ replaceBinding roleId (newBindingId :: RoleInstance) msignedDelta = (lift $ try 
 -- | CURRENTUSER
 -- | SYNCHRONISATION
 -- | STATE EVALUATION
+-- | This function is idempotent: if the role is already filled with the filler, nothing changes.
 setFirstBinding :: RoleInstance -> RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
 setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit filled) >>=
   handlePerspectRolError' "setFirstBinding, filled" []
-    \(filledRole :: PerspectRol) -> (lift $ try $ getPerspectEntiteit filler) >>=
-      handlePerspectRolError' "setFirstBinding, filler" []
-        \fillerRole@(PerspectRol{isMe, pspType:fillerType}) -> do
-          loadModel fillerType
+    \(filledRole :: PerspectRol) -> if rol_binding filledRole == Just filler
+      then pure []
+      else  (lift $ try $ getPerspectEntiteit filler) >>=
+        handlePerspectRolError' "setFirstBinding, filler" []
+          \fillerRole@(PerspectRol{isMe, pspType:fillerType}) -> do
+            loadModel fillerType
 
-          -- PERSISTENCE
-          filled `filledPointsTo` filler
-          filler `fillerPointsTo` filled
+            -- PERSISTENCE
+            filled `filledPointsTo` filler
+            filler `fillerPointsTo` filled
 
-          -- QUERY EVALUATION
-          filledContextType <- lift (rol_context filledRole ##>> contextType)
-          (lift $ findFilledRoleRequests filler filledContextType (rol_pspType filledRole)) >>= addCorrelationIdentifiersToTransactie
-          (lift $ findBindingRequests filled) >>= addCorrelationIdentifiersToTransactie
+            -- QUERY EVALUATION
+            filledContextType <- lift (rol_context filledRole ##>> contextType)
+            (lift $ findFilledRoleRequests filler filledContextType (rol_pspType filledRole)) >>= addCorrelationIdentifiersToTransactie
+            (lift $ findBindingRequests filled) >>= addCorrelationIdentifiersToTransactie
 
-          -- ISME, ME
-          if isMe then roleIsMe filled (rol_context filledRole) else pure unit
+            -- ISME, ME
+            if isMe then roleIsMe filled (rol_context filledRole) else pure unit
 
-          subject <- getSubject
-          delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
-            { filled : filled
-            , filler: Just filler
-            , oldFiller: Nothing
-            , deltaType: SetFirstBinding
-            , subject
-            }
+            subject <- getSubject
+            delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
+              { filled : filled
+              , filler: Just filler
+              , oldFiller: Nothing
+              , deltaType: SetFirstBinding
+              , subject
+              }
 
-          -- STATE EVALUATION
-          -- Adds deltas for paths beyond the nodes involved in the binding,
-          -- for queries that use the binder- or binding step.
-          users <- usersWithPerspectiveOnRoleBinding delta true
-          author <- getAuthor
-          signedDelta <-  case msignedDelta of
-            Nothing -> pure $ SignedDelta
-              { author
-              , encryptedDelta: sign $ encodeJSON $ delta}
-            Just signedDelta -> pure signedDelta
+            -- STATE EVALUATION
+            -- Adds deltas for paths beyond the nodes involved in the binding,
+            -- for queries that use the binder- or binding step.
+            users <- usersWithPerspectiveOnRoleBinding delta true
+            author <- getAuthor
+            signedDelta <-  case msignedDelta of
+              Nothing -> pure $ SignedDelta
+                { author
+                , encryptedDelta: sign $ encodeJSON $ delta}
+              Just signedDelta -> pure signedDelta
 
-          -- SYNCHRONISATION
-          handleNewPeer filled
-          addDelta (DeltaInTransaction { users, delta: signedDelta })
-          -- Save the SignedDelta as the bindingDelta in the role. Re-fetch filled as it has been changed!
+            -- SYNCHRONISATION
+            handleNewPeer filled
+            addDelta (DeltaInTransaction { users, delta: signedDelta })
+            -- Save the SignedDelta as the bindingDelta in the role. Re-fetch filled as it has been changed!
 
-          -- PERSISTENCE
-          (modifiedFilled :: PerspectRol) <- lift $ getPerspectEntiteit filled
-          cacheAndSave filled (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) modifiedFilled)
+            -- PERSISTENCE
+            (modifiedFilled :: PerspectRol) <- lift $ getPerspectEntiteit filled
+            cacheAndSave filled (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) modifiedFilled)
 
-          pure users
+            pure users
 
   where
     -- If the type of the new binding is unknown, load the model. There is only one

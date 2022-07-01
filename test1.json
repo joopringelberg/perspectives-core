@@ -1,6 +1,6 @@
 {
   "contents": {
-    "timeStamp": 1642080384335,
+    "timeStamp": 1656662619886,
     "deltas": [
       {
         "contents": {
@@ -8,16 +8,69 @@
             "contents": {
               "subject": {
                 "contents": {
-                  "contents": "model:System$Invitation$Guest",
+                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
                   "tag": "CR"
                 },
                 "tag": "UserType"
               },
-              "roleType": "model:SimpleChat$Chat$Partner",
+              "roleType": "model:CouchdbManagement$CouchdbServer$External",
               "roleInstances": [
-                "model:User$cbfa4630c_43a4_4f52_bf0a_337ce282d13b$Partner_0000"
+                "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$External"
               ],
-              "id": "model:User$cbfa4630c_43a4_4f52_bf0a_337ce282d13b",
+              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172",
+              "deltaType": {
+                "tag": "ConstructExternalRole"
+              },
+              "authorizedRole": {
+                "contents": "model:CouchdbManagement$CouchdbManagementApp$CouchdbServers",
+                "tag": "ENR"
+              }
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172",
+              "deltaType": {
+                "tag": "ConstructEmptyContext"
+              },
+              "contextType": "model:CouchdbManagement$CouchdbServer"
+            },
+            "tag": "UniverseContextDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:CouchdbManagement$CouchdbServer$Accounts",
+              "roleInstances": [
+                "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000"
+              ],
+              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172",
               "deltaType": {
                 "tag": "ConstructEmptyRole"
               },
@@ -35,22 +88,53 @@
             "contents": {
               "subject": {
                 "contents": {
-                  "contents": "model:System$Invitation$Guest",
-                  "tag": "CR"
+                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
+                  "tag": "ENR"
                 },
                 "tag": "UserType"
               },
-              "roleType": "model:SimpleChat$Chat$Partner",
-              "roleInstances": [
-                "model:User$cbfa4630c_43a4_4f52_bf0a_337ce282d13b$Partner_0000"
-              ],
-              "id": "model:User$cbfa4630c_43a4_4f52_bf0a_337ce282d13b",
+              "roleType": "model:CouchdbManagement$CouchdbServer$Accounts",
+              "roleInstance": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000",
               "destinationContext": null,
               "deltaType": {
                 "tag": "AddRoleInstancesToContext"
-              }
+              },
+              "contextInstance": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172"
             },
             "tag": "ContextDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": "ContextDelta from defaultRolRecord",
+          "author": ""
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "values": [
+                "https://localhost:6984/"
+              ],
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "property": "model:CouchdbManagement$CouchdbServer$External$Url",
+              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$External",
+              "deltaType": {
+                "tag": "AddProperty"
+              }
+            },
+            "tag": "RolePropertyDelta"
           },
           "author": "model:User$prod1$User"
         },
@@ -61,22 +145,74 @@
           "encryptedDelta": {
             "contents": {
               "values": [
-                "I've accepted"
+                "LocalRepo"
               ],
               "subject": {
                 "contents": {
-                  "contents": "model:SimpleChat$Chat$Partner",
+                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
                   "tag": "ENR"
                 },
                 "tag": "UserType"
               },
-              "property": "model:SimpleChat$WithText$TextWriter$MyText",
-              "id": "model:User$cbfa4630c_43a4_4f52_bf0a_337ce282d13b$Partner_0000",
+              "property": "model:CouchdbManagement$CouchdbServer$External$Name",
+              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$External",
               "deltaType": {
                 "tag": "AddProperty"
               }
             },
             "tag": "RolePropertyDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:CouchdbManagement$CouchdbServer$Admin",
+              "roleInstances": [
+                "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Admin_0000"
+              ],
+              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172",
+              "deltaType": {
+                "tag": "ConstructEmptyRole"
+              },
+              "authorizedRole": null
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
+                  "tag": "CR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:CouchdbManagement$CouchdbServer$Admin",
+              "roleInstance": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Admin_0000",
+              "destinationContext": null,
+              "deltaType": {
+                "tag": "AddRoleInstancesToContext"
+              },
+              "contextInstance": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172"
+            },
+            "tag": "ContextDelta"
           },
           "author": "model:User$prod1$User"
         },
@@ -159,14 +295,12 @@
                 "tag": "UserInstance"
               },
               "roleType": "model:System$PerspectivesSystem$User",
-              "roleInstances": [
-                "model:User$prod1$User"
-              ],
-              "id": "model:User$prod1",
+              "roleInstance": "model:User$prod1$User",
               "destinationContext": null,
               "deltaType": {
                 "tag": "AddRoleInstancesToContext"
-              }
+              },
+              "contextInstance": "model:User$prod1"
             },
             "tag": "ContextDelta"
           },
@@ -178,20 +312,45 @@
         "contents": {
           "encryptedDelta": {
             "contents": {
+              "values": [
+                "prod1"
+              ],
               "subject": {
                 "contents": {
-                  "contents": "model:System$Invitation$Guest",
+                  "contents": "model:System$PerspectivesSystem$User",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "property": "model:System$PerspectivesSystem$User$FirstName",
+              "id": "model:User$prod1$User",
+              "deltaType": {
+                "tag": "AddProperty"
+              }
+            },
+            "tag": "RolePropertyDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
                   "tag": "CR"
                 },
                 "tag": "UserType"
               },
-              "roleWillBeRemoved": false,
-              "oldBinding": null,
-              "id": "model:User$cbfa4630c_43a4_4f52_bf0a_337ce282d13b$Partner_0000",
+              "oldFiller": null,
+              "filler": "model:User$prod1$User",
+              "filled": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Admin_0000",
               "deltaType": {
-                "tag": "SetBinding"
-              },
-              "binding": "model:User$prod1$User"
+                "tag": "SetFirstBinding"
+              }
             },
             "tag": "RoleBindingDelta"
           },
@@ -213,8 +372,58 @@
                 },
                 "tag": "UserType"
               },
-              "property": "model:System$PerspectivesSystem$User$Achternaam",
+              "property": "model:System$PerspectivesSystem$User$LastName",
               "id": "model:User$prod1$User",
+              "deltaType": {
+                "tag": "AddProperty"
+              }
+            },
+            "tag": "RolePropertyDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "oldFiller": null,
+              "filler": "model:User$prod2$User",
+              "filled": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000",
+              "deltaType": {
+                "tag": "SetFirstBinding"
+              }
+            },
+            "tag": "RoleBindingDelta"
+          },
+          "author": "model:User$prod1$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "values": [
+                "true"
+              ],
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "property": "model:BodiesWithAccounts$Body$Accounts$IsAccepted",
+              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000",
               "deltaType": {
                 "tag": "AddProperty"
               }
@@ -230,52 +439,22 @@
           "encryptedDelta": {
             "contents": {
               "values": [
-                "prod1"
+                "geheim"
               ],
               "subject": {
                 "contents": {
-                  "contents": "model:System$PerspectivesSystem$User",
+                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
                   "tag": "ENR"
                 },
                 "tag": "UserType"
               },
-              "property": "model:System$PerspectivesSystem$User$Voornaam",
-              "id": "model:User$prod1$User",
+              "property": "model:BodiesWithAccounts$WithCredentials$Password",
+              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000",
               "deltaType": {
                 "tag": "AddProperty"
               }
             },
             "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:SimpleChat$ChatApp$Chatter",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "roleType": "model:SimpleChat$Chat$External",
-              "roleInstances": [
-                "model:User$cbfa4630c_43a4_4f52_bf0a_337ce282d13b$External"
-              ],
-              "id": "model:User$cbfa4630c_43a4_4f52_bf0a_337ce282d13b",
-              "deltaType": {
-                "tag": "RemoveUnboundExternalRoleInstance"
-              },
-              "authorizedRole": {
-                "contents": "model:SimpleChat$ChatApp$Chats",
-                "tag": "ENR"
-              }
-            },
-            "tag": "UniverseRoleDelta"
           },
           "author": "model:User$prod1$User"
         },

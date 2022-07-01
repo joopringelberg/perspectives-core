@@ -131,6 +131,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
     then case deltaType of
       ConstructEmptyContext -> do
         (exists :: Maybe PerspectContext) <- lift $ tryGetPerspectEntiteit id
+        -- This is where we make the operation idempotent. Nothing happens if it already exists.
         if isNothing exists
           then do
             contextInstance <- pure
@@ -202,10 +203,10 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         offset <- (lift (id ##= getRoleInstances (ENR roleType))) >>= pure <<< getNextRolIndex
         forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do
           (exists :: Maybe PerspectRol) <- lift $ tryGetPerspectEntiteit roleInstance
+          -- Here we make constructing another role idempotent. Nothing happens if it already exists.
           if isNothing exists
             then void $ constructEmptyRole_ id (offset + i) roleInstance
             else pure unit
-            -- TODO save it?
 
       constructEmptyRole_ :: ContextInstance -> Int -> RoleInstance -> MonadPerspectivesTransaction Boolean
       constructEmptyRole_ contextInstance i rolInstanceId = do
@@ -229,6 +230,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       constructExternalRole = do
         externalRole <- pure (head $ toNonEmptyArray roleInstances)
         log ("ConstructExternalRole in " <> show id)
+        -- Here we make constructing an external role idempotent. Nothing happens if it already exists.
         constructEmptyRole_ id 0 externalRole >>= if _
           then lift $ void $ saveEntiteit externalRole
           else pure unit
