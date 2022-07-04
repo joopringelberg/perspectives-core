@@ -119,7 +119,7 @@ data SimpleStep =
 
   -- These step types are used in Perspectives.Parsing.Arc.PhaseThree for the standard variables.
   | TypeTimeOnlyContext ArcPosition String
-  -- ArcPosition, EnumeratedRoleType, ContextType
+  -- ArcPosition, ContextType, EnumeratedRoleType
   | TypeTimeOnlyEnumeratedRole ArcPosition String String
   | TypeTimeOnlyCalculatedRole ArcPosition String
 

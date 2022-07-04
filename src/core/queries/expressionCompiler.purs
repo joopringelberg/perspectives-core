@@ -434,7 +434,7 @@ compileSimpleStep currentDomain s@(RegEx pos (reg :: RegExP)) = do
 compileSimpleStep currentDomain (TypeTimeOnlyContext pos ctype) = pure $
   SQD currentDomain (QF.TypeTimeOnlyContextF ctype) (CDOM (ST $ ContextType ctype)) True True
 
-compileSimpleStep currentDomain s@(TypeTimeOnlyEnumeratedRole pos rtype ctype) = pure $ SQD currentDomain (QF.TypeTimeOnlyEnumeratedRoleF rtype) (RDOM $ ST $ RoleInContext {context: ContextType ctype, role: (EnumeratedRoleType rtype)}) True True
+compileSimpleStep currentDomain s@(TypeTimeOnlyEnumeratedRole pos ctype rtype) = pure $ SQD currentDomain (QF.TypeTimeOnlyEnumeratedRoleF rtype) (RDOM $ ST $ RoleInContext {context: ContextType ctype, role: (EnumeratedRoleType rtype)}) True True
 
 compileSimpleStep currentDomain s@(TypeTimeOnlyCalculatedRole pos rtype) = do
   -- Get the ADT for the calculated role.

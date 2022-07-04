@@ -45,7 +45,7 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, reduce)
 import Perspectives.Representation.Class.Identifiable (identifier_)
@@ -198,7 +198,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           else pure unit
         -- the possible bindings of binderType (qualifiedRoleIdentifier) should be less specific (=more general) than or equal to the type of the results of binderExpression (bindings).
         qualifies <- do
-          possibleBinding <- lift $ lift (bindingOfRole (ENR qualifiedRoleIdentifier))
+          (possibleBinding :: ADT RoleInContext) <- lift $ lift (bindingOfRole (ENR qualifiedRoleIdentifier))
           -- On comparing roles, their binding counts!
           bindings' <- lift $ lift $ reduce (getEnumeratedRole >=> roleAndBinding) (roleInContext2Role <$> (unsafePartial domain2roleType (range bindings)))
           lift $ lift ((roleInContext2Role <$> possibleBinding) `equalsOrGeneralisesRoleADT` (roleInContext2Role <$> bindings'))
