@@ -33,7 +33,7 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (concat, cons, elemIndex, foldr, intercalate, intersect, length, nub, singleton, uncons, union)
+import Data.Array (concat, cons, elemIndex, findIndex, intercalate, intersect, length, nub, singleton, uncons, union)
 import Data.Array.Partial (head) as AP
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (foldMap, foldl)
@@ -335,28 +335,39 @@ allLeavesInADT UNIVERSAL = []
 --------------------------------------------------------------------------------------------------
 ---- SPECIALISESADT
 --------------------------------------------------------------------------------------------------
--- | a1 `equalsOrSpecialisesADT` a2
--- | intuitively when a1 is built from a2.
--- equalsOrSpecialisesADT :: forall a. Eq a => ADT a -> ADT a -> Conj Boolean
--- equalsOrSpecialisesADT adt1@(ST a) adt2 = case adt2 of
---   ST b -> Conj (a == b)
---   SUM adts -> foldMap (equalsOrSpecialisesADT adt1) adts
---   PROD adts -> Conj $ isJust $ find (unwrap <<< equalsOrSpecialisesADT adt1) adts
---   UNIVERSAL -> Conj true
---   EMPTY -> Conj false
--- equalsOrSpecialisesADT (SUM adts) adt2 = foldMap (flip equalsOrSpecialisesADT adt2) adts
--- equalsOrSpecialisesADT (PROD adts) adt2 = Conj $ isJust $ find (unwrap <<< flip equalsOrSpecialisesADT adt2) adts
--- equalsOrSpecialisesADT UNIVERSAL _ = Conj false
--- equalsOrSpecialisesADT EMPTY _ = Conj true
-
 -- | a1 `equalsOrGeneralisesADT` a2
 -- | intuitively when a2 is built from a1 (or a2 == a1).
 -- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
-equalsOrGeneralisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
-equalsOrGeneralisesADT adt1 adt2 = let
-  union' = allLeavesInADT adt1
-  intersection' = commonLeavesInADT adt2
-  in subset (fromFoldable union') (fromFoldable intersection')
+equalsOrSpecialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+equalsOrSpecialisesADT adt1 adt2 = let
+  (adt1' :: ADT a) = toDisjunctiveNormalForm adt1
+  adt2' = toDisjunctiveNormalForm adt2
+  in
+  equalsOrSpecialisesADT_ adt1' adt2'
+
+equalsOrSpecialisesADT_ :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+equalsOrSpecialisesADT_ a1 a2 = 
+  case a1 of 
+    EMPTY -> true
+    UNIVERSAL -> case a2 of 
+      UNIVERSAL -> true
+      _ -> false
+    l@(ST _) -> case a2 of
+      EMPTY -> false
+      UNIVERSAL -> true
+      r@(ST _) -> l == r
+      PROD rs -> [l] == rs
+      SUM rs -> isJust $ findIndex (\r -> l `equalsOrSpecialisesADT_` r) rs
+    PROD ts -> case a2 of
+      EMPTY -> false
+      UNIVERSAL -> true
+      r@(ST _) -> ts == [r]
+      PROD rs -> ts `superset` rs
+      SUM rs -> isJust $ findIndex (\r -> PROD ts `equalsOrSpecialisesADT_` r) rs 
+    SUM ls -> foldl (\allTrue l -> if allTrue then l `equalsOrSpecialisesADT_` a2 else false) true ls
+  where
+  superset :: forall x. Ord x => Eq x => Array x -> Array x -> Boolean
+  superset super sub = (fromFoldable sub) `subset` (fromFoldable super)
 
 generalisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
 generalisesADT adt1 adt2 = adt1 /= adt2 && adt1 `equalsOrGeneralisesADT` adt2
@@ -364,5 +375,5 @@ generalisesADT adt1 adt2 = adt1 /= adt2 && adt1 `equalsOrGeneralisesADT` adt2
 specialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
 specialisesADT = flip generalisesADT
 
-equalsOrSpecialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
-equalsOrSpecialisesADT = flip equalsOrGeneralisesADT
+equalsOrGeneralisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+equalsOrGeneralisesADT = flip equalsOrSpecialisesADT

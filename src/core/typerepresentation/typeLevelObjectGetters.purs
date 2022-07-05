@@ -20,7 +20,9 @@
 
 -- END LICENSE
 
-module Perspectives.Types.ObjectGetters where
+module Perspectives.Types.ObjectGetters
+  
+  where
 
 import Control.Monad.Error.Class (try)
 import Control.Monad.State (StateT, execStateT, get, put)
@@ -32,7 +34,6 @@ import Data.List (foldl) as LIST
 import Data.Map (Map, empty, lookup, insert, keys, unionWith, values) as Map
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
-import Data.Set (subset, fromFoldable) as SET
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -51,7 +52,7 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce, toDisjunctiveNormalForm)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce, toDisjunctiveNormalForm, equalsOrSpecialisesADT_)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
@@ -66,7 +67,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (class Eq, class Ord, Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
+import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -395,39 +396,21 @@ allTypesInRoleADT = ArrayT <<< pure <<< allLeavesInADT >=> roleAspectsClosure
 ---- EQUALSORGENERALISESROLEADT, EQUALSORSPECIALISESROLEADT, GENERALISESROLEADT, SPECIALISEDROLEADT,
 ---- SPECIALISESROLETYPE, SPECIALISESROLETYPE_
 --------------------------------------------------------------------------------------------------
+-- | a1 `equalsOrSpecialisesRoleADT` a2
+-- | intuitively when a1 is built from a2 (or a1 == a2).
+-- | Compares with equalsOrSpecialisesADT (module Perspectives.Representation.ADT)
+-- | However, that function works for any a (Ord a, Eq a).
+-- | This function works for EnumeratedRoleTypes and takes Aspects into account.
 -- | For a function that works with ADT RoleInContext, see: `greaterThanOrEqualTo`.
+-- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
 equalsOrSpecialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 equalsOrSpecialisesRoleADT adt1 adt2 = do
   adt1' <- expandAspects adt1 >>= pure <<< toDisjunctiveNormalForm
   adt2' <- expandAspects adt2 >>= pure <<< toDisjunctiveNormalForm
-  pure $ equalsOrSpecialisesRoleADT_ adt1' adt2'
+  pure $ equalsOrSpecialisesADT_ adt1' adt2'
   where
-  equalsOrSpecialisesRoleADT_ ::  ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> Boolean
-  equalsOrSpecialisesRoleADT_ a1 a2 = 
-    case a1 of 
-      EMPTY -> true
-      UNIVERSAL -> case a2 of 
-        UNIVERSAL -> true
-        _ -> false
-      l@(ST _) -> case a2 of
-        EMPTY -> false
-        UNIVERSAL -> true
-        r@(ST _) -> l == r
-        PROD rs -> [l] == rs
-        SUM rs -> isJust $ findIndex (\r -> l `equalsOrSpecialisesRoleADT_` r) rs
-      PROD ts -> case a2 of
-        EMPTY -> false
-        UNIVERSAL -> true
-        r@(ST _) -> ts == [r]
-        PROD rs -> ts `superset` rs
-        SUM rs -> isJust $ findIndex (\r -> PROD ts `equalsOrSpecialisesRoleADT_` r) rs 
-      SUM ls -> foldl (\allTrue l -> if allTrue then l `equalsOrSpecialisesRoleADT_` a2 else false) true ls
-  
   expandAspects :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
   expandAspects = reduce (getEnumeratedRole >=> map (map roleInContext2Role) <<< roleAspectsADT)
-
-superset :: forall a. Ord a => Eq a => Array a -> Array a -> Boolean
-superset super sub = (SET.fromFoldable sub) `SET.subset` (SET.fromFoldable super)
 
 generalisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 generalisesRoleADT adt1 adt2 = do
@@ -438,13 +421,7 @@ generalisesRoleADT adt1 adt2 = do
 specialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 specialisesRoleADT = flip generalisesRoleADT
 
--- | a1 `equalsOrGeneralisesRoleADT` a2
--- | intuitively when a2 is built from a1 (or a2 == a1).
--- | Compares with equalsOrGeneralisesADT (module Perspectives.Representation.ADT)
--- | However, that function works for any a (Ord a, Eq a).
--- | This function works for EnumeratedRoleTypes and takes Aspects into account.
 -- | For a function that works with ADT RoleInContext, see: `lessThanOrEqualTo`.
--- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
 equalsOrGeneralisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 equalsOrGeneralisesRoleADT = flip equalsOrSpecialisesRoleADT
 
