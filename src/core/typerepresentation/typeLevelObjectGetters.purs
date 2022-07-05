@@ -26,7 +26,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (map, (<|>), empty)
-import Data.Array (concat, cons, elemIndex, filter, findIndex, foldl, foldr, fromFoldable, null, singleton, filterA)
+import Data.Array (concat, cons, elemIndex, filter, filterA, findIndex, foldl, foldr, fromFoldable, null, singleton)
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.List (foldl) as LIST
 import Data.Map (Map, empty, lookup, insert, keys, unionWith, values) as Map
@@ -51,7 +51,7 @@ import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce, toDisjunctiveNormalForm)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
@@ -66,7 +66,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
+import Prelude (class Eq, class Ord, Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -402,11 +402,43 @@ allTypesInRoleADT = ArrayT <<< pure <<< allLeavesInADT >=> roleAspectsClosure
 -- | This function works for EnumeratedRoleTypes and takes Aspects into account.
 -- | For a function that works with ADT RoleInContext, see: `lessThanOrEqualTo`.
 -- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
-equalsOrGeneralisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-equalsOrGeneralisesRoleADT adt1 adt2 = do
+equalsOrGeneralisesRoleADT' :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
+equalsOrGeneralisesRoleADT' adt1 adt2 = do
+  a1 <- pure $ toDisjunctiveNormalForm adt1
+  a2 <- pure $ toDisjunctiveNormalForm adt2
   union' <- runArrayT $ allTypesInRoleADT adt1
   intersection' <- runArrayT $ commonTypesInRoleADT adt2
   pure $ SET.subset (SET.fromFoldable union') (SET.fromFoldable intersection')
+
+equalsOrSpecialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
+equalsOrSpecialisesRoleADT adt1 adt2 = do
+  adt1' <- pure $ toDisjunctiveNormalForm adt1
+  adt2' <- pure $ toDisjunctiveNormalForm adt2
+  pure $ equalsOrSpecialisesRoleADT_ adt1' adt2'
+  where
+  equalsOrSpecialisesRoleADT_ ::  ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> Boolean
+  equalsOrSpecialisesRoleADT_ a1 a2 = 
+    case a1 of 
+      EMPTY -> true
+      UNIVERSAL -> case a2 of 
+        UNIVERSAL -> true
+        _ -> false
+      l@(ST _) -> case a2 of
+        EMPTY -> false
+        UNIVERSAL -> true
+        r@(ST _) -> l == r
+        PROD rs -> [l] == rs
+        SUM rs -> isJust $ findIndex (\r -> l `equalsOrSpecialisesRoleADT_` r) rs
+      PROD ts -> case a2 of
+        EMPTY -> false
+        UNIVERSAL -> true
+        r@(ST _) -> ts == [r]
+        PROD rs -> ts `superset` rs
+        SUM rs -> isJust $ findIndex (\r -> PROD ts `equalsOrSpecialisesRoleADT_` r) rs 
+      SUM ls -> foldl (\allTrue l -> if allTrue then l `equalsOrSpecialisesRoleADT_` a2 else false) true ls
+
+superset :: forall a. Ord a => Eq a => Array a -> Array a -> Boolean
+superset super sub = (SET.fromFoldable sub) `SET.subset` (SET.fromFoldable super)
 
 generalisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 generalisesRoleADT adt1 adt2 = do
@@ -418,8 +450,8 @@ specialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boo
 specialisesRoleADT = flip generalisesRoleADT
 
 -- | For a function that works with ADT RoleInContext, see: `greaterThanOrEqualTo`.
-equalsOrSpecialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-equalsOrSpecialisesRoleADT = flip equalsOrGeneralisesRoleADT
+equalsOrGeneralisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
+equalsOrGeneralisesRoleADT = flip equalsOrSpecialisesRoleADT
 
 -- | R1 `specialisesRoleType` R2 is true, iff R2 is an (indirect) Aspect of R1 or if both are equal.
 -- | We want to use this function as the computation behind the query step `specialisesRoleType`:

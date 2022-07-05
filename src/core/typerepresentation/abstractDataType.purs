@@ -33,13 +33,13 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (concat, intercalate, intersect, length, nub, singleton, uncons, union)
+import Data.Array (concat, cons, elemIndex, foldr, intercalate, intersect, length, nub, singleton, uncons, union)
 import Data.Array.Partial (head) as AP
+import Data.Eq.Generic (genericEq)
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Eq.Generic (genericEq)
 import Data.Identity (Identity)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
@@ -49,7 +49,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, flip, map, pure, show, ($), (<$>), (<<<), (<>), (==), (>>>), (/=), (&&), (||))
+import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, flip, map, pure, show, ($), (&&), (/=), (<$>), (<<<), (<>), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
@@ -126,6 +126,87 @@ product = (foldl prod' EMPTY) >>> \(p :: ADT a) -> case p of
   prod' (PROD terms) x = PROD (union terms [x])
   prod' t1@(ST x) t2@(ST y) = if x == y then t1 else PROD [t1, t2]
   prod' a b = PROD [a, b]
+
+data ADT' a = ST' a | SUM' (ADT' a) (ADT' a) | PROD' (ADT' a) (ADT' a) | EMPTY' | UNIVERSAL'
+
+derive instance Generic (ADT' a) _
+instance (Eq a) => Eq (ADT' a) where
+  eq b1 b2 = genericEq b1 b2
+
+toDNF :: forall a. ADT' a -> ADT' a
+toDNF (PROD' p (SUM' s1 s2)) = SUM' (toDNF (PROD' p s1)) (toDNF (PROD' p s2))
+toDNF (PROD' (SUM' s1 s2) p) = SUM' (toDNF (PROD' p s1)) (toDNF (PROD' p s2))
+toDNF x = x
+
+toADT' :: forall a. ADT a -> ADT' a
+toADT' (ST a) = ST' a
+toADT' EMPTY = EMPTY'
+toADT' UNIVERSAL = UNIVERSAL'
+toADT' (SUM as) = case uncons as of 
+  Just {head, tail} -> foldr (\adt adt' -> SUM' adt' (toADT' adt)) (toADT' head) tail
+  Nothing -> EMPTY'
+toADT' (PROD as) = case uncons as of 
+  Just {head, tail} -> foldr (\adt adt' -> PROD' adt' (toADT' adt)) (toADT' head) tail
+  Nothing -> EMPTY' 
+
+toADT :: forall a. Eq a => ADT' a -> ADT a
+toADT (ST' a) = ST a
+toADT EMPTY' = EMPTY
+toADT UNIVERSAL' = UNIVERSAL
+toADT (SUM' a as) = let
+  adt = toADT a
+  in unsafePartial case toADT as of
+    SUM ys -> if isJust $ elemIndex adt ys
+      then SUM ys
+      else SUM $ cons adt ys
+    y -> SUM [adt, y]
+toADT (PROD' a as) = let
+  adt = toADT a
+  in unsafePartial case toADT as of
+    PROD ys -> if isJust $ elemIndex adt ys
+      then PROD ys
+      else PROD $ cons adt ys
+    y -> PROD [adt, y]
+
+toLeftAssociative :: forall a. Eq a => ADT' a -> ADT' a
+toLeftAssociative (SUM' (SUM' a b ) c) = SUM' a $ toLeftAssociative (SUM' b c)
+toLeftAssociative (PROD' (PROD' a b ) c) = PROD' a $ toLeftAssociative(PROD' b c)
+toLeftAssociative x = x
+
+reduceEmptyAndUniversal :: forall a. Eq a => ADT' a -> ADT' a
+reduceEmptyAndUniversal (PROD' x EMPTY') = reduceEmptyAndUniversal x
+reduceEmptyAndUniversal (PROD' EMPTY' x) = reduceEmptyAndUniversal x
+reduceEmptyAndUniversal (PROD' _ UNIVERSAL') = UNIVERSAL'
+reduceEmptyAndUniversal (PROD' UNIVERSAL' _) = UNIVERSAL'
+
+reduceEmptyAndUniversal (SUM' _ EMPTY') = EMPTY'
+reduceEmptyAndUniversal (SUM' EMPTY' _) = EMPTY'
+reduceEmptyAndUniversal (SUM' x UNIVERSAL') = x
+reduceEmptyAndUniversal (SUM' UNIVERSAL' x) = x
+
+reduceEmptyAndUniversal (PROD' x y) = let
+  r = reduceEmptyAndUniversal y
+  in
+    if x == r
+      then x
+      else PROD' x r
+reduceEmptyAndUniversal (SUM' x y) = let
+  r = reduceEmptyAndUniversal y
+  in
+    if x == r
+      then x
+      else SUM' x r
+reduceEmptyAndUniversal x = x
+
+-- If adt is a SUM, that sum is in normal form (its members are products).
+toDisjunctiveNormalForm :: forall a. Eq a => ADT a -> ADT a
+toDisjunctiveNormalForm adt = let 
+  adt' = toADT' adt
+  leftA = toLeftAssociative adt'
+  reduced = reduceEmptyAndUniversal leftA
+  dnf = toDNF reduced
+  adtOut = toADT dnf
+  in adtOut
 
 -- | From two ADTs, compute an ADT that represents their commonality.
 -- | The result is simplified according to these rules:
