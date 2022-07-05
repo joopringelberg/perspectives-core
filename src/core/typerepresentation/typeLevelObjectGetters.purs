@@ -56,7 +56,7 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, typeIncludingAspects)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, roleAspectsADT, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -395,25 +395,11 @@ allTypesInRoleADT = ArrayT <<< pure <<< allLeavesInADT >=> roleAspectsClosure
 ---- EQUALSORGENERALISESROLEADT, EQUALSORSPECIALISESROLEADT, GENERALISESROLEADT, SPECIALISEDROLEADT,
 ---- SPECIALISESROLETYPE, SPECIALISESROLETYPE_
 --------------------------------------------------------------------------------------------------
--- | a1 `equalsOrGeneralisesRoleADT` a2
--- | intuitively when a2 is built from a1 (or a2 == a1).
--- | Compares with equalsOrGeneralisesADT (module Perspectives.Representation.ADT)
--- | However, that function works for any a (Ord a, Eq a).
--- | This function works for EnumeratedRoleTypes and takes Aspects into account.
--- | For a function that works with ADT RoleInContext, see: `lessThanOrEqualTo`.
--- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
-equalsOrGeneralisesRoleADT' :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-equalsOrGeneralisesRoleADT' adt1 adt2 = do
-  a1 <- pure $ toDisjunctiveNormalForm adt1
-  a2 <- pure $ toDisjunctiveNormalForm adt2
-  union' <- runArrayT $ allTypesInRoleADT adt1
-  intersection' <- runArrayT $ commonTypesInRoleADT adt2
-  pure $ SET.subset (SET.fromFoldable union') (SET.fromFoldable intersection')
-
+-- | For a function that works with ADT RoleInContext, see: `greaterThanOrEqualTo`.
 equalsOrSpecialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 equalsOrSpecialisesRoleADT adt1 adt2 = do
-  adt1' <- pure $ toDisjunctiveNormalForm adt1
-  adt2' <- pure $ toDisjunctiveNormalForm adt2
+  adt1' <- expandAspects adt1 >>= pure <<< toDisjunctiveNormalForm
+  adt2' <- expandAspects adt2 >>= pure <<< toDisjunctiveNormalForm
   pure $ equalsOrSpecialisesRoleADT_ adt1' adt2'
   where
   equalsOrSpecialisesRoleADT_ ::  ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> Boolean
@@ -436,6 +422,9 @@ equalsOrSpecialisesRoleADT adt1 adt2 = do
         PROD rs -> ts `superset` rs
         SUM rs -> isJust $ findIndex (\r -> PROD ts `equalsOrSpecialisesRoleADT_` r) rs 
       SUM ls -> foldl (\allTrue l -> if allTrue then l `equalsOrSpecialisesRoleADT_` a2 else false) true ls
+  
+  expandAspects :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+  expandAspects = reduce (getEnumeratedRole >=> map (map roleInContext2Role) <<< roleAspectsADT)
 
 superset :: forall a. Ord a => Eq a => Array a -> Array a -> Boolean
 superset super sub = (SET.fromFoldable sub) `SET.subset` (SET.fromFoldable super)
@@ -449,7 +438,13 @@ generalisesRoleADT adt1 adt2 = do
 specialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 specialisesRoleADT = flip generalisesRoleADT
 
--- | For a function that works with ADT RoleInContext, see: `greaterThanOrEqualTo`.
+-- | a1 `equalsOrGeneralisesRoleADT` a2
+-- | intuitively when a2 is built from a1 (or a2 == a1).
+-- | Compares with equalsOrGeneralisesADT (module Perspectives.Representation.ADT)
+-- | However, that function works for any a (Ord a, Eq a).
+-- | This function works for EnumeratedRoleTypes and takes Aspects into account.
+-- | For a function that works with ADT RoleInContext, see: `lessThanOrEqualTo`.
+-- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
 equalsOrGeneralisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
 equalsOrGeneralisesRoleADT = flip equalsOrSpecialisesRoleADT
 
