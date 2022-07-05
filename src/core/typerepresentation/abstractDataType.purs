@@ -361,7 +361,7 @@ equalsOrSpecialisesADT_ a1 a2 =
     PROD ts -> case a2 of
       EMPTY -> false
       UNIVERSAL -> true
-      r@(ST _) -> ts == [r]
+      r@(ST _) -> isJust $ elemIndex r ts
       PROD rs -> ts `superset` rs
       SUM rs -> isJust $ findIndex (\r -> PROD ts `equalsOrSpecialisesADT_` r) rs 
     SUM ls -> foldl (\allTrue l -> if allTrue then l `equalsOrSpecialisesADT_` a2 else false) true ls
