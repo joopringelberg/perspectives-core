@@ -143,10 +143,10 @@ toADT' (ST a) = ST' a
 toADT' EMPTY = EMPTY'
 toADT' UNIVERSAL = UNIVERSAL'
 toADT' (SUM as) = case uncons as of 
-  Just {head, tail} -> foldr (\adt adt' -> SUM' adt' (toADT' adt)) (toADT' head) tail
+  Just {head, tail} -> foldl (\adt' adt -> SUM' (toADT' adt) adt') (toADT' head) tail
   Nothing -> EMPTY'
 toADT' (PROD as) = case uncons as of 
-  Just {head, tail} -> foldr (\adt adt' -> PROD' adt' (toADT' adt)) (toADT' head) tail
+  Just {head, tail} -> foldl (\adt' adt -> PROD' (toADT' adt) adt') (toADT' head) tail
   Nothing -> EMPTY' 
 
 toADT :: forall a. Eq a => ADT' a -> ADT a
