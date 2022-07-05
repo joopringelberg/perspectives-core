@@ -62,7 +62,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
-import Perspectives.Query.QueryTypes (isRoleDomain, range)
+import Perspectives.Query.QueryTypes (isRoleDomain, range, roleDomain)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, cacheInDomeinFile, getEnumeratedRole, tryGetState)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole, InvertedQueryMap)
@@ -485,6 +485,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
         )
     -- These are all other cases, where there still is some path to walk to the
     -- role (and its binding) that carries the properties.
+    -- NOTE: THE RESULT OF THE FORWARD PART MAY BE A PROPERTY VALUE!
     Just fw -> do
       -- Run the query interpreter on the same role instance as the backwards query,
       -- resulting in all the paths that lead up to a role result.
@@ -529,50 +530,54 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
       -- For each property, get its value from the role instances found by the query interpreter,
       -- if the state condition is met. This is similar but not equal to the treatment
       -- of the case above where there was no forwards query.
-      forWithIndex_ (unwrap statesPerProperty)
-        (\prop propStates -> for_ propStates
-          -- For each state that provides a perspective on the property,
-          \stateIdentifier -> (lift $ tryGetState stateIdentifier) >>= case _ of
-            -- If we deal with a roleInstance of a type for which no state has been defined,
-            -- we should carry on as if the state condition was satisfied.
-            Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependencies (join $ snd <$> cwus))
-            Just (State.State{stateFulObject}) ->
-              -- if the stateful object...
-              case stateFulObject of
-                -- ... is the current context, then if it is in that state,
-                Cnt _ -> for_ cwus
-                  \(Tuple cid users) -> (lift $ contextIsInState stateIdentifier cid) >>= if _
-                    -- then run the interpreter on the property computation and the head of the dependency paths
-                    -- and create deltas for all users
-                    then for_ (_.head <$> rinstances)
-                      \(dep :: Dependency) -> do
-                        (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
-                        for_ (join (allPaths <$> vals)) (serialiseDependencies users)
-                    else pure unit
-                -- ... is the subject role, collect each user that is that state,
-                Srole _ -> for_ cwus
-                  \(Tuple cid users) -> lift (filterA (roleIsInState stateIdentifier) users) >>=
-                    \sanctionedUsers ->
-                      -- run the interpreter on the property computation and the head of the dependency paths
-                      -- and create deltas for all collected users
-                      for_ (_.head <$> rinstances)
-                        \(dep :: Dependency) -> do
-                          (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
-                          for_ (join (allPaths <$> vals)) (serialiseDependencies sanctionedUsers)
-                -- ... is the object role, then for all paths that end in a role that is in that state,
-                Orole _ -> (filterA
-                  (\{head} -> case head of
-                    R rid -> lift (roleIsInState stateIdentifier rid)
-                    otherwise -> throwError (error ("runForwardsComputation (states per property) hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
-                  rinstances)
-                    >>= pure <<< map _.head
-                    -- run the interpreter on the property computation and the head of the dependency path
-                    -- and create deltas for all users
-                    >>= traverse_
-                      \(dep :: Dependency) -> do
-                        (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
-                        for_ (join (allPaths <$> vals)) (serialiseDependencies (join $ snd <$> cwus))
-        )
+      -- Do this only for inverted queries that result in a role domain.
+      if isRoleDomain $ range fw
+        then 
+          forWithIndex_ (unwrap statesPerProperty)
+            (\prop propStates -> for_ propStates
+              -- For each state that provides a perspective on the property,
+              \stateIdentifier -> (lift $ tryGetState stateIdentifier) >>= case _ of
+                -- If we deal with a roleInstance of a type for which no state has been defined,
+                -- we should carry on as if the state condition was satisfied.
+                Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependencies (join $ snd <$> cwus))
+                Just (State.State{stateFulObject}) ->
+                  -- if the stateful object...
+                  case stateFulObject of
+                    -- ... is the current context, then if it is in that state,
+                    Cnt _ -> for_ cwus
+                      \(Tuple cid users) -> (lift $ contextIsInState stateIdentifier cid) >>= if _
+                        -- then run the interpreter on the property computation and the head of the dependency paths
+                        -- and create deltas for all users
+                        then for_ (_.head <$> rinstances)
+                          \(dep :: Dependency) -> do
+                            (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
+                            for_ (join (allPaths <$> vals)) (serialiseDependencies users)
+                        else pure unit
+                    -- ... is the subject role, collect each user that is that state,
+                    Srole _ -> for_ cwus
+                      \(Tuple cid users) -> lift (filterA (roleIsInState stateIdentifier) users) >>=
+                        \sanctionedUsers ->
+                          -- run the interpreter on the property computation and the head of the dependency paths
+                          -- and create deltas for all collected users
+                          for_ (_.head <$> rinstances)
+                            \(dep :: Dependency) -> do
+                              (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
+                              for_ (join (allPaths <$> vals)) (serialiseDependencies sanctionedUsers)
+                    -- ... is the object role, then for all paths that end in a role that is in that state,
+                    Orole _ -> (filterA
+                      (\{head} -> case head of
+                        R rid -> lift (roleIsInState stateIdentifier rid)
+                        otherwise -> throwError (error ("runForwardsComputation (states per property) hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
+                      rinstances)
+                        >>= pure <<< map _.head
+                        -- run the interpreter on the property computation and the head of the dependency path
+                        -- and create deltas for all users
+                        >>= traverse_
+                          \(dep :: Dependency) -> do
+                            (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
+                            for_ (join (allPaths <$> vals)) (serialiseDependencies (join $ snd <$> cwus))
+            )
+        else pure unit
   pure $ join $ snd <$> cwus
 
 -- | Add deltas for all the users to the current transaction, from the given assumption.
