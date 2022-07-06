@@ -555,11 +555,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         maction <- getContextAction predicate userRoleType
         muserRoleInstance <- (ContextInstance object) ##> getMeInRoleAndContext userRoleType
         case muserRoleInstance, maction of
-          Just user, Just (ACTION.Action action) -> void $ runMonadPerspectivesTransaction authoringRole
+          Just user, Just (ACTION.Action action) -> void $ runMonadPerspectivesTransaction userRoleType
             do
               oldFrame <- lift $ pushFrame
               lift $ addBinding "currentcontext" [object]
-              lift $ addBinding "currentactor" [unwrap user] -- userRoleType??
+              lift $ addBinding "currentactor" [unwrap user]
               updater <- lift $ compileAssignment action
               updater (ContextInstance object)
               lift $ restoreFrame oldFrame
