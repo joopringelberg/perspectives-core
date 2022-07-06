@@ -52,7 +52,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, externalRole, filledByCombinator, fillsCombinator, fillsOperator, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseBool, parseDate, parseInt)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
@@ -269,7 +269,7 @@ compileFunction (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) = do
 compileFunction (BQD _ (BinaryCombinator FilledByF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) = do
   sourceOfFilledRoles' <- compileFunction sourceOfBindingRoles
   sourceOfFillerRoles' <- compileFunction sourceOfBoundRoles
-  pure $ (unsafeCoerce fillsOperator (unsafeCoerce sourceOfFilledRoles') (unsafeCoerce sourceOfFillerRoles'))
+  pure $ (unsafeCoerce filledByOperator (unsafeCoerce sourceOfFilledRoles') (unsafeCoerce sourceOfFillerRoles'))
 
 compileFunction (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
