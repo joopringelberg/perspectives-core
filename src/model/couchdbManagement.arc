@@ -1,4 +1,5 @@
--- Copyright Joop Ringelberg and Cor Baars 2021 - 2022
+-- CouchdbManagement - Copyright Joop Ringelberg and Cor Baars 2021 - 2022
+
 domain CouchdbManagement
   use sys for model:System
   use cm for model:CouchdbManagement
@@ -7,6 +8,9 @@ domain CouchdbManagement
   use cdb for model:Couchdb
   use util for model:Utilities
 
+  -------------------------------------------------------------------------------
+  ---- MODEL
+  -------------------------------------------------------------------------------
   -- The model description case.
   -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
   case Model
@@ -14,6 +18,9 @@ domain CouchdbManagement
     external
       aspect sys:Model$External
 
+  -------------------------------------------------------------------------------
+  ---- INDEXED CONTEXT
+  -------------------------------------------------------------------------------
   -- The INDEXED context cm:MyCouchdbApp, that is the starting point containing all CouchdbServers.
   case CouchdbManagementApp
     indexed cm:MyCouchdbApp
@@ -22,13 +29,14 @@ domain CouchdbManagement
       aspect sys:RootContext$External
 
     -- Every user manages his own CouchdbServers.
-    -- This manager should be the Server admin of each CouchdbServer, in order
-    -- to create databases and members.
+    -- This manager should be the Server admin of each CouchdbServer,
+    -- in order to create databases and members.
     -- Becoming a Couchdb Server Admin should be managed outside Perspectives.
     user Manager = sys:Me
       perspective on CouchdbServers
         only (CreateAndFill, Remove)
         props (Name, Url) verbs (Consult)
+
       -- Manager needs this perspective for others to accept Admins created in state NoAdmin.
       -- NOTE that model:TopContext can be used as Aspect instead.
       perspective on CouchdbServers >> binding >> context >> CouchdbServer$Admin
@@ -42,6 +50,9 @@ domain CouchdbManagement
           do for Manager
             bind context >> Manager to Admin in binding >> context
 
+  -------------------------------------------------------------------------------
+  ---- COUCHDBSERVER
+  -------------------------------------------------------------------------------
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
   -- NOTE: a PerspectivesSystem$User should only fill either Admin, or Accounts!
@@ -75,43 +86,49 @@ domain CouchdbManagement
       -- As acc:Body$Admin, has full perspective on Accounts.
       aspect acc:Body$Admin
 
-      -- TODO. Remove this as soon as we do not need the view anymore for the GUI.
-      view AdminProps (UserName, Password)
-
       perspective on Repositories
-        defaults
-
-      -- The Admin should be able to create and fill the Repository$Admin.
-      -- NOTE that model:TopContext can be used as Aspect instead.
-      -- perspective on Repositories >> binding >> context >> Repository$Admin
-      --   defaults
-
-      -- The CouchdbServer$Admin has to be able to enter the credentials that
-      -- make him Server admin of the Couchdb installation.
-      perspective on CouchdbServer$Admin
-        view AdminProps verbs (SetPropertyValue, Consult)
+        all roleverbs
+        props (Endorsed, IsPublic, Name) verbs (Consult)
+        props (IsPublic) verbs (SetPropertyValue)
+        in object state WithoutExternalDatabase
+          props (Endorsed, Name) verbs (SetPropertyValue)
+        in object state WithExternalDatabase
+          props (IsPublic) verbs (SetPropertyValue)
 
       perspective on extern
         defaults
       
       perspective on Accounts
         only (Create, Fill, Remove)
+        props (FirstName, LastName, IsAccepted, IsRejected) verbs (Consult)
+      
+      perspective on WaitingAccounts
         props (FirstName, LastName) verbs (Consult)
+        props (IsAccepted, IsRejected) verbs (SetPropertyValue)
+        action Accept
+          IsAccepted = true
+        action Reject
+          IsRejected = true
       
       screen "Couchdb Server"
-        tab "Extern"
+        tab "The server"
           row
             form External
+          row
+            form Admin
         tab "Accounts"
           row
             table Accounts
         tab "Repositories"
           row 
             table Repositories
+        tab "Applicants"
+          row 
+            table WaitingAccounts
 
-
-    -- Note that the aspect acc:Body introduces a Guest role
-    -- with a perspective that allows it to create an Account.
+    -- The aspect acc:Body introduces a Guest role
+    -- with a perspective that allows it to request an Account when he has none.
+    aspect user acc:Body$Guest
 
     -- This role should be in private space.
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
@@ -124,7 +141,7 @@ domain CouchdbManagement
           callEffect cdb:DeleteUser( context >> extern >> Url, binding )
 
       -- Currently, we automatically accept an applicant.
-      on entry of subject state acc:Body$Accounts$IsFilled
+      on entry of subject state acc:Body$Accounts$IsAccepted
         do for Admin
           letA
               pw <- callExternal util:GenSym() returns String
@@ -147,25 +164,54 @@ domain CouchdbManagement
       action RequestRepository
         letA
           myrepo <- create context Repository bound to Repositories
-          measadmin <- create role Admin in myrepo >> binding >> context
         in
-          bind_ currentactor to measadmin
+          bind currentactor to Admin in myrepo >> binding >> context
 
-      -- As an Account, one can see both public repositories and repositories managed by oneself (as Admin).
-      perspective on filter Repositories with IsPublic or binding >> context >> Repository$Admin filledBy sys:Me
+      perspective on Repositories
+        props (IsPublic, Name) verbs (Consult)
         only (CreateAndFill)
-        verbs (Consult)
-        props (Name) verbs (SetPropertyValue)
+
+      perspective on MyRepositories
+        only (Remove)
+        props (Name, Endorsed) verbs (Consult)
+        props (IsPublic) verbs (SetPropertyValue)
+        in object state WithoutExternalDatabase
+          props (Name) verbs (SetPropertyValue)
+
+      perspective on PublicRepositories
+        props (Name) verbs (Consult)
+        
+      perspective on Repositories >> binding >> context >> Admin
+        only (Create, Fill)
 
       perspective on extern
         props (Url, Name) verbs (Consult)
+      
+      screen "Couchdb Server"
+        tab "Server information"
+          row
+            form External
+          row
+            table Accounts
+        tab "Repositories"
+          row 
+            table MyRepositories
+          row
+            table PublicRepositories
+
+    user WaitingAccounts = filter Accounts with (not IsRejected) and not IsAccepted
+
+    context MyRepositories = filter Repositories with binding >> context >> Repository$Admin filledBy sys:Me
+
+    context PublicRepositories = filter Repositories with IsPublic
 
     -- This role should be in public space.
     -- A Repositories instance comes complete with an (empty) Admin role.
     -- Moreover, as a side effect, both a read- and write database are created
     -- in Couchdb and the write database replicates to the read database.
     context Repositories (relational) filledBy Repository
-      on exit of IsNamed
+      property Endorsed (Boolean)
+      on exit of WithExternalDatabase
         do for Admin
           callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
           callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
@@ -174,12 +220,13 @@ domain CouchdbManagement
 
       -- Note that as it stands, an Account can unconditionally create a new
       -- Repository. Add a Boolean that represents the Admin's consent.
-      state IsNamed = exists Name
+      state WithExternalDatabase = (exists Name) and Endorsed
         on entry
           do for Admin
             callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_read" )
             callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_write" )
             callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
+      state WithoutExternalDatabase = (not exists Name) or not Endorsed
         -- Ad Admin may exist already if the Repository is created by Accounts.
         -- state NoAdmin = not exists binding >> context >> Repository$Admin
         --   on entry
@@ -187,15 +234,25 @@ domain CouchdbManagement
         --       -- create role Admin in binding >> context
         --       bind context >> Admin to Admin in binding >> context
 
+  -------------------------------------------------------------------------------
+  ---- REPOSITORY
+  -------------------------------------------------------------------------------
   -- PUBLIC
   -- This contexts implements the BodyWithAccounts pattern.
   case Repository
     aspect acc:Body
     --storage public
+    -- on exit
+      -- Verwijder de inhoud?
     external
       -- Only public repositories will be visible to Accounts of CouchdbServers.
       property IsPublic (mandatory, Boolean)
       property Name (mandatory, String)
+        -- Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, (, ), +, -, and / are allowed. Must begin with a letter.
+        -- However, the parser refuses (, ) and \.
+        pattern = /[a-z]([a-z]|[0-9]|[_$+-])*/ "Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, + and - are allowed. Must begin with a letter."
+      property ReadDb = Name + "_read"
+      property WriteDb = Name + "_write"
       property Url = binder Repositories >> context >> extern >> Url + Name
 
     -- We need the ServerAdmin in this context in order to configure the local Admin.
@@ -210,14 +267,18 @@ domain CouchdbManagement
       -- and to retract that again.
       aspect acc:Body$Admin
 
-      on exit of acc:Body$Accounts$IsFilled
+      state IsFilled = exists binding
+
+      on exit 
+        notify "You are no longer the administrator of the repository { context >> extern >> Name }."
+
+      on exit of IsFilled
         do for ServerAdmin
-          callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_write", UserName )
-          callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> Name + "_read", UserName )
+          callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> WriteDb, UserName )
+          callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> ReadDb, UserName )
           remove role origin
 
-      -- state IsFilled = (exists binding) and exists context >> extern >> Url
-      on entry of acc:Body$Accounts$IsFilled
+      on entry of IsFilled
         do for ServerAdmin
           -- Only the CouchdbServer$Admin has a Create and Fill perspective on
           -- Repository$Admin. So when this state arises, we can be sure that
@@ -226,22 +287,42 @@ domain CouchdbManagement
           letA
             url <- context >> extern >> binder Repositories >> context >> extern >> Url
           in
-            callEffect cdb:MakeAdminOfDb( url, context >> extern >> Name + "_write", UserName )
-            callEffect cdb:MakeAdminOfDb( url, context >> extern >> Name + "_read", UserName )
+            callEffect cdb:MakeAdminOfDb( url, context >> extern >> WriteDb, UserName )
+            callEffect cdb:MakeAdminOfDb( url, context >> extern >> ReadDb, UserName )
 
       -- The admin can also create an Author and give him/her the right to add and
       -- remove models to the repo.
       perspective on Authors
+        only (Create, Fill, Remove)
+        props (FirstName, LastName) verbs (Consult)
+      
+      perspective on External
+        props (IsPublic, Name) verbs (Consult)
 
       -- The Admin can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
       perspective on AvailableModels
         verbs (Consult)
-
+      
+      screen "Repository"
+        tab "This repository"
+          row 
+            form External
+          row
+            form Admin
+        tab "Accounts"
+          row
+            table Accounts
+        tab "Authors"
+          row
+            table Authors
+      
     -- This role should be stored in private space.
     -- TODO. Is het mogelijk ook deze rol het aspect acc:Body$Accounts te geven?
     -- Guest kan dan kiezen of hij een Account wil, of een Author wil worden.
     user Authors (relational) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
+      on exit 
+        notify "You are no longer an Author of the repository { context >> extern >> Name }."
       on exit of IsFilled
         do for Admin
           letA
@@ -273,9 +354,11 @@ domain CouchdbManagement
     -- through (Couchdb database) roles or by membership.
     user Accounts (relational) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
       aspect acc:Body$Accounts
+      on exit 
+        notify "You no longer have an Account with the repository { context >> extern >> Name }."
       on exit of IsFilled
         do for Admin
-          callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName)
+          callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> ReadDb, binding >> UserName)
           remove role origin
       
       state IsFilled = exists binding
@@ -283,7 +366,7 @@ domain CouchdbManagement
           do for Admin
             -- As only the PDR of a user with role Repository$Admin will execute this,
             -- and Repository$Admin is a Db Admin, this will be allowed.
-            callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> Name + "_read", binding >> UserName )
+            callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> ReadDb, binding >> UserName )
       
       state Accepted = IsAccepted
         -- An account that is accepted has a perspective on available models.

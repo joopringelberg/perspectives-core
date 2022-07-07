@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars 2021
+-- Bodies With Accounts. Copyright Joop Ringelberg and Cor Baars 2021
 -- This model provides a pattern for bodies that have accounts that can be applied for.
 -- The Accounts role has been kept sparse. Obvious extensions would be:
 --  * a date marking the beginning of the Account;
@@ -29,6 +29,8 @@ domain BodiesWithAccounts
 
   case Body
 
+    state NoAccounts = not exists Accounts
+
     -- Admin can always create and fill Accounts and see the UserName.
     user Admin filledBy sys:PerspectivesSystem$User
       aspect bwa:WithCredentials
@@ -43,16 +45,28 @@ domain BodiesWithAccounts
         in object state IsFilled$NoPassword
           props (Password) verbs (SetPropertyValue)
 
+      perspective on Admin
+        props (FirstName, LastName) verbs (Consult)
+        props (UserName, Password) verbs (SetPropertyValue)
+
     -- Role Guest is available so any user can request an Account.
     -- Guest is superceded by Accounts as soon as it exists.
+    -- This role is useful when a Body is a public context.
+    -- Notice that because Accounts is unlinked and this perspective is selfonly, the existence of other accounts 
+    -- plays no role.
     user Guest = sys:Me
-      -- Guest can request an Account.
-      -- Because Guest is calculated, the PDR will make no effort
-      -- to keep it up to date with the Accounts role. That is OK,
-      -- as this perspective should only be used to create an Accounts
-      -- instance.
-      perspective on Accounts
-        only (Create, Fill)
+      in state NoAccounts
+        -- Guest can request an Account.
+        -- Because Guest is calculated, the PDR will make no effort
+        -- to keep it up to date with the Accounts role. That is OK,
+        -- as this perspective should only be used to create an Accounts
+        -- instance.
+        perspective on Accounts
+          only (Create, Fill)
+          props (FirstName, LastName)
+          selfonly
+          action RequestAccount
+            bind currentactor to Accounts
 
     -- User Accounts should stored in private space.
     -- By making the role unlinked, there are no references from the context to
