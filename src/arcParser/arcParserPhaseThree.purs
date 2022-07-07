@@ -124,11 +124,11 @@ phaseThree_ df@{_id, referredModels} postponedParts screens = do
       requalifyBindingsToCalculatedRoles
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
-      -- Now all perspectives are available.
-      handleScreens screens
       compileStateQueries
       addAspectsToExternalRoles
       contextualisePerspectives
+      -- Now all perspectives are available.
+      handleScreens screens
       invertPerspectiveObjects
       -- combinePerspectives
       addUserRoleGraph
@@ -1167,10 +1167,10 @@ handleScreens screenEs = do
   withDomeinFile
     _id
     (DomeinFile df)
-    (handleScreens' df _id)
+    (handleScreens' _id)
   where
-    handleScreens' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
-    handleScreens' {} ns = do
+    handleScreens' :: Namespace -> PhaseThree Unit
+    handleScreens' ns = do
       screenDefs <- foldM screenDefinition EM.empty (fromFoldable screenEs)
       modifyDF \dfr -> dfr {screens = screenDefs}
 
