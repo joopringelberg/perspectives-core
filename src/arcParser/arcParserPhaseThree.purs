@@ -91,7 +91,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (actionStates, allTypesInRoleADT, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
+import Perspectives.Types.ObjectGetters (actionStates, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (*>), (<$>), (<*), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -413,7 +413,8 @@ handlePostponedStateQualifiedParts = do
     -- | Correctly handles incomplete (not qualified) RoleIdentifications.
     collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
     collectStates mpath r = collectRoles r >>= \roles -> do
-      roles' <- lift2 (roles ###= (forceTypeArray >=> f >=> allTypesInRoleADT))
+      -- Don't include aspects.
+      roles' <- lift2 (roles ###= (forceTypeArray >=> f >=> ArrayT <<< pure <<< allLeavesInADT))      
       case mpath of
         -- For a Calculated role, we should now take the range of its calculation.
         -- This is because a Calculated role has no instances that have state.
