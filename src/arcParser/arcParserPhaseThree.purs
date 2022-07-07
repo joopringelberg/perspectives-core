@@ -45,9 +45,10 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MP, MonadPerspectives, (###=), (###>>))
+import Perspectives.CoreTypes (type (~~~>), MP, MonadPerspectives, forceTypeArray, (###=), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
 import Perspectives.Data.EncodableMap (addAll)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutomaticEffect(..), UpstreamStateNotification(..), addUpstreamAutomaticEffect, addUpstreamNotification, indexedContexts, indexedRoles)
 import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedName, isQualifiedWithDomein, qualifyWith, startsWithSegments)
@@ -90,7 +91,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (actionStates, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
+import Perspectives.Types.ObjectGetters (actionStates, allTypesInRoleADT, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (*>), (<$>), (<*), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -411,12 +412,22 @@ handlePostponedStateQualifiedParts = do
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications.
     collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
-    collectStates mpath r = collectRoles r >>= \roles -> case mpath of
-      -- Alleen van EnumeratedRoleTypes!
-      Nothing -> pure (StateIdentifier <<< roletype2string <$> roles)
-      Just p -> if isQualifiedWithDomein p
-        then pure [StateIdentifier p]
-        else pure (StateIdentifier <<< flip append p <<< flip append "$" <<< roletype2string <$> roles)
+    collectStates mpath r = collectRoles r >>= \roles -> do
+      roles' <- lift2 (roles ###= (forceTypeArray >=> f >=> allTypesInRoleADT))
+      case mpath of
+        -- For a Calculated role, we should now take the range of its calculation.
+        -- This is because a Calculated role has no instances that have state.
+        -- It calculates Enumerated role instances - and those have state!
+        Nothing -> pure (StateIdentifier <<< unwrap <$> roles')
+        Just p -> if isQualifiedWithDomein p
+          then pure [StateIdentifier p]
+          else pure (StateIdentifier <<< flip append p <<< flip append "$" <<< unwrap <$> roles')
+
+      where 
+        f :: RoleType ~~~> ADT EnumeratedRoleType
+        f rt = ArrayT do
+          x <- roleADTOfRoleType rt
+          pure [roleInContext2Role <$> x]
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications that may occur in the SubjectState case.
     stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)
@@ -766,7 +777,7 @@ handlePostponedStateQualifiedParts = do
       propertyTypes <- unsafePartial collectPropertyTypes propsOrView object start
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes propertyVerbs
       -- ... for these states only...
-      stateSpecs <- stateSpecificationToStateSpec state
+      stateSpecs <- stateSpecificationToStateSpec state -- HIER!!
       -- ... the action.
       modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' stateSpecs
       -- Add StateDependentPerspectives to the states.

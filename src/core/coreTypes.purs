@@ -35,6 +35,7 @@ module Perspectives.CoreTypes
   , BrokerService
   , ContextInstances
   , ContextPropertyValueGetter
+  , DomeinCache
   , InformedAssumption(..)
   , MP
   , MPQ
@@ -42,12 +43,12 @@ module Perspectives.CoreTypes
   , MonadPerspectives
   , MonadPerspectivesQuery
   , MonadPerspectivesTransaction
-  , RepeatingTransaction(..)
   , ObjectsGetter
   , OrderedDelta(..)
   , PerspectivesExtraState
   , PerspectivesState
   , PropertyValueGetter
+  , RepeatingTransaction(..)
   , RolInstances
   , RoleGetter
   , StateEvaluation(..)
@@ -56,11 +57,12 @@ module Perspectives.CoreTypes
   , TypeLevelResults
   , Updater
   , WithAssumptions
-  , DomeinCache
   , assumption
   , evalMonadPerspectivesQuery
   , evalMonadPerspectivesQueryToMaybeObject
   , execMonadPerspectivesQuery
+  , forceArray
+  , forceTypeArray
   , liftToInstanceLevel
   , runMonadPerspectivesQuery
   , runMonadPerspectivesQueryToObject
@@ -259,6 +261,11 @@ type TypeLevelGetter s o = s -> TypeLevelResults o
 
 infixl 0 type TypeLevelGetter as ~~~>
 
+-- | Use to make a TypeLevelGetter accept an array of values:
+-- | forceArray >=> <some TypeLevelGetter> :: Array s ~~~> o
+forceTypeArray :: forall a. Array a ~~~> a
+forceTypeArray = ArrayT <<< pure
+
 -----------------------------------------------------------
 -- RUN TYPELEVELGETTER TO GET AN ARRAY OF RESULTS
 -----------------------------------------------------------
@@ -322,6 +329,11 @@ instance foldableArrayWithoutDoubles :: Eq a => Foldable ArrayWithoutDoubles whe
 type TrackingObjectsGetter s o = s -> MPQ o
 
 infixl 5 type TrackingObjectsGetter as ~~>
+
+-- | Use to make a TypeLevelGetter accept an array of values:
+-- | forceArray >=> <some TypeLevelGetter> :: Array s ~~~> o
+forceArray :: forall a. Array a ~~> a
+forceArray = ArrayT <<< pure
 
 type RoleGetter = ContextInstance ~~> RoleInstance
 
