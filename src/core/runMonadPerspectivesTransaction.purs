@@ -66,7 +66,7 @@ import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRe
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
 import Perspectives.Types.ObjectGetters (roleRootStates, contextRootStates)
-import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (*>), (+))
+import Prelude (Unit, bind, discard, flip, join, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -296,7 +296,8 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
           lift $ addBinding "currentcontext" [unwrap ctxt]
           -- Error boundary.
           -- TODO. Hier al de state evaluation doen?
-          catchError (for_ states (exitRole rid))
+          stateEvaluationAndQueryUpdatesForRole rid
+          catchError (for_ states (exitingRoleState rid))
             \e -> logPerspectivesError $ Custom ("Cannot exit role state, because " <> show e)
           lift $ restoreFrame oldFrame
   -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
@@ -332,10 +333,7 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
             \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
           lift $ restoreFrame oldFrame
 
-    exitRole :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
-    exitRole roleId stateId = do
-      stateEvaluationAndQueryUpdatesForRole roleId
-      exitingRoleState roleId stateId
+      
 
 -----------------------------------------------------------
 -- LOADMODELIFMISSING

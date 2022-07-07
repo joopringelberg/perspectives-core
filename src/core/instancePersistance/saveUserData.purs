@@ -70,7 +70,7 @@ import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFill
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName)
+import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, contextType, getProperty, getUnlinkedRoleInstances, isMe)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
@@ -258,23 +258,26 @@ statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, pspType:roleType,
       -- Do not run forwards query!
       false
 
--- | SYNCHRONISATION. Compute a RemoveRoleInstance UniverseRoleDelta.
+-- | SYNCHRONISATION. Compute a RemoveRoleInstance UniverseRoleDelta 
+-- | (but not for external roles: a delta is generated on exiting the context).
 synchroniseRoleRemoval :: PerspectRol -> Array RoleInstance -> MonadPerspectivesTransaction Unit
-synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contextId}) users = do
-  -- SYNCHRONISATION
-  subject <- getSubject
-  author <- getAuthor
-  addDelta $ DeltaInTransaction
-    { users
-    , delta: SignedDelta
-      { author
-      , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
-        { id: contextId
-        , roleInstances: (SerializableNonEmptyArray (singleton roleId))
-        , roleType
-        , authorizedRole: Nothing
-        , deltaType: RemoveRoleInstance
-        , subject } }}
+synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contextId}) users = if isExternalRole (unwrap roleId)
+  then pure unit
+  else do
+    -- SYNCHRONISATION
+    subject <- getSubject
+    author <- getAuthor
+    addDelta $ DeltaInTransaction
+      { users
+      , delta: SignedDelta
+        { author
+        , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
+          { id: contextId
+          , roleInstances: (SerializableNonEmptyArray (singleton roleId))
+          , roleType
+          , authorizedRole: Nothing
+          , deltaType: RemoveRoleInstance
+          , subject } }}
 
 -- | QUERY UPDATES. Add correlation identifiers to the current transaction for
 -- | each request that needs to be updated when the role instance is removed.
