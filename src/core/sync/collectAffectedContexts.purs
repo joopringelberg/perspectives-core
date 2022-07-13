@@ -25,7 +25,7 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
-import Data.Array (concat, difference, filterA, foldM, foldl, head, nub, null, singleton, union)
+import Data.Array (concat, cons, difference, filterA, foldM, foldl, head, nub, null, union)
 import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
@@ -77,7 +77,7 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Utilities (findM, prettyPrint)
-import Prelude (Unit, bind, const, discard, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, const, discard, flip, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. #12 Check the way state-conditional verbs are combined to establish whether a peer should receive a delta.
@@ -254,7 +254,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
         -- The currently inefficient version accumulates users from each state examined.
         -- The efficient version stops as soon as a context type state is valid.
         computeUsersFromContext :: Array ContextWithUsers -> ContextInstance -> MonadPerspectivesTransaction (Array ContextWithUsers)
-        computeUsersFromContext accumulatedUsers cid = foldM (computeUsersFromState cid) [] states
+        computeUsersFromContext accumulatedUsers cid = foldM (computeUsersFromState cid) accumulatedUsers states
 
         -- | As explicit Perspectives may be conditional on each type of state, we have to consider them all.
         computeUsersFromState :: ContextInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
@@ -262,15 +262,15 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
           case _ of
             -- No state means: an undefined root state.
             -- But in that situation, there are no conditions at all, so we just compute the users from the context.
-            Nothing -> lift $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+            Nothing -> lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
             Just (State.State{stateFulObject}) ->
               case stateFulObject of
                 -- If the state's StateFulObject is a context type (Cnt), and the context is in that state, obtain all user role instances from the context (and we're done)
                 State.Cnt _ -> (lift $ contextIsInState stateId cid) >>= if _
-                  then lift $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
-                  else pure []
+                  then lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+                  else pure accumulatedUsers
                 -- If the state's StateFulObject is a subject type (Srole), then obtain the user role instances from the context and pass on all that are in that state.
-                State.Srole rtype -> lift $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA (roleIsInState stateId) >>= filterA notIsMe) userTypes)
+                State.Srole rtype -> lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA (roleIsInState stateId) >>= filterA notIsMe) userTypes)
                 -- Construct an Array of object roles. If there is no forwards computation, it is just the roleInstance.
                 -- If the forwards computation results in the object of the original, not inverted, query, run it on the roleInstance. NOTE: instead we use a weaker test: if it results in a role instance.
                 -- Only if any of the object roles is in the required state, obtain the user role instances from the context and return them.
@@ -279,8 +279,8 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
                     Just f, Just true -> lift (roleInstance ##= unsafeCoerce f)
                     _, _ -> pure [roleInstance]
                   lift (findM (roleIsInState stateId) objects) >>= \mObject -> if isJust mObject
-                    then lift $ singleton <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
-                    else pure []
+                    then lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+                    else pure accumulatedUsers
 
     -- | The inverted query (its backward part) always leads to a role instance.
     -- | These InvertedQueries have been derived from 'implicit Perspectives', that is: expressions in statements
@@ -298,7 +298,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
 
       where
         computeUsersFromRole :: Array ContextWithUsers -> RoleInstance -> MonadPerspectivesTransaction (Array ContextWithUsers)
-        computeUsersFromRole accumulatedUsers rid = foldM (computeUsersFromState rid) [] states
+        computeUsersFromRole accumulatedUsers rid = foldM (computeUsersFromState rid) accumulatedUsers states
 
         -- | We only have to consider Srole and Orole cases.
         computeUsersFromState :: RoleInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
@@ -308,21 +308,21 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
             -- We then compute the users from the context of the role instance
             Nothing -> do
               cid <- lift (rid ##>> OG.context)
-              singleton <<< Tuple cid <$> lift (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+              flip cons accumulatedUsers <<< Tuple cid <$> lift (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
             Just (State.State{stateFulObject}) ->
               case stateFulObject of
                 State.Cnt _ -> throwError (error $ "fromRoleResults.computeUsersFromState: context states should not occur.")
                 -- The role we've been lead back to is a user role. Check whether it is in the required state.
                 State.Srole _ -> (lift $ roleIsInState stateId rid) >>= if _
-                  then lift (rid ##>> OG.context) >>= \cid -> pure $ [Tuple cid [rid]]
-                  else pure []
+                  then lift (rid ##>> OG.context) >>= \cid -> pure $ cons (Tuple cid [rid]) accumulatedUsers
+                  else pure accumulatedUsers
                 -- The role we've been lead back to is an object role. If it is in the required state,
                 -- compute the users having a perspective from its context.
                 State.Orole _ -> (lift $ roleIsInState stateId rid) >>= if _
                   then do
                     cid <- lift (rid ##>> OG.context)
-                    singleton <<< Tuple cid <$> lift (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
-                  else pure []
+                    flip cons accumulatedUsers <<< Tuple cid <$> lift (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
+                  else pure accumulatedUsers
 
 -- | Adds the InvertedQueryResult to the current Transaction, but only if the resource is not marked as (to be) removed.
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
