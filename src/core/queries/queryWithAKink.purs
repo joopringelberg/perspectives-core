@@ -75,6 +75,7 @@ completeInversions = invert >=> pure <<< catMaybes <<< map f
     f qwk = if isCompleteInverse qwk then backwards qwk else Nothing
 
     -- | Is the original query completely inversed? (as opposed to: is this a partial inversion).
+    -- | By definition this is true if the forwards part is Nothing.
     isCompleteInverse :: QueryWithAKink -> Boolean
     isCompleteInverse (ZQ _ Nothing) = true
     isCompleteInverse _ = false

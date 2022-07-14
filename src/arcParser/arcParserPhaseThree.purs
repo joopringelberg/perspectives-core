@@ -36,6 +36,7 @@ import Data.Array (cons, elemIndex, filter, find, findIndex, foldM, foldl, foldr
 import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
+import Data.Identity as Identity
 import Data.List (List, filterM, fromFoldable) as LIST
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
 import Data.Newtype (unwrap)
@@ -67,7 +68,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspective
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName, qualifyLocalContextName)
 import Perspectives.Query.Kinked (completeInversions, setInvertedQueries)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Query.StatementCompiler (compileStatement)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, reduce)
@@ -76,7 +77,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getContext, getEnumeratedRole, tryGetPerspectType)
-import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional)
+import Perspectives.Representation.Class.Role (Role(..), allProperties, displayName, displayNameOfRoleType, getRole, getRoleType, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional, getCalculation)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -1385,8 +1386,16 @@ roleIdentificationToQueryFunctionDescription roleIdentification pos = do
 computeCurrentContextFromRoleIdentification :: RoleIdentification -> ArcPosition -> PhaseThree QueryFunctionDescription
 computeCurrentContextFromRoleIdentification roleIdentification pos = do
   compiledObject <- roleIdentificationToQueryFunctionDescription roleIdentification pos
-  -- NOTE that filters and WithFrame constructs are ignored in the inversion process.
-  (contextCalculations :: (Array QueryFunctionDescription)) <- completeInversions compiledObject
+  -- Expand Calculated roles to their calculation.
+  expandedCompiledObject <- traverseQfd (\qfd -> case qfd of 
+    SQD dom (RolGetter (CR r)) ran _ _ -> lift2 $ (getRole >=> getCalculation) (CR r)
+    other -> pure other) compiledObject
+  -- First simplify by reducing `filter source criterium` to `source` and removing WithFrame:
+  reducedObject <- pure $ unwrap $ traverseQfd (\qfd -> case qfd of 
+    (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) -> Identity.Identity source
+    (UQD _ WithFrame qfd1 _ _ _) -> Identity.Identity qfd1
+    other -> Identity.Identity other) expandedCompiledObject
+  (contextCalculations :: (Array QueryFunctionDescription)) <- completeInversions reducedObject
   case joinQfds contextCalculations of
     Nothing -> throwError (Custom $ "It is not possible to compute the current context in position " <> show pos <> " (is `origin` an indexed role or context?). Change current state at this position, for example by using `in object|subject|context state`." <> " Information for programmers: function computeCurrentContextFromRoleIdentification with compiledObject = " <> prettyPrint compiledObject)
     Just result -> pure result

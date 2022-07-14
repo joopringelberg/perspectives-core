@@ -253,8 +253,8 @@ isEmpty (Properties ps) = null ps
 ---- QUERYWITHAKINK
 --------------------------------------------------------------------------------------------------------------
 -- | A QueryWithAKink represents a query as seen from a specific station (context or role) that is visited by some
--- | original query. The forwards part describes a query that will run from the station to its original query's end;
--- | the backwards part is a query that will run from the station to the original queries beginning.
+-- | original query. The forwards (second) part describes a query that will run from the station to its original query's end;
+-- | the backwards (first) part is a query that will run from the station to the original queries beginning.
 data QueryWithAKink = ZQ (Maybe QueryFunctionDescription) (Maybe QueryFunctionDescription)
 
 forwards :: QueryWithAKink -> Maybe QueryFunctionDescription
