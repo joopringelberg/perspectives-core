@@ -153,8 +153,8 @@ interpret (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) a = ArrayT d
     (r :: Array DependencyPath) <- runArrayT $ interpret criterium v
     case head r of
       Just l -> unsafePartial $ case l.head of
-        (V "FilterF" (Value "true")) -> pure $ [appendPaths v l]
-        (V "FilterF" (Value "false")) -> pure []
+        (V _ (Value "true")) -> pure $ [appendPaths v l]
+        (V _ (Value "false")) -> pure []
       -- interpret no criterium result as false.
       otherwise -> pure []
     )
