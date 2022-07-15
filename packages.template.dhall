@@ -77,6 +77,7 @@ in  upstream
       , "maybe"
       , "transformers"
       , "tuples"
+      , "ordered-collections"
       ]
     , repo =
         "https://github.com/joopringelberg/perspectives-utilities.git"

@@ -161,12 +161,6 @@ domain CouchdbManagement
             callEffect cdb:ResetPassword( context >> extern >> Url, UserName, pw )
             Password = pw
 
-      action RequestRepository
-        letA
-          myrepo <- create context Repository bound to Repositories
-        in
-          bind currentactor to Admin in myrepo >> binding >> context
-
       perspective on Repositories
         props (IsPublic, Name) verbs (Consult)
         only (CreateAndFill)
@@ -187,6 +181,12 @@ domain CouchdbManagement
       perspective on extern
         props (Url, Name) verbs (Consult)
       
+      action RequestRepository
+        letA
+          myrepo <- create context Repository bound to Repositories
+        in
+          bind currentactor to Admin in myrepo >> binding >> context
+
       screen "Couchdb Server"
         tab "Server information"
           row

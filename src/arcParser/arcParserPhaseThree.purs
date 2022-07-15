@@ -412,10 +412,11 @@ handlePostponedStateQualifiedParts = do
         otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications.
+    -- | Result contains no double entries.
     collectStates :: (Maybe SegmentedPath) -> RoleIdentification -> PhaseThree (Array StateIdentifier)
     collectStates mpath r = collectRoles r >>= \roles -> do
       -- Don't include aspects.
-      roles' <- lift2 (roles ###= (forceTypeArray >=> f >=> ArrayT <<< pure <<< allLeavesInADT))      
+      roles' <- nub <$> lift2 (roles ###= (forceTypeArray >=> f >=> ArrayT <<< pure <<< allLeavesInADT))      
       case mpath of
         -- For a Calculated role, we should now take the range of its calculation.
         -- This is because a Calculated role has no instances that have state.
@@ -432,6 +433,7 @@ handlePostponedStateQualifiedParts = do
           pure [roleInContext2Role <$> x]
 
     -- | Correctly handles incomplete (not qualified) RoleIdentifications that may occur in the SubjectState case.
+    -- | Result contains no double entries.
     stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
@@ -1100,6 +1102,7 @@ objectMustBeRole qfd start end = case range <$> qfd of
 -- | Qualifies incomplete names and changes RoleType constructor to CalculatedRoleType if necessary.
 -- | The role type name (parameter `rt`) is always fully qualified, EXCEPT
 -- | for the current subject that holds in the body of `perspective of`.
+-- | Result contains no double entries.
 -- TODO. Nu ook voor perspective on als een enkele identifier is gebruikt!
 collectRoles :: RoleIdentification -> PhaseThree (Array RoleType)
 -- A single role type will result from this case, but it may be a calculated role!
@@ -1107,13 +1110,13 @@ collectRoles (ExplicitRole ctxt rt pos) = do
   maximallyQualifiedName <- if isQualifiedWithDomein (roletype2string rt)
     then pure (roletype2string rt)
     else pure $ concatenateSegments (unwrap ctxt) (roletype2string rt)
-  r <- (\a -> [a]) <$> qualifyLocalRoleName pos maximallyQualifiedName
-  pure r
+  r <- qualifyLocalRoleName pos maximallyQualifiedName
+  pure [r]
 -- Compile the expression s with respect to context ctxt.
 -- This case MUST represent the current object that holds in the body of `perspective on`. Multiple Enumerated role types can result from this case.
 collectRoles (ImplicitRole ctxt s) = compileExpression (CDOM (ST ctxt)) s >>= \qfd ->
   case range qfd of
-    RDOM adt -> pure $ map ENR (allLeavesInADT $ roleInContext2Role <$> adt)
+    RDOM adt -> pure $ nub $ map ENR (allLeavesInADT $ roleInContext2Role <$> adt)
     otherwise -> throwError $ NotARoleDomain otherwise (startOf s) (endOf s)
 
 -- We lookup the qualified name of these properties here, for the object of the perspective.

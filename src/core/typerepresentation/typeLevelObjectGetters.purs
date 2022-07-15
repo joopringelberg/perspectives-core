@@ -67,6 +67,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
+import Perspectives.Utilities (addUnique)
 import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
@@ -665,7 +666,7 @@ statesPerProperty (Perspective{propertyVerbs, object}) = foldWithIndexM f Map.em
       pure $ foldr (\prop cum' ->
         case Map.lookup prop cum' of
           Nothing -> Map.insert prop [stateSpec2StateIdentifier stateId] cum'
-          Just states -> Map.insert prop (cons (stateSpec2StateIdentifier stateId) states) cum')
+          Just states -> Map.insert prop (addUnique (stateSpec2StateIdentifier stateId) states) cum')
         cum
         (concat r1)
 

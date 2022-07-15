@@ -27,8 +27,6 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
 import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
-import Data.Variant (Variant)
-import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
@@ -37,8 +35,8 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
-import Prelude (class Eq, class Ord, class Show, map, (<<<))
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl, writeJSON)
+import Prelude (class Eq, class Ord, class Show, map)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 type VariableName = String
 

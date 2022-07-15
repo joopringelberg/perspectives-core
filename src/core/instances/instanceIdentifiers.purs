@@ -26,7 +26,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Perspectives.Utilities (class PrettyPrint)
-import Prelude (class Eq, class Ord, class Show, compare, show, (<<<), (==), (<>))
+import Prelude (class Eq, class Ord, class Show, compare, show, (<>), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
 newtype ContextInstance = ContextInstance String
