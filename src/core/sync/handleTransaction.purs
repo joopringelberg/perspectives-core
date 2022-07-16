@@ -37,7 +37,7 @@ import Foreign.Generic (decodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
 import Perspectives.Authenticate (authenticate)
-import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerb, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
+import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>), (##>>), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
@@ -174,7 +174,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- be created by any user and usually will be created by parsing a CRL file.
       lift (roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$External")) >>= if _
         then constructExternalRole
-        else (lift $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.CreateAndFill) >>= case _ of
+        else (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.CreateAndFill]) >>= case _ of
           Left e -> handleError e
           Right _ -> constructExternalRole
     RemoveRoleInstance -> do
@@ -184,11 +184,11 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
 
     -- TODO Het lijkt niet nuttig om beide cases te behouden.
     RemoveUnboundExternalRoleInstance -> do
-      (lift $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
+      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove]) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
     RemoveExternalRoleInstance -> do
-      (lift $ roleHasPerspectiveOnExternalRoleWithVerb subject authorizedRole Verbs.Delete) >>= case _ of
+      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove]) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
     where

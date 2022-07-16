@@ -202,6 +202,7 @@ contextRootStates = contextAspectsClosure >=> contextRootState
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON STATE
 ----------------------------------------------------------------------------------------
+-- | The substates registered in the state definition (not their transitive closure, nor Aspect states).
 subStates_ :: StateIdentifier -> MonadPerspectives (Array StateIdentifier)
 subStates_ = tryGetState >=> pure <<< (maybe [] _.subStates <<< map unwrap)
 

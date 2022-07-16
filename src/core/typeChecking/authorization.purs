@@ -35,7 +35,7 @@ import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Role (adtOfRole, getRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.Perspective (perspectiveSupportsRoleVerb)
+import Perspectives.Representation.Perspective (perspectiveSupportsOneOfRoleVerbs)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType(..))
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Types.ObjectGetters (findPerspective, hasPerspectiveOnPropertyWithVerb, hasPerspectiveOnRoleWithVerbs, isPerspectiveOnADT)
@@ -74,8 +74,8 @@ roleHasPerspectiveOnRoleWithVerb subject roleType verbs = do
 -- | `authorizedRole` (second parameter). This is the role that binds the external role that we scrutinize,
 -- | or it is the Calculated role that results in external roles. It is this contextrole (or calculated role)
 -- | that the subject is authorized for.
-roleHasPerspectiveOnExternalRoleWithVerb :: SubjectOfAction -> Maybe RoleType -> RoleVerb -> MonadPerspectives (Either PerspectivesError Boolean)
-roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleType of
+roleHasPerspectiveOnExternalRoleWithVerbs :: SubjectOfAction -> Maybe RoleType -> Array RoleVerb -> MonadPerspectives (Either PerspectivesError Boolean)
+roleHasPerspectiveOnExternalRoleWithVerbs subject mroleType verbs = case mroleType of
   Nothing -> do
     (subjectType :: RoleType) <- typeOfSubjectOfAction subject
     liftEffect $ logPerspectivesError $ Custom "roleHasPerspectiveOnExternalRoleWithVerb: no authorizedRole provided to construct external role"
@@ -85,13 +85,13 @@ roleHasPerspectiveOnExternalRoleWithVerb subject mroleType verb' = case mroleTyp
     (hasPerspectiveWithVerb subjectType rt) >>=
       if _
         then pure $ Right true
-        else pure $ Left $ UnauthorizedForRole "Auteur" subjectType rt [verb']
+        else pure $ Left $ UnauthorizedForRole "Auteur" subjectType rt verbs
     where
       hasPerspectiveWithVerb :: RoleType -> RoleType -> MonadPerspectives Boolean
       hasPerspectiveWithVerb subjectType authorizedRoleType = do
         adtOfAuthorizedRoleType <- getRole authorizedRoleType >>= adtOfRole
         isJust <$> findPerspective subjectType
           \perspective -> do
-            s <- pure $ perspectiveSupportsRoleVerb perspective verb'
+            s <- pure $ perspectiveSupportsOneOfRoleVerbs perspective verbs
             p <- unsafePartial (perspective `isPerspectiveOnADT` adtOfAuthorizedRoleType)
             pure (s && p)
