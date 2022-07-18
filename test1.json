@@ -1,6 +1,6 @@
 {
   "contents": {
-    "timeStamp": 1656662619886,
+    "timeStamp": 1657968718553,
     "deltas": [
       {
         "contents": {
@@ -8,460 +8,86 @@
             "contents": {
               "subject": {
                 "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
-                  "tag": "CR"
+                  "contents": "model:CouchdbManagement$CouchdbServer$Accounts",
+                  "tag": "ENR"
                 },
                 "tag": "UserType"
               },
-              "roleType": "model:CouchdbManagement$CouchdbServer$External",
+              "roleType": "model:CouchdbManagement$CouchdbServer$Repositories",
               "roleInstances": [
-                "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$External"
+                "model:User$c44cf6ba5_e792_447a_bd41_eed32cb1c49e$Repositories_0007"
               ],
-              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172",
+              "id": "model:User$c44cf6ba5_e792_447a_bd41_eed32cb1c49e",
               "deltaType": {
-                "tag": "ConstructExternalRole"
+                "tag": "RemoveRoleInstance"
+              },
+              "authorizedRole": null
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod2$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbServer$Accounts",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:CouchdbManagement$Repository$Admin",
+              "roleInstances": [
+                "model:User$cf0c9e0b4_58fe_4e7d_a63a_b5c635bf346b$Admin_0000"
+              ],
+              "id": "model:User$cf0c9e0b4_58fe_4e7d_a63a_b5c635bf346b",
+              "deltaType": {
+                "tag": "RemoveRoleInstance"
+              },
+              "authorizedRole": null
+            },
+            "tag": "UniverseRoleDelta"
+          },
+          "author": "model:User$prod2$User"
+        },
+        "tag": "SignedDelta"
+      },
+      {
+        "contents": {
+          "encryptedDelta": {
+            "contents": {
+              "subject": {
+                "contents": {
+                  "contents": "model:CouchdbManagement$CouchdbServer$Accounts",
+                  "tag": "ENR"
+                },
+                "tag": "UserType"
+              },
+              "roleType": "model:CouchdbManagement$Repository$External",
+              "roleInstances": [
+                "model:User$cf0c9e0b4_58fe_4e7d_a63a_b5c635bf346b$External"
+              ],
+              "id": "model:User$cf0c9e0b4_58fe_4e7d_a63a_b5c635bf346b",
+              "deltaType": {
+                "tag": "RemoveExternalRoleInstance"
               },
               "authorizedRole": {
-                "contents": "model:CouchdbManagement$CouchdbManagementApp$CouchdbServers",
-                "tag": "ENR"
+                "contents": "model:CouchdbManagement$CouchdbServer$MyRepositories",
+                "tag": "CR"
               }
             },
             "tag": "UniverseRoleDelta"
           },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
-                  "tag": "CR"
-                },
-                "tag": "UserType"
-              },
-              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172",
-              "deltaType": {
-                "tag": "ConstructEmptyContext"
-              },
-              "contextType": "model:CouchdbManagement$CouchdbServer"
-            },
-            "tag": "UniverseContextDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "roleType": "model:CouchdbManagement$CouchdbServer$Accounts",
-              "roleInstances": [
-                "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000"
-              ],
-              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172",
-              "deltaType": {
-                "tag": "ConstructEmptyRole"
-              },
-              "authorizedRole": null
-            },
-            "tag": "UniverseRoleDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "roleType": "model:CouchdbManagement$CouchdbServer$Accounts",
-              "roleInstance": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000",
-              "destinationContext": null,
-              "deltaType": {
-                "tag": "AddRoleInstancesToContext"
-              },
-              "contextInstance": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172"
-            },
-            "tag": "ContextDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": "ContextDelta from defaultRolRecord",
-          "author": ""
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "https://localhost:6984/"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:CouchdbManagement$CouchdbServer$External$Url",
-              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$External",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "LocalRepo"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:CouchdbManagement$CouchdbServer$External$Name",
-              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$External",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
-                  "tag": "CR"
-                },
-                "tag": "UserType"
-              },
-              "roleType": "model:CouchdbManagement$CouchdbServer$Admin",
-              "roleInstances": [
-                "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Admin_0000"
-              ],
-              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172",
-              "deltaType": {
-                "tag": "ConstructEmptyRole"
-              },
-              "authorizedRole": null
-            },
-            "tag": "UniverseRoleDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
-                  "tag": "CR"
-                },
-                "tag": "UserType"
-              },
-              "roleType": "model:CouchdbManagement$CouchdbServer$Admin",
-              "roleInstance": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Admin_0000",
-              "destinationContext": null,
-              "deltaType": {
-                "tag": "AddRoleInstancesToContext"
-              },
-              "contextInstance": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172"
-            },
-            "tag": "ContextDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$prod1$User",
-                "tag": "UserInstance"
-              },
-              "roleType": "model:System$PerspectivesSystem$External",
-              "roleInstances": [
-                "model:User$prod1$External"
-              ],
-              "id": "model:User$prod1",
-              "deltaType": {
-                "tag": "ConstructExternalRole"
-              },
-              "authorizedRole": null
-            },
-            "tag": "UniverseRoleDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$prod1$User",
-                "tag": "UserInstance"
-              },
-              "id": "model:User$prod1",
-              "deltaType": {
-                "tag": "ConstructEmptyContext"
-              },
-              "contextType": "model:System$PerspectivesSystem"
-            },
-            "tag": "UniverseContextDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$prod1$User",
-                "tag": "UserInstance"
-              },
-              "roleType": "model:System$PerspectivesSystem$User",
-              "roleInstances": [
-                "model:User$prod1$User"
-              ],
-              "id": "model:User$prod1",
-              "deltaType": {
-                "tag": "ConstructEmptyRole"
-              },
-              "authorizedRole": null
-            },
-            "tag": "UniverseRoleDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": "model:User$prod1$User",
-                "tag": "UserInstance"
-              },
-              "roleType": "model:System$PerspectivesSystem$User",
-              "roleInstance": "model:User$prod1$User",
-              "destinationContext": null,
-              "deltaType": {
-                "tag": "AddRoleInstancesToContext"
-              },
-              "contextInstance": "model:User$prod1"
-            },
-            "tag": "ContextDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "prod1"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:System$PerspectivesSystem$User",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:System$PerspectivesSystem$User$FirstName",
-              "id": "model:User$prod1$User",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbManagementApp$Manager",
-                  "tag": "CR"
-                },
-                "tag": "UserType"
-              },
-              "oldFiller": null,
-              "filler": "model:User$prod1$User",
-              "filled": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Admin_0000",
-              "deltaType": {
-                "tag": "SetFirstBinding"
-              }
-            },
-            "tag": "RoleBindingDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "producer1"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:System$PerspectivesSystem$User",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:System$PerspectivesSystem$User$LastName",
-              "id": "model:User$prod1$User",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "oldFiller": null,
-              "filler": "model:User$prod2$User",
-              "filled": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000",
-              "deltaType": {
-                "tag": "SetFirstBinding"
-              }
-            },
-            "tag": "RoleBindingDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "true"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:BodiesWithAccounts$Body$Accounts$IsAccepted",
-              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$prod1$User"
-        },
-        "tag": "SignedDelta"
-      },
-      {
-        "contents": {
-          "encryptedDelta": {
-            "contents": {
-              "values": [
-                "geheim"
-              ],
-              "subject": {
-                "contents": {
-                  "contents": "model:CouchdbManagement$CouchdbServer$Admin",
-                  "tag": "ENR"
-                },
-                "tag": "UserType"
-              },
-              "property": "model:BodiesWithAccounts$WithCredentials$Password",
-              "id": "model:User$cf4969bb9_38c1_4e32_9f8d_98416fa4d172$Accounts_0000",
-              "deltaType": {
-                "tag": "AddProperty"
-              }
-            },
-            "tag": "RolePropertyDelta"
-          },
-          "author": "model:User$prod1$User"
+          "author": "model:User$prod2$User"
         },
         "tag": "SignedDelta"
       }
     ],
-    "author": "model:User$prod1$User"
+    "author": "model:User$prod2$User"
   },
   "tag": "TransactionForPeer"
 }

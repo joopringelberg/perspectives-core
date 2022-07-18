@@ -43,7 +43,7 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, 
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Identifiers (buitenRol, unsafeDeconstructModelName)
+import Perspectives.Identifiers (buitenRol, deconstructNamespace_, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -54,7 +54,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
-import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, removeRoleInstance, replaceBinding, setFirstBinding)
+import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
@@ -180,7 +180,8 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
     RemoveRoleInstance -> do
       (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove]) >>= case _ of
         Left e -> handleError e
-        Right _ -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
+        -- Right _ -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
+        Right _ -> for_ (toNonEmptyArray roleInstances) scheduleRoleRemoval
 
     -- TODO Het lijkt niet nuttig om beide cases te behouden.
     RemoveUnboundExternalRoleInstance -> do
@@ -190,7 +191,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
     RemoveExternalRoleInstance -> do
       (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove]) >>= case _ of
         Left e -> handleError e
-        Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
+        Right _ -> for_ (ContextInstance <<< deconstructNamespace_ <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)
     where
       userCreatesThemselves :: Boolean
       userCreatesThemselves = case subject of

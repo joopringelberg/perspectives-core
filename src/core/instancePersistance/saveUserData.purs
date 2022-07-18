@@ -30,27 +30,28 @@
 -- | except for saveContextInstance (no CURRENTUSER, nor SYNCHRONISATION)
 
 module Perspectives.SaveUserData
-  ( saveContextInstance
+  ( changeRoleBinding
+  , handleNewPeer
+  , removeAllRoleInstances
+  , removeBinding
+  , removeContextIfUnbound
   , removeContextInstance
   , removeRoleInstance
-  , removeAllRoleInstances
-  , removeContextIfUnbound
-  , removeBinding
+  , replaceBinding
+  , saveContextInstance
+  , scheduleContextRemoval
+  , scheduleRoleRemoval
   , setBinding
   , setFirstBinding
-  , replaceBinding
-  , handleNewPeer
-  , changeRoleBinding
   , stateEvaluationAndQueryUpdatesForContext
   , stateEvaluationAndQueryUpdatesForRole
   )
-
   where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.State (lift)
-import Data.Array (concat, delete, elemIndex, head, nub, union)
+import Data.Array (concat, cons, delete, elemIndex, find, head, nub, union)
 import Data.Array.NonEmpty (singleton)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), isJust, isNothing)
@@ -70,7 +71,7 @@ import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFill
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, isExternalRole)
+import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, deconstructNamespace_, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, contextType, getProperty, getUnlinkedRoleInstances, isMe)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
@@ -87,7 +88,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>), (==), (>>=), (<$>), (<<<))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>), (==), (>>=), (<$>), (<<<), (||))
 
 -- | This function takes care of
 -- | PERSISTENCE
@@ -133,12 +134,46 @@ saveContextInstance id = do
 iedereRolInContext :: PerspectContext -> Array RoleInstance
 iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 
+-- | Add the role instance to the end of the roles to exit.
+-- | Add the actual removal instruction to the end of the scheduledAssignments.
+-- | (we build a last-in, last-out stack of destructive effects)
+scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
+scheduleRoleRemoval id = do
+  -- If the role's context is scheduled to be removed, don't add its removal to the scheduledAssignments.
+  contextIsScheduledToBeRemoved <- gets (\(Transaction{scheduledAssignments}) -> let
+    contextOfRole = ContextInstance $ deconstructNamespace_ (unwrap id)
+    in isJust $ find
+      (case _ of
+        ContextRemoval ctxt _ -> ctxt == contextOfRole
+        _ -> false)
+      scheduledAssignments)
+  roleIsUntouchable <- gets (\(Transaction{untouchableRoles}) -> isJust $ elemIndex id untouchableRoles)
+  if contextIsScheduledToBeRemoved || roleIsUntouchable
+    then pure unit
+    else modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
+      { rolesToExit = rolesToExit `union` [id]
+      , scheduledAssignments = scheduledAssignments `union` [RoleRemoval id]
+      })
+
+-- | Schedules all roles in the context, including its external role, for removal.
+-- | Add the actual removal instruction to the end of the scheduledAssignments.
+-- | (we build a last-in, last-out stack of destructive effects)
+scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
+scheduleContextRemoval authorizedRole id = (lift $ try $ getPerspectContext id) >>=
+  handlePerspectContextError "removeContextInstance"
+  \(ctxt@(PerspectContext{rolInContext, buitenRol, pspType:contextType})) -> do
+    unlinkedRoleTypes <- lift (contextType ###= allUnlinkedRoles)
+    unlinkedInstances <- lift $ concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
+    modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
+      { scheduledAssignments = scheduledAssignments `union` [(ContextRemoval id authorizedRole)]
+      , rolesToExit = nub $ rolesToExit <> (cons buitenRol $ unlinkedInstances <> (concat $ values rolInContext))})
+
 -- Only called when the external role is also 'bound' in a DBQ role.
 removeContextIfUnbound :: RoleInstance -> Maybe RoleType ->  MonadPerspectivesTransaction Unit
 removeContextIfUnbound roleInstance@(RoleInstance rid) rtype = do
   mbinder <- lift (roleInstance ##> allRoleBinders)
   case mbinder of
-    Nothing -> removeContextInstance (ContextInstance $ deconstructBuitenRol rid) rtype
+    Nothing -> scheduleContextRemoval rtype (ContextInstance $ deconstructBuitenRol rid)
     otherwise -> pure unit
 
 -- | Remove the context instance plus roles after detaching all its roles.

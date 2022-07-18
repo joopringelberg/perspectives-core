@@ -86,6 +86,9 @@ domain CouchdbManagement
       -- As acc:Body$Admin, has full perspective on Accounts.
       aspect acc:Body$Admin
 
+      perspective on extern
+        defaults
+
       perspective on Repositories
         all roleverbs
         props (Endorsed, IsPublic, Name) verbs (Consult)
@@ -94,9 +97,6 @@ domain CouchdbManagement
           props (Endorsed, Name) verbs (SetPropertyValue)
         in object state WithExternalDatabase
           props (IsPublic) verbs (SetPropertyValue)
-
-      perspective on extern
-        defaults
       
       perspective on Accounts
         only (Create, Fill, Remove)
@@ -176,7 +176,7 @@ domain CouchdbManagement
         props (Name) verbs (Consult)
         
       perspective on Repositories >> binding >> context >> Admin
-        only (Create, Fill)
+        only (Create, Fill, Remove)
 
       perspective on extern
         props (Url, Name) verbs (Consult)
@@ -228,7 +228,7 @@ domain CouchdbManagement
             callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
       state WithoutExternalDatabase = (not exists Name) or not Endorsed
         -- Ad Admin may exist already if the Repository is created by Accounts.
-        -- state NoAdmin = not exists binding >> context >> Repository$Admin
+        -- state NoAdmin = Endorsed and not exists binding >> context >> Repository$Admin
         --   on entry
         --     do for Admin
         --       -- create role Admin in binding >> context
