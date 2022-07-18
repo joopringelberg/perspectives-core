@@ -91,7 +91,7 @@ domain CouchdbManagement
 
       perspective on Repositories
         all roleverbs
-        props (Endorsed, IsPublic, Name) verbs (Consult)
+        props (Endorsed, IsPublic, Name, AdminLastName) verbs (Consult)
         props (IsPublic) verbs (SetPropertyValue)
         in object state WithoutExternalDatabase
           props (Endorsed, Name) verbs (SetPropertyValue)
@@ -181,11 +181,12 @@ domain CouchdbManagement
       perspective on extern
         props (Url, Name) verbs (Consult)
       
-      action RequestRepository
-        letA
-          myrepo <- create context Repository bound to Repositories
-        in
-          bind currentactor to Admin in myrepo >> binding >> context
+      in state acc:Body$Accounts$IsFilled$Accepted
+        action RequestRepository
+          letA
+            myrepo <- create context Repository bound to Repositories
+          in
+            bind currentactor to Admin in myrepo >> binding >> context
 
       screen "Couchdb Server"
         tab "Server information"

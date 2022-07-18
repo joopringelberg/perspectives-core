@@ -32,13 +32,13 @@ import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
 import Data.Either (Either(..))
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Ord.Generic (genericCompare)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Data.Ord.Generic (genericCompare)
+import Data.Show.Generic (genericShow)
 import Data.Traversable (foldMap, traverse)
 import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
@@ -47,7 +47,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic, and, or)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write, writeImpl)
@@ -417,3 +417,23 @@ instance eqCalculation :: Eq Calculation where
 -----------------------------------------------------------------------------------------
 context2RoleInContextADT :: ADT ContextType -> EnumeratedRoleType -> ADT RoleInContext
 context2RoleInContextADT adt role = (\context -> RoleInContext{context, role}) <$> adt
+
+makeComposition :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
+makeComposition left right = BQD
+  (domain left)
+  (BinaryCombinator ComposeF)
+  left
+  right
+  (range right)
+  (and (functional left) (functional right))
+  (or (mandatory left) (mandatory right))
+
+-- | This function is partial, because it only handles a pure composition.
+-- | While preserving right-association, it adds the extraTerm to the right of the expression:
+-- | (a >> b) extraTerm becomes (a >> (b >> extraTerm))
+addTermOnRight :: Partial => QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
+addTermOnRight left@(BQD _ (BinaryCombinator ComposeF) left' right' _ _ _) extraTerm = case right' of 
+  (BQD _ (BinaryCombinator ComposeF) _ _ _ _ _) -> makeComposition left' (addTermOnRight right' extraTerm)
+  -- _ -> makeComposition left extraTerm
+  _ -> makeComposition left' (makeComposition right' extraTerm)
+addTermOnRight left@(SQD _ _ _ _ _) extraTerm = makeComposition left extraTerm

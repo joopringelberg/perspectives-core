@@ -34,9 +34,9 @@ module Perspectives.Parsing.Arc.InvertQueriesForBindings where
 import Prelude
 
 import Control.Monad.Reader (ReaderT, lift)
-import Data.Array (concat, elemIndex, foldMap, fromFoldable, intersect, length, nub)
+import Data.Array (concat, elemIndex, foldMap, fromFoldable, intersect, length, nub, cons)
 import Data.Foldable (for_)
-import Data.Map (Map, filterKeys, values)
+import Data.Map (Map, filterKeys, values, singleton)
 import Data.Map (lookup) as Map
 import Data.Map.Internal (keys)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
@@ -46,17 +46,18 @@ import Data.Newtype (ala, unwrap)
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.InvertedQuery (QueryWithAKink(..))
-import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (makeComposition, storeInvertedQuery)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo')
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain)
+import Perspectives.Parsing.Arc.PhaseThree.StoreInvertedQueries (storeInvertedQuery)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', lift2)
+import Perspectives.Query.Kinked (invert)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext(..), addTermOnRight, domain, makeComposition)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedRole)
-import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
+import Perspectives.Representation.Class.Property (getCalculation, getProperty, propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, functional, mandatory) as RL
 import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType)
 
 -- | For a User RoleType, and an ADT EnumeratedRoleType that represents the Object of a Perspective,
 -- | construct and distribute InvertedQueries that ensure that this User is notified of changes to the filler
@@ -91,15 +92,29 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
   -- set an inverted query for all states for that property.
   for_ propertiesOnThisLevel \prop -> case Map.lookup prop statesPerProperty of
     Nothing -> pure unit
-    Just s -> do
-      backwards' <- lift3 $ prependValue2Role prop backwards
-      storeInvertedQuery
-        (ZQ (Just backwards') Nothing)
-        users
-        s
-        statesPerProperty
-        selfOnly
-
+    Just s -> case prop of 
+      ENP _ -> do 
+        backwards' <- lift3 $ prependValue2Role prop backwards
+        storeInvertedQuery
+          (ZQ (Just backwards') Nothing)
+          users
+          s
+          statesPerProperty
+          selfOnly
+      CP _ -> do
+        pCalc <- lift ((lift2 $ getProperty prop) >>= lift2 <<< getCalculation)
+        (zqs :: (Array QueryWithAKink)) <- lift (invert pCalc)
+        for_ (cons (ZQ Nothing (Just pCalc)) zqs) \qwk@(ZQ backward forward) -> do 
+          -- We have to preserve right-association in backwards.
+          backwards' <- case backward of
+            Nothing -> pure backwards
+            Just bw -> pure $ addTermOnRight bw backwards
+          storeInvertedQuery 
+            (ZQ (Just backwards') forward) 
+            users 
+            s
+            (singleton prop s)
+            selfOnly
   (adtOfBinding :: ADT RoleInContext) <- (lift3 $ getEnumeratedRole role) >>= pure <<< _.binding <<< unwrap
   -- recursive call, where we just pass the submap with properties that do not reside
   -- on this level, and the states in that map.

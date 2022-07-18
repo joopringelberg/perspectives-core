@@ -22,33 +22,27 @@
 
 module Perspectives.Query.Kinked where
 
-import Control.Monad.Reader (ReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, cons, elemIndex, foldr, intercalate, null, uncons, unsnoc)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
-import Data.Map (Map)
 import Data.Maybe (Maybe(..), isJust)
-import Data.Traversable (for_, traverse)
-import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MP, MonadPerspectives)
+import Data.Show.Generic (genericShow)
+import Data.Traversable (traverse)
+import Perspectives.CoreTypes (MP)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
-import Perspectives.Parsing.Arc.InvertQueriesForBindings (setInvertedQueriesForUserAndRole)
-import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (makeComposition, storeInvertedQuery)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, PhaseTwo', addBinding, lift2, lookupVariableBinding, withFrame, throwError)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, throwError, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (compose, queryFunctionIsFunctional, queryFunctionIsMandatory, invertFunction)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, domain, range, replaceDomain, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, makeComposition, range, replaceDomain, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty)
+import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, getCalculation, getRole)
-import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
-import Prelude (class Show, Unit, append, bind, discard, join, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (class Show, append, bind, discard, join, map, pure, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
@@ -239,41 +233,3 @@ invert_ (SQD dom f ran _ _) = do
 -- Catchall.
 invert_ q = throwError (Custom $ "Missing case in invert for: " <> prettyPrint q)
 
---------------------------------------------------------------------------------------------------------------
----- SET INVERTED QUERIES
---------------------------------------------------------------------------------------------------------------
-type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
-
--- | Modifies the DomeinFile in PhaseTwoState.
-setInvertedQueries ::
-  Array RoleType ->
-  Map PropertyType (Array StateIdentifier) ->
-  Array StateIdentifier ->
-  QueryFunctionDescription ->
-  Boolean ->
-  WithModificationSummary Unit
-setInvertedQueries users statesPerProperty roleStates qfd selfOnly = do
-  -- log ("setInvertedQueries:" <> "\n users =" <> show users <> "\n states = " <> show roleStates <> "\n statesPerProperty = " <> showTree statesPerProperty <> "\n qfd = " <> show qfd)
-  (zqs :: (Array QueryWithAKink)) <- lift $ invert qfd
-
-  for_ zqs \qwk@(ZQ backward forward) -> do
-
-      -- Store the QueryWithAKink.
-      storeInvertedQuery qwk users roleStates statesPerProperty selfOnly
-
-      -- If the original query represents the object of a perspective, we need to do more work
-      -- to handle the properties in the perspective.
-      -- We do this just for the full inversion of the object query, i.e. when there is no forward part.
-      -- To ensure we're not dealing with a property definition, we check that the Domain of the backwards part is
-      -- an RDOM (role) domain (the inversion of a property definition query would start with a VDOM (property) domain).
-      case forward, backward, domain <$> backward of
-        Nothing, Just bw, Just (RDOM role) ->
-          void $ unsafePartial $
-            setInvertedQueriesForUserAndRole
-              bw
-              users
-              role
-              statesPerProperty
-              qwk
-              selfOnly
-        _, _, _ -> pure unit
