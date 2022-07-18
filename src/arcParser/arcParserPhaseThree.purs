@@ -122,8 +122,9 @@ phaseThree_ df@{_id, referredModels} postponedParts screens = do
       inferFromAspectRoles
       qualifyBindings
       qualifyStateNames
-      compileCalculatedRolesAndProperties
+      compileCalculatedRoles
       requalifyBindingsToCalculatedRoles
+      compileCalculatedProperties
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
       compileStateQueries
@@ -345,19 +346,18 @@ qualifyPropertyReferences = do
 -- | and the object and query of a state are all expressions.
 -- | This function compiles the parser AST output that represents these expressions to QueryFunctionDescriptions.
 -- | All names are qualified in the process.
-compileCalculatedRolesAndProperties :: PhaseThree Unit
-compileCalculatedRolesAndProperties = do
+compileCalculatedRoles :: PhaseThree Unit
+compileCalculatedRoles = do
   df@{_id} <- lift $ State.gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
     _id
     (DomeinFile df)
-    (compileCalculatedRolesAndProperties' df _id)
+    (compileCalculatedRoles' df _id)
   where
-    compileCalculatedRolesAndProperties' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
-    compileCalculatedRolesAndProperties' {_id,calculatedRoles, calculatedProperties, states, enumeratedRoles} ns = do
+    compileCalculatedRoles' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
+    compileCalculatedRoles' {_id,calculatedRoles, states, enumeratedRoles} ns = do
       traverse_ compileRolExpr (identifier <$> calculatedRoles)
-      traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
       -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
       -- We will not have errors on trying to retrieve the DomeinFile here.
@@ -373,6 +373,24 @@ compileCalculatedRolesAndProperties = do
             -- the DomeinCache.
             S stp -> void $ compileAndSaveRole (CDOM $ ST context) stp cr
 
+compileCalculatedProperties :: PhaseThree Unit
+compileCalculatedProperties = do
+  df@{_id} <- lift $ State.gets _.dfr
+  -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (compileCalculatedProperties' df _id)
+  where
+    compileCalculatedProperties' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
+    compileCalculatedProperties' {_id, calculatedProperties, states, enumeratedRoles} ns = do
+      traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
+      -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
+      -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
+      -- We will not have errors on trying to retrieve the DomeinFile here.
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId ns)
+      modifyDF \dfr -> modifiedDomeinFile
+      where
         compilePropertyExpr :: CalculatedPropertyType -> PhaseThree Unit
         compilePropertyExpr propertyType = do
           cp@(CalculatedProperty {calculation, role}) <- lift2 $ getCalculatedProperty propertyType

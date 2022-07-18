@@ -254,6 +254,7 @@ domain CouchdbManagement
       property ReadDb = Name + "_read"
       property WriteDb = Name + "_write"
       property Url = binder Repositories >> context >> extern >> Url + Name
+      property AdminLastName = context >> Admin >> LastName
 
     -- We need the ServerAdmin in this context in order to configure the local Admin.
     user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin
