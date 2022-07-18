@@ -87,7 +87,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>), (==), (>>=), (<$>))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>), (==), (>>=), (<$>), (<<<))
 
 -- | This function takes care of
 -- | PERSISTENCE
@@ -264,20 +264,24 @@ synchroniseRoleRemoval :: PerspectRol -> Array RoleInstance -> MonadPerspectives
 synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contextId}) users = if isExternalRole (unwrap roleId)
   then pure unit
   else do
-    -- SYNCHRONISATION
-    subject <- getSubject
-    author <- getAuthor
-    addDelta $ DeltaInTransaction
-      { users
-      , delta: SignedDelta
-        { author
-        , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
-          { id: contextId
-          , roleInstances: (SerializableNonEmptyArray (singleton roleId))
-          , roleType
-          , authorizedRole: Nothing
-          , deltaType: RemoveRoleInstance
-          , subject } }}
+    contextWillBeRemoved <- gets (_.untouchableContexts <<< unwrap) >>= pure <<< isJust <<< elemIndex contextId
+    if contextWillBeRemoved
+      then pure unit
+      else do
+        -- SYNCHRONISATION
+        subject <- getSubject
+        author <- getAuthor
+        addDelta $ DeltaInTransaction
+          { users
+          , delta: SignedDelta
+            { author
+            , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
+              { id: contextId
+              , roleInstances: (SerializableNonEmptyArray (singleton roleId))
+              , roleType
+              , authorizedRole: Nothing
+              , deltaType: RemoveRoleInstance
+              , subject } }}
 
 -- | QUERY UPDATES. Add correlation identifiers to the current transaction for
 -- | each request that needs to be updated when the role instance is removed.

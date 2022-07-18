@@ -294,9 +294,8 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
         else do
           oldFrame <- lift pushFrame
           lift $ addBinding "currentcontext" [unwrap ctxt]
-          -- Error boundary.
-          -- TODO. Hier al de state evaluation doen?
           stateEvaluationAndQueryUpdatesForRole rid
+          -- Error boundary.
           catchError (for_ states (exitingRoleState rid))
             \e -> logPerspectivesError $ Custom ("Cannot exit role state, because " <> show e)
           lift $ restoreFrame oldFrame
