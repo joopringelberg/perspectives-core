@@ -451,8 +451,17 @@ handlePostponedStateQualifiedParts = do
           x <- roleADTOfRoleType rt
           pure [roleInContext2Role <$> x]
 
+    -- | Checks whether all states have been declared.
+    statesExist :: ArcPosition -> ArcPosition -> Array StateIdentifier -> PhaseThree (Array StateIdentifier)
+    statesExist start end states = do 
+      for_ states \stateId -> (lift2 $ tryGetPerspectType stateId) >>= case _ of
+        Nothing -> throwError $ (StateDoesNotExist stateId start end)
+        Just _ -> pure unit
+      pure states
+
     -- | Correctly handles incomplete (not qualified) RoleIdentifications that may occur in the SubjectState case.
     -- | Result contains no double entries.
+    -- | State Identifiers are not guaranteed to refer to existing (declared) states!
     stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
@@ -507,7 +516,7 @@ handlePostponedStateQualifiedParts = do
         , unsafePartial makeTypeTimeOnlyRoleStep "currentactor" usersInContext start
         ]
         effect
-      states <- stateSpec2States (transition2stateSpec transition)
+      states <- stateSpec2States (transition2stateSpec transition) >>= statesExist start end
       -- Compile the side effect. Will invert all expressions in the statements, too, including
       -- the object if it is referenced.
       (sideEffect :: QueryFunctionDescription) <- compileStatement
@@ -609,7 +618,7 @@ handlePostponedStateQualifiedParts = do
     handlePart (AST.N (AST.NotificationE{user, object, transition, message, startMoment, endMoment, repeats, start, end})) = do
       originDomain <- statespec2Domain (transition2stateSpec transition)
       (qualifiedUsers :: Array RoleType) <- collectRoles user
-      states <- stateSpec2States (transition2stateSpec transition)
+      states <- stateSpec2States (transition2stateSpec transition) >>= statesExist start end
       -- Then compile the parts of the sentence, tacking each compiled part onto that sequence.
       -- The expressions in the Sentence are compiled with respect to the current context.
       (usersInContext :: ADT QT.RoleInContext) <- collectRoleInContexts user
@@ -725,7 +734,7 @@ handlePostponedStateQualifiedParts = do
         , unsafePartial makeTypeTimeOnlyRoleStep "currentactor" usersInContext start
         ]
         effect
-      states <- stateSpec2States state
+      states <- stateSpec2States state >>= statesExist start end
       -- `syntacticObject` represents the object of the perspective. It allows
       -- for `currentcontext` and `origin`.
       -- currentcontext == origin and this equals the argument that the
@@ -805,7 +814,7 @@ handlePostponedStateQualifiedParts = do
       modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' stateSpecs
       -- Add StateDependentPerspectives to the states.
       -- We cannot modify states of Calculated Roles, as these do not exist.
-      states <- stateSpec2States state >>= LIST.filterM isEnumeratedRoleState <<< LIST.fromFoldable
+      states <- stateSpec2States state >>= statesExist start end >>= LIST.filterM isEnumeratedRoleState <<< LIST.fromFoldable
       props <- case propertyTypes of
         Universal -> lift2 $ allProperties (roleInContext2Role <$> (unsafePartial domain2roleType $ range objectQfd))
         Empty -> pure []
@@ -847,7 +856,7 @@ handlePostponedStateQualifiedParts = do
       modifyAllSubjectPerspectives qualifiedUsers objectQfd
       -- Modify the selfOnly value of StateDependentPerspectives in states.
       -- We cannot modify states of Calculated Roles, as these do not exist.
-      states <- stateSpec2States state >>= LIST.filterM isEnumeratedRoleState <<< LIST.fromFoldable
+      states <- stateSpec2States state >>= statesExist start end >>= LIST.filterM isEnumeratedRoleState <<< LIST.fromFoldable
       for_ states
         (modifyStateDependentPerspectives
           state
@@ -868,7 +877,7 @@ handlePostponedStateQualifiedParts = do
             (\(Perspective pr) -> Perspective pr {selfOnly = true}))
 
     -- | Modifies the DomeinFile in PhaseTwoState.
-    handlePart (AST.CA (AST.ContextActionE{id, subject, object:currentContext, state, effect, start})) = do
+    handlePart (AST.CA (AST.ContextActionE{id, subject, object:currentContext, state, effect, start, end})) = do
       -- `currentContextDomain` represents the current context, expressed as a Domain.
       currentcontextDomain <- pure (CDOM $ ST $ currentContext)
       -- `subject` is the current subject of lexical analysis. It is represented by
@@ -891,7 +900,7 @@ handlePostponedStateQualifiedParts = do
         ,unsafePartial makeTypeTimeOnlyRoleStep "currentactor" usersInContext start
         ]
         effect
-      states <- stateSpec2States state
+      states <- stateSpec2States state >>= statesExist start end
       -- The effect starts with the Perspective object, i.e. the syntacticObject.
       (theAction :: QueryFunctionDescription) <- compileStatement
         states
