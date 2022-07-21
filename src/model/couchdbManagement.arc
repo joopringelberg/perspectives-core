@@ -99,7 +99,7 @@ domain CouchdbManagement
           props (IsPublic) verbs (SetPropertyValue)
       
       perspective on Accounts
-        only (Create, Fill, Remove)
+        only (Create, Fill, Remove, RemoveFiller)
         props (FirstName, LastName, IsAccepted, IsRejected) verbs (Consult)
       
       perspective on WaitingAccounts
@@ -140,8 +140,7 @@ domain CouchdbManagement
         do for Admin
           callEffect cdb:DeleteUser( context >> extern >> Url, binding )
 
-      -- Currently, we automatically accept an applicant.
-      on entry of subject state acc:Body$Accounts$IsAccepted
+      on entry of subject state acc:Body$Accounts$IsFilled$Accepted
         do for Admin
           letA
               pw <- callExternal util:GenSym() returns String
@@ -250,7 +249,7 @@ domain CouchdbManagement
       property IsPublic (mandatory, Boolean)
       property Name (mandatory, String)
         -- Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, (, ), +, -, and / are allowed. Must begin with a letter.
-        -- However, the parser refuses (, ) and \.
+        -- However, the parser refuses (, ) and /.
         pattern = /[a-z]([a-z]|[0-9]|[_$+-])*/ "Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, + and - are allowed. Must begin with a letter."
       property ReadDb = Name + "_read"
       property WriteDb = Name + "_write"
@@ -370,7 +369,7 @@ domain CouchdbManagement
             -- and Repository$Admin is a Db Admin, this will be allowed.
             callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> ReadDb, binding >> UserName )
       
-      state Accepted = IsAccepted
+      in state acc:Body$Accounts$IsFilled$Accepted
         -- An account that is accepted has a perspective on available models.
         perspective on AvailableModels
           verbs (Consult)
