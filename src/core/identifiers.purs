@@ -61,10 +61,11 @@ import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<
 -- | A Namespace has the general shape model://perspect.it/System@1.0.0-alpha
 -- | /^model:\/\/([^$]*)$/ or new Regex( "^model://([^$]*)$" )
 modelRegex_ :: String
-modelRegex_ = "^model://([^\\$]*)"
+modelRegex_ = "^(model:(?://)?[^\\$]*)"
 modelRegex :: Regex
-modelRegex = unsafeRegex (modelRegex_ <> "\\$") noFlags
+modelRegex = unsafeRegex (modelRegex_ <> "$") noFlags
 
+-- | True iff the string is exactly of the form model://Domain
 isModelName :: String -> Boolean
 isModelName s = test modelRegex s
 
@@ -157,13 +158,16 @@ qualifiedNameRegex = unsafeRegex (modelRegex_ <> "\\$(.*)$") noFlags
 isQualifiedName :: String -> Boolean
 isQualifiedName s = test qualifiedNameRegex s
 
--- | Alias for isQualifiedName.
+matchModelnameRegex :: Regex
+matchModelnameRegex = unsafeRegex modelRegex_ noFlags
+
+-- | Tests whether the string is at least of the form `model://ModelName`.
 isQualifiedWithDomein :: String -> Boolean
-isQualifiedWithDomein = isQualifiedName
+isQualifiedWithDomein = test matchModelnameRegex
 
 -- | Matches the entire namespace part of a qualified name (everything but the last segment).
 namespaceRegEx :: Regex
-namespaceRegEx = unsafeRegex "^(model://.*)\\$\\w*" noFlags
+namespaceRegEx = unsafeRegex "^(model:(?://)?.*)\\$\\w*" noFlags
 
 -- | Returns the entire name but for the last segment. This is the namespace of the local name.
 -- | deconstructNamespace "model:Model$First$Second" == Just "model:Model$First"
@@ -181,7 +185,7 @@ deconstructNamespace_ = unsafePartial $ fromJust <<< deconstructNamespace
 -- | deconstructModelName "model://Model$First$Second" == Just "model://Model"
 -- | deconstructModelName "model://Model" == Just "model://Model"
 deconstructModelName :: String -> Maybe Namespace
-deconstructModelName = getFirstMatch qualifiedNameRegex
+deconstructModelName = getFirstMatch matchModelnameRegex
 
 unsafeDeconstructModelName :: String -> Namespace
 unsafeDeconstructModelName = unsafePartial fromJust <<< deconstructModelName
