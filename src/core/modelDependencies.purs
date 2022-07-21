@@ -138,7 +138,7 @@ accountHolder :: String
 accountHolder = "model:BrokerServices$BrokerContract$AccountHolder"
 
 accountHolderName :: String
-accountHolderName =  "model:BrokerServices$BrokerContract$AccountHolder$AccountName"
+accountHolderName = "model:BrokerServices$BrokerContract$AccountHolder$AccountName"
 
 accountHolderPassword :: String
 accountHolderPassword = "model:BrokerServices$BrokerContract$AccountHolder$AccountPassword"

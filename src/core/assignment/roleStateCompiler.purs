@@ -59,6 +59,7 @@ import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
 import Perspectives.Instances.ObjectGetters (filledBy, contextType, getActiveRoleStates_)
+import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -228,17 +229,17 @@ notify :: CompiledSentence RoleInstance -> (RoleInstance ~~> ContextInstance) ->
 notify compiledSentence contextGetter roleId = do
   currentcontext <- lift $ (roleId ##>> contextGetter)
   lift $ addBinding "currentcontext" [(unwrap currentcontext)]
-  storeNotificationInContext <- lift (currentcontext ##>> (contextType >=> liftToInstanceLevel  (hasContextAspect (ContextType "model:System$ContextWithNotification"))))
+  storeNotificationInContext <- lift (currentcontext ##>> (contextType >=> liftToInstanceLevel  (hasContextAspect (ContextType contextWithNotification))))
   sentenceText <- lift $ compiledSentence roleId
   mySystem <- lift $ getMySystem
   void $ createAndAddRoleInstance
-    (EnumeratedRoleType "model:System$ContextWithNotification$Notifications")
+    (EnumeratedRoleType notifications)
     (if storeNotificationInContext
       then (unwrap currentcontext)
       else mySystem)
     (RolSerialization
       { id: Nothing
-      , properties: PropertySerialization $ singleton "model:System$ContextWithNotification$Notifications$Message"
+      , properties: PropertySerialization $ singleton notificationMessage
         [sentenceText]
       , binding: Just $ buitenRol (unwrap currentcontext)})
 

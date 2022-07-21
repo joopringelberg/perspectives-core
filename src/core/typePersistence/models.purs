@@ -27,6 +27,8 @@ where
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives, (##=))
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
+import Perspectives.ModelDependencies (modelExternalModelIdentification)
+import Perspectives.ModelDependencies (modelsInUse) as DEP
 import Perspectives.Names (getMySystem)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -35,13 +37,13 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), Dome
 import Prelude (bind, pure, ($), (<$>), (<<<), (>=>))
 
 modelsInUseRole :: EnumeratedRoleType
-modelsInUseRole = EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"
+modelsInUseRole = EnumeratedRoleType DEP.modelsInUse
 
 modelsInUse :: MonadPerspectives (Array DomeinFileId)
 modelsInUse = do
   system <- getMySystem
   propertyGetter <- getDynamicPropertyGetter
-    "model:System$Model$External$ModelIdentification"
+    modelExternalModelIdentification
     (ST modelsInUseRole)
   values <- (ContextInstance system) ##= (getEnumeratedRoleInstances modelsInUseRole >=> propertyGetter)
   pure $ DomeinFileId <<< unwrap <$> values

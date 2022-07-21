@@ -44,6 +44,7 @@ import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (bottom_, getProperty, roleType_)
+import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel) as DEP
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Url, addDocument)
 import Perspectives.Persistent (postDatabaseName)
@@ -78,7 +79,7 @@ sendTransactieToUserUsingCouchdb :: Url -> String -> TransactionForPeer -> Monad
 sendTransactieToUserUsingCouchdb cdbUrl userId t = do
   -- TODO controleer of hier authentication nodig is!
   userType <- roleType_ (RoleInstance userId)
-  getChannel <- getDynamicPropertyGetter "model:System$PerspectivesSystem$User$Channel" (ST $ userType)
+  getChannel <- getDynamicPropertyGetter DEP.userChannel (ST $ userType)
   mchannel <- (RoleInstance userId) ##> getChannel
   case mchannel of
     Nothing -> pure unit
@@ -106,7 +107,7 @@ sendTransactieToUserUsingAMQP userId t = do
     connectedToAMQPBroker :: MonadPerspectives Boolean
     connectedToAMQPBroker = do
       mySystem <- getMySystem
-      mConnected <- (RoleInstance $ buitenRol mySystem) ##> getProperty (EnumeratedPropertyType "model:System$PerspectivesSystem$External$ConnectedToAMQPBroker")
+      mConnected <- (RoleInstance $ buitenRol mySystem) ##> getProperty (EnumeratedPropertyType DEP.connectedToAMQPBroker)
       pure $ mConnected == (Just $ Value "true")
 
 saveTransactionInOutgoingPost :: String -> String -> TransactionForPeer -> MonadPerspectives Unit

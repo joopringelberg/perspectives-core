@@ -24,6 +24,7 @@ module Perspectives.SetupUser where
 
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Persistent (entitiesDatabaseName, modelDatabaseName)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
@@ -42,7 +43,7 @@ setupUser :: MonadPerspectives Unit
 setupUser = do
   -- First, upload model:System to perspect_models.
   repo <- publicRepository
-  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (addModelToLocalStore [repo <> "model:System"] (RoleInstance ""))
+  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore [repo <> "model:System"] (RoleInstance ""))
   entitiesDatabaseName >>= setRoleView
   entitiesDatabaseName >>= setRoleFromContextView
   entitiesDatabaseName >>= setPendingInvitationView

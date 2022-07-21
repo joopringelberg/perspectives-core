@@ -52,6 +52,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (exists')
 import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, roleType)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Models (modelsInUseRole)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -223,7 +224,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives o)
 runSterileTransaction a =
   getUserIdentifier
-  >>= lift <<< createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+  >>= lift <<< createTransaction (ENR $ EnumeratedRoleType sysUser)
   >>= lift <<< new
   >>= runReaderT a
 

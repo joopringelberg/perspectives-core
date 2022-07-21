@@ -49,6 +49,7 @@ import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectRolE
 import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole, startsWithSegments)
 import Perspectives.Instances.Combinators (closure_, conjunction, filter', some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
+import Perspectives.ModelDependencies (rootUser)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
@@ -556,7 +557,7 @@ hasPerspectiveOnRoleWithVerbs verbs ur rt = ArrayT ((hasPerspectiveWithVerb ur r
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 hasPerspectiveWithVerb :: Partial => RoleType -> EnumeratedRoleType -> Array RoleVerb -> MonadPerspectives Boolean
 hasPerspectiveWithVerb subjectType roleType verbs = do
-  objectIsRootUser <- roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$RootUser")
+  objectIsRootUser <- roleType ###>> hasAspect (EnumeratedRoleType rootUser)
   if objectIsRootUser
     then pure true
     else do

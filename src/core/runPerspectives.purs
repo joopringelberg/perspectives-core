@@ -28,6 +28,7 @@ import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar, empty, new)
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
+import Perspectives.ModelDependencies (sysMe)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Prelude (bind, show, ($), (<>))
@@ -47,7 +48,7 @@ runPerspectives userName password systemId host port publicRepo mp = do
         }
       publicRepo
       transactionFlag
-      transactionWithTiming) { indexedRoles = singleton "model:System$Me" (RoleInstance $ "model:System$" <> userName) })
+      transactionWithTiming) { indexedRoles = singleton sysMe (RoleInstance $ "model:System$" <> userName) })
   runReaderT mp rf
 
 runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a

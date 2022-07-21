@@ -47,13 +47,13 @@ import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Class (encode)
 import Foreign.Object (lookup)
-import Simple.JSON (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
 import Perspectives.Deltas (addDelta)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType_)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
@@ -68,6 +68,7 @@ import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (perspectivesClosure_, propertiesInPerspective)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Simple.JSON (unsafeStringify)
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor cid userId = do
@@ -82,7 +83,7 @@ serialisedAsDeltasForUserType cid userType = do
   (Transaction{author, timeStamp, deltas}) <- execMonadPerspectivesTransaction
     -- The authoringRole is used on *constructing* deltas. However, here we merely *read* deltas from the
     -- context- and role representations. So this value is in effect ignored.
-    (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+    (ENR $ EnumeratedRoleType sysUser)
     -- NOTE: we provide serialisedAsDeltasFor_ with the value (RoleInstance me) as
     -- identifier for the user for whom we serialise. As we don't know the real
     -- user identifier (we serialise for a type!) we use it as a stand in.

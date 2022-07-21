@@ -46,6 +46,7 @@ import Perspectives.Identifiers (buitenRol, deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (binding, bottom, context, getEnumeratedRoleInstances, roleType, roleType_)
+import Perspectives.ModelDependencies (privateChannel)
 import Perspectives.Persistence.API (createDatabase)
 import Perspectives.Persistence.State (getCouchdbBaseURL, withCouchdbUrl)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
@@ -160,7 +161,7 @@ addChannel invitation = do
     Nothing -> throwError $ (error "addChannel expects a couchdbUrl.")
     Just url -> createChannel url >>= \channel -> do
       void $ createAndAddRoleInstance
-        (EnumeratedRoleType "model:System$Invitation$PrivateChannel")
+        (EnumeratedRoleType privateChannel)
         (unwrap invitation)
         (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
       lift $ setChannelReplication url channel
@@ -173,7 +174,7 @@ createCopyOfChannelDatabase arrWithChannelName invitation =case ARR.head arrWith
   Just channelName -> void $ lift $ withCouchdbUrl \url -> do
     -- If the database existed prior to this line, nothing is created.
     void $ createDatabase channelName
-    mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Invitation$PrivateChannel") >=> binding >=> context)
+    mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType privateChannel) >=> binding >=> context)
     case mchannelContext of
       Just channelContext -> setChannelReplication url channelContext
       Nothing -> pure unit

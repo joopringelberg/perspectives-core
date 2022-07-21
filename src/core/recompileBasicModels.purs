@@ -50,6 +50,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder) as TOP
 import Perspectives.Extern.Couchdb (addInvertedQuery)
 import Perspectives.Identifiers (isModelName)
+import Perspectives.ModelDependencies (modelManagementDescription)
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Persistence.API (addAttachment, addDocument, documentsInDatabase, getAttachment, includeDocs)
 import Perspectives.Persistence.Types (Url)
@@ -59,7 +60,7 @@ import Perspectives.TypePersistence.LoadArc (loadArcAndCrl')
 import Simple.JSON (class ReadForeign, read, read')
 
 modelDescription :: EnumeratedRoleType
-modelDescription = EnumeratedRoleType "model:ModelManagement$ManagedModel$ModelDescription"
+modelDescription = EnumeratedRoleType modelManagementDescription
 
 recompileModelsAtUrl :: Url -> MonadPerspectivesTransaction Unit
 recompileModelsAtUrl repository = do

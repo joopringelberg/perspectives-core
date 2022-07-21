@@ -23,6 +23,7 @@
 module Perspectives.Api where
 
 -- import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
+
 import Control.Coroutine (Consumer, Producer, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (Step(..), produce', Emitter)
 import Control.Monad.AvarMonadAsk (gets)
@@ -33,7 +34,7 @@ import Control.Plus ((<|>))
 import Data.Array (elemIndex, head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe) 
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
@@ -44,7 +45,6 @@ import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (empty)
-import Simple.JSON (unsafeStringify, read)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
@@ -62,6 +62,7 @@ import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getRoleName, roleType, roleType_, siblings)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.State (getSystemIdentifier)
@@ -85,6 +86,7 @@ import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUse
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
+import Simple.JSON (unsafeStringify, read)
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -135,7 +137,7 @@ dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
 dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription, authoringRole: as} = do
   -- The authoringRole is the System User by default.
   authoringRole <- case as of
-    Nothing -> pure $ ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User"
+    Nothing -> pure $ ENR $ EnumeratedRoleType sysUser
     Just x -> getRoleType x
   case request of
     -- Given the context instance identifier and the qualified name of the RolType.

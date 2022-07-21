@@ -39,6 +39,7 @@ import Perspectives.CoreTypes (MonadPerspectives, (##=), (##>))
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances)
+import Perspectives.ModelDependencies (indexedContext, indexedContextName, indexedRoleName)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
@@ -64,13 +65,13 @@ indexedRoles_ roleIds = do
     f :: PerspectRol -> MonadPerspectives (Tuple String RoleInstance)
     f r = case rol_binding r of
       Nothing -> throwError (error ("An instance of sys:Model$IndexedRole has no binding: " <> identifier_ r))
-      Just b -> case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedRole$Name") of
+      Just b -> case head $ rol_property r (EnumeratedPropertyType indexedRoleName) of
         Nothing -> throwError (error ("An instance of sys:Model$IndexedRole$Name has no value: " <> identifier_ r))
         Just (Value iname) -> pure (Tuple ("model:" <> iname) b)
 
 -- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
 indexedContexts :: RoleInstance -> MonadPerspectives (Object ContextInstance)
-indexedContexts modelDescription = (modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType "model:System$Model$IndexedContext")) >>= indexedContexts_
+indexedContexts modelDescription = (modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType indexedContext)) >>= indexedContexts_
 
 indexedContexts_ :: Array RoleInstance -> MonadPerspectives (Object ContextInstance)
 indexedContexts_ contextRoleIds = do
@@ -82,7 +83,7 @@ indexedContexts_ contextRoleIds = do
   pure $ fromFoldable rows
   where
     f :: PerspectRol -> MonadPerspectives (Tuple String ContextInstance)
-    f r = case head $ rol_property r (EnumeratedPropertyType "model:System$Model$IndexedContext$Name") of
+    f r = case head $ rol_property r (EnumeratedPropertyType indexedContextName) of
         Nothing -> throwError (error ("An instance of sys:Model$IndexedContext$Name has no value: " <> identifier_ r))
         Just (Value iname) -> do
           mcontextId <- (identifier r) ##> binding >=> context

@@ -65,6 +65,8 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (contextType, isMe)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
+import Perspectives.ModelDependencies (modelDescription, sysUser)
+import Perspectives.ModelDependencies as DEP
 import Perspectives.Models (modelsInUse, modelsInUseRole) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -116,7 +118,7 @@ modelsDatabaseName :: MonadPerspectives String
 modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models")
 
 -- | Retrieves all instances of a particular role type from Couchdb.
--- | For example: `user: Users = callExternal cdb:RoleInstances("model:System$PerspectivesSystem$User") returns: model:System$PerspectivesSystem$User`
+-- | For example: `user: Users = callExternal cdb:RoleInstances(sysUser) returns: model:System$PerspectivesSystem$User`
 -- | Notice that only the first element of the array argument is actually used.
 -- | Notice, too, that the second parameter is ignored. We must provide it, however, as the query compiler
 -- | will give us an argument for it.
@@ -151,7 +153,7 @@ pendingInvitations _ = ArrayT do
 updateModel :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
 updateModel arrWithurl arrWithModelName arrWithDependencies modelsInUse = case head arrWithModelName of
   Nothing -> do
-    descriptionGetter <- lift $ getDynamicPropertyGetter "model:System$Model$External$Description" (ST Models.modelsInUseRole)
+    descriptionGetter <- lift $ getDynamicPropertyGetter modelDescription (ST Models.modelsInUseRole)
     description <- lift (modelsInUse ##= descriptionGetter)
     lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
   Just modelName -> do
@@ -274,7 +276,7 @@ addModelToLocalStore' url originalLoad = do
       me <- lift (RoleInstance <$> getUserIdentifier)
       -- TODO. Do we really have to reassert Me and MySystem every time? Presumably this is for the
       -- situation where we do not yet have model:System.
-      void $ lift $ AMA.modify \ps -> ps {indexedRoles = insert "model:System$Me" me (ps.indexedRoles `union` iroles), indexedContexts = insert "model:System$MySystem" mySystem (ps.indexedContexts `union` icontexts)}
+      void $ lift $ AMA.modify \ps -> ps {indexedRoles = insert DEP.sysMe me (ps.indexedRoles `union` iroles), indexedContexts = insert DEP.mySystem mySystem (ps.indexedContexts `union` icontexts)}
 
       -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
       crl' <- lift $ replaceIndexedNames crl
@@ -441,7 +443,7 @@ addModelToLocalStore' url originalLoad = do
     saveRoleInstance :: String -> PerspectRol -> StateT (Object PerspectContext) MonadPerspectivesTransaction Unit
     saveRoleInstance i a@(PerspectRol{context, pspType}) = do
       me <- lift $ lift $ isMe (RoleInstance i)
-      if me || pspType == (EnumeratedRoleType "model:System$PerspectivesSystem$User")
+      if me || pspType == (EnumeratedRoleType sysUser)
         then do
           void $ lift $ lift $ saveEntiteit_ (RoleInstance i) (changeRol_isMe a true)
           void $ modify \cis -> case lookup (unwrap context) cis of

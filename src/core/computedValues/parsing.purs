@@ -42,6 +42,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.LoadCRL (loadAndCacheCrlFile')
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
@@ -57,7 +58,7 @@ parseAndCompileArc arcSource_ _ = case head arcSource_ of
   Just arcSource -> catchError
     do
       lift $ lift $ resetWarnings
-      r <- lift $ lift $ runEmbeddedTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (loadAndCompileArcFile_ arcSource)
+      r <- lift $ lift $ runEmbeddedTransaction (ENR $ EnumeratedRoleType sysUser) (loadAndCompileArcFile_ arcSource)
       case r of
         Left errs -> ArrayT $ pure (Value <<< show <$> errs)
         -- Als er meldingen zijn, geef die dan terug.

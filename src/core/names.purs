@@ -108,7 +108,7 @@ psp ln = "model:Perspectives$" <> ln
 getUserIdentifier :: MonadPerspectives String
 getUserIdentifier = getMySystem >>= pure <<< flip append "$User"
 -- getUserIdentifier = do
---   me <- lookupIndexedRole "model:System$Me"
+--   me <- lookupIndexedRole sysMe
 --   case me of
 --     Nothing -> throwError (error "Indexed name 'model:System$Me' should be available!")
 --     Just (RoleInstance m) -> pure m

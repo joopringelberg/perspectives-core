@@ -54,6 +54,7 @@ import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (isModelName)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
+import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, includeDocs)
@@ -401,9 +402,9 @@ removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
 -- | all known indexed names and their private replacements in PerspectivesState.
 addIndexedNames :: MonadPerspectives Unit
 addIndexedNames = do
-  (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedRole"] (ContextInstance "")))
+  (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb [indexedRole] (ContextInstance "")))
   iRoles <- indexedRoles_ roleInstances
-  contextInstances <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb ["model:System$Model$IndexedContext"] (ContextInstance "")))
+  contextInstances <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb [indexedContext] (ContextInstance "")))
   iContexts <- indexedContexts_ contextInstances
   modify \ps -> ps {indexedRoles = iRoles, indexedContexts = iContexts}
 
@@ -433,7 +434,7 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
               Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
             r <- runMonadPerspectivesTransaction'
               false
-              (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+              (ENR $ EnumeratedRoleType sysUser)
               (runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel))
             case r of 
               Left errors -> logPerspectivesError (Custom ("recompileModelsAtUrl: " <> show errors)) 

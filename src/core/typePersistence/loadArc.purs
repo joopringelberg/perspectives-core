@@ -41,6 +41,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinF
 import Perspectives.IndentParser (runIndentParser')
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances_)
+import Perspectives.ModelDependencies (indexedContext, indexedRole, modelExternal)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
@@ -126,13 +127,13 @@ loadArcAndCrl' arcSource crlSource = do
         Left e -> pure $ Left $ [Custom (show e)]
         Right _ -> do
           (modelDescription :: Maybe PerspectRol) <- head <$> filterA
-            (\(PerspectRol{pspType}) -> if pspType == (EnumeratedRoleType "model:System$Model$External")
+            (\(PerspectRol{pspType}) -> if pspType == (EnumeratedRoleType modelExternal)
                 then pure true
                 else do
                   aspects <- pspType ###= aspectsOfRole
-                  pure $ isJust $ findIndex ((==) (EnumeratedRoleType "model:System$Model$External")) aspects)
+                  pure $ isJust $ findIndex ((==) (EnumeratedRoleType modelExternal)) aspects)
             (values roleInstances)
-          -- modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roleInstances
+          -- modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType modelExternal) roleInstances
           (Tuple indexedRoles indexedContexts) <- case modelDescription of
             Nothing -> pure $ Tuple [] []
             Just m -> do
@@ -153,8 +154,8 @@ loadArcAndCrl' arcSource crlSource = do
     collectIndexedNames modelDescription = do
       -- Notice that we MUST use the function that does no model reflection to get role instances from a context!
       -- This is because on compiling model:System, these roles are not yet defined.
-      iroles <- modelDescription ##= context >=> getEnumeratedRoleInstances_ (EnumeratedRoleType "model:System$Model$IndexedRole") >=> binding
-      icontexts <- modelDescription ##= context >=> getEnumeratedRoleInstances_ (EnumeratedRoleType "model:System$Model$IndexedContext") >=> binding >=> context
+      iroles <- modelDescription ##= context >=> getEnumeratedRoleInstances_ (EnumeratedRoleType indexedRole) >=> binding
+      icontexts <- modelDescription ##= context >=> getEnumeratedRoleInstances_ (EnumeratedRoleType indexedContext) >=> binding >=> context
       pure $ Tuple iroles icontexts
 
 parseError2PerspectivesError :: ParseError -> PerspectivesError

@@ -74,6 +74,7 @@ import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, deconstructNamespace_, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, contextType, getProperty, getUnlinkedRoleInstances, isMe)
+import Perspectives.ModelDependencies (modelUrl)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
@@ -485,7 +486,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
       mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (deconstructModelName $ unwrap fillerType)
       if (isNothing mDomeinFile)
         then do
-          murl <- lift (filler ##> getProperty (EnumeratedPropertyType "model:System$Model$External$Url"))
+          murl <- lift (filler ##> getProperty (EnumeratedPropertyType modelUrl))
           case murl of
             Nothing -> throwError (error $ "System error: no url found to load model for unknown type " <> (unwrap fillerType))
             Just (Value url) -> addModelToLocalStore [url] filled

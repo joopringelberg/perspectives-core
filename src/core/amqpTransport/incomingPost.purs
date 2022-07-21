@@ -40,6 +40,8 @@ import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, BrokerService, (##>))
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty, getFilledRoles)
+import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerServiceAccounts, brokerServiceExchange, brokerServiceUrl, connectedToAMQPBroker, sysUser)
+import Perspectives.ModelDependencies (brokerService) as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
@@ -97,7 +99,7 @@ incomingPost = do
     setConnectionState :: Boolean -> MonadPerspectives Unit
     setConnectionState c = do
       mySystem <- getMySystem
-      void $ runMonadPerspectivesTransaction' false (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (setProperty [RoleInstance $ buitenRol mySystem] (EnumeratedPropertyType "model:System$PerspectivesSystem$External$ConnectedToAMQPBroker") [Value $ show c])
+      void $ runMonadPerspectivesTransaction' false (ENR $ EnumeratedRoleType sysUser) (setProperty [RoleInstance $ buitenRol mySystem] (EnumeratedPropertyType connectedToAMQPBroker) [Value $ show c])
       pure unit
 
     -- | Send all transactions that have accumulated in the post database while we had no connection to the Broker.
@@ -123,16 +125,16 @@ constructBrokerServiceForUser :: RoleInstance -> MonadPerspectivesQuery BrokerSe
 constructBrokerServiceForUser userId = do
   -- LET OP: gaat misschien fout als model:BrokerServices nog niet beschikbaar is.
   accountHolder <- getFilledRoles
-    (ContextType "model:BrokerServices$BrokerContract")
-    (EnumeratedRoleType "model:BrokerServices$BrokerContract$AccountHolder")
+    (ContextType brokerContract)
+    (EnumeratedRoleType accountHolder)
     userId
-  (Value login) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerContract$AccountHolder$AccountName") accountHolder
-  (Value passcode) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerContract$AccountHolder$AccountPassword") accountHolder
-  (Value queueId) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerContract$AccountHolder$QueueName") accountHolder
+  (Value login) <- getProperty (EnumeratedPropertyType accountHolderName) accountHolder
+  (Value passcode) <- getProperty (EnumeratedPropertyType accountHolderPassword) accountHolder
+  (Value queueId) <- getProperty (EnumeratedPropertyType accountHolderQueueName) accountHolder
 
-  brokerContractExternal <- (context >=> externalRole >=> getFilledRoles (ContextType "model:BrokerServices$BrokerService") (EnumeratedRoleType "model:BrokerServices$BrokerService$Accounts") >=> context >=> externalRole) accountHolder
-  (Value url) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerService$External$Url") brokerContractExternal
-  (Value vhost) <- getProperty (EnumeratedPropertyType "model:BrokerServices$BrokerService$External$Exchange") brokerContractExternal
+  brokerContractExternal <- (context >=> externalRole >=> getFilledRoles (ContextType DEP.brokerService) (EnumeratedRoleType brokerServiceAccounts) >=> context >=> externalRole) accountHolder
+  (Value url) <- getProperty (EnumeratedPropertyType brokerServiceUrl) brokerContractExternal
+  (Value vhost) <- getProperty (EnumeratedPropertyType brokerServiceExchange) brokerContractExternal
 
   pure $
     { topic : (unwrap userId)

@@ -46,6 +46,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (buitenRol, deconstructNamespace_, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
+import Perspectives.ModelDependencies (rootContext, sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
@@ -172,7 +173,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- QUERY UPDATES, RULE TRIGGERING, PERSISTENCE or CURRENTUSER.
       -- If roleType has the aspect model:System$RootContext$External, it can stand alone. These roles can
       -- be created by any user and usually will be created by parsing a CRL file.
-      lift (roleType ###>> hasAspect (EnumeratedRoleType "model:System$RootContext$External")) >>= if _
+      lift (roleType ###>> hasAspect (EnumeratedRoleType rootContext)) >>= if _
         then constructExternalRole
         else (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.CreateAndFill]) >>= case _ of
           Left e -> handleError e
@@ -242,7 +243,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
 executeTransaction :: TransactionForPeer -> MonadPerspectives Unit
 executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectivesTransaction'
     false
-    (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+    (ENR $ EnumeratedRoleType sysUser)
     (for_ deltas f))
   where
     f :: SignedDelta -> MonadPerspectivesTransaction Unit

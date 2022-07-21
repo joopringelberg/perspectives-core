@@ -46,6 +46,7 @@ import Perspectives.Identifiers (getFirstMatch, getSecondMatch)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, disjunction)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
+import Perspectives.ModelDependencies (addressHost, addressPort, addressRelayHost, addressRelayPort, channelDatabase, channelInitiator, channelPartner, privateChannel)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistence.API (Url, createDatabase, ensureAuthentication)
 import Perspectives.Persistence.CouchdbFunctions (endReplication, replicateContinuously)
@@ -71,21 +72,21 @@ createChannelContext :: Url -> String -> MonadPerspectivesTransaction ContextIns
 createChannelContext couchdbUrl channelName = case splitCouchdbUrl couchdbUrl of
   Nothing -> throwError $ error ("createChannelContext received couchdbUrl that is not well-formed: " <> couchdbUrl)
   Just (Tuple host port) -> do
-    eChannel <- runExceptT $ constructContext (Just $ ENR $ EnumeratedRoleType "model:System$Invitation$PrivateChannel") $ ContextSerialization
+    eChannel <- runExceptT $ constructContext (Just $ ENR $ EnumeratedRoleType privateChannel) $ ContextSerialization
       { id: "model:User$" <> channelName
       , prototype: Nothing
       , ctype: "sys:Channel"
-      , rollen: fromFoldable [(Tuple "model:System$Channel$Initiator" $
+      , rollen: fromFoldable [(Tuple channelInitiator $
         SNA.singleton (RolSerialization
           { id: Nothing
           , properties: PropertySerialization $ fromFoldable
             [
-              Tuple "model:System$PhysicalContext$UserWithAddress$Host" [host]
-            , Tuple "model:System$PhysicalContext$UserWithAddress$Port" [(show port)]
+              Tuple addressHost [host]
+            , Tuple addressPort [(show port)]
             ]
           , binding: Just "usr:Me" })
          )]
-      , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
+      , externeProperties: PropertySerialization $ fromFoldable [Tuple channelDatabase [channelName]]
       }
     case eChannel of
       Left e -> throwError (error ("createChannel could not create channel: " <> show e))
@@ -97,13 +98,13 @@ addPartnerToChannel (RoleInstance usr) (ContextInstance channel) = do
   couchdbUrl <- lift $ getCouchdbBaseURL
   case splitCouchdbUrl <$> couchdbUrl of
     Just (Just (Tuple host port)) -> do
-       void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
+       void $ createAndAddRoleInstance (EnumeratedRoleType channelPartner)
         channel
         (RolSerialization
           { id: Nothing
           , properties: PropertySerialization $ fromFoldable
-            [ Tuple "model:System$PhysicalContext$UserWithAddress$Host" [host]
-            , Tuple "model:System$PhysicalContext$UserWithAddress$Port" [show port]
+            [ Tuple addressHost [host]
+            , Tuple addressPort [show port]
             ],
           binding: Just usr})
     _ -> throwError $ error ("addPartnerToChannel received not a well-formed couchdbUrl: " <> (show couchdbUrl))
@@ -132,13 +133,13 @@ getYouFromChannel = do
 
 setAddress :: Host -> Port -> Array RoleInstance -> MPT Unit
 setAddress host port rl = do
-  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Host") [Value host]
-  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$Port") [Value (show port)]
+  setProperty rl (EnumeratedPropertyType addressHost) [Value host]
+  setProperty rl (EnumeratedPropertyType addressPort) [Value (show port)]
 
 setRelayAddress :: Host -> Port -> Array RoleInstance -> MPT Unit
 setRelayAddress host port rl = do
-  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$RelayHost") [Value host]
-  setProperty rl (EnumeratedPropertyType "model:System$PhysicalContext$UserWithAddress$RelayPort") [Value (show port)]
+  setProperty rl (EnumeratedPropertyType addressRelayHost) [Value host]
+  setProperty rl (EnumeratedPropertyType addressRelayPort) [Value (show port)]
 
 -- | Regardless whether I am the Initiator or the ConnectedPartner, set my host and port value.
 setMyAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
@@ -173,7 +174,7 @@ setChannelReplication couchdbUrl channel = do
     -- Fails silently
     Nothing -> pure unit
     Just (Tuple myHost port) -> do
-      getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+      getChannelId <- getPropertyFunction channelDatabase
       mchannel <- channel ##> externalRole >=> getChannelId
       post <- postDbName
       case mchannel of
@@ -297,7 +298,7 @@ localReplication base source target author = do
 -- | Stop replicating the channel database to the remote version.
 endChannelReplication :: Url -> ContextInstance -> MonadPerspectives Unit
 endChannelReplication couchdbUrl channel = do
-  getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+  getChannelId <- getPropertyFunction channelDatabase
   mchannel <- channel ##> externalRole >=> getChannelId
   post <- postDbName
   case mchannel of
