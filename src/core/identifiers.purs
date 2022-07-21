@@ -36,12 +36,34 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
 import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||))
 
+-- | The unsafeRegex function takes a string `pattern` as first argument and uses it as is in a new Regex(`pattern`).
+-- | Hence, in Purescript, we can follow the rules for the new Regex("your pattern") approach.
+-- | 
+-- | So regexes are constructed from strings. The following characters have special meaning in Purescript string literals:
+-- | \, ", ' (backslash, double quote, single quote). They must be escaped with a backslash to be used __as is__ in a string literal.
+-- |
+-- | The following character has special meaning in Regex patterns, while also occurring in Perspectives identifiers:
+-- | $ (dollar sign). DOLLAR SIGN must be escaped in a Regex pattern to be matched literally.
+-- | But because a backward slash has special meaning in Purescript strings, it must be escaped with a backslash!
+-- | TO LITERALLY MATCH $, USE \\$
+-- |
+-- | / (forward slash) is used in Javascript syntax to delimit a regular expression. If you want to match it literally, you'll have to escape it.
+-- | However, with the new Regex("your pattern") syntax, no escaping is necessary. As Purescript follows that syntax, 
+-- | we DO NOT ESCAPE FORWARD SLASHES.
+-- |
+-- | As backslash has special meaning in Purescript string literals, we must escape it if we want to use it literally.
+-- | Literal use comprises character class syntax, e.g. \w (for word characters). 
+-- | FOR CHARACTER CLASSES, USE DOUBLE BACKSLASH: \\w, \\n, etc.
+
 -----------------------------------------------------------
 -- NAMESPACE, MODELNAME
 -----------------------------------------------------------
--- | A Namespace has the form "model:Name"
+-- | A Namespace has the general shape model://perspect.it/System@1.0.0-alpha
+-- | /^model:\/\/([^$]*)$/ or new Regex( "^model://([^$]*)$" )
+modelRegex_ :: String
+modelRegex_ = "^model://([^\\$]*)"
 modelRegex :: Regex
-modelRegex = unsafeRegex "^model:(\\w*)$" noFlags
+modelRegex = unsafeRegex (modelRegex_ <> "\\$") noFlags
 
 isModelName :: String -> Boolean
 isModelName s = test modelRegex s
@@ -120,31 +142,28 @@ qualifyWith ns = append (ns <> "$")
 -----------------------------------------------------------
 -- DECONSTRUCTING NAMESPACES
 -----------------------------------------------------------
--- | A qualified name has the form `model:ModelName$First$Second`.
+-- | A qualified name has the form `model://ModelName$First$Second`.
 -- | In other words, it consists of
--- |  * a modelName: `model:ModelName`, followed by any number of
+-- |  * a modelName: `model://ModelName`, followed by any number of
 -- |  * segments: `$segment` (a '$' followed by word characters).
 -- | Alternatively, we can split a qualifiedName in
 -- |  * a namespace: everything but the last segment, and
 -- |  * the localName: the last segment.
 
 qualifiedNameRegex :: Regex
-qualifiedNameRegex = unsafeRegex "^model:(\\w*)\\$(.*)$" noFlags
+qualifiedNameRegex = unsafeRegex (modelRegex_ <> "\\$(.*)$") noFlags
 
--- | Is the identifier of the form `model:Domain$atLeastOneSegment`?
+-- | Is the identifier of the form `model://ModelName$atLeastOneSegment`?
 isQualifiedName :: String -> Boolean
 isQualifiedName s = test qualifiedNameRegex s
 
-domeinURIQualifiedRegex :: Regex
-domeinURIQualifiedRegex = unsafeRegex "^model:(\\w*)(.*)$" noFlags
-
--- | Is the identifier qualified with a valid Namespace?
+-- | Alias for isQualifiedName.
 isQualifiedWithDomein :: String -> Boolean
-isQualifiedWithDomein s = test domeinURIQualifiedRegex s
+isQualifiedWithDomein = isQualifiedName
 
 -- | Matches the entire namespace part of a qualified name (everything but the last segment).
 namespaceRegEx :: Regex
-namespaceRegEx = unsafeRegex "^(model:.*)\\$\\w*" noFlags
+namespaceRegEx = unsafeRegex "^(model://.*)\\$\\w*" noFlags
 
 -- | Returns the entire name but for the last segment. This is the namespace of the local name.
 -- | deconstructNamespace "model:Model$First$Second" == Just "model:Model$First"
@@ -158,29 +177,22 @@ deconstructNamespace s = case deconstructLocalName s of
 deconstructNamespace_ :: String -> Namespace
 deconstructNamespace_ = unsafePartial $ fromJust <<< deconstructNamespace
 
-namespaceRegex :: Regex
-namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
-
--- | Returns the "model:ModelName" part of an identifier or Nothing if it does not start with model:ModelName.
--- | deconstructModelName "model:Model$First$Second" == Just "model:Model"
--- | deconstructModelName "model:Model" == Just "model:Model"
+-- | Returns the "model://ModelName" part of an identifier or Nothing if it does not start with model:ModelName.
+-- | deconstructModelName "model://Model$First$Second" == Just "model://Model"
+-- | deconstructModelName "model://Model" == Just "model://Model"
 deconstructModelName :: String -> Maybe Namespace
-deconstructModelName = getFirstMatch namespaceRegex
+deconstructModelName = getFirstMatch qualifiedNameRegex
 
 unsafeDeconstructModelName :: String -> Namespace
 unsafeDeconstructModelName = unsafePartial fromJust <<< deconstructModelName
 
--- | Matches all segments of the name (the string after the first "$")
-localPartsRegEx :: Regex
-localPartsRegEx = unsafeRegex "^model:\\w*\\$(.*)$" noFlags
-
--- | Returns "Context$localName" from "model:ModelName$Context$localName" or Nothing if it does
--- | not start with model:ModelName
--- | So this function returns ALL SEGMENTS of the name, omitting just the model:ModelName part.
--- | deconstructSegments "model:ModelName$Context$localName" == Just "Context$localName"
--- | deconstructSegments "model:Model" == Just ""
+-- | Returns "Context$localName" from "model://ModelName$Context$localName" or Nothing if it does
+-- | not start with model://ModelName
+-- | So this function returns ALL SEGMENTS of the name, omitting just the model://ModelName part.
+-- | deconstructSegments "model://ModelName$Context$localName" == Just "Context$localName"
+-- | deconstructSegments "model://Model" == Just ""
 deconstructSegments :: String -> Maybe String
-deconstructSegments = getFirstMatch localPartsRegEx
+deconstructSegments = getSecondMatch qualifiedNameRegex
 
 lastPartRegEx :: Regex
 lastPartRegEx = unsafeRegex ".*\\$(\\w+)" noFlags
@@ -221,22 +233,12 @@ deconstructLocalNameFromCurie = getSecondMatch curieRegEx
 -----------------------------------------------------------
 -- THE MODEL:USER DOMEIN
 -----------------------------------------------------------
-userCurieRegEx :: Regex
-userCurieRegEx = unsafeRegex "^usr:" noFlags
-
--- | True iff the string starts on "usr:"
-isUserCurie :: String -> Boolean
-isUserCurie = test userCurieRegEx
-
 userUriRegEx :: Regex
 userUriRegEx = unsafeRegex "^model:User\\$" noFlags
 
 -- | True iff the string starts on "model:User$"
 isUserURI :: String -> Boolean
 isUserURI = test userUriRegEx
-
-isUserEntiteitID :: String -> Boolean
-isUserEntiteitID id = isUserURI id || isUserURI id
 
 -- | Matches all segments of the name (the string after the first "$")
 userNameRegEx :: Regex
