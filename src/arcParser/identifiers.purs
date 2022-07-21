@@ -20,7 +20,8 @@
 
 -- END LICENSE
 
-module Perspectives.Parsing.Arc.Identifiers where
+module Perspectives.Parsing.Arc.Identifiers
+  where
 
 import Control.Alt (void, (<|>))
 import Data.Array (cons, elemIndex, intercalate, many)
@@ -33,9 +34,9 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Parsing.Arc.Token (token)
-import Prelude (Unit, bind, discard, not, pure, ($), (*>), (/=), (<>), (<<<))
+import Prelude (Unit, bind, discard, not, pure, ($), (*>), (/=), (<$>), (<*>), (<<<), (<>))
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (try, (<?>))
+import Text.Parsing.Parser.Combinators (option, try, (<?>))
 import Text.Parsing.Parser.String (string, satisfy, whiteSpace)
 
 reserved :: String -> IP Unit
@@ -47,11 +48,31 @@ colon = token.colon
 arcIdentifier :: IP String
 arcIdentifier = (qualifiedName <|> prefixedName <|> segmentedName) <?> "a capitalized name, a prefixed name, or a fully qualified name"
 
+-- For now, we want to accept both the old and the new forms:
+--  * model:System
+--  * model://perspect.it/System
 qualifiedName :: IP String
-qualifiedName = try do
+qualifiedName = oldQualifiedName <|> newQualifiedName
+
+oldQualifiedName :: IP String
+oldQualifiedName = try do
   m <- (string "model:")
-  i <- segmentedName
-  pure $ m <> i
+  i <- token.identifier
+  segments <- option "" ((<>) <$> (string "$") <*> segmentedName)
+  pure $ m <> i <> segments
+
+newQualifiedName :: IP String
+newQualifiedName = try do
+  m <- (string "model://")
+  i <- dottedName
+  segments <- option "" ((<>) <$> (string "/") <*> segmentedName)
+  pure $ m <> i <> segments
+
+dottedName :: IP String
+dottedName = try do
+  first <- lowerCaseName
+  rest <- many (string "." *> lowerCaseName)
+  pure (intercalate "." (cons first rest))
 
 prefixedName :: IP String
 prefixedName = try do
