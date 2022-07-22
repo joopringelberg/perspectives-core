@@ -63,6 +63,7 @@ newtype DomeinFile = DomeinFile DomeinFileRecord
 type DomeinFileRecord =
   { _rev :: Revision_
   , _id :: String
+  , namespace :: String
   , contexts :: Object Context
   , enumeratedRoles :: Object EnumeratedRole
   , calculatedRoles :: Object CalculatedRole
@@ -189,6 +190,7 @@ defaultDomeinFileRecord :: DomeinFileRecord
 defaultDomeinFileRecord =
   { _rev: Nothing
   , _id: ""
+  , namespace: ""
   , contexts: empty
   , enumeratedRoles: empty
   , calculatedRoles: empty

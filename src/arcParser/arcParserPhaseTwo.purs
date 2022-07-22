@@ -31,7 +31,7 @@ import Data.Array (fromFoldable) as ARR
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, traverse)
@@ -39,7 +39,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (fromFoldable, insert, union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein, namespace2modelname)
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), ScreenE(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
@@ -66,16 +66,22 @@ import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=), 
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
   -- Traverse the model parse tree and construct a DomeinFileRecord in PhaseTwoState.
-  (Context {_id}) <- traverseContextE c ns
+  (Context {_id:namespace}) <- traverseContextE c ns
   domeinFileRecord <- getDF
-  pure $ DomeinFile (domeinFileRecord {_id = unwrap _id})
+  -- Here we replace the _id with the name of the form "model:Modelname" that we derive from the namespace - or if it is
+  -- in that form already, we leave things as they are.
+  -- We also fill the namespace field.
+  pure $ DomeinFile (domeinFileRecord 
+    { _id = unsafePartial fromJust $ namespace2modelname (unwrap namespace)
+    , namespace = unwrap namespace
+    })
 
 -- | Traverse the members of the ContextE AST type to construct a new Context type
 -- | and insert it into a DomeinFileRecord.
 traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
 traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
-  context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
+  context <- pure $ defaultContext (if ns == "model:" then id else (addNamespace ns id)) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
   withNamespaces
     contextParts
     do

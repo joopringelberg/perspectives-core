@@ -34,7 +34,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||))
+import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||), (<$>), (<*>))
 
 -- | The unsafeRegex function takes a string `pattern` as first argument and uses it as is in a new Regex(`pattern`).
 -- | Hence, in Purescript, we can follow the rules for the new Regex("your pattern") approach.
@@ -60,10 +60,10 @@ import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<
 -----------------------------------------------------------
 -- | A Namespace has the general shape model://perspect.it/System@1.0.0-alpha
 -- | /^model:\/\/([^$]*)$/ or new Regex( "^model://([^$]*)$" )
-modelRegex_ :: String
-modelRegex_ = "^(model:(?://)?[^\\$]*)"
+modelPattern :: String
+modelPattern = "^(model:(?://)?[^\\$]*)"
 modelRegex :: Regex
-modelRegex = unsafeRegex (modelRegex_ <> "$") noFlags
+modelRegex = unsafeRegex (modelPattern <> "$") noFlags
 
 -- | True iff the string is exactly of the form model://Domain
 isModelName :: String -> Boolean
@@ -113,6 +113,33 @@ instance eqQualifiedName :: Eq QualifiedName where
   eq (QualifiedName ns1 ln1) (QualifiedName ns2 ln2) = eq ns1 ns2 && eq ln1 ln2
 
 -----------------------------------------------------------
+-- URI STYLE MODEL NAMES
+-----------------------------------------------------------
+-- | A Namespace has the general shape model://perspect.it/System@1.0.0-alpha
+
+-- | A pattern to match "model:Modelname" exactly.
+oldModelPattern :: String
+oldModelPattern = "^model:[^\\$/]*$"
+
+oldModelRegex :: Regex
+oldModelRegex = unsafeRegex oldModelPattern noFlags
+
+-- | A pattern to match "model://some.authority/Modelname" exactly.
+-- | It is very permissive, allowing any character in the authority except the forward slash.
+-- | The model name must start on an upper case alphabetic character.
+newModelPattern :: String
+newModelPattern = "^model://([^/]+)/([A-Z][^\\$/]+)$"
+
+newModelRegex :: Regex
+newModelRegex = unsafeRegex newModelPattern noFlags
+
+-- | Maps both an old and a new style model name to the old style.
+namespace2modelname :: String -> Maybe String
+namespace2modelname s = if test oldModelRegex s
+  then Just s
+  else (<>) <$> Just "model:" <*> getSecondMatch newModelRegex s
+
+-----------------------------------------------------------
 -- CLASS PERSPECTENTITEITIDENTIFIER
 -----------------------------------------------------------
 -- | Abstracts over identifiers for Perspect, used in the CRL parser. There are two instances: ModelName and QualifiedName.
@@ -152,14 +179,14 @@ qualifyWith ns = append (ns <> "$")
 -- |  * the localName: the last segment.
 
 qualifiedNameRegex :: Regex
-qualifiedNameRegex = unsafeRegex (modelRegex_ <> "\\$(.*)$") noFlags
+qualifiedNameRegex = unsafeRegex (modelPattern <> "\\$(.*)$") noFlags
 
 -- | Is the identifier of the form `model://ModelName$atLeastOneSegment`?
 isQualifiedName :: String -> Boolean
 isQualifiedName s = test qualifiedNameRegex s
 
 matchModelnameRegex :: Regex
-matchModelnameRegex = unsafeRegex modelRegex_ noFlags
+matchModelnameRegex = unsafeRegex modelPattern noFlags
 
 -- | Tests whether the string is at least of the form `model://ModelName`.
 isQualifiedWithDomein :: String -> Boolean
