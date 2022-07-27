@@ -33,13 +33,14 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
+import Data.String.Regex (test)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (fromFoldable, insert, union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein, namespace2modelname)
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein, namespace2modelname, newModelRegex)
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), ScreenE(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
@@ -60,7 +61,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.View (View(..)) as VIEW
-import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=), (<$>))
+import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=), (<$>), (&&))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
@@ -81,7 +82,7 @@ traverseDomain c ns = do
 traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
 traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
-  contextIdentifier <- if ns == "model:" then pure id else pure (addNamespace ns id)
+  contextIdentifier <- pure $ modelName id
   context <- pure $ defaultContext contextIdentifier id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
   withNamespaces
     contextParts
@@ -102,6 +103,11 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
 
   where
 
+    modelName :: String -> String
+    modelName contextId = if ns == "model:" && test newModelRegex contextId 
+      then contextId
+      else addNamespace ns contextId
+
     trueCondition :: Domain -> QueryFunctionDescription
     trueCondition dom = SQD dom (Constant PBool "true") (VDOM PBool Nothing) True True
 
@@ -110,12 +116,12 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     handleParts :: Context -> ContextPart -> PhaseTwo Context
     -- Construct a nested Context.
     handleParts contextUnderConstruction (CE c) = do
-      subContext <- traverseContextE c (if ns == "model:" then id else (addNamespace ns id))
+      subContext <- traverseContextE c (modelName id)
       pure (subContext `insertInto` contextUnderConstruction)
 
     -- Construct a Role
     handleParts contextUnderConstruction (RE r) = do
-      role <- traverseRoleE r (if ns == "model:" then id else (addNamespace ns id))
+      role <- traverseRoleE r (modelName id)
       context' <- pure (role `insertRoleInto` contextUnderConstruction)
       case role of 
         E (EnumeratedRole {_id, roleAspects}) -> do

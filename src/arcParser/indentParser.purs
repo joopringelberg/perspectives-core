@@ -32,8 +32,10 @@ import Data.List (List(..), many, singleton, some)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), indexOf)
+import Data.String.Regex (test)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
+import Perspectives.Identifiers (newModelRegex)
 import Perspectives.Parsing.Arc.AST (RoleIdentification, StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..))
@@ -113,7 +115,9 @@ inSubContext :: forall a. String -> IP a -> IP a
 inSubContext subContextName p = do
   oldState@{currentContext} <- getArcParserState
   void $ modifyArcParserState \s -> s {currentContext = case unwrap currentContext of
-    "" -> ContextType subContextName
+    "" -> if test newModelRegex subContextName 
+      then ContextType subContextName
+      else ContextType ("model:" <> subContextName)
     m -> ContextType (m <> "$" <> subContextName)}
   -- getCurrentContext >>= \c -> log ("Entered context " <> show c)
   result <- p
