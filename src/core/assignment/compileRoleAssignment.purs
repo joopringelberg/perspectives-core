@@ -51,7 +51,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Identifiers (buitenRol)
+import Perspectives.Identifiers (buitenRol, constructUserIdentifier)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
@@ -142,7 +142,7 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifie
         CR calculatedType -> do 
           g <- liftEffect guid
           void $ runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
-            { id = "model:User$c" <> (show g)
+            { id = constructUserIdentifier (show g)
             , ctype = unwrap qualifiedContextTypeIdentifier
             })
 
@@ -162,13 +162,13 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifie
             for contextTypesToCreate' \contextTypeToCreate -> do 
               g <- liftEffect guid
               void $ runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
-                { id = "model:User$c" <> (show g)
+                { id = constructUserIdentifier (show g)
                 , ctype = unwrap contextTypeToCreate
                 })
               void $ createAndAddRoleInstance roleTypeToCreate (unwrap ctxt) (RolSerialization
                 { id: Nothing
                 , properties: PropertySerialization empty
-                , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+                , binding: Just $ buitenRol $ constructUserIdentifier (show g) })
 
 compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleGetterDescription
@@ -186,7 +186,7 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifi
         Nothing -> pure unit
         Just contextTypeToCreate -> do 
           g <- liftEffect guid
-          newContextId <- pure $ "model:User$c" <> (show g)
+          newContextId <- pure $ constructUserIdentifier (show g)
           newContext <- runExceptT $ constructContext (Just $ ENR roleTypeToFill) (ContextSerialization defaultContextSerializationRecord
             { id = newContextId
             , ctype = unwrap contextTypeToCreate
@@ -405,7 +405,7 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
         CR calculatedType -> do
           g <- liftEffect guid
           r <- runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
-            { id = "model:User$c" <> (show g)
+            { id = constructUserIdentifier (show g)
             , ctype = unwrap qualifiedContextTypeIdentifier
             })
           case r of
@@ -429,7 +429,7 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
             for contextTypesToCreate' \contextTypeToCreate -> do
               g <- liftEffect guid
               r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
-                { id = "model:User$c" <> (show g)
+                { id = constructUserIdentifier (show g)
                 , ctype = unwrap contextTypeToCreate
                 })
               case r of
@@ -442,7 +442,7 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
                   (RolSerialization
                     { id: Nothing
                     , properties: PropertySerialization empty
-                    , binding: Just $ buitenRol $ "model:User$c" <> (show g) })
+                    , binding: Just $ buitenRol $ constructUserIdentifier (show g) })
     pure $ catMaybes (hush <$> results)
 
 compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do

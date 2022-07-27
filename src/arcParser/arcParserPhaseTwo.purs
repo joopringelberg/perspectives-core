@@ -81,7 +81,8 @@ traverseDomain c ns = do
 traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
 traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
-  context <- pure $ defaultContext (if ns == "model:" then id else (addNamespace ns id)) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
+  contextIdentifier <- if ns == "model:" then pure id else pure (addNamespace ns id)
+  context <- pure $ defaultContext contextIdentifier id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
   withNamespaces
     contextParts
     do
@@ -90,7 +91,7 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
         otherwise -> false) contextParts)) of          
           Nothing -> do
             -- Add a default state for the external role.
-            state <- pure $ constructState (StateIdentifier $ (addNamespace ns id) <> "$External") (Q $ trueCondition (CDOM $ ST (ContextType (addNamespace ns id)))) (Cnt (ContextType (addNamespace ns id))) []
+            state <- pure $ constructState (StateIdentifier $ contextIdentifier <> "$External") (Q $ trueCondition (CDOM $ ST (ContextType contextIdentifier))) (Cnt (ContextType contextIdentifier)) []
             modifyDF (\domeinFile -> addStatesToDomeinFile [state] domeinFile)
             -- Add a definition for the external role; it apparently hasn't been declared in the source.
             pure $ Cons (RE (RoleE{id: "External", kindOfRole: TI.ExternalRole, roleParts: Nil, pos})) contextParts
@@ -109,12 +110,12 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     handleParts :: Context -> ContextPart -> PhaseTwo Context
     -- Construct a nested Context.
     handleParts contextUnderConstruction (CE c) = do
-      subContext <- traverseContextE c (addNamespace ns id)
+      subContext <- traverseContextE c (if ns == "model:" then id else (addNamespace ns id))
       pure (subContext `insertInto` contextUnderConstruction)
 
     -- Construct a Role
     handleParts contextUnderConstruction (RE r) = do
-      role <- traverseRoleE r (addNamespace ns id)
+      role <- traverseRoleE r (if ns == "model:" then id else (addNamespace ns id))
       context' <- pure (role `insertRoleInto` contextUnderConstruction)
       case role of 
         E (EnumeratedRole {_id, roleAspects}) -> do

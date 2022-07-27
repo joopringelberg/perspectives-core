@@ -339,6 +339,7 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
 -- LOADMODELIFMISSING
 -----------------------------------------------------------
 -- | Retrieves from the repository the model, if necessary.
+-- modelname can be both an old style modelname or a new style modelname.
 -- TODO. This function relies on a repository URL in PerspectivesState. That is a stub.
 loadModelIfMissing :: String -> MonadPerspectivesTransaction Unit
 loadModelIfMissing modelName = do
@@ -346,7 +347,7 @@ loadModelIfMissing modelName = do
   if isNothing mDomeinFile
     then do
       repositoryUrl <- lift publicRepository
-      addModelToLocalStore' (repositoryUrl <> modelName) true
+      addModelToLocalStore' modelName true
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
       (lift $ try $ getDomeinFile (DomeinFileId modelName)) >>=
         handleDomeinFileError "loadModelIfMissing"

@@ -23,12 +23,14 @@
 module Perspectives.Names
 
 where
+
 import Control.Monad.AvarMonadAsk (gets)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isQualifiedWithDomein)
+import Perspectives.Identifiers (constructUserIdentifier, deconstructLocalNameFromCurie, deconstructPrefix, isQualifiedWithDomein)
+import Perspectives.ModelDependencies (sysMe)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
@@ -46,7 +48,7 @@ expandDefaultNamespaces n = do
 expandDefaultNamespaces_ :: OBJ.Object String -> OBJ.Object String -> String -> String
 expandDefaultNamespaces_ indexedNames namespaces n = expandIndexedNames indexedNames (expandNamespaces namespaces n)
 
--- | Replace model:User$Me by "model:User$<guid>$User_0001".
+-- | Replace model:System$Me by "model:User$<guid>$User_0001".
 expandIndexedNames :: OBJ.Object String -> String -> String
 expandIndexedNames defaults expandedName =
   case OBJ.lookup expandedName defaults of
@@ -78,13 +80,13 @@ defaultIndexedNames :: MonadPerspectives (OBJ.Object String)
 defaultIndexedNames = do
   user <- getUserIdentifier
   pure $ OBJ.fromFoldable
-    [ Tuple "model:User$Me" user
+    [ Tuple sysMe user
     ]
 
 -----------------------------------------------------------
 -- LOOKUP INDEXED NAMES
 -----------------------------------------------------------
--- | Look up a fully qualified indexed name, e.g. model:User$Me
+-- | Look up a fully qualified indexed name, e.g. model:System$Me
 lookupIndexedRole :: String -> MonadPerspectives (Maybe RoleInstance)
 lookupIndexedRole iname = gets _.indexedRoles >>= pure <<< OBJ.lookup iname
 
@@ -107,12 +109,7 @@ psp ln = "model:Perspectives$" <> ln
 -- | Returns a Perspectives Identifier of the form "model:User$<systemIdentifier>$User".
 getUserIdentifier :: MonadPerspectives String
 getUserIdentifier = getMySystem >>= pure <<< flip append "$User"
--- getUserIdentifier = do
---   me <- lookupIndexedRole sysMe
---   case me of
---     Nothing -> throwError (error "Indexed name 'model:System$Me' should be available!")
---     Just (RoleInstance m) -> pure m
 
 -- | Returns a Perspectives Identifier of the form "model:User$<guid>"
 getMySystem :: MonadPerspectives String
-getMySystem = getSystemIdentifier >>= pure <<< append "model:User$"
+getMySystem = getSystemIdentifier >>= pure <<< constructUserIdentifier

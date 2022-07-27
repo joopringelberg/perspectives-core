@@ -28,7 +28,7 @@ domain Models
             do for LocalUser
               -- For the implementer: notice that this effect is called with
               -- a context role instance!
-              callEffect cdb:UpdateModel( LastVersionUrl, ModelIdentification, IncludingDependencies)
+              callEffect cdb:UpdateModel( ModelIdentification, IncludingDependencies)
               PerformUpdate = false
           on exit
             do for LocalUser

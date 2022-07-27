@@ -79,10 +79,10 @@ type IP a = IndentParser ArcParser String a
 
 initialArcParserState :: ArcParserState
 initialArcParserState =
-  { currentContext: ContextType "model:"
+  { currentContext: ContextType ""
   , subject: Nothing
   , object: Nothing
-  , state: ContextState (ContextType "model:") Nothing
+  , state: ContextState (ContextType "") Nothing
   , onEntry: Nothing
   , onExit: Nothing
 }
@@ -113,7 +113,7 @@ inSubContext :: forall a. String -> IP a -> IP a
 inSubContext subContextName p = do
   oldState@{currentContext} <- getArcParserState
   void $ modifyArcParserState \s -> s {currentContext = case unwrap currentContext of
-    "model:" -> ContextType ("model:" <> subContextName)
+    "" -> ContextType subContextName
     m -> ContextType (m <> "$" <> subContextName)}
   -- getCurrentContext >>= \c -> log ("Entered context " <> show c)
   result <- p

@@ -34,9 +34,10 @@ import Effect.Aff.AVar (AVar, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (Namespace)
+import Perspectives.Identifiers (Namespace, namespace2modelname_)
 import Perspectives.Persistence.API (addAttachment, getAttachment)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
@@ -100,8 +101,16 @@ modifyStateInDomeinFile ns sr@(State {id}) = modifyDomeinFileInCache modifier ns
 -- RETRIEVE A DOMAINFILE
 -----------------------------------------------------------
 -- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the database and caches it.
+
+-- | Retrieve a domain file.
+-- | Searches the cache with the local model name.
+-- | If not found, tries to fetch the file from its repository and add it to the local models and the cache.
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
-retrieveDomeinFile ns = getPerspectEntiteit (DomeinFileId ns)
+retrieveDomeinFile ns = tryGetPerspectEntiteit (DomeinFileId $ unsafePartial namespace2modelname_ ns) >>= case _ of 
+  -- Now retrieve the DomeinFile from a remote repository and store it in the local "models" database of this user.
+  -- Nothing -> addModelToLocalStore' ns true
+  Nothing -> throwError (error $ "Unknown model " <> ns)
+  Just df -> pure df
 
 tryRetrieveDomeinFile :: Namespace -> MonadPerspectives (Maybe DomeinFile)
 tryRetrieveDomeinFile id = catchError (Just <$> (getPerspectEntiteit (DomeinFileId id)))

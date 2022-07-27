@@ -42,7 +42,7 @@ import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, MPT, (##=), (##>), (##>>), type (~~>))
 import Perspectives.Couchdb (selectOnFieldEqual, selectOnFieldNotEqual)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (getFirstMatch, getSecondMatch)
+import Perspectives.Identifiers (constructUserIdentifier, getFirstMatch, getSecondMatch)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, disjunction)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
@@ -73,7 +73,7 @@ createChannelContext couchdbUrl channelName = case splitCouchdbUrl couchdbUrl of
   Nothing -> throwError $ error ("createChannelContext received couchdbUrl that is not well-formed: " <> couchdbUrl)
   Just (Tuple host port) -> do
     eChannel <- runExceptT $ constructContext (Just $ ENR $ EnumeratedRoleType privateChannel) $ ContextSerialization
-      { id: "model:User$" <> channelName
+      { id: constructUserIdentifier channelName
       , prototype: Nothing
       , ctype: "sys:Channel"
       , rollen: fromFoldable [(Tuple channelInitiator $

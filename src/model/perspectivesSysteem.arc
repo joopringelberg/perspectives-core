@@ -52,6 +52,7 @@ domain System
         defaults
         action StopUsing
           remove context origin
+      -- OBSOLETE!?
       perspective on IndexedContextOfModel
         defaults
       perspective on RootUsers
@@ -62,7 +63,7 @@ domain System
         view ShowLibraries verbs (Consult, SetPropertyValue)
       perspective on Modellen
         action StartUsing
-          callEffect cdb:AddModelToLocalStore( Url )
+          callEffect cdb:AddModelToLocalStore( ModelIdentification )
           bind origin to ModelsInUse in currentcontext
         view Modellen$ModelPresentation verbs (Consult)
       perspective on PendingInvitations
@@ -100,6 +101,7 @@ domain System
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
+    -- OBSOLETE!? OF SPEELT SYNCHRONISATIE HIER EEN ROL?
     context IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
 
     thing RootUsers = IndexedContexts >> binding >> context >> RootUser
@@ -127,7 +129,7 @@ domain System
       state Update = PerformUpdate
         on entry
           do for User
-            callEffect cdb:UpdateModel( Url, ModelIdentification, IncludingDependencies )
+            callEffect cdb:UpdateModel( ModelIdentification, IncludingDependencies )
             PerformUpdate = false
             -- Updating without dependencies is the default.
             IncludingDependencies = false

@@ -23,8 +23,9 @@
 module Perspectives.Identifiers
 
 where
+
 import Control.Monad.Error.Class (class MonadThrow)
-import Data.Array (intercalate, null, uncons)
+import Data.Array (intercalate, null, uncons, unsnoc)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.String (Pattern(..), Replacement(..), replaceAll, split, stripPrefix, stripSuffix)
@@ -139,6 +140,26 @@ namespace2modelname s = if test oldModelRegex s
   then Just s
   else (<>) <$> Just "model:" <*> getSecondMatch newModelRegex s
 
+namespace2modelname_ :: Partial => String -> String
+namespace2modelname_ = fromJust <<< namespace2modelname
+
+-- | Transform a model URI of the form model://perspect.it/System@1.0.0-alpha to 
+-- | a model URL of the form https://perspect.it/models/System@1.0.0-alpha
+-- | The function is Partial because it should only be applied to a string that matches newModelPattern.
+-- 	model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
+-- https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{LocalModelName}.json
+modelName2modelUrl :: Partial => String -> String
+modelName2modelUrl s = let
+    (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
+    (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
+    (localModelName :: String) = fromJust $ fromJust $ index matches 2
+    (namespaceParts :: Array String) = split (Pattern "\\.") hierarchicalNamespace
+    {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
+    {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
+  in
+    "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts <> localModelName <> ".json"
+
+
 -----------------------------------------------------------
 -- CLASS PERSPECTENTITEITIDENTIFIER
 -----------------------------------------------------------
@@ -208,9 +229,9 @@ deconstructNamespace s = case deconstructLocalName s of
 deconstructNamespace_ :: String -> Namespace
 deconstructNamespace_ = unsafePartial $ fromJust <<< deconstructNamespace
 
--- | Returns the "model://ModelName" part of an identifier or Nothing if it does not start with model:ModelName.
--- | deconstructModelName "model://Model$First$Second" == Just "model://Model"
--- | deconstructModelName "model://Model" == Just "model://Model"
+-- | Returns the "model://authority/ModelName" part of an identifier or Nothing if it does not start with model://authority/ModelName.
+-- | deconstructModelName "model://authority/Model$First$Second" == Just "model://authority/Model"
+-- | deconstructModelName "model://authority/Model" == Just "model://Modelauthority/"
 deconstructModelName :: String -> Maybe Namespace
 deconstructModelName = getFirstMatch matchModelnameRegex
 
@@ -264,19 +285,15 @@ deconstructLocalNameFromCurie = getSecondMatch curieRegEx
 -----------------------------------------------------------
 -- THE MODEL:USER DOMEIN
 -----------------------------------------------------------
-userUriRegEx :: Regex
-userUriRegEx = unsafeRegex "^model:User\\$" noFlags
-
--- | True iff the string starts on "model:User$"
-isUserURI :: String -> Boolean
-isUserURI = test userUriRegEx
-
 -- | Matches all segments of the name (the string after the first "$")
 userNameRegEx :: Regex
 userNameRegEx = unsafeRegex "^model:User\\$(.*)\\$.*" noFlags
 
 deconstructUserName :: String -> Maybe String
 deconstructUserName = getFirstMatch userNameRegEx
+
+constructUserIdentifier :: String -> String
+constructUserIdentifier s = "model:User$" <> s
 
 -----------------------------------------------------------
 -- ROLNAMES

@@ -58,7 +58,7 @@ import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unre
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Fuzzysort (matchIndexedContextNames)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
+import Perspectives.Identifiers (buitenRol, constructUserIdentifier, deconstructBuitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getRoleName, roleType, roleType_, siblings)
@@ -614,7 +614,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         void $ runMonadPerspectivesTransaction authoringRole do
           loadModelIfMissing $ unsafeDeconstructModelName ctype
           g <- liftEffect guid
-          ctxt <- runExceptT $ constructContext mroleType (ContextSerialization cd {id = "model:User$c" <> (show g)})
+          ctxt <- runExceptT $ constructContext mroleType (ContextSerialization cd {id = constructUserIdentifier (show g)})
           case ctxt of
             (Left messages) -> lift $ sendResponse (Error corrId (show messages)) setter
             (Right ctxtId) -> effect ctxtId
