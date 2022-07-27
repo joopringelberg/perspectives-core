@@ -37,7 +37,7 @@ import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Statements)
 import Perspectives.Repetition (Duration, Repeater)
-import Perspectives.Representation.Context (ContextKind)
+import Perspectives.Representation.Context (ContextKind, PublicStore)
 import Perspectives.Representation.ExplicitSet (ExplicitSet)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.Sentence (Sentence)
@@ -51,6 +51,7 @@ import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 newtype ContextE = ContextE
   { id :: String
   , kindOfContext :: ContextKind
+  , public :: Maybe PublicStore
   , contextParts :: List ContextPart
   , pos :: ArcPosition}
 

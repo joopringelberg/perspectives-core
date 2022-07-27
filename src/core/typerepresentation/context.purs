@@ -47,6 +47,7 @@ type ContextRecord =
   , _rev :: Revision_
   , displayName :: String
   , kindOfContext :: ContextKind
+  , public :: Maybe PublicStore
 
   , contextAspects :: Array ContextType
   , defaultPrototype :: Maybe ContextInstance
@@ -67,17 +68,20 @@ type ContextRecord =
   , pos :: ArcPosition
   }
 
+data PublicStore = NAMESPACESTORE
+
 -- TODO: verwijder State. Het is geen ContextKind.
 data ContextKind = Domain | Case | Party | Activity | State
 
 -- | We assume the id is a qualified name.
-defaultContext :: String -> String -> ContextKind -> Maybe String -> ArcPosition -> Context
-defaultContext id dname kind context pos = Context { _id: (ContextType id)
+defaultContext :: String -> String -> ContextKind -> Maybe String -> ArcPosition -> Maybe PublicStore -> Context
+defaultContext id dname kind context pos public = Context { _id: (ContextType id)
   , _rev: Nothing
   , displayName: dname
   , kindOfContext: kind
   , contextAspects: []
   , defaultPrototype: Nothing
+  , public
 
   , rolInContext: []
   , contextRol: []
@@ -124,4 +128,12 @@ derive instance eqContextKind :: Eq ContextKind
 instance encodeContextKind :: Encode ContextKind where
   encode = genericEncode defaultOptions
 instance decodeContextKind :: Decode ContextKind where
+  decode = genericDecode defaultOptions
+
+derive instance  Generic PublicStore _
+instance Show PublicStore where show = genericShow
+derive instance Eq PublicStore
+instance Encode PublicStore where
+  encode = genericEncode defaultOptions
+instance Decode PublicStore where
   decode = genericDecode defaultOptions

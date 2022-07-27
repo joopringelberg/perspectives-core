@@ -240,7 +240,7 @@ domain System
     user You = filter (Initiator either ConnectedPartner) with not filledBy sys:Me
 
   -- This will become obsolete when we start using model:CouchdbManagement.
-  case Model
+  case Model public NAMESPACESTORE
     aspect sys:RootContext
     external
       aspect sys:RootContext$External

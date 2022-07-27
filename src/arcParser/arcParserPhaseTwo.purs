@@ -80,10 +80,10 @@ traverseDomain c ns = do
 -- | Traverse the members of the ContextE AST type to construct a new Context type
 -- | and insert it into a DomeinFileRecord.
 traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
-traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
+traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
   contextIdentifier <- pure $ modelName id
-  context <- pure $ defaultContext contextIdentifier id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
+  context <- pure $ defaultContext contextIdentifier id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos public
   withNamespaces
     contextParts
     do

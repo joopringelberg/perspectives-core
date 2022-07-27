@@ -71,6 +71,7 @@ perspectDef = LanguageDef
                   , "use"
                   , "indexed"
                   , "aspect"
+                  , "public"
 
                   -- Roles
                   , "thing"

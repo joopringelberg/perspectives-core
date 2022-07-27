@@ -52,7 +52,7 @@ import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Repetition (Duration(..), Repeater(..))
-import Perspectives.Representation.Context (ContextKind(..))
+import Perspectives.Representation.Context (ContextKind(..), PublicStore(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
@@ -104,6 +104,7 @@ contextE = withPos do
   knd <- contextKind
   pos <- getPosition
   uname <- arcIdentifier
+  mpublicStore <- optionMaybe (reserved "public" *> publicStore)
   -- | ook hier geldt: als op de volgende regel en geïndenteerd, dan moet de deelparser slagen en het hele blok consumeren.
   isIndented' <- isIndented
   isNextLine' <- isNextLine
@@ -148,7 +149,7 @@ contextE = withPos do
                 rolesAndContexts))))
     else pure Nil
   -- | Notice: uname is unqualified.
-  pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts, pos: pos}
+  pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts, pos: pos, public: mpublicStore}
 
   where
 
@@ -251,6 +252,10 @@ contextE = withPos do
       if isModelName modelName
         then pure $ PREFIX prefix modelName
         else fail ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)")
+    
+    -- Returns one of a limited set of symbolic store names
+    publicStore :: IP PublicStore
+    publicStore = reserved "NAMESPACESTORE" *> pure NAMESPACESTORE
 
 domain :: IP ContextE
 domain = do
