@@ -172,6 +172,17 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifie
                 , properties: PropertySerialization empty
                 , binding: Just $ buitenRol contextIdentifier })
 
+compileAssignmentFromRole (UQD _ (QF.CreateRootContext qualifiedContextTypeIdentifier localName) contextGetterDescription _ _ _) = do
+  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
+  pure \(roleId :: RoleInstance) -> do
+    ctxts <- lift (roleId ##= contextGetter)
+    for_ ctxts \ctxt -> do
+      contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+      void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+        { id = contextIdentifier
+        , ctype = unwrap qualifiedContextTypeIdentifier
+        })
+
 compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier localName) roleGetterDescription _ _ _) = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleGetterDescription
   pure \(roleId :: RoleInstance) -> do

@@ -112,7 +112,7 @@ createContext = withPos do
   start <- getPosition
   contextTypeIdentifier <- reserved "create" *> reserved "context" *> arcIdentifier
   localName <- optionMaybe token.stringLiteral
-  roleTypeIdentifier <- reserved "bound" *> reserved "to" *> arcIdentifier
+  roleTypeIdentifier <- optionMaybe (reserved "bound" *> reserved "to" *> arcIdentifier)
   -- Check indentiation to prevent confusion of 'in' with the 'in' of the letA.
   contextExpression <- optionMaybe (indented' *> reserved "in" *> step)
   end <- getPosition

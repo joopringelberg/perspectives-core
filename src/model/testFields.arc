@@ -5,6 +5,21 @@ domain model://perspectives.domains/TestFields
   use sys for model:System
   use tf for model:TestFields
 
+  user Installer = sys:Me
+    perspective on TestFieldsApp
+      only (Create)
+      props (Name) verbs (SetPropertyValue)
+    perspective on TestFieldsApp >> Tester
+      only (Fill)
+
+  on entry
+    do for Installer
+      letA
+        app <- create context TestFieldsApp "TheTestFields"
+      in
+        Name = "TestFields Management" for app
+        bind sys:Me to Tester
+
   -- The model description case.
   case Model
     aspect sys:Model

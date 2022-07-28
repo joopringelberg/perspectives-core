@@ -255,6 +255,7 @@ data QueryFunction
   | ContextIndividual ContextInstance
 
   | CreateContext ContextType (Maybe LocalName) RoleType
+  | CreateRootContext ContextType (Maybe LocalName)
   | CreateContext_ ContextType (Maybe LocalName)
   | CreateRole EnumeratedRoleType
   | Bind EnumeratedRoleType

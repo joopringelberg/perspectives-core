@@ -26,11 +26,11 @@ module Perspectives.Parsing.Arc.Statement.AST where
 
 import Prelude
 
+import Data.Eq.Generic (genericEq)
 import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
-import Data.Eq.Generic (genericEq)
+import Data.Maybe (Maybe(..), isNothing)
 import Data.Show.Generic (genericShow)
-import Data.Maybe (Maybe, isNothing)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding)
@@ -54,7 +54,7 @@ data Assignment =
   RemoveRole (WithTextRange (roleExpression :: Step))
   | RemoveContext (WithTextRange (roleExpression :: Step))
   | CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
-  | CreateContext (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe String, roleTypeIdentifier :: String, contextExpression :: Maybe Step))
+  | CreateContext (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe String, roleTypeIdentifier :: Maybe String, contextExpression :: Maybe Step))
   | CreateContext_ (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe String, roleExpression :: Step))
   | Move (WithTextRange (roleExpression :: Step, contextExpression :: Maybe Step))
   | Bind (WithTextRange (bindingExpression :: Step, roleIdentifier :: String, contextExpression :: Maybe Step))
@@ -150,8 +150,11 @@ instance prettyPrintAssignment :: PrettyPrint Assignment where
   prettyPrint' t (CreateRole {roleIdentifier, contextExpression}) = "CreateRole " <> roleIdentifier <> " " <> prettyPrint' t contextExpression
   prettyPrint' t (CreateContext {contextTypeIdentifier, roleTypeIdentifier, contextExpression}) = let
     context = if isNothing contextExpression then "current context" else prettyPrint' t contextExpression
+    boundTo = case roleTypeIdentifier of
+      Nothing -> ""
+      Just r -> " bound to " <> r
     in
-      "CreateContext " <> contextTypeIdentifier <> " bound to " <> roleTypeIdentifier <> " in " <> context
+      "CreateContext " <> contextTypeIdentifier <> boundTo <> " in " <> context
   prettyPrint' t (CreateContext_ {contextTypeIdentifier, roleExpression}) = "CreateContext_ " <> contextTypeIdentifier <> " bound to " <> prettyPrint' t roleExpression
   prettyPrint' t (Move {roleExpression, contextExpression}) = "Move " <> prettyPrint' t roleExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
   prettyPrint' t (Bind {bindingExpression, contextExpression}) = "Bind " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
