@@ -111,20 +111,22 @@ createContext :: IP Assignment
 createContext = withPos do
   start <- getPosition
   contextTypeIdentifier <- reserved "create" *> reserved "context" *> arcIdentifier
+  localName <- optionMaybe token.stringLiteral
   roleTypeIdentifier <- reserved "bound" *> reserved "to" *> arcIdentifier
   -- Check indentiation to prevent confusion of 'in' with the 'in' of the letA.
   contextExpression <- optionMaybe (indented' *> reserved "in" *> step)
   end <- getPosition
-  pure $ CreateContext {start, end, contextTypeIdentifier, roleTypeIdentifier, contextExpression}
+  pure $ CreateContext {start, end, contextTypeIdentifier, localName, roleTypeIdentifier, contextExpression}
 
 -- createContext_ ContextType bound to <roleExpression>
 createContext_ :: IP Assignment
 createContext_ = do
   start <- getPosition
   contextTypeIdentifier <- reserved "create_" *> reserved "context" *> arcIdentifier
+  localName <- optionMaybe token.stringLiteral
   roleExpression <- reserved "bound" *> reserved "to" *> step
   end <- getPosition
-  pure $ CreateContext_ {start, end, contextTypeIdentifier, roleExpression}
+  pure $ CreateContext_ {start, end, contextTypeIdentifier, localName, roleExpression}
 
 move :: IP Assignment
 move = do
