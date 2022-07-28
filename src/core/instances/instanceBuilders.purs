@@ -59,17 +59,17 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
-import Perspectives.Identifiers (buitenRol, deconstructLocalName, deconstructModelName, isQualifiedWithDomein, modelName2NamespaceStore)
+import Perspectives.Identifiers (buitenRol, deconstructLocalName, deconstructModelName, isQualifiedWithDomein)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Arc.PhaseTwo (addNamespace)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistent.PublicStore (mapPublicStore)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole)
-import Perspectives.Representation.Context (PublicStore(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
@@ -144,12 +144,11 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
         else (lift $ lift $ getPublicStore_ (ContextType ctype)) >>= unsafePartial case _ of 
           -- There is no public store that we can use to construct an identifier.
           Nothing -> throwError (NotWellFormedName upperLeft id)
-          Just pStore -> case pStore of 
-            NAMESPACESTORE -> case deconstructModelName ctype of
+          Just pStore -> case deconstructModelName ctype of
               -- As ctype comes from a ContextSerialization that comes from the client, 
               -- anticipate incorrectly formed names.
               Nothing -> throwError (NotWellFormedName upperLeft ctype)
-              Just modelName -> pure $ ContextInstance $ addNamespace (modelName2NamespaceStore modelName) id
+              Just modelName -> pure $ ContextInstance $ addNamespace (mapPublicStore pStore modelName) id
 
     -- Constructed with a UniverseRoleDelta but no RoleBindingDelta.
     constructSingleRoleInstance ::

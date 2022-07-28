@@ -51,13 +51,16 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Identifiers (buitenRol, constructUserIdentifier)
+import Perspectives.Identifiers (buitenRol, constructUserIdentifier) as Identifier
+import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as OG
 import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
+import Perspectives.Parsing.Arc.PhaseTwo (addNamespace)
 import Perspectives.Persistent (getPerspectEntiteit)
+import Perspectives.Persistent.PublicStore (mapPublicStore)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, getRoleInstances, typeTimeOnly)
@@ -69,11 +72,11 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), RoleType(..))
 import Perspectives.SaveUserData (removeBinding, setBinding, setFirstBinding, scheduleRoleRemoval, scheduleContextRemoval)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, hasContextAspect, isDatabaseQueryRole)
+import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, getPublicStore_, hasContextAspect, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Deletes, from all contexts, the role instance.
@@ -140,9 +143,10 @@ compileAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualif
         -- Create a context without binding contextrole.
         -- Calculated Roles cannot be specialised, and there is no way to model a specialised embedded context type.
         CR calculatedType -> do
-          g <- liftEffect guid
+          -- TODO: Add syntax to enter a local name for the context to be constructed.
+          contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier Nothing
           void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
-            { id = constructUserIdentifier (show g)
+            { id = contextIdentifier
             , ctype = unwrap qualifiedContextTypeIdentifier
             })
         ENR enumeratedType -> do
@@ -158,15 +162,15 @@ compileAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualif
               then pure $ filter ((notEq) qualifiedContextTypeIdentifier) contextTypesToCreate
               else pure contextTypesToCreate
             for contextTypesToCreate' \contextTypeToCreate -> do 
-              g <- liftEffect guid
+              contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier Nothing
               void $ runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
-                { id = constructUserIdentifier (show g)
+                { id = contextIdentifier
                 , ctype = unwrap contextTypeToCreate
                 })
               void $ createAndAddRoleInstance roleTypeToCreate (unwrap ctxt) (RolSerialization
                 { id: Nothing
                 , properties: PropertySerialization empty
-                , binding: Just $ buitenRol $ constructUserIdentifier (show g) })
+                , binding: Just $ Identifier.buitenRol contextIdentifier })
 
 compileAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleGetterDescription
@@ -184,14 +188,13 @@ compileAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) role
       case head contextTypesToCreate of
         Nothing -> pure unit
         Just contextTypeToCreate -> do 
-          g <- liftEffect guid
-          newContextId <- pure $ constructUserIdentifier (show g)
+          contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier Nothing
           newContext <- runExceptT $ constructContext (Just $ ENR roleTypeToFill) (ContextSerialization defaultContextSerializationRecord
-            { id = newContextId
+            { id = contextIdentifier
             , ctype = unwrap contextTypeToCreate
             })
           -- now bind it in the role instance.
-          void $ setFirstBinding roleInstance (RoleInstance $ buitenRol newContextId) Nothing
+          void $ setFirstBinding roleInstance (RoleInstance $ Identifier.buitenRol contextIdentifier) Nothing
 
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
@@ -398,11 +401,11 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
         -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.
         -- Create a context without binding contextrole.
         CR calculatedType -> do
-          g <- liftEffect guid
+          contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier Nothing
           r <- runExceptT $ constructContext
             Nothing
             (ContextSerialization defaultContextSerializationRecord
-              { id = constructUserIdentifier (show g)
+              { id = contextIdentifier
               , ctype = unwrap qualifiedContextTypeIdentifier
               })
           case r of
@@ -424,9 +427,9 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
               then pure $ filter ((notEq) qualifiedContextTypeIdentifier) contextTypesToCreate
               else pure contextTypesToCreate
             for contextTypesToCreate' \contextTypeToCreate -> do
-              g <- liftEffect guid
+              contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier Nothing
               r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
-                { id = constructUserIdentifier (show g)
+                { id = contextIdentifier
                 , ctype = unwrap contextTypeToCreate
                 })
               case r of
@@ -439,7 +442,7 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
                   (RolSerialization
                     { id: Nothing
                     , properties: PropertySerialization empty
-                    , binding: Just $ buitenRol $ constructUserIdentifier (show g) })
+                    , binding: Just $ Identifier.buitenRol contextIdentifier })
     pure $ catMaybes (hush <$> results)
 
 compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
@@ -454,3 +457,13 @@ compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contex
           -- No need to handle retrieval errors as we've just created the role.
           pure (unwrap roleIdentifier)
 compileCreatingAssignments qfd = pure \ci -> pure []
+
+constructContextIdentifier :: ContextType -> Maybe String -> MonadPerspectivesTransaction String
+constructContextIdentifier ctype@(ContextType cname) mlocalName = do
+  localName <- case mlocalName of 
+      Nothing -> show <$> liftEffect guid
+      Just n -> pure n
+  mPStore <- lift $ getPublicStore_ ctype 
+  case mPStore of 
+    Nothing -> pure $ Identifier.constructUserIdentifier localName
+    Just pStore -> pure $ addNamespace (unsafePartial mapPublicStore pStore (unsafePartial fromJust $ deconstructModelName cname)) localName

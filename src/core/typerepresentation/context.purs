@@ -34,6 +34,7 @@ import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
+import Perspectives.Persistent.PublicStore (PublicStore)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType, RoleType)
 import Prelude (class Eq, class Show, map, (<<<), (==))
 
@@ -67,8 +68,6 @@ type ContextRecord =
 
   , pos :: ArcPosition
   }
-
-data PublicStore = NAMESPACESTORE
 
 -- TODO: verwijder State. Het is geen ContextKind.
 data ContextKind = Domain | Case | Party | Activity | State
@@ -128,12 +127,4 @@ derive instance eqContextKind :: Eq ContextKind
 instance encodeContextKind :: Encode ContextKind where
   encode = genericEncode defaultOptions
 instance decodeContextKind :: Decode ContextKind where
-  decode = genericDecode defaultOptions
-
-derive instance  Generic PublicStore _
-instance Show PublicStore where show = genericShow
-derive instance Eq PublicStore
-instance Encode PublicStore where
-  encode = genericEncode defaultOptions
-instance Decode PublicStore where
   decode = genericDecode defaultOptions
