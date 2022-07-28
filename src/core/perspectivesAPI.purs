@@ -610,11 +610,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     withNewContext :: RoleType -> (Maybe RoleType) -> (ContextInstance -> MonadPerspectivesTransaction Unit) -> MonadPerspectives Unit
     withNewContext authoringRole mroleType effect = case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
-      (Right (ContextSerialization cd@{ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
+      (Right (ContextSerialization cd@{id, ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
         void $ runMonadPerspectivesTransaction authoringRole do
           loadModelIfMissing $ unsafeDeconstructModelName ctype
-          g <- liftEffect guid
-          ctxt <- runExceptT $ constructContext mroleType (ContextSerialization cd {id = constructUserIdentifier (show g)})
+          contextIdentifier <- if id == ""
+            then do
+              g <- liftEffect guid
+              pure $ constructUserIdentifier (show g)
+            else pure id
+          ctxt <- runExceptT $ constructContext mroleType (ContextSerialization cd {id = contextIdentifier})
           case ctxt of
             (Left messages) -> lift $ sendResponse (Error corrId (show messages)) setter
             (Right ctxtId) -> effect ctxtId
