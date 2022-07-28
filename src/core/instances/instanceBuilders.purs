@@ -59,15 +59,17 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
-import Perspectives.Identifiers (buitenRol, deconstructLocalName)
+import Perspectives.Identifiers (buitenRol, deconstructLocalName, deconstructModelName, isQualifiedWithDomein, modelName2NamespaceStore)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
+import Perspectives.Parsing.Arc.PhaseTwo (addNamespace)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole)
+import Perspectives.Representation.Context (PublicStore(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
@@ -75,7 +77,7 @@ import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
-import Perspectives.Types.ObjectGetters (roleAspectsClosure)
+import Perspectives.Types.ObjectGetters (getPublicStore_, roleAspectsClosure)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
 
@@ -87,7 +89,7 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
 constructContext :: Maybe RoleType -> ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
 constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
-  contextInstanceId <- ContextInstance <$> (lift $ lift $ expandDefaultNamespaces id)
+  contextInstanceId <- constructContextIdentifier
   case (deconstructLocalName $ unwrap contextInstanceId) of
     Nothing -> throwError (NotWellFormedName upperLeft (unwrap contextInstanceId))
     Just localName -> do
@@ -131,6 +133,23 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
           lift $ addCreatedContextToTransaction contextInstanceId
           pure contextInstanceId
   where
+
+    constructContextIdentifier :: ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
+    constructContextIdentifier = do 
+      expanded <- lift $ lift $ expandDefaultNamespaces id 
+      if isQualifiedWithDomein expanded
+        then pure $ ContextInstance expanded
+        -- The case expression below is Partial, but the parser only returns constructors of PublicStore,
+        -- hence it is safe to claim unsafePartial.
+        else (lift $ lift $ getPublicStore_ (ContextType ctype)) >>= unsafePartial case _ of 
+          -- There is no public store that we can use to construct an identifier.
+          Nothing -> throwError (NotWellFormedName upperLeft id)
+          Just pStore -> case pStore of 
+            NAMESPACESTORE -> case deconstructModelName ctype of
+              -- As ctype comes from a ContextSerialization that comes from the client, 
+              -- anticipate incorrectly formed names.
+              Nothing -> throwError (NotWellFormedName upperLeft ctype)
+              Just modelName -> pure $ ContextInstance $ addNamespace (modelName2NamespaceStore modelName) id
 
     -- Constructed with a UniverseRoleDelta but no RoleBindingDelta.
     constructSingleRoleInstance ::

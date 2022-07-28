@@ -143,11 +143,11 @@ namespace2modelname s = if test oldModelRegex s
 namespace2modelname_ :: Partial => String -> String
 namespace2modelname_ = fromJust <<< namespace2modelname
 
--- | Transform a model URI of the form model://perspect.it/System@1.0.0-alpha to 
--- | a model URL of the form https://perspect.it/models/System@1.0.0-alpha
+-- | Transform a model URI of the form 
+-- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
+-- | to:
+-- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{LocalModelName}.json
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
--- 	model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
--- https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{LocalModelName}.json
 modelName2modelUrl :: Partial => String -> String
 modelName2modelUrl s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
@@ -159,7 +159,20 @@ modelName2modelUrl s = let
   in
     "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts <> localModelName <> ".json"
 
-
+-- | Transform a model URI of the form 
+-- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
+-- | to:
+-- |    https://{authority-with-dots}/cw_{subdomains-with-underscores}_{authority-with-underscores}/
+-- | The function is Partial because it should only be applied to a string that matches newModelPattern.
+modelName2NamespaceStore :: Partial => String -> String
+modelName2NamespaceStore s = let
+    (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
+    (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
+    (namespaceParts :: Array String) = split (Pattern "\\.") hierarchicalNamespace
+    {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
+    {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
+  in
+    "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
 -----------------------------------------------------------
 -- CLASS PERSPECTENTITEITIDENTIFIER
 -----------------------------------------------------------

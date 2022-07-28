@@ -40,7 +40,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for_, traverse)
 import Foreign.Object (Object, keys, lookup, union) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), type (~~~>), MonadPerspectives, MP, (###=), (###>>))
+import Perspectives.CoreTypes (type (~~>), type (~~~>), MP, MonadPerspectives, (###=), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -59,7 +59,7 @@ import Perspectives.Representation.Class.Context (contextADT, contextRole, roleI
 import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
 import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, roleAspectsADT, typeIncludingAspects)
-import Perspectives.Representation.Context (Context)
+import Perspectives.Representation.Context (Context, PublicStore)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
@@ -199,6 +199,9 @@ contextRootState ctype = pure $ StateIdentifier $ unwrap ctype
 -- | The transitive closure over Aspects of rootState.
 contextRootStates :: ContextType ~~~> StateIdentifier
 contextRootStates = contextAspectsClosure >=> contextRootState
+
+getPublicStore_ :: ContextType -> MonadPerspectives (Maybe PublicStore)
+getPublicStore_ ctype = getContext ctype >>= pure <<< _.public <<< unwrap 
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON STATE
