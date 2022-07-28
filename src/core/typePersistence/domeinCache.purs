@@ -60,14 +60,15 @@ removeDomeinFileFromCache = void <<< domeinCacheRemove
 modifyDomeinFileInCache :: (DomeinFile -> DomeinFile) -> Namespace -> MonadPerspectives Unit
 modifyDomeinFileInCache modifier ns =
   do
-    mAvar <- retrieveInternally (DomeinFileId ns)
+    modelName <- pure $ unsafePartial namespace2modelname_ ns
+    mAvar <- retrieveInternally (DomeinFileId modelName)
     case mAvar of
       Nothing -> throwError $ error $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> ns
       (Just avar) -> do
         df <- liftAff $ take avar
         -- Because we modify the existing Entiteit, we do not overwrite the version number -
         -- unless that is what our modifier does.
-        _ <- cacheEntity (DomeinFileId ns) (modifier df)
+        _ <- cacheEntity (DomeinFileId modelName) (modifier df)
         pure unit
 
 -----------------------------------------------------------
