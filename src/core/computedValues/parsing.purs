@@ -32,8 +32,10 @@ import Control.Monad.Writer (runWriterT)
 import Data.Array (cons, head, intercalate)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.String.Regex (test)
 import Data.Tuple (Tuple(..))
 import Main.RecompileBasicModels (recompileModelsAtUrl)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, type (~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (storeDomeinFileInCache)
@@ -41,6 +43,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
+import Perspectives.Identifiers (modelName2NamespaceStore, oldModelRegex)
 import Perspectives.LoadCRL (loadAndCacheCrlFile')
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -93,13 +96,21 @@ uploadToRepository ::
   Array RoleInstance -> MonadPerspectivesTransaction Unit
 uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crlSource_, head url_ of
   Just arcSource, Just crlSource, Just url -> do
-    r <- loadArcAndCrl' arcSource crlSource
+    r <- loadAndCompileArcFile_ arcSource
     case r of
       Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
-      Right df@(DomeinFile drf@{_id}) -> do
-        lift $ void $ storeDomeinFileInCache _id df
-        -- construct the url from host and port.
-        lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) url
+      Right (DomeinFile {_id, namespace}) -> if test oldModelRegex namespace
+        then do 
+          -- This is inefficient, but temporary until we're done with the old model identifiers.
+          -- Adds the modelDescription, crl, indexedRoles and indexedContexts.
+          withInstances <- loadArcAndCrl' arcSource crlSource
+          case withInstances of
+            Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
+            Right df -> do
+              lift $ void $ storeDomeinFileInCache _id df
+              -- construct the url from host and port.
+              lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) url
+        else lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelName2NamespaceStore namespace)
   _, _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
 -- | Parse and compile all models found at the URL.

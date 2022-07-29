@@ -153,7 +153,7 @@ modelName2modelUrl s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
     (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
     (localModelName :: String) = fromJust $ fromJust $ index matches 2
-    (namespaceParts :: Array String) = split (Pattern "\\.") hierarchicalNamespace
+    (namespaceParts :: Array String) = split (Pattern ".") hierarchicalNamespace
     {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in
@@ -168,7 +168,7 @@ modelName2NamespaceStore :: Partial => String -> String
 modelName2NamespaceStore s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
     (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
-    (namespaceParts :: Array String) = split (Pattern "\\.") hierarchicalNamespace
+    (namespaceParts :: Array String) = split (Pattern ".") hierarchicalNamespace
     {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in

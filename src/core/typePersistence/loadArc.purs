@@ -96,7 +96,7 @@ loadAndCompileArcFile_ text = catchError
                       { referredModels = delete (DomeinFileId _id) refModels
                       , arc = text
                       }
-                    void $ lift $ storeDomeinFileInCache _id df
+                    -- void $ lift $ storeDomeinFileInCache _id df
                     pure $ Right df
                   else pure $ Left typeCheckErrors
   \e -> pure $ Left [Custom (show e)]
@@ -120,6 +120,7 @@ loadArcAndCrl' arcSource crlSource = do
         (Right withInstances) -> do
           pure $ Right (DomeinFile withInstances)
   where
+    -- Adds the modelDescription, crl, indexedRoles and indexedContexts.
     addModelDescriptionAndCrl :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
     addModelDescriptionAndCrl df = do
       (Tuple parseResult {roleInstances, prefixes}) <- runIndentParser' crlSource userData

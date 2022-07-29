@@ -95,7 +95,7 @@ import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (actionStates, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (*>), (<$>), (<*), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree ::
   DomeinFileRecord ->
@@ -106,7 +106,9 @@ phaseThree df@{_id} postponedParts screens = do
   -- Store the DomeinFile in cache. If a prefix for the domain is defined in the file,
   -- phaseThree_ will try to retrieve it.
   void $ storeDomeinFileInCache _id (DomeinFile df)
-  phaseThree_ df postponedParts screens <* removeDomeinFileFromCache _id
+  result <- phaseThree_ df postponedParts screens 
+  removeDomeinFileFromCache _id
+  pure result
 
 phaseThree_ ::
   DomeinFileRecord ->
