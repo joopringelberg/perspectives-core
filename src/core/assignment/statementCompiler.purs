@@ -381,6 +381,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
               otherwise -> throwError $ NotUniquelyIdentifying start ident (identifier_ <$> candidates)
 
         -- Compiles the Step and inverts it as well.
+        -- NOTE: parameter userTypes is not used.
         ensureContext :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription
         ensureContext userTypes stp  = do
           -- An expression that results in a ContextInstance, in this state, for this usertype.
@@ -390,6 +391,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             otherwise -> throwError $ NotAContextDomain qfd (range qfd) (startOf stp) (endOf stp)
 
         -- Compiles the Step and inverts it as well.
+        -- NOTE: parameter userTypes is not used.
         ensureRole :: Array RoleType -> Step -> PhaseThree QueryFunctionDescription
         ensureRole userTypes stp = do
           -- An expression that results in a RoleInstance, in this state, for this usertype.

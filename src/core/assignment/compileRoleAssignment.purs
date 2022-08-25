@@ -27,7 +27,7 @@ module Perspectives.CompileRoleAssignment where
 
 import Prelude
 
-import Control.Monad.AvarMonadAsk (modify)
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
@@ -57,6 +57,7 @@ import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstan
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as OG
 import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Arc.PhaseTwo (addNamespace)
 import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Persistent.PublicStore (mapPublicStore)
@@ -71,7 +72,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SaveUserData (removeBinding, setBinding, setFirstBinding, scheduleRoleRemoval, scheduleContextRemoval)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -174,14 +175,16 @@ compileAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeIdentifie
 
 compileAssignmentFromRole (UQD _ (QF.CreateRootContext qualifiedContextTypeIdentifier localName) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
-  pure \(roleId :: RoleInstance) -> do
-    ctxts <- lift (roleId ##= contextGetter)
-    for_ ctxts \ctxt -> do
-      contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
-      void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
-        { id = contextIdentifier
-        , ctype = unwrap qualifiedContextTypeIdentifier
-        })
+  pure $ withAuthoringRole 
+    (ENR $ EnumeratedRoleType sysUser)
+    \(roleId :: RoleInstance) -> do
+      ctxts <- lift (roleId ##= contextGetter)
+      for_ ctxts \ctxt -> do
+        contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+        void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+          { id = contextIdentifier
+          , ctype = unwrap qualifiedContextTypeIdentifier
+          })
 
 compileAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier localName) roleGetterDescription _ _ _) = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleGetterDescription
@@ -482,3 +485,10 @@ constructContextIdentifier ctype@(ContextType cname) mlocalName = do
   case mPStore of 
     Nothing -> pure $ constructUserIdentifier localName
     Just pStore -> pure $ addNamespace (unsafePartial mapPublicStore pStore (unsafePartial fromJust $ deconstructModelName cname)) localName
+
+withAuthoringRole :: forall a. RoleType -> Updater a -> Updater a
+withAuthoringRole aRole updater a = do
+  originalRole <- gets (_.authoringRole <<< unwrap)
+  modify (over Transaction \t -> t {authoringRole = aRole})
+  updater a
+  modify (over Transaction \t -> t {authoringRole = originalRole})

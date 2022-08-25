@@ -106,7 +106,7 @@ roleCreation = do
   end <- getPosition
   pure $ CreateRole {start, end, roleIdentifier, contextExpression}
 
--- createContext ContextType bound to RoleType [ in <contextExpression>]
+-- createContext ContextType [bound to RoleType] [in <contextExpression>]
 createContext :: IP Assignment
 createContext = withPos do
   start <- getPosition

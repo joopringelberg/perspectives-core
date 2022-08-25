@@ -38,7 +38,7 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, lookup, delete)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (ala, alaF, over, unwrap)
+import Data.Newtype (ala, alaF, unwrap)
 import Data.Traversable (for_, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
@@ -51,7 +51,7 @@ import Perspectives.Assignment.SentenceCompiler (CompiledSentence, compileContex
 import Perspectives.Assignment.SerialiseAsDeltas (serialiseRoleInstancesAndProperties)
 import Perspectives.Assignment.StateCache (CompiledContextState, cacheCompiledContextState, retrieveCompiledContextState)
 import Perspectives.Assignment.Update (setActiveContextState, setInActiveContextState)
-import Perspectives.CompileAssignment (compileAssignment)
+import Perspectives.CompileAssignment (compileAssignment, withAuthoringRole)
 import Perspectives.CompileTimeFacets (addTimeFacets)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -68,7 +68,6 @@ import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..), externalRole)
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType, StateIdentifier)
-import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
 
 compileState :: Partial => StateIdentifier -> MP CompiledContextState
@@ -116,13 +115,6 @@ compileState stateId = do
       updater <- pure $ notify compiledSentence
       addTimeFacets updater r subject stateId
     
-    withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
-    withAuthoringRole aRole updater a = do
-      originalRole <- gets (_.authoringRole <<< unwrap)
-      modify (over Transaction \t -> t {authoringRole = aRole})
-      updater a
-      modify (over Transaction \t -> t {authoringRole = originalRole})
-
 -- | This function is applied without knowing whether state condition is valid.
 -- | Ensure that the current context is available in the environment before applying this function!
 -- | Put an error boundary around this function.
