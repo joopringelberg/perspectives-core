@@ -460,6 +460,22 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
                     , binding: Just $ buitenRol contextIdentifier })
     pure $ catMaybes (hush <$> results)
 
+compileCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextTypeIdentifier localName) contextGetterDescription _ _ _) = do
+  (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
+  pure \(roleId :: RoleInstance) -> do
+      originalRole <- gets (_.authoringRole <<< unwrap)
+      modify (over Transaction \t -> t {authoringRole = (ENR $ EnumeratedRoleType sysUser)})
+      ctxts <- lift (roleId ##= contextGetter)
+      r <- for ctxts \ctxt -> do
+        contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+        void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+          { id = contextIdentifier
+          , ctype = unwrap qualifiedContextTypeIdentifier
+          })
+        pure $ contextIdentifier
+      modify (over Transaction \t -> t {authoringRole = originalRole})
+      pure r
+
 compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
   pure \roleId -> do

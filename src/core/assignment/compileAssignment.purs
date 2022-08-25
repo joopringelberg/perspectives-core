@@ -460,6 +460,23 @@ compileCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifi
                     , binding: Just $ Identifier.buitenRol contextIdentifier })
     pure $ catMaybes (hush <$> results)
 
+compileCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextTypeIdentifier localName) contextGetterDescription _ _ _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
+  pure \(contextId :: ContextInstance) -> do
+      originalRole <- gets (_.authoringRole <<< unwrap)
+      modify (over Transaction \t -> t {authoringRole = (ENR $ EnumeratedRoleType sysUser)})
+      ctxts <- lift (contextId ##= contextGetter)
+      -- As root contexts should be constructed by sys:PerspectivesSystem$User, we set the authoringRole of the transaction temporarily to that value.
+      r <- for ctxts \ctxt -> do
+        contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+        void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+          { id = contextIdentifier
+          , ctype = unwrap qualifiedContextTypeIdentifier
+          })
+        pure $ contextIdentifier
+      modify (over Transaction \t -> t {authoringRole = originalRole})
+      pure r
+
 compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
   pure \contextId -> do
