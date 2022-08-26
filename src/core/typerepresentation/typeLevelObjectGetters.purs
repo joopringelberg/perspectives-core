@@ -63,7 +63,7 @@ import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, all
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.InstanceIdentifiers (Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType, propertytype2string, roletype2string)
@@ -107,6 +107,9 @@ enumeratedRolePropertyTypes_ = getEnumeratedRole >=> \(EnumeratedRole{properties
 
 enumeratedRoleContextType :: EnumeratedRoleType -> MonadPerspectives ContextType
 enumeratedRoleContextType = getEnumeratedRole >=> pure <<< _.context <<< unwrap
+
+indexedRoleName :: EnumeratedRoleType -> MonadPerspectives (Maybe RoleInstance)
+indexedRoleName rtype = getEnumeratedRole rtype >>= pure <<< _.indexedRole <<< unwrap 
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -203,6 +206,9 @@ contextRootStates = contextAspectsClosure >=> contextRootState
 
 getPublicStore_ :: ContextType -> MonadPerspectives (Maybe PublicStore)
 getPublicStore_ ctype = getContext ctype >>= pure <<< _.public <<< unwrap 
+
+indexedContextName :: ContextType -> MonadPerspectives (Maybe ContextInstance)
+indexedContextName ctype = getContext ctype >>= pure <<< _.indexedContext <<< unwrap 
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON STATE
