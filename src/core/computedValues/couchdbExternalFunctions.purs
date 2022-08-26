@@ -485,11 +485,6 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   lift $ updateRevision(DomeinFileId _id)
   revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
 
-  -- Retrieve the modelDescription from cache or database: it may have been changed if the user decided to use it in InPlace.
-  (mmodelDescription :: Maybe PerspectRol) <- case modelDescription of
-    Nothing -> throwError (error ("A model has no description: " <> modelname))
-    Just m -> lift $ tryGetPerspectEntiteit (identifier (m :: PerspectRol))
-
   -- Distribute the SeparateInvertedQueries over the other domains.
   forWithIndex_ invertedQueriesInOtherDomains
     \domainName queries -> do
