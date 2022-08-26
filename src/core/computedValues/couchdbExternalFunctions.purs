@@ -62,7 +62,7 @@ import Perspectives.Error.Boundaries (handleDomeinFileError, handlePerspectRolEr
 import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (constructUserIdentifier, getFirstMatch, modelName2modelUrl, namespace2modelname_, newModelRegex, oldModelRegex)
+import Perspectives.Identifiers (constructUserIdentifier, getFirstMatch, modelName2modelStore, namespace2modelname_, newModelRegex, oldModelRegex)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (contextType, isMe)
@@ -461,7 +461,7 @@ addModelToLocalStore_oldStyle modelname originalLoad = do
 
 addModelToLocalStore_newStyle :: String -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore_newStyle modelname originalLoad = do
-  repositoryUrl <- pure $ unsafePartial modelName2modelUrl modelname
+  repositoryUrl <- pure $ unsafePartial modelName2modelStore modelname
   docName <- pure $ unsafePartial namespace2modelname_ modelname
   df@(DomeinFile
     { _id
@@ -479,167 +479,16 @@ addModelToLocalStore_newStyle modelname originalLoad = do
     case mmodel of
       Nothing -> addModelToLocalStore' (unwrap dfid) originalLoad
       Just _ -> pure unit
-  -- Store the model in Couchdb.
-  -- Fetch the local revision before saving: it belongs to the repository,
-  -- not the local perspect_models.
+  -- Store the model in Couchdb, that is: in the local store of models.
+  -- Save it with the revision of the local version that we have, if any (do not use the repository version).
   lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
   lift $ updateRevision(DomeinFileId _id)
   revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
-
-  -- Add replacements to PerspectivesState for the new indexed names introduced in this model,
-  -- unless we find existing ones left over from a previous installation of the model.
-  (iroles :: Object RoleInstance) <- for indexedRoles (\iRole -> do
-    -- iRole is the *indexed name* (not the unique name).
-    (mexistingReplacement :: Maybe RoleInstance) <- lift $ lookupIndexedRole (unwrap iRole)
-    case mexistingReplacement of
-      Just existingReplacement -> pure $ Tuple (unwrap iRole) existingReplacement
-      Nothing -> do
-        g <- liftEffect guid
-        pure $ Tuple (unwrap iRole) (RoleInstance (constructUserIdentifier $ show g))) >>= pure <<< fromFoldable
-
-  (icontexts :: Object ContextInstance) <- for indexedContexts (\iContext -> do
-    (mexistingReplacement :: Maybe ContextInstance) <- lift $ lookupIndexedContext (unwrap iContext)
-    case mexistingReplacement of
-      Just existingReplacement -> pure $ Tuple (unwrap iContext) existingReplacement
-      Nothing -> do
-        g <- liftEffect guid
-        pure $ Tuple (unwrap iContext) (ContextInstance (constructUserIdentifier $ show g))) >>= pure <<< fromFoldable
-
-  mySystem <- lift (ContextInstance <$> getMySystem)
-  me <- lift (RoleInstance <$> getUserIdentifier)
-  -- TODO. Do we really have to reassert Me and MySystem every time? Presumably this is for the
-  -- situation where we do not yet have model:System.
-  -- Save the augmented indexed roles and contexts in Perspectives State.
-  void $ lift $ AMA.modify \ps -> ps {indexedRoles = insert DEP.sysMe me (ps.indexedRoles `union` iroles), indexedContexts = insert DEP.mySystem mySystem (ps.indexedContexts `union` icontexts)}
-
-  -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
-  crl' <- lift $ replaceIndexedNames crl
 
   -- Retrieve the modelDescription from cache or database: it may have been changed if the user decided to use it in InPlace.
   (mmodelDescription :: Maybe PerspectRol) <- case modelDescription of
     Nothing -> throwError (error ("A model has no description: " <> modelname))
     Just m -> lift $ tryGetPerspectEntiteit (identifier (m :: PerspectRol))
-
-  -- Parse the CRL. This will cache all roleInstances, overwriting the modelDescription and any other entities
-  -- in cache left over from a previous installation.
-  parseResult <- lift $ parseAndCache crl'
-  case parseResult of
-    Left e -> throwError (error (show e))
-    Right (Tuple contextInstances roleInstances') -> do
-      -- Add the new instances to the transaction, so their states will be computed etc.
-      -- NOTE that the model description that we store in the file is, at this point, still waiting to be
-      -- handled in the Transaction. It does therefore not have all states (particularly not the aspect states).
-      if originalLoad
-        then do
-          for_ contextInstances (addCreatedContextToTransaction <<< identifier)
-          for_ roleInstances' (addCreatedRoleToTransaction <<< identifier)
-        else pure unit
-      -- Restore the modelDescription, preferring the version left over from a previous installation
-      -- over the version that came out of the user instances in the crl file.
-      case mmodelDescription of
-        Nothing -> pure unit
-        Just (m :: PerspectRol) -> void $ lift $ cacheEntity (identifier m) m
-
-      -- Save role instances, overwriting versions left over from a previous installation.
-      (cis :: Object PerspectContext) <- execStateT
-        (forWithIndex_
-          roleInstances'
-          (\i newRole' -> do
-            -- Fetch from the database, not cache.
-            newRoleContextType <- lift $ lift ((rol_context newRole') ##>> contextType)
-            (mrole :: Maybe PerspectRol) <- lift $ lift $ tryFetchEntiteit (RoleInstance i)
-            case mrole of
-              -- If we find a previous version in the database, overwrite it.
-              -- We will have handled bindings on the previous occasion.
-              -- NOTE. There may be a snag here. Suppose the previous version
-              -- did have a binding while the current does not? Then we'd need
-              -- to readjust the inverse binding administration.
-              -- Also, the new version may not have a binding while the old version does.
-              -- This may trigger automatic effects as indeed it does for state NotInIndexedContexts.
-              -- ME. This operation should preserve the value of `isMe`.
-              Just oldRole -> do
-                newRole <- pure $ changeRol_isMe newRole' (rol_isMe oldRole)
-                case rol_binding newRole of
-                  Nothing -> case rol_binding oldRole of
-                    -- Neither the old nor the new version have a binding.
-                    Nothing -> saveRoleInstance i $ changeRevision (rev oldRole) newRole
-                    -- The old role has a binding, the new one does not.
-                    -- This code is a temporary solution. For now we choose to restore the binding relations.
-                    -- As a consequence, a model update cannot undo binding relations on model instances.
-                    -- Give the new role the binding the old role has.
-                    -- Note that we asssume the fillers have their administration intact! This might not be true
-                    -- when the filler comes from the model, as well.
-                    -- Finally note that the state administration is overwritten.
-                    -- This causes, in the case of model:System, state Update for ModelsInUse to exit silently, as it were.
-                    Just oldBindingId -> saveRoleInstance i $ changeRevision (rev oldRole) (changeRol_binding oldBindingId newRole)
-                  Just newBindingId -> case rol_binding oldRole of
-                    -- New role has binding, old role does not. Update the inverse binding administration for the new binding, if it is not a model instance.
-                    Nothing -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
-                      -- The binding comes with the other model instances and so must already have the inverse binding administration.
-                      then saveRoleInstance i $ changeRevision (rev oldRole) newRole
-                      -- The binding is on an instance outside the model. Add the inverse binding administration.
-                      else (lift $ lift $ try $ getPerspectEntiteit newBindingId) >>=
-                        handlePerspectRolError
-                          "addModelToLocalStore'"
-                          -- set the inverse binding if not already there.
-                          \newBinding -> do
-                            void $ lift $ lift ((addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole) (RoleInstance i)) >>= cacheEntity newBindingId )
-                            void $ lift $ lift $ saveEntiteit newBindingId
-                            saveRoleInstance i $ changeRevision (rev oldRole) newRole
-                    Just oldBindingId -> if newBindingId == oldBindingId
-                      -- Old and new role both have the same binding. Nothing needs to be changed.
-                      then saveRoleInstance i $ changeRevision (rev oldRole) newRole
-                      -- New role has another binding than the old role. TODO.
-                      else pure unit
-                -- As with the binding relation, we choose to restore the binder relations.
-                -- This means we cannot change them with a model update.
-                -- Find those binders on the old role that are not on the new role.
-                -- For each such binder, add it to the new role.
-                -- SHORTCUT. We just replace the binders of the new role with those of the old role.
-                -- Notice that this makes it impossible, too, to remove a binder relation between model instances.
-                -- As this is a temporary solution, that is acceptable.
-                -- Fetch the revision again, because it may have changed above.
-                updatedRole <- lift $ lift $ getPerspectRol (RoleInstance i)
-                lift $ lift $ void $ saveEntiteit_ (rol_id newRole) (changeRevision (rev updatedRole) (setRol_gevuldeRollen newRole (rol_gevuldeRollen oldRole)))
-
-              Nothing -> do
-                case rol_binding newRole' of
-                  Nothing -> saveRoleInstance i newRole'
-                  Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
-                    then saveRoleInstance i newRole'
-                    else (lift $ lift $ try $ getPerspectEntiteit newBindingId) >>=
-                      handlePerspectRolError
-                        "addModelToLocalStore'"
-                        -- set the inverse binding if not already there.
-                        \newBinding -> do
-                          void $ lift $ lift ((addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole') (RoleInstance i)) >>= cacheEntity newBindingId )
-                          void $ lift $ lift $ saveEntiteit newBindingId
-                          saveRoleInstance i newRole'
-                          -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
-                          -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
-                -- The new role may have a context that already existed. It will not have a reference to this new role.
-                moldCtxt <- lift $ lift $ tryFetchEntiteit (rol_context newRole')
-                case moldCtxt of
-                  Nothing -> pure unit
-                  -- We could retrieve the context from the database.
-                  -- Add the new role to the old context and save it.
-                  Just oldCtxt -> void $ lift $ lift $ saveEntiteit_ (context_id oldCtxt) 
-                    (addContext_rolInContext oldCtxt (rol_pspType newRole') (RoleInstance i))
-        ))
-        contextInstances
-
-      -- Save context instances, but prefer a version left over from a previous installation.
-      forWithIndex_ cis \(i :: String) newVersion -> do
-        -- We *must* get the revision from the database. On doing an update, the context will be put into
-        -- cache by the CRL parser. It then has no revision.
-        moldCtxt <- lift $ tryFetchEntiteit (ContextInstance i)
-        case moldCtxt of
-          Nothing -> lift $ saveEntiteit_ (ContextInstance i) newVersion
-          Just oldCtxt  -> do
-            -- We could retrieve the context from the database.
-            -- As tryFetchEntiteit does not cache, we do it now.
-            void $ lift $ cacheEntity (ContextInstance i) oldCtxt
-            pure oldCtxt
 
   -- Distribute the SeparateInvertedQueries over the other domains.
   forWithIndex_ invertedQueriesInOtherDomains
@@ -671,19 +520,6 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   -- Copy the attachment
   lift $ addA repositoryUrl docName revision
   where
-
-    -- Sets the `me` property on the role instances. Detects the ultimate bottom case: the user instance of sys:PerspectivesSystem. Note that model user instances should never comprise particular other users!
-    -- Saves the role instance both in cache and the database.
-    saveRoleInstance :: String -> PerspectRol -> StateT (Object PerspectContext) MonadPerspectivesTransaction Unit
-    saveRoleInstance i a@(PerspectRol{context, pspType}) = do
-      me <- lift $ lift $ isMe (RoleInstance i)
-      if me || pspType == (EnumeratedRoleType sysUser)
-        then do
-          void $ lift $ lift $ saveEntiteit_ (RoleInstance i) (changeRol_isMe a true)
-          void $ modify \cis -> case lookup (unwrap context) cis of
-            Nothing -> cis
-            Just c -> insert (unwrap context) (changeContext_me c (Just (RoleInstance i))) cis
-        else void $ lift $ lift $ saveEntiteit_ (RoleInstance i) a
 
     -- url is the path to the document in the repository.
     addA :: String -> String -> Revision_ -> MP Unit

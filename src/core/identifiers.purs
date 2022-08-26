@@ -157,7 +157,22 @@ modelName2modelUrl s = let
     {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in
-    "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts <> localModelName <> ".json"
+    "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts <> "/" <> localModelName <> ".json"
+
+-- | Transform a model URI of the form 
+-- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
+-- | to:
+-- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}
+-- | The function is Partial because it should only be applied to a string that matches newModelPattern.
+modelName2modelStore :: Partial => String -> String
+modelName2modelStore s = let
+    (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
+    (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
+    (namespaceParts :: Array String) = split (Pattern ".") hierarchicalNamespace
+    {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
+    {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
+  in
+    "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
 
 -- | Transform a model URI of the form 
 -- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
