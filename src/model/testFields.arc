@@ -16,9 +16,7 @@ domain model://perspectives.domains/TestFields
   on entry
     do for Installer
       letA
-        app <- create context TestFieldsApp "TheTestFields"
-        -- Het zou dit kunnen zijn:
-        -- app <- create context TestFieldsApp bound to IndexedContexts of sys:MySystem
+        app <- create context TestFieldsApp bound to IndexedContexts of sys:MySystem
       in
         Name = "TestFields Management" for app >> extern
         bind sys:Me to Tester in app
