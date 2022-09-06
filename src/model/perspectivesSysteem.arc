@@ -66,6 +66,11 @@ domain System
           callEffect cdb:AddModelToLocalStore( ModelIdentification )
           bind origin to ModelsInUse in currentcontext
         view Modellen$ModelPresentation verbs (Consult)
+      perspective on ModelsNewStyle
+        action StartUsing
+          callEffect cdb:AddModelToLocalStore( ModelIdentification )
+          bind origin to ModelsNewStyleInUse in currentcontext
+        view ModelsNewStyle$ManifestPresentation verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
       perspective on SystemCaches
@@ -82,6 +87,13 @@ domain System
               props (Name, Description) verbs (Consult)
           row 
             table ModelsInUse
+              props (Name) verbs (Consult)
+        tab "Manage new models"
+          row
+            table ModelsNewStyle
+              props (Name, Description) verbs (Consult)
+          row 
+            table ModelsNewStyleInUse
               props (Name) verbs (Consult)
         tab "Start contexts"
           row
@@ -114,6 +126,10 @@ domain System
       in
         filter callExternal cdb:Models() returns sys:Model$External with showlibs or (not IsLibrary)
       view ModelPresentation (Description, Name)
+
+    context ModelsNewStyle filledBy sys:ModelManifest
+
+    context ModelsNewStyleInUse filledBy sys:ModelManifest
 
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context IndexedContexts (relational) filledBy sys:RootContext
@@ -238,6 +254,19 @@ domain System
       perspective on ConnectedPartner
     user Me = filter (Initiator either ConnectedPartner) with filledBy sys:Me
     user You = filter (Initiator either ConnectedPartner) with not filledBy sys:Me
+
+case ModelManifest public NAMESPACESTORE
+    aspect sys:RootContext
+    external
+      aspect sys:RootContext$External
+      property Description (mandatory, String)
+      property ModelIdentification (mandatory, String)
+      property Url (mandatory, String)
+      property IsLibrary (mandatory, Boolean)
+      view ManifestPresentation (Description, ModelIdentification, IsLibrary)
+    user Author filledBy User
+      aspect sys:RootContext$RootUser
+      perspective on extern  
 
   -- This will become obsolete when we start using model:CouchdbManagement.
   case Model public NAMESPACESTORE

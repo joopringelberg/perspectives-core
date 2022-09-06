@@ -32,7 +32,7 @@
 module Perspectives.Instances.Builders
   ( constructContext
   , createAndAddRoleInstance
-  , constructEmptyContext
+  , module Perspectives.Instances.CreateContext
   )
 
 where
@@ -49,18 +49,17 @@ import Data.Traversable (traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), snd)
 import Foreign.Generic (encodeJSON)
-import Foreign.Object (isEmpty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addRoleInstanceToContext, getAuthor, getSubject, setProperty)
 import Perspectives.Authenticate (sign)
-import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
+import Perspectives.ContextAndRole (defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
-import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
-import Perspectives.DependencyTracking.Dependency (findRoleRequests)
+import Perspectives.Deltas (addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
-import Perspectives.Identifiers (buitenRol, deconstructLocalName, deconstructModelName, isQualifiedWithDomein)
+import Perspectives.Identifiers (deconstructLocalName, deconstructModelName, isQualifiedWithDomein)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
+import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Arc.PhaseTwo (addNamespace)
@@ -72,14 +71,14 @@ import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedP
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (RoleType(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (getPublicStore_, roleAspectsClosure)
-import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
+import Perspectives.TypesForDeltas (UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<>), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setFirstBinding on each role.
@@ -182,73 +181,6 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
         (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
           lift $ lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
       tell users
-
--- | Constructs an empty context, caches it.
--- | The context contains a UniverseContextDelta, the external role contains a UniverseRoleDelta.
--- | However, they have not yet been added to the Transaction. This is because we need to know the users
--- | we should sent these deltas to, and these are computed on constructing the roles of the context.
--- | So each caller of constructEmptyContext should add these two deltas to the Transaction.
--- | to the Transaction (and also a UniverseRoleDelta for the external role).
--- | QUERY UPDATES
--- | PERSISTENCE of the external role, but not of the context itself.
--- |
--- | For properties:
--- | SYNCHRONISATION by RolePropertyDelta.
--- | RULE TRIGGERING
--- | QUERY UPDATES
-constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> Maybe RoleType -> ExceptT PerspectivesError MonadPerspectivesTransaction PerspectContext
-constructEmptyContext contextInstanceId ctype localName externeProperties authorizedRole = do
-  externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
-  pspType <- ContextType <$> (lift $ lift $ expandDefaultNamespaces ctype)
-  author <- lift $ getAuthor
-  subject <- lift $ getSubject
-  contextInstance <- pure
-    (PerspectContext defaultContextRecord
-      { _id = contextInstanceId
-      , displayName  = localName
-      , pspType = pspType
-      , buitenRol = externalRole
-      , universeContextDelta = SignedDelta
-        { author
-        , encryptedDelta: sign $ encodeJSON $ UniverseContextDelta
-            { id: contextInstanceId
-            , contextType: pspType
-            , deltaType: ConstructEmptyContext
-            , subject
-          }}
-      , states = [StateIdentifier $ unwrap pspType]
-      })
-  lift $ lift  $ void $ cacheEntity contextInstanceId contextInstance
-  _ <- lift $ lift $ cacheEntity externalRole
-    (PerspectRol defaultRolRecord
-      { _id = externalRole
-      , pspType = externalRoleType pspType
-      , context = contextInstanceId
-      , binding = Nothing
-      , universeRoleDelta =
-          SignedDelta
-            { author
-            , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
-              { id: contextInstanceId
-              , roleInstances: (SNEA.singleton externalRole)
-              , roleType: externalRoleType pspType
-              , authorizedRole
-              , deltaType: ConstructExternalRole
-              , subject } }
-      , states = [StateIdentifier $ unwrap pspType]
-      })
-  lift $ addCreatedRoleToTransaction externalRole
-  -- QUERY UPDATES
-  (lift $ lift $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType pspType)) >>= lift <<< addCorrelationIdentifiersToTransactie
-  -- TODO. Op dit moment van constructie aangekomen is nog niet vastgelegd wie 'me' is in de context.
-  case externeProperties of
-    (PropertySerialization props) -> lift do
-      forWithIndex_ props \propertyTypeId values ->
-        -- PERSISTENCE of the role instance.
-        -- CURRENTUSER: there can be no change to the current user.
-        setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
-      if isEmpty props then lift $ void $ saveEntiteit externalRole else pure unit
-  pure contextInstance
 
 -- | Construct a Role instance for an existing Context instance.
 -- | This function is complete w.r.t. the five responsibilities.

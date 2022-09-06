@@ -26,6 +26,7 @@ module Perspectives.Extern.Couchdb where
 
 import Control.Monad.AvarMonadAsk (modify) as AMA
 import Control.Monad.Error.Class (catchError, throwError, try)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.State (State, StateT, execState, execStateT, get, modify, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
@@ -48,6 +49,7 @@ import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_id, rol_binding, rol_context, rol_gevuldeRollen, rol_id, rol_isMe, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.ContextRoleParser (parseAndCache)
@@ -64,6 +66,7 @@ import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (constructUserIdentifier, getFirstMatch, modelName2modelStore, namespace2modelname_, newModelRegex, oldModelRegex)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (contextType, isMe)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
@@ -514,6 +517,16 @@ addModelToLocalStore_newStyle modelname originalLoad = do
 
   -- Copy the attachment
   lift $ addA repositoryUrl docName revision
+
+  -- Create the model instance
+  g <- show <$> liftEffect guid
+  void $ runExceptT $ constructEmptyContext 
+    (ContextInstance $ constructUserIdentifier g)
+    modelname
+    "manifest"
+    (PropertySerialization empty)
+    Nothing
+
   where
 
     -- url is the path to the document in the repository.
