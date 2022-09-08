@@ -37,7 +37,7 @@ executeInTopologicalOrder getLabel getDependencies toSort action = snd <$> runWr
       if null skipped
         then pure sortedItems'
         else if length sortedItems == length sortedItems'
-          then throwError [(Custom ("Cannot topologically sort these items: " <> show (getLabel <$> skipped)))]
+          then throwError [(Custom ("Cannot topologically sort these items (are you sure all relevant items are included?): " <> show (getLabel <$> skipped)))]
           -- If not done, rinse and repeat!
           else executeInTopologicalOrder' skipped sortedItems'
 
