@@ -476,17 +476,31 @@ addModelToLocalStore_newStyle modelname originalLoad = do
     , invertedQueriesInOtherDomains
     , upstreamStateNotifications
     , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl docName
+
+  -- Store the model in Couchdb, that is: in the local store of models.
+  -- Save it with the revision of the local version that we have, if any (do not use the repository version).
+  lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
+  lift $ updateRevision(DomeinFileId _id)
+  revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
+
+  -- Copy the attachment
+  lift $ addA repositoryUrl docName revision
+
+  -- Create the model instance
+  g <- show <$> liftEffect guid
+  void $ runExceptT $ constructEmptyContext 
+    (ContextInstance g)
+    modelname
+    "manifest"
+    (PropertySerialization empty)
+    Nothing
+
   -- Add new dependencies.
   for_ referredModels \dfid -> do
     mmodel <- lift $ tryGetPerspectEntiteit dfid
     case mmodel of
       Nothing -> addModelToLocalStore' (unwrap dfid) originalLoad
       Just _ -> pure unit
-  -- Store the model in Couchdb, that is: in the local store of models.
-  -- Save it with the revision of the local version that we have, if any (do not use the repository version).
-  lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
-  lift $ updateRevision(DomeinFileId _id)
-  revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
 
   -- Distribute the SeparateInvertedQueries over the other domains.
   forWithIndex_ invertedQueriesInOtherDomains
@@ -514,18 +528,6 @@ addModelToLocalStore_newStyle modelname originalLoad = do
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
           lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
-
-  -- Copy the attachment
-  lift $ addA repositoryUrl docName revision
-
-  -- Create the model instance
-  g <- show <$> liftEffect guid
-  void $ runExceptT $ constructEmptyContext 
-    (ContextInstance $ constructUserIdentifier g)
-    modelname
-    "manifest"
-    (PropertySerialization empty)
-    Nothing
 
   where
 
