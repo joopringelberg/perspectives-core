@@ -30,6 +30,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Prelude (bind, pure, ($), (<$>), (<*>), (<<<), (>>=))
 
 class ContainsPrefixes s where
@@ -195,8 +196,14 @@ instance containsPrefixesPropsOrView :: ContainsPrefixes PropsOrView where
   expandPrefix x = pure x
 
 instance containsPrefixesRoleIdentification :: ContainsPrefixes RoleIdentification where
-  expandPrefix r@(ExplicitRole _ _ _) = pure r
+  expandPrefix r@(ExplicitRole ct roleType pos) = do
+    roleType' <- expandPrefix roleType
+    pure (ExplicitRole ct roleType' pos)
   expandPrefix (ImplicitRole ct s) = expandPrefix s >>= pure <<< ImplicitRole ct
+
+instance containsPrefixesRoleType :: ContainsPrefixes RoleType where
+  expandPrefix (ENR (EnumeratedRoleType s)) = expandNamespace s >>= pure <<< ENR <<< EnumeratedRoleType
+  expandPrefix (CR (CalculatedRoleType s)) = expandNamespace s >>= pure <<< CR <<< CalculatedRoleType
 
 instance containsPrefixesStateSpecification :: ContainsPrefixes StateSpecification where
   expandPrefix c@(ContextState _ _) = pure c
