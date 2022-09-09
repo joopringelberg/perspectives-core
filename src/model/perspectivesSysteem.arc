@@ -66,11 +66,14 @@ domain System
           callEffect cdb:AddModelToLocalStore( ModelIdentification )
           bind origin to ModelsInUse in currentcontext
         view Modellen$ModelPresentation verbs (Consult)
-      perspective on ModelsNewStyle
+      perspective on BasicModels
         action StartUsing
           callEffect cdb:AddModelToLocalStore( ModelIdentification )
-          bind origin to ModelsNewStyleInUse in currentcontext
-        view ModelsNewStyle$ManifestPresentation verbs (Consult)
+          bind origin to ModelManifestsInUse in currentcontext
+        props (Namespace, ModelName) verbs (SetPropertyValue)
+      perspective on ModelManifestsInUse
+        props (Name, Description) verbs (Consult)
+
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
       perspective on SystemCaches
@@ -90,10 +93,9 @@ domain System
               props (Name) verbs (Consult)
         tab "Manage new models"
           row
-            table ModelsNewStyle
-              props (Name, Description) verbs (Consult)
+            table BasicModels
           row 
-            table ModelsNewStyleInUse
+            table ModelManifestsInUse
               props (Name) verbs (Consult)
         tab "Start contexts"
           row
@@ -113,6 +115,12 @@ domain System
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
+    context BaseRepository filledBy ManifestCollection
+
+    context BasicModels = BaseRepository >> binding >> context >> Manifests
+
+    context ModelManifestsInUse (relational) filledBy sys:ModelManifest
+
     -- OBSOLETE!? OF SPEELT SYNCHRONISATIE HIER EEN ROL?
     context IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
 
@@ -126,10 +134,6 @@ domain System
       in
         filter callExternal cdb:Models() returns sys:Model$External with showlibs or (not IsLibrary)
       view ModelPresentation (Description, Name)
-
-    context ModelsNewStyle filledBy sys:ModelManifest
-
-    context ModelsNewStyleInUse filledBy sys:ModelManifest
 
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context IndexedContexts (relational) filledBy sys:RootContext
@@ -255,15 +259,13 @@ domain System
     user Me = filter (Initiator either ConnectedPartner) with filledBy sys:Me
     user You = filter (Initiator either ConnectedPartner) with not filledBy sys:Me
 
-case ModelManifest public NAMESPACESTORE
+  case ModelManifest public NAMESPACESTORE
     aspect sys:RootContext
     external
       aspect sys:RootContext$External
       property Description (mandatory, String)
-      property ModelIdentification (mandatory, String)
       property Url (mandatory, String)
       property IsLibrary (mandatory, Boolean)
-      view ManifestPresentation (Description, ModelIdentification, IsLibrary)
     user Author filledBy User
       aspect sys:RootContext$RootUser
       perspective on extern  
@@ -319,3 +321,24 @@ case ModelManifest public NAMESPACESTORE
     user Guest = filter sys:Me with not fills (currentcontext >> Inviter)
       perspective on Invitee
         only (Fill, Create)
+
+  -- To b used as Aspect in model:CouchdbManagement$Repository
+  case ManifestCollection
+    context Manifests (relational) filledBy ModelManifest
+      -- e.g. "JoopsModel"
+      property ModelName (String)
+      -- e.g. "model://joopringelberg.nl"
+      property Namespace (String)
+
+      property ModelIdentification = Namespace + "/" + ModelName
+      
+      state ReadyToMake = (exists ModelName) and (exists Namespace) and not exists binding
+
+      state Ready = exists binding
+    
+    user Manager = sys:Me
+      perspective on Manifests
+        in object state ReadyToMake
+          action CreateModel
+            create_ context ModelManifest named (Namespace + "/" + ModelName + ".json") bound to origin
+        props (Namespace, ModelName) verbs (SetPropertyValue)
