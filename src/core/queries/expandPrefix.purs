@@ -24,7 +24,7 @@ module Perspectives.Query.ExpandPrefix where
 
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TableE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
@@ -237,15 +237,18 @@ instance containsPrefixesCalculation :: ContainsPrefixes Calculation where
   expandPrefix q@(Q _) = pure q
 
 instance containsPrefixesScreenE :: ContainsPrefixes ScreenE where
-  expandPrefix (ScreenE rec@{rows, columns, subject}) = do
+  expandPrefix (ScreenE rec@{tabs, rows, columns, subject}) = do
     subject' <- expandPrefix subject
+    tabs' <- case tabs of 
+      Nothing -> pure Nothing
+      Just tbs -> Just <$> traverse expandPrefix tbs
     rows' <- case rows of
       Nothing -> pure Nothing
       Just rws -> Just <$> traverse expandPrefix rws
     columns' <- case columns of
       Nothing -> pure Nothing
       Just cols -> Just <$> traverse expandPrefix cols
-    pure $ ScreenE rec {rows = rows', columns = columns', subject = subject'}
+    pure $ ScreenE rec {rows = rows', columns = columns', subject = subject', tabs = tabs'}
 
 instance containsPrefixesTableE :: ContainsPrefixes TableE where
   expandPrefix (TableE wcf)= TableE <$> expandPrefixWidgetCommonFields wcf
@@ -256,13 +259,18 @@ instance containsPrefixesFormE :: ContainsPrefixes FormE where
 expandPrefixWidgetCommonFields :: WidgetCommonFields-> PhaseTwo WidgetCommonFields
 expandPrefixWidgetCommonFields cf@{perspective} = do
     perspective' <- expandPrefix perspective
-    pure cf {perspective = perspective}
+    pure cf {perspective = perspective'}
 
 instance containsPrefixesRowE :: ContainsPrefixes RowE where
   expandPrefix (RowE scrEls) = RowE <$> (traverse expandPrefix scrEls)
 
 instance containsPrefixesColumnE :: ContainsPrefixes ColumnE where
   expandPrefix (ColumnE scrEls) = ColumnE <$> (traverse expandPrefix scrEls)
+
+instance containsPrefixesTabE :: ContainsPrefixes TabE where
+  expandPrefix (TabE title scrEls) = do
+    scrEls' <- traverse expandPrefix scrEls
+    pure $ TabE title scrEls'
 
 instance containsPrefixesScreenElement :: ContainsPrefixes ScreenElement where
   expandPrefix (RowElement r) = RowElement <$> expandPrefix r
