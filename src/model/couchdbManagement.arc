@@ -241,6 +241,7 @@ domain CouchdbManagement
   -- This contexts implements the BodyWithAccounts pattern.
   case Repository
     aspect acc:Body
+    aspect sys:ManifestCollection
     --storage public
     -- on exit
       -- Verwijder de inhoud?
@@ -303,8 +304,8 @@ domain CouchdbManagement
 
       -- The Admin can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
-      perspective on AvailableModels
-        verbs (Consult)
+      perspective on sys:ManifestCollection$Manifests
+        props (ModelName) verbs (Consult)
       
       screen "Repository"
         tab "This repository"
@@ -318,11 +319,15 @@ domain CouchdbManagement
         tab "Authors"
           row
             table Authors
+        tab "Manifests"
+          row
+            table sys:ManifestCollection$Manifests
       
     -- This role should be stored in private space.
     -- TODO. Is het mogelijk ook deze rol het aspect acc:Body$Accounts te geven?
     -- Guest kan dan kiezen of hij een Account wil, of een Author wil worden.
     user Authors (relational) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
+      aspect sys:ManifestCollection$Manager
       on exit 
         notify "You are no longer an Author of the repository { context >> extern >> Name }."
       on exit of IsFilled
@@ -347,8 +352,8 @@ domain CouchdbManagement
 
       -- The Authors can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
-      perspective on AvailableModels
-        verbs (Consult)
+      perspective on sys:ManifestCollection$Manifests
+        props (ModelName) verbs (Consult)
 
     -- This role should be stored in private space.
     -- No further credentials are needed to access a Repository.
@@ -370,15 +375,15 @@ domain CouchdbManagement
             -- and Repository$Admin is a Db Admin, this will be allowed.
             callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> ReadDb, binding >> UserName )
       
-      in state acc:Body$Accounts$IsFilled$Accepted
-        -- An account that is accepted has a perspective on available models.
-        perspective on AvailableModels
-          verbs (Consult)
+      -- in state acc:Body$Accounts$IsFilled$Accepted
+      --   -- An account that is accepted has a perspective on available models.
+        perspective on sys:ManifestCollection$Manifests
+          props (ModelName) verbs (Consult)
 
     -- Note that the aspect acc:Body introduces a Guest role
     -- with a perspective that allows it to create an Account.
 
     -- This role should be stored in public space. These are all models that
     -- are stored in this Repository.
-    context AvailableModels (relational) filledBy mod:ModelDescription
+    aspect context sys:ManifestCollection$Manifests
       --storage public

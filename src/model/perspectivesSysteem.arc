@@ -336,7 +336,7 @@ domain System
 
       state Ready = exists binding
     
-    user Manager = sys:Me
+    user Manager filledBy sys:PerspectivesSystem$User
       perspective on Manifests
         in object state ReadyToMake
           action CreateModel
