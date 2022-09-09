@@ -55,6 +55,7 @@ import Perspectives.Representation.Class.Role (bindingOfADT, bindingOfRole, role
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isDatabaseQueryRole, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
@@ -155,6 +156,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         pure $ UQD originDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) qualifiedRoleIdentifier)) True True
       CreateContext {contextTypeIdentifier, localName, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
+        mnameGetterDescription <- ensureStringValue localName
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
         case roleTypeIdentifier of
           Just r -> do
@@ -163,21 +165,44 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
               CR calculatedType -> do
                 isDBQRole <- lift2 $ isDatabaseQueryRole qualifiedRoleIdentifier
                 if isDBQRole
-                  then pure $ UQD
-                    originDomain
-                    (QF.CreateContext qualifiedContextTypeIdentifier localName qualifiedRoleIdentifier)
-                    cte
-                    (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) (EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier)))
-                    True
-                    True
+                  then case mnameGetterDescription of
+                    Nothing -> pure $ UQD
+                      originDomain
+                      (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier)
+                      cte
+                      (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) (EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier)))
+                      True
+                      True
+                    Just nameGetterDescription -> pure $ BQD
+                      originDomain
+                      (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier)
+                      cte
+                      nameGetterDescription
+                      (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) (EnumeratedRoleType $ buitenRol $ unwrap qualifiedContextTypeIdentifier)))
+                      True
+                      True
                   else throwError $ CannotCreateCalculatedRole calculatedType start end
-              ENR enumeratedType -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier localName qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType)) True True
-          Nothing -> pure $ UQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier localName) cte (CDOM $ ST qualifiedContextTypeIdentifier) True True
+              ENR enumeratedType -> case mnameGetterDescription of
+                Nothing -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType)) True True
+                Just nameGetterDescription -> pure $ BQD
+                  originDomain
+                  (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier)
+                  cte
+                  nameGetterDescription
+                  (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType))
+                  True
+                  True
+          Nothing -> case mnameGetterDescription of
+            Nothing -> pure $ UQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte (CDOM $ ST qualifiedContextTypeIdentifier) True True
+            Just nameGetterDescription -> pure $ BQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte nameGetterDescription (CDOM $ ST qualifiedContextTypeIdentifier) True True
 
       CreateContext_ {contextTypeIdentifier, localName, roleExpression, start, end} -> do
         roleQfd <- ensureRole subjects roleExpression
+        mnameGetterDescription <- ensureStringValue localName
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
-        pure $ UQD originDomain (QF.CreateContext_ qualifiedContextTypeIdentifier localName) roleQfd originDomain True True
+        case mnameGetterDescription of
+          Nothing -> pure $ UQD originDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd originDomain True True
+          Just nameGetterDescription -> pure $ BQD originDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd nameGetterDescription originDomain True True
 
       Move {roleExpression, contextExpression} -> do
         rle <- ensureRole subjects roleExpression
@@ -389,6 +414,15 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           case range qfd of
             (CDOM _) -> pure qfd
             otherwise -> throwError $ NotAContextDomain qfd (range qfd) (startOf stp) (endOf stp)
+
+        ensureStringValue :: Maybe Step -> PhaseThree (Maybe QueryFunctionDescription)
+        ensureStringValue mstp = case mstp of
+          Just stp -> do
+            qfd <- compileExpression originDomain stp
+            case range qfd of 
+              (VDOM PString _) -> pure $ Just qfd
+              otherwise -> throwError $ NotAStringDomain qfd (startOf stp) (endOf stp)
+          Nothing -> pure Nothing
 
         -- Compiles the Step and inverts it as well.
         -- NOTE: parameter userTypes is not used.

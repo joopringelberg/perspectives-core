@@ -30,7 +30,6 @@ import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
-import Perspectives.Identifiers (LocalName)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Range (Range)
@@ -254,9 +253,9 @@ data QueryFunction
   | RoleIndividual RoleInstance
   | ContextIndividual ContextInstance
 
-  | CreateContext ContextType (Maybe LocalName) RoleType
-  | CreateRootContext ContextType (Maybe LocalName)
-  | CreateContext_ ContextType (Maybe LocalName)
+  | CreateContext ContextType RoleType
+  | CreateRootContext ContextType
+  | CreateContext_ ContextType
   | CreateRole EnumeratedRoleType
   | Bind EnumeratedRoleType
   | Bind_

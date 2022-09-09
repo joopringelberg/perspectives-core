@@ -148,6 +148,7 @@ perspectDef = LanguageDef
                   , "create"
                   , "create_"
                   , "bound"
+                  , "named"
                   , "move"
                   , "bind"
                   , "bind_"

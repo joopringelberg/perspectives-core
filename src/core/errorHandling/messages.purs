@@ -89,6 +89,7 @@ data PerspectivesError
     | CannotCreateCalculatedProperty CalculatedPropertyType ArcPosition ArcPosition
     | NotAContextDomain QueryFunctionDescription Domain ArcPosition ArcPosition
     | NotARoleDomain Domain ArcPosition ArcPosition
+    | NotAStringDomain QueryFunctionDescription ArcPosition ArcPosition
     | NotAContextRole ArcPosition ArcPosition
     | NotFunctional ArcPosition ArcPosition Step
     | MaybeNotFunctional ArcPosition ArcPosition Step
@@ -171,6 +172,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (CannotCreateCalculatedRole cr start end) = "(CannotCreateCalculatedRole) Can not create an instance of a calculated role (" <> show cr <> ") between: " <> show start <> " and: " <> show end
   show (CannotCreateCalculatedProperty pt start end) = "(CannotCreateCalculatedProperty) Can not change the value of a property that is calculated, between: " <> show start <> " and: " <> show end
   show (NotARoleDomain dom start end) = "(NotARoleDomain) This expression should have a role type: " <> show dom <> ", between " <> show start <> " and " <> show end
+  show (NotAStringDomain qfd start end) = "(NotAStringDomain) This expression should have a string type: " <> show qfd <> ", between " <> show start <> " and " <> show end
   show (NotAContextRole start end) = "(NotAContextRole) All role types in this expression should be context roles (binding the external role of a context), between " <> show start <> " and " <> show end
   show (NotAContextDomain qfd dom start end) = "(NotAContextDomain) This expression:\n" <> prettyPrint qfd <> "\nshould return a context type, but has instead: " <> show dom <> ", between " <> show start <> " and " <> show end
   show (NotFunctional start end qfd) = "(NotFunctional) This expression is not a single value, between " <> show start <> " and " <> show end
