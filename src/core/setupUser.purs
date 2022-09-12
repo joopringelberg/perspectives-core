@@ -26,12 +26,11 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Persistent (entitiesDatabaseName, modelDatabaseName)
-import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SetupCouchdb (setContextSpecialisationsView, setContextView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
-import Prelude (Unit, bind, void, ($), discard, (<>), (>>=))
+import Prelude (Unit, void, ($), discard, (>>=))
 
 modelDirectory :: String
 modelDirectory = "./src/model" 
@@ -42,8 +41,7 @@ modelDirectory = "./src/model"
 setupUser :: MonadPerspectives Unit
 setupUser = do
   -- First, upload model:System to perspect_models.
-  repo <- publicRepository
-  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore [repo <> "model:System"] (RoleInstance ""))
+  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore ["model:System"] (RoleInstance ""))
   entitiesDatabaseName >>= setRoleView
   entitiesDatabaseName >>= setRoleFromContextView
   entitiesDatabaseName >>= setPendingInvitationView

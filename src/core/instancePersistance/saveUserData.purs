@@ -486,10 +486,10 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
       mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (deconstructModelName $ unwrap fillerType)
       if (isNothing mDomeinFile)
         then do
-          murl <- lift (filler ##> getProperty (EnumeratedPropertyType modelUrl))
-          case murl of
+          mmodelIdentification <- lift (filler ##> getProperty (EnumeratedPropertyType "ModelIdentification"))
+          case mmodelIdentification of
             Nothing -> throwError (error $ "System error: no url found to load model for unknown type " <> (unwrap fillerType))
-            Just (Value url) -> addModelToLocalStore [url] filled
+            Just (Value modelIdentification) -> addModelToLocalStore [modelIdentification] filled
         else pure unit
 
 -- | If the type of the role has kind UserRole and is not the `me` role for its context,
