@@ -29,7 +29,7 @@ module Perspectives.Persistence.API
 
 where
 
-import Perspectives.Persistence.Types
+import Perspectives.Persistence.Types (AttachmentName, CouchdbUrl, DatabaseName, DocumentName, DocumentWithRevision, MonadPouchdb, Password, PouchError, PouchdbDatabase, PouchdbExtraState, PouchdbState, PouchdbUser, SystemIdentifier, Url, UserName, ViewName, decodePouchdbUser', encodePouchdbUser', readPouchError, runMonadPouchdb)
 import Prelude
 
 import Control.Monad.AvarMonadAsk (gets, modify)
@@ -54,7 +54,7 @@ import Foreign.Object (Object, delete, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (DeleteCouchdbDocument(..), PutCouchdbDocument(..), ViewResult(..), ViewResultRow(..))
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev, rev)
-import Perspectives.Persistence.Authentication (ensureAuthentication)
+import Perspectives.Persistence.Authentication (AuthoritySource(..), ensureAuthentication)
 import Perspectives.Persistence.Errors (handlePouchError, handleNotFound)
 import Perspectives.Persistence.RunEffectAff (runEffectFnAff2, runEffectFnAff3, runEffectFnAff6)
 import Perspectives.Persistence.State (getCouchdbBaseURL)
@@ -71,23 +71,23 @@ import Simple.JSON (read, readImpl, write)
 createDatabase :: forall f. DatabaseName -> MonadPouchdb f Unit
 createDatabase dbname = if startsWithDatabaseEndpoint dbname
   then do
-    pdb <- ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
+    pdb <- ensureAuthentication (Url dbname) (\_ -> liftEffect $ runEffectFn1 createDatabaseImpl dbname)
     modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
   else do
     mprefix <- getCouchdbBaseURL
     case mprefix of
       Nothing -> do
-        pdb <- ensureAuthentication (liftEffect $ runEffectFn1 createDatabaseImpl dbname)
+        pdb <- liftEffect $ runEffectFn1 createDatabaseImpl dbname
         modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
       Just prefix -> do
-        pdb <- ensureAuthentication (liftEffect $ runEffectFn2 createRemoteDatabaseImpl dbname prefix)
+        pdb <- ensureAuthentication (Authority prefix) (\_ -> liftEffect $ runEffectFn2 createRemoteDatabaseImpl dbname prefix)
         modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
-  where
-    endpointRegex :: Regex
-    endpointRegex = unsafeRegex "^https?" noFlags
 
-    startsWithDatabaseEndpoint :: DatabaseName -> Boolean
-    startsWithDatabaseEndpoint = test endpointRegex
+endpointRegex :: Regex
+endpointRegex = unsafeRegex "^https?" noFlags
+
+startsWithDatabaseEndpoint :: DatabaseName -> Boolean
+startsWithDatabaseEndpoint = test endpointRegex
 
 foreign import createDatabaseImpl :: EffectFn1
   String
@@ -131,7 +131,10 @@ ensureDatabase dbName = do
   case mdb of
     Nothing -> do
       createDatabase dbName
-      gets \{databases} -> unsafePartial $ fromJust $ lookup dbName databases
+      -- Access the database to trigger authentication.
+      db <- gets \{databases} -> unsafePartial $ fromJust $ lookup dbName databases
+      lift $ void $ fromEffectFnAff $ databaseInfoImpl db
+      pure db
     Just db -> pure db
 
 -----------------------------------------------------------
@@ -143,8 +146,14 @@ withDatabase :: forall f a.
   DatabaseName ->
   (PouchdbDatabase -> MonadPouchdb f a) ->
   MonadPouchdb f a
-withDatabase dbName fun = ensureAuthentication $ do
-  (db :: PouchdbDatabase) <- ensureDatabase dbName
+withDatabase dbName fun = do
+  db <- if startsWithDatabaseEndpoint dbName
+    then ensureAuthentication (Url dbName) (\_ -> ensureDatabase dbName)
+    else do 
+      mprefix <- getCouchdbBaseURL
+      case mprefix of
+        Nothing -> ensureDatabase dbName
+        Just prefix -> ensureAuthentication (Authority prefix) (\_ -> ensureDatabase dbName)
   fun db
 
 -----------------------------------------------------------
@@ -165,7 +174,7 @@ databaseInfo dbName = withDatabase dbName
           Left e -> throwError $ error ("databaseInfo: error in decoding result: " <> show e)
           Right info -> pure info
       -- Convert the incoming message to a PouchError type.
-      (handlePouchError "deleteDatabase" dbName)
+      (handlePouchError "databaseInfo" dbName)
 
 foreign import databaseInfoImpl :: PouchdbDatabase -> EffectFnAff Foreign
 
@@ -207,12 +216,20 @@ type PouchdbAllDocs =
 -- | Creates the document in the database.
 -- | Returns the new revision.
 -- | Authentication ensured.
--- TODO. Zolang we de generic encode gebruiken die een tagged versie oplevert zonder _id en _rev members,
--- hebben we docName als parameter nodig en moeten we de hack addNameAndVersion toepassen.
+-- | The semantics of this operation depends critically on using generic encode.
+-- | This allows us to control the value of the _id member of the json representation independently of 
+-- | that of the ContextRecord or the RolRecord.
 addDocument :: forall d f. Encode d => Revision d => DatabaseName -> d -> DocumentName -> MonadPouchdb f Revision_
 addDocument dbName doc docName = withDatabase dbName
   \db -> do
-    -- TODO. Omdat encoding een json doc oplevert zonder _id en _rev, moeten we die hier toevoegen.
+    -- Because generic encoding results in a json document having this shape:
+    -- {
+    --   "contents": {
+    --     ...
+    --     },
+    --   "tag": "PerspectRol"
+    -- }
+    -- but Couchdb needs the "id_" and "rev_" members, we have to add them here.
     doc' <- liftEffect (addNameAndVersion (encode doc) docName (maybe "" identity (rev doc)))
     catchError
       do
@@ -235,7 +252,7 @@ addDocument_ dbName doc docName = withDatabase dbName
         Left e -> throwError $ error ("addDocument: error in decoding result: " <> show e)
         Right (PutCouchdbDocument {rev}) -> pure rev
     -- Promise rejected. Convert the incoming message to a PouchError type.
-    (handlePouchError "addDocument" docName)
+    (handlePouchError "addDocument_" docName)
 
 foreign import addDocumentImpl :: EffectFn2 PouchdbDatabase Foreign Foreign
 

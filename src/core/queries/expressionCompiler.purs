@@ -534,6 +534,9 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
   case operator of
     Filter pos -> do
       f1 <- compileStep currentDomain left
+      -- TODO. #18 Add a way to ensure that the left term of the criterium is a functional expression.
+      -- The criterium is applied to a single instance each time. Therefore, its left term is, by definition, functional.
+      -- We have no way of handling this, currently.
       f2 <- compileStep (range f1) right
       -- f1 is the source to be filtered, f2 is the criterium.
       case range f2 of

@@ -8,7 +8,18 @@ exports.modelDescriptions = (function (doc)
 
 exports.roleView = (function (doc)
 {
-  emit(doc.contents.pspType, doc._id);
+  // a proxy for being a role:
+  if (doc.contents.universeRoleDelta)
+  {
+    doc.contents.allTypes.forEach(
+      function(typeId)
+      {
+        emit(typeId, doc._id);
+      }
+    );
+  }
+  
+
 }).toString();
 
 exports.pendingInvitations = (function(doc)

@@ -34,7 +34,7 @@ import Effect.AVar (AVar)
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (new)
 import Foreign (Foreign, MultipleErrors)
-import Foreign.Object (Object, empty)
+import Foreign.Object (Object, empty, singleton)
 import Simple.JSON (read, readImpl, readJSON', write, E)
 
 -----------------------------------------------------------
@@ -58,8 +58,13 @@ type DatabaseName = String
 -- POUCHDBSTATE
 -----------------------------------------------------------
 type PouchdbState f =
-  { userInfo :: PouchdbUser
-  , databases :: Object PouchdbDatabase
+  { databases :: Object PouchdbDatabase
+  , systemIdentifier :: String
+  , couchdbUrl :: Maybe String
+  -- The keys are the URLs of CouchdbServers
+  -- The values are passwords.
+  -- Each account is in the name of the systemIdentifier.
+  , couchdbCredentials :: Object String
 
   -- TODO. De volgende drie kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen:
   -- , couchdbPassword :: String
@@ -73,7 +78,7 @@ type PouchdbState f =
 -- type PouchdbUser = PouchdbUser' (userName :: CDBstate.UserName)
 type PouchdbUser =
   { systemIdentifier :: String
-  , password :: String -- Maybe String om met IndexedDB rekening te houden?
+  , password :: Maybe String
   , couchdbUrl :: Maybe String
   }
 
@@ -102,14 +107,9 @@ runMonadPouchdb :: forall a. UserName -> Password -> SystemIdentifier -> Maybe U
   -> Aff a
 runMonadPouchdb userName password systemId couchdbUrl mp = do
   (rf :: AVar (PouchdbState ())) <- new $
-    { userInfo:
-      { systemIdentifier: systemId
-      , password
-      , couchdbUrl
-      -- compat:
-      -- , _rev: Nothing
-      -- , userName: CDBstate.UserName userName
-    }
+    { systemIdentifier: systemId
+    , couchdbUrl
+    , couchdbCredentials: singleton systemId password
     , databases: empty
     -- compat
     -- , couchdbPassword: password

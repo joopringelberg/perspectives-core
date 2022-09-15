@@ -23,11 +23,11 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Data.Maybe (Maybe(..))
 import Data.Map (empty) as Map
+import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (AVar)
 import Effect.Class (liftEffect)
-import Foreign.Object (empty)
+import Foreign.Object (empty, singleton)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
 import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, MonadPerspectives, PerspectivesState, RepeatingTransaction)
@@ -44,7 +44,11 @@ newPerspectivesState uinfo publicRepo transFlag transactionWithTiming =
   , queryAssumptionRegister: empty
   , variableBindings: ENV.empty
   , publicRepository: publicRepo
-  , userInfo: uinfo
+  , systemIdentifier: uinfo.systemIdentifier
+  , couchdbUrl: uinfo.couchdbUrl 
+  , couchdbCredentials: case uinfo.couchdbUrl, uinfo.password of 
+      Just url, Just password -> singleton url password
+      _, _ -> empty
   , indexedRoles: empty
   , indexedContexts: empty
   , post: Nothing

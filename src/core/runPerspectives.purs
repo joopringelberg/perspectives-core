@@ -42,7 +42,7 @@ runPerspectives userName password systemId host port publicRepo mp = do
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState
         { systemIdentifier: systemId
-        , password
+        , password: Just password
         , couchdbUrl: Just (host <> ":" <> show port <> "/")
         -- , userName: UserName userName
         }

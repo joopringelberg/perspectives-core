@@ -36,19 +36,86 @@ domain CouchdbManagement
       perspective on CouchdbServers
         only (CreateAndFill, Remove)
         props (Name, Url) verbs (Consult)
+        action CreateServer
+          create role CouchdbServers
 
       -- Manager needs this perspective for others to accept Admins created in state NoAdmin.
       -- NOTE that model:TopContext can be used as Aspect instead.
       perspective on CouchdbServers >> binding >> context >> CouchdbServer$Admin
         only (Create, Fill)
+      
+      perspective on PrivatelyManagedServers
+        props (ServerName) verbs (Consult)
+        only (CreateAndFill, Remove)
+        in object state Ready
+          action CreateCouchdbServer
+            letA 
+              server <- create context CouchdbServer named (ServerUrl + "cw_servers_and_repositories/" + ServerName) bound to CouchdbServers
+            in
+              Url = ServerUrl for server
+              Name = ServerName for server
+      
+      perspective on PrivatelyManagedServers >> binding >> context >> PManager
+        only (Create, Fill)
+              
+
+    context PrivatelyManagedServers (relational) filledBy PrivatelyManagedServer
+      -- De expressie hieronder levert de melding dat beide zijden niet vergeleken kunnen worden. 
+      -- Waarschijnlijk omdat ze niet functioneel zijn.
+      state Ready = HasDatabase -- and not exists filter context >> CouchdbServers with Url == origin >> ServerUrl
+      state NoAdmin = (exists binding) and not exists binding >> context >> PManager
+        on entry
+          do for Manager
+            bind context >> Manager to PManager in binding >> context
+
 
     -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
     -- filled with CouchdbManagementApp$Admin.
+    -- Also, the public database "servers_and_repositories" is created on the CouchdbServer_.
     context CouchdbServers (relational) filledBy CouchdbServer
-      state NoAdmin = not exists binding >> context >> CouchdbServer$Admin
+
+      state NoAdmin = (exists binding) and not exists binding >> context >> CouchdbServer$Admin
         on entry
           do for Manager
             bind context >> Manager to Admin in binding >> context
+
+  -------------------------------------------------------------------------------
+  ---- PRIVATELYMANAGEDSERVER
+  -------------------------------------------------------------------------------
+  -- This context is not public. It allows us to 
+  --    * register credentials for the ServerAdmin;
+  --    * create the default database `servers_and_repositories`;
+  --    * create a public CouchdbServer from it.
+  case PrivatelyManagedServer
+  
+    external
+      property ServerUrl (mandatory, String)
+        -- pattern = /^https://[^\\/]+\\/$/ "An url with the https scheme, ending on a slash"
+      property ServerName (mandatory, String)
+      property HasDatabase (Boolean)
+
+      state NoDatabase = (not HasDatabase) and (exists ServerUrl) and (exists context >> PManager >> Password)
+        on entry
+          do for PManager
+            -- Notice that Pouchdb only creates a database if it does not yet exist.
+            -- This allows us to reconnect to a CouchdbServer_ if its CouchdbServer had been lost.
+            AuthorizedDomain = ServerUrl for context >> PManager
+            callEffect cdb:AddCredentials( ServerUrl, context >> PManager >> Password)
+            callEffect cdb:CreateCouchdbDatabase( ServerUrl, "cw_servers_and_repositories" )
+            HasDatabase = true
+
+    user PManager filledBy sys:PerspectivesSystem$User
+      aspect acc:WithCredentials
+
+      perspective on PManager
+        only (CreateAndFill)
+        props (UserName, Password) verbs (SetPropertyValue)
+      
+      perspective on extern 
+        props (ServerUrl, ServerName) verbs (SetPropertyValue)
+        props (HasDatabase) verbs (Consult)
+      
+
 
   -------------------------------------------------------------------------------
   ---- COUCHDBSERVER
@@ -61,8 +128,8 @@ domain CouchdbManagement
     aspect acc:Body
     --storage public
     external
-      property Url (mandatory, String)
-      property Name (mandatory, String)
+      property Url (String)
+      property Name (String)
 
       -- If we do not refer to my indexed version of the CouchdbApp, this condition will fail because another user
       -- will have shared his App, too!
@@ -82,7 +149,7 @@ domain CouchdbManagement
 
     -- This role should be in private space.
     -- Admin in Couchdb of a particular server.
-    user Admin filledBy CouchdbManagementApp$Manager
+    user Admin filledBy CouchdbManagementApp$Manager -- unlinked??
       -- As acc:Body$Admin, has full perspective on Accounts.
       aspect acc:Body$Admin
 

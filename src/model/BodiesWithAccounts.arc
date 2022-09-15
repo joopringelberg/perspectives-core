@@ -10,9 +10,14 @@ domain BodiesWithAccounts
   use sys for model:System
   use bwa for model:BodiesWithAccounts
 
-  user WithCredentials
+  user WithCredentials filledBy sys:PerspectivesSystem$User
     property UserName (String)
     property Password (String)
+    property AuthorizedDomain (String)
+
+    on entry
+      do for WithCredentials
+        UserName = sys:PerspectivesSystem$User$Id
 
   -- The model description case.
   -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION

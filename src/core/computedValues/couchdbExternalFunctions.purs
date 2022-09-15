@@ -76,6 +76,7 @@ import Perspectives.Models (modelsInUse, modelsInUseRole) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
+import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, getPerspectRol, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
@@ -784,6 +785,13 @@ resetPassword databaseUrls userNames passwords _ = case head databaseUrls, head 
   Just databaseUrl, Just userName, Just password -> lift $ CDB.setPassword databaseUrl userName password
   _, _, _ -> pure unit
 
+-- | Add credentials to the current session. Once persisted in the User's local storage, they will be retrieved on each session.
+-- | Notice that this function causes a change in PerspectivesState but not in the Perspectives Universe.
+addCredentials :: Array Url -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
+addCredentials urls passwords _ = case head urls, head passwords of 
+  Just url, Just password -> lift $ Authentication.addCredentials url password
+  _, _ -> pure unit
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -808,4 +816,5 @@ externalFunctions =
   , Tuple "model:Couchdb$MakeMemberOf" {func: unsafeCoerce makeMemberOf, nArgs: 3}
   , Tuple "model:Couchdb$RemoveAsMemberOf" {func: unsafeCoerce removeAsMemberOf, nArgs: 3}
   , Tuple "model:Couchdb$ResetPassword" {func: unsafeCoerce resetPassword, nArgs: 3}
+  , Tuple "model:Couchdb$AddCredentials" {func: unsafeCoerce addCredentials, nArgs: 2}
   ]

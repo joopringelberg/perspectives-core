@@ -267,7 +267,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       matches <- matchIndexedContextNames subject
       sendResponse (Result corrId [encodeJSON matches]) setter
     Api.GetCouchdbUrl -> do
-      url <- gets \s -> maybe "" identity s.userInfo.couchdbUrl
+      url <- gets \s -> maybe "" identity s.couchdbUrl
       sendResponse (Result corrId [url]) setter
     -- {object: Role Instance}
     Api.GetRoleName -> registerSupportedEffect

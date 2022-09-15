@@ -48,7 +48,7 @@ import Perspectives.Instances.Combinators (filter, disjunction)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.ModelDependencies (addressHost, addressPort, addressRelayHost, addressRelayPort, channelDatabase, channelInitiator, channelPartner, privateChannel)
 import Perspectives.Names (getUserIdentifier)
-import Perspectives.Persistence.API (Url, createDatabase, ensureAuthentication)
+import Perspectives.Persistence.API (Url, createDatabase)
 import Perspectives.Persistence.CouchdbFunctions (endReplication, replicateContinuously)
 import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
@@ -65,7 +65,7 @@ createChannel couchdbUrl = do
   g <- liftEffect guid
   channelName <- pure ("channel_" <> (show g))
   channel <- createChannelContext couchdbUrl channelName
-  lift $ ensureAuthentication (createDatabase channelName)
+  lift (createDatabase channelName)
   pure channel
 
 createChannelContext :: Url -> String -> MonadPerspectivesTransaction ContextInstance

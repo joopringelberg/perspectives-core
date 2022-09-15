@@ -27,7 +27,7 @@ import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (catMaybes, filter)
+import Data.Array (catMaybes, cons, filter, foldM)
 import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -42,19 +42,21 @@ import Effect.Aff.AVar (AVar, empty, new, put, take)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Foreign (Foreign)
+import Foreign.Object (fromFoldable)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
+import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (isModelName)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
-import Perspectives.Instances.ObjectGetters (context, externalRole)
-import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser)
+import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
+import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser, userWithCredentials, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, includeDocs)
@@ -65,13 +67,13 @@ import Perspectives.PerspectivesState (newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..), StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>=>), (>>=), (>>>), (>), (-), (+), (<), (*>))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
 import Simple.JSON (read)
 
 -- | Don't do anything. runPDR will actually start the core.
@@ -105,12 +107,7 @@ runPDR :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
 runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
-    Right (pdbu :: PouchdbUser) -> do
-      (pouchdbUser :: PouchdbUser) <- pure
-        { systemIdentifier: pdbu.systemIdentifier
-        , password: pdbu.password
-        , couchdbUrl: pdbu.couchdbUrl
-      }
+    Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
       transactionWithTiming <- empty
       state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
@@ -121,6 +118,7 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
       runPerspectivesWithState (do
         addAllExternalFunctions
         addIndexedNames
+        retrieveAllCredentials
         retrieveBrokerService)
         state
       void $ forkAff $ forever do
@@ -252,12 +250,7 @@ createAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effec
 createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
-    Right (pdbu :: PouchdbUser) -> do
-      (pouchdbUser :: PouchdbUser) <- pure
-        { systemIdentifier: pdbu.systemIdentifier
-        , password: pdbu.password
-        , couchdbUrl: pdbu.couchdbUrl
-        }
+    Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
       transactionWithTiming <- empty
       state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
@@ -324,7 +317,7 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
           \_ -> createDatabase dbname
         createDatabase dbname
         -- If this is a remote (Couchdb) database, set a security policy:
-        mcouchdbUrl <- gets (_.userInfo >>> _.couchdbUrl)
+        mcouchdbUrl <- gets _.couchdbUrl
         case mcouchdbUrl of
           Nothing -> pure unit
           _ -> do
@@ -359,6 +352,7 @@ deleteDb dbname = do
     Left e -> logPerspectivesError $ Custom (show e)
     Right _ -> pure unit
 
+-- NOTE: Only local databases are removed.
 removeAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
 removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   do
@@ -449,3 +443,17 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
     handler (Right e) = do
       logPerspectivesError $ Custom $ "Basic models recompiled!"
       callback true
+
+retrieveAllCredentials :: MonadPerspectives Unit
+retrieveAllCredentials = do
+  (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb [userWithCredentials] (ContextInstance "")))
+  rows <- foldM
+    (\rows' roleId -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsPassword))) >>=
+      handlePerspectRolError' "retrieveAllCredentials_Password" rows'
+        \pw -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsAuthorizedDomain))) >>=
+          handlePerspectRolError' "retrieveAllCredentials_AuthorizedDomain" rows' 
+            (\authorizedDomain -> pure $ cons (Tuple (unwrap authorizedDomain) (unwrap pw)) rows')
+        )
+    []
+    roleInstances
+  modify \s@{couchdbCredentials} -> s {couchdbCredentials = couchdbCredentials <> fromFoldable rows}

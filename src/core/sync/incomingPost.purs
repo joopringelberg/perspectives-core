@@ -82,13 +82,16 @@ incomingPost url = do
 getCouchdbBaseURLWithCredentials :: forall f . String -> MonadPouchdb f String
 getCouchdbBaseURLWithCredentials url = do
   user <- getSystemIdentifier
-  password <- getCouchdbPassword
-  case match domainRegex url of
-    Nothing -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
-    Just matches | length matches < 3 -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
-    Just matches -> case (unsafePartial (fromJust (index matches 1))), (unsafePartial (fromJust (index matches 2))) of
-      Just scheme, Just domain -> pure $ scheme <> user <> ":" <> password <> "@" <> url <> "/"
-      _, _ -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
+  mpassword <- getCouchdbPassword
+  case mpassword of 
+    Just password -> do 
+      case match domainRegex url of
+        Nothing -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
+        Just matches | length matches < 3 -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
+        Just matches -> case (unsafePartial (fromJust (index matches 1))), (unsafePartial (fromJust (index matches 2))) of
+          Just scheme, Just domain -> pure $ scheme <> user <> ":" <> password <> "@" <> url <> "/"
+          _, _ -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
+    Nothing -> throwError (error $ "getCouchdbBaseURLWithCredentials: no password for " <> url)
   where
     domainRegex :: Regex
     domainRegex = unsafeRegex "^(https?\\:\\/\\/)(.*)$" noFlags

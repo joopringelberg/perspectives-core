@@ -25,7 +25,7 @@ module Perspectives.SetupCouchdb where
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Perspectives.Couchdb (SecurityDocument(..), User)
-import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, ensureAuthentication, runMonadPouchdb)
+import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, runMonadPouchdb)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName)
@@ -45,15 +45,14 @@ setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couc
     {doc_count} <- databaseInfo "localusers"
     -- isFirstUser <- databaseExists_ "localusers"
     if doc_count == 0
-      then (ensureAuthentication
-        do
-          createSystemDatabases
-          -- For now, we initialise the repository, too.
-          initRepository
-          createDatabase "localusers"
-          void $ withCouchdbUrl
-            \url -> setSecurityDocument url "localusers"
-              (SecurityDocument {admins: {names: Just [], roles: []}, members: {names: Just [], roles: ["NotExistingRole"]}}))
+      then do
+        createSystemDatabases
+        -- For now, we initialise the repository, too.
+        initRepository
+        createDatabase "localusers"
+        void $ withCouchdbUrl
+          \url -> setSecurityDocument url "localusers"
+            (SecurityDocument {admins: {names: Just [], roles: []}, members: {names: Just [], roles: ["NotExistingRole"]}})
       else pure unit
 
 -----------------------------------------------------------
@@ -166,7 +165,7 @@ foreign import contextView :: String
 
 -----------------------------------------------------------
 -- THE VIEW 'SETROLESPECIALISATIONVIEW'
--- This view collects instances of a particular context type.
+-- This view collects instances of a particular role type.
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
 setRoleSpecialisationsView :: forall f. String -> MonadPouchdb f Unit

@@ -147,3 +147,15 @@ accountHolderQueueName :: String
 accountHolderQueueName = "model:BrokerServices$BrokerContract$AccountHolder$QueueName"
 
 -- "model:Couchdb$ContextInstances"
+
+------------------------------------------------------------------------------------
+-- AUTHENTICATION
+------------------------------------------------------------------------------------
+userWithCredentials :: String
+userWithCredentials = "model:BodiesWithAccounts$WithCredentials"
+
+userWithCredentialsPassword :: String
+userWithCredentialsPassword = "model:BodiesWithAccounts$WithCredentials$Password"
+
+userWithCredentialsAuthorizedDomain :: String
+userWithCredentialsAuthorizedDomain = "model:BodiesWithAccounts$WithCredentials$AuthorizedDomain"

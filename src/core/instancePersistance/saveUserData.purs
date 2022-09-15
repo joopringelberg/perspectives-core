@@ -73,8 +73,7 @@ import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspect
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, deconstructNamespace_, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allRoleBinders, contextType, getProperty, getUnlinkedRoleInstances, isMe)
-import Perspectives.ModelDependencies (modelUrl)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, getProperty, getUnlinkedRoleInstances, isMe)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
@@ -140,14 +139,13 @@ iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 -- | (we build a last-in, last-out stack of destructive effects)
 scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
 scheduleRoleRemoval id = do
+  contextOfRole <- lift (id ##>> context)
   -- If the role's context is scheduled to be removed, don't add its removal to the scheduledAssignments.
-  contextIsScheduledToBeRemoved <- gets (\(Transaction{scheduledAssignments}) -> let
-    contextOfRole = ContextInstance $ deconstructNamespace_ (unwrap id)
-    in isJust $ find
-      (case _ of
-        ContextRemoval ctxt _ -> ctxt == contextOfRole
-        _ -> false)
-      scheduledAssignments)
+  contextIsScheduledToBeRemoved <- gets (\(Transaction{scheduledAssignments}) -> isJust $ find
+    (case _ of
+      ContextRemoval ctxt _ -> ctxt == contextOfRole
+      _ -> false)
+    scheduledAssignments)
   roleIsUntouchable <- gets (\(Transaction{untouchableRoles}) -> isJust $ elemIndex id untouchableRoles)
   if contextIsScheduledToBeRemoved || roleIsUntouchable
     then pure unit

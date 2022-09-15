@@ -52,7 +52,7 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, loo
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (buitenRol, constructUserIdentifier) as Identifier
-import Perspectives.Identifiers (buitenRol, deconstructModelName)
+import Perspectives.Identifiers (buitenRol, deconstructModelName, isPublicResource)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
@@ -581,10 +581,13 @@ constructContextIdentifier ctype@(ContextType cname) mlocalName = do
           Nothing -> show <$> liftEffect guid
           Just indexedName -> pure $ unwrap indexedName
       Just n -> pure n
-  mPStore <- lift $ getPublicStore_ ctype 
-  case mPStore of 
-    Nothing -> pure $ Identifier.constructUserIdentifier localName
-    Just pStore -> pure $ addNamespace (unsafePartial mapPublicStore pStore (unsafePartial fromJust $ deconstructModelName cname)) localName
+  if isPublicResource localName
+    then pure localName
+    else do
+      mPStore <- lift $ getPublicStore_ ctype 
+      case mPStore of 
+        Nothing -> pure $ Identifier.constructUserIdentifier localName
+        Just pStore -> pure $ addNamespace (unsafePartial mapPublicStore pStore (unsafePartial fromJust $ deconstructModelName cname)) localName
 
 withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
 withAuthoringRole aRole updater a = do

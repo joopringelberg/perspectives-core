@@ -59,7 +59,7 @@ import Prelude
 
 import Control.Monad.Except (catchError, lift, throwError)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (AVar, kill, put, read)
 import Effect.Aff.Class (liftAff)
@@ -69,8 +69,11 @@ import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
+import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.Identifiers (couchdbResourceIdentifier, isUrl, publicResourceIdentifier2database_)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Persistence.API (MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.API (AuthoritySource(..), MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -85,18 +88,22 @@ instance persistentInstancePerspectContext :: Persistent PerspectContext Context
   --   sysId <- getSystemIdentifier
   --   cdbUrl <- getCouchdbBaseURL
   --   pure $ cdbUrl <> sysId <> "_entities/"
-  dbLocalName _ = do
-    sysId <- getSystemIdentifier
-    pure $ sysId <> "_entities"
+  dbLocalName id = if isUrl (unwrap id) 
+    then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id)
+    else do
+      sysId <- getSystemIdentifier
+      pure $ sysId <> "_entities"
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
   -- database _ = do
   --   sysId <- getSystemIdentifier
   --   cdbUrl <- getCouchdbBaseURL
   --   pure $ cdbUrl <> sysId <> "_entities/"
-  dbLocalName _ = do
-    sysId <- getSystemIdentifier
-    pure $ sysId <> "_entities"
+  dbLocalName id = if isUrl (unwrap id) 
+    then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id)
+    else do
+      sysId <- getSystemIdentifier
+      pure $ sysId <> "_entities"
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
   -- database _ = do
@@ -137,23 +144,15 @@ getDomeinFile = getPerspectEntiteit
 
 tryGetPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
-  \_ -> pure Nothing
+  \e -> do 
+    logPerspectivesError (Custom $ show e)
+    pure Nothing
 
 entityExists :: forall a i. Persistent a i => i -> MonadPerspectives Boolean
 entityExists id = catchError ((getPerspectEntiteit id) >>= (pure <<< const true))
-  \_ -> pure false
-
-getAVarRepresentingPerspectEntiteit :: forall a i. Persistent a i  => i -> MonadPerspectives (AVar a)
-getAVarRepresentingPerspectEntiteit id =
-  do
-    (av :: Maybe (AVar a)) <- retrieveInternally id
-    case av of
-      (Just avar) -> pure avar
-      Nothing -> do
-        (_ :: a) <- fetchEntiteit id
-        mavar <- retrieveInternally id
-        -- NOTE: this may fail if the Entiteit was not stored in Couchdb.
-        pure $ unsafePartial $ fromJust mavar
+  \e ->  do 
+    logPerspectivesError (Custom $ show e)
+    pure false
 
 -- | Remove from Couchdb if possible and remove from the cache, too.
 removeEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
@@ -163,7 +162,7 @@ removeEntiteit entId = do
 
 removeEntiteit_ :: forall a i. Persistent a i => i -> a -> MonadPerspectives a
 removeEntiteit_ entId entiteit =
-  ensureAuthentication $ do
+  ensureAuthentication (Entity $ unwrap entId) $ \_ ->
     case (rev entiteit) of
       Nothing -> pure entiteit
       (Just rev) -> do
@@ -181,7 +180,7 @@ tryRemoveEntiteit entId = do
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
 fetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
-fetchEntiteit id = ensureAuthentication $ catchError
+fetchEntiteit id = ensureAuthentication (Entity $ unwrap id) $ \_ -> catchError
   do
     v <- representInternally id
     -- TODO.
@@ -192,7 +191,7 @@ fetchEntiteit id = ensureAuthentication $ catchError
     -- Pas ensureAuthentication aan: geef de symbolische naam van de storage mee.
     -- Pas ensureAuthentication pas toe als de symbolische naam bekend is.
     dbName <- dbLocalName id
-    doc <- getDocument dbName (unwrap id)
+    doc <- getDocument dbName (couchdbResourceIdentifier $ unwrap id)
     lift $ put doc v
     pure doc
 
@@ -220,7 +219,7 @@ saveEntiteit_ entId entiteit = saveEntiteit' entId (Just entiteit)
 
 -- | Save an Entiteit and set its new _rev parameter in the cache.
 saveEntiteit' :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
-saveEntiteit' entId mentiteit = ensureAuthentication $ do
+saveEntiteit' entId mentiteit = ensureAuthentication (Entity $ unwrap entId) $ \_ -> do
   mentityFromCache <- tryTakeEntiteitFromCache entId
   entiteit <- case mentiteit of
     Nothing -> case mentityFromCache of
@@ -228,7 +227,7 @@ saveEntiteit' entId mentiteit = ensureAuthentication $ do
       Just e -> pure e
     Just e -> pure e
   dbName <- dbLocalName entId
-  (rev :: Revision_) <- addDocument dbName entiteit (unwrap entId)
+  (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
   entiteit' <- pure (changeRevision rev entiteit)
   void $ cacheEntity entId entiteit'
   pure entiteit'

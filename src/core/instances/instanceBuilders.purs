@@ -57,7 +57,7 @@ import Perspectives.ContextAndRole (defaultRolRecord, getNextRolIndex, rol_padOc
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
 import Perspectives.Deltas (addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
-import Perspectives.Identifiers (deconstructLocalName, deconstructModelName, isQualifiedWithDomein)
+import Perspectives.Identifiers (deconstructLocalName, deconstructModelName, isQualifiedWithDomein, isUrl)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Names (expandDefaultNamespaces)
@@ -138,16 +138,18 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
       expanded <- lift $ lift $ expandDefaultNamespaces id 
       if isQualifiedWithDomein expanded
         then pure $ ContextInstance expanded
-        -- The case expression below is Partial, but the parser only returns constructors of PublicStore,
-        -- hence it is safe to claim unsafePartial.
-        else (lift $ lift $ getPublicStore_ (ContextType ctype)) >>= unsafePartial case _ of 
-          -- There is no public store that we can use to construct an identifier.
-          Nothing -> throwError (NotWellFormedName upperLeft id)
-          Just pStore -> case deconstructModelName ctype of
-              -- As ctype comes from a ContextSerialization that comes from the client, 
-              -- anticipate incorrectly formed names.
-              Nothing -> throwError (NotWellFormedName upperLeft ctype)
-              Just modelName -> pure $ ContextInstance $ addNamespace (mapPublicStore pStore modelName) id
+        else if isUrl id
+          then pure $ ContextInstance id
+          -- The case expression below is Partial, but the parser only returns constructors of PublicStore,
+          -- hence it is safe to claim unsafePartial.
+          else (lift $ lift $ getPublicStore_ (ContextType ctype)) >>= unsafePartial case _ of 
+            -- There is no public store that we can use to construct an identifier.
+            Nothing -> throwError (NotWellFormedName upperLeft id)
+            Just pStore -> case deconstructModelName ctype of
+                -- As ctype comes from a ContextSerialization that comes from the client, 
+                -- anticipate incorrectly formed names.
+                Nothing -> throwError (NotWellFormedName upperLeft ctype)
+                Just modelName -> pure $ ContextInstance $ addNamespace (mapPublicStore pStore modelName) id
 
     -- Constructed with a UniverseRoleDelta but no RoleBindingDelta.
     constructSingleRoleInstance ::

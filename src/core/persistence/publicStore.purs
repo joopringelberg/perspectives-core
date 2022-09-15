@@ -39,6 +39,12 @@ instance Encode PublicStore where
 instance Decode PublicStore where
   decode = genericDecode defaultOptions
 
+-- | Given a public store symbolic name, maps it to an URL.
+-- | The special case NAMESPACESTORE maps a model URI of the form 
+-- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
+-- | to:
+-- |    https://{authority-with-dots}/cw_{subdomains-with-underscores}_{authority-with-underscores}/
+-- | The function is Partial because it should only be applied to a string that matches newModelPattern.
 mapPublicStore :: Partial => PublicStore -> Namespace -> String
 mapPublicStore pStore modelName = case pStore of 
   NAMESPACESTORE -> modelName2NamespaceStore modelName

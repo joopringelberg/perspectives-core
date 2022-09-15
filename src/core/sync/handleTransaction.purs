@@ -192,6 +192,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
     RemoveExternalRoleInstance -> do
       (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove]) >>= case _ of
         Left e -> handleError e
+        -- As external roles are always stored the same as their contexts, we can reliably retrieve the context instance id from the role id.
         Right _ -> for_ (ContextInstance <<< deconstructNamespace_ <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)
     where
       userCreatesThemselves :: Boolean

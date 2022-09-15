@@ -80,8 +80,10 @@ instance encodePerspectContext :: Encode PerspectContext where
 
 instance decodePerspectContext :: Decode PerspectContext where
   decode (json :: Foreign) = do
+    -- Get the value of the _rev member of the raw json representation (the "outer _rev").
     rev <- getRev json
     a <- genericDecode defaultOptions json
+    -- Set the value of the _rev member of the ContextRecord (the "inner _rev").
     pure (changeRevision rev a)
 
 instance eqPerspectContext :: Eq PerspectContext where

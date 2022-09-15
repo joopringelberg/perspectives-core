@@ -35,7 +35,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||), (<$>), (<*>))
+import Prelude (class Eq, class Show, append, eq, flip, identity, join, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (||))
 
 -- | The unsafeRegex function takes a string `pattern` as first argument and uses it as is in a new Regex(`pattern`).
 -- | Hence, in Purescript, we can follow the rules for the new Regex("your pattern") approach.
@@ -188,6 +188,81 @@ modelName2NamespaceStore s = let
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in
     "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
+
+
+-----------------------------------------------------------
+-- PUBLIC RESOURCE IDENTIFIERS
+-----------------------------------------------------------
+-- | A pattern to match https://{authority}/cw_{databasename}/{SegmentedIdentifier} exactly.
+-- | It is very permissive, allowing any character in the authority except the forward slash.
+-- | The model name must start on an upper case alphabetic character.
+publicResourcePattern :: String
+publicResourcePattern = "^https://([^/]+)/(cw_[^/]+)/(.+)$"
+
+publicResourceRegex :: Regex
+publicResourceRegex = unsafeRegex publicResourcePattern noFlags
+
+isPublicResource :: String -> Boolean
+isPublicResource = test publicResourceRegex
+
+-- | Transform a resource URI of the form 
+-- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
+-- | to:
+-- |    https://{authority}
+-- | The function is Partial because it should only be applied to a string that matches newModelPattern.
+publicResourceIdentifier2Authority :: String -> Maybe String
+publicResourceIdentifier2Authority s = let
+    (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
+    (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 1 <$> matches
+  in
+    append "https://" <$> (append hierarchicalNamespace (Just "/"))
+
+-- | Transform a resource URI of the form 
+-- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
+-- | to:
+-- |    SegmentedIdentifier
+-- | The function is Partial because it should only be applied to a string that matches newModelPattern.
+publicResourceIdentifier2LocalName :: String -> Maybe String
+publicResourceIdentifier2LocalName s = let
+    (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
+    (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 3 <$> matches
+  in
+    hierarchicalNamespace
+
+publicResourceIdentifier2LocalName_ :: Partial => String -> String
+publicResourceIdentifier2LocalName_ = fromJust <<< publicResourceIdentifier2LocalName
+
+-- | Transform a resource URI of the form 
+-- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
+-- | to:
+-- |    databasename
+-- | The function is Partial because it should only be applied to a string that matches newModelPattern.
+publicResourceIdentifier2database :: String -> Maybe String
+publicResourceIdentifier2database s = let
+    (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
+    (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 2 <$> matches
+  in
+    hierarchicalNamespace
+
+publicResourceIdentifier2database_ :: Partial => String -> String
+publicResourceIdentifier2database_ = fromJust <<< publicResourceIdentifier2database
+
+-- | From the identification of a resource, return the identifier of the resource in Couchdb.
+couchdbResourceIdentifier :: String -> String
+couchdbResourceIdentifier s = if isUrl s
+  then unsafePartial publicResourceIdentifier2LocalName_ s
+  else s
+
+-----------------------------------------------------------
+-- URL2AUTHORITY
+-----------------------------------------------------------
+urlRegex :: Regex
+urlRegex = unsafeRegex "^(https://[^/]+/).*$" noFlags
+
+url2Authority :: String -> Maybe String
+url2Authority = getFirstMatch urlRegex
+
+
 -----------------------------------------------------------
 -- CLASS PERSPECTENTITEITIDENTIFIER
 -----------------------------------------------------------
@@ -275,9 +350,9 @@ deconstructSegments :: String -> Maybe String
 deconstructSegments = getSecondMatch qualifiedNameRegex
 
 lastPartRegEx :: Regex
-lastPartRegEx = unsafeRegex ".*\\$(\\w+)" noFlags
+lastPartRegEx = unsafeRegex ".*[\\$|/](\\w+)" noFlags
 
--- | Returns "localName" from "model:ModelName$Context$localName" or Nothing
+-- | Returns "localName" from "model:ModelName$Context$localName" and from "https://some.domain/database/localName" or Nothing
 -- | So this function returns THE LAST SEGMENT of the name.
 -- | deconstructLocalName "model:Model$First$Second" == Just "Second"
 -- | deconstructLocalName "model:Model" == Nothing
@@ -296,6 +371,35 @@ hasLocalName qn ln = case deconstructLocalName qn of
 -- | "Context" `isLocalNameOf` "model:Perspectives$Context"
 isLocalNameOf :: String -> String -> Boolean
 isLocalNameOf = flip hasLocalName
+
+-----------------------------------------------------------
+-- URL
+-----------------------------------------------------------
+urlRegEx :: Regex
+urlRegEx = unsafeRegex "^http" noFlags
+
+isUrl :: String -> Boolean
+isUrl = test urlRegEx
+
+-----------------------------------------------------------
+-- URI REPRESENTING RESOURCE
+-----------------------------------------------------------
+-- | Returns the part of the string following the last "$".
+localNameFromUriRegEx :: Regex
+localNameFromUriRegEx = unsafeRegex "(.*)\\$(.*)" noFlags
+
+deconstructAuthorityFromUri :: String -> Maybe String
+deconstructAuthorityFromUri = getFirstMatch localNameFromUriRegEx
+
+deconstructAuthorityFromUri_ :: Partial => String -> String
+deconstructAuthorityFromUri_ = fromJust <<< deconstructAuthorityFromUri
+
+deconstructLocalNameFromUri :: String -> Maybe String
+deconstructLocalNameFromUri = getSecondMatch localNameFromUriRegEx
+
+deconstructLocalNameFromUri_ :: Partial => String -> String
+deconstructLocalNameFromUri_ = fromJust <<< deconstructLocalNameFromUri
+
 -----------------------------------------------------------
 -- CURIES
 -----------------------------------------------------------

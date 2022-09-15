@@ -51,7 +51,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Identifiers (buitenRol, constructUserIdentifier, deconstructModelName)
+import Perspectives.Identifiers (buitenRol, constructUserIdentifier, deconstructModelName, isPublicResource)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
@@ -76,7 +76,7 @@ import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedR
 import Perspectives.SaveUserData (removeBinding, setBinding, setFirstBinding, scheduleRoleRemoval, scheduleContextRemoval)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, getPublicStore_, hasContextAspect, isDatabaseQueryRole)
+import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, getPublicStore_, hasContextAspect, indexedContextName, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Deletes, from all contexts, the role instance.
@@ -560,12 +560,19 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
 constructContextIdentifier :: ContextType -> Maybe String -> MonadPerspectivesTransaction String
 constructContextIdentifier ctype@(ContextType cname) mlocalName = do
   localName <- case mlocalName of 
-      Nothing -> show <$> liftEffect guid
+      Nothing -> do
+        mindexedName <- lift $ indexedContextName ctype 
+        case mindexedName of 
+          Nothing -> show <$> liftEffect guid
+          Just indexedName -> pure $ unwrap indexedName
       Just n -> pure n
-  mPStore <- lift $ getPublicStore_ ctype 
-  case mPStore of 
-    Nothing -> pure $ constructUserIdentifier localName
-    Just pStore -> pure $ addNamespace (unsafePartial mapPublicStore pStore (unsafePartial fromJust $ deconstructModelName cname)) localName
+  if isPublicResource localName
+    then pure localName
+    else do
+      mPStore <- lift $ getPublicStore_ ctype 
+      case mPStore of 
+        Nothing -> pure $ constructUserIdentifier localName
+        Just pStore -> pure $ addNamespace (unsafePartial mapPublicStore pStore (unsafePartial fromJust $ deconstructModelName cname)) localName
 
 withAuthoringRole :: forall a. RoleType -> Updater a -> Updater a
 withAuthoringRole aRole updater a = do

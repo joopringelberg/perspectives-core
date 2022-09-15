@@ -67,7 +67,7 @@ import Foreign.Object (fromFoldable, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted', onAccepted_)
 import Perspectives.Identifiers (deconstructUserName)
-import Perspectives.Persistence.Authentication (defaultPerspectRequest, ensureAuthentication)
+import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication)
 import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
 import Perspectives.Persistence.Types (DatabaseName, Url, MonadPouchdb)
 import Simple.JSON (writeJSON)
@@ -91,7 +91,7 @@ import Simple.JSON (writeJSON)
 -- | Set the security document in the database.
 -- | Authentication ensured.
 setSecurityDocument :: forall f. Url -> DatabaseName -> SecurityDocument -> MonadPouchdb f Unit
-setSecurityDocument base db doc = ensureAuthentication do
+setSecurityDocument base db doc = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
   -- Security documents have no versions.
   res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> db <> "/_security"), content = Just $ RequestBody.string (writeJSON $ unwrap doc)}
@@ -131,23 +131,26 @@ ensureSecurityDocument base db = do
 replicateContinuously :: forall f. Url -> DatabaseName -> Url -> Url -> Maybe SelectorObject -> MonadPouchdb f Unit
 replicateContinuously couchdbUrl name source target selector = do
   usr <- getSystemIdentifier
-  pwd <- getCouchdbPassword
-  bvalue <- pure (btoa (usr <> ":" <> pwd))
-  case bvalue of
-    Left _ -> pure unit
-    Right auth -> setReplicationDocument couchdbUrl (ReplicationDocument
-        { _id: name
-        , source: ReplicationEndpoint {url: source, headers: singleton "Authorization" ("Basic " <> auth)}
-        , target: ReplicationEndpoint {url: target, headers: singleton "Authorization" ("Basic " <> auth)}
-        , create_target: false
-        , continuous: true
-        -- , selector: maybe (Just emptySelector) Just selector
-        , selector
-        })
+  mpwd <- getCouchdbPassword
+  case mpwd of 
+    Nothing -> throwError (error $ "replicateContinuously: no password found for user " <> usr <> " in " <> couchdbUrl)
+    Just pwd -> do 
+      bvalue <- pure (btoa (usr <> ":" <> pwd))
+      case bvalue of
+        Left _ -> pure unit
+        Right auth -> setReplicationDocument couchdbUrl (ReplicationDocument
+            { _id: name
+            , source: ReplicationEndpoint {url: source, headers: singleton "Authorization" ("Basic " <> auth)}
+            , target: ReplicationEndpoint {url: target, headers: singleton "Authorization" ("Basic " <> auth)}
+            , create_target: false
+            , continuous: true
+            -- , selector: maybe (Just emptySelector) Just selector
+            , selector
+            })
 
 -- | Authentication ensured.
 setReplicationDocument :: forall f. Url -> ReplicationDocument -> MonadPouchdb f Unit
-setReplicationDocument base rd@(ReplicationDocument{_id}) = ensureAuthentication do
+setReplicationDocument base rd@(ReplicationDocument{_id}) = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
   res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_replicator/" <> _id), content = Just $ RequestBody.string (writeJSON $ unwrap rd)}
   onAccepted res [StatusCode 200, StatusCode 201, StatusCode 202] "setReplicationDocument" (\_ -> pure unit)
@@ -168,7 +171,7 @@ type User = String
 type Password = String
 -- | Create a non-admin user.
 createUser :: forall f. Url -> User -> Password -> Array Role -> MonadPouchdb f Unit
-createUser base user password roles = ensureAuthentication do
+createUser base user password roles = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
   (content :: Json) <- pure (fromObject (fromFoldable
     [ Tuple "name" (fromString $ user2couchdbuser user)
@@ -190,7 +193,7 @@ deleteUser base user = deleteDocument (base <> "_users/org.couchdb.user:" <> use
 -- SETPASSWORD
 -----------------------------------------------------------
 setPassword :: forall f. Url -> User -> Password -> MonadPouchdb f Unit
-setPassword base user password = ensureAuthentication do
+setPassword base user password = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
   (res :: (Either AJ.Error (Response Json))) <- liftAff $ AJ.request $ rq
     { method = Left GET
@@ -212,7 +215,7 @@ foreign import changePassword :: Json -> String -> Json
 -----------------------------------------------------------
 -- | Authentication ensured.
 deleteDocument :: forall f. Url -> Maybe String -> MonadPouchdb f Boolean
-deleteDocument url version' = ensureAuthentication do
+deleteDocument url version' = ensureAuthentication (Url url) \_ -> do
   mrev <- case version' of
     Nothing -> retrieveDocumentVersion url
     Just v -> pure $ Just v
@@ -259,7 +262,7 @@ version headers =  case find (\rh -> toLower (name rh) == "etag") headers of
 -----------------------------------------------------------
 -- Database names must comply to rules given in https://docs.couchdb.org/en/stable/api/database/common.html#db
 createDatabase :: forall f. DatabaseName -> MonadPouchdb f Unit
-createDatabase databaseUrl = ensureAuthentication do
+createDatabase databaseUrl = ensureAuthentication (Url databaseUrl) \_ -> do
   rq <- defaultPerspectRequest
   res <- liftAff $ AJ.request $ rq {method = Left PUT, url = databaseUrl}
   onAccepted' createStatusCodes res [StatusCode 201] "createDatabase" (\_ -> pure unit)
@@ -271,7 +274,7 @@ createDatabase databaseUrl = ensureAuthentication do
 -- DELETEDATABASE
 -----------------------------------------------------------
 deleteDatabase :: forall f. Url -> MonadPouchdb f Unit
-deleteDatabase databaseUrl = ensureAuthentication do
+deleteDatabase databaseUrl = ensureAuthentication (Url databaseUrl) \_ -> do
   rq <- defaultPerspectRequest
   res <- liftAff $ AJ.request $ rq {method = Left DELETE, url = databaseUrl}
   onAccepted'
