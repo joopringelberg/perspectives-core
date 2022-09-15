@@ -279,7 +279,9 @@ documentExists url = ensureAuthentication (Url url) \_ -> do
   (rq :: (AJ.Request String)) <- defaultPerspectRequest
   res <- liftAff $ AJ.request $ rq {method = Left HEAD, url = url}
   onAccepted_
-    (\_ _ -> pure false)
+    (\response _ -> if response.status == StatusCode 401
+      then throwError (error "unauthorized")
+      else pure false)
     res
     [StatusCode 200, StatusCode 304]
     "documentExists"
