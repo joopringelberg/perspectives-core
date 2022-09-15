@@ -34,8 +34,8 @@ domain System
       property Channel = (binder Initiator either binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       -- User instances need not have a value for this property. It is used in the PDR to
       -- ensure serialisation of the User role.
-      -- property Id (String)
-      property Id = callExternal util:RoleIdentifier() returns String
+      property Id (String)
+      -- property Id = callExternal util:RoleIdentifier() returns String
       indexed sys:Me
       view VolledigeNaam (FirstName, LastName)
       perspective on User
