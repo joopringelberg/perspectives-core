@@ -24,11 +24,13 @@
 
 module Perspectives.Extern.Utilities where
 
+import Control.Monad.Trans.Class (lift)
 import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
+import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Prelude (pure)
+import Prelude (pure, ($))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO: verander naar echte gegenereerde identifiers.
@@ -38,10 +40,14 @@ genSym _ = pure "geheim"
 roleIdentifier :: RoleInstance -> MonadPerspectivesQuery String
 roleIdentifier (RoleInstance id) = pure id
 
+systemIdentifier :: RoleInstance -> MonadPerspectivesQuery String
+systemIdentifier _ = lift $ lift getSystemIdentifier
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model:Utilities$GenSym" {func: unsafeCoerce genSym, nArgs: 0}
   , Tuple "model:Utilities$RoleIdentifier" {func: unsafeCoerce roleIdentifier, nArgs: 0}
+  , Tuple "model:Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0}
   ]

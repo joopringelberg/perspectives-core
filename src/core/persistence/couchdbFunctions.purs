@@ -33,6 +33,7 @@ module Perspectives.Persistence.CouchdbFunctions
 , createDatabase
 , deleteDatabase
 , user2couchdbuser
+, databaseExists
 )
 
 where
@@ -269,6 +270,23 @@ createDatabase databaseUrl = ensureAuthentication (Url databaseUrl) \_ -> do
   where
     createStatusCodes = MAP.insert 412 "Precondition failed. Database already exists."
       databaseStatusCodes
+
+-----------------------------------------------------------
+-- DOCUMENT, DATABASE EXISTS
+-----------------------------------------------------------
+documentExists :: forall f. Url -> MonadPouchdb f Boolean
+documentExists url = ensureAuthentication (Url url) \_ -> do
+  (rq :: (AJ.Request String)) <- defaultPerspectRequest
+  res <- liftAff $ AJ.request $ rq {method = Left HEAD, url = url}
+  onAccepted_
+    (\_ _ -> pure false)
+    res
+    [StatusCode 200, StatusCode 304]
+    "documentExists"
+    (\_ -> pure true)
+
+databaseExists :: forall f. Url -> MonadPouchdb f Boolean
+databaseExists = documentExists
 
 -----------------------------------------------------------
 -- DELETEDATABASE

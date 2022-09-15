@@ -713,7 +713,11 @@ type Url = String
 createCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 createCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
-  Just databaseUrl, Just databaseName -> lift $ CDB.createDatabase (databaseUrl <> databaseName)
+  Just databaseUrl, Just databaseName -> do 
+    exists <- lift $ CDB.databaseExists $ databaseUrl <> databaseName
+    if exists
+      then pure unit
+      else do lift $ CDB.createDatabase (databaseUrl <> databaseName)
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.

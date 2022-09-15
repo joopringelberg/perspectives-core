@@ -241,6 +241,7 @@ initialisePersistence userName password couchdbUrl = void $ runAff
 
 -- | Implementation notes:
 -- |  1. couchdbUrl should terminate on a forward slash.
+-- OBSOLETE??
 createUser :: UserName -> Password -> Maybe Url -> Effect Unit
 createUser userName password couchdbUrl = void $ runAff
   handleError

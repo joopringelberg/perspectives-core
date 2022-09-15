@@ -9,15 +9,12 @@
 domain BodiesWithAccounts
   use sys for model:System
   use bwa for model:BodiesWithAccounts
+  use util for model:Utilities
 
   user WithCredentials filledBy sys:PerspectivesSystem$User
-    property UserName (String)
+    property UserName = callExternal util:SystemIdentifier() returns String
     property Password (String)
     property AuthorizedDomain (String)
-
-    on entry
-      do for WithCredentials
-        UserName = sys:PerspectivesSystem$User$Id
 
   -- The model description case.
   -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
@@ -42,7 +39,8 @@ domain BodiesWithAccounts
 
       perspective on Accounts
         only (Create, Fill, Remove)
-        props (UserName, FirstName, LastName) verbs (SetPropertyValue)
+        props (FirstName, LastName) verbs (SetPropertyValue)
+        props (UserName) verbs (Consult)
 
         -- We limit visibility of the Password to the (initial) situation that it
         -- does not exist.
@@ -52,7 +50,8 @@ domain BodiesWithAccounts
 
       perspective on Admin
         props (FirstName, LastName) verbs (Consult)
-        props (UserName, Password) verbs (SetPropertyValue)
+        props (Password) verbs (SetPropertyValue)
+        props (UserName) verbs (Consult)
 
     -- Role Guest is available so any user can request an Account.
     -- Guest is superceded by Accounts as soon as it exists.

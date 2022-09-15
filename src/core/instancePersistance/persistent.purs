@@ -168,7 +168,7 @@ removeEntiteit_ entId entiteit =
       (Just rev) -> do
         void $ removeInternally entId
         dbName <- dbLocalName entId
-        void $ deleteDocument dbName (unwrap entId) (Just rev)
+        void $ deleteDocument dbName (couchdbResourceIdentifier $ unwrap entId) (Just rev)
         pure entiteit
 
 tryRemoveEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives Unit

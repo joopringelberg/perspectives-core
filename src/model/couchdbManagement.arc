@@ -109,7 +109,8 @@ domain CouchdbManagement
 
       perspective on PManager
         only (CreateAndFill)
-        props (UserName, Password) verbs (SetPropertyValue)
+        props (Password) verbs (SetPropertyValue)
+        props (UserName) verbs (Consult)
       
       perspective on extern 
         props (ServerUrl, ServerName) verbs (SetPropertyValue)
@@ -154,7 +155,7 @@ domain CouchdbManagement
       aspect acc:Body$Admin
 
       perspective on extern
-        defaults
+        props (Url, Name) verbs (Consult)
 
       perspective on Repositories
         all roleverbs
@@ -181,6 +182,7 @@ domain CouchdbManagement
         tab "The server"
           row
             form External
+              props (Url, Name) verbs (Consult)
           row
             form Admin
         tab "Accounts"
