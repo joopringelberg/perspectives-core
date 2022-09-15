@@ -90,7 +90,7 @@ domain CouchdbManagement
   
     external
       property ServerUrl (mandatory, String)
-        -- pattern = /^https://[^\\/]+\\/$/ "An url with the https scheme, ending on a slash"
+        pattern = "^https://[^\\/]+\\/$" "An url with the https scheme, ending on a slash"
       property ServerName (mandatory, String)
       property HasDatabase (Boolean)
 
@@ -321,7 +321,7 @@ domain CouchdbManagement
         -- Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, (, ), +, -, and / are allowed. Must begin with a letter.
         -- However, the parser refuses (, ) and /.
         -- ^[a-z][a-z0-9_$()+/-]*$ according to https://docs.couchdb.org/en/3.2.0/api/database/common.html and https://localhost:6984//_utils/docs/api/database/common.html#specifying-the-document-id
-        pattern = /[a-z]([a-z]|[0-9]|[_$+-])*/ "Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, + and - are allowed. Must begin with a letter."
+        pattern = "[a-z]([a-z]|[0-9]|[_$+-])*" "Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, + and - are allowed. Must begin with a letter."
       property ReadDb = Name + "_read"
       property WriteDb = Name + "_write"
       property Url = binder Repositories >> context >> extern >> Url + Name

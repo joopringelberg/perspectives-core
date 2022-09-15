@@ -36,7 +36,7 @@ import Data.String.Regex (parseFlags, regex)
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, regexExpression', regexFlags', reserved)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, regexFlags', reserved)
 import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
@@ -160,7 +160,7 @@ simpleStep = try
 -- | where all flags are optional.
 regexExpression :: IP RegExP
 regexExpression = do
-  regexString <- regexExpression'
+  regexString <- token.stringLiteral
   flags <- option "" regexFlags'
   result <- pure $ regex regexString (parseFlags flags)
   case result of

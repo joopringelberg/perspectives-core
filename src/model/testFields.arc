@@ -73,7 +73,7 @@ domain model://perspectives.domains/TestFields
       property WeekDay (String)
         enumeration = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
       property Appel (String)
-        pattern = /.*appel.*/ "Any word with the string `appel` in it."
+        pattern = ".*appel.*" "Any word with the string `appel` in it."
 
     thing TestTable (relational)
       property Text (mandatory, String)

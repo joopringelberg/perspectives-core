@@ -87,20 +87,6 @@ segmentedName = try do
   rest <- many (string "$" *> token.identifier)
   pure (intercalate "$" (cons first rest))
 
--- | Parses /.../
-regexExpression' :: IP String
-regexExpression' = do
-  void $ string "/"
-  s <- stringUntilForwardSlash
-  void $ string "/"
-  pure s
-  where
-    stringUntilForwardSlash :: IP String
-    stringUntilForwardSlash = do
-      (chars :: Array Char) <- many (satisfy (_ /= '/'))
-      _ <- whiteSpace
-      pure $ fromCharArray chars
-
 -- | Parses gimyu.
 regexFlags' :: IP String
 regexFlags' = do
