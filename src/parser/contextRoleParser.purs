@@ -421,6 +421,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
           { _id = rolId
           , occurrence = (roleIndex occurrence nrOfRoleOccurrences)
           , pspType = EnumeratedRoleType $ show rname
+          , allTypes = [EnumeratedRoleType $ show rname]
           , binding = bindng
           , context = ContextInstance $ show cname
           -- , properties = FO.fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
@@ -615,6 +616,7 @@ context contextRole = withRoleCounting context' where
               (PerspectRol defaultRolRecord
                 { _id = RoleInstance $ buitenRol (show instanceName)
                 , pspType = EnumeratedRoleType $ externalRoleType_ $ show typeName
+                , allTypes = [EnumeratedRoleType $ externalRoleType_ $ show typeName]
                 , context = (ContextInstance $ show instanceName)
                 , binding = RoleInstance <<< buitenRol <$> prototype
                 , properties = FO.fromFoldable publicProps
@@ -709,6 +711,7 @@ definition = do
       { _id = rolId
       , occurrence = maybe 0 identity nrOfRoleOccurrences
       , pspType = EnumeratedRoleType (show prop)
+      , allTypes = [EnumeratedRoleType $ show prop]
       , binding = Just bindng
       , context = ContextInstance enclContext
       , universeRoleDelta = universeRoleDelta
