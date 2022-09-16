@@ -25,7 +25,7 @@ module Perspectives.Parsing.Arc.Statement where
 import Control.Alt ((<|>))
 import Data.Array (fromFoldable)
 import Data.List (List(..))
-import Data.Maybe (isJust)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (VarBinding(..))
@@ -33,7 +33,7 @@ import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reser
 import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, outdented')
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..), LetABinding(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
-import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (>>=), (<>), (<*>))
+import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<>), (>>=))
 import Text.Parsing.Indent (indented', withPos)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (lookAhead, manyTill, option, optionMaybe, try, (<?>))
@@ -290,7 +290,11 @@ letABinding = do
   case first, second of
     "create", "role" -> Stat <$> pure varName <*> roleCreation
     "create", "context" -> Stat <$> pure varName <*> createContext
-    _, _ -> Expr <$> (VarBinding <$> pure varName <*> step)
+    _, _ -> do 
+      me <- optionMaybe (try (step <* outdented'))
+      case me of
+        Nothing -> fail "Expected `create role` or `create context` or a functional expression here."
+        Just e -> pure $ Expr (VarBinding varName e)
 
 
 -- | Looking ahead, find at least one reserved identifier, two if possible.
