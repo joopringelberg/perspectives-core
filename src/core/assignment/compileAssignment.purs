@@ -454,8 +454,8 @@ compileContextAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifie
             pure $ Right contextIdentifier
 
 makeUQD :: Partial => QueryFunctionDescription -> QueryFunctionDescription
-makeUQD (BQD dom (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ ran fun man) =
-  (UQD dom (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription ran fun man)
+makeUQD (BQD dom qf contextGetterDescription _ ran fun man) =
+  (UQD dom qf contextGetterDescription ran fun man)
 
 -- | This is a special way to compile Creating assignment statements, that result in a function that actually returns
 -- | something, as opposed to ordinary assignment statements (including Creating statements) that return nothing.
