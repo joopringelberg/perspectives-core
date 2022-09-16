@@ -124,7 +124,7 @@ foreign import deleteDatabaseImpl :: PouchdbDatabase -> EffectFnAff Foreign
 -- ENSUREDATABASE
 -----------------------------------------------------------
 -- | Creates the database if it does not exist.
--- | Authentication ensured.
+-- | Makes a default request, so databases are actually created remotely and authentication is triggered.
 ensureDatabase :: forall f. DatabaseName -> MonadPouchdb f PouchdbDatabase
 ensureDatabase dbName = do
   mdb <- gets \{databases} -> lookup dbName databases
@@ -135,7 +135,13 @@ ensureDatabase dbName = do
       db <- gets \{databases} -> unsafePartial $ fromJust $ lookup dbName databases
       lift $ void $ fromEffectFnAff $ databaseInfoImpl db
       pure db
-    Just db -> pure db
+    Just db -> do 
+      -- Access the database and throw error if it failed to trigger authentication.
+      f <- lift $ fromEffectFnAff $ databaseInfoImpl db 
+      case read f of 
+        Left e -> throwError (error "unauthorized")
+        (Right (i :: DatabaseInfo)) -> pure unit
+      pure db
 
 -----------------------------------------------------------
 -- WITHDATABASE

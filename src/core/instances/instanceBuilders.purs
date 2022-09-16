@@ -159,7 +159,7 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
       RolSerialization ->
       (WriterT (Array RoleInstance) (ExceptT PerspectivesError MonadPerspectivesTransaction)) (Tuple RolSerialization RoleInstance)
     constructSingleRoleInstance contextInstanceId roleType i s@(RolSerialization{id:mid, properties, binding}) = do
-      case (deconstructLocalName $unwrap roleType) of
+      case (deconstructLocalName $ unwrap roleType) of
         Nothing -> throwError $ NotWellFormedName upperLeft "not a valid identifier"
         Just localRoleName -> do
           binding' <- lift  $ lift $ lift (traverse expandDefaultNamespaces binding)
