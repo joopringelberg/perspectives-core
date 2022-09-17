@@ -129,6 +129,7 @@ domain CouchdbManagement
     aspect acc:Body
     --storage public
     external
+      -- The location of the CouchdbServer_.
       property Url (String)
       property Name (String)
 
@@ -154,13 +155,16 @@ domain CouchdbManagement
       -- As acc:Body$Admin, has full perspective on Accounts.
       aspect acc:Body$Admin
 
+      action CreateRepository
+        create role Repositories
+
       perspective on extern
         props (Url, Name) verbs (Consult)
 
       perspective on Repositories
         all roleverbs
-        props (Endorsed, IsPublic, Name, AdminLastName) verbs (Consult)
-        props (IsPublic) verbs (SetPropertyValue)
+        props (Endorsed, IsPublic, AdminLastName) verbs (Consult)
+        props (IsPublic, RepositoryName) verbs (SetPropertyValue)
         in object state WithoutExternalDatabase
           props (Endorsed, Name) verbs (SetPropertyValue)
         in object state WithExternalDatabase
@@ -280,21 +284,34 @@ domain CouchdbManagement
     -- in Couchdb and the write database replicates to the read database.
     context Repositories (relational) filledBy Repository
       property Endorsed (Boolean)
-      on exit of WithExternalDatabase
-        do for Admin
-          callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
-          callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
-          callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
-          remove role binding >> context >> Repository$Admin
+      property RepositoryName (String)
+
+      state HasName = exists RepositoryName
+        on entry
+          do for Admin
+            create_ context Repository named (context >> extern >> Url + "cw_servers_and_repositories/" + RepositoryName) bound to origin
+            Name = RepositoryName for origin >> binding
 
       -- Note that as it stands, an Account can unconditionally create a new
       -- Repository. Add a Boolean that represents the Admin's consent.
       state WithExternalDatabase = (exists Name) and Endorsed
         on entry
           do for Admin
-            callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_read" )
-            callEffect cdb:CreateCouchdbDatabase( context >> extern >> Url, Name + "_write" )
-            callEffect cdb:ReplicateContinuously( context >> extern >> Url, Name, Name + "_write", Name + "_read" )
+            letA
+              baseurl <- context >> extern >> Url
+              readdb <- "models_" + Name
+              writedb <- "models_" + Name + "_write"
+            in 
+              callEffect cdb:CreateCouchdbDatabase( baseurl, readdb )
+              callEffect cdb:CreateCouchdbDatabase( baseurl, writedb )
+              callEffect cdb:ReplicateContinuously( baseurl, readdb, writedb, readdb )
+        on exit
+          do for Admin
+            callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
+            callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
+            callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
+            remove role binding >> context >> Repository$Admin
+
       state WithoutExternalDatabase = (not exists Name) or not Endorsed
         -- Ad Admin may exist already if the Repository is created by Accounts.
         -- state NoAdmin = Endorsed and not exists binding >> context >> Repository$Admin
@@ -322,8 +339,8 @@ domain CouchdbManagement
         -- However, the parser refuses (, ) and /.
         -- ^[a-z][a-z0-9_$()+/-]*$ according to https://docs.couchdb.org/en/3.2.0/api/database/common.html and https://localhost:6984//_utils/docs/api/database/common.html#specifying-the-document-id
         pattern = "[a-z]([a-z]|[0-9]|[_$+-])*" "Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, + and - are allowed. Must begin with a letter."
-      property ReadDb = Name + "_read"
-      property WriteDb = Name + "_write"
+      property ReadDb = "models_" + Name
+      property WriteDb = "models_" + Name + "_write"
       property Url = binder Repositories >> context >> extern >> Url + Name
       property AdminLastName = context >> Admin >> LastName
 
@@ -404,8 +421,8 @@ domain CouchdbManagement
           letA
             url <- context >> extern >> binder Repositories >> context >> extern >> Url
           in
-            callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_write", binding >> UserName)
-            callEffect cdb:RemoveAsMemberOf( url, context >> extern >> Name + "_read", binding >> UserName)
+            callEffect cdb:RemoveAsMemberOf( url, context >> extern >> WriteDb, binding >> UserName)
+            callEffect cdb:RemoveAsMemberOf( url, context >> extern >> ReadDb, binding >> UserName)
             remove role origin
 
       state IsFilled = exists binding
@@ -416,8 +433,8 @@ domain CouchdbManagement
             letA
               url <- context >> extern >> binder Repositories >> context >> extern >> Url
             in
-              callEffect cdb:MakeMemberOf( url, context >> extern >> Name + "_write", binding >> UserName )
-              callEffect cdb:MakeMemberOf( url, context >> extern >> Name + "_read", binding >> UserName )
+              callEffect cdb:MakeMemberOf( url, context >> extern >> WriteDb, binding >> UserName )
+              callEffect cdb:MakeMemberOf( url, context >> extern >> ReadDb, binding >> UserName )
 
       -- The Authors can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
