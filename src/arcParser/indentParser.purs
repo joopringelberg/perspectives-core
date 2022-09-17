@@ -320,6 +320,16 @@ outdented' = do
   parserPosition <- getPosition
   if (sourceColumn parserPosition >= sourceColumn indentParserPosition) then fail "not outdented" else pure unit
 
+-- | Parses only when the same or outdented with respect to the level of reference, but does not change internal state
+sameOrOutdented' :: IP Unit
+sameOrOutdented' = do
+  -- The stored position.
+  indentParserPosition <- get'
+  -- The current position.
+  parserPosition <- getPosition
+  -- fail when indented.
+  if (sourceColumn parserPosition > sourceColumn indentParserPosition) then fail "not the same or outdented" else pure unit
+
 isNextLine :: IP Boolean
 isNextLine = do
     (indentParserPosition :: ArcPosition) <- get'

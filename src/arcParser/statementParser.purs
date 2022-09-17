@@ -30,7 +30,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (VarBinding(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reserved)
-import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, outdented')
+import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, outdented', sameOrOutdented')
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..), LetABinding(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<>), (>>=))
@@ -291,7 +291,9 @@ letABinding = do
     "create", "role" -> Stat <$> pure varName <*> roleCreation
     "create", "context" -> Stat <$> pure varName <*> createContext
     _, _ -> do 
-      me <- optionMaybe (try (step <* outdented'))
+      -- We must parse the entire expression. So after parsing the position is either equal to the starting position,
+      -- or indented to the left (outdented).
+      me <- optionMaybe (try (step <* sameOrOutdented' ))
       case me of
         Nothing -> fail "Expected `create role` or `create context` or a functional expression here."
         Just e -> pure $ Expr (VarBinding varName e)
