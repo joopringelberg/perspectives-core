@@ -147,9 +147,9 @@ compileAssignmentFromRole qfd@(BQD _ (QF.CreateRootContext _) _ nameGetterDescri
 
 compileAssignmentFromRole qfd@(UQD _ (QF.CreateContext_ _) _ _ _ _) = unsafePartial compileContextAssignmentFromRole qfd Nothing
 
-compileAssignmentFromRole qfd@(BQD _ (QF.CreateContext_ _) _ _ _ _ _) = unsafePartial compileContextAssignmentFromRole 
+compileAssignmentFromRole qfd@(BQD _ (QF.CreateContext_ _) _ nameGetterDescription _ _ _) = unsafePartial compileContextAssignmentFromRole 
   (unsafePartial makeUQD qfd) 
-  Nothing
+  (Just nameGetterDescription)
 
 compileAssignmentFromRole (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
