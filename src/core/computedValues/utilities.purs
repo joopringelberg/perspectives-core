@@ -29,7 +29,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Prelude (pure, ($))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -40,6 +40,9 @@ genSym _ = pure "geheim"
 roleIdentifier :: RoleInstance -> MonadPerspectivesQuery String
 roleIdentifier (RoleInstance id) = pure id
 
+contextIdentifier :: ContextInstance -> MonadPerspectivesQuery String
+contextIdentifier (ContextInstance id) = pure id
+
 systemIdentifier :: RoleInstance -> MonadPerspectivesQuery String
 systemIdentifier _ = lift $ lift getSystemIdentifier
 
@@ -49,5 +52,6 @@ externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model:Utilities$GenSym" {func: unsafeCoerce genSym, nArgs: 0}
   , Tuple "model:Utilities$RoleIdentifier" {func: unsafeCoerce roleIdentifier, nArgs: 0}
+  , Tuple "model:Utilities$ContextIdentifier" {func: unsafeCoerce contextIdentifier, nArgs: 0}
   , Tuple "model:Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0}
   ]
