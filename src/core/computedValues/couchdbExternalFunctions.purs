@@ -728,15 +728,15 @@ deleteCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, hea
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
-replicateContinuously :: Array Url -> Array String -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
-replicateContinuously databaseUrls names sources targets _ = case head databaseUrls, head names, head sources, head targets of
-  Just databaseUrl, Just name, Just source, Just target -> lift $ CDB.replicateContinuously
+replicateContinuously :: Array Url -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+replicateContinuously databaseUrls sources targets _ = case head databaseUrls, head sources, head targets of
+  Just databaseUrl, Just source, Just target -> lift $ CDB.replicateContinuously
     databaseUrl
-    name
+    (source <> "_" <> target)
     (databaseUrl <> source)
     (databaseUrl <> target)
     Nothing
-  _, _, _, _ -> pure unit
+  _, _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 endReplication :: Array Url -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -810,7 +810,7 @@ externalFunctions =
   , Tuple "model:Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
   , Tuple "model:Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
   , Tuple "model:Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
-  , Tuple "model:Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 4}
+  , Tuple "model:Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 3}
   , Tuple "model:Couchdb$EndReplication" {func: unsafeCoerce endReplication, nArgs: 3}
   , Tuple "model:Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}
   , Tuple "model:Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2}
