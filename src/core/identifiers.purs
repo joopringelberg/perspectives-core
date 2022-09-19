@@ -108,7 +108,9 @@ instance eqModelName :: Eq ModelName where
 data QualifiedName = QualifiedName Namespace LocalName
 
 instance showQualifiedName :: Show QualifiedName where
-  show (QualifiedName mn ln) = mn <> "$" <> ln
+  show (QualifiedName mn ln) = if isUrl mn 
+    then mn <> ln 
+    else mn <> "$" <> ln
 
 instance eqQualifiedName :: Eq QualifiedName where
   eq (QualifiedName ns1 ln1) (QualifiedName ns2 ln2) = eq ns1 ns2 && eq ln1 ln2
@@ -208,7 +210,7 @@ isPublicResource = test publicResourceRegex
 -- | Transform a resource URI of the form 
 -- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
 -- | to:
--- |    https://{authority}
+-- |    https://{authority}/
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
 publicResourceIdentifier2Authority :: String -> Maybe String
 publicResourceIdentifier2Authority s = let
@@ -216,6 +218,10 @@ publicResourceIdentifier2Authority s = let
     (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 1 <$> matches
   in
     append "https://" <$> (append hierarchicalNamespace (Just "/"))
+
+publicResourceIdentifier2Authority_ :: Partial => String -> String
+publicResourceIdentifier2Authority_ = fromJust <<< publicResourceIdentifier2Authority
+
 
 -- | Transform a resource URI of the form 
 -- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}

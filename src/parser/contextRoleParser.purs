@@ -45,7 +45,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
-import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
+import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol, isPublicResource, publicResourceIdentifier2Authority_, publicResourceIdentifier2LocalName_)
 import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Names (getUserIdentifier)
@@ -115,6 +115,14 @@ simpleValue = string <|> int <|> bool
 identLetter ::  IP Char
 identLetter = alphaNum <|> STRING.oneOf ['_', '\'']
 
+-- https://some.domain/bla
+urlLetter :: IP Char
+urlLetter = alphaNum <|> STRING.oneOf [':', '/', '.', '_']
+
+urlLetterString :: IP String
+urlLetterString = f <$> urlLetter <*> AR.many urlLetter where
+  f c ca = fromCharArray $ AR.cons c ca
+
 identLetterString ::  IP String
 identLetterString = f <$> identLetter <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
@@ -133,6 +141,13 @@ lower = satisfy (isLower <<< codePointFromChar) <?> "uppercase letter"
 uncapitalizedString ::  IP String
 uncapitalizedString = f <$> lower <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
+
+publicResourceIdentifier :: IP QualifiedName
+publicResourceIdentifier = try $ lexeme do
+  s <- urlLetterString
+  if isPublicResource s
+    then pure $ QualifiedName (unsafePartial publicResourceIdentifier2Authority_ s) (unsafePartial publicResourceIdentifier2LocalName_ s)
+    else fail "Expected a string of the form 'https://some.domain/path'."
 
 -- domeinName = 'model:' upper alphaNum* '$'
 domeinName ::  IP String
@@ -186,7 +201,7 @@ prefixedName localName = lexeme do
 
 -- prefixedContextName = prefix segmentedName
 prefixedContextName ::  IP QualifiedName
-prefixedContextName = prefixedName segmentedName
+prefixedContextName = try $ prefixedName segmentedName
 
 -- prefixedPropertyName = prefix localPropertyName
 prefixedPropertyName ::  IP QualifiedName
@@ -496,7 +511,7 @@ contextBindingByReference cName = roleBinding' cName ContextBinding \_ -> do
   where
     contextReference :: IP RolName
     contextReference = do
-      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID)
+      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID <|> publicResourceIdentifier)
       pure $ buitenRol (show qn)
 
 roleBindingByReference ::  QualifiedName
@@ -509,7 +524,7 @@ roleBindingByReference cName = roleBinding' cName RoleBinding \_ -> do
   where
     rolReference :: IP RolName
     rolReference = do
-      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID)
+      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID <|> publicResourceIdentifier)
       pure (show qn)
 
 indexedIndividualBinding ::  QualifiedName
@@ -520,7 +535,7 @@ indexedIndividualBinding cName = roleBinding' cName RoleBinding \_ -> do
   pure $ Tuple cmt (Just $ RoleInstance (show ident))
 
 relativeInstanceID ::  IP QualifiedName
-relativeInstanceID = lexeme do
+relativeInstanceID = try $ lexeme do
   namespace <- getNamespace -- not $-terminated!
   namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
   sName <- segmentedName
