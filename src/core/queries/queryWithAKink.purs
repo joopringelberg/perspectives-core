@@ -200,7 +200,7 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
   (hasProp :: Boolean) <- lift $ lift $ roleHasProperty roleAdt
   if hasProp
     then do
-      minvertedF <- pure $ invertFunction dom f ran
+      minvertedF <- invertFunction dom f ran
       case minvertedF of
         Nothing -> pure []
         Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom True True)] Nothing]
@@ -225,7 +225,7 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
     roleHasProperty adt = allLocallyRepresentedProperties (roleInContext2Role <$> adt) >>= pure <<< isJust <<< (elemIndex prop)
 
 invert_ (SQD dom f ran _ _) = do
-  (minvertedF :: Maybe QueryFunction) <- pure $ invertFunction dom f ran
+  (minvertedF :: Maybe QueryFunction) <- invertFunction dom f ran
   case minvertedF of
     Nothing -> pure []
     Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom (queryFunctionIsFunctional invertedF) (queryFunctionIsMandatory f))] Nothing]

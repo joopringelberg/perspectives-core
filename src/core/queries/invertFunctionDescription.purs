@@ -22,65 +22,67 @@
 
 module Perspectives.Query.Inversion where
 
-import Data.Array (cons)
-import Data.Maybe (Maybe(..))
+import Data.Array (catMaybes, cons, head)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (endsWithSegments)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, functional, mandatory, range)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, functional, mandatory, range, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..), isFunctionalFunction, isMandatoryFunction)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType(..))
-import Prelude (class Monoid, class Semigroup, ($), (<$>), (<>))
+import Prelude (class Monoid, class Semigroup, pure, ($), (<$>), (<>), (<<<), bind)
 
 -- | For each type of function that appears as a single step in a query, we compute the inverse step.
-invertFunction :: Domain -> QueryFunction -> Range -> Maybe QueryFunction
+invertFunction :: Domain -> QueryFunction -> Range -> PhaseThree (Maybe QueryFunction)
 invertFunction dom qf ran = case qf of
   DataTypeGetter f -> case f of
     -- If we have the external role, use `DataTypeGetter ExternalRoleF`. That is, if the range is a Context.
     ContextF -> if isExternalRole dom
-      then Just $ DataTypeGetter ExternalRoleF
-      else Just $ RolGetter $ ENR (unsafePartial $ domain2RoleType dom)
+      then pure $ Just $ DataTypeGetter ExternalRoleF
+      else Just <<< RolGetter <<< ENR <$> (unsafePartial $ domain2RoleType dom)
     -- BindingF is the `filledBy` step. So we have filled `filledBy` filler.
     -- Its inversion is filler `fills` filled, or: filler GetRoleBindersF filled.
     -- We must qualify GetRoleBindersF with the type that is filled.
     -- That is the domain, here!
     BindingF -> case dom of
-      (RDOM EMPTY) -> Nothing
-      (RDOM (ST (RoleInContext{context,role}))) -> Just $ GetRoleBindersF role context
-      otherwise -> Nothing
-    ExternalRoleF -> Just $ DataTypeGetter ContextF
+      (RDOM EMPTY) -> pure $ Nothing
+      (RDOM (ST (RoleInContext{context,role}))) -> pure $ Just $ GetRoleBindersF role context
+      otherwise -> pure $ Nothing
+    ExternalRoleF -> pure $ Just $ DataTypeGetter ContextF
     -- Identity steps add nothing to the query and can be left out.
-    IdentityF -> Nothing
+    IdentityF -> pure $ Nothing
 
     -- An expression like `step >>= sum` is compiled as an SQD with DataTypeGetter as constructor for QueryFunction.
     -- These function descriptions have the same domain as range. In general, the domain will be a VDOM, as the
     -- sequence functions apply to Values, EXCEPT for CountF. We can count anything.
     -- In the compiled AffectedContextQuery we wish to ignore a step like this. We accomplish that by constructing
     -- a Value2Role QueryFunction.
-    MinimumF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
-    MaximumF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
-    AddF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
-    MultiplyF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
+    MinimumF -> pure $ Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
+    MaximumF -> pure $ Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
+    AddF -> pure $ Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
+    MultiplyF -> pure $ Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
 
-    _ -> Nothing
+    _ -> pure $ Nothing
 
   DataTypeGetterWithParameter f _ -> case f of
-    GetRoleInstancesForContextFromDatabaseF -> Just $ DataTypeGetter ContextF
-    SpecialisesRoleTypeF -> Nothing
-    CreateRoleF -> Just $ DataTypeGetter ContextF
+    GetRoleInstancesForContextFromDatabaseF -> pure $ Just $ DataTypeGetter ContextF
+    SpecialisesRoleTypeF -> pure $ Nothing
+    CreateRoleF -> pure $ Just $ DataTypeGetter ContextF
     -- A lot of cases will never be seen in a regular query.
-    _ -> Nothing
+    _ -> pure $ Nothing
 
-  GetRoleBindersF _ _ -> Just $ DataTypeGetter BindingF
+  GetRoleBindersF _ _ -> pure $ Just $ DataTypeGetter BindingF
 
-  PropertyGetter pt -> Just $ Value2Role pt
+  PropertyGetter pt -> pure $ Just $ Value2Role pt
 
   -- ExternalCoreContextGetter ct
 
   -- Catchall clause
-  _ -> Nothing
+  _ -> pure $ Nothing
 
   where
     -- NOTE: this is a shortcut that depends on a naming convention. It allows us to **not** make this function in MP.
@@ -146,8 +148,21 @@ queryFunctionIsMandatory qf = case qf of
   ContextIndividual _ -> True
   _ -> Unknown
 
-domain2RoleType :: Partial => Domain -> EnumeratedRoleType
-domain2RoleType (RDOM (ST (RoleInContext {role}))) = role
+-- TODO. #22 This function is a stub: it selects arbitrarily the first EnumeratedRoleType from SUMS and PRODUCTS
+domain2RoleType :: Partial => Domain -> PhaseThree EnumeratedRoleType
+-- domain2RoleType (RDOM (ST (RoleInContext {role}))) = pure role
+domain2RoleType (RDOM adt) = fromJust <$> domain2RoleType' adt
+  where
+  domain2RoleType' :: Partial => ADT RoleInContext -> PhaseThree (Maybe EnumeratedRoleType)
+  domain2RoleType' (ST a) = pure $ Just $ roleInContext2Role a
+  domain2RoleType' (SUM adts) = do
+    (roles :: Array EnumeratedRoleType) <- catMaybes <$> traverse domain2RoleType' adts
+    pure $ head roles
+  domain2RoleType' (PROD adts) = do
+    (roles :: Array EnumeratedRoleType) <- catMaybes <$> traverse domain2RoleType' adts
+    pure $ head roles
+  domain2RoleType' EMPTY = pure Nothing
+  domain2RoleType' UNIVERSAL = pure Nothing
 
 domain2PropertyType :: Partial => Domain -> PropertyType
 domain2PropertyType (VDOM _ (Just pt)) = pt
