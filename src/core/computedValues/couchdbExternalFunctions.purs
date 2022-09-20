@@ -241,18 +241,20 @@ addModelToLocalStore_oldStyle modelname originalLoad = do
     , invertedQueriesInOtherDomains
     , upstreamStateNotifications
     , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl docName
-  -- Add new dependencies.
-  for_ referredModels \dfid -> do
-    mmodel <- lift $ tryGetPerspectEntiteit dfid
-    case mmodel of
-      Nothing -> addModelToLocalStore' (unwrap dfid) originalLoad
-      Just _ -> pure unit
+
   -- Store the model in Couchdb.
   -- Fetch the local revision before saving: it belongs to the repository,
   -- not the local perspect_models.
   lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
   lift $ updateRevision(DomeinFileId _id)
   revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
+
+  -- Add new dependencies.
+  for_ referredModels \dfid -> do
+    mmodel <- lift $ tryGetPerspectEntiteit dfid
+    case mmodel of
+      Nothing -> addModelToLocalStore' (unwrap dfid) originalLoad
+      Just _ -> pure unit
 
   -- Add replacements to PerspectivesState for the new indexed names introduced in this model,
   -- unless we find existing ones left over from a previous installation of the model.
@@ -783,6 +785,18 @@ makeMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> Security
 removeAsMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 removeAsMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {members = {names: ARR.delete userName <$> r.members.names, roles: r.admins.roles}}
 
+-- | Any user can read the documents (and write them too, though we will restrict this using Apache)
+-- | This involves removing both the `names` and the `roles` field from the members section.
+makeDatabasePublic :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+makeDatabasePublic databaseUrls databaseNames roleId = updateSecurityDocument 
+  (\_ (SecurityDocument r) -> 
+    SecurityDocument r {members = {names: Nothing, roles: []}})
+  databaseUrls
+  databaseNames
+  []
+  roleId
+
+
 -- | The RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts
 resetPassword :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
 resetPassword databaseUrls userNames passwords _ = case head databaseUrls, head userNames, head passwords of
@@ -814,9 +828,9 @@ externalFunctions =
   , Tuple "model:Couchdb$EndReplication" {func: unsafeCoerce endReplication, nArgs: 3}
   , Tuple "model:Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}
   , Tuple "model:Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2}
+  , Tuple "model:Couchdb$MakeDatabasePublic" {func: unsafeCoerce makeDatabasePublic, nArgs: 2}
   , Tuple "model:Couchdb$MakeAdminOfDb" {func: unsafeCoerce makeAdminOfDb, nArgs: 3}
   , Tuple "model:Couchdb$RemoveAsAdminFromDb" {func: unsafeCoerce removeAsAdminFromDb, nArgs: 3}
-  , Tuple "model:Couchdb$MakeMemberOf" {func: unsafeCoerce makeMemberOf, nArgs: 3}
   , Tuple "model:Couchdb$MakeMemberOf" {func: unsafeCoerce makeMemberOf, nArgs: 3}
   , Tuple "model:Couchdb$RemoveAsMemberOf" {func: unsafeCoerce removeAsMemberOf, nArgs: 3}
   , Tuple "model:Couchdb$ResetPassword" {func: unsafeCoerce resetPassword, nArgs: 3}

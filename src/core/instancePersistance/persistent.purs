@@ -145,13 +145,13 @@ getDomeinFile = getPerspectEntiteit
 tryGetPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
   \e -> do 
-    logPerspectivesError (Custom $ show e)
+    -- logPerspectivesError (Custom $ show e)
     pure Nothing
 
 entityExists :: forall a i. Persistent a i => i -> MonadPerspectives Boolean
 entityExists id = catchError ((getPerspectEntiteit id) >>= (pure <<< const true))
   \e ->  do 
-    logPerspectivesError (Custom $ show e)
+    -- logPerspectivesError (Custom $ show e)
     pure false
 
 -- | Remove from Couchdb if possible and remove from the cache, too.
