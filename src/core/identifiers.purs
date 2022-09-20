@@ -253,6 +253,17 @@ publicResourceIdentifier2database s = let
 publicResourceIdentifier2database_ :: Partial => String -> String
 publicResourceIdentifier2database_ = fromJust <<< publicResourceIdentifier2database
 
+publicResourceIdentifier2repository :: String -> Maybe String
+publicResourceIdentifier2repository s = let
+    (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
+    (authority :: (Maybe String)) = join $ join $ flip index 1 <$> matches
+    (database :: (Maybe String)) = join $ join $ flip index 2 <$> matches
+  in
+    append <$> Just "https://" <*> (append <$> authority <*> (append <$> (Just "/") <*> (append <$> database <*> Just "/")))
+
+publicResourceIdentifier2repository_ :: Partial => String -> String
+publicResourceIdentifier2repository_ = fromJust <<< publicResourceIdentifier2repository
+
 -- | From the identification of a resource, return the identifier of the resource in Couchdb.
 couchdbResourceIdentifier :: String -> String
 couchdbResourceIdentifier s = if isUrl s

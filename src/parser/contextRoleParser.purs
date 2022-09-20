@@ -45,7 +45,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
-import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol, isPublicResource, publicResourceIdentifier2Authority_, publicResourceIdentifier2LocalName_)
+import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol, isPublicResource, publicResourceIdentifier2LocalName_, publicResourceIdentifier2repository_)
 import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Names (getUserIdentifier)
@@ -146,7 +146,7 @@ publicResourceIdentifier :: IP QualifiedName
 publicResourceIdentifier = try $ lexeme do
   s <- urlLetterString
   if isPublicResource s
-    then pure $ QualifiedName (unsafePartial publicResourceIdentifier2Authority_ s) (unsafePartial publicResourceIdentifier2LocalName_ s)
+    then pure $ QualifiedName (unsafePartial publicResourceIdentifier2repository_ s) (unsafePartial publicResourceIdentifier2LocalName_ s)
     else fail "Expected a string of the form 'https://some.domain/path'."
 
 -- domeinName = 'model:' upper alphaNum* '$'
