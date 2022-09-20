@@ -19,7 +19,7 @@ sys:PerspectivesSystem sys:MySystem
 		$Name = "data"
 	$Databases => ()
 		$Name = "models"
-	$BaseRepository => https://perspectives.domains/cw_servers_and_repositories/perspectives_domains$External
+	$BaseRepository => https://perspectives.domains/cw_servers_and_repositories/perspectives_domains
 	$ModelsInUse =>
 		sys:Model usr:PerspectivesSystemModel
 			extern sys:RootContext$External$Name = "Perspectives System"
