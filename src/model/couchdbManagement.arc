@@ -3,10 +3,10 @@
 domain CouchdbManagement
   use sys for model:System
   use cm for model:CouchdbManagement
-  use mod for model:Models
   use acc for model:BodiesWithAccounts
   use cdb for model:Couchdb
   use util for model:Utilities
+  use p for model:Parsing
 
   -------------------------------------------------------------------------------
   ---- MODEL
@@ -68,7 +68,6 @@ domain CouchdbManagement
           do for Manager
             bind context >> Manager to PManager in binding >> context
 
-
     -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
     -- filled with CouchdbManagementApp$Admin.
     -- Also, the public database "servers_and_repositories" is created on the CouchdbServer_.
@@ -100,9 +99,14 @@ domain CouchdbManagement
             -- Notice that Pouchdb only creates a database if it does not yet exist.
             -- This allows us to reconnect to a CouchdbServer_ if its CouchdbServer had been lost.
             AuthorizedDomain = ServerUrl for context >> PManager
+            -- Adds credentials to Perspectives State; not to the Couchdb_!
             callEffect cdb:AddCredentials( ServerUrl, context >> PManager >> Password)
             callEffect cdb:CreateCouchdbDatabase( ServerUrl, "cw_servers_and_repositories" )
+            callEffect cdb:MakeDatabasePublic( ServerUrl, "cw_servers_and_repositories" )
             HasDatabase = true
+      on exit
+        do for PManager
+          callEffect cdb:DeleteCouchdbDatabase( ServerUrl, "cw_servers_and_repositories" )
 
     user PManager filledBy sys:PerspectivesSystem$User
       aspect acc:WithCredentials
@@ -166,7 +170,7 @@ domain CouchdbManagement
         props (Endorsed, IsPublic, AdminLastName) verbs (Consult)
         props (IsPublic, RepositoryName) verbs (SetPropertyValue)
         in object state WithoutExternalDatabase
-          props (Endorsed, Name) verbs (SetPropertyValue)
+          props (Endorsed) verbs (SetPropertyValue)
         in object state WithExternalDatabase
           props (IsPublic) verbs (SetPropertyValue)
       
@@ -299,18 +303,39 @@ domain CouchdbManagement
           do for Admin
             letA
               baseurl <- context >> extern >> Url
-              readdb <- "models_" + Name
-              writedb <- "models_" + Name + "_write"
+              readmodels <- "models_" + Name
+              writemodels <- "models_" + Name + "_write"
+              readinstances <- "cw_" + Name
+              writeinstances <- "cw_" + Name + "_write"
             in 
-              callEffect cdb:CreateCouchdbDatabase( baseurl, readdb )
-              callEffect cdb:CreateCouchdbDatabase( baseurl, writedb )
-              callEffect cdb:ReplicateContinuously( baseurl, readdb, writedb, readdb )
+              -- models
+              callEffect cdb:CreateCouchdbDatabase( baseurl, readmodels )
+              callEffect cdb:MakeDatabasePublic( baseurl, readmodels )
+              callEffect cdb:CreateCouchdbDatabase( baseurl, writemodels )
+              callEffect cdb:ReplicateContinuously( baseurl, writemodels, readmodels )
+              -- instances
+              callEffect cdb:CreateCouchdbDatabase( baseurl, readinstances )
+              callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
+              callEffect cdb:CreateCouchdbDatabase( baseurl, writeinstances )
+              callEffect cdb:ReplicateContinuously( baseurl, writeinstances, readinstances )
         on exit
           do for Admin
-            callEffect cdb:EndReplication( context >> extern >> Url, Name + "_write", Name + "_read" )
-            callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_read" )
-            callEffect cdb:DeleteCouchdbDatabase( context >> extern >> Url, Name + "_write" )
-            remove role binding >> context >> Repository$Admin
+            letA
+              baseurl <- context >> extern >> Url
+              readmodels <- "models_" + Name
+              writemodels <- "models_" + Name + "_write"
+              readinstances <- "cw_" + Name
+              writeinstances <- "cw_" + Name + "_write"
+            in 
+              -- models
+              callEffect cdb:EndReplication( baseurl, writemodels, readmodels )
+              callEffect cdb:DeleteCouchdbDatabase( baseurl, readmodels )
+              callEffect cdb:DeleteCouchdbDatabase( baseurl, writemodels )
+              -- instances
+              callEffect cdb:EndReplication( baseurl, writeinstances, readinstances )
+              callEffect cdb:DeleteCouchdbDatabase( baseurl, readinstances )
+              callEffect cdb:DeleteCouchdbDatabase( baseurl, writeinstances )
+              remove role binding >> context >> Repository$Admin
 
       state WithoutExternalDatabase = (not exists Name) or not Endorsed
         -- Ad Admin may exist already if the Repository is created by Accounts.
@@ -339,9 +364,16 @@ domain CouchdbManagement
         -- However, the parser refuses (, ) and /.
         -- ^[a-z][a-z0-9_$()+/-]*$ according to https://docs.couchdb.org/en/3.2.0/api/database/common.html and https://localhost:6984//_utils/docs/api/database/common.html#specifying-the-document-id
         pattern = "[a-z]([a-z]|[0-9]|[_$+-])*" "Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, + and - are allowed. Must begin with a letter."
-      property ReadDb = "models_" + Name
-      property WriteDb = "models_" + Name + "_write"
-      property Url = binder Repositories >> context >> extern >> Url + Name
+      property ReadModels = "models_" + Name
+      property WriteModels = "models_" + Name + "_write"
+      property ReadInstances = "cw_" + Name
+      property WriteInstances = "cw_" + Name + "_write"
+      -- This equals the identifier of the Repository itself.
+      property RepositoryUrl = binder Repositories >> context >> extern >> Url + Name
+      -- The URL that identifies the models database for this repository (for reading).
+      property ModelsUrl = binder Repositories >> context >> extern >> Url + ReadModels + "/"
+      -- The URL that identifies the instances database for this repository (for reading).
+      property InstancesUrl = binder Repositories >> context >> extern >> Url + ReadInstances + "/"
       property AdminLastName = context >> Admin >> LastName
 
     -- We need the ServerAdmin in this context in order to configure the local Admin.
@@ -356,6 +388,9 @@ domain CouchdbManagement
       -- and to retract that again.
       aspect acc:Body$Admin
 
+      action CreateManifest
+        create role Manifests
+
       state IsFilled = exists binding
 
       on exit 
@@ -363,9 +398,16 @@ domain CouchdbManagement
 
       on exit of IsFilled
         do for ServerAdmin
-          callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> WriteDb, UserName )
-          callEffect cdb:RemoveAsAdminFromDb( context >> extern >> Url, context >> extern >> ReadDb, UserName )
-          remove role origin
+          letA
+            couchdbserverurl <- context >> extern >> binder Repositories >> context >> extern >> Url
+          in
+            -- models
+            callEffect cdb:RemoveAsAdminFromDb( couchdbserverurl, context >> extern >> WriteModels, UserName )
+            callEffect cdb:RemoveAsAdminFromDb( couchdbserverurl, context >> extern >> ReadModels, UserName )
+            -- instances
+            callEffect cdb:RemoveAsAdminFromDb( couchdbserverurl, context >> extern >> WriteInstances, UserName )
+            callEffect cdb:RemoveAsAdminFromDb( couchdbserverurl, context >> extern >> ReadInstances, UserName )
+            remove role origin
 
       on entry of IsFilled
         do for ServerAdmin
@@ -374,10 +416,14 @@ domain CouchdbManagement
           -- the current user is, indeed, a CouchdbServer$Admin.
           -- Hence the PDR will authenticate with Server Admin credentials.
           letA
-            url <- context >> extern >> binder Repositories >> context >> extern >> Url
+            couchdbserverurl <- context >> extern >> binder Repositories >> context >> extern >> Url
           in
-            callEffect cdb:MakeAdminOfDb( url, context >> extern >> WriteDb, UserName )
-            callEffect cdb:MakeAdminOfDb( url, context >> extern >> ReadDb, UserName )
+            -- models
+            callEffect cdb:MakeAdminOfDb( couchdbserverurl, context >> extern >> WriteModels, UserName )
+            callEffect cdb:MakeAdminOfDb( couchdbserverurl, context >> extern >> ReadModels, UserName )
+            -- instances
+            callEffect cdb:MakeAdminOfDb( couchdbserverurl, context >> extern >> WriteInstances, UserName )
+            callEffect cdb:MakeAdminOfDb( couchdbserverurl, context >> extern >> ReadInstances, UserName )
 
       -- The admin can also create an Author and give him/her the right to add and
       -- remove models to the repo.
@@ -390,9 +436,11 @@ domain CouchdbManagement
 
       -- The Admin can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
-      perspective on sys:ManifestCollection$Manifests
-        props (ModelName) verbs (Consult)
-      
+      perspective on Manifests
+        only (Create, Delete)
+        props (ModelName) verbs (SetPropertyValue)
+        props (Description) verbs (Consult)
+
       screen "Repository"
         tab "This repository"
           row 
@@ -407,22 +455,25 @@ domain CouchdbManagement
             table Authors
         tab "Manifests"
           row
-            table sys:ManifestCollection$Manifests
+            table Manifests
       
     -- This role should be stored in private space.
     -- TODO. Is het mogelijk ook deze rol het aspect acc:Body$Accounts te geven?
     -- Guest kan dan kiezen of hij een Account wil, of een Author wil worden.
     user Authors (relational) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
-      aspect sys:ManifestCollection$Manager
       on exit 
         notify "You are no longer an Author of the repository { context >> extern >> Name }."
       on exit of IsFilled
         do for Admin
           letA
-            url <- context >> extern >> binder Repositories >> context >> extern >> Url
+            couchdbserverurl <- context >> extern >> binder Repositories >> context >> extern >> Url
           in
-            callEffect cdb:RemoveAsMemberOf( url, context >> extern >> WriteDb, binding >> UserName)
-            callEffect cdb:RemoveAsMemberOf( url, context >> extern >> ReadDb, binding >> UserName)
+            -- models
+            callEffect cdb:RemoveAsMemberOf( couchdbserverurl, context >> extern >> WriteModels, binding >> UserName)
+            callEffect cdb:RemoveAsMemberOf( couchdbserverurl, context >> extern >> ReadModels, binding >> UserName)
+            -- instances
+            callEffect cdb:RemoveAsMemberOf( couchdbserverurl, context >> extern >> WriteInstances, binding >> UserName)
+            callEffect cdb:RemoveAsMemberOf( couchdbserverurl, context >> extern >> ReadInstances, binding >> UserName)
             remove role origin
 
       state IsFilled = exists binding
@@ -431,14 +482,18 @@ domain CouchdbManagement
             -- As only the PDR of a user with role Repository$Admin will execute this,
             -- and Repository$Admin is a Db Admin, this will be allowed in Couchdb.
             letA
-              url <- context >> extern >> binder Repositories >> context >> extern >> Url
+              couchdbserverurl <- context >> extern >> binder Repositories >> context >> extern >> Url
             in
-              callEffect cdb:MakeMemberOf( url, context >> extern >> WriteDb, binding >> UserName )
-              callEffect cdb:MakeMemberOf( url, context >> extern >> ReadDb, binding >> UserName )
+              -- models
+              callEffect cdb:MakeMemberOf( couchdbserverurl, context >> extern >> WriteModels, binding >> UserName )
+              callEffect cdb:MakeMemberOf( couchdbserverurl, context >> extern >> ReadModels, binding >> UserName )
+              -- instances
+              callEffect cdb:MakeMemberOf( couchdbserverurl, context >> extern >> WriteInstances, binding >> UserName )
+              callEffect cdb:MakeMemberOf( couchdbserverurl, context >> extern >> ReadInstances, binding >> UserName )
 
       -- The Authors can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
-      perspective on sys:ManifestCollection$Manifests
+      perspective on Manifests
         props (ModelName) verbs (Consult)
 
     -- This role should be stored in private space.
@@ -451,7 +506,7 @@ domain CouchdbManagement
         notify "You no longer have an Account with the repository { context >> extern >> Name }."
       on exit of IsFilled
         do for Admin
-          callEffect cdb:RemoveAsMemberOf( context >> extern >> Url, context >> extern >> ReadDb, binding >> UserName)
+          callEffect cdb:RemoveAsMemberOf( context >> extern >> binder Repositories >> context >> extern >> Url, context >> extern >> ReadModels, binding >> UserName)
           remove role origin
       
       state IsFilled = exists binding
@@ -459,11 +514,11 @@ domain CouchdbManagement
           do for Admin
             -- As only the PDR of a user with role Repository$Admin will execute this,
             -- and Repository$Admin is a Db Admin, this will be allowed.
-            callEffect cdb:MakeMemberOf( context >> extern >> Url, context >> extern >> ReadDb, binding >> UserName )
+            callEffect cdb:MakeMemberOf( context >> extern >> binder Repositories >> context >> extern >> Url, context >> extern >> ReadModels, binding >> UserName )
       
       -- in state acc:Body$Accounts$IsFilled$Accepted
       --   -- An account that is accepted has a perspective on available models.
-        perspective on sys:ManifestCollection$Manifests
+        perspective on Manifests
           props (ModelName) verbs (Consult)
 
     -- Note that the aspect acc:Body introduces a Guest role
@@ -471,5 +526,36 @@ domain CouchdbManagement
 
     -- This role should be stored in public space. These are all models that
     -- are stored in this Repository.
-    aspect context sys:ManifestCollection$Manifests
-      --storage public
+    context Manifests filledBy ModelManifest
+      aspect sys:ManifestCollection$Manifests
+      state ReadyToMake = (exists ModelName) and not exists binding
+        on entry
+          do for Admin
+            create_ context ModelManifest named (context >> extern >> InstancesUrl + ModelName) bound to origin
+            bind currentactor to Author in origin >> binding >> context
+
+
+  case ModelManifest
+    aspect sys:ModelManifest
+    external
+      aspect sys:ModelManifest$External
+      property ArcSource (mandatory, String)
+      property ArcFeedback (mandatory, String)
+      property ArcOK = ArcFeedback matches "^OK"
+      property SourcesChanged (Boolean)
+
+      state ReadyToCompile = (exists ArcSource)
+        perspective of Author
+          action RestoreState
+            ArcFeedback = "Explicitly restoring state"
+          action CompileArc
+            delete property ArcFeedback
+      state ProcessArc = (exists ArcSource) and not exists ArcFeedback
+        on entry
+          do for Author
+            ArcFeedback = callExternal p:ParseAndCompileArc( ArcSource ) returns String
+            SourcesChanged = true
+  
+    user Author filledBy sys:PerspectivesSystem$User
+      perspective on extern
+        props (ArcSource, ArcFeedback, Description, IsLibrary) verbs (SetPropertyValue)
