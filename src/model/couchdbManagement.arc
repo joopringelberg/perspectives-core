@@ -440,6 +440,9 @@ domain CouchdbManagement
         only (Create, Delete)
         props (ModelName) verbs (SetPropertyValue)
         props (Description) verbs (Consult)
+      
+      perspective on Manifests >> binding >> context >> Author
+        only (Create, Fill)
 
       screen "Repository"
         tab "This repository"
@@ -533,7 +536,6 @@ domain CouchdbManagement
           do for Admin
             create_ context ModelManifest named (context >> extern >> InstancesUrl + ModelName) bound to origin
             bind currentactor to Author in origin >> binding >> context
-
 
   case ModelManifest
     aspect sys:ModelManifest
