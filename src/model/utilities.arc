@@ -2,3 +2,6 @@
 domain Utilities
 
 -- Tuple "model:Utilities$GenSym" {func: unsafeCoerce genSym, nArgs: 0}
+-- Tuple "model:Utilities$RoleIdentifier" {func: unsafeCoerce roleIdentifier, nArgs: 0}
+--  Tuple "model:Utilities$ContextIdentifier" {func: unsafeCoerce contextIdentifier, nArgs: 0}
+-- Tuple "model:Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0}

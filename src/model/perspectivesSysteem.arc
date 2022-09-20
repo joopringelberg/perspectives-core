@@ -68,9 +68,9 @@ domain System
         view Modellen$ModelPresentation verbs (Consult)
       perspective on BasicModels
         action StartUsing
-          callEffect cdb:AddModelToLocalStore( ModelIdentification )
+          callEffect cdb:AddModelToLocalStore( binding >> context >> callExternal util:ContextIdentifier() returns String )
           bind origin to ModelManifestsInUse in currentcontext
-        props (Namespace, ModelName) verbs (SetPropertyValue)
+        props (ModelName, Description) verbs (Consult)
       perspective on ModelManifestsInUse
         props (Name, Description) verbs (Consult)
 
@@ -259,16 +259,12 @@ domain System
     user Me = filter (Initiator either ConnectedPartner) with filledBy sys:Me
     user You = filter (Initiator either ConnectedPartner) with not filledBy sys:Me
 
-  case ModelManifest public NAMESPACESTORE
+  case ModelManifest
     aspect sys:RootContext
     external
       aspect sys:RootContext$External
       property Description (mandatory, String)
-      property Url (mandatory, String)
       property IsLibrary (mandatory, Boolean)
-    user Author filledBy User
-      aspect sys:RootContext$RootUser
-      perspective on extern  
 
   -- This will become obsolete when we start using model:CouchdbManagement.
   case Model public NAMESPACESTORE
@@ -322,23 +318,8 @@ domain System
       perspective on Invitee
         only (Fill, Create)
 
-  -- To b used as Aspect in model:CouchdbManagement$Repository
+  -- To be used as Aspect in model:CouchdbManagement$Repository
   case ManifestCollection
     context Manifests (relational) filledBy ModelManifest
       -- e.g. "JoopsModel"
       property ModelName (String)
-      -- e.g. "model://joopringelberg.nl"
-      property Namespace (String)
-
-      property ModelIdentification = Namespace + "/" + ModelName
-      
-      state ReadyToMake = (exists ModelName) and (exists Namespace) and not exists binding
-
-      state Ready = exists binding
-    
-    user Manager filledBy sys:PerspectivesSystem$User
-      perspective on Manifests
-        in object state ReadyToMake
-          action CreateModel
-            create_ context ModelManifest named (Namespace + "/" + ModelName + ".json") bound to origin
-        props (Namespace, ModelName) verbs (SetPropertyValue)
