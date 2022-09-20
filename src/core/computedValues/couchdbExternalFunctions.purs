@@ -783,19 +783,27 @@ makeMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> Security
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
 removeAsMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
-removeAsMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {members = {names: ARR.delete userName <$> r.members.names, roles: r.admins.roles}}
+removeAsMemberOf = updateSecurityDocument 
+  \userName (SecurityDocument r) -> 
+    SecurityDocument r 
+      { members = 
+        { names: ARR.delete userName <$> r.members.names
+        , roles: r.admins.roles}}
 
 -- | Any user can read the documents (and write them too, though we will restrict this using Apache)
 -- | This involves removing both the `names` and the `roles` field from the members section.
 makeDatabasePublic :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
-makeDatabasePublic databaseUrls databaseNames roleId = updateSecurityDocument 
-  (\_ (SecurityDocument r) -> 
-    SecurityDocument r {members = {names: Nothing, roles: []}})
-  databaseUrls
-  databaseNames
-  []
-  roleId
-
+makeDatabasePublic databaseUrls databaseNames roleId = lift $
+  case head databaseUrls, head databaseNames of
+    Just databaseUrl, Just databaseName -> do 
+      SecurityDocument sdoc <- CDB.ensureSecurityDocument databaseUrl databaseName
+      CDB.setSecurityDocument 
+        databaseUrl 
+        databaseName 
+        (SecurityDocument $ sdoc { members = 
+          { names: Nothing
+          , roles: []}})
+    _, _ -> pure unit
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts
 resetPassword :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
