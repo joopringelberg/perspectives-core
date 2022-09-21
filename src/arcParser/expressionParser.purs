@@ -149,7 +149,7 @@ simpleStep = try
   <|>
   Simple <$> (SpecialisesRoleType <$> (getPosition <* reserved "specialisesRoleType") <*> arcIdentifier)
   <|>
-  Simple <$> (RegEx <$> getPosition <*> regexExpression)
+  Simple <$> (RegEx <$> (getPosition <* reserved "regexp") <*> regexExpression)
   -- VARIABLE MUST BE LAST!
   <|>
   Simple <$> (Variable <$> getPosition <*> lowerCaseName)

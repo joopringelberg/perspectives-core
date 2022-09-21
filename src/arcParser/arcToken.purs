@@ -105,6 +105,7 @@ perspectDef = LanguageDef
                   , "minExclusive"
                   , "totalDigits"
                   , "fractionDigits"
+                  , "regexp"
 
                   -- Perspectives
                   , "perspective"
