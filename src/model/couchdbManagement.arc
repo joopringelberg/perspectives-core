@@ -539,19 +539,26 @@ domain CouchdbManagement
 
   case ModelManifest
     aspect sys:ModelManifest
+    aspect sys:ContextWithNotification
+    state UploadToRepository = extern >> (ArcOK and SourcesChanged)
+      on entry
+        do for Author
+          callEffect p:UploadToRepository2( extern >> ArcSource )
+          SourcesChanged = false for extern
+        notify Author
+          "Model {extern >> ModelManifest$External$Name} has been uploaded to the repository {extern >> binder Manifests >> context >> extern >> Repository$External$Name}."
+
     external
       aspect sys:ModelManifest$External
+      property Name = binder Manifests >> ModelName
       property ArcSource (mandatory, String)
-      property ArcFeedback (mandatory, String)
-      property ArcOK = ArcFeedback matches "^OK"
+        minLength = 81 -- shows as a textarea
+      property ArcFeedback (String)
+      property ArcOK = ArcFeedback matches regexp "^OK"
       property SourcesChanged (Boolean)
 
       state ReadyToCompile = (exists ArcSource)
-        perspective of Author
-          action RestoreState
-            ArcFeedback = "Explicitly restoring state"
-          action CompileArc
-            delete property ArcFeedback
+
       state ProcessArc = (exists ArcSource) and not exists ArcFeedback
         on entry
           do for Author
@@ -560,4 +567,15 @@ domain CouchdbManagement
   
     user Author filledBy sys:PerspectivesSystem$User
       perspective on extern
-        props (ArcSource, ArcFeedback, Description, IsLibrary) verbs (SetPropertyValue)
+        props (ModelManifest$External$Name, ArcOK) verbs (Consult)
+        props (ArcSource, ArcFeedback, IsLibrary, Description) verbs (SetPropertyValue)
+
+        in object state ReadyToCompile
+          action RestoreState
+            ArcFeedback = "Explicitly restoring state"
+          action CompileArc
+            delete property ArcFeedback
+      
+      screen "Manifest"
+        row
+          form External
