@@ -113,6 +113,22 @@ uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crl
         else lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelName2NamespaceStore namespace)
   _, _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
+-- | Parse and compile the Arc file. Upload to the repository.
+-- | If the file is not valid, nothing happens.
+uploadToRepository2 ::
+  Array ArcSource ->
+  Array RoleInstance -> MonadPerspectivesTransaction Unit
+uploadToRepository2 arcSource_ _ = case head arcSource_ of
+  Just arcSource -> do
+    r <- loadAndCompileArcFile_ arcSource
+    case r of
+      Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
+      -- PROBABLY: STORE IN CACHE. model identification?
+      Right df@(DomeinFile {_id, namespace}) -> do
+        lift $ void $ storeDomeinFileInCache _id df
+        lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelName2NamespaceStore namespace)
+  _ -> logPerspectivesError $ Custom ("uploadToRepository2 lacks arguments")
+
 -- | Parse and compile all models found at the URL.
 compileRepositoryModels ::
   Array Url ->
@@ -128,5 +144,6 @@ externalFunctions =
   [ Tuple "model:Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1}
   , Tuple "model:Parsing$ParseAndCompileCrl" {func: unsafeCoerce parseAndCompileCrl, nArgs: 1}
   , Tuple "model:Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 3}
+  , Tuple "model:Parsing$UploadToRepository2" {func: unsafeCoerce uploadToRepository2, nArgs: 1}
   , Tuple "model:Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1}
 ]

@@ -25,6 +25,10 @@
 module Perspectives.Extern.Utilities where
 
 import Control.Monad.Trans.Class (lift)
+import Data.Array (head)
+import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..), Replacement(..))
+import Data.String (replace) as String
 import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
@@ -46,6 +50,11 @@ contextIdentifier (ContextInstance id) = pure id
 systemIdentifier :: RoleInstance -> MonadPerspectivesQuery String
 systemIdentifier _ = lift $ lift getSystemIdentifier
 
+replace :: Array String -> Array String -> String -> MonadPerspectivesQuery String
+replace patterns replacements value = case head patterns, head replacements of
+  Just pattern, Just replacement -> pure $ String.replace (Pattern pattern) (Replacement replacement) value
+  _, _ -> pure value
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -54,4 +63,5 @@ externalFunctions =
   , Tuple "model:Utilities$RoleIdentifier" {func: unsafeCoerce roleIdentifier, nArgs: 0}
   , Tuple "model:Utilities$ContextIdentifier" {func: unsafeCoerce contextIdentifier, nArgs: 0}
   , Tuple "model:Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0}
+  , Tuple "model:Utilities$Replace" {func: unsafeCoerce replace, nArgs: 2}
   ]
