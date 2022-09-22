@@ -68,11 +68,12 @@ domain System
         view Modellen$ModelPresentation verbs (Consult)
       perspective on BasicModels
         action StartUsing
-          callEffect cdb:AddModelToLocalStore( binding >> context >> callExternal util:ContextIdentifier() returns String )
-          bind origin to ModelManifestsInUse in currentcontext
+          callEffect cdb:AddModelToLocalStore( binding >> context >> extern >> ModelIdentifier )
+          bind origin >> binding to BasicModelsInUse in currentcontext
         props (ModelName, Description) verbs (Consult)
-      perspective on ModelManifestsInUse
-        props (Name, Description) verbs (Consult)
+      perspective on BasicModelsInUse
+        only (Remove)
+        props (ModelIdentifier, Description) verbs (Consult)
 
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
@@ -95,8 +96,8 @@ domain System
           row
             table BasicModels
           row 
-            table ModelManifestsInUse
-              props (Name) verbs (Consult)
+            table BasicModelsInUse
+              props (ModelIdentifier) verbs (Consult)
         tab "Start contexts"
           row
             table IndexedContexts
@@ -115,11 +116,18 @@ domain System
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
+    user Installer
+      perspective on IndexedContexts
+        only (CreateAndFill)
+
     context BaseRepository filledBy ManifestCollection
 
     context BasicModels = BaseRepository >> binding >> context >> Manifests
 
-    context ModelManifestsInUse (relational) filledBy sys:ModelManifest
+    context BasicModelsInUse (relational) filledBy sys:ModelManifest
+      on exit
+        do for User
+          callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelIdentifier )
 
     -- OBSOLETE!? OF SPEELT SYNCHRONISATIE HIER EEN ROL?
     context IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
@@ -259,12 +267,6 @@ domain System
     user Me = filter (Initiator either ConnectedPartner) with filledBy sys:Me
     user You = filter (Initiator either ConnectedPartner) with not filledBy sys:Me
 
-  case ModelManifest
-    aspect sys:RootContext
-    external
-      aspect sys:RootContext$External
-      property Description (mandatory, String)
-      property IsLibrary (mandatory, Boolean)
 
   -- This will become obsolete when we start using model:CouchdbManagement.
   case Model public NAMESPACESTORE
@@ -323,3 +325,11 @@ domain System
     context Manifests (relational) filledBy ModelManifest
       -- e.g. "JoopsModel"
       property ModelName (String)
+
+  case ModelManifest
+    aspect sys:RootContext
+    external
+      aspect sys:RootContext$External
+      property Description (mandatory, String)
+      property IsLibrary (mandatory, Boolean)
+      property ModelIdentifier (String)

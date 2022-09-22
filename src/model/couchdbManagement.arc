@@ -27,6 +27,11 @@ domain CouchdbManagement
     aspect sys:RootContext
     external
       aspect sys:RootContext$External
+    
+    on exit
+      do for Manager
+        delete context bound to PrivatelyManagedServers
+        delete context bound to CouchdbServers
 
     -- Every user manages his own CouchdbServers.
     -- This manager should be the Server admin of each CouchdbServer,
@@ -34,7 +39,7 @@ domain CouchdbManagement
     -- Becoming a Couchdb Server Admin should be managed outside Perspectives.
     user Manager = sys:Me
       perspective on CouchdbServers
-        only (CreateAndFill, Remove)
+        only (CreateAndFill, Remove, Delete)
         props (Name, Url) verbs (Consult)
         action CreateServer
           create role CouchdbServers
@@ -46,7 +51,7 @@ domain CouchdbManagement
       
       perspective on PrivatelyManagedServers
         props (ServerName) verbs (Consult)
-        only (CreateAndFill, Remove)
+        only (CreateAndFill, Remove, Delete)
         in object state Ready
           action CreateCouchdbServer
             letA 
@@ -152,6 +157,10 @@ domain CouchdbManagement
             bind origin to CouchdbServers in cm:MyCouchdbApp
           notify Accounts
             "You now have an account with CouchdbServer {Name}"
+
+    on exit
+      do for Admin
+        delete context bound to Repositories
 
     -- This role should be in private space.
     -- Admin in Couchdb of a particular server.
@@ -353,9 +362,7 @@ domain CouchdbManagement
   case Repository
     aspect acc:Body
     aspect sys:ManifestCollection
-    --storage public
-    -- on exit
-      -- Verwijder de inhoud?
+
     external
       -- Only public repositories will be visible to Accounts of CouchdbServers.
       property IsPublic (mandatory, Boolean)
@@ -376,6 +383,10 @@ domain CouchdbManagement
       -- The URL that identifies the instances database for this repository (for reading).
       property InstancesUrl = binder Repositories >> context >> extern >> Url + ReadInstances + "/"
       property AdminLastName = context >> Admin >> LastName
+
+    on exit
+      do for Admin
+        delete context bound to Manifests
 
     -- We need the ServerAdmin in this context in order to configure the local Admin.
     user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin
@@ -438,7 +449,7 @@ domain CouchdbManagement
       -- The Admin can, of course, consult all models that are stored locally
       -- or in contributing Repositories.
       perspective on Manifests
-        only (Create, Delete)
+        only (Create, Delete, Remove)
         props (ModelName) verbs (SetPropertyValue)
         props (Description) verbs (Consult)
       
@@ -555,9 +566,13 @@ domain CouchdbManagement
       property ArcSource (mandatory, String)
         minLength = 81 -- shows as a textarea
       property ArcFeedback (String)
+        minLength = 81
       property ArcOK = ArcFeedback matches regexp "^OK"
       property SourcesChanged (Boolean)
-      property ModelIdentifier = "model://" +  binder Manifests >> context >> extern >> Authority + "/" + ModelManifest$External$Name
+
+      on entry
+        do for Author
+          ModelIdentifier = "model://" +  binder Manifests >> context >> extern >> Authority + "/" + ModelManifest$External$Name
 
       state ReadyToCompile = (exists ArcSource)
 
@@ -569,7 +584,7 @@ domain CouchdbManagement
   
     user Author filledBy sys:PerspectivesSystem$User
       perspective on extern
-        props (ModelIdentifier, ArcOK) verbs (Consult)
+        props (ModelManifest$External$Name, ModelIdentifier, ArcOK) verbs (Consult)
         props (ArcSource, ArcFeedback, IsLibrary, Description) verbs (SetPropertyValue)
 
         in object state ReadyToCompile
@@ -577,7 +592,20 @@ domain CouchdbManagement
             ArcFeedback = "Explicitly restoring state"
           action CompileArc
             delete property ArcFeedback
+
+      -- action StartUsing
+      --   callEffect cdb:AddModelToLocalStore( extern >> ModelIdentifier )
+      --   bind extern to BasicModelsInUse in sys:MySystem
       
       screen "Manifest"
         row
           form External
+
+    user Visitor = sys:Me
+      perspective on extern
+        props (ModelIdentifier, Description) verbs (Consult)
+      -- perspective on sys:PerspectivesSystem >> ModelManifestsInUse
+      --   only (CreateAndFill)
+      -- action StartUsing
+      --   callEffect cdb:AddModelToLocalStore( extern >> ModelIdentifier )
+      --   bind extern to BasicModelsInUse in sys:MySystem

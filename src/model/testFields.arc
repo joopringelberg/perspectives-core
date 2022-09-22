@@ -5,37 +5,33 @@ domain model://perspectives.domains/TestFields
   use sys for model:System
   use tf for model:TestFields
 
-  user Installer = sys:Me
-  -- TODO. Een perspectief moet op een rol zijn! Hier beschrijf ik een perspectief op een context.
-  --   perspective on TestFieldsApp
-  --     only (Create)
-  --     props (Name) verbs (SetPropertyValue)
-  --   perspective on TestFieldsApp >> Tester
-  --     only (Fill)
+  state ReadyToInstall = exists sys:PerspectivesSystem$Installer
+    on entry
+      do for sys:PerspectivesSystem$Installer
+        letA
+          -- We must first create the context and then later bind it.
+          -- If we try to create and bind it in a single statement, 
+          -- we find that the Installer can just create RootContexts
+          -- as they are the allowed binding of IndexedContexts.
+          -- As a consequence, no context is created.
+          app <- create context TestFieldsApp
+        in
+          -- Being a RootContext, too, Installer can fill a new instance
+          -- of IndexedContexts with it.
+          bind app >> extern to IndexedContexts in sys:MySystem
+          Name = "TestFields Management" for app >> extern
 
-  on entry
-    do for Installer
-      letA
-        app <- create context TestFieldsApp bound to IndexedContexts of sys:MySystem
-      in
-        Name = "TestFields Management" for app >> extern
-        bind sys:Me to Tester in app
-
-  -- The model description case.
-  case Model
-    aspect sys:Model
-    external
-      aspect sys:Model$External
+  aspect user sys:PerspectivesSystem$Installer
 
   -- The entry point (the `application`), available as tf:TheTestFields.
   case TestFieldsApp
     indexed tf:TheTestFields
     aspect sys:RootContext
+
     external
       aspect sys:RootContext$External
-
-    user Tester filledBy sys:PerspectivesSystem$User
-      indexed com:Tester
+    
+    user Tester = sys:Me
       perspective on TestRole
         props (Text, Bool, ADateTime, ANumber, AnEmail, WeekDay, Appel) verbs (Consult, SetPropertyValue)
         only (Remove, Create)
