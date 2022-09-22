@@ -575,11 +575,7 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
 constructContextIdentifier :: ContextType -> Maybe String -> MonadPerspectivesTransaction String
 constructContextIdentifier ctype@(ContextType cname) mlocalName = do
   localName <- case mlocalName of 
-      Nothing -> do
-        mindexedName <- lift $ indexedContextName ctype 
-        case mindexedName of 
-          Nothing -> show <$> liftEffect guid
-          Just indexedName -> pure $ unwrap indexedName
+      Nothing -> show <$> liftEffect guid
       Just n -> pure n
   if isPublicResource localName
     then pure localName

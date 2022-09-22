@@ -76,7 +76,7 @@ import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedR
 import Perspectives.SaveUserData (removeBinding, setBinding, setFirstBinding, scheduleRoleRemoval, scheduleContextRemoval)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, getPublicStore_, hasContextAspect, indexedContextName, isDatabaseQueryRole)
+import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, getPublicStore_, hasContextAspect, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Deletes, from all contexts, the role instance.
@@ -560,11 +560,7 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
 constructContextIdentifier :: ContextType -> Maybe String -> MonadPerspectivesTransaction String
 constructContextIdentifier ctype@(ContextType cname) mlocalName = do
   localName <- case mlocalName of 
-      Nothing -> do
-        mindexedName <- lift $ indexedContextName ctype 
-        case mindexedName of 
-          Nothing -> show <$> liftEffect guid
-          Just indexedName -> pure $ unwrap indexedName
+      Nothing -> show <$> liftEffect guid
       Just n -> pure n
   if isPublicResource localName
     then pure localName
