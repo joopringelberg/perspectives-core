@@ -64,14 +64,14 @@ import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, rol_binding, rol_context, rol_isMe, rol_pspType)
+import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findMeRequests, findResourceDependencies, findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, deconstructNamespace_, isExternalRole)
+import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, getProperty, getUnlinkedRoleInstances, isMe)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
@@ -80,6 +80,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
@@ -636,91 +637,3 @@ changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filled
                 then roleIsMe filledId (rol_context filled) -- Set isMe of the role and set the role to Me of the context.
                 else pure unit
 
--- | In the context of the roleInstance, find the role that is me and set its isMe to true.
--- | Set the me of the context to that role.
--- | If not found, set me of the context to Nothing.
--- | Invariant: roleId was the previous value of me of contextId at the time of calling.
-lookForAlternativeMe :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
-lookForAlternativeMe roleId contextId = (lift $ try $ getPerspectContext contextId) >>=
-  handlePerspectContextError "lookForAlternativeMe"
-    \ctxt -> do
-      mmyType <- lift (contextId ##> getMyType)
-      case mmyType of
-        Nothing -> cacheAndSave contextId (changeContext_me ctxt Nothing)
-        Just myType -> do
-          mme <- lift (contextId ##> getRoleInstances myType)
-          case mme of
-            Nothing -> cacheAndSave contextId (changeContext_me ctxt Nothing)
-            Just me -> roleIsMe me contextId
-
--- | Set isMe of the roleInstance to false.
-roleIsNotMe :: RoleInstance -> MonadPerspectivesTransaction Unit
-roleIsNotMe roleId = (lift $ try $ getPerspectRol roleId) >>=
-  handlePerspectRolError "roleIsNotMe"
-    \role -> do
-      cacheAndSave roleId (changeRol_isMe role false)
-
--- | Set isMe of the roleInstance to true.
--- | Set me of the context to the roleInstance.
-roleIsMe :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
-roleIsMe roleId contextId = (lift $ try $ getPerspectContext contextId) >>=
-  handlePerspectContextError "roleIsMe"
-    \ctxt -> (lift $ try $ getPerspectRol roleId) >>=
-      handlePerspectRolError "roleIsMe"
-        \role -> do
-          (lift $ findMeRequests contextId)  >>= addCorrelationIdentifiersToTransactie
-          cacheAndSave roleId (changeRol_isMe role true)
-          cacheAndSave contextId (changeContext_me ctxt (Just roleId))
-
--- | <fillerId> `fillerNoLongerPointsTo` <filledId>
--- | Break the link from filler to filled (FILLS link)
--- | (Remove from the filledRoles, in other words: change filler)
--- | Not the other way round!
--- | Removes filled from filledRoles of filler (because filler no longer fills filled).
--- | This function takes care of
--- | PERSISTENCE
-fillerNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
-fillerNoLongerPointsTo fillerId filledId = (lift $ try $ getPerspectEntiteit fillerId) >>=
-  handlePerspectRolError' "fillerNoLongerPointsTo" unit
-    \(filler :: PerspectRol) -> (lift $ try $ getPerspectEntiteit filledId) >>=
-      handlePerspectRolError "fillerNoLongerPointsTo"
-      \(filled :: PerspectRol) -> do
-        filledContextType <- lift (rol_context filled ##>> contextType)
-        filler' <- pure $ (removeRol_gevuldeRollen filler filledContextType (rol_pspType filled) filledId)
-        cacheAndSave fillerId filler'
-
--- | <fillerId> `fillerPointsTo` <filledId>
--- | Add the link from filler to filled (FILLS link)
--- | (Add to the filledRoles, in other words: change filler)
--- | Not the other way round!
--- | Adds filled from filledRoles of filler (because filler now fills filled).
--- | This function takes care of
--- | PERSISTENCE
-fillerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
-fillerPointsTo fillerId filledId = (lift $ try $ getPerspectEntiteit fillerId) >>=
-  handlePerspectRolError' "fillerNoLongerPointsTo" unit
-    \(filler :: PerspectRol) -> (lift $ try $ getPerspectEntiteit filledId) >>=
-      handlePerspectRolError' "fillerNoLongerPointsTo" unit
-      \(filled :: PerspectRol) -> do
-        filledContextType <- lift (rol_context filled ##>> contextType)
-        filler' <- lift (addRol_gevuldeRollen filler filledContextType (rol_pspType filled) filledId)
-        cacheAndSave fillerId filler'
-
--- | <filledId> `filledNoLongerPointsTo` <fillerId>
--- | Break the link from Filled to Filler (FILLEDBY link).
--- | Not the other way round!
--- | (Remove the binding, in other words: change filled. Also removes the bindingDelta.)
--- | NOTE: the second argument is currently useless, but we anticipate with it on multiple fillers.
-filledNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
-filledNoLongerPointsTo filledId fillerId = (lift $ try $ getPerspectEntiteit filledId) >>=
-  handlePerspectRolError' "filledNoLongerPointsTo" unit
-    \(filled :: PerspectRol) -> cacheAndSave filledId (removeRol_binding filled)
-
--- | <filledId> `filledPointsTo` <fillerId>
--- | Add the link from Filled to Filler (FILLEDBY link).
--- | Not the other way round!
--- | (Insert the binding, in other words: change filled)
-filledPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
-filledPointsTo filledId fillerId = (lift $ try $ getPerspectEntiteit filledId) >>=
-  handlePerspectRolError' "filledPointsTo" unit
-    \(filled :: PerspectRol) -> cacheAndSave filledId (changeRol_binding fillerId filled)

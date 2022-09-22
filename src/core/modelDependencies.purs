@@ -31,6 +31,9 @@ userChannel = "model:System$PerspectivesSystem$User$Channel"
 roleWithId :: String
 roleWithId = "model:System$RoleWithId$Id"
 
+installer :: String
+installer = "model:System$PerspectivesSystem$Installer"
+
 ------------------------------------------------------------------------------------
 -- ROOTCONTEXT
 ------------------------------------------------------------------------------------

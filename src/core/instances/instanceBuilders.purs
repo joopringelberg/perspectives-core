@@ -48,18 +48,17 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), snd)
-import Foreign.Generic (encodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.Update (addRoleInstanceToContext, getAuthor, getSubject, setProperty)
-import Perspectives.Authenticate (sign)
-import Perspectives.ContextAndRole (defaultRolRecord, getNextRolIndex, rol_padOccurrence)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
-import Perspectives.Deltas (addCreatedContextToTransaction, addCreatedRoleToTransaction, deltaIndex, insertDelta)
+import Perspectives.Assignment.Update (addRoleInstanceToContext, setProperty)
+import Perspectives.ContextAndRole (getNextRolIndex, rol_padOccurrence)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
+import Perspectives.Deltas (addCreatedContextToTransaction, deltaIndex, insertDelta)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.Identifiers (deconstructLocalName, deconstructModelName, isQualifiedWithDomein, isUrl)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
+import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Arc.PhaseTwo (addNamespace)
@@ -67,17 +66,12 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Persistent.PublicStore (mapPublicStore)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
-import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole)
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (setFirstBinding)
-import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
-import Perspectives.Sync.SignedDelta (SignedDelta(..))
-import Perspectives.Types.ObjectGetters (getPublicStore_, roleAspectsClosure)
-import Perspectives.TypesForDeltas (UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.Types.ObjectGetters (getPublicStore_)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<>), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
@@ -199,9 +193,8 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
   where
     go :: Boolean -> MonadPerspectivesTransaction (Maybe RoleInstance)
     go isMe = do
-      contextInstanceId <- ContextInstance <$> (lift $ expandDefaultNamespaces contextId)
+      contextInstanceId <- ContextInstance <$> (lift $ expandDefaultNamespaces contextId) 
       rolInstances <- lift (contextInstanceId ##= getRoleInstances (ENR roleType))
-      (EnumeratedRole{kindOfRole}) <- lift $ getEnumeratedRole roleType
       -- SYNCHRONISATION by UniverseRoleDelta
       (PerspectRol r@{_id:roleInstance}) <- case mRoleId of
         Nothing -> do
@@ -228,36 +221,3 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
       pure $ Just roleInstance
 
 
--- | `localName` should be the local name of the roleType.
--- | The role instance is cached.
-constructEmptyRole ::
-  ContextInstance ->
-  EnumeratedRoleType ->
-  Int ->
-  RoleInstance ->
-  MonadPerspectivesTransaction PerspectRol
-constructEmptyRole contextInstance roleType i rolInstanceId = do
-  author <- getAuthor
-  subject <- getSubject
-  allTypes <- lift (roleType ###= roleAspectsClosure)
-  role <- pure (PerspectRol defaultRolRecord
-    { _id = rolInstanceId
-    , pspType = roleType
-    , allTypes = allTypes
-    , context = contextInstance
-    , occurrence = i
-    , universeRoleDelta =
-        SignedDelta
-          { author
-          , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
-            { id: contextInstance
-            , roleInstances: (SNEA.singleton rolInstanceId)
-            , roleType
-            , authorizedRole: Nothing
-            , deltaType: ConstructEmptyRole
-            , subject } }
-    , states = [StateIdentifier $ unwrap roleType]
-    })
-  void $ lift $ cacheEntity rolInstanceId role
-  addCreatedRoleToTransaction rolInstanceId
-  pure role
