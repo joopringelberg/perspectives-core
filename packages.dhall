@@ -63,7 +63,7 @@ in  upstream
     , repo =
        "https://github.com/joopringelberg/perspectives-apitypes.git"
     , version =
-        "v2.13.2"
+        "v2.13.3"
     }
 
   with perspectives-utilities =
@@ -77,11 +77,12 @@ in  upstream
       , "maybe"
       , "transformers"
       , "tuples"
+      , "ordered-collections"
       ]
     , repo =
         "https://github.com/joopringelberg/perspectives-utilities.git"
     , version =
-        "v1.0.0"
+        "v1.1.0"
     }
 
   with serializablenonemptyarray =
@@ -104,7 +105,7 @@ in  upstream
     , repo =
         "https://github.com/joopringelberg/serialisable-nonempty-arrays.git"
     , version =
-        "v1.0.1"
+        "v1.1.0"
     }
 
   with perspectives-couchdb =

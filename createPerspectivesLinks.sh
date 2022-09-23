@@ -34,28 +34,28 @@ ln -s ../../../purescript-kishimen v1.1.0
 
 cd ..
 
-#### PERSPECTIVES-v2.13.2 #####
+#### PERSPECTIVES-v2.13.3 #####
 cd apitypes
 
-rm -Rf v2.13.2
+rm -Rf v2.13.3
 
-ln -s ../../../perspectives-apitypes v2.13.2
+ln -s ../../../perspectives-apitypes v2.13.3
 
 cd ..
 
-##### PERSPECTIVES-v1.0.0
+##### PERSPECTIVES-v1.1.0
 cd perspectives-utilities
 
-rm -Rf v v1.0.0
-ln -s ../../../perspectives-utilities v1.0.0
+rm -Rf v v1.1.0
+ln -s ../../../perspectives-utilities v1.1.0
 
 cd ..
 
 ##### SERIALISABLE-NONEMPTY-ARRAYS
 cd serializablenonemptyarray
 
-rm -Rf v v1.0.1
-ln -s ../../../serialisable-nonempty-arrays v1.0.1
+rm -Rf v v1.1.0
+ln -s ../../../serialisable-nonempty-arrays v1.1.0
 
 cd ..
 
