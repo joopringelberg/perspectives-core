@@ -83,8 +83,7 @@ domain System
       screen "Home"
         tab "SystemCaches"
           row
-            column
-              form SystemCaches
+            form SystemCaches
         tab "Manage models"
           row
             table Modellen
