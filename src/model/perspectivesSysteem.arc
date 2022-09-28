@@ -10,6 +10,11 @@ domain System
   thing RoleWithId
     property Id = callExternal util:RoleIdentifier() returns String
 
+  user WithCredentials filledBy sys:PerspectivesSystem$User
+    property UserName = callExternal util:SystemIdentifier() returns String
+    property Password (String)
+    property AuthorizedDomain (String)
+
   case PerspectivesSystem
     indexed sys:MySystem
     aspect sys:RootContext

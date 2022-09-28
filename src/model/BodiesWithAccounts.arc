@@ -11,11 +11,6 @@ domain BodiesWithAccounts
   use bwa for model:BodiesWithAccounts
   use util for model:Utilities
 
-  user WithCredentials filledBy sys:PerspectivesSystem$User
-    property UserName = callExternal util:SystemIdentifier() returns String
-    property Password (String)
-    property AuthorizedDomain (String)
-
   -- The model description case.
   -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
   case Model
@@ -35,7 +30,7 @@ domain BodiesWithAccounts
 
     -- Admin can always create and fill Accounts and see the UserName.
     user Admin filledBy sys:PerspectivesSystem$User
-      aspect bwa:WithCredentials
+      aspect sys:WithCredentials
 
       perspective on Accounts
         only (Create, Fill, Remove)
@@ -79,7 +74,7 @@ domain BodiesWithAccounts
     -- loading all references at once with the context.
     -- Specialisation may restrict their fillers.
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
-      aspect bwa:WithCredentials
+      aspect sys:WithCredentials
       property IsAccepted (Boolean)
       property IsRejected (Boolean)
 

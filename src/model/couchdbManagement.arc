@@ -114,7 +114,7 @@ domain CouchdbManagement
           callEffect cdb:DeleteCouchdbDatabase( ServerUrl, "cw_servers_and_repositories" )
 
     user PManager filledBy sys:PerspectivesSystem$User
-      aspect acc:WithCredentials
+      aspect sys:WithCredentials
 
       perspective on PManager
         only (CreateAndFill)
