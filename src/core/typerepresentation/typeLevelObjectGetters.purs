@@ -111,6 +111,9 @@ enumeratedRoleContextType = getEnumeratedRole >=> pure <<< _.context <<< unwrap
 indexedRoleName :: EnumeratedRoleType -> MonadPerspectives (Maybe RoleInstance)
 indexedRoleName rtype = getEnumeratedRole rtype >>= pure <<< _.indexedRole <<< unwrap 
 
+propertyAliases :: EnumeratedRoleType -> MP (OBJ.Object EnumeratedPropertyType)
+propertyAliases rtype = getEnumeratedRole rtype >>= pure <<< _.propertyAliases <<< unwrap 
+
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
 ----------------------------------------------------------------------------------------

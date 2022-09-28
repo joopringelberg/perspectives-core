@@ -30,8 +30,9 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
-import Foreign.Object (Object)
+import Foreign.Object (Object, toArrayWithKey)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Identifiers (buitenRol)
@@ -47,7 +48,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective, StateSpec)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
 import Prelude (class Show, bind, flip, pure, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>))
 
 -----------------------------------------------------------
@@ -215,6 +216,14 @@ allLocallyRepresentedProperties = reduce magic
         otherwise -> do
           props <- reduce magic otherwise
           pure $ props <> properties
+
+allLocalAliases :: ADT EnumeratedRoleType -> MP (Array (Tuple String EnumeratedPropertyType))
+allLocalAliases = reduce magic
+  where
+    magic :: EnumeratedRoleType -> MP (Array (Tuple String EnumeratedPropertyType))
+    magic role = do
+      EnumeratedRole{propertyAliases} <- getEnumeratedRole role
+      pure $ toArrayWithKey Tuple propertyAliases
 
 -- | Similar to propertySet, except for UNIVERSAL.
 -- | UNIVERSAL is treated like EMPTY.

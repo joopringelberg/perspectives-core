@@ -155,10 +155,10 @@ accountHolderQueueName = "model:BrokerServices$BrokerContract$AccountHolder$Queu
 -- AUTHENTICATION
 ------------------------------------------------------------------------------------
 userWithCredentials :: String
-userWithCredentials = "model:BodiesWithAccounts$WithCredentials"
+userWithCredentials = "model:System$WithCredentials"
 
 userWithCredentialsPassword :: String
-userWithCredentialsPassword = "model:BodiesWithAccounts$WithCredentials$Password"
+userWithCredentialsPassword = "model:System$WithCredentials$Password"
 
 userWithCredentialsAuthorizedDomain :: String
-userWithCredentialsAuthorizedDomain = "model:BodiesWithAccounts$WithCredentials$AuthorizedDomain"
+userWithCredentialsAuthorizedDomain = "model:System$WithCredentials$AuthorizedDomain"

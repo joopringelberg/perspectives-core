@@ -284,6 +284,7 @@ requalifyBindingsToCalculatedRoles = (lift $ State.gets _.dfr) >>= qualifyBindin
           Just crole -> lift2 $ roleADT crole
 
 -- | Qualify the references to Properties in each View.
+-- | Also qualify references to properties in propertyAliases (qualify the destinations).
 -- | Note that we need the DomeinFile with qualified bindings in the cache
 -- | for this function to work correctly!
 qualifyPropertyReferences :: PhaseThree Unit
@@ -295,11 +296,20 @@ qualifyPropertyReferences = do
     (qualifyPropertyReferences' df)
   where
     qualifyPropertyReferences' :: DomeinFileRecord -> PhaseThree Unit
-    qualifyPropertyReferences' df@{_id, views, calculatedProperties} = do
+    qualifyPropertyReferences' df@{_id, views, calculatedProperties, enumeratedRoles} = do
       qviews <- traverseWithIndex qualifyView views
-      modifyDF \dfr -> dfr {views = qviews}
+      enumeratedRoles' <- traverse (unsafePartial qualifyAliases) enumeratedRoles
+      modifyDF \dfr -> dfr {views = qviews, enumeratedRoles = enumeratedRoles'}
 
       where
+        qualifyAliases :: Partial => EnumeratedRole -> PhaseThree EnumeratedRole
+        qualifyAliases (EnumeratedRole r@{_id:roletype, propertyAliases, pos}) = do
+          propertyAliases' <- for propertyAliases
+            \(destination) -> do
+              (ENP destination') <- qualifyProperty (ENR roletype) pos (ENP destination)
+              pure destination'
+          pure $ EnumeratedRole r { propertyAliases = propertyAliases'}
+
         qualifyView :: String -> View -> PhaseThree View
         qualifyView viewName (View vr@{propertyReferences, role, pos}) = do
           qprops <- traverse (qualifyProperty role pos) propertyReferences

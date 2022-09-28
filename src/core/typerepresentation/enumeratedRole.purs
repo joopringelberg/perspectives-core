@@ -23,13 +23,13 @@
 module Perspectives.Representation.EnumeratedRole where
 
 import Data.Array (cons, delete, elemIndex)
+import Data.Eq.Generic (genericEq)
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Eq.Generic (genericEq)
-import Data.Ord.Generic (genericCompare)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype, over, unwrap)
+import Data.Ord.Generic (genericCompare)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty) as OBJ
@@ -43,7 +43,7 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.Perspective (Perspective, StateSpec)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
 import Prelude (class Eq, class Ord, class Show, (<<<), (==), ($))
 
 -----------------------------------------------------------
@@ -65,6 +65,7 @@ type EnumeratedRoleRecord =
 
   , roleAspects :: Array RoleInContext
   , properties :: Array PropertyType
+  , propertyAliases :: OBJ.Object (EnumeratedPropertyType)
 
   , binding :: ADT RoleInContext
 
@@ -92,6 +93,7 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
 
   , roleAspects: []
   , properties: []
+  , propertyAliases: OBJ.empty
 
   , context: ContextType context
   , binding: EMPTY

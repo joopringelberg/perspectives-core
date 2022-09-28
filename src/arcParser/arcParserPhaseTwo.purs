@@ -31,17 +31,17 @@ import Data.Array (fromFoldable) as ARR
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (fromFoldable, insert, union)
+import Foreign.Object (Object, fromFoldable, insert, union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein, namespace2modelname, newModelRegex)
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), ScreenE(..), StateE(..), StateSpecification(..), ViewE(..))
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein, namespace2modelname, newModelRegex, qualifyWith)
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyMapping(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), ScreenE(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..))
@@ -61,7 +61,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.View (View(..)) as VIEW
-import Prelude (bind, discard, pure, show, void, ($), (<<<), (<>), (==), (>>=), (<$>), (&&))
+import Prelude (bind, discard, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
 
 -------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
@@ -279,12 +279,25 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
           pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding (RoleInContext {context, role: EnumeratedRoleType expandedBnd})})
 
     -- ROLEASPECT
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{context, roleAspects}) (RoleAspect a pos') = do
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{context, roleAspects, propertyAliases}) (RoleAspect a pos' mPropertyMapping) = do
       expandedAspect <- expandNamespace a
       if isQualifiedWithDomein expandedAspect
-        then pure (EnumeratedRole $ roleUnderConstruction {roleAspects = cons
-          (RoleInContext{context: ContextType (deconstructNamespace_ expandedAspect), role: (EnumeratedRoleType expandedAspect)})
-          roleAspects})
+        then do 
+          (mPropertyMapping' :: Maybe (Object EnumeratedPropertyType)) <- case mPropertyMapping of 
+            Nothing -> pure Nothing
+            Just (PropertyMapping propertyMapping) -> Just <<< fromFoldable <$> for propertyMapping (\(Tuple origin destination) -> do 
+              destination' <- expandNamespace destination
+              pure $ Tuple (qualifyWith expandedAspect origin) (EnumeratedPropertyType destination'))
+          pure (EnumeratedRole $ roleUnderConstruction 
+            { roleAspects = cons
+              (RoleInContext{context: ContextType (deconstructNamespace_ expandedAspect), role: (EnumeratedRoleType expandedAspect)})
+              roleAspects
+              -- There may be a mapping already, as each Aspect can contribute to the mapping.
+              -- The properties-to-be-mapped (the origins) are qualified by the aspect and so are guaranteed to be unique.
+              -- Therefore we can just construct the union.
+              -- NOTICE that the destinations may be underqualified. We will fix that in PhaseThree.
+            , propertyAliases = maybe propertyAliases (union propertyAliases) mPropertyMapping'
+            })
         else throwError $ NotWellFormedName pos' a
 
     -- INDEXEDROLE

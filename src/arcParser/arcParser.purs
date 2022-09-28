@@ -41,7 +41,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelName)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, prefixedName, qualifiedName, reserved, stringUntilNewline)
@@ -507,11 +507,27 @@ createRoleState pos stateSpec roleParts = let
     (state : otherParts)
 
 aspectE :: IP RolePart
-aspectE = do
+aspectE = withPos do
   void $ reserved "aspect"
   pos <- getPosition
   aspect <- arcIdentifier
-  pure $ RoleAspect aspect pos
+  (mPropertyMapping :: Maybe PropertyMapping) <- optionMaybe ((reserved "where") *> propertyMapping)
+  pure $ RoleAspect aspect pos mPropertyMapping
+
+propertyMapping :: IP PropertyMapping
+propertyMapping = do
+  -- moet geïndenteerd zijn
+  PropertyMapping <$> nestedBlock mapping
+  where 
+    mapping :: IP ((Tuple String String))
+    mapping = do
+      aspectProp <- arcIdentifier
+      void $ reserved "is" 
+      void $ reserved "replaced"
+      void $ reserved "by"
+      replacingProp <- arcIdentifier
+      pure $ Tuple aspectProp replacingProp
+
 
 indexedE :: IP RolePart
 indexedE = do

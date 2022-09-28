@@ -29,7 +29,7 @@ module Perspectives.Query.UnsafeCompiler where
 
 import Control.Alt (map, void, (<|>))
 import Control.Monad.AvarMonadAsk (modify)
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
@@ -43,6 +43,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (maximum, minimum, traverse)
 import Effect.Exception (error)
+import Foreign.Object (lookup, fromFoldable, empty) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, liftToInstanceLevel)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -66,14 +67,14 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
 import Perspectives.Representation.Class.Property (getProperType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
+import Perspectives.Representation.Class.Role (allLocalAliases, allLocallyRepresentedProperties)
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextTypeModelName', enumeratedUserRole, isUnlinked_, roleTypeModelName', specialisesRoleType, userRole)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||), (==))
 import Unsafe.Coerce (unsafeCoerce)
@@ -693,14 +694,38 @@ getHiddenFunction = unsafeCoerce $ compileFunction
 getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
 getDynamicPropertyGetter p adt = do
   (pt :: PropertyType) <- getProperType p
-  allProps <- allLocallyRepresentedProperties adt
-  -- Special case for the 'property of last resort' that is inserted in serialised perspectives for roles without properties.
-  if (isJust $ elemIndex pt allProps) || pt == (CP $ CalculatedPropertyType roleWithId)
-    then getterFromPropertyType pt
-    else pure (binding >=> f)
-
+  case pt of 
+    CP _ -> do 
+      allProps <- allLocallyRepresentedProperties adt
+      -- Special case for the 'property of last resort' that is inserted in serialised perspectives for roles without properties.
+      if (isJust $ elemIndex pt allProps) || pt == (CP $ CalculatedPropertyType roleWithId)
+        then getterFromPropertyType pt
+        else pure (binding >=> f)
+    ENP eprop -> pure $ g eprop
   where
-    f :: (RoleInstance ~~> Value)
+    g :: EnumeratedPropertyType -> RoleInstance ~~> Value
+    g eprop rid = do 
+      -- We must take aliases of the actual role type into account.
+      (roleType :: EnumeratedRoleType) <- lift $ lift $ roleType_ rid
+      -- NOTE. UP TILL version v0.20.0 we have a very specific problem with the external roles of the specialisations
+      -- of model:System$Model. These roles are fetched before the models themselves are fetched; indeed, we don't mean to 
+      -- get the models until the end user explicitly asks for it.
+      -- This situation will go away in the next version.
+      aliases <- catchError (lift $ lift $ propertyAliases roleType)
+        \e -> pure OBJ.empty
+      case OBJ.lookup (unwrap eprop) aliases of
+        Just destination -> do 
+          getter <- lift $ lift $ getterFromPropertyType (ENP destination)
+          getter rid
+        Nothing -> do
+          allProps <- lift $ lift $ allLocallyRepresentedProperties adt
+          if isJust $ elemIndex (ENP eprop) allProps
+            then do 
+              getter <- lift $ lift $ getterFromPropertyType (ENP eprop)
+              getter rid
+            else (binding >=> f) rid
+
+    f :: RoleInstance ~~> Value
     f bnd = do
       (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd
       getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)

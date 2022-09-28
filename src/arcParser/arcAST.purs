@@ -30,6 +30,7 @@ import Data.List (List)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
+import Data.Tuple (Tuple)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
@@ -89,10 +90,15 @@ data RolePart =
   UnlinkedAttribute |
   FilledByAttribute String ContextType |
   Calculation Step |
-  RoleAspect String ArcPosition |
+  RoleAspect String ArcPosition (Maybe PropertyMapping) |
   IndexedRole String ArcPosition |
   ROLESTATE StateE |
   Screen ScreenE
+
+--------------------------------------------------------------------------------
+---- PROPERTYMAPPING
+--------------------------------------------------------------------------------
+newtype PropertyMapping = PropertyMapping (List (Tuple String String))
 
 --------------------------------------------------------------------------------
 ---- STATE
@@ -375,6 +381,9 @@ instance showRoleE :: Show RoleE where show = genericShow
 
 derive instance genericRoleElement :: Generic RolePart _
 instance showRoleElement :: Show RolePart where show = genericShow
+
+derive instance Generic PropertyMapping _
+instance Show PropertyMapping where show = genericShow
 
 derive instance genericStateE :: Generic StateE _
 instance showStateE :: Show StateE where show s = genericShow s
