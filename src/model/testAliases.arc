@@ -50,13 +50,16 @@ domain TestAliases
       -- In specialisation Pilot we add to the Pilots' perspective on Plane (a specialisation of Vehicle)
       -- that is dependent on this (aspect) state.
       property License (String)
-      state HasLicense = exists License
+      -- In specialisation Pilot we map License to Certification. If property contextualisation works well,
+      -- the computed property HasLicense should have value 'true' when we enter a value for Certification.
+      property HasALicense = exists License
+      state HasLicense = HasALicense
       perspective on Vehicle
         only (Create)
         props (Name) verbs (SetPropertyValue)
         props (NumberOfPassengers) verbs (Consult)
       perspective on Driver
-        props (VehicleName, FirstName, LastName) verbs (Consult)
+        props (VehicleName, FirstName, LastName, HasALicense) verbs (Consult)
         props (License) verbs (SetPropertyValue)
       perspective on extern
         props (Name) verbs (SetPropertyValue)
@@ -113,7 +116,8 @@ domain TestAliases
     aspect ta:Transport     
     aspect sys:ContextWithNotification 
     user Pilot
-      aspect ta:Transport$Driver
+      aspect ta:Transport$Driver where
+        License is replaced by Certification
       -- A perspective on Plane is not necessary (other than for properties of Plane
       -- itself, or to add verbs)
       -- As a Driver, Pilot will have a perspective on Vehicle.
@@ -133,6 +137,11 @@ domain TestAliases
       -- TESTS: ADD ASPECT ACTIONS
       -- The test fails if the actions is not visible on the schedules tab.
       
+      property Certification (String)
+
+      perspective on Pilot
+        props (Certification) verbs (SetPropertyValue)
+
       -- TESTS: CREATE CONTEXT CONTEXTUALISATION
       -- The test fails if the created schedule doesn't have properties IsInternational and IsCargoFlight.
       perspective on FlightSchedules
