@@ -67,6 +67,9 @@ instance decodeEncodableMap :: (Ord k, Decode k, Decode v) => Decode (EncodableM
 instance prettyPrintEncodableMap :: (Show k, Show v) => PrettyPrint (EncodableMap k v) where
   prettyPrint' _ (EncodableMap mp) = Map.showTree mp
 
+instance Functor (EncodableMap k) where
+  map f (EncodableMap mp) = EncodableMap $ map f mp
+
 -- instance traversableEncodableMap :: Traversable (EncodableMap k) where
 --   traverse f (EncodableMap mp)  = EncodableMap <$> (traverse f mp)
 --   sequence (EncodableMap mp) t = EncodableMap <$> (traverse t)

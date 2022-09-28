@@ -139,9 +139,6 @@ domain TestAliases
       
       property Certification (String)
 
-      perspective on Pilot
-        props (Certification) verbs (SetPropertyValue)
-
       -- TESTS: CREATE CONTEXT CONTEXTUALISATION
       -- The test fails if the created schedule doesn't have properties IsInternational and IsCargoFlight.
       perspective on FlightSchedules
