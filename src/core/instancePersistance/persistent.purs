@@ -61,6 +61,9 @@ import Control.Monad.Except (catchError, lift, throwError)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.String.Regex (Regex, test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Aff.AVar (AVar, kill, put, read)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
@@ -69,8 +72,10 @@ import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (couchdbResourceIdentifier, isUrl, publicResourceIdentifier2database_)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (AuthoritySource(..), MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
@@ -198,7 +203,14 @@ fetchEntiteit id = ensureAuthentication (Entity $ unwrap id) $ \_ -> catchError
     case mav of
       Nothing -> pure unit
       Just av -> liftAff $ kill (error ("Cound not find " <> unwrap id)) av
+    if test decodingErrorRegex (show e)
+      then logPerspectivesError (Custom ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e))
+      else pure unit
     throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
+  where
+    decodingErrorRegex :: Regex
+    decodingErrorRegex = unsafeRegex "error in decoding result" noFlags
+
 
 -- | Fetch the definition of a document if it can be found. DOES NOT CACHE THE ENTITY!
 tryFetchEntiteit :: forall a i. Revision a => Persistent a i => i -> MonadPerspectives (Maybe a)
