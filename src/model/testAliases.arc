@@ -61,6 +61,8 @@ domain TestAliases
       perspective on Driver
         props (VehicleName, FirstName, LastName, HasALicense) verbs (Consult)
         props (License) verbs (SetPropertyValue)
+        action ApproveLicense
+          License = License + " Approved!"
       perspective on extern
         props (Name) verbs (SetPropertyValue)
       perspective on Schedules

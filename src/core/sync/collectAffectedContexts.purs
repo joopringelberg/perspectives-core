@@ -41,6 +41,7 @@ import Data.Traversable (for, for_, traverse, traverse_)
 import Data.Tuple (Tuple(..), snd)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, lookup, values)
+import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspective.InvertedQuery.Indices (runTimeIndexForRoleQueries, runtimeIndexForContextQueries, runtimeIndexForFilledByQueries, runtimeIndexForFillsQueries, runtimeIndexForPropertyQueries)
 import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependencies)
@@ -677,9 +678,15 @@ magic ctxt roleInstances rtype users =  do
 -- The role instance is the current object; so if a perspective is conditional on object state, we can check
 -- this role instance.
 -- Note we don't evaluate any forward part; it is not needed, so it may be Nothing.
-aisInPropertyDelta :: RoleInstance -> EnumeratedPropertyType -> EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
-aisInPropertyDelta id property eroleType = do
-  calculations <- lift $ compileDescriptions' property
+aisInPropertyDelta :: RoleInstance -> EnumeratedPropertyType -> EnumeratedPropertyType -> EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
+aisInPropertyDelta id property replacementProperty eroleType = do
+  -- We must handle both the original property type and its replacement (if any).
+  calculations <- if property == replacementProperty
+    then lift $ compileDescriptions' property
+    else do
+      calculations <- lift $ compileDescriptions' property
+      calculations' <- lift $ compileDescriptions' replacementProperty
+      pure (calculations `OBJ.union` calculations')
   -- `handleBackwardQuery` just passes on users that have at least one
   -- valid perspective, even if the condition is object state.
   -- We must use all types of the role to look up calculations.
@@ -693,6 +700,7 @@ aisInPropertyDelta id property eroleType = do
   (cwu :: Array ContextWithUsers) <- join <$> for allCalculations (handleBackwardQuery id)
   lift $ filterA notIsMe (nub $ join $ snd <$> cwu)
   where
+    -- Either compile the InvertedQuery or take the compilation from the DomeinFile in cache, if it had been compiled before.
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Object (Array InvertedQuery))
     compileDescriptions' rt@(EnumeratedPropertyType ert) =  do
       modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
