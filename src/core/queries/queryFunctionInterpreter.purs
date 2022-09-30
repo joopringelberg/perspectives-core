@@ -36,7 +36,7 @@
 module Perspectives.Query.Interpreter where
 
 import Control.Monad.AvarMonadAsk (modify)
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (empty, join, void)
 import Data.Array (elemIndex, head, length, null, union, unsafeIndex)
@@ -47,6 +47,7 @@ import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, traverse)
 import Effect.Exception (error)
+import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MP, MPQ, liftToInstanceLevel, (##>>), (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -57,6 +58,7 @@ import Perspectives.Instances.Combinators (available', not_)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, externalRole, fills, getEnumeratedRoleInstances, getFilledRoles, getProperty, getUnlinkedRoleInstances, roleModelName, roleType)
 import Perspectives.Instances.Values (bool2Value, value2Date, value2Int)
+import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
@@ -73,7 +75,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', roleTypeModelName', specialisesRoleType)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', propertyAliases, roleTypeModelName', specialisesRoleType)
 import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||), (<#>), (<=))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -442,14 +444,35 @@ toString {head} = case head of
 -- | Returns a DependencyPath with (R roleId) as the last dependency in the mainPath, (V "SomeProperty" "value") as its head.
 getDynamicPropertyGetter :: String -> RoleInstance ~~> DependencyPath
 getDynamicPropertyGetter p rid = do
-  rt <- roleType rid
+  (rt :: EnumeratedRoleType) <- roleType rid
   (pt :: PropertyType) <- lift2MPQ $ getProperType p
-  allProps <- lift2MPQ $ allLocallyRepresentedProperties (ST rt)
-  if (isJust $ elemIndex pt allProps)
-    then getterFromPropertyType pt rid
-    else f rid
+  case pt of 
+    CP _ -> do 
+      allProps <- lift2MPQ $ allLocallyRepresentedProperties (ST rt)
+      -- Special case for the 'property of last resort' that is inserted in serialised perspectives for roles without properties.
+      if (isJust $ elemIndex pt allProps) || pt == (CP $ CalculatedPropertyType roleWithId)
+        then getterFromPropertyType pt rid
+        else f rid
+    ENP eprop -> g rt eprop
 
   where
+    g :: EnumeratedRoleType -> EnumeratedPropertyType ~~> DependencyPath
+    g roleType eprop = do 
+      -- We must take aliases of the actual role type into account.
+      -- NOTE. UP TILL version v0.20.0 we have a very specific problem with the external roles of the specialisations
+      -- of model:System$Model. These roles are fetched before the models themselves are fetched; indeed, we don't mean to 
+      -- get the models until the end user explicitly asks for it.
+      -- This situation will go away in the next version.
+      aliases <- catchError (lift $ lift $ propertyAliases roleType)
+        \e -> pure OBJ.empty
+      case OBJ.lookup (unwrap eprop) aliases of
+        Just destination -> getterFromPropertyType (ENP destination) rid
+        Nothing -> do
+          allProps <- lift2MPQ $ allLocallyRepresentedProperties (ST roleType)
+          if isJust $ elemIndex (ENP eprop) allProps
+            then getterFromPropertyType (ENP eprop) rid
+            else f rid
+
     f :: RoleInstance ~~> DependencyPath
     f roleInstance = do
       (bnd :: Maybe RoleInstance) <- lift2MPQ $ binding_ roleInstance
