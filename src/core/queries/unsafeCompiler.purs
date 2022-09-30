@@ -740,9 +740,29 @@ getDynamicPropertyGetterFromLocalName ln adt = do
   (allProps :: Array PropertyType) <- allLocallyRepresentedProperties adt
   case findIndex ((test (unsafeRegex (ln <> "$") noFlags)) <<< propertytype2string) allProps of
     Nothing -> pure f
-    (Just i) -> getterFromPropertyType (unsafePartial $ fromJust $ index allProps i)
+    (Just i) -> case (unsafePartial $ fromJust $ index allProps i) of
+      prop@(CP _) -> getterFromPropertyType prop
+      ENP eprop -> pure $ g eprop
 
   where
+    g :: EnumeratedPropertyType -> RoleInstance ~~> Value
+    g eprop rid = do 
+      -- We must take aliases of the actual role type into account.
+      (roleType :: EnumeratedRoleType) <- lift $ lift $ roleType_ rid
+      -- NOTE. UP TILL version v0.20.0 we have a very specific problem with the external roles of the specialisations
+      -- of model:System$Model. These roles are fetched before the models themselves are fetched; indeed, we don't mean to 
+      -- get the models until the end user explicitly asks for it.
+      -- This situation will go away in the next version.
+      aliases <- catchError (lift $ lift $ propertyAliases roleType)
+        \e -> pure OBJ.empty
+      case OBJ.lookup (unwrap eprop) aliases of
+        Just destination -> do 
+          getter <- lift $ lift $ getterFromPropertyType (ENP destination)
+          getter rid
+        Nothing -> do
+          getter <- lift $ lift $ getterFromPropertyType (ENP eprop)
+          getter rid
+
     f :: (RoleInstance ~~> Value)
     f roleInstance = do
       bnd <- lift $ lift $ binding_ roleInstance
