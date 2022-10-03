@@ -56,6 +56,9 @@ type EnumeratedRoleRecord =
   , _rev :: Revision_
   , displayName :: String
   , kindOfRole :: RoleKind
+  -- An EnumeratedRole instance is public if its context is public,
+  -- unless it has been explicitly declared private.
+  , declaredAsPrivate :: Boolean
   , context :: ContextType
   , views :: Array ViewType
   , pos :: ArcPosition
@@ -84,12 +87,13 @@ type EnumeratedRoleRecord =
 
   }
 
-defaultEnumeratedRole :: String -> String -> RoleKind -> String -> ArcPosition -> EnumeratedRole
-defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
+defaultEnumeratedRole :: String -> String -> RoleKind -> String -> Boolean -> ArcPosition -> EnumeratedRole
+defaultEnumeratedRole qname dname kindOfRole context declaredAsPrivate pos = EnumeratedRole
   { _id: EnumeratedRoleType qname
   , _rev: Nothing
   , displayName: dname
   , kindOfRole: kindOfRole
+  , declaredAsPrivate
 
   , roleAspects: []
   , properties: []

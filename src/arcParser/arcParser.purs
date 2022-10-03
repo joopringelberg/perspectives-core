@@ -289,18 +289,19 @@ userRoleE = do
   -- `state` will be a role state specification.
   {state} <- getArcParserState
   protectSubject $ withEntireBlock
-    (\{uname, knd, pos, parts, isEnumerated} elements -> RE $ RoleE
+    (\{uname, knd, pos, parts, isEnumerated, declaredAsPrivate} elements -> RE $ RoleE
       { id: uname
       , kindOfRole: knd
       , roleParts: if isEnumerated
           then (createRoleState pos state elements) <> parts
           else elements <> parts
+      , declaredAsPrivate
       , pos
       })
     user_
     rolePart
   where
-    user_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
+    user_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
     user_ = do
       pos <- getPosition
       kind <- reserved "user" *> pure UserRole
@@ -321,18 +322,19 @@ thingRoleE = do
   -- `state` will be a role state specification.
   {state} <- getArcParserState
   protectObject $ withEntireBlock
-    (\{uname, knd, pos, parts, isEnumerated} elements -> RE $ RoleE
+    (\{uname, knd, pos, parts, isEnumerated, declaredAsPrivate} elements -> RE $ RoleE
       { id: uname
       , kindOfRole: knd
       , roleParts: if isEnumerated
           then (createRoleState pos state elements) <> parts
           else elements <> parts
+      , declaredAsPrivate
       , pos
       })
     thing_
     rolePart
   where
-    thing_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
+    thing_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
     thing_ = do
       pos <- getPosition
       kind <- reserved "thing" *> pure RoleInContext
@@ -352,18 +354,19 @@ contextRoleE = do
   -- `state` will be a role state specification.
   {state} <- getArcParserState
   protectObject $ withEntireBlock
-    (\{uname, knd, pos, parts, isEnumerated} elements -> RE $ RoleE
+    (\{uname, knd, pos, parts, isEnumerated, declaredAsPrivate} elements -> RE $ RoleE
       { id: uname
       , kindOfRole: knd
       , roleParts: if isEnumerated
           then (createRoleState pos state elements) <> parts
           else elements <> parts
+      , declaredAsPrivate
       , pos
       })
     context_
     rolePart
   where
-    context_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
+    context_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
     context_ = do
       pos <- getPosition
       kind <- reserved "context" *> pure ContextRole
@@ -374,7 +377,7 @@ contextRoleE = do
       if isCalculated
         then do
           setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
-          calculatedRole_  uname kind pos
+          calculatedRole_ uname kind pos
         else do
           setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
           enumeratedRole_ uname kind pos
@@ -384,33 +387,35 @@ externalRoleE = do
   -- `state` will be a role state specification.
   {state} <- getArcParserState
   protectObject $ withEntireBlock
-    (\{uname, knd, pos, parts} elements -> RE $ RoleE
+    (\{uname, knd, pos, parts, declaredAsPrivate} elements -> RE $ RoleE
       { id: uname
       , kindOfRole: knd
       , roleParts: (createRoleState pos state elements) <> parts
+      , declaredAsPrivate
       , pos
       })
     external_
     rolePart
   where
-    external_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
+    external_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
     external_ = do
       pos <- getPosition
       knd <- reserved "external" *> pure ExternalRole
       ct@(ContextType ctxt) <- getCurrentContext
       setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$External")) pos)
-      pure {uname: "External", knd, pos, parts: Nil, isEnumerated: true}
+      pure {uname: "External", knd, pos, parts: Nil, isEnumerated: true, declaredAsPrivate: false}
 
-calculatedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
+calculatedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
 calculatedRole_ uname knd pos = do
   calculation <- reserved "=" *> step >>= pure <<< Calculation
-  pure {uname, knd, pos, parts: Cons calculation Nil, isEnumerated: false}
+  pure {uname, knd, pos, parts: Cons calculation Nil, isEnumerated: false, declaredAsPrivate: false}
 
-enumeratedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean))
+enumeratedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
 enumeratedRole_ uname knd pos = do
   attributes <- option Nil roleAttributes
   filledBy' <- filledBy
-  pure {uname, knd, pos, parts: attributes <> filledBy', isEnumerated: true}
+  declaredAsPrivate <- option false (reserved "private" *> pure true)
+  pure {uname, knd, pos, parts: attributes <> filledBy', isEnumerated: true, declaredAsPrivate}
   where
     -- | We cannot use token.commaSep or sebBy to separate the role attributes;
     -- | it will cause looping as long as it is used

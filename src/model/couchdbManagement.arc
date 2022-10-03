@@ -217,7 +217,7 @@ domain CouchdbManagement
     aspect user acc:Body$Guest
 
     -- This role should be in private space.
-    user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
+    user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User private
       aspect acc:Body$Accounts
 
       -- Our execution model allows us to query the entire intact structure in the 

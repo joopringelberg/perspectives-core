@@ -28,7 +28,7 @@ import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array (intercalate, null, uncons, unsnoc)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.String (Pattern(..), Replacement(..), replaceAll, split, stripPrefix, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), replace, replaceAll, split, stripPrefix, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -269,6 +269,16 @@ couchdbResourceIdentifier :: String -> String
 couchdbResourceIdentifier s = if isUrl s
   then unsafePartial publicResourceIdentifier2LocalName_ s
   else s
+
+-- | Create a resource identifier suited for a local resource from the identifier of a public resource.
+publicResourceIdentifier2Private :: String -> String
+publicResourceIdentifier2Private s = replaceAll 
+  (Pattern ".")
+  (Replacement "_")
+  (replaceAll
+    (Pattern "/")
+    (Replacement "_")
+    (replace (Pattern "https://") (Replacement "model:User$") s))
 
 -----------------------------------------------------------
 -- URL2AUTHORITY

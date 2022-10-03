@@ -95,7 +95,7 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
             state <- pure $ constructState (StateIdentifier $ contextIdentifier <> "$External") (Q $ trueCondition (CDOM $ ST (ContextType contextIdentifier))) (Cnt (ContextType contextIdentifier)) []
             modifyDF (\domeinFile -> addStatesToDomeinFile [state] domeinFile)
             -- Add a definition for the external role; it apparently hasn't been declared in the source.
-            pure $ Cons (RE (RoleE{id: "External", kindOfRole: TI.ExternalRole, roleParts: Nil, pos})) contextParts
+            pure $ Cons (RE (RoleE{id: "External", kindOfRole: TI.ExternalRole, roleParts: Nil, declaredAsPrivate: false, pos})) contextParts
           otherwise -> pure contextParts
       context' <- foldM handleParts context contextParts'
       modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
@@ -211,9 +211,9 @@ traverseRoleE r ns = if isCalculatedRole r
       otherwise -> false) roleParts))
 
 traverseEnumeratedRoleE :: RoleE -> Namespace -> PhaseTwo Role
-traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
+traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, declaredAsPrivate, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
-  role <- pure (defaultEnumeratedRole (ns <> "$" <> id) id kindOfRole ns pos)
+  role <- pure (defaultEnumeratedRole (ns <> "$" <> id) id kindOfRole ns declaredAsPrivate pos)
   traverseEnumeratedRoleE_ role roleParts
 
 traverseEnumeratedRoleE_ :: EnumeratedRole -> List RolePart -> PhaseTwo Role

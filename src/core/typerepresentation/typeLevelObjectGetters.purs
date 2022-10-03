@@ -93,6 +93,9 @@ isMandatory_ et = getEnumeratedRole et >>= pure <<< _.mandatory <<< unwrap
 isOptional_ :: EnumeratedRoleType -> MonadPerspectives Boolean
 isOptional_ et = getEnumeratedRole et >>= pure <<< not <<< _.mandatory <<< unwrap
 
+declaredAsPrivate_ :: EnumeratedRoleType -> MonadPerspectives Boolean
+declaredAsPrivate_ et = getEnumeratedRole et >>= pure <<< _.declaredAsPrivate <<< unwrap
+
 -- | The state identifier of the root state of a role has the same string value as the role identifier.
 roleRootState :: EnumeratedRoleType ~~~> StateIdentifier
 roleRootState rtype = pure $ StateIdentifier $ unwrap rtype

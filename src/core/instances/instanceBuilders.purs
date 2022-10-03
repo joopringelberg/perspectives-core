@@ -52,10 +52,10 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addRoleInstanceToContext, setProperty)
 import Perspectives.ContextAndRole (getNextRolIndex, rol_padOccurrence)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), MP)
 import Perspectives.Deltas (addCreatedContextToTransaction, deltaIndex, insertDelta)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
-import Perspectives.Identifiers (deconstructLocalName, deconstructModelName, isQualifiedWithDomein, isUrl)
+import Perspectives.Identifiers (deconstructLocalName, deconstructModelName, isPublicResource, isQualifiedWithDomein, isUrl, publicResourceIdentifier2Private)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
@@ -71,7 +71,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (RoleType(..))
 import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
-import Perspectives.Types.ObjectGetters (getPublicStore_)
+import Perspectives.Types.ObjectGetters (declaredAsPrivate_, getPublicStore_)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<>), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
@@ -158,7 +158,8 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
         Just localRoleName -> do
           binding' <- lift  $ lift $ lift (traverse expandDefaultNamespaces binding)
           roleInstanceId <- case mid of
-            Nothing -> pure $ RoleInstance (unwrap contextInstanceId <> "$" <> localRoleName <> "_" <> (rol_padOccurrence i))
+            -- Nothing -> pure $ RoleInstance (unwrap contextInstanceId <> "$" <> localRoleName <> "_" <> (rol_padOccurrence i))
+            Nothing -> lift $ lift $ lift $ createRoleId roleType contextInstanceId i
             Just rid -> pure $ RoleInstance rid
           void $ lift $ lift $ constructEmptyRole contextInstanceId roleType i roleInstanceId
           pure $ Tuple s roleInstanceId
@@ -198,7 +199,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
       -- SYNCHRONISATION by UniverseRoleDelta
       (PerspectRol r@{_id:roleInstance}) <- case mRoleId of
         Nothing -> do
-          rolInstanceId <- pure $ RoleInstance (unwrap contextInstanceId <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType)) <> "_" <> (rol_padOccurrence (getNextRolIndex rolInstances)))
+          rolInstanceId <- lift $ createRoleId roleType contextInstanceId (getNextRolIndex rolInstances)
           constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) rolInstanceId
         Just roleId -> constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) (RoleInstance roleId)
 
@@ -219,5 +220,12 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
           setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
 
       pure $ Just roleInstance
-
-
+    
+createRoleId :: EnumeratedRoleType -> ContextInstance -> Int -> MP RoleInstance
+createRoleId roleType contextInstanceId i = if isPublicResource (unwrap contextInstanceId)
+  then do 
+    private <- declaredAsPrivate_ roleType
+    if private
+      then pure $ RoleInstance (publicResourceIdentifier2Private (unwrap contextInstanceId) <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType)) <> "_" <> (rol_padOccurrence i))
+      else pure $ RoleInstance (unwrap contextInstanceId <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType)) <> "_" <> (rol_padOccurrence i))
+  else pure $ RoleInstance (unwrap contextInstanceId <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType)) <> "_" <> (rol_padOccurrence i))
