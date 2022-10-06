@@ -719,6 +719,8 @@ uploadToRepository dfId url = do
     Right df -> uploadToRepository_ dfId url df
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
+-- | In this function we handle the difference between the database that we read from (provided as the value of 
+-- | the argument `url`), and the database that we write to (ending on "_write").
 uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit
 uploadToRepository_ dfId url df = lift $ lift do
   -- Get the attachment info
@@ -730,7 +732,7 @@ uploadToRepository_ dfId url df = lift $ lift do
       _attachments
   -- Get the revision (if any) from the remote database, so we can overwrite.
   (mVersion :: Maybe String) <- retrieveDocumentVersion url (show dfId)
-  (newRev :: Revision_) <- addDocument url (changeRevision mVersion df) (show dfId)
+  (newRev :: Revision_) <- addDocument (url <> "_write") (changeRevision mVersion df) (show dfId)
   -- Now add the attachments.
   void $ execStateT (go attachments) newRev
 
@@ -742,7 +744,7 @@ uploadToRepository_ dfId url df = lift $ lift do
       Nothing -> pure unit
       Just attachment -> do
         newRev <- get
-        DeleteCouchdbDocument {rev} <- lift $ addAttachment url (show dfId) newRev attName attachment mimetype
+        DeleteCouchdbDocument {rev} <- lift $ addAttachment (url <> "_write") (show dfId) newRev attName attachment mimetype
         put rev
 
 type URL = String

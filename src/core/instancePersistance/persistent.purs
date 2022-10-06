@@ -36,6 +36,7 @@
 module Perspectives.Persistent
   ( class Persistent
   , dbLocalName
+  , writeDbName
   , entitiesDatabaseName
   , entityExists
   , fetchEntiteit
@@ -85,6 +86,7 @@ import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   -- database :: i -> MP String
   dbLocalName :: i -> MP String
+  writeDbName :: i -> MP String
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
   -- database _ = do
@@ -93,6 +95,11 @@ instance persistentInstancePerspectContext :: Persistent PerspectContext Context
   --   pure $ cdbUrl <> sysId <> "_entities/"
   dbLocalName id = if isUrl (unwrap id) 
     then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id)
+    else do
+      sysId <- getSystemIdentifier
+      pure $ sysId <> "_entities"
+  writeDbName id = if isUrl (unwrap id) 
+    then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id) <> "_write"
     else do
       sysId <- getSystemIdentifier
       pure $ sysId <> "_entities"
@@ -107,6 +114,11 @@ instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance wh
     else do
       sysId <- getSystemIdentifier
       pure $ sysId <> "_entities"
+  writeDbName id = if isUrl (unwrap id) 
+    then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id) <> "_write"
+    else do
+      sysId <- getSystemIdentifier
+      pure $ sysId <> "_entities"
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
   -- database _ = do
@@ -116,6 +128,9 @@ instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId wher
   dbLocalName _ = do
     sysId <- getSystemIdentifier
     pure $ sysId <> "_models"
+  -- When saving a DomeinFile through Persistent, we only save it in the local models database.
+  -- It's only through uploadToRepository that we write to remote and public databases (Repositories).
+  writeDbName i = dbLocalName i
 
 getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
@@ -170,7 +185,9 @@ removeEntiteit_ entId entiteit =
       Nothing -> pure entiteit
       (Just rev) -> do
         void $ removeInternally entId
-        dbName <- dbLocalName entId
+        -- Returns either the local database name or a URL.
+        dbName <- writeDbName entId
+        -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
         void $ deleteDocument dbName (couchdbResourceIdentifier $ unwrap entId) (Just rev)
         pure entiteit
 
@@ -236,7 +253,9 @@ saveEntiteit' entId mentiteit = ensureAuthentication (Entity $ unwrap entId) $ \
       Nothing -> throwError $ error ("saveEntiteit' needs either an entity as parameter, or a locally stored resource for " <>  unwrap entId)
       Just e -> pure e
     Just e -> pure e
-  dbName <- dbLocalName entId
+  -- Returns either the local database name or a URL.
+  dbName <- writeDbName entId
+  -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
   (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
   entiteit' <- pure (changeRevision rev entiteit)
   void $ cacheEntity entId entiteit'

@@ -107,6 +107,8 @@ domain CouchdbManagement
             -- Adds credentials to Perspectives State; not to the Couchdb_!
             callEffect cdb:AddCredentials( ServerUrl, context >> PManager >> Password)
             callEffect cdb:CreateCouchdbDatabase( ServerUrl, "cw_servers_and_repositories" )
+            callEffect cdb:CreateCouchdbDatabase( ServerUrl, "cw_servers_and_repositories_write" )
+            callEffect cdb:ReplicateContinuously( ServerUrl, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
             callEffect cdb:MakeDatabasePublic( ServerUrl, "cw_servers_and_repositories" )
             HasDatabase = true
       on exit
