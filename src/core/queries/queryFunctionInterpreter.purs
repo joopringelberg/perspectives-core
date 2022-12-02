@@ -312,6 +312,15 @@ interpret (MQD dom fun args ran _ _) a = do
         [ ( toString (fourth argValues))]
         (toString a)
       pure a {head = domain2Dependency ran r}
+    5 -> do
+      r <- (unsafe6argFunction f)
+        [ ( toString (first argValues))]
+        [ ( toString (second argValues))]
+        [ ( toString (third argValues))]
+        [ ( toString (fourth argValues))]
+        [ ( toString (fifth argValues))]
+        (toString a)
+      pure a {head = domain2Dependency ran r}
     otherwise -> throwError (error "Too many arguments for external core module: maximum is 4")
 
 -----------------------------------------------------------
@@ -516,6 +525,9 @@ unsafe4argFunction = unsafeCoerce
 unsafe5argFunction :: HiddenFunction -> Array String -> Array String -> Array String -> Array String -> String ~~> String
 unsafe5argFunction = unsafeCoerce
 
+unsafe6argFunction :: HiddenFunction -> Array String -> Array String -> Array String -> Array String -> Array String -> String ~~> String
+unsafe6argFunction = unsafeCoerce
+
 first :: forall a. Array a -> a
 first = flip (unsafePartial unsafeIndex) 0
 
@@ -527,3 +539,9 @@ third = flip (unsafePartial unsafeIndex) 2
 
 fourth :: forall a. Array a -> a
 fourth = flip (unsafePartial unsafeIndex) 3
+
+fifth :: forall a. Array a -> a
+fifth = flip (unsafePartial unsafeIndex) 4
+
+sixth :: forall a. Array a -> a
+sixth = flip (unsafePartial unsafeIndex) 5

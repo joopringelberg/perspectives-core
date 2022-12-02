@@ -175,7 +175,22 @@ compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
         (unsafePartial (unsafeIndex values 2))
         (unsafePartial (unsafeIndex values 3))
         c
-      _ -> throwError (error "Too many arguments for external core module: maximum is 4")
+      5 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> String -> MPQ String))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
+        (unsafePartial (unsafeIndex values 4))
+        c
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> Array String -> String -> MPQ String))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
+        (unsafePartial (unsafeIndex values 4))
+        (unsafePartial (unsafeIndex values 5))
+        c
+      _ -> throwError (error "Too many arguments for external core module: maximum is 6")
     )
 
 compileFunction (MQD dom (ExternalCorePropertyGetter functionName) args _ _ _) = do
@@ -202,7 +217,22 @@ compileFunction (MQD dom (ExternalCorePropertyGetter functionName) args _ _ _) =
         (unsafePartial (unsafeIndex values 2))
         (unsafePartial (unsafeIndex values 3))
         r
-      _ -> throwError (error "Too many arguments for external core module: maximum is 4")
+      5 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> String -> MPQ String))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
+        (unsafePartial (unsafeIndex values 4))
+        r
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> Array String -> String -> MPQ String))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
+        (unsafePartial (unsafeIndex values 4))
+        (unsafePartial (unsafeIndex values 5))
+        r
+      _ -> throwError (error "Too many arguments for external core module: maximum is 6")
     )
 
 compileFunction (SQD dom (VariableLookup varName) range _ _) = pure $ unsafeCoerce (lookup varName)

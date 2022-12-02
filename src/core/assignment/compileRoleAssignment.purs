@@ -333,7 +333,22 @@ compileAssignmentFromRole (MQD dom (ExternalEffectFullFunction functionName) arg
         (unsafePartial (unsafeIndex values 2))
         (unsafePartial (unsafeIndex values 3))
         c
-      _ -> throwError (error "Too many arguments for external core module: maximum is 4")
+      5 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
+        (unsafePartial (unsafeIndex values 4))
+        c
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 1))
+        (unsafePartial (unsafeIndex values 2))
+        (unsafePartial (unsafeIndex values 3))
+        (unsafePartial (unsafeIndex values 4))
+        (unsafePartial (unsafeIndex values 5))
+        c
+      _ -> throwError (error "Too many arguments for external core module: maximum is 6")
     )
 
 compileAssignmentFromRole (MQD dom (ExternalDestructiveFunction functionName) args _ _ _) = do
