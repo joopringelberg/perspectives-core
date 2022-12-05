@@ -40,6 +40,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, Error, Fiber, Milliseconds(..), catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
 import Effect.Aff.AVar (AVar, empty, new, put, take)
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
 import Effect.Now (now)
 import Foreign (Foreign)
 import Foreign.Object (fromFoldable)
@@ -122,7 +123,9 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
         retrieveBrokerService)
         state
       void $ forkAff $ forever do
-        apiFiber <- forkAff $ runPerspectivesWithState setupApi state
+        apiFiber <- forkAff $ do
+          log "(Re)starting the API listener."
+          runPerspectivesWithState setupApi state
         catchError (joinFiber apiFiber)
           \e -> do
             logPerspectivesError $ Custom $ "API stopped and restarted because of: " <> show e

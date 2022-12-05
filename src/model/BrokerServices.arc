@@ -3,6 +3,8 @@
 domain BrokerServices
   use sys for model:System
   use bs for model:BrokerServices
+  use util for model:Utilities
+  use rabbit for model:RabbitMQ
 
   -- The model description case.
   case Model
@@ -45,29 +47,37 @@ domain BrokerServices
     external
       property Name (mandatory, String)
       property Url (mandatory, String)
+        pattern = "^wss://[^\\/]+:[0-9]+\\/$" "A url with the wss scheme, ending on a port followd by a forward slash"
       property Exchange (mandatory, String)
 
     user Administrator filledBy sys:PerspectivesSystem$User
-      property RegistryTopic (String)
-      property GuestRolePassword (String)
-      view Admin (RegistryTopic, GuestRolePassword)
+      property AdminUserName (String)
+      property (AdminPassword) (string)
+      -- property RegistryTopic (String)
+      -- property GuestRolePassword (String)
 
       perspective on Accounts
         only (CreateAndFill, Remove)
         props(LastNameOfAccountHolder) verbs (Consult)
       perspective on Administrator
-        defaults
+        props (AdminUserName, AdminPassword) verbs (SetPropertyValue)
       perspective on extern
         defaults
       -- Without this perspective we get a synchronization warning.
       perspective on Accounts >> binding >> context >> Administrator
         props (ConfirmationCode) verbs (Consult)
+      perspective on Nodes
+        only (Create, Remove)
+        props (Name) verbs (SetPropertyValue)
 
     user Guest = sys:Me
       perspective on Administrator
         only (Fill, Create)
 
     context Accounts (relational) filledBy BrokerContract
+
+    thing Nodes (relational)
+      property Name (String)
 
   -- The contract between an end user and a BrokerService.
   case BrokerContract
@@ -80,53 +90,120 @@ domain BrokerServices
       on entry
         do for BrokerContract$Administrator
           create role AccountHolder
+    state DefaultNode = 1 == extern >> binder Nodes >>= count
+      on entry
+        do for BrokerContract$Administrator
+          bind extern >> context >> Nodes to Node
     external
       aspect sys:Invitation$External
-      property Url = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url
+      property EndPoint = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url + "ws"
       property Exchange = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Exchange
       property Name = binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Name
       property FirstNameOfAccountHolder = context >> AccountHolder >> FirstName
       property LastNameOfAccountHolder = context >> AccountHolder >> LastName
+      property NodeName = context >> Node >> Name
 
-      view ForAccountHolder (Url, Exchange)
+      view ForAccountHolder (EndPoint, Exchange, NodeName)
       view ForAdministrator (IWantToInviteAnUnconnectedUser, Message, SerialisedInvitation)
       view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
+    
+    thing Node filledBy Nodes
+
+    context Invitations filledBy BrokerContract
 
     user AccountHolder filledBy sys:PerspectivesSystem$User
       aspect sys:Invitation$Invitee
       property AccountName (mandatory, String)
       property AccountPassword (mandatory, String)
       property QueueName (mandatory, String)
-      property ConfirmationCode (String)
 
-      view ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, LastName)
+      -- Create an account on the RabbitMQ server. It is ready for the AccountHolder to listen to,
+      -- but no other users can reach him yet.
+      state PrepareAccount = not exists binding
+        on entry
+          do for BrokerContract$Administrator
+            AccountName = callExternal util:GenSym() returns String
+            QueueName = callExternal util:GenSym() returns String
+            AccountPassword = callExternal rabbit:PrepareAMQPaccount(
+              context >> extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url,
+              context >> extern >> NodeName,
+              context >> Administrator >> AdminUserName,
+              context >> Administrator >> AdminPassword,
+              AccountName,
+              QueueName
+            ) returns String
+             
+      -- Now we now who the AccountHolder is, we bind his identity to his queue, so other users can reach him.
+      state SetBinding = exists binding
+        on entry
+          do for BrokerContract$Administrator
+            callEffect rabbit:SetBindingKey(
+              context >> extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url,
+              context >> Administrator >> AdminUserName,
+              context >> Administrator >> AdminPassword,
+              QueueName
+              binding >> callExternal util:RoleIdentifier() returns String
+            )
+            IWantToInviteAnUnconnectedUser = true for context >> extern
+
+      state IsPrepared = IWantToInviteAnUnconnectedUser
+
+      on exit
+          do for BrokerContract$Administrator
+            callEffect rabbit:DeleteAMQPaccount(
+              context >> extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url,
+              context >> extern >> NodeName,
+              context >> Administrator >> AdminUserName,
+              context >> Administrator >> AdminPassword,
+              callExternal util:RoleIdentifier() returns String,
+              AccountName
+            )
+      view ForAccountHolder (AccountName, AccountPassword, QueueName, LastName)
 
       perspective on extern
         view External$ForAccountHolder verbs (Consult)
       perspective on AccountHolder
         all roleverbs
-        props (AccountPassword) verbs (SetPropertyValue)
+        props (AccountName, AccountPassword, QueueName) verbs (SetPropertyValue)
         props (AccountName, QueueName) verbs (Consult)
       perspective on BrokerContract$Administrator
         props (LastName) verbs (Consult)
+      perspective on Invitations
+        only CreateAndFill
+        props (FirstNameOfAccountHolder, LastNameOfAccountHolder) verbs (Consult)
+        in object state IsPrepared
+          props (Message) verbs (SetPropertyValue)
+          props (SerialisedInvitation) verbs (Consult)
 
+      action CreateInvitation
+        do
+          let 
+            inv <- create context BrokerContract bound to Invitations
+          in
+            bind inv to Accounts in extern >> binder model:BrokerServices$BrokerService$Accounts >> context
+            bind Administrator to Administrator in inv
+            
       screen "Broker Contract"
         column
           form "BrokerService" External
           form "Administrator" Administrator
           form "Account" AccountHolder
+          table "Invitations" Invitations
+            props (Message, SerialisedInvitation)
 
     user Administrator filledBy bs:BrokerService$Administrator
       aspect sys:Invitation$Inviter
       property ConfirmationCode (String)
-      view Confirmation (ConfirmationCode)
 
       perspective on AccountHolder
         all roleverbs
-        props (AccountName, QueueName, AccountPassword) verbs (Consult, SetPropertyValue)
+        props (AccountName, QueueName, AccountPassword) verbs (SetPropertyValue)
         props (LastName, FirstName) verbs (Consult)
       perspective on extern
         view External$ForAdministrator verbs (Consult, SetPropertyValue)
+      perspective on Invitations
+        -- This is merely to make sure Administrator is sent all Invitations.
+        props (Name) verbs Consult
 
     aspect user sys:Invitation$Guest
 

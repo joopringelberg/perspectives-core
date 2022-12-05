@@ -198,7 +198,7 @@ bottom_ r = do
     Just b -> bottom_ b
 
 -- | From the instance of a Role (fillerId) of any kind, find the instances of the Role of the given
--- | type (filledId) that are filled with it. The type of rname (EnumeratedRoleType) may
+-- | type (filledType) that are filled with it. The type of filledType (EnumeratedRoleType) may
 -- | be psp:Context$externalRole.
 -- getFilledRoles
 getFilledRoles :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)

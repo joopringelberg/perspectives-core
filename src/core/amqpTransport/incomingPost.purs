@@ -40,7 +40,7 @@ import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, BrokerService, (##>))
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty, getFilledRoles)
-import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerServiceAccounts, brokerServiceExchange, brokerServiceUrl, connectedToAMQPBroker, sysUser)
+import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerServiceAccounts, brokerServiceExchange, brokerEndpoint, connectedToAMQPBroker, sysUser)
 import Perspectives.ModelDependencies (brokerService) as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
@@ -133,7 +133,7 @@ constructBrokerServiceForUser userId = do
   (Value queueId) <- getProperty (EnumeratedPropertyType accountHolderQueueName) accountHolder
 
   brokerContractExternal <- (context >=> externalRole >=> getFilledRoles (ContextType DEP.brokerService) (EnumeratedRoleType brokerServiceAccounts) >=> context >=> externalRole) accountHolder
-  (Value url) <- getProperty (EnumeratedPropertyType brokerServiceUrl) brokerContractExternal
+  (Value url) <- getProperty (EnumeratedPropertyType brokerEndpoint) brokerContractExternal
   (Value vhost) <- getProperty (EnumeratedPropertyType brokerServiceExchange) brokerContractExternal
 
   pure $

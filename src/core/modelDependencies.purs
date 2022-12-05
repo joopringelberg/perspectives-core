@@ -128,8 +128,8 @@ brokerService = "model:BrokerServices$BrokerService"
 brokerServiceAccounts :: String
 brokerServiceAccounts = "model:BrokerServices$BrokerService$Accounts"
 
-brokerServiceUrl :: String
-brokerServiceUrl = "model:BrokerServices$BrokerService$External$Url"
+brokerEndpoint :: String
+brokerEndpoint = "model:BrokerServices$BrokerService$External$Url"
 
 brokerServiceExchange :: String
 brokerServiceExchange = "model:BrokerServices$BrokerService$External$Exchange"
