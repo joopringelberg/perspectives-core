@@ -114,6 +114,8 @@ domain CouchdbManagement
       on exit
         do for PManager
           callEffect cdb:DeleteCouchdbDatabase( ServerUrl, "cw_servers_and_repositories" )
+          callEffect cdb:DeleteCouchdbDatabase( ServerUrl, "cw_servers_and_repositories_write" )
+          callEffect cdb:EndReplication( ServerUrl, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
 
     user PManager filledBy sys:PerspectivesSystem$User
       aspect sys:WithCredentials
@@ -380,8 +382,8 @@ domain CouchdbManagement
       property WriteInstances = "cw_" + Name + "_write"
       -- This equals the identifier of the Repository itself.
       property RepositoryUrl = binder Repositories >> context >> extern >> Url + Name
-      -- The URL that identifies the models database for this repository (for reading).
-      property ModelsUrl = binder Repositories >> context >> extern >> Url + ReadModels + "/"
+      -- The URL that identifies the models database for this repository (for writing).
+      property ModelsUrl = binder Repositories >> context >> extern >> Url + WriteModels + "/"
       -- The URL that identifies the instances database for this repository (for reading).
       property InstancesUrl = binder Repositories >> context >> extern >> Url + ReadInstances + "/"
       property AdminLastName = context >> Admin >> LastName
@@ -575,6 +577,10 @@ domain CouchdbManagement
       on entry
         do for Author
           ModelIdentifier = "model://" +  binder Manifests >> context >> extern >> Authority + "/" + ModelManifest$External$Name
+      
+      on exit
+        do for Author
+          callEffect cdb:DeleteDocument( binder Manifests >> context >> extern >> ModelsUrl + "model:" + ModelManifest$External$Name )
 
       state ReadyToCompile = (exists ArcSource)
 
