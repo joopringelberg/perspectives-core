@@ -28,6 +28,7 @@ module Perspectives.Persistence.CouchdbFunctions
 , endReplication
 , createUser
 , deleteUser
+, deleteDocument
 , ensureSecurityDocument
 , setPassword
 , createDatabase

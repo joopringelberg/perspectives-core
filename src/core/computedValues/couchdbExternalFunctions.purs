@@ -796,6 +796,11 @@ endReplication databaseUrls sources targets _ = case head databaseUrls, head sou
   Just databaseUrl, Just source, Just target -> void $ lift $ CDB.endReplication databaseUrl source target
   _, _, _ -> pure unit
 
+deleteDocument :: Array Url -> RoleInstance -> MonadPerspectivesTransaction Unit
+deleteDocument url_ _ = case head url_ of
+  Just url -> void $ lift $ CDB.deleteDocument url Nothing 
+  _ -> pure unit
+
 type UserName = String
 type Password = String
 
@@ -884,6 +889,7 @@ externalFunctions =
   , Tuple "model:Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
   , Tuple "model:Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 3}
   , Tuple "model:Couchdb$EndReplication" {func: unsafeCoerce endReplication, nArgs: 3}
+  , Tuple "model:Couchdb$DeleteDocument" {func: unsafeCoerce deleteDocument, nArgs: 1}
   , Tuple "model:Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}
   , Tuple "model:Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2}
   , Tuple "model:Couchdb$MakeDatabasePublic" {func: unsafeCoerce makeDatabasePublic, nArgs: 2}
