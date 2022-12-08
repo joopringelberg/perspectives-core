@@ -655,7 +655,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 
   where
     ensureDomainIsRange :: Domain -> Array Range -> ArcPosition -> FD -> FD
-    ensureDomainIsRange d@(VDOM r p) allowedRangeConstructors pos fd = if (isJust $ elemIndex r allowedRangeConstructors) && (isJust p)
+    ensureDomainIsRange d@(VDOM r p) allowedRangeConstructors pos fd = if (isJust $ elemIndex r allowedRangeConstructors) -- && (isJust p) Don't know why I originally added this constraint?
       then fd
       else throwError $ WrongTypeForOperator pos allowedRangeConstructors d
     ensureDomainIsRange d allowedRangeConstructors pos _ = throwError $ WrongTypeForOperator pos allowedRangeConstructors d
@@ -663,17 +663,20 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
     comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> FunctionName -> PhaseThree QueryFunctionDescription
     comparison pos left' right' functionName = do
       -- Both ranges must be equal, both sides must be functional.
-      gt <- lift2 $ pure (((range left') `eq` (range right')) && (pessimistic $ functional left') && (pessimistic $ functional right'))
-      if gt
-        then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM PBool Nothing) (isFunctionalFunction functionName) True
+      if ((range left') `eq` (range right'))
+        then if (pessimistic $ functional left') && (pessimistic $ functional right')
+          then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM PBool Nothing) (isFunctionalFunction functionName) True
+          else throwError $ CardinalitiesDoNotMatch (pessimistic $ functional left') (pessimistic $ functional right') pos
         else throwError $ TypesCannotBeCompared pos (range left') (range right')
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
       -- Both ranges must be equal, both sides must be functional.
       d1@(VDOM rc1 _), (VDOM rc2 _) | rc1 == rc2 ->
-        if  allowed rc1 && allowed rc2  && (pessimistic $ functional left') && (pessimistic $ functional right')
-          then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
+        if  allowed rc1 && allowed rc2
+          then if (pessimistic $ functional left') && (pessimistic $ functional right')
+            then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
+            else throwError $ CardinalitiesDoNotMatch (pessimistic $ functional left') (pessimistic $ functional right') pos
           else throwError $ WrongTypeForOperator pos allowedRangeConstructors d1
       l, r -> throwError $ TypesCannotBeCompared pos l r
       where
