@@ -72,9 +72,6 @@ domain System
           bind origin to ModelsInUse in currentcontext
         view Modellen$ModelPresentation verbs (Consult)
       perspective on BasicModels
-        action StartUsing
-          callEffect cdb:AddModelToLocalStore( binding >> context >> extern >> ModelIdentifier )
-          bind origin >> binding to BasicModelsInUse in currentcontext
         props (ModelName, Description) verbs (Consult)
       perspective on BasicModelsInUse
         only (Remove)
@@ -101,7 +98,7 @@ domain System
             table BasicModels
           row 
             table BasicModelsInUse
-              props (ModelIdentifier) verbs (Consult)
+              props (ModelIdentifier, Description) verbs (Consult)
         tab "Start contexts"
           row
             table IndexedContexts
@@ -128,7 +125,7 @@ domain System
 
     context BasicModels = BaseRepository >> binding >> context >> Manifests
 
-    context BasicModelsInUse (relational) filledBy sys:ModelManifest
+    context BasicModelsInUse (relational) filledBy sys:VersionedModelManifest
       on exit
         do for User
           callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelIdentifier )
@@ -327,7 +324,7 @@ domain System
   -- To be used as Aspect in model:CouchdbManagement$Repository
   case ManifestCollection
     context Manifests (relational) filledBy ModelManifest
-      -- e.g. "JoopsModel"
+      -- This is the local name, unqualified, of the model, e.g. "JoopsModel" or "System".
       property ModelName (String)
 
   case ModelManifest
@@ -336,4 +333,24 @@ domain System
       aspect sys:RootContext$External
       property Description (mandatory, String)
       property IsLibrary (mandatory, Boolean)
-      property ModelIdentifier (String)
+
+    user Visitor = sys:Me
+      perspective on Versions
+        props (Version, Description) verbs (Consult)
+        action StartUsing
+          callEffect cdb:AddModelToLocalStore( Versions$ModelIdentifier )
+          -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
+          -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
+          -- and complain that the author has no rights to modify it.
+          bind origin >> binding to BasicModelsInUse in sys:MySystem
+
+    context Versions filledBy VersionedModelManifest
+      property Version (mandatory, String)
+      -- The value of this property will be set by the Couchdb:VersionedModelManifest$Author.
+      property ModelIdentifier (mandatory, String)
+      property ModelUrl (mandatory, String)
+
+  case VersionedModelManifest
+    external
+      property Description (mandatory, String)
+      property ModelIdentifier = binder Versions >> Versions$ModelIdentifier
