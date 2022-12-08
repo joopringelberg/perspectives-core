@@ -25,11 +25,11 @@ module Perspectives.Parsing.Arc.PhaseTwoDefs where
 import Control.Monad.Except (ExceptT, lift, runExceptT)
 import Control.Monad.Except (throwError) as EXCEPT
 import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, runStateT)
-import Data.Array (singleton, union)
+import Data.Array (cons, elemIndex, singleton, tail, union)
 import Data.Either (Either)
 import Data.List (List(..), filter)
 import Data.Map (Map, empty, lookup) as MAP
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe, isJust, maybe)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import Foreign.Object (Object, empty, values)
@@ -44,11 +44,12 @@ import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
 import Perspectives.Names (defaultNamespaces, expandNamespaces)
 import Perspectives.Parsing.Arc.AST (ContextPart(..), ScreenE, StateQualifiedPart)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError, MultiplePerspectivesErrors)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Perspective (Perspective)
-import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedRoleType, RoleType)
-import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<<<), (>>=), (<$>))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType, DomeinFileId(..), EnumeratedRoleType, RoleType)
+import Prelude (class Eq, class Monad, Unit, bind, discard, eq, identity, map, pure, show, void, ($), (<$>), (<<<), (<>), (>>=))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -68,7 +69,17 @@ type PhaseTwoState =
   , postponedStateQualifiedParts :: List StateQualifiedPart
   , screens :: List ScreenE
   , perspectives :: MAP.Map (Tuple RoleType Step) Perspective
+  , loopdetection :: LoopDetection
 }
+
+data CurrentlyCalculated = Prop CalculatedPropertyType | Role CalculatedRoleType
+instance Eq CurrentlyCalculated where
+  eq (Prop p1) (Prop p2) = eq p1 p2
+  eq (Role p1) (Role p2) = eq p1 p2
+  eq _ _ = false
+
+
+type LoopDetection = Array CurrentlyCalculated
 
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot,
 -- | and allows exceptions.
@@ -99,7 +110,8 @@ runPhaseTwo_' computation dfr indexedContexts indexedRoles postponedParts = runS
   , variableBindings: ENV.empty
   , postponedStateQualifiedParts: postponedParts
   , screens: Nil
-  , perspectives: MAP.empty}
+  , perspectives: MAP.empty
+  , loopdetection: []}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 -- | Used in the test modules.
@@ -118,6 +130,7 @@ evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExc
   , postponedStateQualifiedParts: Nil
   , screens: Nil
   , perspectives: MAP.empty
+  , loopdetection: []
   }
 
 -- type PhaseTwo a = PhaseTwo' a Identity
@@ -148,6 +161,26 @@ getDF = lift $ gets _.dfr
 -- | Get a part of the DomeinFileRecord from PhaseTwoState.
 getsDF :: forall m n. MonadState PhaseTwoState m => (DomeinFileRecord -> n) -> m n
 getsDF f = gets (f <<< _.dfr)
+
+getLoopdetection :: PhaseThree LoopDetection
+getLoopdetection = lift $ gets _.loopdetection
+
+isBeingCalculated :: CurrentlyCalculated -> PhaseThree Boolean
+isBeingCalculated c@(Prop (CalculatedPropertyType _)) = getLoopdetection >>= pure <<< isJust <<< elemIndex c 
+isBeingCalculated c@(Role (CalculatedRoleType _)) = getLoopdetection >>= pure <<< isJust <<< elemIndex c 
+
+loopErrorMessage :: CurrentlyCalculated -> ArcPosition -> ArcPosition -> String
+loopErrorMessage def start end = 
+  case def of
+    (Prop (CalculatedPropertyType p)) -> "(RecursiveDefinition) Property " <> p <> " is defined in terms of itself (between " <> show start <> " and " <> show end <> ")."
+    (Role (CalculatedRoleType r)) -> "(RecursiveDefinition) Role " <> r <> " is defined in terms of itself (between " <> show start <> " and " <> show end <> ")."
+
+withCurrentCalculation :: forall a. CurrentlyCalculated -> PhaseThree a -> PhaseThree a
+withCurrentCalculation cc computation = do
+  void $ modify \s@{loopdetection} -> s {loopdetection = cons cc loopdetection}
+  r <- computation
+  void $ modify \s@{loopdetection} -> s {loopdetection = maybe [] identity (tail loopdetection)}
+  pure r
 
 getVariableBindings :: forall m. Monad m => PhaseTwo' m (Environment QueryFunctionDescription)
 getVariableBindings = lift $ gets _.variableBindings

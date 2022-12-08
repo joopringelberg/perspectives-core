@@ -102,6 +102,7 @@ data PerspectivesError
     | CurrentObjectNotAllowed ArcPosition ArcPosition
     | CurrentSubjectNotAllowed ArcPosition ArcPosition
     | FillerRestrictionNotAnAspectSubtype ArcPosition ArcPosition String String
+    | RecursiveDefinition String
 
     | UnauthorizedForProperty String RoleType RoleType PropertyType PropertyVerb
     | UnauthorizedForRole String RoleType RoleType (Array RoleVerb)
@@ -186,6 +187,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (CurrentObjectNotAllowed start end) = "(CurrentObjectNotAllowed) The variable `currentobject` is illegal in the expression between " <> show start <> " and " <> show end <> "."
   show (CurrentSubjectNotAllowed start end) = "(CurrentSubjectNotAllowed) The variable `currentsubject` is illegal in the expression between " <> show start <> " and " <> show end <> "."
   show (FillerRestrictionNotAnAspectSubtype rolePos aspectPos roleName aspectName) = "(FillerRestrictionNotAnAspectSubtype) The role " <> roleName <> " (at " <> show rolePos <> ") has a value for the filledBy clause that is not a subtype of that of its aspect " <> aspectName <> "(at " <> show aspectPos <> ")."
+  show (RecursiveDefinition s) = "(RecursiveDefinition) " <> s
   show (UnauthorizedForProperty author userRole role property verb) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> "."
   show (UnauthorizedForRole author userRole role verbs) = "(UnauthorizedForRole) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes at least one of " <> show verbs
   show (UnauthorizedForContext author userRole contextType) = "(UnauthorizedForContext) User " <> author <> " in role " <> show userRole <> " has no perspective on context " <> show contextType

@@ -51,10 +51,10 @@ import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpr
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, throwError, withFrame)
+import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2roleType, functional, mandatory, propertyOfRange, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
@@ -116,16 +116,21 @@ makeRoleGetter currentDomain@(CDOM contextAdt) rt@(ENR et) = do
 -- | Saves it in the DomainCache.
 -- | Returns the range of the calculation.
 compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT RoleInContext)
-compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole}) = withFrame do
-  expressionWithEnvironment <- pure $ addContextualBindingsToExpression
-    [ makeIdentityStep "currentcontext" (startOf step)
-    , makeIdentityStep "origin" (startOf step)
-    ]
-    step
-  compiledExpression <- compileExpression dom expressionWithEnvironment
-  -- Save the result in DomeinCache.
-  lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
-  pure $ unsafePartial $ domain2roleType $ range compiledExpression
+compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole, pos}) = withFrame do
+  loops <- isBeingCalculated (Role _id)
+  if loops
+    then throwError $ (RecursiveDefinition $ loopErrorMessage (Role _id) pos pos) 
+    else withCurrentCalculation (Role _id)
+      do
+        expressionWithEnvironment <- pure $ addContextualBindingsToExpression
+          [ makeIdentityStep "currentcontext" (startOf step)
+          , makeIdentityStep "origin" (startOf step)
+          ]
+          step
+        compiledExpression <- compileExpression dom expressionWithEnvironment
+        -- Save the result in DomeinCache.
+        lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
+        pure $ unsafePartial $ domain2roleType $ range compiledExpression
 
 -- | Ensures that the range of the QueryFunctionDescription is a qualified
 -- | EnumeratedRole.
@@ -211,24 +216,29 @@ makePropertyGetter currentDomain pt = do
 -- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
 -- | Saves it in the DomainCache.
 compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> PhaseThree QT.Range
-compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role}) = withFrame do
-  -- We add the role as the variable "currentobject"
-  kindOfRole <- unsafePartial $ roleKind role
-  if kindOfRole == RTI.UserRole && stepContainsVariableReference "currentobject" step
-    then throwError (CurrentObjectNotAllowed (startOf step) (endOf step))
-    else pure unit
-  expressionWithEnvironment <- pure $ addContextualBindingsToExpression
-    [ makeContextStep "currentcontext" (startOf step)
-    , makeIdentityStep "origin" (startOf step)
-    ]
-    step
-  compiledExpression <- compileExpression dom expressionWithEnvironment
-  -- Save the result in DomeinCache.
-  lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
-  pure $ range compiledExpression
-  where
-    roleKind :: Partial => EnumeratedRoleType -> PhaseThree RTI.RoleKind
-    roleKind (EnumeratedRoleType s) = gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
+compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role, pos}) = withFrame do
+  loops <- isBeingCalculated (Prop _id)
+  if loops
+    then throwError $ (RecursiveDefinition $ loopErrorMessage (Prop _id) pos pos) 
+    else withCurrentCalculation (Prop _id)
+      do
+      -- We add the role as the variable "currentobject"
+      kindOfRole <- unsafePartial $ roleKind role
+      if kindOfRole == RTI.UserRole && stepContainsVariableReference "currentobject" step
+        then throwError (CurrentObjectNotAllowed (startOf step) (endOf step))
+        else pure unit
+      expressionWithEnvironment <- pure $ addContextualBindingsToExpression
+        [ makeContextStep "currentcontext" (startOf step)
+        , makeIdentityStep "origin" (startOf step)
+        ]
+        step
+      compiledExpression <- compileExpression dom expressionWithEnvironment
+      -- Save the result in DomeinCache.
+      lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
+      pure $ range compiledExpression
+      where
+        roleKind :: Partial => EnumeratedRoleType -> PhaseThree RTI.RoleKind
+        roleKind (EnumeratedRoleType s) = gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
 
 ------------------------------------------------------------------------------------
 ------ COMPILING STEPS AND DISTRIBUTING THEIR INVERSION OVER THE DOMEINFILE.
