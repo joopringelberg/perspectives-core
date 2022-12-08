@@ -505,7 +505,11 @@ compileSimpleStep currentDomain (Variable pos varName) = do
   mBinding <- lookupVariableBinding varName
   case mBinding of
     Nothing -> throwError $ UnknownVariable pos varName
-    (Just fdesc) -> pure $ SQD currentDomain (QF.VariableLookup varName) (range fdesc) (functional fdesc) (mandatory fdesc)
+    (Just fdesc) -> do 
+      isF <- if isJust $ elemIndex varName ["currentcontext", "origin", "currentactor", "notifieduser"]
+        then pure True
+        else pure $ functional fdesc
+      pure $ SQD currentDomain (QF.VariableLookup varName) (range fdesc) isF (mandatory fdesc)
 
 compileUnaryStep :: Domain -> UnaryStep -> FD
 compileUnaryStep currentDomain (LogicalNot pos s) = do
@@ -717,7 +721,7 @@ compileVarBinding currentDomain (VarBinding varName step) = do
   step_ <- compileStep currentDomain step
   addBinding varName step_
   -- TODO. Misschien: als varName=="currentsubject", en step is niet Identity, maak er dan "filter <step> with binds sys:Me" van.
-  isF <- if varName == "currentsubject"
+  isF <- if isJust $ elemIndex varName ["currentcontext", "origin", "currentactor", "notifieduser"]
     then pure True
     else pure $ functional step_
   pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) isF (mandatory step_)
