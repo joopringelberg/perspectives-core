@@ -45,7 +45,7 @@ import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(
 import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, prefixedName, qualifiedName, reserved, stringUntilNewline)
-import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, sameOrOutdented', setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoReservedWords)
 import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
@@ -242,6 +242,7 @@ contextE = withPos do
       void $ reserved "indexed"
       pos <- getPosition
       indexedName <- arcIdentifier
+      sameOrOutdented'
       pure $ singleton $ IndexedContext indexedName pos
 
     useE :: IP ContextPart
@@ -250,6 +251,7 @@ contextE = withPos do
       void $ reserved "for"
       pos <- getPosition
       modelName <- arcIdentifier
+      sameOrOutdented'
       if isModelName modelName
         then pure $ PREFIX prefix modelName
         else fail ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)")
@@ -517,6 +519,8 @@ aspectE = withPos do
   pos <- getPosition
   aspect <- arcIdentifier
   (mPropertyMapping :: Maybe PropertyMapping) <- optionMaybe ((reserved "where") *> propertyMapping)
+  -- There may be no indented source beyond this, so the next line must have the same or less indentation.
+  sameOrOutdented'
   pure $ RoleAspect aspect pos mPropertyMapping
 
 propertyMapping :: IP PropertyMapping
@@ -539,6 +543,7 @@ indexedE = do
   void $ reserved "indexed"
   pos <- getPosition
   indexedName <- arcIdentifier
+  sameOrOutdented'
   pure $ IndexedRole indexedName pos
 
 propertyE :: IP RolePart
@@ -1115,6 +1120,7 @@ roleVerbs = do
       start <- getPosition
       (rv :: RoleVerbList) <- roleVerbList
       end <- getPosition
+      sameOrOutdented'
       pure $ RoleVerbE {subject: s, object: o, state, roleVerbs: rv, start, end}
     Nothing, Nothing -> fail "User role and object of perspective must be given"
     Nothing, (Just _) -> fail "User role must be given"
@@ -1159,6 +1165,7 @@ selfOnly = do
     Just s, Just o -> do
       start <- getPosition
       end <- getPosition
+      sameOrOutdented'
       pure $ SelfOnly {subject: s, object: o, state, start, end}
     Nothing, Nothing -> fail "User role and object of perspective must be given"
     Nothing, (Just _) -> fail "User role must be given"
@@ -1184,6 +1191,7 @@ propertyVerbs = basedOnView <|> basedOnProps
           view <- reserved "view" *> (View <$> arcIdentifier)
           (pv :: ExplicitSet PropertyVerb) <- option Universal (reserved "verbs" *> lotsOfVerbs)
           end <- getPosition
+          sameOrOutdented'
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
         _, _ -> fail "User role and object of perspective must be given"
 
@@ -1202,6 +1210,7 @@ propertyVerbs = basedOnView <|> basedOnProps
           props <- option AllProperties (reserved "props" *> (Properties <$> lotsOfProperties))
           (pv :: ExplicitSet PropertyVerb) <- option Universal (reserved "verbs" *> lotsOfVerbs)
           end <- getPosition
+          sameOrOutdented'
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: props, start, end}
         _, _ -> fail "User role and object of perspective must be given"
 
