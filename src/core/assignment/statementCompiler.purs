@@ -33,11 +33,12 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (Object, keys, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes ((###>), (###=))
+import Perspectives.CoreTypes ((###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (areLastSegmentsOf, buitenRol, deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
+import Perspectives.Instances.Combinators (filter')
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame, throwError)
@@ -58,8 +59,8 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isDatabaseQueryRole, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, show, unit, ($), (<$>), (<*>), (<>), (==), (>>=), (<<<), (>), (&&), (>=>))
+import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isCalculatedProperty, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
+import Prelude (bind, discard, pure, show, unit, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>), (>=>), (>>=))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -378,10 +379,9 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           (rt :: ADT EnumeratedRoleType) <- case range roleQfd of
             (RDOM rt') -> pure $ roleInContext2Role <$> rt'
             otherwise -> throwError $ NotARoleDomain otherwise start end
-          (mrt :: Maybe PropertyType) <- lift2 (rt ###> lookForUnqualifiedPropertyType propertyIdentifier)
-          case mrt of
-            Just (ENP et) -> pure et
-            Just (CP ct') -> throwError $ CannotCreateCalculatedProperty ct' start end
+          (candidates :: Array PropertyType) <- lift2 (rt ###= (filter' (lookForUnqualifiedPropertyType propertyIdentifier) isEnumeratedProperty))
+          case head candidates of
+            Just (ENP et) | length candidates == 1 -> pure et
             otherwise -> throwError $ RoleHasNoProperty rt propertyIdentifier start end
 
         -- | If the name is unqualified, look for an EnumeratedRole with matching local name in the Domain.

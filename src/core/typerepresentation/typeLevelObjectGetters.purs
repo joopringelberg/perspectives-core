@@ -166,11 +166,19 @@ enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspe
 
 -- | Returns User RoleTypes that are guaranteed to be Calculated.
 calculatedUserRole :: ContextType ~~~> RoleType
-calculatedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< filter isCalculated <<< ContextClass.userRole)
-  where
-    isCalculated :: RoleType -> Boolean
-    isCalculated (ENR _) = false
-    isCalculated (CR _) = true
+calculatedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> pure <<< filter isCalculatedRole <<< ContextClass.userRole)
+
+isCalculatedRole :: RoleType -> Boolean
+isCalculatedRole (ENR _) = false
+isCalculatedRole (CR _) = true
+
+isCalculatedProperty :: PropertyType -> Boolean
+isCalculatedProperty (ENP _) = false
+isCalculatedProperty (CP _) = true
+
+isEnumeratedProperty :: PropertyType -> Boolean
+isEnumeratedProperty (ENP _) = true
+isEnumeratedProperty (CP _) = false
 
 -- | Returns all Enumerated role types in the context
 allEnumeratedRoles :: ContextType ~~~> EnumeratedRoleType
