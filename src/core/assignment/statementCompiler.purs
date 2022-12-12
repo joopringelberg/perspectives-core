@@ -48,11 +48,11 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, reduce)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfADT, bindingOfRole, roleAndBinding, roleAspectsADT, roleKindOfRoleType)
+import Perspectives.Representation.Class.Role (allFillers, bindingOfADT, bindingOfRole, roleAspectsADT, roleKindOfRoleType)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
@@ -228,9 +228,9 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         -- the possible bindings of binderType (qualifiedRoleIdentifier) should be less specific (=more general) than or equal to the type of the results of binderExpression (bindings).
         qualifies <- do
           (possibleBinding :: ADT RoleInContext) <- lift $ lift (bindingOfRole (ENR qualifiedRoleIdentifier))
-          -- On comparing roles, their binding counts!
-          bindings' <- lift $ lift $ reduce (getEnumeratedRole >=> roleAndBinding) (roleInContext2Role <$> (unsafePartial domain2roleType (range bindings)))
-          lift $ lift ((roleInContext2Role <$> possibleBinding) `equalsOrGeneralisesRoleADT` (roleInContext2Role <$> bindings'))
+          -- On comparing roles, their binding counts! TODO. Dit is niet recursief genoeg.
+          bindings' <- lift $ lift $ allFillers (roleInContext2Role <$> (unsafePartial domain2roleType (range bindings)))
+          lift $ lift ((roleInContext2Role <$> possibleBinding) `equalsOrGeneralisesRoleADT` bindings')
         if qualifies
           -- Create a function description that describes the actual role creating and binding.
           then pure $ BQD originDomain (QF.Bind qualifiedRoleIdentifier) bindings cte originDomain True True

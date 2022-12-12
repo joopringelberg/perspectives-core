@@ -236,6 +236,24 @@ directProperties = reduce magic
       pure properties
 
 --------------------------------------------------------------------------------------------------
+---- ALLFILLERS
+--------------------------------------------------------------------------------------------------
+-- | All fillers, computed recursively over binding, of the Role ADT.
+-- | UNIVERSAL is treated like EMPTY.
+-- Ik wil naar ADT EnumeratedRoleType, van ADT EnumeratedRoleType
+allFillers :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+allFillers = reduce magic
+  where
+    magic :: EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+    magic role = do
+      EnumeratedRole{binding} <- getEnumeratedRole role
+      case binding of 
+        EMPTY -> pure $ ST role
+        otherwise -> do
+          expansion <- reduce magic (roleInContext2Role <$> otherwise)
+          pure $ product [ST role, expansion]
+
+--------------------------------------------------------------------------------------------------
 ---- ROLESET
 --------------------------------------------------------------------------------------------------
 -- | The roles of this context and its aspects, recursively.
