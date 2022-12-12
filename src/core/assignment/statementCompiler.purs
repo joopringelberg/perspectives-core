@@ -59,7 +59,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isCalculatedProperty, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
+import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
 import Prelude (bind, discard, pure, show, unit, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>), (>=>), (>>=))
 
 ------------------------------------------------------------------------------------
@@ -382,7 +382,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           (candidates :: Array PropertyType) <- lift2 (rt ###= (filter' (lookForUnqualifiedPropertyType propertyIdentifier) isEnumeratedProperty))
           case head candidates of
             Just (ENP et) | length candidates == 1 -> pure et
-            otherwise -> throwError $ RoleHasNoProperty rt propertyIdentifier start end
+            otherwise -> throwError $ RoleHasNoEnumeratedProperty rt propertyIdentifier start end
 
         -- | If the name is unqualified, look for an EnumeratedRole with matching local name in the Domain.
         -- | Then, we check whether a candidate's binding type equals the second argument, or is less specialised. In other words: whether the candidate could bind it (the second argument).
