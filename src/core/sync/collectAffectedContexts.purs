@@ -50,6 +50,7 @@ import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPers
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.Data.EncodableMap (values, empty, lookup) as EM
 import Perspectives.Deltas (addDelta)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
@@ -202,20 +203,25 @@ isForSelfOnly (InvertedQuery{selfOnly}) = selfOnly
 handleBackwardQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array ContextWithUsers)
 handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompiled, users:userTypes, states, forwardsCompiled}) = catchError
   (do
-  if unsafePartial shouldResultInContextStateQuery iq
-    then createContextStateQuery
-    else if unsafePartial shouldResultInRoleStateQuery iq
-      then createRoleStateQuery
-        else usersWithAnActivePerspective)
-  (\e -> do
-    logPerspectivesError (Custom $ show e)
-    pure [])
+  case backwardsCompiled of
+    Nothing -> do 
+      logPerspectivesError (Custom $ "Backwards is not compiled on " <> prettyPrint description) 
+      pure []
+    _ -> do
+      if unsafePartial shouldResultInContextStateQuery iq
+        then createContextStateQuery
+        else if unsafePartial shouldResultInRoleStateQuery iq
+          then createRoleStateQuery
+            else usersWithAnActivePerspective)
+      (\e -> do
+        logPerspectivesError (Custom $ show e)
+        pure [])
   where
     -- | The InvertedQuery is based on a Context state condition.
     -- | This function adds, as a side effect, an InvertedQueryResult to the current transaction.
     createContextStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createContextStateQuery = do
-      (invertedQueryResults :: Array ContextInstance) <- lift (roleInstance ##= ((unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance))
+      (invertedQueryResults :: Array ContextInstance) <- lift (roleInstance ##= (contextInstancesGetter :: RoleInstance ~~> ContextInstance))
       addInvertedQueryResult $ ContextStateQuery invertedQueryResults
       pure []
 
@@ -223,7 +229,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
     -- | This function adds, as a side effect, an InvertedQueryResult to the current transaction.
     createRoleStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createRoleStateQuery = do
-      (affectedRoles :: Array RoleInstance) <- lift (roleInstance ##= ((unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance))
+      (affectedRoles :: Array RoleInstance) <- lift (roleInstance ##= (roleInstancesGetter :: RoleInstance ~~> RoleInstance))
       addInvertedQueryResult $ RoleStateQuery affectedRoles
       pure []
 
@@ -248,7 +254,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
     -- | Hence, it inversion leads back to that context.
     fromContextResults :: MonadPerspectivesTransaction (Array ContextWithUsers)
     fromContextResults = do
-      (contextsWithPerspectiveHolders :: Array ContextInstance) <- lift (roleInstance ##= ((unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> ContextInstance))
+      (contextsWithPerspectiveHolders :: Array ContextInstance) <- lift (roleInstance ##= (contextInstancesGetter :: RoleInstance ~~> ContextInstance))
       foldM computeUsersFromContext [] contextsWithPerspectiveHolders
 
       where
@@ -294,7 +300,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
     -- | subject state.
     fromRoleResults :: MonadPerspectivesTransaction (Array ContextWithUsers)
     fromRoleResults = do
-      (rolesExpressionsAreAppliedTo :: Array RoleInstance) <- lift (roleInstance ##= ((unsafeCoerce $ unsafePartial $ fromJust backwardsCompiled) :: RoleInstance ~~> RoleInstance))
+      (rolesExpressionsAreAppliedTo :: Array RoleInstance) <- lift (roleInstance ##= (roleInstancesGetter :: RoleInstance ~~> RoleInstance))
       foldM computeUsersFromRole [] rolesExpressionsAreAppliedTo
 
       where
@@ -324,6 +330,22 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
                     cid <- lift (rid ##>> OG.context)
                     flip cons accumulatedUsers <<< Tuple cid <$> lift (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
                   else pure accumulatedUsers
+    
+    roleInstancesGetter :: RoleInstance ~~> RoleInstance
+    roleInstancesGetter = case backwardsCompiled of
+      Nothing -> do 
+        \_ -> do 
+          logPerspectivesError (Custom $ "Backwards is not compiled on " <> prettyPrint description) 
+          ArrayT $ pure []
+      Just c -> unsafeCoerce c
+
+    contextInstancesGetter :: RoleInstance ~~> ContextInstance
+    contextInstancesGetter = case backwardsCompiled of
+      Nothing -> do 
+        \_ -> do 
+          logPerspectivesError (Custom $ "Backwards is not compiled on " <> prettyPrint description) 
+          ArrayT $ pure []
+      Just c -> unsafeCoerce c
 
 -- | Adds the InvertedQueryResult to the current Transaction, but only if the resource is not marked as (to be) removed.
 addInvertedQueryResult :: InvertedQueryResult -> MonadPerspectivesTransaction Unit
