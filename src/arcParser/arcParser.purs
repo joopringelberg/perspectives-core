@@ -1348,7 +1348,7 @@ widgetCommonFields = do
   protectObject do
     setObject perspective
     if isIndented'
-      then do
+      then withPos do
         mpropertyVerbs <- optionMaybe propertyVerbs
         mroleVerbs <- optionMaybe roleVerbs
         end <- getPosition
