@@ -42,7 +42,7 @@ import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
-import Perspectives.Identifiers (LocalName, deconstructBuitenRol, deconstructLocalName, deconstructModelName)
+import Perspectives.Identifiers (LocalName, deconstructBuitenRol, deconstructLocalName, deconstructModelName, isPublicResource)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
 import Perspectives.Instances.Combinators (disjunction)
 import Perspectives.Persistence.API (getViewOnDatabase)
@@ -88,12 +88,17 @@ contextType cid  = ArrayT $ (lift $ try $ getContextMember (\c -> [context_pspTy
 
 -- TODO. Fix the issue that an unlinked role does not show up for
 -- a public context.
+-- | For a global context, never returns an instance. 
+-- | This is because member 'me' is a purely local optimization to quickly find the users' role.
+-- | However, all users share the same global context, so this cannot be done.
 getMe :: ContextInstance ~~> RoleInstance
-getMe ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
-  handlePerspectContextError' "getMe" []
-    \c -> do
-      tell $ ArrayWithoutDoubles [Me ctxt]
-      pure $ maybe [] singleton (context_me c)
+getMe ctxt = if isPublicResource (unwrap ctxt)
+  then ArrayT $ pure []
+  else ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
+    handlePerspectContextError' "getMe" []
+      \c -> do
+        tell $ ArrayWithoutDoubles [Me ctxt]
+        pure $ maybe [] singleton (context_me c)
 
 getPreferredUserRoleType :: ContextInstance ~~> RoleType
 getPreferredUserRoleType ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
@@ -302,14 +307,21 @@ allRoleBinders r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
         filledRoles
 
 -- | `isMe` has an internal error boundary. On failure, it returns false.
+-- | If the role instance is a public resource, checks the binding regardless of the value of member 'me'.
+-- | This is because 'me' is a purely local optimization that is never synchronized, but this fails for 
+-- | obvious reasons for public resources.
 isMe :: RoleInstance -> MP Boolean
 isMe ri = (try $ getPerspectRol ri) >>=
   handlePerspectRolError' "isMe" false
-    \(IP.PerspectRol{isMe: me, binding: bnd, pspType}) -> if me
-      then pure true
-      else case bnd of
+    \(IP.PerspectRol{isMe: me, binding: bnd, pspType}) -> if isPublicResource (unwrap ri)
+      then case bnd of 
         Nothing -> pure false
         Just b -> isMe b
+      else if me
+        then pure true
+        else case bnd of
+          Nothing -> pure false
+          Just b -> isMe b
 
 notIsMe :: RoleInstance -> MP Boolean
 notIsMe = isMe >=> pure <<< not
