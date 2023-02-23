@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
--- | This module defines External Core functions for model:Couchdb.
+-- | This module defines External Core functions for model://perspectives.domains#Couchdb.
 
 module Perspectives.Instances.Indexed where
 

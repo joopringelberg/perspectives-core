@@ -43,7 +43,7 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, 
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Identifiers (buitenRol, deconstructNamespace_, unsafeDeconstructModelName)
+import Perspectives.Identifiers (buitenRol, typeUri2typeNameSpace_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
 import Perspectives.ModelDependencies (rootContext, sysUser)
@@ -145,7 +145,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
                 , states = [StateIdentifier $ unwrap contextType]
                 })
             lift $ void $ cacheEntity id contextInstance
-            (lift $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
+            (lift $ findRoleRequests (ContextInstance "def:AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
             addCreatedContextToTransaction id
           else pure unit
     else do
@@ -156,7 +156,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authorizedRole, deltaType, subject}) s = do
   log (show deltaType <> " for/from " <> show id <> " with ids " <> show roleInstances <> " with type " <> show roleType)
-  loadModelIfMissing (unsafeDeconstructModelName $ unwrap roleType)
+  loadModelIfMissing (unsafePartial typeUri2ModelUri_ $ unwrap roleType)
   case deltaType of
     ConstructEmptyRole -> do
       -- We have to check this case: a user is allowed to create himself.
@@ -193,7 +193,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove]) >>= case _ of
         Left e -> handleError e
         -- As external roles are always stored the same as their contexts, we can reliably retrieve the context instance id from the role id.
-        Right _ -> for_ (ContextInstance <<< deconstructNamespace_ <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)
+        Right _ -> for_ (ContextInstance <<< typeUri2typeNameSpace_ <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)
     where
       userCreatesThemselves :: Boolean
       userCreatesThemselves = case subject of

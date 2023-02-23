@@ -1,4 +1,4 @@
-module Test.Parsing.Arc.PhaseTwo where
+module Test.Parsing.Arc.PhaseTwo where 
 
 import Prelude
 
@@ -55,7 +55,9 @@ testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 evalPhaseTwo :: forall a. PhaseTwo a -> Aff (Either PerspectivesError a)
 -- evalPhaseTwo = unwrap <<< evalPhaseTwo'
-evalPhaseTwo = evalPhaseTwo'
+evalPhaseTwo = evalPhaseTwo' >=> case _ of
+  Left errs -> pure $ Left (unsafePartial fromJust $ head errs)
+  Right r -> pure $ Right r
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do

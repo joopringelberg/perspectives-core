@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
--- | This module defines External Core functions for model:Couchdb.
+-- | This module defines External Core functions for model://perspectives.domains#Couchdb.
 
 module Perspectives.Extern.Couchdb where
 
@@ -45,7 +45,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Effect.Class (liftEffect)
+import Effect.Class.Console (logShow)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
@@ -66,15 +66,14 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvert
 import Perspectives.Error.Boundaries (handleDomeinFileError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Guid (guid)
-import Perspectives.Identifiers (constructUserIdentifier, deconstructLocalName_, getFirstMatch, modelName2modelStore, namespace2modelname_, newModelRegex, oldModelRegex)
+import Perspectives.Identifiers (typeUri2LocalName_, getFirstMatch, modelUri2DomeinFileName_, modelUri2ModelRepository, newModelRegex)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.Indexed (replaceIndexedNames)
 import Perspectives.Instances.ObjectGetters (contextType, isMe)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
-import Perspectives.ModelDependencies (installer, modelDescription, sysUser)
+import Perspectives.ModelDependencies (installer, modelDescription, sysUser, systemModelName, theSystem)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Models (modelsInUse, modelsInUseRole) as Models
 import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
@@ -93,7 +92,8 @@ import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
+import Perspectives.ResourceIdentifiers (createResourceIdentifier)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -131,7 +131,7 @@ modelsDatabaseName :: MonadPerspectives String
 modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models")
 
 -- | Retrieves all instances of a particular role type from Couchdb.
--- | For example: `user: Users = callExternal cdb:RoleInstances(sysUser) returns: model:System$PerspectivesSystem$User`
+-- | For example: `user: Users = callExternal cdb:RoleInstances(sysUser) returns: model://perspectives.domains/System$PerspectivesSystem$User`
 -- | Notice that only the first element of the array argument is actually used.
 -- | Notice, too, that the second parameter is ignored. We must provide it, however, as the query compiler
 -- | will give us an argument for it.
@@ -140,7 +140,7 @@ roleInstancesFromCouchdb roleTypes _ = ArrayT do
   case head roleTypes of
     Nothing -> pure []
     Just rt -> do
-      (tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)])
+      (tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "def:AnyContext") (EnumeratedRoleType rt)])
       (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/roleView" (head roleTypes)
 
 contextInstancesFromCouchdb :: Array String -> (RoleInstance ~~> ContextInstance)
@@ -153,7 +153,7 @@ contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
 
 pendingInvitations :: ContextInstance ~~> RoleInstance
 pendingInvitations _ = ArrayT do
-  -- tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "model:System$AnyContext") (EnumeratedRoleType rt)]
+  -- tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "def:AnyContext") (EnumeratedRoleType rt)]
   (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/pendingInvitations" (Nothing :: Maybe Unit)
 
 -- | Overwrites the model currently residing in the local models database.
@@ -167,7 +167,7 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
     descriptionGetter <- lift $ getDynamicPropertyGetter modelDescription (ST Models.modelsInUseRole)
     description <- lift (modelsInUse ##= descriptionGetter)
     lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
-  Just modelName -> updateModel' (maybe false (eq "true") (head arrWithDependencies)) (DomeinFileId modelName)
+  Just modelName -> updateModel' (maybe false (eq "true") (head arrWithDependencies)) (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ modelName)
   where
     -- TODO. Note that while we have not yet the model identification as an URL, the parameter url is bound to
     -- the repository location of the model supplied in the call to updateModel.
@@ -180,21 +180,21 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
         -- Untangle the InvertedQueries of the previous model.
       forWithIndex_ invertedQueriesInOtherDomains
         \domainName queries -> do
-          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+          (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
       forWithIndex_ upstreamStateNotifications
         \domainName notifications -> do
-          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+          (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications removeDownStreamNotification) dfr))
       forWithIndex_ upstreamAutomaticEffects
         \domainName automaticEffects -> do
-          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+          (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
@@ -204,7 +204,7 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
       -- Install the new model, taking care of outgoing InvertedQueries.
       -- TODO. As soon as model identifiers are URLs, do not concatenate the url to the modelName.
       addModelToLocalStore' modelName false
-      DomeinFile dfr <- lift $ getDomeinFile $ DomeinFileId modelName
+      DomeinFile dfr <- lift $ getDomeinFile $ DomeinFileId $ unsafePartial modelUri2DomeinFileName_ modelName
       -- Find all models in use.
       models' <- lift (Models.modelsInUse >>= traverse getDomeinFile)
       -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
@@ -227,11 +227,9 @@ addModelsToLocalStore_ :: Array String -> MonadPerspectivesTransaction Unit
 addModelsToLocalStore_ modelnames = for_ modelnames (flip addModelToLocalStore' true)
 
 addModelToLocalStore' :: String -> Boolean -> MonadPerspectivesTransaction Unit
-addModelToLocalStore' modelname originalLoad = if test oldModelRegex modelname 
-  then addModelToLocalStore_oldStyle modelname originalLoad
-  else if test newModelRegex modelname 
-    then addModelToLocalStore_newStyle modelname originalLoad
-    else throwError (error $ "Not a valid model name: " <> modelname)
+addModelToLocalStore' modelname originalLoad = if test newModelRegex modelname 
+  then addModelToLocalStore_newStyle modelname originalLoad
+  else throwError (error $ "Not a valid model name: " <> modelname)
 
 -- modelname can be both an old style modelname or a new style modelname.
 addModelToLocalStore_oldStyle :: String -> Boolean -> MonadPerspectivesTransaction Unit
@@ -271,16 +269,20 @@ addModelToLocalStore_oldStyle modelname originalLoad = do
     case mexistingReplacement of
       Just existingReplacement -> pure $ Tuple (unwrap iRole) existingReplacement
       Nothing -> do
-        g <- liftEffect guid
-        pure $ Tuple (unwrap iRole) (RoleInstance (constructUserIdentifier $ show g))) >>= pure <<< fromFoldable
+        -- We don't want to look up the role type right now and we don't really need it
+        -- because it is allright for now to store this instance in the default store.
+        rid <- createResourceIdentifier (RType $ EnumeratedRoleType "")
+        pure $ Tuple (unwrap iRole) (RoleInstance rid)) >>= pure <<< fromFoldable
 
   (icontexts :: Object ContextInstance) <- for indexedContexts (\iContext -> do
     (mexistingReplacement :: Maybe ContextInstance) <- lift $ lookupIndexedContext (unwrap iContext)
     case mexistingReplacement of
       Just existingReplacement -> pure $ Tuple (unwrap iContext) existingReplacement
       Nothing -> do
-        g <- liftEffect guid
-        pure $ Tuple (unwrap iContext) (ContextInstance (constructUserIdentifier $ show g))) >>= pure <<< fromFoldable
+        -- We don't want to look up the context type right now and we don't really need it
+        -- because it is allright for now to store this instance in the default store.
+        cid <- createResourceIdentifier (CType $ ContextType "")
+        pure $ Tuple (unwrap iContext) (ContextInstance cid)) >>= pure <<< fromFoldable
 
   mySystem <- lift (ContextInstance <$> getMySystem)
   me <- lift (RoleInstance <$> getUserIdentifier)
@@ -420,7 +422,7 @@ addModelToLocalStore_oldStyle modelname originalLoad = do
   -- Distribute the SeparateInvertedQueries over the other domains.
   forWithIndex_ invertedQueriesInOtherDomains
     \domainName queries -> do
-      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -429,7 +431,7 @@ addModelToLocalStore_oldStyle modelname originalLoad = do
   -- Distribute upstream state notifications over the other domains.
   forWithIndex_ upstreamStateNotifications
     \domainName notifications -> do
-      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -438,7 +440,7 @@ addModelToLocalStore_oldStyle modelname originalLoad = do
   -- Distribute upstream automatic effects over the other domains.
   forWithIndex_ upstreamAutomaticEffects
     \domainName automaticEffects -> do
-      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -474,14 +476,12 @@ addModelToLocalStore_oldStyle modelname originalLoad = do
 
 addModelToLocalStore_newStyle :: String -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore_newStyle modelname originalLoad = do
-  repositoryUrl <- pure $ unsafePartial modelName2modelStore modelname
-  docName <- pure $ unsafePartial namespace2modelname_ modelname
+  repositoryUrl <- pure $ unsafePartial modelUri2ModelRepository modelname
+  docName <- pure $ unsafePartial modelUri2DomeinFileName_ modelname
   df@(DomeinFile
     { _id
-    , modelDescription
-    , crl
-    , indexedRoles
-    , indexedContexts
+    -- , indexedRoles
+    -- , indexedContexts
     , referredModels
     , invertedQueriesInOtherDomains
     , upstreamStateNotifications
@@ -496,10 +496,16 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   -- Copy the attachment
   lift $ addA repositoryUrl docName revision
 
+  -- If and only if the model we load is model:System, create both the system context and the system user.
+  -- This is part of the installation routine.
+  if modelname == systemModelName
+    then initSystem
+    else pure unit
+
   -- Create the model instance
-  g <- show <$> liftEffect guid
+  cid <- createResourceIdentifier (CType $ ContextType modelname)
   r <- runExceptT $ constructEmptyContext 
-    (ContextInstance $ constructUserIdentifier g)
+    (ContextInstance cid)
     modelname
     "model root context"
     (PropertySerialization empty)
@@ -517,7 +523,7 @@ addModelToLocalStore_newStyle modelname originalLoad = do
         (identifier ctxt)
         (EnumeratedRoleType installer)
         0
-        (RoleInstance (identifier_ ctxt <> "$" <> (deconstructLocalName_ installer) <> "_0000"))
+        (RoleInstance (identifier_ ctxt <> "$" <> (typeUri2LocalName_ installer) <> "_0000"))
 
       -- Fill the installerRole with sys:Me (all these operations cache the roles that are involved).
       me <- RoleInstance <$> (lift $ getUserIdentifier)
@@ -556,7 +562,7 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   -- Distribute the SeparateInvertedQueries over the other domains.
   forWithIndex_ invertedQueriesInOtherDomains
     \domainName queries -> do
-      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -565,7 +571,7 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   -- Distribute upstream state notifications over the other domains.
   forWithIndex_ upstreamStateNotifications
     \domainName notifications -> do
-      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -574,7 +580,7 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   -- Distribute upstream automatic effects over the other domains.
   forWithIndex_ upstreamAutomaticEffects
     \domainName automaticEffects -> do
-      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -592,6 +598,39 @@ addModelToLocalStore_newStyle modelname originalLoad = do
           perspect_models <- modelsDatabaseName
           void $ addAttachment perspect_models modelName rev "screens.js" attachment (MediaType "text/ecmascript")
           updateRevision (DomeinFileId modelName)
+    
+    initSystem :: MonadPerspectivesTransaction Unit
+    initSystem = do
+      -- Create the model instance
+      cid <- createResourceIdentifier (CType $ ContextType theSystem)
+      r <- runExceptT $ constructEmptyContext 
+        (ContextInstance cid)
+        theSystem
+        "My System"
+        (PropertySerialization empty)
+        Nothing
+      case r of 
+        Left e -> logPerspectivesError (Custom (show e))
+        Right (system :: PerspectContext) -> do 
+          lift $ void $ saveEntiteit_ (identifier system) system
+          addCreatedContextToTransaction (identifier system)
+          -- Now create the user role (it is cached automatically).
+          -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
+          -- it would introduce module imnport circularity.
+          (me :: PerspectRol) <- constructEmptyRole
+            (identifier system)
+            (EnumeratedRoleType sysUser)
+            0
+            (RoleInstance (identifier_ system <> "$" <> (typeUri2LocalName_ sysUser) <> "_0000"))
+          lift $ void $ saveEntiteit_ (identifier me) (changeRol_isMe me true)
+          -- The user role is not filled.
+          -- And now add to the context.
+          addRoleInstanceToContext (identifier system) (EnumeratedRoleType sysUser) (Tuple (identifier me) Nothing)
+          void $ lift $ AMA.modify \ps -> ps 
+            { indexedContexts = insert DEP.mySystem (identifier system) ps.indexedContexts
+            , indexedRoles = insert DEP.sysMe (identifier me) ps.indexedRoles
+            }
+
 
 -- NOTE. Currently, these functions `documentName` and `repository` handle both old and new style model names.
 documentName :: String -> MonadPerspectivesTransaction String
@@ -713,7 +752,9 @@ modifyInvertedQuery add = modifyInvertedQuery'
 -- | they will be in the repository after uploading.
 uploadToRepository :: DomeinFileId -> URL -> MPQ Unit
 uploadToRepository dfId url = do
+  logShow ("\nuploadToRepository (voor getPerspectEntiteit): " <> (unwrap dfId))
   mdf <- lift $ lift $ try $ getPerspectEntiteit dfId
+  logShow ("\nuploadToRepository (na getPerspectEntiteit): " <> (unwrap dfId))
   case mdf of
     Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err)
     Right df -> uploadToRepository_ dfId url df
@@ -722,7 +763,7 @@ uploadToRepository dfId url = do
 -- | In this function we handle the difference between the database that we read from (provided as the value of 
 -- | the argument `url`), and the database that we write to (ending on "_write").
 uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit
-uploadToRepository_ dfId url df = lift $ lift do
+uploadToRepository_ dfId url df = lift $ lift do 
   -- Get the attachment info
   (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument url (show dfId)
   attachments <- case atts of
@@ -877,26 +918,26 @@ addCredentials urls passwords _ = case head urls, head passwords of
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model:Couchdb$Models" {func: unsafeCoerce models, nArgs: 0}
-  , Tuple "model:Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
-  , Tuple "model:Couchdb$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
-  , Tuple "model:Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
-  , Tuple "model:Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
-  , Tuple "model:Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
-  , Tuple "model:Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
-  , Tuple "model:Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
-  , Tuple "model:Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
-  , Tuple "model:Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
-  , Tuple "model:Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 3}
-  , Tuple "model:Couchdb$EndReplication" {func: unsafeCoerce endReplication, nArgs: 3}
-  , Tuple "model:Couchdb$DeleteDocument" {func: unsafeCoerce deleteDocument, nArgs: 1}
-  , Tuple "model:Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}
-  , Tuple "model:Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2}
-  , Tuple "model:Couchdb$MakeDatabasePublic" {func: unsafeCoerce makeDatabasePublic, nArgs: 2}
-  , Tuple "model:Couchdb$MakeAdminOfDb" {func: unsafeCoerce makeAdminOfDb, nArgs: 3}
-  , Tuple "model:Couchdb$RemoveAsAdminFromDb" {func: unsafeCoerce removeAsAdminFromDb, nArgs: 3}
-  , Tuple "model:Couchdb$MakeMemberOf" {func: unsafeCoerce makeMemberOf, nArgs: 3}
-  , Tuple "model:Couchdb$RemoveAsMemberOf" {func: unsafeCoerce removeAsMemberOf, nArgs: 3}
-  , Tuple "model:Couchdb$ResetPassword" {func: unsafeCoerce resetPassword, nArgs: 3}
-  , Tuple "model:Couchdb$AddCredentials" {func: unsafeCoerce addCredentials, nArgs: 2}
+  [ Tuple "model://perspectives.domains#Couchdb$Models" {func: unsafeCoerce models, nArgs: 0}
+  , Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
+  , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
+  , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
+  , Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
+  , Tuple "model://perspectives.domains#Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
+  , Tuple "model://perspectives.domains#Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$EndReplication" {func: unsafeCoerce endReplication, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$DeleteDocument" {func: unsafeCoerce deleteDocument, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2}
+  , Tuple "model://perspectives.domains#Couchdb$MakeDatabasePublic" {func: unsafeCoerce makeDatabasePublic, nArgs: 2}
+  , Tuple "model://perspectives.domains#Couchdb$MakeAdminOfDb" {func: unsafeCoerce makeAdminOfDb, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$RemoveAsAdminFromDb" {func: unsafeCoerce removeAsAdminFromDb, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$MakeMemberOf" {func: unsafeCoerce makeMemberOf, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$RemoveAsMemberOf" {func: unsafeCoerce removeAsMemberOf, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$ResetPassword" {func: unsafeCoerce resetPassword, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$AddCredentials" {func: unsafeCoerce addCredentials, nArgs: 2}
   ]

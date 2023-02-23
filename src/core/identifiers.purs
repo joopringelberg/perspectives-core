@@ -24,18 +24,15 @@ module Perspectives.Identifiers
 
 where
 
-import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array (intercalate, null, uncons, unsnoc)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.String (Pattern(..), Replacement(..), replace, replaceAll, split, stripPrefix, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), replaceAll, split, stripPrefix, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Show, append, eq, flip, identity, join, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (||))
+import Prelude (class Eq, class Show, append, eq, flip, identity, join, map, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (||))
 
 -- | The unsafeRegex function takes a string `pattern` as first argument and uses it as is in a new Regex(`pattern`).
 -- | Hence, in Purescript, we can follow the rules for the new Regex("your pattern") approach.
@@ -56,102 +53,65 @@ import Prelude (class Eq, class Show, append, eq, flip, identity, join, ($), (&&
 -- | Literal use comprises character class syntax, e.g. \w (for word characters). 
 -- | FOR CHARACTER CLASSES, USE DOUBLE BACKSLASH: \\w, \\n, etc.
 
------------------------------------------------------------
--- NAMESPACE, MODELNAME
------------------------------------------------------------
--- | A Namespace has the general shape model://perspect.it/System@1.0.0-alpha
--- | /^model:\/\/([^$]*)$/ or new Regex( "^model://([^$]*)$" )
-modelPattern :: String
-modelPattern = "^(model:(?://)?[^\\$]*)"
-modelRegex :: Regex
-modelRegex = unsafeRegex (modelPattern <> "$") noFlags
-
--- | True iff the string is exactly of the form model://Domain
-isModelName :: String -> Boolean
-isModelName s = test modelRegex s
-
--- | From a well-formed identifier of a ContextInstance, construct the identifier of its External Role.
-buitenRol :: String -> String
-buitenRol s = if isModelName s
-  then s <> "$_External"
-  else s <> "$External"
-
--- | Returns the identifier minus the "$External" or "$_External" part.
-deconstructBuitenRol :: String -> String
-deconstructBuitenRol s = replaceAll (Pattern "$External") (Replacement "")(replaceAll (Pattern "$_External") (Replacement "") s)
-
-isExternalRole :: String -> Boolean
-isExternalRole n = isJust $ stripSuffix (Pattern "External") n
-
-
--- | Return the Namespace that is the last segment of the URL.
-namespaceFromUrl :: String -> Maybe String
-namespaceFromUrl = getFirstMatch (unsafeRegex ".*\\/(model:.+)" noFlags)
-
-type Namespace = String
-type LocalName = String
-type Prefix = String
-
-type PEIdentifier = String
-
--- | Only a psp:Context can have a ModelName. In other words, if something has a ModelName, its pspType is psp:Context.
--- | However, a psp:Context may have a QualifiedName!
-newtype ModelName = ModelName Namespace
-
-instance showModelName :: Show ModelName where
-  show (ModelName mn) = mn
-
-instance eqModelName :: Eq ModelName where
-  eq (ModelName n1) (ModelName n2) = n1 == n2
-
--- | A QualifiedName consists of a namespace and a local name.
-data QualifiedName = QualifiedName Namespace LocalName
-
-instance showQualifiedName :: Show QualifiedName where
-  show (QualifiedName mn ln) = if isUrl mn 
-    then mn <> ln 
-    else mn <> "$" <> ln
-
-instance eqQualifiedName :: Eq QualifiedName where
-  eq (QualifiedName ns1 ln1) (QualifiedName ns2 ln2) = eq ns1 ns2 && eq ln1 ln2
 
 -----------------------------------------------------------
--- URI STYLE MODEL NAMES
 -----------------------------------------------------------
--- | A Namespace has the general shape model://perspect.it/System@1.0.0-alpha
+--      MODEL URIS AND HOW TO TRANSFORM THEM
+-----------------------------------------------------------
+-----------------------------------------------------------
+-- | A Namespace has the general shape model://perspect.it#System@1.0.0-alpha
 
--- | A pattern to match "model:Modelname" exactly.
-oldModelPattern :: String
-oldModelPattern = "^model:[^\\$/]*$"
-
-oldModelRegex :: Regex
-oldModelRegex = unsafeRegex oldModelPattern noFlags
-
--- | A pattern to match "model://some.authority/Modelname" exactly.
+-- | A pattern to match "model://some.authority#Modelname" exactly.
 -- | It is very permissive, allowing any character in the authority except the forward slash.
 -- | The model name must start on an upper case alphabetic character.
+-- | The first group captures the authority.
+-- | The second group captures the local model name that is unique within the authority domain.
 newModelPattern :: String
-newModelPattern = "^model://([^/]+)/([A-Z][^\\$/]+)$"
+newModelPattern = "^model://([^/]+)#([A-Z][^\\$/]+)$"
 
 newModelRegex :: Regex
 newModelRegex = unsafeRegex newModelPattern noFlags
 
--- | Maps both an old and a new style model name to the old style.
-namespace2modelname :: String -> Maybe String
-namespace2modelname s = if test oldModelRegex s
-  then Just s
-  else (<>) <$> Just "model:" <*> getSecondMatch newModelRegex s
+type ModelUri = String
+type DomeinFileName = String
 
-namespace2modelname_ :: Partial => String -> String
-namespace2modelname_ = fromJust <<< namespace2modelname
+-----------------------------------------------------------
+-- TESTING FOR A MODEL URI
+-----------------------------------------------------------
+isModelUri :: String -> Boolean
+isModelUri = isJust <<< match newModelRegex
 
+-----------------------------------------------------------
+-- MODEL URI TO DOMEINFILE IDENTIFIER
+-----------------------------------------------------------
+-- | Transform a model URI of the form 
+-- |	  model://{subdomains-with-dots}.{authority-with-dots}#{LocalModelName}
+-- | to:
+-- |    {subdomains-with-dots}.{authority-with-dots}#{LocalModelName}
+-- | The latter form is the string value of a DomeinFileId.
+modelUri2DomeinFileName :: String -> Maybe String
+modelUri2DomeinFileName s = case match newModelRegex s of
+  Nothing -> Nothing
+  Just (matches :: NonEmptyArray (Maybe String)) -> let
+    (hierarchicalNamespace :: Maybe String) = unsafePartial fromJust $ index matches 1
+    (localModelName :: Maybe String) = unsafePartial fromJust $ index matches 2
+    in 
+      append <$> hierarchicalNamespace <*> (append <$> Just "#" <*> localModelName)
+
+modelUri2DomeinFileName_ :: Partial => String -> String
+modelUri2DomeinFileName_ = fromJust <<< modelUri2DomeinFileName
+
+-----------------------------------------------------------
+-- MODEL URI TO MODEL URL
+-- Fetch the model from a repository using this URL.
+-----------------------------------------------------------
 -- | Transform a model URI of the form 
 -- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
 -- | to:
 -- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{LocalModelName}.json
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
-modelName2modelUrl :: Partial => String -> String
-modelName2modelUrl s = let
+modelUri2ModelUrl :: Partial => String -> String
+modelUri2ModelUrl s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
     (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
     (localModelName :: String) = fromJust $ fromJust $ index matches 2
@@ -161,13 +121,17 @@ modelName2modelUrl s = let
   in
     "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts <> "/" <> localModelName <> ".json"
 
+-----------------------------------------------------------
+-- MODEL URI TO REPOSITORY URL
+-- The DomeinFile is served from this Repository Url.
+-----------------------------------------------------------
 -- | Transform a model URI of the form 
 -- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
 -- | to:
 -- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
-modelName2modelStore :: Partial => String -> String
-modelName2modelStore s = let
+modelUri2ModelRepository :: Partial => String -> String
+modelUri2ModelRepository s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
     (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
     (namespaceParts :: Array String) = split (Pattern ".") hierarchicalNamespace
@@ -176,109 +140,24 @@ modelName2modelStore s = let
   in
     "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
 
+-----------------------------------------------------------
+-- MODEL URI TO INSTANCES STORE
+-- Instances representing the repository and its manifests are stored here.
+-----------------------------------------------------------
 -- | Transform a model URI of the form 
 -- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
 -- | to:
 -- |    https://{authority-with-dots}/cw_{subdomains-with-underscores}_{authority-with-underscores}/
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
-modelName2NamespaceStore :: Partial => String -> String
-modelName2NamespaceStore s = let
+modelUri2InstancesStore :: Partial => String -> String
+modelUri2InstancesStore s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
     (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
     (namespaceParts :: Array String) = split (Pattern ".") hierarchicalNamespace
     {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in
-    "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
-
-
------------------------------------------------------------
--- PUBLIC RESOURCE IDENTIFIERS
------------------------------------------------------------
--- | A pattern to match https://{authority}/cw_{databasename}/{SegmentedIdentifier} exactly.
--- | It is very permissive, allowing any character in the authority except the forward slash.
--- | The model name must start on an upper case alphabetic character.
-publicResourcePattern :: String
-publicResourcePattern = "^https://([^/]+)/(cw_[^/]+)/(.+)$"
-
-publicResourceRegex :: Regex
-publicResourceRegex = unsafeRegex publicResourcePattern noFlags
-
-isPublicResource :: String -> Boolean
-isPublicResource = test publicResourceRegex
-
--- | Transform a resource URI of the form 
--- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
--- | to:
--- |    https://{authority}/
--- | The function is Partial because it should only be applied to a string that matches newModelPattern.
-publicResourceIdentifier2Authority :: String -> Maybe String
-publicResourceIdentifier2Authority s = let
-    (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
-    (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 1 <$> matches
-  in
-    append "https://" <$> (append hierarchicalNamespace (Just "/"))
-
-publicResourceIdentifier2Authority_ :: Partial => String -> String
-publicResourceIdentifier2Authority_ = fromJust <<< publicResourceIdentifier2Authority
-
-
--- | Transform a resource URI of the form 
--- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
--- | to:
--- |    SegmentedIdentifier
--- | The function is Partial because it should only be applied to a string that matches newModelPattern.
-publicResourceIdentifier2LocalName :: String -> Maybe String
-publicResourceIdentifier2LocalName s = let
-    (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
-    (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 3 <$> matches
-  in
-    hierarchicalNamespace
-
-publicResourceIdentifier2LocalName_ :: Partial => String -> String
-publicResourceIdentifier2LocalName_ = fromJust <<< publicResourceIdentifier2LocalName
-
--- | Transform a resource URI of the form 
--- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
--- | to:
--- |    databasename
--- | The function is Partial because it should only be applied to a string that matches newModelPattern.
-publicResourceIdentifier2database :: String -> Maybe String
-publicResourceIdentifier2database s = let
-    (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
-    (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 2 <$> matches
-  in
-    hierarchicalNamespace
-
-publicResourceIdentifier2database_ :: Partial => String -> String
-publicResourceIdentifier2database_ = fromJust <<< publicResourceIdentifier2database
-
-publicResourceIdentifier2repository :: String -> Maybe String
-publicResourceIdentifier2repository s = let
-    (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
-    (authority :: (Maybe String)) = join $ join $ flip index 1 <$> matches
-    (database :: (Maybe String)) = join $ join $ flip index 2 <$> matches
-  in
-    append <$> Just "https://" <*> (append <$> authority <*> (append <$> (Just "/") <*> (append <$> database <*> Just "/")))
-
-publicResourceIdentifier2repository_ :: Partial => String -> String
-publicResourceIdentifier2repository_ = fromJust <<< publicResourceIdentifier2repository
-
--- | From the identification of a resource, return the identifier of the resource in Couchdb.
-couchdbResourceIdentifier :: String -> String
-couchdbResourceIdentifier s = if isUrl s
-  then unsafePartial publicResourceIdentifier2LocalName_ s
-  else s
-
--- | Create a resource identifier suited for a local resource from the identifier of a public resource.
-publicResourceIdentifier2Private :: String -> String
-publicResourceIdentifier2Private s = replaceAll 
-  (Pattern ".")
-  (Replacement "_")
-  (replaceAll
-    (Pattern "/")
-    (Replacement "_")
-    (replace (Pattern "https://") (Replacement "model:User$") s))
+    "https://" <> secondLevel <> "." <> toplevel <> "/cw_" <> intercalate "_" namespaceParts
 
 -----------------------------------------------------------
 -- URL2AUTHORITY
@@ -289,29 +168,6 @@ urlRegex = unsafeRegex "^(https://[^/]+/).*$" noFlags
 url2Authority :: String -> Maybe String
 url2Authority = getFirstMatch urlRegex
 
-
------------------------------------------------------------
--- CLASS PERSPECTENTITEITIDENTIFIER
------------------------------------------------------------
--- | Abstracts over identifiers for Perspect, used in the CRL parser. There are two instances: ModelName and QualifiedName.
-class PerspectEntiteitIdentifier a where
-  pe_namespace :: a -> Namespace
-  pe_localName :: a -> Maybe LocalName
-
-instance peIdentifierModelName :: PerspectEntiteitIdentifier ModelName where
-  pe_namespace (ModelName ns) = ns
-  pe_localName _ = Nothing
-
-instance peIdentifierQualifiedName :: PerspectEntiteitIdentifier QualifiedName where
-  pe_namespace (QualifiedName ns _) = ns
-  pe_localName (QualifiedName _ ln) = Just ln
-
------------------------------------------------------------
--- THROW ERROR WHEN RESULT IS NOTHING
------------------------------------------------------------
-guardWellFormedNess :: forall m. MonadThrow Error m => (String -> Maybe String) -> String -> m String
-guardWellFormedNess f a = onNothing' (error $ "This identifier is not well formed: " <> a ) (f a)
-
 -----------------------------------------------------------
 -- QUALIFY A NAME
 -----------------------------------------------------------
@@ -319,113 +175,97 @@ qualifyWith :: Namespace -> String -> String
 qualifyWith ns = append (ns <> "$")
 
 -----------------------------------------------------------
--- DECONSTRUCTING NAMESPACES
 -----------------------------------------------------------
--- | A qualified name has the form `model://ModelName$First$Second`.
--- | In other words, it consists of
--- |  * a modelName: `model://ModelName`, followed by any number of
--- |  * segments: `$segment` (a '$' followed by word characters).
--- | Alternatively, we can split a qualifiedName in
--- |  * a namespace: everything but the last segment, and
--- |  * the localName: the last segment.
+--      TYPE URIS AND HOW TO TRANSFORM THEM
+-----------------------------------------------------------
+-----------------------------------------------------------
+-- 	type URI = model URI '$' segmentedName
 
-qualifiedNameRegex :: Regex
-qualifiedNameRegex = unsafeRegex (modelPattern <> "\\$(.*)$") noFlags
+type TypeUri = String
 
--- | Is the identifier of the form `model://ModelName$atLeastOneSegment`?
-isQualifiedName :: String -> Boolean
-isQualifiedName s = test qualifiedNameRegex s
+-- | A pattern to match "model://some.authority#Modelname$Sometype" exactly.
+-- | The model URI capturing group is exactly equal to that of the newModelPattern except for the capturing groups.
+-- | It is very permissive: 
+-- |   - allowing any character in the authority except the forward slash;
+-- |   - allowing any character in the model name but the $ sign;
+-- |   - however, the model name should start on an upper case alphabetic character;
+-- |   - and then we allow everything up till the end. This may be nothing, so we accept a model URI as a type name, too.
+-- |     This is to cover the top context of a model.
+-- | The first group captures the model URI; the second captures the segmented type name.
+typePattern :: String
+typePattern = "^(model://[^/]+#[A-Z][^\\$]+)\\$?(.*)$"
 
-matchModelnameRegex :: Regex
-matchModelnameRegex = unsafeRegex modelPattern noFlags
+typeRegex :: Regex
+typeRegex = unsafeRegex typePattern noFlags
 
--- | Tests whether the string is at least of the form `model://ModelName`.
-isQualifiedWithDomein :: String -> Boolean
-isQualifiedWithDomein = test matchModelnameRegex
+-- | This regex is like the typeRegex but it separates THE LAST segment from the rest of the expression.
+localNameRegEx :: Regex
+localNameRegEx = unsafeRegex "^model://[^/]+#[A-Z][^#/]+\\$([A-Z][^\\$/]+)$" noFlags
 
--- | Matches the entire namespace part of a qualified name (everything but the last segment).
-namespaceRegEx :: Regex
-namespaceRegEx = unsafeRegex "^(model:(?://)?.*)\\$\\w*" noFlags
+-----------------------------------------------------------
+-- TEST IF A STRING IS A TYPE URI
+-----------------------------------------------------------
+-- | Does NOW ALSO match: "model://perspectives.domains#System"
+-- | Does match "model://perspectives.domains#System$PerspectivesSystem$User"
+isTypeUri :: String -> Boolean
+isTypeUri = isJust <<< match typeRegex
 
+-----------------------------------------------------------
+-- TAKE THE MODEL URI FROM A TYPE URI
+-----------------------------------------------------------
+-- | Transforms
+-- |    model://perspectives.domains#System$PerspectivesSystem
+-- | to 
+-- |    model://perspectives.domains#System
+-- |
+-- | Strips away the first '$' and everything following it.
+-- | Does not test whether the input actually is a TypeUri!
+typeUri2ModelUri :: TypeUri -> Maybe ModelUri
+typeUri2ModelUri = getFirstMatch typeRegex
+
+typeUri2ModelUri_ :: Partial => TypeUri -> ModelUri
+typeUri2ModelUri_ = fromJust <<< typeUri2ModelUri
+
+-----------------------------------------------------------
+-- TAKE THE TYPE NAMESPACE FROM A TYPE NAME
+-- (the type namespace is the type directly enclosing the given type)
+-----------------------------------------------------------
 -- | Returns the entire name but for the last segment. This is the namespace of the local name.
--- | deconstructNamespace "model:Model$First$Second" == Just "model:Model$First"
--- | deconstructNamespace "model:Model" == Just "model:Model"
-deconstructNamespace :: String -> Maybe Namespace
-deconstructNamespace s = case deconstructLocalName s of
+-- | typeUri2typeNameSpace "model:Model$First$Second" == Just "model:Model$First"
+-- | typeUri2typeNameSpace "model:Model" == Just "model:Model"
+typeUri2typeNameSpace :: String -> Maybe Namespace
+typeUri2typeNameSpace s = case typeUri2LocalName s of
   Nothing -> Just s
   (Just ln) -> stripSuffix (Pattern $ "$" <> ln) s
 
--- | As deconstructNamespace, but will throw a runtime error if it fails.
-deconstructNamespace_ :: String -> Namespace
-deconstructNamespace_ = unsafePartial $ fromJust <<< deconstructNamespace
+typeUri2typeNameSpace_ :: String -> Namespace
+typeUri2typeNameSpace_ = unsafePartial $ fromJust <<< typeUri2typeNameSpace
 
--- | Returns the "model://authority/ModelName" part of an identifier or Nothing if it does not start with model://authority/ModelName.
--- | deconstructModelName "model://authority/Model$First$Second" == Just "model://authority/Model"
--- | deconstructModelName "model://authority/Model" == Just "model://Modelauthority/"
-deconstructModelName :: String -> Maybe Namespace
-deconstructModelName = getFirstMatch matchModelnameRegex
-
-unsafeDeconstructModelName :: String -> Namespace
-unsafeDeconstructModelName = unsafePartial fromJust <<< deconstructModelName
-
--- | Returns "Context$localName" from "model://ModelName$Context$localName" or Nothing if it does
--- | not start with model://ModelName
--- | So this function returns ALL SEGMENTS of the name, omitting just the model://ModelName part.
--- | deconstructSegments "model://ModelName$Context$localName" == Just "Context$localName"
--- | deconstructSegments "model://Model" == Just ""
-deconstructSegments :: String -> Maybe String
-deconstructSegments = getSecondMatch qualifiedNameRegex
-
-lastPartRegEx :: Regex
-lastPartRegEx = unsafeRegex ".*[\\$|/](\\w+)" noFlags
-
--- | Returns "localName" from "model:ModelName$Context$localName" and from "https://some.domain/database/localName" or Nothing
+-----------------------------------------------------------
+-- REMOVE THE TYPE NAMESPACE FROM A TYPE NAME (=GET THE LOCALNAME PART)
+-- (the type namespace is the type directly enclosing the given type)
+-----------------------------------------------------------
+-- | Returns "System" from "model:perspectives.domains$PerspectivesSystem$System" or Nothing
 -- | So this function returns THE LAST SEGMENT of the name.
--- | deconstructLocalName "model:Model$First$Second" == Just "Second"
--- | deconstructLocalName "model:Model" == Nothing
-deconstructLocalName :: String -> Maybe String
-deconstructLocalName = getFirstMatch lastPartRegEx
+typeUri2LocalName :: String -> Maybe String
+typeUri2LocalName = getFirstMatch localNameRegEx
 
-deconstructLocalName_ :: String -> String
-deconstructLocalName_ s = unsafePartial (fromJust (deconstructLocalName s))
+typeUri2LocalName_ :: String -> String
+typeUri2LocalName_ s = unsafePartial (fromJust (typeUri2LocalName s))
 
--- | "model:Perspectives$Context" `hasLocalName` "Context"
+-----------------------------------------------------------
+-- TEST FOR A LOCAL NAME
+-----------------------------------------------------------
+-- | "model:perspectives.domains$PerspectivesSystem$System" `hasLocalName` "System"
 hasLocalName :: String -> String -> Boolean
-hasLocalName qn ln = case deconstructLocalName qn of
+hasLocalName qn ln = case typeUri2LocalName qn of
   Nothing -> false
   (Just ln') -> ln == ln'
 
+-- | "System" `isLocalNameOf` "model:perspectives.domains$PerspectivesSystem$System"
 -- | "Context" `isLocalNameOf` "model:Perspectives$Context"
 isLocalNameOf :: String -> String -> Boolean
 isLocalNameOf = flip hasLocalName
-
------------------------------------------------------------
--- URL
------------------------------------------------------------
-urlRegEx :: Regex
-urlRegEx = unsafeRegex "^http" noFlags
-
-isUrl :: String -> Boolean
-isUrl = test urlRegEx
-
------------------------------------------------------------
--- URI REPRESENTING RESOURCE
------------------------------------------------------------
--- | Returns the part of the string following the last "$".
-localNameFromUriRegEx :: Regex
-localNameFromUriRegEx = unsafeRegex "(.*)\\$(.*)" noFlags
-
-deconstructAuthorityFromUri :: String -> Maybe String
-deconstructAuthorityFromUri = getFirstMatch localNameFromUriRegEx
-
-deconstructAuthorityFromUri_ :: Partial => String -> String
-deconstructAuthorityFromUri_ = fromJust <<< deconstructAuthorityFromUri
-
-deconstructLocalNameFromUri :: String -> Maybe String
-deconstructLocalNameFromUri = getSecondMatch localNameFromUriRegEx
-
-deconstructLocalNameFromUri_ :: Partial => String -> String
-deconstructLocalNameFromUri_ = fromJust <<< deconstructLocalNameFromUri
 
 -----------------------------------------------------------
 -- CURIES
@@ -442,38 +282,8 @@ deconstructLocalNameFromCurie :: String -> Maybe String
 deconstructLocalNameFromCurie = getSecondMatch curieRegEx
 
 -----------------------------------------------------------
--- THE MODEL:USER DOMEIN
+-- PRICING APART SEGMENTED NAMES
 -----------------------------------------------------------
--- | Matches all segments of the name (the string after the first "$")
-userNameRegEx :: Regex
-userNameRegEx = unsafeRegex "^model:User\\$(.*)\\$.*" noFlags
-
-deconstructUserName :: String -> Maybe String
-deconstructUserName = getFirstMatch userNameRegEx
-
-constructUserIdentifier :: String -> String
-constructUserIdentifier s = "model:User$" <> s
-
------------------------------------------------------------
--- ROLNAMES
------------------------------------------------------------
-roleIndexNrRegex :: Regex
-roleIndexNrRegex = unsafeRegex "_(\\d+)$" noFlags
-
--- | Role names are postfixed with an index to distinghuish between multiple occurrences of the same role type.
-roleIndexNr :: String -> Maybe String
-roleIndexNr s = case match roleIndexNrRegex s of
-  (Just (matches :: NonEmptyArray (Maybe String))) -> maybe Nothing identity (index matches 1)
-  _ -> Nothing
-
------------------------------------------------------------
--- ESCAPING FOR RETRIEVAL FROM COUCHDB
---  Couchdb accepts documentnames with ":" en "$". But to retrieve them through http, these
---  characters have to be escaped.
------------------------------------------------------------
-
-escapeCouchdbDocumentName :: String -> String
-escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (replaceAll (Pattern "$") (Replacement "%24") s)
 
 -- | True iff the second argument is a suffix of the first argument, or if they are equal.
 -- | Does not check whether names are well-formed qualified names.
@@ -494,19 +304,6 @@ areLastSegmentsOf = flip endsWithSegments
 -- | "model:Model$First$Second$Third" `startsWithSegments` "model:Model$First$Second" == true
 startsWithSegments :: String -> String -> Boolean
 startsWithSegments whole part = (whole == part) || (isJust $ stripPrefix (Pattern (part <> "$")) whole)
-
------------------------------------------------------------
--- REGEX MATCHING HELPER FUNCTIONS
------------------------------------------------------------
-getFirstMatch :: Regex -> String -> Maybe String
-getFirstMatch regex s = case match regex s of
-  (Just matches) -> maybe Nothing identity (index matches 1)
-  _ -> Nothing
-
-getSecondMatch :: Regex -> String -> Maybe String
-getSecondMatch regex s = case match regex s of
-  (Just (matches :: NonEmptyArray (Maybe String))) -> maybe Nothing identity (index matches 2)
-  _ -> Nothing
 
 -----------------------------------------------------------
 -- CONCATENATE SEGMENTS
@@ -537,3 +334,146 @@ concatenateSegments left right = run (split (Pattern "$") left) (split (Pattern 
           else if result == ""
             then run tail rightParts head
             else run tail rightParts (result <> "$" <> head)
+
+-----------------------------------------------------------
+-- REGEX MATCHING HELPER FUNCTIONS
+-----------------------------------------------------------
+getFirstMatch :: Regex -> String -> Maybe String
+getFirstMatch regex s = case match regex s of
+  (Just matches) -> maybe Nothing identity (index matches 1)
+  _ -> Nothing
+
+getSecondMatch :: Regex -> String -> Maybe String
+getSecondMatch regex s = case match regex s of
+  (Just (matches :: NonEmptyArray (Maybe String))) -> maybe Nothing identity (index matches 2)
+  _ -> Nothing
+
+-----------------------------------------------------------
+-- THE MODEL:USER DOMEIN
+-----------------------------------------------------------
+-- | Matches all segments of the name (the string after the first "$")
+userNameRegEx :: Regex
+userNameRegEx = unsafeRegex "^model:User\\$(.*)\\$.*" noFlags
+
+-- Used in module Perspectives.Persistence.CouchdbFunctions
+-- Will probably be OBSOLETE now since we have new resource identifiers.
+deconstructUserName :: String -> Maybe String
+deconstructUserName = getFirstMatch userNameRegEx
+
+-----------------------------------------------------------
+-- NAMESPACE, MODELNAME
+-----------------------------------------------------------
+-- | From a well-formed identifier of a ContextInstance, construct the identifier of its External Role.
+buitenRol :: String -> String
+buitenRol s = if isModelUri s
+  then s <> "$_External"
+  else s <> "$External"
+
+-- | Returns the identifier minus the "$External" or "$_External" part.
+deconstructBuitenRol :: String -> String
+deconstructBuitenRol s = replaceAll (Pattern "$External") (Replacement "")(replaceAll (Pattern "$_External") (Replacement "") s)
+
+isExternalRole :: String -> Boolean
+isExternalRole n = isJust $ stripSuffix (Pattern "External") n
+
+type LocalName = String
+type Prefix = String
+
+type PEIdentifier = String
+
+type Namespace = String
+
+-- Used in ContextRoleParser, IndentParser, PerspectSyntax.
+-- | A QualifiedName consists of a namespace and a local name.
+data QualifiedName = QualifiedName Namespace LocalName
+
+instance showQualifiedName :: Show QualifiedName where
+  show (QualifiedName mn ln) = if isUrl mn 
+    then mn <> ln 
+    -- temporary hack. CRL is on its way out
+    else if mn == "def"
+      then mn <> ":" <> ln 
+      else mn <> "$" <> ln
+
+instance eqQualifiedName :: Eq QualifiedName where
+  eq (QualifiedName ns1 ln1) (QualifiedName ns2 ln2) = eq ns1 ns2 && eq ln1 ln2
+
+urlRegEx :: Regex
+urlRegEx = unsafeRegex "^http" noFlags
+
+isUrl :: String -> Boolean
+isUrl = test urlRegEx
+
+-----------------------------------------------------------
+-- FUNCTIONS IN THIS SECTION ARE ONLY USED IN THE CONTEXTROLE PARSER.
+-- Remove them with the ContextRole Parser.
+-----------------------------------------------------------
+publicResourceIdentifier2LocalName_ :: Partial => String -> String
+publicResourceIdentifier2LocalName_ = fromJust <<< publicResourceIdentifier2LocalName
+  where
+      -- | Transform a resource URI of the form 
+    -- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
+    -- | to:
+    -- |    SegmentedIdentifier
+    -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
+    publicResourceIdentifier2LocalName :: String -> Maybe String
+    publicResourceIdentifier2LocalName s = let
+        (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
+        (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 3 <$> matches
+      in
+        hierarchicalNamespace
+
+-- ONLY USED IN THE CONTEXTROLE PARSER.
+publicResourceIdentifier2repository_ :: Partial => String -> String
+publicResourceIdentifier2repository_ = fromJust <<< publicResourceIdentifier2repository
+
+  where
+
+  publicResourceIdentifier2repository :: String -> Maybe String
+  publicResourceIdentifier2repository = (map (flip append "/")) <<< publicResourceIdentifier2repository'
+
+  publicResourceIdentifier2repository' :: String -> Maybe String
+  publicResourceIdentifier2repository' s = let
+      (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
+      (authority :: (Maybe String)) = join $ join $ flip index 1 <$> matches
+      (database :: (Maybe String)) = join $ join $ flip index 2 <$> matches
+    in
+      append <$> Just "https://" <*> (append <$> authority <*> (append <$> (Just "/") <*> database))
+
+-- | A pattern to match https://{authority}/cw_{databasename}/{SegmentedIdentifier} exactly.
+-- | It is very permissive, allowing any character in the authority except the forward slash.
+-- | The model name must start on an upper case alphabetic character.
+-- | index 1 is the authority (scheme plus domain name).
+-- | index 2 is the database name.
+-- | index 3 is the resource name.
+publicResourcePattern :: String
+publicResourcePattern = "^https://([^/]+)/(cw_[^/]+)/(.+)$"
+
+publicResourceRegex :: Regex
+publicResourceRegex = unsafeRegex publicResourcePattern noFlags
+
+-- | Abstracts over identifiers for Perspect, used in the CRL parser. There are two instances: ModelName and QualifiedName.
+class PerspectEntiteitIdentifier a where
+  pe_namespace :: a -> Namespace
+  pe_localName :: a -> Maybe LocalName
+
+instance peIdentifierModelName :: PerspectEntiteitIdentifier ModelName where
+  pe_namespace (ModelName ns) = ns
+  pe_localName _ = Nothing
+
+instance peIdentifierQualifiedName :: PerspectEntiteitIdentifier QualifiedName where
+  pe_namespace (QualifiedName ns _) = ns
+  pe_localName (QualifiedName _ ln) = Just ln
+
+
+-- | Only a psp:Context can have a ModelName. In other words, if something has a ModelName, its pspType is psp:Context.
+-- | However, a psp:Context may have a QualifiedName!
+-- Only used in ContextRoleParser
+newtype ModelName = ModelName Namespace
+
+instance showModelName :: Show ModelName where
+  show (ModelName mn) = mn
+
+instance eqModelName :: Eq ModelName where
+  eq (ModelName n1) (ModelName n2) = n1 == n2
+

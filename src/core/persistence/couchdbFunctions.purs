@@ -83,7 +83,7 @@ import Simple.JSON (writeJSON)
 -- |  - version
 -- | These functions are not exported.
 -- | To complete a suite of functions to manipulate databases in Couchdb,
--- | we add createDatabase and addDatabase, too. This is mainly for use in model:Couchdb
+-- | we add createDatabase and addDatabase, too. This is mainly for use in model://perspectives.domains#Couchdb
 -- | where we offer a functions to handle couchdb installations through Perspectives.
 
 -----------------------------------------------------------

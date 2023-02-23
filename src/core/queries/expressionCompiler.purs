@@ -46,7 +46,8 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
+import Perspectives.Identifiers (typeUri2ModelUri, endsWithSegments, isExternalRole, isTypeUri)
+import Perspectives.Instances.ObjectGetters (contextType_, roleType_)
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, makeContextStep, makeIdentityStep, stepContainsVariableReference)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
@@ -129,7 +130,7 @@ compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole, pos}) = withFra
           step
         compiledExpression <- compileExpression dom expressionWithEnvironment
         -- Save the result in DomeinCache.
-        lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
+        lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ typeUri2ModelUri (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
         pure $ unsafePartial $ domain2roleType $ range compiledExpression
 
 -- | Ensures that the range of the QueryFunctionDescription is a qualified
@@ -158,7 +159,7 @@ qualifyReturnsClause pos qfd = pure qfd
 qualifyLocalRoleName :: ArcPosition -> String -> PhaseThree RoleType
 qualifyLocalRoleName pos ident = do
   {enumeratedRoles, calculatedRoles} <- lift $ gets _.dfr
-  if isQualifiedWithDomein ident
+  if isTypeUri ident
     then case lookup ident enumeratedRoles of
       Just _ -> pure $ ENR $ EnumeratedRoleType ident
       Nothing -> case lookup ident calculatedRoles of
@@ -234,7 +235,7 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role, pos}) = withF
         step
       compiledExpression <- compileExpression dom expressionWithEnvironment
       -- Save the result in DomeinCache.
-      lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ deconstructModelName (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
+      lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ typeUri2ModelUri (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
       pure $ range compiledExpression
       where
         roleKind :: Partial => EnumeratedRoleType -> PhaseThree RTI.RoleKind
@@ -314,7 +315,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
           pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (ST (RoleInContext {context, role}))) True True
         Nothing -> case currentDomain of
           (CDOM c) -> do
-            (rts :: Array RoleType) <- if isQualifiedWithDomein ident
+            (rts :: Array RoleType) <- if isTypeUri ident
               then if isExternalRole ident
                 then pure [ENR $ EnumeratedRoleType ident]
                 else lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
@@ -329,7 +330,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
                 then unsafePartial $ makeRoleGetter currentDomain head
                 else throwError (NotUniquelyIdentifying pos ident (roletype2string <$> rts))
           (RDOM r) -> do
-            (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
+            (pts :: Array PropertyType) <- if isTypeUri ident
               then  lift2 $ runArrayT $ lookForPropertyType ident (roleInContext2Role <$> r)
               else lift2 $ runArrayT $ lookForUnqualifiedPropertyType ident (roleInContext2Role <$> r)
             case uncons pts of
@@ -338,6 +339,15 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
                 then makePropertyGetter currentDomain pt
                 else throwError $ NotUniquelyIdentifying pos ident (show <$> pts)
           otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
+compileSimpleStep currentDomain (PublicRole pos ident) = do
+  rType <- lift2 $ roleType_ (RoleInstance ident)
+  cType <- lift2 $ enumeratedRoleContextType rType
+  pure $ SQD currentDomain (QF.PublicRole (RoleInstance ident)) (RDOM $ ST $ RoleInContext {context: cType, role: rType}) True True
+
+compileSimpleStep currentDomain (PublicContext pos ident) = do
+  rType <- lift2 $ contextType_ (ContextInstance ident)
+  pure $ SQD currentDomain (QF.PublicContext (ContextInstance ident)) (CDOM $ ST $ rType) True True
 
 compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $
   SQD currentDomain (QF.Constant range stringRepresentation) (VDOM range Nothing) True True
@@ -357,12 +367,12 @@ compileSimpleStep currentDomain s@(Binding pos membeddingContext) = do
         -- Otherwise, take the default specified with the role(s) that is(are) the current domain.
         otherwise -> case membeddingContext of
           Nothing -> pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM adtOfBinding) True False
-          Just context -> if isQualifiedWithDomein context
+          Just context -> if isTypeUri context
             then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter BindingF context) (RDOM $ replaceContext adtOfBinding (ContextType context)) True False
             -- Try to qualify the name within the Domain.
             else do
-              {_id:namespace} <- lift $ gets _.dfr
-              (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context (unsafePartial $ fromJust $ (deconstructModelName namespace))
+              {namespace} <- lift $ gets _.dfr
+              (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context namespace
               case head qnames of
                 Nothing -> throwError $ UnknownContext pos context
                 (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.DataTypeGetterWithParameter BindingF (unwrap qn)) (RDOM $ replaceContext adtOfBinding qn) True False
@@ -372,12 +382,12 @@ compileSimpleStep currentDomain s@(Binding pos membeddingContext) = do
 compileSimpleStep currentDomain s@(Binder pos binderName membeddingContext) = do
   case currentDomain of
     (RDOM (adtOfBinder :: ADT RoleInContext)) -> do
-      (qBinderType :: EnumeratedRoleType) <- if isQualifiedWithDomein binderName
+      (qBinderType :: EnumeratedRoleType) <- if isTypeUri binderName
         then pure $ EnumeratedRoleType binderName
         -- Try to qualify the name within the Domain.
         else do
-          {_id:namespace} <- lift $ gets _.dfr
-          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain binderName (unsafePartial $ fromJust $ (deconstructModelName namespace))
+          {namespace} <- lift $ gets _.dfr
+          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain binderName namespace
           case head qnames of
             Nothing -> throwError $ UnknownRole pos binderName
             (Just qn) | length qnames == 1 -> pure qn
@@ -388,12 +398,12 @@ compileSimpleStep currentDomain s@(Binder pos binderName membeddingContext) = do
         Nothing -> do
           EnumeratedRole{context} <- lift2 $ getEnumeratedRole qBinderType
           pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType context) (RDOM (ST $ RoleInContext{context, role: qBinderType})) True False
-        Just context -> if isQualifiedWithDomein context
+        Just context -> if isTypeUri context
           then pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder (ContextType context) ) True False
           -- Try to qualify the name within the Domain.
           else do
-            {_id:namespace} <- lift $ gets _.dfr
-            (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context (unsafePartial $ fromJust $ (deconstructModelName namespace))
+            {namespace} <- lift $ gets _.dfr
+            (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context namespace
             case head qnames of
               Nothing -> throwError $ UnknownContext pos context
               (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder qn) True False
@@ -423,12 +433,12 @@ compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
   case currentDomain of
     RoleKind -> do
       -- TODO: controleer of roleName inderdaad een EnumeratedRole is!
-      (qRoleName :: EnumeratedRoleType) <- if isQualifiedWithDomein roleName
+      (qRoleName :: EnumeratedRoleType) <- if isTypeUri roleName
         then pure $ EnumeratedRoleType roleName
         -- Try to qualify the name within the Domain.
         else do
-          {_id:namespace} <- lift $ gets _.dfr
-          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain roleName (unsafePartial $ fromJust $ (deconstructModelName namespace))
+          {namespace} <- lift $ gets _.dfr
+          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain roleName namespace
           case head qnames of
             Nothing -> throwError $ UnknownRole pos roleName
             (Just qn) | length qnames == 1 -> pure qn
@@ -460,12 +470,12 @@ compileSimpleStep currentDomain s@(Extern pos) = do
 
 -- compileSimpleStep currentDomain (CreateContext pos ident) = do
 --   -- If `ident` is not qualified, try to qualify it in the Domain.
---   (qcontextType :: ContextType) <- if isQualifiedWithDomein ident
+--   (qcontextType :: ContextType) <- if isTypeUri ident
 --     then pure $ ContextType ident
 --     -- Try to qualify the name within the Domain.
 --     else do
 --       {_id:namespace} <- lift $ gets _.dfr
---       (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain ident (unsafePartial $ fromJust $ (deconstructModelName namespace))
+--       (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain ident (unsafePartial $ fromJust $ (typeUri2ModelUri namespace))
 --       case head qnames of
 --         Nothing -> throwError $ UnknownContext pos ident
 --         (Just qn) | length qnames == 1 -> pure qn
@@ -475,12 +485,12 @@ compileSimpleStep currentDomain s@(Extern pos) = do
 compileSimpleStep currentDomain s@(CreateEnumeratedRole pos ident) = case currentDomain of
   (CDOM contextADT) -> do
     -- If `ident` is not qualified, try to qualify it in the Domain.
-    (qroleType :: EnumeratedRoleType) <- if isQualifiedWithDomein ident
+    (qroleType :: EnumeratedRoleType) <- if isTypeUri ident
       then pure $ EnumeratedRoleType ident
       -- Try to qualify the name within the Domain.
       else do
-        {_id:namespace} <- lift $ gets _.dfr
-        (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain ident (unsafePartial $ fromJust $ (deconstructModelName namespace))
+        {namespace} <- lift $ gets _.dfr
+        (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain ident namespace
         case head qnames of
           Nothing -> throwError $ UnknownRole pos ident
           (Just qn) | length qnames == 1 -> pure qn
@@ -728,7 +738,7 @@ compileVarBinding currentDomain (VarBinding varName step) = do
 
 compileComputationStep :: Domain -> ComputationStep -> FD
 compileComputationStep currentDomain (ComputationStep {functionName, arguments, computedType, start, end}) = do
-  case (deconstructModelName functionName) of
+  case (typeUri2ModelUri functionName) of
     Nothing -> throwError (NotWellFormedName start functionName)
     Just modelName -> if isExternalCoreModule modelName
       then do

@@ -19,31 +19,19 @@ npm install -g purescript@0.14.9
 npm npm install -g spago
 ```
 
-5. Install [Webpack](https://webpack.js.org/)
-```
-npm install --save-dev webpack
-```
-
-5. To install the purescript dependencies, run:
+4. To install the purescript dependencies, run:
 
 ```
   $ spago install
 ```
 
-6. To install the javascript dependencies, run:
+5. To install the javascript dependencies, run:
 
 ```
   $ npm install
 ```
 
-### Developing
-
-To compile the .purs source files, run:
-
-```
-  $ spago build
-```
-
+### Development environment
 Preferrably install [vscode](https://code.visualstudio.com/) and add two extensions:
   * [Purescript IDE](https://marketplace.visualstudio.com/items?itemName=nwolverson.ide-purescript)
   * [Purescript Language Support](https://marketplace.visualstudio.com/items?itemName=nwolverson.language-purescript)
@@ -54,7 +42,14 @@ Alternatively, install [Atom](https://atom.io/) and two packages to support Pure
 
 The vscode version has more recent language server support than the Atom version.
 
-### Develop this interface; construct a bundle
+### Develop
+
+To compile the .purs source files, run:
+
+```
+  $ spago build
+```
+
 Execute this command to combine the sources into a bundle, as it is used by InPlace:
 
 ```
@@ -62,6 +57,12 @@ npm run build
 ```
 (which just calls `webpack`)
 
+### Develop for InPlace
+The PDR forms the base of InPlace. To make changes to the PDR effective in InPlace, you will have to build both 
+*  the [SharedWorker](https://github.com/joopringelberg/perspectives-sharedworker) package with the new PDR and 
+*  [InPlace](https://github.com/joopringelberg/inplace) with the new SharedWorker.
+
+Assuming you've set up your working environment with Symlinks (see below), just run `npm build` in the former and `npm builddevelopment` (or production) in the latter package's root directory.
 
 ### Program documentation
 The source files have many annotations. Moreover, the compiler can generate standard documentation from the types in the sources. The entrance point to this documentation is [here](https://joopringelberg.github.io/perspectives-core/Perspectives.Docu.Main.html#t:x).

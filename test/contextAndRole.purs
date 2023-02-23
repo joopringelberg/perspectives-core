@@ -1,10 +1,11 @@
-module Test.ContextAndRole where
+module Test.ContextAndRole where 
 
 import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Array (length, union)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (snd)
 import Effect.Aff.Class (liftAff)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeRol_binding, context_rolInContext, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_gevuldeRol, rol_property, setRol_property)
 import Perspectives.Parsing.Messages (PerspectivesError)
@@ -26,7 +27,7 @@ theSuite = suite "ContextAndRole" do
     -- logShow r
     -- now get the role
     ra <- getPerspectContext (ContextInstance "model:User$MyTestCase") >>= flip context_rolInContext (EnumeratedRoleType "model:ContextAndRole$TestCase$Self")
-    liftAff $ assert "There should be an instance of Self" (length ra == 1)
+    liftAff $ assert "There should be an instance of Self" (length (snd ra) == 1)
 
   test "Add a Role" $ runP $ withSystem do
     (r :: (Array PerspectivesError)) <- loadCompileAndCacheArcFile "contextAndRole" testDirectory
@@ -35,7 +36,7 @@ theSuite = suite "ContextAndRole" do
     ra <- getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
       (\c -> pure $ addContext_rolInContext c  (EnumeratedRoleType "model:ContextAndRole$TestCase$Self") (RoleInstance "blabla")) >>=
         (flip context_rolInContext (EnumeratedRoleType "model:ContextAndRole$TestCase$Self"))
-    liftAff $ assert "There should be two instances of Self" (length ra == 2)
+    liftAff $ assert "There should be two instances of Self" (length (snd ra) == 2)
 
   test "Add an array of Role instances" $ runP $ withSystem do
     (r :: (Array PerspectivesError)) <- loadCompileAndCacheArcFile "contextAndRole" testDirectory
@@ -44,7 +45,7 @@ theSuite = suite "ContextAndRole" do
     ra <- getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
       (\c -> modifyContext_rolInContext c (EnumeratedRoleType "model:ContextAndRole$TestCase$Self") (flip union [(RoleInstance "blabla")])) >>=
         (flip context_rolInContext (EnumeratedRoleType "model:ContextAndRole$TestCase$Self"))
-    liftAff $ assert "There should be two instances of Self" (length ra == 2)
+    liftAff $ assert "There should be two instances of Self" (length (snd ra) == 2)
 
   test "Retrieve non-existing role instances" $ runP $ withSystem do
     (r :: (Array PerspectivesError)) <- loadCompileAndCacheArcFile "contextAndRole" testDirectory
@@ -52,7 +53,7 @@ theSuite = suite "ContextAndRole" do
     -- now add a Role
     ra <- getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
         (flip context_rolInContext (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
-    liftAff $ assert "There should be an empty array of instances of Self" (length ra == 0)
+    liftAff $ assert "There should be an empty array of instances of Self" (length (snd ra) == 0)
 
   test "Add an array of Role instances to non-existing role instances" $ runP $ withSystem do
     (r :: (Array PerspectivesError)) <- loadCompileAndCacheArcFile "contextAndRole" testDirectory
@@ -61,7 +62,7 @@ theSuite = suite "ContextAndRole" do
     ra <- getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
       (\c -> modifyContext_rolInContext c (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (flip union [(RoleInstance "blabla")])) >>=
         (flip context_rolInContext (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
-    liftAff $ assert "There should be one instance of Self" (length ra == 1)
+    liftAff $ assert "There should be one instance of Self" (length (snd ra) == 1)
 
   test "Add a Role instance to non-existing role instances" $ runP $ withSystem do
     (r :: (Array PerspectivesError)) <- loadCompileAndCacheArcFile "contextAndRole" testDirectory
@@ -70,7 +71,7 @@ theSuite = suite "ContextAndRole" do
     ra <- getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
       (\c -> pure $ addContext_rolInContext c (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla")) >>=
         (flip context_rolInContext (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
-    liftAff $ assert "There should be one instance of Self" (length ra == 1)
+    liftAff $ assert "There should be one instance of Self" (length (snd ra) == 1)
 
   test "Role assignments" $ runP $ withSystem do
     (r :: (Array PerspectivesError)) <- loadCompileAndCacheArcFile "contextAndRole" testDirectory
@@ -79,19 +80,19 @@ theSuite = suite "ContextAndRole" do
     context1 <- getPerspectContext (ContextInstance "model:User$MyTestCase") >>=
       (\c -> pure $ addContext_rolInContext c (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla"))
     roles <- context_rolInContext context1 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole")
-    liftAff $ assert "addContext_rolInContext fails" (length roles == 1)
+    liftAff $ assert "addContext_rolInContext fails" (length (snd roles) == 1)
 
     context2 <- pure $ removeContext_rolInContext context1 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla")
     roles <- (context_rolInContext context2 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
-    liftAff $ assert "removeContext_rolInContext fails" (length roles == 0)
+    liftAff $ assert "removeContext_rolInContext fails" (length (snd roles) == 0)
 
     context4 <- pure $ deleteContext_rolInContext context2 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole")
     roles <- (context_rolInContext context4 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
-    liftAff $ assert "deleteContext_rolInContext fails" (length roles == 0)
+    liftAff $ assert "deleteContext_rolInContext fails" (length (snd roles) == 0)
 
     context5 <- modifyContext_rolInContext context4 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (const [(RoleInstance "blabla")])
     roles <- (context_rolInContext context5 (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
-    liftAff $ assert "modifyContext_rolInContext fails" (length roles == 1)
+    liftAff $ assert "modifyContext_rolInContext fails" (length (snd roles) == 1)
 
   test "Property assignments" $ runP $ withSystem do
     (r :: (Array PerspectivesError)) <- loadCompileAndCacheArcFile "contextAndRole" testDirectory
@@ -117,7 +118,7 @@ theSuite = suite "ContextAndRole" do
     liftAff $ assert "removeRol_binding fails" ((rol_binding role6 == Nothing))
 
     role7 <- addRol_gevuldeRollen role6 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla")
-    liftAff $ assert "addRol_gevuldeRollen fails" ((rol_gevuldeRol role7 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") == [(RoleInstance "blabla")]))
+    liftAff $ assert "addRol_gevuldeRollen fails" (((_.instances $ rol_gevuldeRol role7 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole")) == [(RoleInstance "blabla")]))
 
     role8 <- pure $ removeRol_gevuldeRollen role7 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") (RoleInstance "blabla")
-    liftAff $ assert "removeRol_gevuldeRollen fails" ((rol_gevuldeRol role8 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole") == []))
+    liftAff $ assert "removeRol_gevuldeRollen fails" (((_.instances $ rol_gevuldeRol role8 (ContextType "model:ContextAndRole$TestCase") (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole")) == []))

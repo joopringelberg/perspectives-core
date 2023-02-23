@@ -42,6 +42,7 @@ import Data.MediaType (MediaType(..))
 import Data.Traversable (for)
 import Effect.Aff (try)
 import Effect.Class.Console (log)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, addDownStreamNotification, setRevision)
@@ -49,7 +50,7 @@ import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder) as TOP
 import Perspectives.Extern.Couchdb (addInvertedQuery)
-import Perspectives.Identifiers (isModelName)
+import Perspectives.Identifiers (isModelUri, modelUri2DomeinFileName_)
 import Perspectives.ModelDependencies (modelManagementDescription)
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Persistence.API (addAttachment, addDocument, documentsInDatabase, getAttachment, includeDocs)
@@ -65,7 +66,7 @@ modelDescription = EnumeratedRoleType modelManagementDescription
 recompileModelsAtUrl :: Url -> MonadPerspectivesTransaction Unit
 recompileModelsAtUrl repository = do
   {rows:allModels} <- lift $ documentsInDatabase repository includeDocs
-  uninterpretedDomeinFiles <- for (filter (isModelName <<< _.id) allModels) \({id, doc}) -> case read <$> doc of
+  uninterpretedDomeinFiles <- for (filter (isModelUri <<< _.id) allModels) \({id, doc}) -> case read <$> doc of
     Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
     Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
     Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
@@ -105,7 +106,7 @@ recompileModel model@(UninterpretedDomeinFile{_id, _rev, contents}) =
         -- Distribute the SeparateInvertedQueries over the other domains.
         forWithIndex_ invertedQueriesInOtherDomains
           \domainName queries -> do
-            (try $ getDomeinFile (DomeinFileId domainName)) >>=
+            (try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
               handleDomeinFileError "addModelToLocalStore'"
               \(DomeinFile dfr) -> do
                 -- Here we must take care to preserve the screens.js attachment.
@@ -113,7 +114,7 @@ recompileModel model@(UninterpretedDomeinFile{_id, _rev, contents}) =
         -- Distribute upstream state notifications over the other domains.
         forWithIndex_ upstreamStateNotifications
           \domainName notifications -> do
-            (try $ getDomeinFile (DomeinFileId domainName)) >>=
+            (try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
               handleDomeinFileError "addModelToLocalStore'"
               \(DomeinFile dfr) -> do
                 -- Here we must take care to preserve the screens.js attachment.
@@ -121,7 +122,7 @@ recompileModel model@(UninterpretedDomeinFile{_id, _rev, contents}) =
         -- Distribute upstream automatic effects over the other domains.
         forWithIndex_ upstreamAutomaticEffects
           \domainName automaticEffects -> do
-            (try $ getDomeinFile (DomeinFileId domainName)) >>=
+            (try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
               handleDomeinFileError "addModelToLocalStore'"
               \(DomeinFile dfr) -> do
                 -- Here we must take care to preserve the screens.js attachment.

@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
--- | This module defines External Core functions for model:Couchdb.
+-- | This module defines External Core functions for model://perspectives.domains#Couchdb.
 
 module Perspectives.Extern.Utilities where
 
@@ -59,9 +59,9 @@ replace patterns replacements value = case head patterns, head replacements of
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model:Utilities$GenSym" {func: unsafeCoerce genSym, nArgs: 0}
-  , Tuple "model:Utilities$RoleIdentifier" {func: unsafeCoerce roleIdentifier, nArgs: 0}
-  , Tuple "model:Utilities$ContextIdentifier" {func: unsafeCoerce contextIdentifier, nArgs: 0}
-  , Tuple "model:Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0}
-  , Tuple "model:Utilities$Replace" {func: unsafeCoerce replace, nArgs: 2}
+  [ Tuple "model://perspectives.domains#Utilities$GenSym" {func: unsafeCoerce genSym, nArgs: 0}
+  , Tuple "model://perspectives.domains#Utilities$RoleIdentifier" {func: unsafeCoerce roleIdentifier, nArgs: 0}
+  , Tuple "model://perspectives.domains#Utilities$ContextIdentifier" {func: unsafeCoerce contextIdentifier, nArgs: 0}
+  , Tuple "model://perspectives.domains#Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0}
+  , Tuple "model://perspectives.domains#Utilities$Replace" {func: unsafeCoerce replace, nArgs: 2}
   ]

@@ -170,6 +170,8 @@ perspectDef = LanguageDef
                   , "from"
                   , "role"
                   , "matches"
+                  , "publicrole"
+                  , "publiccontext"
 
                   -- Functions in expressions
                   , "specialisesRoleType"

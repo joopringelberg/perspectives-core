@@ -46,7 +46,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectRolError')
-import Perspectives.Identifiers (areLastSegmentsOf, deconstructModelName, endsWithSegments, isExternalRole, startsWithSegments)
+import Perspectives.Identifiers (areLastSegmentsOf, typeUri2ModelUri, endsWithSegments, isExternalRole, startsWithSegments)
 import Perspectives.Instances.Combinators (closure_, conjunction, filter', some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.ModelDependencies (rootUser)
@@ -205,10 +205,10 @@ aspectRoles ct@(ContextType contextName) = filter' allEnumeratedRoles
 
 -- | Returns the name of the model that defines the role type as a String Value.
 contextTypeModelName :: ContextType ~~~> Value
-contextTypeModelName (ContextType rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
+contextTypeModelName (ContextType rid) = maybe empty (pure <<< Value) (typeUri2ModelUri rid)
 
 contextTypeModelName' :: ContextType ~~> Value
-contextTypeModelName' (ContextType rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
+contextTypeModelName' (ContextType rid) = maybe empty (pure <<< Value) (typeUri2ModelUri rid)
 
 -- | The state identifier of the root state of a role has the same string value as the role identifier.
 contextRootState :: ContextType ~~~> StateIdentifier
@@ -365,10 +365,10 @@ perspectiveOnRoleType userRoleType objectRoleType = (lift $ getRole objectRoleTy
 ------- FUNCTIONS ON ROLETYPES
 ----------------------------------------------------------------------------------------
 roleTypeModelName :: RoleType ~~~> Value
-roleTypeModelName rt = maybe empty (pure <<< Value) (deconstructModelName (roletype2string rt))
+roleTypeModelName rt = maybe empty (pure <<< Value) (typeUri2ModelUri (roletype2string rt))
 
 roleTypeModelName' :: RoleType ~~> Value
-roleTypeModelName' rt = maybe empty (pure <<< Value) (deconstructModelName (roletype2string rt))
+roleTypeModelName' rt = maybe empty (pure <<< Value) (typeUri2ModelUri (roletype2string rt))
 
 -- | For a given context type, find the locally defined Enumerated role type that has an aspect role
 -- | whose local name is the first parameter value.

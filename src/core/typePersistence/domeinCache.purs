@@ -37,7 +37,7 @@ import Foreign.Object (insert)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (Namespace, namespace2modelname_)
+import Perspectives.Identifiers (DomeinFileName, ModelUri, modelUri2DomeinFileName_)
 import Perspectives.Persistence.API (addAttachment, getAttachment)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
@@ -50,71 +50,71 @@ import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (<$>), (>>=))
 
-storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
-storeDomeinFileInCache ns df= cacheEntity (DomeinFileId ns) df
+storeDomeinFileInCache :: DomeinFileName -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
+storeDomeinFileInCache domeinFileName df= cacheEntity (DomeinFileId domeinFileName) df
 
-removeDomeinFileFromCache :: Namespace -> MonadPerspectives Unit
+removeDomeinFileFromCache :: DomeinFileName -> MonadPerspectives Unit
 removeDomeinFileFromCache = void <<< domeinCacheRemove
 
 -- | Change the domeinfile in cache. NOTA BENE: does not store the modified file in Couchdb!
-modifyDomeinFileInCache :: (DomeinFile -> DomeinFile) -> Namespace -> MonadPerspectives Unit
-modifyDomeinFileInCache modifier ns =
+modifyDomeinFileInCache :: (DomeinFile -> DomeinFile) -> ModelUri -> MonadPerspectives Unit
+modifyDomeinFileInCache modifier modelUri =
   do
-    modelName <- pure $ unsafePartial namespace2modelname_ ns
-    mAvar <- retrieveInternally (DomeinFileId modelName)
+    domeinFileName <- pure $ unsafePartial modelUri2DomeinFileName_ modelUri
+    mAvar <- retrieveInternally (DomeinFileId domeinFileName)
     case mAvar of
-      Nothing -> throwError $ error $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> ns
+      Nothing -> throwError $ error $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> modelUri
       (Just avar) -> do
         df <- liftAff $ take avar
         -- Because we modify the existing Entiteit, we do not overwrite the version number -
         -- unless that is what our modifier does.
-        _ <- cacheEntity (DomeinFileId modelName) (modifier df)
+        _ <- cacheEntity (DomeinFileId domeinFileName) (modifier df)
         pure unit
 
 -----------------------------------------------------------
 -- MODIFY ELEMENTS OF A DOMEINFILE
 -----------------------------------------------------------
-modifyCalculatedRoleInDomeinFile :: Namespace -> CalculatedRole -> MonadPerspectives CalculatedRole
-modifyCalculatedRoleInDomeinFile ns cr@(CalculatedRole {_id}) = modifyDomeinFileInCache modifier ns *> pure cr
+modifyCalculatedRoleInDomeinFile :: ModelUri -> CalculatedRole -> MonadPerspectives CalculatedRole
+modifyCalculatedRoleInDomeinFile modeluri cr@(CalculatedRole {_id}) = modifyDomeinFileInCache modifier modeluri *> pure cr
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{calculatedRoles}) = DomeinFile dff {calculatedRoles = insert (unwrap _id) cr calculatedRoles}
 
-modifyEnumeratedRoleInDomeinFile :: Namespace -> EnumeratedRole -> MonadPerspectives EnumeratedRole
-modifyEnumeratedRoleInDomeinFile ns er@(EnumeratedRole {_id}) = modifyDomeinFileInCache modifier ns *> pure er
+modifyEnumeratedRoleInDomeinFile :: ModelUri -> EnumeratedRole -> MonadPerspectives EnumeratedRole
+modifyEnumeratedRoleInDomeinFile modeluri er@(EnumeratedRole {_id}) = modifyDomeinFileInCache modifier modeluri *> pure er
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{enumeratedRoles}) = DomeinFile dff {enumeratedRoles = insert (unwrap _id) er enumeratedRoles}
 
-modifyCalculatedPropertyInDomeinFile :: Namespace -> CalculatedProperty -> MonadPerspectives CalculatedProperty
-modifyCalculatedPropertyInDomeinFile ns cr@(CalculatedProperty {_id}) = modifyDomeinFileInCache modifier ns *> pure cr
+modifyCalculatedPropertyInDomeinFile :: ModelUri -> CalculatedProperty -> MonadPerspectives CalculatedProperty
+modifyCalculatedPropertyInDomeinFile modeluri cr@(CalculatedProperty {_id}) = modifyDomeinFileInCache modifier modeluri *> pure cr
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{calculatedProperties}) = DomeinFile dff {calculatedProperties = insert (unwrap _id) cr calculatedProperties}
 
-modifyStateInDomeinFile :: Namespace -> State -> MonadPerspectives State
-modifyStateInDomeinFile ns sr@(State {id}) = modifyDomeinFileInCache modifier ns *> pure sr
+modifyStateInDomeinFile :: ModelUri -> State -> MonadPerspectives State
+modifyStateInDomeinFile modeluri sr@(State {id}) = modifyDomeinFileInCache modifier modeluri *> pure sr
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{states}) = DomeinFile dff {states = insert (unwrap id) sr states}
 
 -----------------------------------------------------------
--- RETRIEVE A DOMAINFILE
+-- DOMEINFILE PERSISTENCE
 -----------------------------------------------------------
 -- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the database and caches it.
 
 -- | Retrieve a domain file.
 -- | Searches the cache with the local model name.
 -- | If not found, tries to fetch the file from its repository and add it to the local models and the cache.
-retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
-retrieveDomeinFile ns = tryGetPerspectEntiteit (DomeinFileId $ unsafePartial namespace2modelname_ ns) >>= case _ of 
+retrieveDomeinFile :: ModelUri -> MonadPerspectives DomeinFile
+retrieveDomeinFile modeluri = tryGetPerspectEntiteit (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ modeluri) >>= case _ of 
   -- Now retrieve the DomeinFile from a remote repository and store it in the local "models" database of this user.
-  -- Nothing -> addModelToLocalStore' ns true
-  Nothing -> throwError (error $ "Unknown model " <> ns)
+  -- Nothing -> addModelToLocalStore' modeluri true
+  Nothing -> throwError (error $ "Unknown model " <> modeluri)
   Just df -> pure df
 
-tryRetrieveDomeinFile :: Namespace -> MonadPerspectives (Maybe DomeinFile)
-tryRetrieveDomeinFile id = catchError (Just <$> (getPerspectEntiteit (DomeinFileId id)))
+tryRetrieveDomeinFile :: ModelUri -> MonadPerspectives (Maybe DomeinFile)
+tryRetrieveDomeinFile modelUri = catchError (Just <$> (getPerspectEntiteit (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ modelUri)))
   \_ -> pure Nothing
 
 -- | A name not preceded or followed by a forward slash.
@@ -152,8 +152,8 @@ getDomeinFileScreens (DomeinFile {_id}) = do
   getAttachment (user <> "_models") _id "screens.js"
 
 -- | Remove the file from couchb. Removes the model from cache.
-removeDomeinFileFromCouchdb :: Namespace -> MonadPerspectives Unit
-removeDomeinFileFromCouchdb ns = removeEntiteit (DomeinFileId ns) *> pure unit
+removeDomeinFileFromCouchdb :: DomeinFileName -> MonadPerspectives Unit
+removeDomeinFileFromCouchdb domeinFileName = removeEntiteit (DomeinFileId domeinFileName) *> pure unit
 
 -----------------------------------------------------------
 -- CASCADING DELETION OF A DOMAINFILE

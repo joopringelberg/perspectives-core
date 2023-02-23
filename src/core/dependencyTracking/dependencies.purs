@@ -128,12 +128,12 @@ unregisterSupportedEffect corrId = do
 findDependencies :: Assumption -> MP (Maybe (Array CorrelationIdentifier))
 findDependencies a@(Tuple resource tpe) = do
   r <- queryAssumptionRegister
-  (wildCardIdentifiers :: Maybe (Array CorrelationIdentifier)) <- case lookup "model:System$AnyContext" r of
+  (wildCardIdentifiers :: Maybe (Array CorrelationIdentifier)) <- case lookup "def:AnyContext" r of
       Nothing -> pure Nothing
       Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
 
   case lookup resource r of
-    -- The resource "model:System$AnyContext" serves as a wildcard.
+    -- The resource "def:AnyContext" serves as a wildcard.
     Nothing -> pure wildCardIdentifiers
     Just (typesForResource :: Object (Array CorrelationIdentifier)) -> case lookup tpe typesForResource of
       Nothing -> pure wildCardIdentifiers
@@ -149,7 +149,7 @@ findResourceDependencies resource = do
     Just typesForResource -> pure $ join $ values typesForResource
 
 findMeRequests :: ContextInstance -> MP (Array CorrelationIdentifier)
-findMeRequests resource = findDependencies (Tuple (unwrap resource) "model:System$Context$Me") >>= \ma -> pure $ maybe [] identity ma
+findMeRequests resource = findDependencies (Tuple (unwrap resource) "model://perspectives.domains/System$Context$Me") >>= \ma -> pure $ maybe [] identity ma
 
 -- Find all correlation identifiers for requests of the form `role <TypeOfRole>`.
 findRoleRequests :: ContextInstance -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
@@ -169,7 +169,7 @@ findBindingRequests (RoleInstance roleId) = do
   r <- queryAssumptionRegister
   case lookup roleId r of
     Nothing -> pure []
-    Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Role$binding" typesForResource)
+    Just typesForResource -> pure $ maybe [] identity (lookup "model://perspectives.domains/System$Role$binding" typesForResource)
 
 -- | Returns CorrelationIdentifiers for requests through the API that have
 -- | the `binder <EnumeratedRoleType> in <ContextType>` step on the `roleId`.
@@ -185,14 +185,14 @@ findContextStateRequests (ContextInstance contextId) = do
   r <- queryAssumptionRegister
   case lookup contextId r of
     Nothing -> pure []
-    Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Context$State" typesForResource)
+    Just typesForResource -> pure $ maybe [] identity (lookup "model://perspectives.domains/System$Context$State" typesForResource)
 
 findRoleStateRequests :: RoleInstance -> MP (Array CorrelationIdentifier)
 findRoleStateRequests (RoleInstance roleId) = do
   r <- queryAssumptionRegister
   case lookup roleId r of
     Nothing -> pure []
-    Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Role$State" typesForResource)
+    Just typesForResource -> pure $ maybe [] identity (lookup "model://perspectives.domains/System$Role$State" typesForResource)
 
 isRegistered :: CorrelationIdentifier -> Assumption -> MP Boolean
 isRegistered corrId assumption = findDependencies assumption >>= pure <<<
@@ -216,15 +216,15 @@ deregisterDependency corrId (Tuple resource tpe) = queryAssumptionRegisterModify
 
 toAssumption :: InformedAssumption -> Assumption
 toAssumption (RoleAssumption ci rt) = assumption (unwrap ci) (unwrap rt)
-toAssumption (Me ci) = assumption (unwrap ci) "model:System$Context$Me"
-toAssumption (Binding ri) = assumption (unwrap ri) "model:System$Role$binding"
+toAssumption (Me ci) = assumption (unwrap ci) "model://perspectives.domains/System$Context$Me"
+toAssumption (Binding ri) = assumption (unwrap ri) "model://perspectives.domains/System$Role$binding"
 -- NOTE that we create a single key out of the ContextType and RoleType by concatenating their String values.
 toAssumption (FilledRolesAssumption ri ct rt) = assumption (unwrap ri) ((unwrap ct) <> (unwrap rt))
 toAssumption (Property ri pt) = assumption (unwrap ri) (unwrap pt)
-toAssumption (Context ri) = assumption (unwrap ri) "model:System$Role$context"
-toAssumption (External ci) = assumption (unwrap ci) "model:System$Context$external"
-toAssumption (State ci) = assumption (unwrap ci) "model:System$Context$State"
-toAssumption (RoleState ri) = assumption (unwrap ri) "model:System$Role$State"
+toAssumption (Context ri) = assumption (unwrap ri) "model://perspectives.domains/System$Role$context"
+toAssumption (External ci) = assumption (unwrap ci) "model://perspectives.domains/System$Context$external"
+toAssumption (State ci) = assumption (unwrap ci) "model://perspectives.domains/System$Context$State"
+toAssumption (RoleState ri) = assumption (unwrap ri) "model://perspectives.domains/System$Role$State"
 
 canBeUntypedAssumption :: InformedAssumption -> Boolean
 canBeUntypedAssumption (RoleAssumption _ _) = true

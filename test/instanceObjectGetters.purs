@@ -16,7 +16,7 @@ import Perspectives.CoreTypes ((##>), (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.InstanceRepresentation (PerspectContext(..))
 import Perspectives.Instances.Builders (constructEmptyContext)
-import Perspectives.Instances.ObjectGetters (binds, bottom)
+import Perspectives.Instances.ObjectGetters (filledBy, bottom)
 import Perspectives.LoadCRL.FS (loadAndSaveCrlFile)
 import Perspectives.Query.UnsafeCompiler (getMyType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -27,7 +27,7 @@ import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
 testDirectory :: String
-testDirectory = "test"
+testDirectory = "test" 
 
 modelDirectory :: String
 modelDirectory = "src/model"
@@ -57,20 +57,20 @@ theSuite = suite "Test.Instances.ObjectGetters" do
           Just t -> t == (CR $ CalculatedRoleType "model:System$Invitation$Guest"))
       )
 
-  test "binds" $ runP $ withSimpleChat do
+  test "filledBy" $ runP $ withSimpleChat do
     -- Construct an instance of a Chat with an Initiator.
     -- The Initiator is filled with the Chatter of ChatApp.
     -- Chatter is filled by User.
-    -- Then check that Initiator `binds` User is true.
+    -- Then check that Initiator `filledBy` User is true.
     errs <- loadAndSaveCrlFile "chatInitiator.crl" testDirectory
     if null errs
       then do
-        r <- (RoleInstance "model:User$test$User") ##= binds \_ -> pure (RoleInstance "model:User$Initiator")
+        r <- (RoleInstance "model:User$test$User") ##= filledBy (RoleInstance "model:User$Initiator")
         -- logShow r
-        liftAff $ assert "Initator should bind User" (r == [Value "true"])
+        liftAff $ assert "Initator should bind User" (r == [true])
 
-        s <- (RoleInstance "model:User$test$TheTrustedCluster") ##= binds \_ -> pure (RoleInstance "model:User$Initiator")
-        liftAff $ assert "Initiator should not bind TheTrustedCluster" (s == [Value "false"])
+        s <- (RoleInstance "model:User$test$TheTrustedCluster") ##= filledBy (RoleInstance "model:User$Initiator")
+        liftAff $ assert "Initiator should not bind TheTrustedCluster" (s == [false])
 
       else liftAff $ assert ("There are model errors" <> (show errs)) false
 

@@ -22,57 +22,7 @@
 
 
 module Perspectives.CoreTypes
-  ( (###=)
-  , (###>)
-  , (###>>)
-  , (##=)
-  , (##>)
-  , (##>>)
-  , ArrayWithoutDoubles(..)
-  , Assumption
-  , AssumptionRegister
-  , AssumptionTracking
-  , BrokerService
-  , ContextInstances
-  , ContextPropertyValueGetter
-  , DomeinCache
-  , InformedAssumption(..)
-  , MP
-  , MPQ
-  , MPT
-  , MonadPerspectives
-  , MonadPerspectivesQuery
-  , MonadPerspectivesTransaction
-  , ObjectsGetter
-  , OrderedDelta(..)
-  , PerspectivesExtraState
-  , PerspectivesState
-  , PropertyValueGetter
-  , RepeatingTransaction(..)
-  , RolInstances
-  , RoleGetter
-  , StateEvaluation(..)
-  , TrackingObjectsGetter
-  , TypeLevelGetter
-  , TypeLevelResults
-  , Updater
-  , WithAssumptions
-  , assumption
-  , evalMonadPerspectivesQuery
-  , evalMonadPerspectivesQueryToMaybeObject
-  , execMonadPerspectivesQuery
-  , forceArray
-  , forceTypeArray
-  , liftToInstanceLevel
-  , runMonadPerspectivesQuery
-  , runMonadPerspectivesQueryToObject
-  , runTypeLevelToArray
-  , runTypeLevelToMaybeObject
-  , runTypeLevelToObject
-  , type (##>)
-  , type (~~>)
-  , type (~~~>)
-  )
+
   where
 
 import Control.Monad.Reader (ReaderT, lift)
@@ -98,12 +48,12 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
-import Perspectives.Persistence.API (PouchdbState)
+import Perspectives.Persistence.Types (PouchdbState)
 import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.Repetition (Duration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType, StateIdentifier)
-import Perspectives.Sync.Transaction (Transaction)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, ResourceType, RoleType, StateIdentifier)
+import Perspectives.Sync.Transaction (Transaction, StorageScheme)
 import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
@@ -154,6 +104,8 @@ type PerspectivesExtraState =
 
   , transactionFibers :: Map (Tuple String StateIdentifier) (Fiber Unit)
 
+  , typeToStorage :: Map ResourceType StorageScheme
+
   )
 
 data RepeatingTransaction = TransactionWithTiming
@@ -176,6 +128,7 @@ data RepeatingTransaction = TransactionWithTiming
   , startMoment :: Maybe Duration
   , endMoment :: Maybe Duration
   }
+
 -----------------------------------------------------------
 -- ASSUMPTIONS
 -----------------------------------------------------------

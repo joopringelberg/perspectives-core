@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
--- | This module defines External Core functions for model:Couchdb.
+-- | This module defines External Core functions for model://perspectives.domains#Couchdb.
 
 module Perspectives.Extern.Sensors where
 
@@ -88,5 +88,5 @@ readSensor device' sensor' _ = case head device', head sensor' of
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model:Sensor$ReadSensor" {func: unsafeCoerce readSensor, nArgs: 2}
+  [ Tuple "model://perspectives.domains#Sensor$ReadSensor" {func: unsafeCoerce readSensor, nArgs: 2}
 ]

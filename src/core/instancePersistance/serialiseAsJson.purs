@@ -199,8 +199,8 @@ addConnectedPartnerToChannel userArr channelArr cid = do
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model:Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1}
-  , Tuple "model:Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0}
-  , Tuple "model:Serialise$AddConnectedPartnerToChannel" {func: unsafeCoerce addConnectedPartnerToChannel, nArgs: 2}
-  , Tuple "model:Serialise$CreateCopyOfChannelDatabase" {func: unsafeCoerce createCopyOfChannelDatabase, nArgs: 1}
+  [ Tuple "model://perspectives.domains#Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1}
+  , Tuple "model://perspectives.domains#Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0}
+  , Tuple "model://perspectives.domains#Serialise$AddConnectedPartnerToChannel" {func: unsafeCoerce addConnectedPartnerToChannel, nArgs: 2}
+  , Tuple "model://perspectives.domains#Serialise$CreateCopyOfChannelDatabase" {func: unsafeCoerce createCopyOfChannelDatabase, nArgs: 1}
   ]

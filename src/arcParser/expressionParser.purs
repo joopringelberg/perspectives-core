@@ -36,7 +36,7 @@ import Data.String.Regex (parseFlags, regex)
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, regexFlags', reserved)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, regexFlags', reserved, pubParser)
 import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
@@ -134,6 +134,10 @@ simpleStep = try
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
   <|>
   Simple <$> (Value <$> getPosition <*> pure PEmail <*> (email))
+  <|>
+  Simple <$> (PublicRole <$> getPosition <*> (reserved "publicrole" *> pubParser))
+  <|>
+  Simple <$> (PublicContext <$> getPosition <*> (reserved "publiccontext" *> pubParser))
   <|>
   Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> arcIdentifier))
   <|>
@@ -294,6 +298,8 @@ startOf stp = case stp of
   where
     startOfSimple (ArcIdentifier p _) = p
     startOfSimple (Value p _ _) = p
+    startOfSimple (PublicRole p _) = p
+    startOfSimple (PublicContext p _) = p
     startOfSimple (Binding p _) = p
     startOfSimple (Binder p _ _) = p
     startOfSimple (Context p) = p
@@ -331,6 +337,8 @@ endOf stp = case stp of
   where
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
     endOfSimple (Value (ArcPosition{line, column}) _ v) = ArcPosition({line, column: column + length v + 1})
+    endOfSimple (PublicRole (ArcPosition{line, column}) url) =  ArcPosition({line, column: column + length url + 1})
+    endOfSimple (PublicContext (ArcPosition{line, column}) url) =  ArcPosition({line, column: column + length url + 1})
     endOfSimple (Binding (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 7}
     endOfSimple (Binder (ArcPosition{line, column}) _ _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}

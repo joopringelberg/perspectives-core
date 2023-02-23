@@ -24,17 +24,19 @@
 
 module Perspectives.Extern.RabbitMQ where
 
+import Control.Monad.Error.Class (throwError)
+import Control.Monad.Trans.Class (lift)
+import Data.Array (head)
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Effect.Exception (error)
+import Perspectives.AMQP.RabbitMQManagement (AdminPassword, AdminUserName, BrokerServiceUrl, NodeName, getNodes, runRabbitState, virtualHost)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectivesTransaction)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Prelude (Unit, pure, unit)
+import Prelude (Unit, pure, unit, ($), bind)
 import Unsafe.Coerce (unsafeCoerce)
 
-type BrokerServiceUrl = String
-type NodeName = String
-type AdminUserName = String
-type AdminPassword = String
 type AccountName = String
 type RoutingKey = String
 type AccountPassword = String
@@ -52,15 +54,26 @@ createAMQPaccount ::
 createAMQPaccount url_ nodeName_ adminUserName_ adminPassword_ accountName_ routingKey_ _ = pure "some password"
 
 prepareAMQPaccount :: 
-  BrokerServiceUrl -> 
-  NodeName -> 
-  AdminUserName -> 
-  AdminPassword -> 
-  AccountName -> 
-  QueueName -> 
+  Array BrokerServiceUrl -> 
+  Array NodeName -> 
+  Array AdminUserName -> 
+  Array AdminPassword -> 
+  Array AccountName -> 
+  Array QueueName -> 
   RoleInstance ->   -- NOTE: this may have to be a ContextInstance.
   MonadPerspectivesQuery AccountPassword
-prepareAMQPaccount url_ nodeName_ adminUserName_ adminPassword_ accountName_ queueName_ _ = pure "some password"
+prepareAMQPaccount url_ nodeName_ adminUserName_ adminPassword_ accountName_ queueName_ _ = case 
+    head url_, 
+    head nodeName_, 
+    head adminUserName_, 
+    head adminPassword_, 
+    head accountName_, 
+    head queueName_ of
+  Just url, Just nodeName, Just adminUserName, Just adminPassword, Just accountName, Just queueName -> do
+    nodeNames <- lift $ lift $ runRabbitState virtualHost url nodeName adminUserName adminPassword getNodes
+    pure "some password"    
+  _, _, _, _, _, _ -> throwError $ error "Missing some arguments" 
+
 
 setBindingKey ::
   BrokerServiceUrl -> 
@@ -97,9 +110,9 @@ deleteAMQPaccount url_ nodeName_ adminUserName_ adminPassword_ accountName_ _ = 
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model:RabbitMQ$CreateAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6}
-  , Tuple "model:RabbitMQ$PrepareAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6}
-  , Tuple "model:RabbitMQ$SetBindingKey" {func: unsafeCoerce setPassword, nArgs: 5}
-  , Tuple "model:RabbitMQ$SetPassword" {func: unsafeCoerce setPassword, nArgs: 6}
-  , Tuple "model:RabbitMQ$DeleteAMQPaccount" {func: unsafeCoerce deleteAMQPaccount, nArgs: 5}
+  [ Tuple "model://perspectives.domains#RabbitMQ$CreateAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6}
+  , Tuple "model://perspectives.domains#RabbitMQ$PrepareAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6}
+  , Tuple "model://perspectives.domains#RabbitMQ$SetBindingKey" {func: unsafeCoerce setPassword, nArgs: 5}
+  , Tuple "model://perspectives.domains#RabbitMQ$SetPassword" {func: unsafeCoerce setPassword, nArgs: 6}
+  , Tuple "model://perspectives.domains#RabbitMQ$DeleteAMQPaccount" {func: unsafeCoerce deleteAMQPaccount, nArgs: 5}
   ]

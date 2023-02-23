@@ -17,7 +17,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectives)
-import Test.Unit.Assert as Assert
+import Test.Unit.Assert as Assert 
 
 developmentRepository :: MonadPerspectives String
 developmentRepository = pure "http://localhost:5984/repository"

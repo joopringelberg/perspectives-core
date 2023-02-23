@@ -22,7 +22,7 @@ import Perspectives.CoreTypes ((###=), MP)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder)
-import Perspectives.Identifiers (Namespace, buitenRol, deconstructBuitenRol, deconstructLocalName_, isExternalRole, startsWithSegments)
+import Perspectives.Identifiers (Namespace, buitenRol, deconstructBuitenRol, typeUri2LocalName_, isExternalRole, startsWithSegments)
 import Perspectives.Instances.Combinators (closure)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, modifyDF, withDomeinFile)
 import Perspectives.Query.QueryTypes (Domain(..), RoleInContext, domain2roleInContext, domain2roleType, range, replaceRange, roleInContext2Role)
@@ -123,7 +123,7 @@ contextualisePerspectives = do
                   tell [Perspective precord 
                     { object = replaceRange object (RDOM contextualisedObject)
                     , roleTypes = roleTypes
-                    , displayName = (intercalate ", " (deconstructLocalName_ <<< roletype2string <$> roleTypes))
+                    , displayName = (intercalate ", " (typeUri2LocalName_ <<< roletype2string <$> roleTypes))
                     -- Apply property mappings found in the contextualisedObject ADT to the propertyVerbs.
                     , propertyVerbs = propertyVerbs'
                     }]

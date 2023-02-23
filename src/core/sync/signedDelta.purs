@@ -32,6 +32,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
+-- | The author is the instance of sys:PerspectivesSystem$User who signed the delta.
 newtype SignedDelta = SignedDelta {author :: String, encryptedDelta :: String}
 
 derive instance genericRepSignedDelta :: Generic SignedDelta _

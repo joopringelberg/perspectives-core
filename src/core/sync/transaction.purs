@@ -30,24 +30,26 @@ import Data.Array (length, null, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map, empty, union) as MAP
+import Data.Map (empty)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import Foreign.Class (class Decode, class Encode)
+import Foreign.Class (class Decode, class Encode, encode, decode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId, RoleType)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId, EnumeratedRoleType(..), ResourceType, RoleType(..))
 import Perspectives.ScheduledAssignment (ScheduledAssignment)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Semigroup, class Show, bind, ($), (<>), pure, (>), (&&))
+import Prelude (class Semigroup, class Show, bind, pure, ($), (&&), (<>), (>))
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -55,6 +57,8 @@ import Prelude (class Semigroup, class Show, bind, ($), (<>), pure, (>), (&&))
 newtype Transaction = Transaction (TransactionRecord
   ( invertedQueryResults :: Array InvertedQueryResult
   , correlationIdentifiers :: Array CorrelationIdentifier
+  -- The role type that must have a sufficient perspective for the deltas in the transaction.
+  -- Notice that it may be changed during the transaction, so not all delta's need have the same authoringRole.
   , authoringRole :: RoleType
   -- rolesToExit is the only complete collection of role instances that will be removed
   -- (including role instances that are removed with their context).
@@ -68,9 +72,11 @@ newtype Transaction = Transaction (TransactionRecord
   , untouchableContexts :: Array ContextInstance
   , untouchableRoles :: Array RoleInstance
   , userRoleBottoms :: MAP.Map RoleInstance RoleInstance
+  , typeToStorage :: MAP.Map ResourceType StorageScheme
   ))
 
 type TransactionRecord f =
+  -- The author is an instance of sys:PerspectivesSystem$User who signs deltas.
   { author :: String
   , timeStamp :: SerializableDateTime
   , deltas :: Array DeltaInTransaction
@@ -88,16 +94,35 @@ derive instance newtypeTransactie :: Newtype Transaction _
 instance showTransactie :: Show Transaction where
   show = genericShow
 
--- instance encodeTransactie :: Encode Transaction where
---   encode (Transaction{author, timeStamp, deltas, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, deltas, changedDomeinFiles})
+-- Only used in Tests
+instance encodeTransactie :: Encode Transaction where
+  encode (Transaction{author, timeStamp, deltas, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, deltas, changedDomeinFiles})
 
 instance encodeTransactie' :: Encode Transaction' where
   encode = genericEncode defaultOptions
 
--- instance decodeTransactie :: Decode Transaction where
---   decode f = do
---     ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- decode f
---     pure $ Transaction{author, timeStamp, deltas, changedDomeinFiles, scheduledAssignments: [], invertedQueryResults: [], correlationIdentifiers: [], authoringRole: ENR $ EnumeratedRoleType "model:System$PerspectivesContext$User", rolesToExit: [], modelsToBeRemoved: [], createdContexts: [], createdRoles: [], untouchableRoles: [], untouchableContexts: []}
+-- Only used in Tests
+instance decodeTransactie :: Decode Transaction where
+  decode f = do
+    ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- decode f
+    pure $ Transaction
+      { author
+      , timeStamp
+      , deltas
+      , changedDomeinFiles
+      , scheduledAssignments: []
+      , invertedQueryResults: []
+      , correlationIdentifiers: []
+      , authoringRole: ENR $ EnumeratedRoleType sysUser
+      , rolesToExit: []
+      , modelsToBeRemoved: []
+      , createdContexts: []
+      , createdRoles: []
+      , untouchableRoles: []
+      , untouchableContexts: []
+      , userRoleBottoms: empty
+      , typeToStorage: empty
+      }
 
 instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
@@ -120,6 +145,7 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , untouchableRoles: if length untouchableRoles > length ur then untouchableRoles else ur
       , untouchableContexts: if length untouchableContexts > length uc then untouchableContexts else uc
       , userRoleBottoms: userRoleBottoms `MAP.union` urb
+      , typeToStorage: MAP.empty
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
@@ -150,10 +176,11 @@ createTransaction authoringRole author =
       , untouchableContexts: []
       , untouchableRoles: []
       , userRoleBottoms: MAP.empty
+      , typeToStorage: MAP.empty
     }
 
 cloneEmptyTransaction :: Transaction -> Transaction
-cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms}) = Transaction
+cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms, typeToStorage}) = Transaction
   { author
   , timeStamp
   , authoringRole
@@ -169,6 +196,7 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchabl
   , untouchableRoles
   , untouchableContexts
   , userRoleBottoms
+  , typeToStorage
 }
 
 -- | We consider a Transaction to be 'empty' when it shows no difference to the clone of the original.
@@ -184,3 +212,23 @@ isEmptyTransaction (Transaction tr) =
   && null tr.modelsToBeRemoved
   && null tr.createdContexts
   && null tr.createdRoles
+
+-----------------------------------------------------------
+-- STORAGE SCHEME
+-----------------------------------------------------------
+-- | Resources (Context- or role instances) are stored under one of several 'schemes'.
+-- | All storage options should be understood in terms of Pouchdb databases.
+-- | A resource identified by the Default scheme is stored locally, in a database whose 
+-- | identifier derives from the identifier sys:Me.
+-- | A resource identified by the Local scheme is stored in another private, local database.
+-- | Finally, a resource identified by the Remote scheme is stored in a database 
+-- | through a REST interface. Because Pouchdb doesn't support the notion of a read-only 
+-- | database, we separate a writing endpoint from a reading endpoint.
+data StorageScheme = Default DbName | Local DbName | Remote Url WriteUrl
+
+type DbName = String
+type WriteUrl = String
+type Url = String
+
+derive instance Generic StorageScheme _
+instance Show StorageScheme where show = genericShow

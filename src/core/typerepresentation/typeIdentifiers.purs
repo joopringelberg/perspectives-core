@@ -40,11 +40,11 @@ module Perspectives.Representation.TypeIdentifiers where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
+import Data.Generic.Rep (class Generic)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
-import Data.Newtype (class Newtype, unwrap)
 import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -313,3 +313,13 @@ instance ordDomeinFileId :: Ord DomeinFileId where
   compare (DomeinFileId a) (DomeinFileId b) = compare a b
 instance prettyPrintDomeinFileId :: PrettyPrint DomeinFileId where
   prettyPrint' t (DomeinFileId n) = n
+
+data ResourceType = CType ContextType | RType EnumeratedRoleType
+derive instance Generic ResourceType _
+instance Show ResourceType where show = genericShow
+instance Eq ResourceType where eq = genericEq
+instance Ord ResourceType where
+  compare (CType ct1)(CType ct2) = compare ct1 ct2
+  compare (RType ct1)(RType ct2) = compare ct1 ct2
+  compare (CType ct1)(RType ct2) = GT
+  compare (RType ct1)(CType ct2) = LT

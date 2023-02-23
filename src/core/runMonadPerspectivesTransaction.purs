@@ -44,7 +44,7 @@ import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (addModelToLocalStore')
+import Perspectives.Extern.Couchdb (addModelToLocalStore', addModelToLocalStore_newStyle)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
@@ -340,7 +340,7 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
 -- LOADMODELIFMISSING
 -----------------------------------------------------------
 -- | Retrieves from the repository the model, if necessary.
--- modelname can be both an old style modelname or a new style modelname.
+-- modelname should be the string value of a DomeinFileId (NOT a model URN)
 -- TODO. This function relies on a repository URL in PerspectivesState. That is a stub.
 loadModelIfMissing :: String -> MonadPerspectivesTransaction Unit
 loadModelIfMissing modelName = do
@@ -348,7 +348,7 @@ loadModelIfMissing modelName = do
   if isNothing mDomeinFile
     then do
       repositoryUrl <- lift publicRepository
-      addModelToLocalStore' modelName true
+      addModelToLocalStore_newStyle modelName true
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
       (lift $ try $ getDomeinFile (DomeinFileId modelName)) >>=
         handleDomeinFileError "loadModelIfMissing"

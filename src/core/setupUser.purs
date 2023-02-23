@@ -24,7 +24,7 @@ module Perspectives.SetupUser where
 
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.ModelDependencies (sysUser)
+import Perspectives.ModelDependencies (sysUser, systemModelName)
 import Perspectives.Persistent (entitiesDatabaseName, modelDatabaseName)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
@@ -37,11 +37,11 @@ modelDirectory = "./src/model"
 
 -- | Set up by adding model:System and dependencies to the users' models database. This will add the model instances, too.
 -- | This function also ensures CURRENTUSER.
--- | Note that the repository should have model:Couchdb, model:Serialise and model:System.
+-- | Note that the repository should have model://perspectives.domains#Couchdb, model://perspectives.domains#Serialise and model://perspectives.domains#System.
 setupUser :: MonadPerspectives Unit
 setupUser = do
   -- First, upload model:System to perspect_models.
-  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore ["model:System"] (RoleInstance ""))
+  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore [systemModelName] (RoleInstance ""))
   entitiesDatabaseName >>= setRoleView
   entitiesDatabaseName >>= setRoleFromContextView
   entitiesDatabaseName >>= setPendingInvitationView

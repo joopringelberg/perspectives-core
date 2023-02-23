@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
@@ -61,7 +62,7 @@ makeTest_ test title source errorHandler theTest = test title do
             -- logShow dr'
             x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
             case x of
-              (Left e) -> errorHandler e
+              (Left e) -> for_ e errorHandler
               (Right correctedDFR) -> theTest correctedDFR
 
 makeTest :: String -> String -> (PerspectivesError -> Aff Unit) -> (DomeinFileRecord -> Aff Unit) -> Free TestF Unit

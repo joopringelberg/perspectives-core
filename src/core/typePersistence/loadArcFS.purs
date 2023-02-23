@@ -32,6 +32,7 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (Object, empty, keys, lookup, values)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
@@ -86,14 +87,18 @@ loadAndCompileArcFile_ filePath = catchError
     case r of
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
       (Right ctxt) -> do
+        -- liftEffect $ log ((show ctxt) <> "\n\n\n")
         (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
         case result of
           (Left e) -> pure $ Left e
           (Right (DomeinFile dr'@{_id})) -> do
+            -- log (show dr')
             dr'' <- pure dr' {referredModels = state.referredModels}
+            -- logShow state.referredModels
             (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
-              (Left e) -> pure $ Left e
+              (Left e) -> do 
+                pure $ Left e
               (Right correctedDFR@{referredModels}) -> do
                 -- Remove the self-referral and add the source.
                 pure $ Right $ DomeinFile correctedDFR
@@ -180,7 +185,7 @@ loadAndPersistArcFile loadCRL persist fileName directoryName = do
     else loadAndCompileArcFile fileName directoryName
   case r of
     Left m -> pure m
-    Right df@(DomeinFile drf@{_id}) -> persist _id df *> pure []
+    Right df@(DomeinFile {_id}) -> persist _id df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.
 -- | Loads an instance file, too. If not present, throws an error. Instances are added to the cache.

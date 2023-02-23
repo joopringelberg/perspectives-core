@@ -36,7 +36,7 @@ import Foreign.Object (insert, lookup) as FO
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (deconstructModelName)
+import Perspectives.Identifiers (typeUri2ModelUri)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, retrieveInternally)
@@ -59,7 +59,7 @@ class (Show i, Identifiable v i, Revision v, Newtype i String, Eq v) <= Persiste
 -- | couchdb.
 getPerspectType :: forall v i. PersistentType v i => i -> MonadPerspectives v
 getPerspectType id = do
-  mns <- pure (deconstructModelName (unwrap id))
+  mns <- pure (typeUri2ModelUri (unwrap id))
   case mns of
     Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> show id <> "'.")
     (Just ns) -> retrieveFromDomein id ns
@@ -110,7 +110,7 @@ addEnumeratedRoleToDomeinFile c (DomeinFile dff@{enumeratedRoles}) = DomeinFile 
 -----------------------------------------------------------
 -----------------------------------------------------------
 ifNamespace :: forall i. Newtype i String => i -> (DomeinFile -> DomeinFile) -> MP Unit
-ifNamespace i modifier = maybe (pure unit) (modifyDomeinFileInCache modifier) (deconstructModelName (unwrap i))
+ifNamespace i modifier = maybe (pure unit) (modifyDomeinFileInCache modifier) (typeUri2ModelUri (unwrap i))
 
 -- Put error boundaries around calls to this function.
 retrieveFromDomein_ :: forall v i. PersistentType v i =>

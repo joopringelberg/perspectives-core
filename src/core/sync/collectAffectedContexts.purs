@@ -26,7 +26,7 @@ import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
 import Data.Array (concat, cons, difference, filterA, foldM, foldl, head, nub, null, union)
-import Data.Array.NonEmpty (fromArray, singleton, head) as ANE
+import Data.Array.NonEmpty (fromArray, singleton) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
@@ -55,13 +55,13 @@ import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Identifiers (deconstructModelName)
+import Perspectives.Identifiers (typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding, contextIsInState, contextType, getFilledRoles, makeChainGetter, notIsMe, roleIsInState)
 import Perspectives.Instances.ObjectGetters (roleType, context) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, lookupInvertedQueries, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistent (getPerspectContext, getPerspectRol)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol, tryGetPerspectEntiteit)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
 import Perspectives.Query.QueryTypes (isRoleDomain, range)
@@ -631,12 +631,12 @@ createDeltasFromAssumption users (Binding roleInstance) = do
 -- FilledRolesAssumption fillerId filledContextType filledType
 createDeltasFromAssumption users (FilledRolesAssumption fillerId filledContextType filledType) = do
   filledRoles <- lift (fillerId ##= getFilledRoles filledContextType filledType)
-  -- There may not be a filledRole!
-  case ANE.fromArray filledRoles of
+  case head filledRoles of
     Nothing -> pure unit
-    Just someFilleds -> do
-      filledContext <- lift (ANE.head someFilleds ##>> OG.context)
-      magic filledContext (SerializableNonEmptyArray someFilleds) filledType users
+    Just someFilled -> (lift $ tryGetPerspectEntiteit someFilled) >>= (case _ of 
+      -- This means that the context of the filler is public.
+      Nothing -> pure unit
+      Just (PerspectRol{context:filledContext}) -> magic filledContext (SerializableNonEmptyArray $ unsafePartial fromJust $ ANE.fromArray filledRoles) filledType users)
   for_ filledRoles \filledId -> do
     (try $ lift $ getPerspectRol filledId) >>=
       handlePerspectRolError "createDeltasFromAssumption.FilledRolesAssumption"
@@ -725,7 +725,7 @@ aisInPropertyDelta id property replacementProperty eroleType = do
     -- Either compile the InvertedQuery or take the compilation from the DomeinFile in cache, if it had been compiled before.
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Object (Array InvertedQuery))
     compileDescriptions' rt@(EnumeratedPropertyType ert) =  do
-      modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
+      modelName <- pure $ (unsafePartial $ fromJust $ typeUri2ModelUri ert)
       (try $ retrieveDomeinFile modelName) >>=
         handleDomeinFileError' "aisInPropertyDelta" empty
           \(df :: DomeinFile) -> case preview (onPropertyDelta rt) df of
@@ -753,7 +753,7 @@ type InvertedQueryMapsLens = Lens' EnumeratedRole InvertedQueryMap
 -- | stores the result in cache.
 compileInvertedQueryMap :: InvertedQueryMapsLens -> EnumeratedRoleType -> MonadPerspectives InvertedQueryMap
 compileInvertedQueryMap lens rt@(EnumeratedRoleType ert) = do
-  modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
+  modelName <- pure $ (unsafePartial $ fromJust $ typeUri2ModelUri ert)
   -- Get the InvertedQueries, for all types of rt.
   (allRoletypes :: Array EnumeratedRoleType) <- (rt ###= roleAspectsClosure)
   foldM (\cumulatedMap roleType -> do
@@ -782,7 +782,7 @@ compileInvertedQueryMap lens rt@(EnumeratedRoleType ert) = do
 -- | stores the result in cache.
 compileContextInvertedQueries :: EnumeratedRoleType -> MonadPerspectives (Object (Array InvertedQuery))
 compileContextInvertedQueries rt@(EnumeratedRoleType ert) = do
-  modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
+  modelName <- pure $ (unsafePartial $ fromJust $ typeUri2ModelUri ert)
   (try $ retrieveDomeinFile modelName) >>=
     handleDomeinFileError' "compileDescriptions_" empty
     \(df :: DomeinFile) -> do
@@ -805,7 +805,7 @@ compileContextInvertedQueries rt@(EnumeratedRoleType ert) = do
 -- | stores the result in cache.
 compileRoleInvertedQueries :: ContextType -> MonadPerspectives (Object (Array InvertedQuery))
 compileRoleInvertedQueries ct@(ContextType ctxtType) = do
-  modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ctxtType)
+  modelName <- pure $ (unsafePartial $ fromJust $ typeUri2ModelUri ctxtType)
   (try $ retrieveDomeinFile modelName) >>=
     handleDomeinFileError' "compileDescriptions_" empty
     \(df :: DomeinFile) -> do

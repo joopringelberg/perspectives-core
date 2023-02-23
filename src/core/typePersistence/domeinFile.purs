@@ -40,7 +40,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
 import Perspectives.Data.EncodableMap (EncodableMap, addAll, removeAll)
 import Perspectives.Data.EncodableMap (empty) as EM
-import Perspectives.Identifiers (deconstructModelName)
+import Perspectives.Identifiers (typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Representation.Action (AutomaticAction)
@@ -175,7 +175,7 @@ instance decodeSeparateInvertedQuery :: Decode SeparateInvertedQuery where
   decode = genericDecode defaultOptions
 
 addInvertedQueryForDomain :: TypeName -> InvertedQuery -> (TypeName -> InvertedQuery -> SeparateInvertedQuery) -> DomeinFileRecord -> DomeinFileRecord
-addInvertedQueryForDomain typeName iq collectionConstructor dfr@{invertedQueriesInOtherDomains} = case deconstructModelName typeName of
+addInvertedQueryForDomain typeName iq collectionConstructor dfr@{invertedQueriesInOtherDomains} = case typeUri2ModelUri typeName of
   Nothing -> dfr
   Just modelName -> let
     invertedQueriesInOtherDomains' = case lookup modelName invertedQueriesInOtherDomains of
@@ -239,7 +239,7 @@ indexedRoles (DomeinFile{enumeratedRoles}) = execState indexedRoles_ empty
 
 addUpstreamNotification :: UpstreamStateNotification -> StateIdentifier -> DomeinFileRecord -> DomeinFileRecord
 addUpstreamNotification notification (StateIdentifier s) dfr@{upstreamStateNotifications} = let 
-    domeinName = unsafePartial fromJust $ deconstructModelName s
+    domeinName = unsafePartial fromJust $ typeUri2ModelUri s
   in 
     dfr 
       {upstreamStateNotifications = case lookup domeinName upstreamStateNotifications of
@@ -248,7 +248,7 @@ addUpstreamNotification notification (StateIdentifier s) dfr@{upstreamStateNotif
 
 addUpstreamAutomaticEffect :: UpstreamAutomaticEffect -> StateIdentifier -> DomeinFileRecord -> DomeinFileRecord
 addUpstreamAutomaticEffect effect (StateIdentifier s) dfr@{upstreamAutomaticEffects} = let 
-    domeinName = unsafePartial fromJust $ deconstructModelName s
+    domeinName = unsafePartial fromJust $ typeUri2ModelUri s
   in 
     dfr 
       {upstreamAutomaticEffects = case lookup domeinName upstreamAutomaticEffects of

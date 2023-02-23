@@ -54,7 +54,7 @@ import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
-import Perspectives.Identifiers (isModelName)
+import Perspectives.Identifiers (isModelUri)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
 import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser, userWithCredentials, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword)
@@ -426,7 +426,7 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
             addAllExternalFunctions
             modelsDb <- modelsDatabaseName
             {rows:allModels} <- documentsInDatabase modelsDb includeDocs
-            uninterpretedDomeinFiles <- for (filter (isModelName <<< _.id) allModels) \({id, doc}) -> case read <$> doc of
+            uninterpretedDomeinFiles <- for (filter (isModelUri <<< _.id) allModels) \({id, doc}) -> case read <$> doc of
               Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
               Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
               Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df

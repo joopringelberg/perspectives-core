@@ -2,7 +2,7 @@ module Test.ContextRoleParser where
 
 import Prelude
 
-import Control.Monad.Except (runExceptT)
+import Control.Monad.Except (runExceptT) 
 import Control.Monad.Free (Free)
 import Data.Array (catMaybes, head, length, null)
 import Data.Array.NonEmpty (singleton)
@@ -49,9 +49,9 @@ theSuite = suite "ContextRoleParser" do
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadAndCacheCrlFile "contextRoleParser.crl" testDirectory
     (rl :: RoleInstance) <- (ContextInstance "model:User$MyTestCase") ##>> getEnumeratedRoleInstances (EnumeratedRoleType "model:Test$TestCase$Self")
     ra <- getPerspectRol rl
-    liftAff $ assert "There should be two inverse bindings for model:Test$TestCase$NestedCase$NestedSelf" (2 == (length $ rol_gevuldeRol ra (ContextType "model:Test$TestCase$NestedCase") (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")))
+    liftAff $ assert "There should be two inverse bindings for model:Test$TestCase$NestedCase$NestedSelf" (2 == (length $ _.instances $ rol_gevuldeRol ra (ContextType "model:Test$TestCase$NestedCase") (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")))
 
-    liftAff $ assert "There should be an inverse binding for model:Test$TestCase$NestedCase2$NestedSelf" (not $ null $ rol_gevuldeRol ra (ContextType "model:Test$TestCase$NestedCase2") (EnumeratedRoleType "model:Test$TestCase$NestedCase2$NestedSelf"))
+    liftAff $ assert "There should be an inverse binding for model:Test$TestCase$NestedCase2$NestedSelf" (not $ null $ _.instances $ rol_gevuldeRol ra (ContextType "model:Test$TestCase$NestedCase2") (EnumeratedRoleType "model:Test$TestCase$NestedCase2$NestedSelf"))
 
 
   test "Load both a model and instances" $ runP $ withSystem do

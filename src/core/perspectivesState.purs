@@ -62,6 +62,7 @@ newPerspectivesState uinfo publicRepo transFlag transactionWithTiming =
   , transactionFlag: transFlag
   , transactionWithTiming
   , transactionFibers: Map.empty
+  , typeToStorage: Map.empty
   }
 
 -----------------------------------------------------------

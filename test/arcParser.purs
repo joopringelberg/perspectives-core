@@ -167,7 +167,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
             otherwise -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
 
-  test "Role that has two FilledBy attributes" do
+  test "Role that has two FilledBy attributes" do 
     (r :: Either ParseError ContextPart) <- {-pure $ unwrap $-} runIndentParser "thing MyRole (mandatory) filledBy Host, Guest\n" thingRoleE
     case r of
       (Left e) -> assert (show e) false
@@ -250,10 +250,10 @@ theSuite = suite "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) false
       (Right rl@(RE (RoleE{roleParts}))) -> case (head (filter (case _ of
-            (RoleAspect _ _) -> true
+            (RoleAspect _ _ _) -> true
             otherwise -> false) roleParts)) of
           Nothing -> assert "Role should have a RoleAspect part." false
-          Just (RoleAspect u _) -> assert "Role should have a RoleAspect part with value 'pre:MyAspectRole'" (u == "pre:MyAspectRole")
+          Just (RoleAspect u _ _) -> assert "Role should have a RoleAspect part with value 'pre:MyAspectRole'" (u == "pre:MyAspectRole")
           otherwise -> assert "Role should have a RoleAspect part" false
       otherwise -> assert "Role should have a RoleAspect part" false
 

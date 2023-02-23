@@ -33,7 +33,7 @@ domain BodiesWithAccounts
       aspect sys:WithCredentials
 
       perspective on Accounts
-        only (Create, Fill, Remove)
+        only (Create, Fill, Remove, RemoveFiller)
         props (FirstName, LastName) verbs (SetPropertyValue)
         props (UserName) verbs (Consult)
 
@@ -56,16 +56,21 @@ domain BodiesWithAccounts
     user Guest = sys:Me
       in state NoAccounts
         -- Guest can request an Account.
-        -- Because Guest is calculated, the PDR will make no effort
-        -- to keep it up to date with the Accounts role. That is OK,
+        -- The only Guest instance that a PDR can ever compute, is by construction
+        -- the user himself. A change to Accounts will therefore never lead to synchronization with
+        -- the Guest role. That is OK,
         -- as this perspective should only be used to create an Accounts
         -- instance.
         perspective on Accounts
           only (Create, Fill)
           props (FirstName, LastName)
-          selfonly
+          -- selfonly -- This has no effect; selfOnly only applies to self-perspectives.
           action RequestAccount
             bind currentactor to Accounts
+        -- Guest needs a perspective on Admin in order to keep him up to date of the new account
+        -- created by RequestAccount
+        perspective on Admin
+          props (FirstName, LastName) verbs (Consult)
 
     -- User Accounts should stored in private space.
     -- By making the role unlinked, there are no references from the context to

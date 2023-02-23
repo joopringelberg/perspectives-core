@@ -38,32 +38,26 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Object (empty, insert)
+import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, roleContextualisations, setProperty)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, roleContextualisations, setProperty, lookupOrCreateRoleInstance, lookupOrCreateContextInstance)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (###>>), (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Error.Boundaries (handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
-import Perspectives.Guid (guid)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Identifiers (buitenRol, constructUserIdentifier) as Identifier
-import Perspectives.Identifiers (buitenRol, deconstructModelName, isPublicResource)
+import Perspectives.Identifiers (buitenRol) as Identifier
+import Perspectives.Identifiers (buitenRol)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as OG
 import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
-import Perspectives.Parsing.Arc.PhaseTwo (addNamespace)
-import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectEntiteit)
-import Perspectives.Persistent.PublicStore (mapPublicStore)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, getRoleInstances, typeTimeOnly)
@@ -71,15 +65,16 @@ import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (bindingOfRole, contextOfADT)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), ResourceType(..), RoleType(..))
+import Perspectives.ResourceIdentifiers (createResourceIdentifier)
 import Perspectives.SaveUserData (removeBinding, setBinding, setFirstBinding, scheduleRoleRemoval, scheduleContextRemoval)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, getPublicStore_, hasContextAspect, indexedContextName, indexedRoleName, isDatabaseQueryRole)
+import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, hasContextAspect, isDatabaseQueryRole)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Deletes, from all contexts, the role instance.
@@ -159,8 +154,9 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
     ctxts <- lift (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
       roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
+      -- If the role type is indexed, adds the created instance to the indexed roles in PerspectivesState.
       for_ roleTypesToCreate \qualifiedRoleIdentifier' -> lookupOrCreateRoleInstance
-          qualifiedRoleIdentifier
+          qualifiedRoleIdentifier'
           (unwrap <<< unsafePartial fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier' (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing}))
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
@@ -382,7 +378,7 @@ compileContextAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier
         CR calculatedType -> void $ lookupOrCreateContextInstance 
           qualifiedContextTypeIdentifier
           do
-            contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+            contextIdentifier <- createResourceIdentifier (CType qualifiedContextTypeIdentifier)
             void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
               { id = contextIdentifier
               , ctype = unwrap qualifiedContextTypeIdentifier
@@ -403,7 +399,7 @@ compileContextAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier
             for contextTypesToCreate' \contextTypeToCreate -> void $ lookupOrCreateContextInstance 
               qualifiedContextTypeIdentifier
               do 
-                contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+                contextIdentifier <- createResourceIdentifier (CType qualifiedContextTypeIdentifier)
                 void $ runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
                   { id = contextIdentifier
                   , ctype = unwrap contextTypeToCreate
@@ -429,7 +425,7 @@ compileContextAssignment (UQD _ (QF.CreateRootContext qualifiedContextTypeIdenti
       -- As root contexts should be constructed by sys:PerspectivesSystem$User, we set the authoringRole of the transaction temporarily to that value.
       -- Since all indexed contexts are bound in sys:MySystem, we cannot have a root context that is indexed.
       for_ ctxts \ctxt -> do
-        contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+        contextIdentifier <- createResourceIdentifier (CType qualifiedContextTypeIdentifier)
         void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
           { id = contextIdentifier
           , ctype = unwrap qualifiedContextTypeIdentifier
@@ -459,7 +455,7 @@ compileContextAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifie
         Just contextTypeToCreate -> void $ lookupOrCreateContextInstance 
           qualifiedContextTypeIdentifier
           do 
-            contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+            contextIdentifier <- createResourceIdentifier (CType qualifiedContextTypeIdentifier)
             newContext <- runExceptT $ constructContext (Just $ ENR roleTypeToFill) (ContextSerialization defaultContextSerializationRecord
               { id = contextIdentifier
               , ctype = unwrap contextTypeToCreate
@@ -495,6 +491,7 @@ compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contex
     concat <$> for ctxts \ctxt -> do
       roleTypesToCreate <- cons qualifiedRoleIdentifier <$> roleContextualisations ctxt qualifiedRoleIdentifier
       for roleTypesToCreate
+        -- If the role type is indexed, adds the created instance to the indexed roles in PerspectivesState.
         \roleTypeToCreate -> lookupOrCreateRoleInstance
           qualifiedRoleIdentifier
           (unwrap <<< unsafePartial fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing}))
@@ -518,7 +515,7 @@ compileContextCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeI
         CR calculatedType -> singleton <$> lookupOrCreateContextInstance 
           qualifiedContextTypeIdentifier
           do
-            contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+            contextIdentifier <- createResourceIdentifier (CType qualifiedContextTypeIdentifier)
             r <- runExceptT $ constructContext
               Nothing
               (ContextSerialization defaultContextSerializationRecord
@@ -546,7 +543,7 @@ compileContextCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeI
             for contextTypesToCreate' \contextTypeToCreate -> lookupOrCreateContextInstance
               qualifiedContextTypeIdentifier
               do
-                contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+                contextIdentifier <- createResourceIdentifier (CType qualifiedContextTypeIdentifier)
                 r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
                   { id = contextIdentifier
                   , ctype = unwrap contextTypeToCreate
@@ -578,7 +575,7 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
         Nothing -> pure Nothing
       -- As root contexts should be constructed by sys:PerspectivesSystem$User, we set the authoringRole of the transaction temporarily to that value.
       r <- for ctxts \ctxt -> do
-        contextIdentifier <- constructContextIdentifier qualifiedContextTypeIdentifier localName
+        contextIdentifier <- createResourceIdentifier (CType qualifiedContextTypeIdentifier)
         void $ runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
           { id = contextIdentifier
           , ctype = unwrap qualifiedContextTypeIdentifier
@@ -587,55 +584,10 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
       modify (over Transaction \t -> t {authoringRole = originalRole})
       pure r
 
-constructContextIdentifier :: ContextType -> Maybe String -> MonadPerspectivesTransaction String
-constructContextIdentifier ctype@(ContextType cname) mlocalName = do
-  localName <- case mlocalName of 
-      Nothing -> show <$> liftEffect guid
-      Just n -> pure n
-  if isPublicResource localName
-    then pure localName
-    else do
-      mPStore <- lift $ getPublicStore_ ctype 
-      case mPStore of 
-        Nothing -> pure $ Identifier.constructUserIdentifier localName
-        Just pStore -> pure $ addNamespace (unsafePartial mapPublicStore pStore (unsafePartial fromJust $ deconstructModelName cname)) localName
-
+-- | Temporarily change the subject of effects to a particular role type (not necessarily the instance of sys:PerspectivesSystem$User)
 withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit
 withAuthoringRole aRole updater a = do
   originalRole <- gets (_.authoringRole <<< unwrap)
   modify (over Transaction \t -> t {authoringRole = aRole})
   updater a
   modify (over Transaction \t -> t {authoringRole = originalRole})
-
--- | If the context type is indexed, look it up. 
--- | If it isn't yet registered, create it and add an entry to the table of indexed contexts in perspectives state (overwriting previous values).
-lookupOrCreateContextInstance :: ContextType -> MonadPerspectivesTransaction (Either PerspectivesError String) -> MonadPerspectivesTransaction (Either PerspectivesError String)
-lookupOrCreateContextInstance ctype contextConstructor = do
-  mindexedName <- lift $ indexedContextName ctype 
-  case mindexedName of 
-    Nothing -> contextConstructor
-    Just indexedName -> do
-      minst <- lift $ lookupIndexedContext (unwrap indexedName)
-      case minst of
-        Nothing -> do
-          mcid <- contextConstructor
-          case mcid of
-            Left e -> pure $ Left e
-            Right s -> do
-              lift $ modify \ps -> ps {indexedContexts = insert (unwrap indexedName) (ContextInstance s) ps.indexedContexts}
-              pure $ Right s
-        Just i -> pure $ Right (unwrap i)
-
-lookupOrCreateRoleInstance :: EnumeratedRoleType -> MonadPerspectivesTransaction String -> MonadPerspectivesTransaction String
-lookupOrCreateRoleInstance rtype roleConstructor = do
-  mindexedName <- lift $ indexedRoleName rtype
-  case mindexedName of
-    Nothing -> roleConstructor
-    Just indexedName -> do
-      mrole <- lift $ lookupIndexedRole (unwrap indexedName)
-      case mrole of 
-        Nothing -> do
-          rid <- roleConstructor
-          lift $ modify \ps -> ps {indexedRoles = insert (unwrap indexedName) (RoleInstance rid) ps.indexedRoles}
-          pure rid
-        Just i -> pure (unwrap i)

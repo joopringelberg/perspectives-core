@@ -27,7 +27,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
-import Perspectives.Identifiers (Namespace, modelName2NamespaceStore)
+import Perspectives.Identifiers (Namespace, modelUri2InstancesStore)
 
 data PublicStore = NAMESPACESTORE
 
@@ -47,4 +47,4 @@ instance Decode PublicStore where
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
 mapPublicStore :: Partial => PublicStore -> Namespace -> String
 mapPublicStore pStore modelName = case pStore of 
-  NAMESPACESTORE -> modelName2NamespaceStore modelName
+  NAMESPACESTORE -> modelUri2InstancesStore modelName

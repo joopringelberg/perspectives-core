@@ -15,7 +15,7 @@ import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFileRecord)
-import Perspectives.Identifiers (deconstructNamespace_)
+import Perspectives.Identifiers (typeUri2typeNameSpace_)
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, Range, RoleInContext(..), range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action, AutomaticAction)
@@ -64,7 +64,7 @@ ensureERole roleName {enumeratedRoles} = case lookup roleName enumeratedRoles of
 -- | (we derive the context type as the lexical context of the EnumeratedRoleType)
 ensurePerspectiveOn :: String -> EnumeratedRole -> Aff Perspective.Perspective
 ensurePerspectiveOn roleName (EnumeratedRole{perspectives}) = case head $ filter
-  (unsafePartial Perspective.objectOfPerspective >>> eq (ST $ RoleInContext {context: ContextType $ deconstructNamespace_ roleName, role: EnumeratedRoleType roleName})) perspectives of
+  (unsafePartial Perspective.objectOfPerspective >>> eq (ST $ RoleInContext {context: ContextType $ typeUri2typeNameSpace_ roleName, role: EnumeratedRoleType roleName})) perspectives of
   Nothing -> failure  ("There should be a Perspective on '" <> roleName <> "'.")
   Just p -> pure p
 

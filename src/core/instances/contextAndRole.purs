@@ -41,7 +41,7 @@ import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
 import Perspectives.Couchdb.Revision (Revision_)
-import Perspectives.Identifiers (Namespace, deconstructNamespace)
+import Perspectives.Identifiers (Namespace, typeUri2typeNameSpace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
 import Perspectives.Representation.Class.PersistentType (getContext)
 import Perspectives.Representation.Context (Context(..))
@@ -57,7 +57,7 @@ context_id :: PerspectContext -> ContextInstance
 context_id (PerspectContext{_id})= _id
 
 context_Namespace :: PerspectContext -> Namespace
-context_Namespace (PerspectContext{_id}) = unsafePartial $ fromJust $ deconstructNamespace (NT.unwrap _id)
+context_Namespace (PerspectContext{_id}) = unsafePartial $ fromJust $ typeUri2typeNameSpace (NT.unwrap _id)
 
 changeContext_id :: ContextInstance -> PerspectContext -> PerspectContext
 changeContext_id id (PerspectContext cr) = PerspectContext $ cr {_id = id}

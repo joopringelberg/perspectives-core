@@ -253,6 +253,9 @@ data QueryFunction
   | RoleIndividual RoleInstance
   | ContextIndividual ContextInstance
 
+  | PublicContext ContextInstance
+  | PublicRole RoleInstance
+
   | CreateContext ContextType RoleType
   | CreateRootContext ContextType
   | CreateContext_ ContextType

@@ -29,7 +29,7 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Identifiers (constructUserIdentifier, deconstructLocalNameFromCurie, deconstructPrefix, isQualifiedWithDomein)
+import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isTypeUri)
 import Perspectives.ModelDependencies (sysMe)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -56,7 +56,7 @@ expandIndexedNames defaults expandedName =
     Nothing -> expandedName
 
 expandNamespaces :: OBJ.Object String -> String -> String
-expandNamespaces namespaces s = if isQualifiedWithDomein s then s else
+expandNamespaces namespaces s = if isTypeUri s then s else
   case deconstructPrefix s of
     (Just pre) -> do
       case OBJ.lookup pre namespaces of
@@ -68,12 +68,12 @@ expandNamespaces namespaces s = if isQualifiedWithDomein s then s else
 
 defaultNamespaces :: OBJ.Object String
 defaultNamespaces = OBJ.fromFoldable
-  [ Tuple "cdb" "model:Couchdb"
-  , Tuple "sys" "model:System"
+  [ Tuple "cdb" "model://perspectives.domains/Couchdb"
+  , Tuple "sys" "model://perspectives.domains/System"
   , Tuple "usr" "model:User"
-  , Tuple "ser" "model:Serialise"
-  , Tuple "p" "model:Parsing"
-  , Tuple "util" "model:Utilities"
+  , Tuple "ser" "model://perspectives.domains/Serialise"
+  , Tuple "p" "model://perspectives.domains/Parsing"
+  , Tuple "util" "model://perspectives.domains/Utilities"
   ]
 
 defaultIndexedNames :: MonadPerspectives (OBJ.Object String)
@@ -110,6 +110,7 @@ psp ln = "model:Perspectives$" <> ln
 getUserIdentifier :: MonadPerspectives String
 getUserIdentifier = getMySystem >>= pure <<< flip append "$User"
 
--- | Returns a Perspectives Identifier of the form "model:User$<guid>"
+-- | Returns a Perspectives Identifier of the form "def:<guid>"
+-- | To be more precise: "def:<SystemIdentifier>"
 getMySystem :: MonadPerspectives String
-getMySystem = getSystemIdentifier >>= pure <<< constructUserIdentifier
+getMySystem = getSystemIdentifier >>= \sysId -> pure $ "def:" <> sysId

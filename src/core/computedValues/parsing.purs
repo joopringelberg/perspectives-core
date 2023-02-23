@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
--- | This module defines External Core functions for model:Couchdb.
+-- | This module defines External Core functions for model://perspectives.domains#Couchdb.
 
 module Perspectives.Extern.Parsing where
 
@@ -32,7 +32,6 @@ import Control.Monad.Writer (runWriterT)
 import Data.Array (cons, head, intercalate)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.String.Regex (test)
 import Data.Tuple (Tuple(..))
 import Main.RecompileBasicModels (recompileModelsAtUrl)
 import Partial.Unsafe (unsafePartial)
@@ -43,7 +42,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (modelName2NamespaceStore, oldModelRegex)
+import Perspectives.Identifiers (modelUri2ModelRepository)
 import Perspectives.LoadCRL (loadAndCacheCrlFile')
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -51,7 +50,7 @@ import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runEmbeddedTransaction)
-import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_, loadArcAndCrl')
+import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Read the .arc file, parse it and try to compile it.
@@ -99,21 +98,10 @@ uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crl
     r <- loadAndCompileArcFile_ arcSource
     case r of
       Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
-      Right (DomeinFile {_id, namespace}) -> if test oldModelRegex namespace
-        then do 
-          -- This is inefficient, but temporary until we're done with the old model identifiers.
-          -- Adds the modelDescription, crl, indexedRoles and indexedContexts.
-          withInstances <- loadArcAndCrl' arcSource crlSource
-          case withInstances of
-            Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
-            Right df -> do
-              lift $ void $ storeDomeinFileInCache _id df
-              -- construct the url from host and port.
-              lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) url
-        else lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelName2NamespaceStore namespace)
+      Right (DomeinFile {_id, namespace}) -> lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelUri2ModelRepository namespace)
   _, _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
--- | Parse and compile the Arc file. Upload to the repository.
+-- | Parse and compile the Arc file. Upload to the repository. Puts it in the Cache, but not in the local collection of DomeinFiles.
 -- | If the file is not valid, nothing happens.
 uploadToRepository2 ::
   Array ArcSource ->
@@ -126,7 +114,7 @@ uploadToRepository2 arcSource_ _ = case head arcSource_ of
       -- PROBABLY: STORE IN CACHE. model identification?
       Right df@(DomeinFile {_id, namespace}) -> do
         lift $ void $ storeDomeinFileInCache _id df
-        lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelName2NamespaceStore namespace)
+        lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelUri2ModelRepository namespace)
   _ -> logPerspectivesError $ Custom ("uploadToRepository2 lacks arguments")
 
 -- | Parse and compile all models found at the URL.
@@ -141,9 +129,9 @@ compileRepositoryModels url_ _ = case head url_ of
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model:Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1}
-  , Tuple "model:Parsing$ParseAndCompileCrl" {func: unsafeCoerce parseAndCompileCrl, nArgs: 1}
-  , Tuple "model:Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 3}
-  , Tuple "model:Parsing$UploadToRepository2" {func: unsafeCoerce uploadToRepository2, nArgs: 1}
-  , Tuple "model:Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1}
+  [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1}
+  , Tuple "model://perspectives.domains#Parsing$ParseAndCompileCrl" {func: unsafeCoerce parseAndCompileCrl, nArgs: 1}
+  , Tuple "model://perspectives.domains#Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 3}
+  , Tuple "model://perspectives.domains#Parsing$UploadToRepository2" {func: unsafeCoerce uploadToRepository2, nArgs: 1}
+  , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1}
 ]

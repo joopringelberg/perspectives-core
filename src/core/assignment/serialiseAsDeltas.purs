@@ -53,7 +53,7 @@ import Perspectives.Deltas (addDelta)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType_)
-import Perspectives.ModelDependencies (sysUser)
+import Perspectives.ModelDependencies (idProperty, sysUser)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
@@ -148,7 +148,7 @@ serialiseRoleInstancesAndProperties ::
 serialiseRoleInstancesAndProperties cid users object properties selfOnly isPerspectiveOnSelf = do
   -- We know that object has a role range.
   properties' <- if isPerspectiveOnSelf
-    then pure $ ARR.cons (ENP $ EnumeratedPropertyType "model:System$PerspectivesSystem$User$Id") properties
+    then pure $ ARR.cons (ENP $ EnumeratedPropertyType idProperty) properties
     else pure properties
   -- All instances of this RoleType (object) the user may see in this context.
   -- In general, these may be instances of several role types, as the perspective object is expressed as a query.

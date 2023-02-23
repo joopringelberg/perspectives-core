@@ -40,11 +40,16 @@ import Prelude (class Show, show, (<>), (==), (&&))
 -- GENERIC
 -----------------------------------------------------------
 -- type DeltaRecord f = {users :: Array RoleInstance, sequenceNumber :: Int, subject :: SubjectOfAction | f}
+-- | The subject is the user role with the perspective that should include the right verbs to allow the delta
+-- | and with an object that corresponds to the resource being modified by the delta.
+-- | This is often taken from the transacton in which modifications are made. It is the member 'authoringRole'
+-- | (not to be confused with member 'author', who must be an instance of sys:PerspectivesSystem$User).
 type DeltaRecord f = {subject :: SubjectOfAction | f}
 
 -----------------------------------------------------------
 -- SUBJECTOFACTION
 -----------------------------------------------------------
+-- UserInstance is all but unused (only in the ContextRoleParser)
 data SubjectOfAction = UserInstance RoleInstance | UserType RoleType
 
 derive instance genericSubjectOfAction :: Generic SubjectOfAction _

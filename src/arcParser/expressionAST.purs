@@ -117,6 +117,9 @@ data SimpleStep =
   | SpecialisesRoleType ArcPosition String
   | RegEx ArcPosition RegExP
 
+  | PublicRole ArcPosition String
+  | PublicContext ArcPosition String
+
   -- These step types are used in Perspectives.Parsing.Arc.PhaseThree for the standard variables.
   | TypeTimeOnlyContext ArcPosition String
   -- ArcPosition, ContextType, EnumeratedRoleType
@@ -205,6 +208,8 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (TypeTimeOnlyEnumeratedRole _ r c) = "TypeTimeOnlyEnumeratedRole " <> r <> " " <> c
   prettyPrint' t (TypeTimeOnlyCalculatedRole _ s) = "TypeTimeOnlyCalculatedRole " <> s
   prettyPrint' t (RegEx _ r) = show r
+  prettyPrint' t (PublicRole _ u) = "PublicRole " <> u
+  prettyPrint' t (PublicContext _ u) = "PublicContext " <> u
 
 derive instance genericBinaryStep :: Generic BinaryStep _
 instance showBinaryStep :: Show BinaryStep where show = genericShow

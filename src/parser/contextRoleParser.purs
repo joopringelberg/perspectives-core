@@ -45,7 +45,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
-import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol, isPublicResource, publicResourceIdentifier2LocalName_, publicResourceIdentifier2repository_)
+import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol, publicResourceIdentifier2LocalName_, publicResourceIdentifier2repository_)
 import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Names (getUserIdentifier)
@@ -54,6 +54,7 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType(..), 
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier(..), externalRoleType_)
+import Perspectives.ResourceIdentifiers (hasPublicResourceShape)
 import Perspectives.SerializableNonEmptyArray (singleton)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
@@ -145,7 +146,7 @@ uncapitalizedString = f <$> lower <*> AR.many identLetter where
 publicResourceIdentifier :: IP QualifiedName
 publicResourceIdentifier = try $ lexeme do
   s <- urlLetterString
-  if isPublicResource s
+  if hasPublicResourceShape s
     then pure $ QualifiedName (unsafePartial publicResourceIdentifier2repository_ s) (unsafePartial publicResourceIdentifier2LocalName_ s)
     else fail "Expected a string of the form 'https://some.domain/path'."
 
@@ -230,6 +231,20 @@ contextInstanceIDInCurrentNamespace = lexeme do
   ln <- (STRING.string "$") *> localContextName
   pure $ QualifiedName namespace ln
 
+-- The new ResourceIdentifiers follow a scheme with a prefix that indicates the
+-- way the identifier is constructed, not a namespace. However, we try to stretch 
+-- the meaning of QualifiedName here to include those identifiers. 
+-- The CRL parser is on its way out, anyway.
+schemedResourceIdentifier :: IP QualifiedName
+schemedResourceIdentifier = try $ lexeme defaultName
+
+-- def:<systemId>_entities#<guid>
+defaultName :: IP QualifiedName
+defaultName = do
+  pre <- STRING.string "def:"
+  rest <- segmentedName  
+  pure $ QualifiedName "def" rest
+
 relativeContextTypeName ::  IP QualifiedName
 relativeContextTypeName = lexeme do
   namespace <- getTypeNamespace
@@ -243,7 +258,7 @@ relativeRolTypeName = lexeme do
   pure $ QualifiedName namespace ln
 
 relativePropertyTypeName ::  IP QualifiedName
-relativePropertyTypeName = lexeme do
+relativePropertyTypeName = try $ lexeme do
   namespace <- getTypeNamespace
   ln <- (STRING.string "$") *> localPropertyName
   pure $ QualifiedName namespace ln
@@ -254,7 +269,7 @@ relativeRolTypeNameOutsideNamespace = lexeme do
   pure $ QualifiedName "?" ln
 
 contextName ::  IP QualifiedName
-contextName = (expandedName <|> prefixedContextName <|> contextInstanceIDInCurrentNamespace) <?> "the name of a resource (Context or Role)."
+contextName = (expandedName <|> prefixedContextName <|> contextInstanceIDInCurrentNamespace <|> schemedResourceIdentifier) <?> "the name of a resource (Context or Role)."
 
 typeContextName ::  IP QualifiedName
 typeContextName = (expandedName <|> prefixedContextName <|> relativeContextTypeName) <?> "the name of a resource (Context or Role)."
@@ -371,7 +386,7 @@ roleOccurrence ::  IP Int
 roleOccurrence = token.parens token.integer
 
 roleInstanceName :: IP QualifiedName
-roleInstanceName = token.parens (expandedName <|> prefixedContextName)
+roleInstanceName = token.parens (expandedName <|> prefixedContextName <|> schemedResourceIdentifier)
 
 data Arrow = ContextBinding | RoleBinding
 instance showArrow :: Show Arrow where
@@ -511,7 +526,7 @@ contextBindingByReference cName = roleBinding' cName ContextBinding \_ -> do
   where
     contextReference :: IP RolName
     contextReference = do
-      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID <|> publicResourceIdentifier)
+      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID <|> publicResourceIdentifier <|> schemedResourceIdentifier)
       pure $ buitenRol (show qn)
 
 roleBindingByReference ::  QualifiedName
@@ -524,13 +539,13 @@ roleBindingByReference cName = roleBinding' cName RoleBinding \_ -> do
   where
     rolReference :: IP RolName
     rolReference = do
-      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID <|> publicResourceIdentifier)
+      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID <|> publicResourceIdentifier <|> schemedResourceIdentifier)
       pure (show qn)
 
 indexedIndividualBinding ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
 indexedIndividualBinding cName = roleBinding' cName RoleBinding \_ -> do
-  ident <- (sameLine *> (expandedName <|> prefixedContextName))
+  ident <- (sameLine *> (expandedName <|> prefixedContextName <|> schemedResourceIdentifier))
   cmt <- inLineComment
   pure $ Tuple cmt (Just $ RoleInstance (show ident))
 

@@ -1,10 +1,24 @@
--- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021
-domain System
-  use sys for model:System
-  use cdb for model:Couchdb
-  use ser for model:Serialise
-  use sensor for model:Sensor
-  use util for model:Utilities
+-- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021, 2022, 2023
+domain model://perspectives.domains#System
+  use sys for model://perspectives.domains#System
+  use cdb for model://perspectives.domains#Couchdb
+  use ser for model://perspectives.domains#Serialise
+  use sensor for model://perspectives.domains#Sensor
+  use util for model://perspectives.domains#Utilities
+
+  -- model:System (short for model://perspectives.domains#System) is booted in a unique way.
+  -- Other models rely on there being an instance of sys:PerspectivesSystem and a User role in it.
+  -- That precondition obviously fails for this model.
+  -- Consequently, we create both in code. 
+  -- We also create their indexed names, so we can refer to them below.
+  -- The initialisation routine below therefore is somewhat simpler.
+
+  on entry
+    do for sys:PerspectivesSystem$User
+      bind sys:MySystem >> extern to IndexedContexts in sys:MySystem
+      -- NOTE that we should uncomment this role but cannot do so until this resource and its model is available. This is a Catch22 situation.
+      -- bind publicrole https://perspectives.domains/cw_servers_and_repositories/perspectives_domains$External to BaseRepository in sys:MySystem
+      -- Do we need to create an instance of a Manifest?
 
   -- Used as model:System$RoleWithId$Id in the PDR code.
   thing RoleWithId
@@ -115,7 +129,7 @@ domain System
               props (InviterLastName, Message) verbs (Consult)
 
 
-    user Contacts = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
+    user Contacts = filter (callExternal cdb:RoleInstances( "model://perspectives.domains#System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
     user Installer
       perspective on IndexedContexts
@@ -189,7 +203,7 @@ domain System
       property Identifier (mandatory, String)
 
     -- A calculated role representing all available Notifications (from any context).
-    thing AllNotifications = callExternal cdb:RoleInstances( "model:System$ContextWithNotification$Notifications" ) returns sys:ContextWithNotification$Notifications
+    thing AllNotifications = callExternal cdb:RoleInstances( "model://perspectives.domains#System$ContextWithNotification$Notifications" ) returns sys:ContextWithNotification$Notifications
 
     context SystemCaches (mandatory) filledBy Caches
 
@@ -302,7 +316,7 @@ domain System
       state InviteUnconnectedUser = IWantToInviteAnUnconnectedUser and exists Message
         on entry
           do for Inviter
-            SerialisedInvitation = callExternal ser:SerialiseFor( filter origin >> context >> contextType >> roleTypes with specialisesRoleType model:System$Invitation$Invitee ) returns String
+            SerialisedInvitation = callExternal ser:SerialiseFor( filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee ) returns String
 
       view ForInvitee (InviterLastName, Message)
 
@@ -344,7 +358,7 @@ domain System
           -- and complain that the author has no rights to modify it.
           bind origin >> binding to BasicModelsInUse in sys:MySystem
 
-    context Versions filledBy VersionedModelManifest
+    context Versions (relational) filledBy VersionedModelManifest
       property Version (mandatory, String)
       -- The value of this property will be set by the Couchdb:VersionedModelManifest$Author.
       property ModelIdentifier (mandatory, String)
@@ -353,4 +367,10 @@ domain System
   case VersionedModelManifest
     external
       property Description (mandatory, String)
+      -- Notice that we have to register the ModelIdentifier on the context role in the collection (ModelManifest$Versions),
+      -- to serve in the pattern that creates a DNS URI, so it can be a public resource.
       property ModelIdentifier = binder Versions >> Versions$ModelIdentifier
+    user Visitor = sys:Me
+      perspective on extern
+        props (Description, ModelIdentifier) verbs (Consult)
+    

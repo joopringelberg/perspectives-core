@@ -70,67 +70,50 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic.Class (class GenericEncode)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Identifiers (couchdbResourceIdentifier, isUrl, publicResourceIdentifier2database_)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (AuthoritySource(..), MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
+import Perspectives.ResourceIdentifiers (pouchdbDatabaseName, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, writeUrl)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
-  -- database :: i -> MP String
+  -- | Either a local database name, or a URL that identifies a database to read from, in some Couchdb installation on the internet.
   dbLocalName :: i -> MP String
+  -- | Either a local database name, or a URL that identifies a database to write to, in some Couchdb installation on the internet.
   writeDbName :: i -> MP String
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
-  -- database _ = do
-  --   sysId <- getSystemIdentifier
-  --   cdbUrl <- getCouchdbBaseURL
-  --   pure $ cdbUrl <> sysId <> "_entities/"
-  dbLocalName id = if isUrl (unwrap id) 
-    then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id)
-    else do
-      sysId <- getSystemIdentifier
-      pure $ sysId <> "_entities"
-  writeDbName id = if isUrl (unwrap id) 
-    then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id) <> "_write"
-    else do
-      sysId <- getSystemIdentifier
-      pure $ sysId <> "_entities"
+  dbLocalName (ContextInstance id) = pouchdbDatabaseName id
+  -- dbLocalName id = if isUrl (unwrap id) 
+  --   then pure $ unsafePartial publicResourceIdentifier2repository_ (unwrap id)
+  --   else do
+  --     sysId <- getSystemIdentifier
+  --     pure $ sysId <> "_entities"
+  writeDbName (ContextInstance id) = writeUrl id
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
-  -- database _ = do
-  --   sysId <- getSystemIdentifier
-  --   cdbUrl <- getCouchdbBaseURL
-  --   pure $ cdbUrl <> sysId <> "_entities/"
-  dbLocalName id = if isUrl (unwrap id) 
-    then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id)
-    else do
-      sysId <- getSystemIdentifier
-      pure $ sysId <> "_entities"
-  writeDbName id = if isUrl (unwrap id) 
-    then pure $ unsafePartial publicResourceIdentifier2database_ (unwrap id) <> "_write"
-    else do
-      sysId <- getSystemIdentifier
-      pure $ sysId <> "_entities"
+  dbLocalName (RoleInstance id) = pouchdbDatabaseName id
+  -- dbLocalName id = if isUrl (unwrap id) 
+  --   then pure $ unsafePartial publicResourceIdentifier2repository_ (unwrap id)
+  --   else do
+  --     sysId <- getSystemIdentifier
+  --     pure $ sysId <> "_entities"
+  writeDbName (RoleInstance id) = writeUrl id
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
-  -- database _ = do
+  dbLocalName (DomeinFileId id) = pouchdbDatabaseName id
+  -- dbLocalName _ = do
   --   sysId <- getSystemIdentifier
-  --   cdbUrl <- getCouchdbBaseURL
-  --   pure $ cdbUrl <> sysId <> "_models/"
-  dbLocalName _ = do
-    sysId <- getSystemIdentifier
-    pure $ sysId <> "_models"
-  -- When saving a DomeinFile through Persistent, we only save it in the local models database.
-  -- It's only through uploadToRepository that we write to remote and public databases (Repositories).
-  writeDbName i = dbLocalName i
+  --   pure $ sysId <> "_models"
+  -- -- When saving a DomeinFile through Persistent, we only save it in the local models database.
+  -- -- It's only through uploadToRepository that we write to remote and public databases (Repositories).
+  writeDbName (DomeinFileId id) = writeUrl id
 
 getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
@@ -149,7 +132,7 @@ postDatabaseName :: forall f. MonadPouchdb f String
 postDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_post")
 
 modelDatabaseName :: MonadPerspectives String
-modelDatabaseName = dbLocalName (DomeinFileId "model:System")
+modelDatabaseName = dbLocalName (DomeinFileId "") -- The argument is ignored.
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit
@@ -157,6 +140,7 @@ getPerspectContext = getPerspectEntiteit
 getPerspectRol :: RoleInstance -> MP PerspectRol
 getPerspectRol = getPerspectEntiteit
 
+-- | Argument should have form model:ModelName (not the new model:some.domain/ModelName form).
 getDomeinFile :: DomeinFileId -> MP DomeinFile
 getDomeinFile = getPerspectEntiteit
 
@@ -180,15 +164,20 @@ removeEntiteit entId = do
 
 removeEntiteit_ :: forall a i. Persistent a i => i -> a -> MonadPerspectives a
 removeEntiteit_ entId entiteit =
-  ensureAuthentication (Entity $ unwrap entId) $ \_ ->
+  ensureAuthentication (Resource $ unwrap entId) $ \_ ->
     case (rev entiteit) of
       Nothing -> pure entiteit
       (Just rev) -> do
         void $ removeInternally entId
+
+        -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
+        {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
+        void $ deleteDocument database documentName (Just rev)
+
         -- Returns either the local database name or a URL.
-        dbName <- writeDbName entId
-        -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
-        void $ deleteDocument dbName (couchdbResourceIdentifier $ unwrap entId) (Just rev)
+        -- dbName <- writeDbName entId
+        -- -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
+        -- void $ deleteDocument dbName (couchdbResourceIdentifier $ unwrap entId) (Just rev)
         pure entiteit
 
 tryRemoveEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives Unit
@@ -200,18 +189,17 @@ tryRemoveEntiteit entId = do
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
 fetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
-fetchEntiteit id = ensureAuthentication (Entity $ unwrap id) $ \_ -> catchError
+fetchEntiteit id = ensureAuthentication (Resource $ unwrap id) $ \_ -> catchError
   do
     v <- representInternally id
-    -- TODO.
-    -- Neem de prefix van de id (het deel vóór de $).
-    -- als dat "model:User" is, neem dan de dbLocalName van id.
-    -- anders is het de symbolische naam van een storage location. Zoek in PerspectivesState de bijbehorende
-    -- locatie (URL) van die storage op.
-    -- Pas ensureAuthentication aan: geef de symbolische naam van de storage mee.
-    -- Pas ensureAuthentication pas toe als de symbolische naam bekend is.
-    dbName <- dbLocalName id
-    doc <- getDocument dbName (couchdbResourceIdentifier $ unwrap id)
+
+    -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
+    {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
+    doc <- getDocument database documentName
+
+    -- Returns either the local database name or a URL.
+    -- dbName <- dbLocalName id
+    -- doc <- getDocument dbName (couchdbResourceIdentifier $ unwrap id)
     lift $ put doc v
     pure doc
 
@@ -232,9 +220,14 @@ fetchEntiteit id = ensureAuthentication (Entity $ unwrap id) $ \_ -> catchError
 -- | Fetch the definition of a document if it can be found. DOES NOT CACHE THE ENTITY!
 tryFetchEntiteit :: forall a i. Revision a => Persistent a i => i -> MonadPerspectives (Maybe a)
 tryFetchEntiteit id = do
-  dbName <- dbLocalName id
-  catchError (Just <$> getDocument dbName (unwrap id))
+  -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
+  {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
+  catchError (Just <$> getDocument database documentName)
     \e -> pure Nothing
+
+  -- dbName <- dbLocalName id
+  -- catchError (Just <$> getDocument dbName (couchdbResourceIdentifier $ unwrap id))
+  --   \e -> pure Nothing
 
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveEntiteit id = saveEntiteit' id Nothing
@@ -246,21 +239,27 @@ saveEntiteit_ entId entiteit = saveEntiteit' entId (Just entiteit)
 
 -- | Save an Entiteit and set its new _rev parameter in the cache.
 saveEntiteit' :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
-saveEntiteit' entId mentiteit = ensureAuthentication (Entity $ unwrap entId) $ \_ -> do
+saveEntiteit' entId mentiteit = ensureAuthentication (Resource $ unwrap entId) $ \_ -> do
   mentityFromCache <- tryTakeEntiteitFromCache entId
   entiteit <- case mentiteit of
     Nothing -> case mentityFromCache of
       Nothing -> throwError $ error ("saveEntiteit' needs either an entity as parameter, or a locally stored resource for " <>  unwrap entId)
       Just e -> pure e
     Just e -> pure e
+
+  -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
+  {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
+  (rev :: Revision_) <- addDocument database entiteit documentName
+  
   -- Returns either the local database name or a URL.
-  dbName <- writeDbName entId
-  -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
-  (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
+  -- dbName <- writeDbName entId
+  -- -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
+  -- (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
   entiteit' <- pure (changeRevision rev entiteit)
   void $ cacheEntity entId entiteit'
   pure entiteit'
 
+-- | Updates the revision in cache (no change to the version in database).
 updateRevision :: forall a i. Persistent a i => i -> MonadPerspectives Unit
 updateRevision entId = do
   dbName <- dbLocalName entId

@@ -3,162 +3,174 @@ module Perspectives.ModelDependencies  where
 -- | This module contains all Arc identifiers that are used in the PDR source code.
 -- | None of these identifiers can be changed in their models without breaking the PDR.
 -- | Relevant models are:
--- |    * model:System
--- |    * model:BrokerServices
+-- |    * model://perspectives.domains/System
+-- |    * model://perspectives.domains/BrokerServices
 
 ------------------------------------------------------------------------------------
 -- SYSTEM
 ------------------------------------------------------------------------------------
 
+systemModelName :: String
+systemModelName = "model://perspectives.domains/System"
+
 sysMe :: String
-sysMe = "model:System$Me"
+sysMe = "model://perspectives.domains/System$Me"
 
 mySystem :: String
-mySystem = "model:System$MySystem"
+mySystem = "model://perspectives.domains/System$MySystem"
+
+theSystem :: String
+theSystem = "model://perspectives.domains/System$PerspectivesSystem"
 
 sysUser :: String
-sysUser = "model:System$PerspectivesSystem$User"
+sysUser = "model://perspectives.domains/System$PerspectivesSystem$User"
+
+idProperty :: String
+idProperty = "model://perspectives.domains/System$PerspectivesSystem$User$Id"
 
 modelsInUse :: String
-modelsInUse = "model:System$PerspectivesSystem$ModelsInUse"
+modelsInUse = "model://perspectives.domains/System$PerspectivesSystem$ModelsInUse"
 
 connectedToAMQPBroker :: String
-connectedToAMQPBroker = "model:System$PerspectivesSystem$External$ConnectedToAMQPBroker"
+connectedToAMQPBroker = "model://perspectives.domains/System$PerspectivesSystem$External$ConnectedToAMQPBroker"
 
 userChannel :: String
-userChannel = "model:System$PerspectivesSystem$User$Channel"
+userChannel = "model://perspectives.domains/System$PerspectivesSystem$User$Channel"
 
 roleWithId :: String
-roleWithId = "model:System$RoleWithId$Id"
+roleWithId = "model://perspectives.domains/System$RoleWithId$Id"
 
 installer :: String
-installer = "model:System$PerspectivesSystem$Installer"
+installer = "model://perspectives.domains/System$PerspectivesSystem$Installer"
 
 ------------------------------------------------------------------------------------
 -- ROOTCONTEXT
 ------------------------------------------------------------------------------------
 rootContext :: String
-rootContext = "model:System$RootContext$External"
+rootContext = "model://perspectives.domains/System$RootContext$External"
 
 rootUser :: String
-rootUser = "model:System$RootContext$RootUser"
+rootUser = "model://perspectives.domains/System$RootContext$RootUser"
 
 ------------------------------------------------------------------------------------
 -- NOTIFICATION
 ------------------------------------------------------------------------------------
 contextWithNotification :: String
-contextWithNotification = "model:System$ContextWithNotification"
+contextWithNotification = "model://perspectives.domains/System$ContextWithNotification"
 
 notifications :: String
-notifications = "model:System$ContextWithNotification$Notifications"
+notifications = "model://perspectives.domains/System$ContextWithNotification$Notifications"
 
 notificationMessage :: String
-notificationMessage = "model:System$ContextWithNotification$Notifications$Message"
+notificationMessage = "model://perspectives.domains/System$ContextWithNotification$Notifications$Message"
 
 
 ------------------------------------------------------------------------------------
 -- MODEL
 ------------------------------------------------------------------------------------
 indexedRole :: String
-indexedRole = "model:System$Model$IndexedRole"
+indexedRole = "model://perspectives.domains/System$Model$IndexedRole"
 
 indexedRoleName :: String
-indexedRoleName = "model:System$Model$IndexedRole$Name"
+indexedRoleName = "model://perspectives.domains/System$Model$IndexedRole$Name"
 
 indexedContext :: String
-indexedContext = "model:System$Model$IndexedContext"
+indexedContext = "model://perspectives.domains/System$Model$IndexedContext"
 
 indexedContextName :: String
-indexedContextName = "model:System$Model$IndexedContext$Name"
+indexedContextName = "model://perspectives.domains/System$Model$IndexedContext$Name"
 
 modelDescription :: String
-modelDescription = "model:System$Model$External$Description"
+modelDescription = "model://perspectives.domains/System$Model$External$Description"
 
 modelManagementDescription :: String
-modelManagementDescription = "model:ModelManagement$ManagedModel$ModelDescription"
+modelManagementDescription = "model://perspectives.domains/ModelManagement$ManagedModel$ModelDescription"
 
 modelUrl :: String
-modelUrl = "model:System$Model$External$Url"
+modelUrl = "model://perspectives.domains/System$Model$External$Url"
 
 modelExternal :: String
-modelExternal = "model:System$Model$External"
+modelExternal = "model://perspectives.domains/System$Model$External"
 
 modelExternalModelIdentification :: String
-modelExternalModelIdentification = "model:System$Model$External$ModelIdentification"
+modelExternalModelIdentification = "model://perspectives.domains/System$Model$External$ModelIdentification"
 
 ------------------------------------------------------------------------------------
 -- INVITATION
 ------------------------------------------------------------------------------------
 privateChannel :: String
-privateChannel = "model:System$Invitation$PrivateChannel"
+privateChannel = "model://perspectives.domains/System$Invitation$PrivateChannel"
 
 ------------------------------------------------------------------------------------
 -- CHANNEL
 ------------------------------------------------------------------------------------
 channelInitiator :: String
-channelInitiator = "model:System$Channel$Initiator"
+channelInitiator = "model://perspectives.domains/System$Channel$Initiator"
+
+channel :: String
+channel = "model://perspectives.domains/System$Channel"
 
 channelDatabase :: String
-channelDatabase= "model:System$Channel$External$ChannelDatabaseName"
+channelDatabase= "model://perspectives.domains/System$Channel$External$ChannelDatabaseName"
 
 channelPartner :: String
-channelPartner = "model:System$Channel$ConnectedPartner"
+channelPartner = "model://perspectives.domains/System$Channel$ConnectedPartner"
 
 ------------------------------------------------------------------------------------
 -- PHYSICALCONTEXT
 ------------------------------------------------------------------------------------
 addressHost :: String
-addressHost = "model:System$PhysicalContext$UserWithAddress$Host"
+addressHost = "model://perspectives.domains/System$PhysicalContext$UserWithAddress$Host"
 
 addressPort :: String
-addressPort = "model:System$PhysicalContext$UserWithAddress$Port"
+addressPort = "model://perspectives.domains/System$PhysicalContext$UserWithAddress$Port"
 
 addressRelayHost :: String
-addressRelayHost = "model:System$PhysicalContext$UserWithAddress$RelayHost"
+addressRelayHost = "model://perspectives.domains/System$PhysicalContext$UserWithAddress$RelayHost"
 
 addressRelayPort :: String
-addressRelayPort = "model:System$PhysicalContext$UserWithAddress$RelayPort"
+addressRelayPort = "model://perspectives.domains/System$PhysicalContext$UserWithAddress$RelayPort"
 
 ------------------------------------------------------------------------------------
 -- BROKERSERVICES
 ------------------------------------------------------------------------------------
 brokerService :: String
-brokerService = "model:BrokerServices$BrokerService"
+brokerService = "model://perspectives.domains/BrokerServices$BrokerService"
 
 brokerServiceAccounts :: String
-brokerServiceAccounts = "model:BrokerServices$BrokerService$Accounts"
+brokerServiceAccounts = "model://perspectives.domains/BrokerServices$BrokerService$Accounts"
 
 brokerEndpoint :: String
-brokerEndpoint = "model:BrokerServices$BrokerService$External$Url"
+brokerEndpoint = "model://perspectives.domains/BrokerServices$BrokerService$External$Url"
 
 brokerServiceExchange :: String
-brokerServiceExchange = "model:BrokerServices$BrokerService$External$Exchange"
+brokerServiceExchange = "model://perspectives.domains/BrokerServices$BrokerService$External$Exchange"
 
 brokerContract :: String
-brokerContract = "model:BrokerServices$BrokerContract"
+brokerContract = "model://perspectives.domains/BrokerServices$BrokerContract"
 
 accountHolder :: String
-accountHolder = "model:BrokerServices$BrokerContract$AccountHolder"
+accountHolder = "model://perspectives.domains/BrokerServices$BrokerContract$AccountHolder"
 
 accountHolderName :: String
-accountHolderName = "model:BrokerServices$BrokerContract$AccountHolder$AccountName"
+accountHolderName = "model://perspectives.domains/BrokerServices$BrokerContract$AccountHolder$AccountName"
 
 accountHolderPassword :: String
-accountHolderPassword = "model:BrokerServices$BrokerContract$AccountHolder$AccountPassword"
+accountHolderPassword = "model://perspectives.domains/BrokerServices$BrokerContract$AccountHolder$AccountPassword"
 
 accountHolderQueueName :: String
-accountHolderQueueName = "model:BrokerServices$BrokerContract$AccountHolder$QueueName"
+accountHolderQueueName = "model://perspectives.domains/BrokerServices$BrokerContract$AccountHolder$QueueName"
 
--- "model:Couchdb$ContextInstances"
+-- "model:perspectives.domains#Couchdb$ContextInstances"
 
 ------------------------------------------------------------------------------------
 -- AUTHENTICATION
 ------------------------------------------------------------------------------------
 userWithCredentials :: String
-userWithCredentials = "model:System$WithCredentials"
+userWithCredentials = "model://perspectives.domains/System$WithCredentials"
 
 userWithCredentialsPassword :: String
-userWithCredentialsPassword = "model:System$WithCredentials$Password"
+userWithCredentialsPassword = "model://perspectives.domains/System$WithCredentials$Password"
 
 userWithCredentialsAuthorizedDomain :: String
-userWithCredentialsAuthorizedDomain = "model:System$WithCredentials$AuthorizedDomain"
+userWithCredentialsAuthorizedDomain = "model://perspectives.domains/System$WithCredentials$AuthorizedDomain"

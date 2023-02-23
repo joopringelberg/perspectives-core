@@ -71,7 +71,9 @@ distributeTransaction t@(Transaction{changedDomeinFiles}) = do
 distributeTransactie' :: Transaction -> MonadPerspectives Unit
 distributeTransactie' t = do
   (customizedTransacties :: TransactionPerUser) <- transactieForEachUser t
-  _ <- forWithIndex customizedTransacties sendTransactieToUserUsingAMQP
+  _ <- forWithIndex customizedTransacties 
+    -- If we have the visitor user, handle it by augmenting resources in the public store with the deltas.
+    sendTransactieToUserUsingAMQP
   pure unit
 
 -- | Send a transaction using the Couchdb Channel.
@@ -115,6 +117,8 @@ saveTransactionInOutgoingPost userId messageId t = do
   postDB <- postDatabaseName
   void $ addDocument postDB (OutgoingTransaction{_id: messageId, receiver: userId, transaction: t}) messageId
 
+-- | An object of TransactionForPeer where the keys are the string value of RoleInstances, invariably identifying user roles.
+-- | Must be either an instance of sys:PerspectivesSystem$User, or of a RoleInstance of a type with RoleKind Visitor.
 type TransactionPerUser = Object TransactionForPeer
 
 -- | The Transaction holds Deltas and each Delta names user instances who should receive that Delta.
@@ -123,6 +127,7 @@ type TransactionPerUser = Object TransactionForPeer
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
 transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas, userRoleBottoms}) = do
   execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do
+    -- Compute the instances of sys:PerspectivesSystem$User for all users in the delta.
     sysUsers <- pure $ catMaybes (flip Map.lookup userRoleBottoms <$> users)
     addDeltaToCustomisedTransactie delta (nub sysUsers))
     empty
@@ -147,6 +152,7 @@ addDomeinFileToTransactie dfId = AA.modify (over Transaction \(t@{changedDomeinF
 addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
 addDelta dt@(DeltaInTransaction{users}) = do
   -- bottom_ can be idempotent if a role has no binding. Hence we filter away the tuples where fst == snd.
+  -- TODO. Handle the 'visitor' user instances here.
   newUserBottoms <- lift $ filter (\(Tuple r b) -> r `notEq` b) <$> (for users \user -> Tuple user <$> bottom_ user)  
   AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
     { deltas =

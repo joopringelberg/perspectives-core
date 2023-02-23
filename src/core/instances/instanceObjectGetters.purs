@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.Instances.ObjectGetters where
+module Perspectives.Instances.ObjectGetters where 
 
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
@@ -42,7 +42,7 @@ import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
-import Perspectives.Identifiers (LocalName, deconstructBuitenRol, deconstructLocalName, deconstructModelName, isPublicResource)
+import Perspectives.Identifiers (LocalName, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
 import Perspectives.Instances.Combinators (disjunction)
 import Perspectives.Persistence.API (getViewOnDatabase)
@@ -52,6 +52,7 @@ import Perspectives.Representation.Class.Role (actionsOfRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
+import Perspectives.ResourceIdentifiers (isInPublicScheme)
 import Perspectives.TypesForDeltas (SubjectOfAction(..))
 import Prelude (bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
@@ -86,19 +87,20 @@ contextType :: ContextInstance ~~> ContextType
 contextType cid  = ArrayT $ (lift $ try $ getContextMember (\c -> [context_pspType c]) cid) >>=
   handlePerspectContextError' "contextType" [] (pure <<< identity)
 
+contextType_ :: ContextInstance -> MP ContextType
+contextType_ = getContextMember context_pspType
+
 -- TODO. Fix the issue that an unlinked role does not show up for
 -- a public context.
--- | For a global context, never returns an instance. 
+-- | For a public context, never returns an instance. 
 -- | This is because member 'me' is a purely local optimization to quickly find the users' role.
 -- | However, all users share the same global context, so this cannot be done.
 getMe :: ContextInstance ~~> RoleInstance
-getMe ctxt = if isPublicResource (unwrap ctxt)
-  then ArrayT $ pure []
-  else ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
-    handlePerspectContextError' "getMe" []
-      \c -> do
-        tell $ ArrayWithoutDoubles [Me ctxt]
-        pure $ maybe [] singleton (context_me c)
+getMe ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
+  handlePerspectContextError' "getMe" []
+    \c -> do
+      tell $ ArrayWithoutDoubles [Me ctxt]
+      pure $ maybe [] singleton (context_me c)
 
 getPreferredUserRoleType :: ContextInstance ~~> RoleType
 getPreferredUserRoleType ctxt = ArrayT $ (try $ lift $ getPerspectContext ctxt) >>=
@@ -136,7 +138,7 @@ getContextActions userRoleType userRoleInstance cid = ArrayT do
 
 -- | Returns the name of the model that defines the context type as a String Value.
 contextModelName :: ContextInstance ~~> Value
-contextModelName (ContextInstance cid) = maybe empty (pure <<< Value) (deconstructModelName cid)
+contextModelName (ContextInstance cid) = maybe empty (pure <<< Value) (typeUri2ModelUri cid)
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE
@@ -195,6 +197,7 @@ bottom r = ArrayT do
     Nothing -> pure [r]
     Just b -> runArrayT $ bottom b
 
+-- | The most deeply nested role in the chain.
 bottom_ :: RoleInstance -> MP RoleInstance
 bottom_ r = do
   (mbinding :: Maybe RoleInstance) <- binding_ r
@@ -310,10 +313,16 @@ allRoleBinders r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
 -- | If the role instance is a public resource, checks the binding regardless of the value of member 'me'.
 -- | This is because 'me' is a purely local optimization that is never synchronized, but this fails for 
 -- | obvious reasons for public resources.
+-- TODO. If the identifier is in the pub: scheme, try to find a local resource with the same GUID.
+-- This involves getting the type of the role instance and looking up where I store its instances.
+-- If found, apply isMe to it.
+-- Otherwise return false.
+-- We must do this because the public version will never have a useful version of 'isMe'. Neither will it 
+-- bottom out in a role that has a value for 'isMe': it will be public roles all to the bottom.
 isMe :: RoleInstance -> MP Boolean
 isMe ri = (try $ getPerspectRol ri) >>=
   handlePerspectRolError' "isMe" false
-    \(IP.PerspectRol{isMe: me, binding: bnd, pspType}) -> if isPublicResource (unwrap ri)
+    \(IP.PerspectRol{isMe: me, binding: bnd, pspType}) -> if isInPublicScheme (unwrap ri)
       then case bnd of 
         Nothing -> pure false
         Just b -> isMe b
@@ -437,10 +446,10 @@ roleIsInState stateId ri = getActiveRoleStates_ ri >>= pure <<< isJust <<< elemI
 
 -- | Returns the name of the model that defines the role type as a String Value.
 roleModelName :: RoleInstance ~~> Value
-roleModelName (RoleInstance rid) = maybe empty (pure <<< Value) (deconstructModelName rid)
+roleModelName (RoleInstance rid) = maybe empty (pure <<< Value) (typeUri2ModelUri rid)
 
 -- | Return the value of the local property "Name", or return the last segment of the role type name.
 getRoleName :: RoleInstance ~~> Value
 getRoleName = disjunction
   (getUnqualifiedProperty "Name")
-  (roleType >=> ArrayT <<< pure <<< map Value <<< (maybe [] singleton) <<< deconstructLocalName <<< deconstructBuitenRol <<< unwrap)
+  (roleType >=> ArrayT <<< pure <<< map Value <<< (maybe [] singleton) <<< typeUri2LocalName <<< deconstructBuitenRol <<< unwrap)

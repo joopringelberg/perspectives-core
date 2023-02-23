@@ -44,12 +44,12 @@ type ExternalFunctions = Array (Tuple String HiddenFunctionDescription)
 
 coreModules :: Object ExternalFunctions
 coreModules = fromFoldable
-  [ Tuple "model:Couchdb" ExternalCouchdb.externalFunctions
-  , Tuple "model:Serialise" Serialise.externalFunctions
-  , Tuple "model:Parsing" Parsing.externalFunctions
-  , Tuple "model:Utilities" Utilities.externalFunctions
-  , Tuple "model:Sensor" Sensor.externalFunctions
-  , Tuple "model:RabbitMQ" RabbitMQ.externalFunctions
+  [ Tuple "model://perspectives.domains#Couchdb" ExternalCouchdb.externalFunctions
+  , Tuple "model://perspectives.domains#Serialise" Serialise.externalFunctions
+  , Tuple "model://perspectives.domains#Parsing" Parsing.externalFunctions
+  , Tuple "model://perspectives.domains#Utilities" Utilities.externalFunctions
+  , Tuple "model://perspectives.domains#Sensor" Sensor.externalFunctions
+  , Tuple "model://perspectives.domains#RabbitMQ" RabbitMQ.externalFunctions
   ]
 
 addAllExternalFunctions :: forall m. Monad m => m Unit

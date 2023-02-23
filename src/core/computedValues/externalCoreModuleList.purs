@@ -34,7 +34,13 @@ import Data.Array (elemIndex)
 import Data.Maybe (isJust)
 
 coreModules :: Array String
-coreModules = [ "model:Couchdb", "model:Serialise", "model:Parsing", "model:Utilities", "model:Sensor", "model:RabbitMQ" ]
+coreModules = 
+  [ "model://perspectives.domains#Couchdb"
+  , "model://perspectives.domains#Serialise"
+  , "model://perspectives.domains#Parsing"
+  , "model://perspectives.domains#Utilities"
+  , "model://perspectives.domains#Sensor"
+  , "model://perspectives.domains#RabbitMQ" ]
 
 isExternalCoreModule :: String -> Boolean
 isExternalCoreModule n = isJust (elemIndex n coreModules)

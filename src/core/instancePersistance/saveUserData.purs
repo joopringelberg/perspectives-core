@@ -71,7 +71,7 @@ import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFill
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
-import Perspectives.Identifiers (deconstructBuitenRol, deconstructModelName, isExternalRole)
+import Perspectives.Identifiers (deconstructBuitenRol, typeUri2ModelUri, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, getProperty, getUnlinkedRoleInstances, isMe)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
@@ -90,7 +90,7 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>), (==), (>>=), (<$>), (<<<), (||))
-
+ 
 -- | This function takes care of
 -- | PERSISTENCE
 -- | QUERY UPDATES
@@ -115,6 +115,7 @@ saveContextInstance id = do
     for_ filledRoles \roleMap ->
       for_ roleMap \instances ->
         for_ instances \binder ->
+          -- no attempt is made to look up role 'binder'.
           (lift $ findBindingRequests binder) >>= addCorrelationIdentifiersToTransactie
     -- For rule triggering, not for the delta or SYNCHRONISATION:
     if isJust binding
@@ -482,7 +483,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
     -- we can fetch the model from.
     loadModel :: EnumeratedRoleType -> MonadPerspectivesTransaction Unit
     loadModel fillerType = do
-      mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (deconstructModelName $ unwrap fillerType)
+      mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (typeUri2ModelUri $ unwrap fillerType)
       if (isNothing mDomeinFile)
         then do
           mmodelIdentification <- lift (filler ##> getProperty (EnumeratedPropertyType "ModelIdentification"))

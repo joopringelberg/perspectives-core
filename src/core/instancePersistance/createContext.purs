@@ -85,7 +85,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       })
   lift $ addCreatedRoleToTransaction externalRole
   -- QUERY UPDATES
-  (lift $ lift $ findRoleRequests (ContextInstance "model:System$AnyContext") (externalRoleType pspType)) >>= lift <<< addCorrelationIdentifiersToTransactie
+  (lift $ lift $ findRoleRequests (ContextInstance "def:AnyContext") (externalRoleType pspType)) >>= lift <<< addCorrelationIdentifiersToTransactie
   -- TODO. Op dit moment van constructie aangekomen is nog niet vastgelegd wie 'me' is in de context.
   case externeProperties of
     (PropertySerialization props) -> lift do

@@ -37,7 +37,7 @@ import Perspectives.CoreTypes ((###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (areLastSegmentsOf, buitenRol, deconstructModelName, endsWithSegments, isExternalRole, isQualifiedWithDomein)
+import Perspectives.Identifiers (areLastSegmentsOf, buitenRol, typeUri2ModelUri, endsWithSegments, isExternalRole, isTypeUri)
 import Perspectives.Instances.Combinators (filter')
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
@@ -302,7 +302,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           otherwise -> throwError $ NotAPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty
         pure $ BQD originDomain fname valueQfd roleQfd originDomain True True
       ExternalEffect f@{start, end, effectName, arguments} -> do
-        case (deconstructModelName effectName) of
+        case (typeUri2ModelUri effectName) of
           Nothing -> throwError (NotWellFormedName start effectName)
           Just modelName -> if isExternalCoreModule modelName
             then do
@@ -319,7 +319,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             -- TODO: behandel hier Foreign functions.
             else throwError (UnknownExternalFunction start end effectName)
       ExternalDestructiveEffect f@{start, end, effectName, arguments} -> do
-        case (deconstructModelName effectName) of
+        case (typeUri2ModelUri effectName) of
           Nothing -> throwError (NotWellFormedName start effectName)
           Just modelName -> if isExternalCoreModule modelName
             then do
@@ -349,7 +349,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           (ct :: ADT ContextType) <- case range contextFunctionDescription of
             (CDOM ct') -> pure ct'
             otherwise -> throwError $ NotAContextDomain contextFunctionDescription otherwise start end
-          mrt <- if isQualifiedWithDomein roleIdentifier
+          mrt <- if isTypeUri roleIdentifier
             then if isExternalRole roleIdentifier
               then pure [ENR $ EnumeratedRoleType roleIdentifier]
               else lift2 $ runArrayT $ lookForRoleTypeOfADT roleIdentifier ct
@@ -365,7 +365,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
 
         -- Either the identifier is qualified, or we qualify it with respect to the model.
         qualifyContextType :: String -> ArcPosition -> ArcPosition -> PhaseThree ContextType
-        qualifyContextType contextIdentifier start end = if isQualifiedWithDomein contextIdentifier
+        qualifyContextType contextIdentifier start end = if isTypeUri contextIdentifier
           then pure $ ContextType contextIdentifier
           else do
             ctxts <- getsDF (keys <<< _.contexts)
@@ -388,7 +388,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         -- | Then, we check whether a candidate's binding type equals the second argument, or is less specialised. In other words: whether the candidate could bind it (the second argument).
         qualifyBinderType :: Maybe String -> ADT QT.RoleInContext -> ArcPosition -> ArcPosition -> PhaseThree (Maybe EnumeratedRoleType)
         qualifyBinderType Nothing _ _ _ = pure Nothing
-        qualifyBinderType (Just ident) bindings start end = if isQualifiedWithDomein ident
+        qualifyBinderType (Just ident) bindings start end = if isTypeUri ident
           then pure $ Just $ EnumeratedRoleType ident
           else do
             -- EnumeratedRoles in the model with (end)matching name.

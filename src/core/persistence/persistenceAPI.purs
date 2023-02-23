@@ -89,6 +89,7 @@ endpointRegex = unsafeRegex "^https?" noFlags
 startsWithDatabaseEndpoint :: DatabaseName -> Boolean
 startsWithDatabaseEndpoint = test endpointRegex
 
+-- | Creates a remote database or a local database, depending on whether the first argument is an Url or not.
 foreign import createDatabaseImpl :: EffectFn1
   String
   PouchdbDatabase

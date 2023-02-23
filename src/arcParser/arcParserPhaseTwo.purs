@@ -37,10 +37,11 @@ import Data.String.Regex (test)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
 import Foreign.Object (Object, fromFoldable, insert, union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein, namespace2modelname, newModelRegex, qualifyWith)
+import Perspectives.Identifiers (Namespace, typeUri2typeNameSpace_, isTypeUri, modelUri2DomeinFileName, newModelRegex, qualifyWith)
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyMapping(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), ScreenE(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
@@ -68,12 +69,13 @@ traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
   -- Traverse the model parse tree and construct a DomeinFileRecord in PhaseTwoState.
   (Context {_id:namespace}) <- traverseContextE c ns
+  log ("\n" <> unwrap namespace <> "\n")
   domeinFileRecord <- getDF
   -- Here we replace the _id with the name of the form "model:Modelname" that we derive from the namespace - or if it is
   -- in that form already, we leave things as they are.
   -- We also fill the namespace field.
   pure $ DomeinFile (domeinFileRecord 
-    { _id = unsafePartial fromJust $ namespace2modelname (unwrap namespace)
+    { _id = unsafePartial fromJust $ modelUri2DomeinFileName (unwrap namespace)
     , namespace = unwrap namespace
     })
 
@@ -136,7 +138,7 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
       expandedAspect <- expandNamespace contextName
       -- TODO. This is strange: surely the unqualified name should be REPLACED by the qualified one!?
       -- Probably we currently just allow fully qualified aspect names.
-      if isQualifiedWithDomein expandedAspect
+      if isTypeUri expandedAspect
         then pure (Context $ contextUnderConstruction {contextAspects = cons (ContextType expandedAspect) contextAspects})
         else throwError $ NotWellFormedName pos' contextName
 
@@ -281,7 +283,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
     -- ROLEASPECT
     handleParts roleName (EnumeratedRole roleUnderConstruction@{context, roleAspects, propertyAliases}) (RoleAspect a pos' mPropertyMapping) = do
       expandedAspect <- expandNamespace a
-      if isQualifiedWithDomein expandedAspect
+      if isTypeUri expandedAspect
         then do 
           (mPropertyMapping' :: Maybe (Object EnumeratedPropertyType)) <- case mPropertyMapping of 
             Nothing -> pure Nothing
@@ -290,7 +292,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
               pure $ Tuple (qualifyWith expandedAspect origin) (EnumeratedPropertyType destination'))
           pure (EnumeratedRole $ roleUnderConstruction 
             { roleAspects = cons
-              (RoleInContext{context: ContextType (deconstructNamespace_ expandedAspect), role: (EnumeratedRoleType expandedAspect)})
+              (RoleInContext{context: ContextType (typeUri2typeNameSpace_ expandedAspect), role: (EnumeratedRoleType expandedAspect)})
               roleAspects
               -- There may be a mapping already, as each Aspect can contribute to the mapping.
               -- The properties-to-be-mapped (the origins) are qualified by the aspect and so are guaranteed to be unique.

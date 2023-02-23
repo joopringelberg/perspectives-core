@@ -1,7 +1,7 @@
 -- Copyright Joop Ringelberg and Cor Baars, 2021
 -- A model to test smart field controls.
 
-domain model://perspectives.domains/TestFields
+domain model://perspectives.domains/TestFields --@1.0.0
   use sys for model:System
   use tf for model:TestFields
 

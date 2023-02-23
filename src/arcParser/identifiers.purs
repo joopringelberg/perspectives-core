@@ -34,9 +34,10 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Parsing.Arc.Token (token)
-import Prelude (Unit, bind, discard, not, pure, ($), (*>), (/=), (<$>), (<*>), (<<<), (<>))
+import Perspectives.ResourceIdentifiers (hasPublicResourceShape)
+import Prelude (Unit, bind, discard, not, pure, ($), (*>), (/=), (<<<), (<>))
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (option, try, (<?>))
+import Text.Parsing.Parser.Combinators (try, (<?>))
 import Text.Parsing.Parser.String (string, satisfy, whiteSpace)
 
 reserved :: String -> IP Unit
@@ -48,25 +49,14 @@ colon = token.colon
 arcIdentifier :: IP String
 arcIdentifier = (qualifiedName <|> prefixedName <|> segmentedName) <?> "a capitalized name, a prefixed name, or a fully qualified name"
 
--- For now, we want to accept both the old and the new forms:
---  * model:System
---  * model://perspect.it/System
+-- Parses model://perspectives.domains#System
 qualifiedName :: IP String
-qualifiedName = oldQualifiedName <|> newQualifiedName
-
-oldQualifiedName :: IP String
-oldQualifiedName = try do
-  m <- (string "model:")
-  i <- token.identifier
-  segments <- option "" ((<>) <$> (string "$") <*> segmentedName)
-  pure $ m <> i <> segments
-
-newQualifiedName :: IP String
-newQualifiedName = try do
+qualifiedName = try do
   m <- (string "model://")
-  i <- dottedName
-  segments <- option "" ((<>) <$> (string "/") <*> segmentedName)
-  pure $ m <> i <> segments
+  authority <- dottedName
+  hash <- string "#"
+  segments <- segmentedName
+  pure $ m <> authority <> "#" <> segments
 
 dottedName :: IP String
 dottedName = try do
@@ -124,3 +114,15 @@ email = try do
     -- See: https://regexlib.com/REDetails.aspx?regexp_id=26.
     emailRegExp :: Regex
     emailRegExp = unsafeRegex "^([a-zA-Z0-9_\\-\\.]+)@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.)|(([a-zA-Z0-9\\-]+\\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\\]?)$" noFlags
+
+-- | Produces a resource identifier in the pub: scheme:
+-- | pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains
+-- | Only passes strings of this form: https://{authority}/cw_{databasename}/{SegmentedIdentifier}.
+pubParser :: IP String
+pubParser = try do
+  chars <- many (satisfy (not <<< isSpace <<< codePointFromChar))
+  void whiteSpace
+  s <- pure (fromCharArray chars)
+  if hasPublicResourceShape s
+    then pure $ "pub:" <> s
+    else fail "Not a valid public resource url." 

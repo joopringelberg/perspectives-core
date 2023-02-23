@@ -63,7 +63,7 @@ inferFromAspectRoles = do
     (inferFromAspectRoles' df)
   where
     inferFromAspectRoles' :: DomeinFileRecord -> PhaseThree Unit
-    inferFromAspectRoles' df@{_id:namespace, enumeratedRoles} = do
+    inferFromAspectRoles' df@{_id, namespace, enumeratedRoles} = do
       -- We have to execute in topological order, so aspects are handled before they are applied.
       enumeratedRoles' <- executeInTopologicalOrder
         identifier_
@@ -71,7 +71,7 @@ inferFromAspectRoles = do
         (filter (flip startsWithSegments namespace) <<< (map (unwrap <<< roleInContext2Role) <<< _.roleAspects <<< unwrap))
         (values enumeratedRoles)
         (inferCardinality >=> inferMandatoriness >=> inferBinding >=> lift <<< lift <<< modifyEnumeratedRoleInDomeinFile namespace)
-      (DomeinFile dfr') <- lift $ lift $ getPerspectEntiteit (DomeinFileId namespace)
+      (DomeinFile dfr') <- lift $ lift $ getPerspectEntiteit (DomeinFileId _id)
       modifyDF \_ -> dfr'
 
     inferCardinality :: EnumeratedRole -> PhaseThree EnumeratedRole

@@ -57,8 +57,7 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Fuzzysort (matchIndexedContextNames)
-import Perspectives.Guid (guid)
-import Perspectives.Identifiers (buitenRol, constructUserIdentifier, deconstructBuitenRol, isExternalRole, isQualifiedName, unsafeDeconstructModelName)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getRoleName, roleType, roleType_, siblings)
@@ -76,8 +75,9 @@ import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfR
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, ResourceType(..), RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
+import Perspectives.ResourceIdentifiers (createResourceIdentifier)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding, scheduleContextRemoval, scheduleRoleRemoval)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
@@ -165,7 +165,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   logPerspectivesError $ TypeErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ TypeErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right (EnumeratedRole{context:filledContextType}) ->do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap fillerType))
+                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafePartial typeUri2ModelUri_ (unwrap fillerType))
                   registerSupportedEffect corrId setter (getFilledRoles filledContextType (EnumeratedRoleType predicate)) (RoleInstance subject)
             filledContextType -> (try $ getContext (ContextType filledContextType)) >>=
               case _ of
@@ -173,7 +173,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   logPerspectivesError $ ContextErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ ContextErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right _ -> do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap fillerType))
+                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafePartial typeUri2ModelUri_ (unwrap fillerType))
                   registerSupportedEffect corrId setter (getFilledRoles (ContextType filledContextType) (EnumeratedRoleType predicate)) (RoleInstance subject)
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
@@ -392,13 +392,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         sendResponse (Result corrId []) setter
     -- TODO/NOTE that we cannot provide a context role type that will bind these contexts.
     -- This can only be correct if the contexts have the aspect RootContext.
+    -- TODO/NOTE the context type must be fully qualified with a model URN.
     Api.ImportContexts -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextsSerialisation ctxts) :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> void $
         runMonadPerspectivesTransaction' false authoringRole do
           result <- runExceptT $ traverse
             (\ctxt@(ContextSerialization{ctype}) -> do
-              lift $ loadModelIfMissing $ unsafeDeconstructModelName ctype
+              lift $ loadModelIfMissing $ unsafePartial typeUri2ModelUri_ ctype
               constructContext Nothing ctxt)
             ctxts
           case result of
@@ -440,7 +441,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       sendResponse (Result corrId []) setter
     -- subject :: ContextInstance, predicate :: EnumeratedRoleType
     Api.CreateRol -> do
-      if isQualifiedName predicate
+      if isTypeUri predicate
         then do
           -- Notice that createAndAddRoleInstance adds the model describing the eroltype if necessary.
           (rolInst :: RoleInstance) <- runMonadPerspectivesTransaction authoringRole $ unsafePartial $ fromJust <$> createAndAddRoleInstance (EnumeratedRoleType predicate) subject (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
@@ -502,7 +503,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             logPerspectivesError $ RolErrorBoundary "Api.CheckBinding" (show err)
             sendResponse (Error corrId (show $ RolErrorBoundary "Api.CheckBinding" (show err))) setter
           Right (PerspectRol{pspType}) -> do
-            void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafeDeconstructModelName (unwrap pspType))
+            void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafePartial typeUri2ModelUri_ (unwrap pspType))
             ok <- checkBinding typeOfRolToBindTo (RoleInstance object)
             sendResponse (Result corrId [(show ok)]) setter
     Api.SetProperty -> catchError
@@ -592,7 +593,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- The model describing the ContextType must be locally installed.
     withLocalName :: String -> ContextType -> (RoleType -> MonadPerspectives Unit) -> MonadPerspectives Unit
     withLocalName localRoleName contextType effect = do
-      qrolNames <- if isQualifiedName localRoleName
+      qrolNames <- if isTypeUri localRoleName
         then if isExternalRole localRoleName
           then if deconstructBuitenRol localRoleName == (unwrap contextType)
             then pure [(ENR $ (EnumeratedRoleType localRoleName))]
@@ -612,11 +613,10 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd@{id, ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
         void $ runMonadPerspectivesTransaction authoringRole do
-          loadModelIfMissing $ unsafeDeconstructModelName ctype
+          loadModelIfMissing $ unsafePartial unsafePartial typeUri2ModelUri_ ctype
+
           contextIdentifier <- if id == ""
-            then do
-              g <- liftEffect guid
-              pure $ constructUserIdentifier (show g)
+            then createResourceIdentifier (CType $ ContextType ctype)
             else pure id
           ctxt <- runExceptT $ constructContext mroleType (ContextSerialization cd {id = contextIdentifier})
           case ctxt of

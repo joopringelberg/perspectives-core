@@ -104,7 +104,7 @@ invert = invert_ >=> traverse h >=> pure <<< catMaybes
 -- | are inversed wrt the orinal query.
 invert_ :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink_)
 -- NOTE moeten we hier niet iets met de args?
-invert_ (MQD dom (ExternalCoreRoleGetter f) args ran _ _) = pure $ [ZQ_ [SQD ran (ExternalCoreContextGetter "model:Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
+invert_ (MQD dom (ExternalCoreRoleGetter f) args ran _ _) = pure $ [ZQ_ [SQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
 
 invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
 

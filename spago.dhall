@@ -25,6 +25,7 @@ to generate this file without the comments in this block.
   , "control"
   , "coroutines"
   , "datetime"
+  , "debug"
   , "effect"
   , "either"
   , "enums"
@@ -74,5 +75,5 @@ to generate this file without the comments in this block.
   , "yargs"
   ]
 , packages = ./packages.dhall
-, sources = [ "src/**/*.purs" {-}, "test/*.purs"-} ]
+, sources = [ "src/**/*.purs" , "test/*.purs" ]
 }

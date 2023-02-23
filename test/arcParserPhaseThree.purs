@@ -1,10 +1,11 @@
-module Test.Parsing.Arc.PhaseThree where
+module Test.Parsing.Arc.PhaseThree where 
 
 import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Array (elemIndex, filter, head, length)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
@@ -112,7 +113,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               -- logShow dr'
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
                 case _ of
-                  (Left (ContextHasNoRole _ _)) -> assert "" true
+                  (Left [(ContextHasNoRole _ _)]) -> assert "" true
                   otherwise -> do
                     logShow otherwise
                     assert "Expected the 'ContextHasNoRole' error" false
@@ -196,7 +197,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               -- logShow dr'
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
                 case _ of
-                  (Left (UnknownRole _ _)) -> assert "" true
+                  (Left [(UnknownRole _ _)]) -> assert "" true
                   otherwise -> do
                     assert "The binding of 'Binder' is not defined and that should have been detected." false
 
@@ -214,7 +215,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
               -- logShow x'
                 case _ of
-                  (Left e@(NotUniquelyIdentifying _ _ _)) -> do
+                  (Left [e@(NotUniquelyIdentifying _ _ _)]) -> do
                     -- logShow e
                     assert "" true
                   otherwise -> do
@@ -258,7 +259,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               -- logShow dr'
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
-                (Left (UnknownProperty _ _ _)) -> assert "" true
+                (Left [(UnknownProperty _ _ _)]) -> assert "" true
                 otherwise -> assert "The view refers to a non-existing property 'Datu' and that should be detected." false
 
   test "Testing qualifyPropertyReferences: reference to property on binding." do
@@ -846,7 +847,10 @@ expectErrorX theTest testName modelText resultTester = do
             (Right (DomeinFile dr')) -> do
               -- logShow dr'
               x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
-              resultTester x
+              case x of
+                Right r -> resultTester (Right r)
+                Left errs -> for_ errs (resultTester <<< Left)
+              -- resultTester x
 
 type DomainTester = (DomeinFileRecord -> Aff Unit)
 

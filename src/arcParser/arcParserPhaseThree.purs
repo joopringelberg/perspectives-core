@@ -39,11 +39,12 @@ import Data.Foldable (for_, traverse_)
 import Data.Identity as Identity
 import Data.List (List, filterM, fromFoldable) as LIST
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
 import Data.String (Pattern(..), indexOf)
 import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MP, MonadPerspectives, forceTypeArray, (###=), (###>>))
@@ -52,7 +53,7 @@ import Perspectives.Data.EncodableMap (addAll)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutomaticEffect(..), UpstreamStateNotification(..), addUpstreamAutomaticEffect, addUpstreamNotification, indexedContexts, indexedRoles)
-import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, deconstructNamespace, isQualifiedName, isQualifiedWithDomein, qualifyWith, startsWithSegments)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, typeUri2typeNameSpace, isTypeUri, modelUri2DomeinFileName_, qualifyWith, startsWithSegments)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), StateTransitionE(..), SegmentedPath)
@@ -117,27 +118,45 @@ phaseThree_ ::
   MP (Either MultiplePerspectivesErrors DomeinFileRecord)
 phaseThree_ df@{_id, referredModels} postponedParts screens = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
-  indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
-  indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
+  log "-2"
+  indexedContexts <- unions <$> traverse (getDomeinFile <<< over DomeinFileId (unsafePartial modelUri2DomeinFileName_) >=> pure <<< indexedContexts) referredModels
+  log "-1"
+  indexedRoles <- unions <$> traverse (getDomeinFile <<< over DomeinFileId (unsafePartial modelUri2DomeinFileName_) >=> pure <<< indexedRoles) referredModels
   (Tuple ei {dfr}) <- runPhaseTwo_'
     (do
+      log "0"
       checkAspectRoleReferences
+      log "1"
       inferFromAspectRoles
+      log "2"
       qualifyBindings
+      log "3"
       qualifyStateNames
+      log "4"
       compileCalculatedRoles
+      log "5"
       requalifyBindingsToCalculatedRoles
+      log "6"
       compileCalculatedProperties
+      log "7"
       qualifyPropertyReferences
+      log "8"
       handlePostponedStateQualifiedParts
+      log "9"
       compileStateQueries
+      log "10"
       addAspectsToExternalRoles
+      log "11"
       contextualisePerspectives
+      log "12"
       -- Now all perspectives are available.
       handleScreens screens
+      log "13"
       invertPerspectiveObjects
       -- combinePerspectives
+      log "14"
       addUserRoleGraph
+      log "15"
       checkSynchronization
       )
     df
@@ -163,6 +182,7 @@ checkAspectRoleReferences = do
   where
     checkAspectRoles' :: DomeinFileRecord -> PhaseThree Unit
     checkAspectRoles' {contexts} = do 
+      log "checkAspectRoles'\n"
       contexts' <- for contexts
         \(CTXT.Context r@{contextRol, rolInContext, gebruikerRol}) -> do
           contextRol' <- traverse check contextRol
@@ -212,7 +232,7 @@ qualifyBindings = (lift $ State.gets _.dfr) >>= qualifyBindings'
                     (UnknownRole _ _) -> do
                       -- If we cannot find the identifier in the Calculated roles, it may be in another namespace.
                       -- But then the name must be fully qualified; we're not going to try just any model.
-                      if isQualifiedWithDomein (unwrap role)
+                      if isTypeUri (unwrap role)
                         then do
                           rl <- lift $ lift $ getRoleType (unwrap role) >>= getRole
                           case rl of
@@ -257,7 +277,7 @@ qualifyStateNames = (lift $ State.gets _.dfr) >>= qualifyStateNames'
   where
     qualifyStateNames' :: DomeinFileRecord -> PhaseThree Unit
     qualifyStateNames' {states} = for states (\(State sr@{id}) -> do
-      qid <- if isQualifiedWithDomein (unwrap id)
+      qid <- if isTypeUri (unwrap id)
         then pure $ unwrap id
         -- Note that the validity of this depends on the unqualfied name being a reference to a role!
         else qualifyLocalRoleName arcParserStartPosition (unwrap id) >>= pure <<< roletype2string
@@ -318,7 +338,7 @@ qualifyPropertyReferences = do
         qualifyProperty :: RoleType -> ArcPosition -> PropertyType -> PhaseThree PropertyType
         qualifyProperty rtype pos propType = do
 
-          if isQualifiedWithDomein (propertytype2string propType)
+          if isTypeUri (propertytype2string propType)
             -- The modeller has provided a qualified property. He cannot say whether it is Calculated, or Enumerated,
             -- however. If it is Calculated, change now.
             then if isJust (lookup (propertytype2string propType) calculatedProperties)
@@ -366,15 +386,15 @@ compileCalculatedRoles = do
   withDomeinFile
     _id
     (DomeinFile df)
-    (compileCalculatedRoles' df _id)
+    (compileCalculatedRoles' df)
   where
-    compileCalculatedRoles' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
-    compileCalculatedRoles' {_id,calculatedRoles, states, enumeratedRoles} ns = do
+    compileCalculatedRoles' :: DomeinFileRecord -> PhaseThree Unit
+    compileCalculatedRoles' {_id,calculatedRoles, states, enumeratedRoles} = do
       traverse_ compileRolExpr (identifier <$> calculatedRoles)
       -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
       -- We will not have errors on trying to retrieve the DomeinFile here.
-      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId ns)
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId _id)
       modifyDF \dfr -> modifiedDomeinFile
       where
         compileRolExpr :: CalculatedRoleType -> PhaseThree Unit
@@ -393,15 +413,15 @@ compileCalculatedProperties = do
   withDomeinFile
     _id
     (DomeinFile df)
-    (compileCalculatedProperties' df _id)
+    (compileCalculatedProperties' df)
   where
-    compileCalculatedProperties' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
-    compileCalculatedProperties' {_id, calculatedProperties, states, enumeratedRoles} ns = do
+    compileCalculatedProperties' :: DomeinFileRecord -> PhaseThree Unit
+    compileCalculatedProperties' {_id, calculatedProperties, states, enumeratedRoles} = do
       traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
       -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
       -- We will not have errors on trying to retrieve the DomeinFile here.
-      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId ns)
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId _id)
       modifyDF \dfr -> modifiedDomeinFile
       where
         compilePropertyExpr :: CalculatedPropertyType -> PhaseThree Unit
@@ -430,7 +450,7 @@ handlePostponedStateQualifiedParts = do
     collectRoleInContexts :: RoleIdentification -> PhaseThree (ADT QT.RoleInContext)
     -- A single role type will result from this case, but it may be a calculated role!
     collectRoleInContexts (ExplicitRole ctxt rt pos) = do
-      maximallyQualifiedName <- if isQualifiedWithDomein (roletype2string rt)
+      maximallyQualifiedName <- if isTypeUri (roletype2string rt)
         then pure (roletype2string rt)
         else pure $ concatenateSegments (unwrap ctxt) (roletype2string rt)
       (r :: RoleType) <- qualifyLocalRoleName pos maximallyQualifiedName
@@ -453,7 +473,7 @@ handlePostponedStateQualifiedParts = do
         -- This is because a Calculated role has no instances that have state.
         -- It calculates Enumerated role instances - and those have state!
         Nothing -> pure (StateIdentifier <<< unwrap <$> roles')
-        Just p -> if isQualifiedWithDomein p
+        Just p -> if isTypeUri p
           then pure [StateIdentifier p]
           else pure (StateIdentifier <<< flip append p <<< flip append "$" <<< unwrap <$> roles')
 
@@ -487,7 +507,7 @@ handlePostponedStateQualifiedParts = do
 
       where
         maybeQualifyWith :: Namespace -> SegmentedPath -> String
-        maybeQualifyWith ns path = if isQualifiedWithDomein path then path else qualifyWith ns path
+        maybeQualifyWith ns path = if isTypeUri path then path else qualifyWith ns path
 
     stateSpecificationToStateSpec :: AST.StateSpecification -> PhaseThree (Array StateSpec)
     stateSpecificationToStateSpec spec = case spec of
@@ -1147,7 +1167,7 @@ objectMustBeRole qfd start end = case range <$> qfd of
 collectRoles :: RoleIdentification -> PhaseThree (Array RoleType)
 -- A single role type will result from this case, but it may be a calculated role!
 collectRoles (ExplicitRole ctxt rt pos) = do
-  maximallyQualifiedName <- if isQualifiedWithDomein (roletype2string rt)
+  maximallyQualifiedName <- if isTypeUri (roletype2string rt)
     then pure (roletype2string rt)
     else pure $ concatenateSegments (unwrap ctxt) (roletype2string rt)
   r <- qualifyLocalRoleName pos maximallyQualifiedName
@@ -1181,7 +1201,7 @@ collectPropertyTypes (AST.Properties ps) object start = do
         _ -> throwError $ NotUniquelyIdentifying start localPropertyName (propertytype2string <$> candidates)
 
 collectPropertyTypes (AST.View view) object start = do
-  if isQualifiedWithDomein view
+  if isTypeUri view
     then do
       mview <- lift2 $ tryGetPerspectType (ViewType view)
       case mview of
@@ -1522,7 +1542,7 @@ compileStateQueries = do
 -- sub `isDirectSubstateOf` super
 -- model:System$PerspectivesSystem$Root `isDirectSubStateOf` model:System$PerspectivesSystem
 isDirectSubstateOf :: Array String -> String -> String -> Boolean
-isDirectSubstateOf enumeratedRoleNames sub super = maybe false (\ns -> ns `eq` super && (isNothing $ elemIndex sub enumeratedRoleNames)) (deconstructNamespace sub)
+isDirectSubstateOf enumeratedRoleNames sub super = maybe false (\ns -> ns `eq` super && (isNothing $ elemIndex sub enumeratedRoleNames)) (typeUri2typeNameSpace sub)
 -- The requirement that `sub` is not an EnumeratedRoleType, prevents root states of roles to
 -- be interpreted as named substates of contexts.
 
@@ -1632,7 +1652,7 @@ isEnumeratedRoleState (StateIdentifier s) = do
 isCoherentStateSpecification :: AST.StateSpecification -> PhaseThree Unit
 isCoherentStateSpecification stateSpec = case stateSpec of 
   AST.ContextState cType mident -> case mident of 
-    Just ident ->  if isQualifiedName ident
+    Just ident ->  if isTypeUri ident
       then do
         aspects <- lift2 ((ContextType ident) ###= contextAspectsClosure)
         if isJust $ find (\aspect -> ident `startsWithSegments` (unwrap aspect)) aspects

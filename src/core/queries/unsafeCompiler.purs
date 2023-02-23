@@ -147,6 +147,10 @@ compileFunction (SQD dom (ContextIndividual (ContextInstance ident)) _ _ _) = pu
     Nothing -> pure []
     Just i -> pure [unwrap i]
 
+compileFunction (SQD dom (PublicRole individual) _ _ _) = pure $ unsafeCoerce (\x -> (pure $ unwrap individual :: MonadPerspectivesQuery String))
+
+compileFunction (SQD dom (PublicContext individual) _ _ _) = pure $ unsafeCoerce (\x -> (pure $ unwrap individual :: MonadPerspectivesQuery String))
+
 compileFunction (SQD dom (Value2Role _) _ _ _) = pure $ unsafeCoerce (\x -> pure x :: MPQ String)
 
 compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
