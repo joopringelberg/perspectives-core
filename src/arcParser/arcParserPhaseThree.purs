@@ -44,7 +44,6 @@ import Data.String (Pattern(..), indexOf)
 import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log)
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MP, MonadPerspectives, forceTypeArray, (###=), (###>>))
@@ -118,45 +117,27 @@ phaseThree_ ::
   MP (Either MultiplePerspectivesErrors DomeinFileRecord)
 phaseThree_ df@{_id, referredModels} postponedParts screens = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
-  log "-2"
   indexedContexts <- unions <$> traverse (getDomeinFile <<< over DomeinFileId (unsafePartial modelUri2DomeinFileName_) >=> pure <<< indexedContexts) referredModels
-  log "-1"
   indexedRoles <- unions <$> traverse (getDomeinFile <<< over DomeinFileId (unsafePartial modelUri2DomeinFileName_) >=> pure <<< indexedRoles) referredModels
   (Tuple ei {dfr}) <- runPhaseTwo_'
     (do
-      log "0"
       checkAspectRoleReferences
-      log "1"
       inferFromAspectRoles
-      log "2"
       qualifyBindings
-      log "3"
       qualifyStateNames
-      log "4"
       compileCalculatedRoles
-      log "5"
       requalifyBindingsToCalculatedRoles
-      log "6"
       compileCalculatedProperties
-      log "7"
       qualifyPropertyReferences
-      log "8"
       handlePostponedStateQualifiedParts
-      log "9"
       compileStateQueries
-      log "10"
       addAspectsToExternalRoles
-      log "11"
       contextualisePerspectives
-      log "12"
       -- Now all perspectives are available.
       handleScreens screens
-      log "13"
       invertPerspectiveObjects
       -- combinePerspectives
-      log "14"
       addUserRoleGraph
-      log "15"
       checkSynchronization
       )
     df
@@ -182,7 +163,6 @@ checkAspectRoleReferences = do
   where
     checkAspectRoles' :: DomeinFileRecord -> PhaseThree Unit
     checkAspectRoles' {contexts} = do 
-      log "checkAspectRoles'\n"
       contexts' <- for contexts
         \(CTXT.Context r@{contextRol, rolInContext, gebruikerRol}) -> do
           contextRol' <- traverse check contextRol

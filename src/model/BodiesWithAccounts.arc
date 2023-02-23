@@ -6,17 +6,28 @@
 --  * credentials like username and password to provide access to resources of the Body.
 --  * a fee due for Accountship;
 
-domain BodiesWithAccounts
-  use sys for model:System
-  use bwa for model:BodiesWithAccounts
-  use util for model:Utilities
+domain model://perspectives.domains#BodiesWithAccounts
+  use sys for model://perspectives.domains#System
+  use bwa for model://perspectives.domains#BodiesWithAccounts
+  use util for model://perspectives.domains#Utilities
 
-  -- The model description case.
-  -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
-  case Model
-    aspect sys:Model
-    external
-      aspect sys:Model$External
+  state ReadyToInstall = exists sys:PerspectivesSystem$Installer
+    on entry
+      do for sys:PerspectivesSystem$Installer
+        letA
+          -- We must first create the context and then later bind it.
+          -- If we try to create and bind it in a single statement, 
+          -- we find that the Installer can just create RootContexts
+          -- as they are the allowed binding of IndexedContexts.
+          -- As a consequence, no context is created.
+          app <- create context BodiesWithAccountsApp
+        in
+          -- Being a RootContext, too, Installer can fill a new instance
+          -- of IndexedContexts with it.
+          bind app >> extern to IndexedContexts in sys:MySystem
+          Name = "Bodies with Accounts" for app >> extern
+
+  aspect user sys:PerspectivesSystem$Installer
 
   case BodiesWithAccountsApp
     indexed bwa:App

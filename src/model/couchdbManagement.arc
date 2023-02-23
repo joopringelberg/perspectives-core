@@ -1,23 +1,33 @@
 -- CouchdbManagement - Copyright Joop Ringelberg and Cor Baars 2021 - 2022
 
-domain CouchdbManagement
-  use sys for model:System
-  use cm for model:CouchdbManagement
-  use acc for model:BodiesWithAccounts
-  use cdb for model:Couchdb
-  use util for model:Utilities
-  use p for model:Parsing
+domain model://perspectives.domains#CouchdbManagement
+  use sys for model://perspectives.domains#System
+  use cm for model://perspectives.domains#CouchdbManagement
+  use acc for model://perspectives.domains#BodiesWithAccounts
+  use cdb for model://perspectives.domains#Couchdb
+  use util for model://perspectives.domains#Utilities
+  use p for model://perspectives.domains#Parsing
 
   -------------------------------------------------------------------------------
-  ---- MODEL
+  ---- SETTING UP
   -------------------------------------------------------------------------------
-  -- The model description case.
-  -- REMOVE ONCE WE CREATE INSTANCES WITH AN ACTION
-  case Model
-    aspect sys:Model
-    external
-      aspect sys:Model$External
+  state ReadyToInstall = exists sys:PerspectivesSystem$Installer
+    on entry
+      do for sys:PerspectivesSystem$Installer
+        letA
+          -- We must first create the context and then later bind it.
+          -- If we try to create and bind it in a single statement, 
+          -- we find that the Installer can just create RootContexts
+          -- as they are the allowed binding of IndexedContexts.
+          -- As a consequence, no context is created.
+          app <- create context CouchdbManagementApp
+        in
+          -- Being a RootContext, too, Installer can fill a new instance
+          -- of IndexedContexts with it.
+          bind app >> extern to IndexedContexts in sys:MySystem
+          Name = "Couchdb Management App" for app >> extern
 
+  aspect user sys:PerspectivesSystem$Installer
   -------------------------------------------------------------------------------
   ---- INDEXED CONTEXT
   -------------------------------------------------------------------------------
@@ -166,13 +176,13 @@ domain CouchdbManagement
       do for Admin
         delete context bound to Repositories
 
-    publish at extern >> Url
-      perspective on extern
-        props (Name) verbs (Consult)
-      perspective on Admin
-        props (FirstName, LastName)
-      perspective on PublicRepositories
-        props (RepositoryName) verbs (Consult)
+    -- publish at extern >> Url
+    --   perspective on extern
+    --     props (Name) verbs (Consult)
+    --   perspective on Admin
+    --     props (FirstName, LastName)
+    --   perspective on PublicRepositories
+    --     props (RepositoryName) verbs (Consult)
 
 
     -- This role should be in public space insofar that e.g. acc:Body$Guest should be able to see it.

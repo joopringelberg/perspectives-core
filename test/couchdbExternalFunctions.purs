@@ -128,7 +128,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestStandardVars") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:TestStandardVars: " <> show errs) false
 
-  testOnly "upload model:System to repository from files" $ runP do
+  test "upload model:System to repository from files" $ runP do
     -- Add a password for "https://localhost:6984/"
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
@@ -138,29 +138,27 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     _ <- loadCompileAndCacheArcFile' "utilities" modelDirectory
     errs <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     if null errs
-      then do
-        pure unit
-        cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "perspectives.domains#System") models_perspectives_domains)
-      else liftAff $ assert ("There are instance- or model errors for model:System: " <> show errs) false
+      then void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "perspectives.domains#System") models_perspectives_domains)
+      else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#System: " <> show errs) false
 
-  test "upload model:Parsing to repository from files" $ runP do
-    errs <- loadCompileAndCacheArcFile "parsing" modelDirectory
+  test "upload model://perspectives.domains#Parsing to repository from files" $ runP do
+    errs <- loadCompileAndCacheArcFile' "parsing" modelDirectory
     if null errs
-      then do
-        cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Parsing") cdburl)
-      else liftAff $ assert ("There are instance- or model errors for model:Parsing: " <> show errs) false
+      then void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "perspectives.domains#Parsing") models_perspectives_domains)
+      else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#Parsing: " <> show errs) false
 
-  test "upload model:BodiesWithAccounts to repository from files (without testuser)" $ runP do
+  test "upload model:perspectives.domains#BodiesWithAccounts to repository from files (without testuser)" $ runP do
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
-    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    errs <- loadCompileAndCacheArcFile "bodiesWithAccounts" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "sensor" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "utilities" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    errs <- loadCompileAndCacheArcFile' "bodiesWithAccounts" modelDirectory
     if null errs
-      then do
-        cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:BodiesWithAccounts") cdburl)
-      else liftAff $ assert ("There are instance- or model errors for model:BodiesWithAccounts: " <> show errs) false
+      then void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "perspectives.domains#BodiesWithAccounts") models_perspectives_domains)
+      else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#BodiesWithAccounts: " <> show errs) false
 
   test "upload model:Models to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
@@ -225,20 +223,20 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:Competition") cdburl)
       else liftAff $ assert ("There are instance- or model errors for model:Competition: " <> show errs) false
 
-  test "upload model:CouchdbManagement to repository from files (without testuser)" $ runP do
+  testOnly "upload model://perspectives.domains#CouchdbManagement to repository from files (without testuser)" $ runP do
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
-    _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
-    _ <- loadCompileAndCacheArcFile "utilities" modelDirectory
-    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    _ <- loadCompileAndCacheArcFile "models" modelDirectory
-    _ <- loadCompileAndCacheArcFile "bodiesWithAccounts" modelDirectory
-    errs <- loadCompileAndCacheArcFile "couchdbManagement" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "sensor" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "utilities" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "bodiesWithAccounts" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "parsing" modelDirectory
+    errs <- loadCompileAndCacheArcFile' "couchdbManagement" modelDirectory
     if null errs
-      then do
-        pure unit
-        cdburl <- developmentRepository
-        void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:CouchdbManagement") cdburl)
-      else liftAff $ assert ("There are instance- or model errors for model:CouchdbManagement: " <> show errs) false
+      then void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "perspectives.domains#CouchdbManagement") models_perspectives_domains)
+      else liftAff $ assert ("There are instance- or model errors for model//perspectives.domains#CouchdbManagement: " <> show errs) false
 
   test "upload model:WitCoin to repository from files (without testuser)" $ runP do
     addAllExternalFunctions

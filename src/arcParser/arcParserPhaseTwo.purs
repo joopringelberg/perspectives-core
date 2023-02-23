@@ -37,7 +37,6 @@ import Data.String.Regex (test)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log)
 import Foreign.Object (Object, fromFoldable, insert, union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
@@ -69,7 +68,6 @@ traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
   -- Traverse the model parse tree and construct a DomeinFileRecord in PhaseTwoState.
   (Context {_id:namespace}) <- traverseContextE c ns
-  log ("\n" <> unwrap namespace <> "\n")
   domeinFileRecord <- getDF
   -- Here we replace the _id with the name of the form "model:Modelname" that we derive from the namespace - or if it is
   -- in that form already, we leave things as they are.
