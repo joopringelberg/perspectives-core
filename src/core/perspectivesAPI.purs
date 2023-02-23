@@ -362,7 +362,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.CreateContext -> withLocalName predicate (ContextType object)
       \(qrolname :: RoleType) -> case qrolname of
         -- If a CalculatedRole AND a Database Query Role, do not create a role instance.
-        (CR embeddingctype) -> do
+        (CR _) -> do
           isDBQ <- isDatabaseQueryRole qrolname
           if isDBQ
             then withNewContext authoringRole (Just qrolname)

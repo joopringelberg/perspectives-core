@@ -35,15 +35,13 @@ module Perspectives.GlobalUnsafeStrMap
   , keys
   , values
   , filterKeys
+  , delete'
   ) where
 
-import Data.Lens (lens, wander)
-import Data.Lens.At (class At)
-import Data.Lens.Index (class Index)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Foreign (Foreign, isUndefined, unsafeFromForeign)
 import Foreign.Object (Object)
-import Prelude (class Show, Unit, flip, map, pure, show, (#), (>>>))
+import Prelude (class Show, Unit, show)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A reference to a mutable map

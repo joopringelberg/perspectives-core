@@ -56,8 +56,6 @@ import Prelude (Unit, bind, pure, show, unit, void, ($), (>=>), (>>=), discard, 
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
-  -- get the post database
-  post <- postDatabaseName
   mbrokerService <- brokerService
   case mbrokerService of
     Just {topic, queueId, login, passcode, vhost, url} -> do
@@ -87,7 +85,7 @@ incomingPost = do
             ForeignError "noConnection" -> lift $ setConnectionState false
             ForeignError "connection" -> lift $ setConnectionState true *> sendOutgoingPost
             TypeMismatch "receipt" docId -> void $ lift $ deleteDocument postDB docId Nothing
-            otherwise -> log ("Perspectives.AMQP.IncomingPost.transactionConsumer: " <> show me)
+            _ -> log ("Perspectives.AMQP.IncomingPost.transactionConsumer: " <> show me)
           Right {body, ack} -> do
             -- NOTE. Transaction execution seems to be so slow, that the connection can be last before we acknowledge.
             -- In that case, the broker resends the message.
@@ -113,8 +111,8 @@ incomingPost = do
         Just stompClient -> do
           (transactions :: Array OutgoingTransaction) <- sort <<< nub <$> traverse (getDocument_ postDB) waitingTransactions
           -- We do not delete here; only when we receive the receipt.
-          for_ transactions \t@(OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient receiver _id (encodeJSON transaction)
-        otherwise -> pure unit
+          for_ transactions \(OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient receiver _id (encodeJSON transaction)
+        _ -> pure unit
 
 -- | Construct the BrokerService from the database, if possible, and set it in PerspectivesState.
 retrieveBrokerService :: MonadPerspectives Unit

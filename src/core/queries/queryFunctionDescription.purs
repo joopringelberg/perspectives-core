@@ -100,11 +100,11 @@ instance writeForeignQFD :: WriteForeign QueryFunctionDescription where
 
 instance readForeignQFD :: ReadForeign QueryFunctionDescription where
   readImpl f = case unsafeFromForeign f of
-    {constructor: "SQD", domain, function, range, isFunctional, isMandatory} -> SQD <$> (readImpl domain) <*> (readImpl function) <*> (readImpl range) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
-    {constructor: "UQD", domain, function, singleArg, range, isFunctional, isMandatory} -> UQD <$> (readImpl domain) <*> (readImpl function) <*> (readImpl singleArg) <*> (readImpl range) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
-    {constructor: "BQD", domain, function, firstArg, secondArg, range, isFunctional, isMandatory} -> BQD <$> (readImpl domain) <*> (readImpl function) <*> (readImpl firstArg) <*> (readImpl secondArg) <*> (readImpl range) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
-    {constructor: "MQD", domain, function, arguments, range, isFunctional, isMandatory} ->
-      MQD <$> (readImpl domain) <*> (readImpl function) <*> (traverse readImpl arguments) <*> (readImpl range) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
+    {constructor: "SQD", dom, function, ran, isFunctional, isMandatory} -> SQD <$> (readImpl dom) <*> (readImpl function) <*> (readImpl ran) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
+    {constructor: "UQD", dom, function, singleArg, ran, isFunctional, isMandatory} -> UQD <$> (readImpl dom) <*> (readImpl function) <*> (readImpl singleArg) <*> (readImpl ran) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
+    {constructor: "BQD", dom, function, firstArg, secondArg, ran, isFunctional, isMandatory} -> BQD <$> (readImpl dom) <*> (readImpl function) <*> (readImpl firstArg) <*> (readImpl secondArg) <*> (readImpl ran) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
+    {constructor: "MQD", dom, function, arguments, ran, isFunctional, isMandatory} ->
+      MQD <$> (readImpl dom) <*> (readImpl function) <*> (traverse readImpl arguments) <*> (readImpl ran) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
     otherwise -> fail $ ForeignError "Expected record with constructor SQD, UQD, BQD, or MQD"
 
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _

@@ -94,7 +94,7 @@ uploadToRepository ::
   Array Url ->
   Array RoleInstance -> MonadPerspectivesTransaction Unit
 uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crlSource_, head url_ of
-  Just arcSource, Just crlSource, Just url -> do
+  Just arcSource, Just _, Just _ -> do
     r <- loadAndCompileArcFile_ arcSource
     case r of
       Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
