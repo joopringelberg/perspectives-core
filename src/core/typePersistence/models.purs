@@ -25,9 +25,7 @@ module Perspectives.Models
 where
 
 import Data.Newtype (unwrap)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, (##=))
-import Perspectives.Identifiers (modelUri2DomeinFileName_)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.ModelDependencies (modelExternalModelIdentification)
 import Perspectives.ModelDependencies (modelsInUse) as DEP
@@ -49,4 +47,4 @@ modelsInUse = do
     modelExternalModelIdentification
     (ST modelsInUseRole)
   values <- (ContextInstance system) ##= (getEnumeratedRoleInstances modelsInUseRole >=> propertyGetter)
-  pure $ DomeinFileId <<< unsafePartial modelUri2DomeinFileName_ <<< unwrap <$> values
+  pure $ DomeinFileId <<< unwrap <$> values

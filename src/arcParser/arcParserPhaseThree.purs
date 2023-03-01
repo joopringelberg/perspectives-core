@@ -39,7 +39,7 @@ import Data.Foldable (for_, traverse_)
 import Data.Identity as Identity
 import Data.List (List, filterM, fromFoldable) as LIST
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
-import Data.Newtype (over, unwrap)
+import Data.Newtype (unwrap)
 import Data.String (Pattern(..), indexOf)
 import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
@@ -52,7 +52,7 @@ import Perspectives.Data.EncodableMap (addAll)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutomaticEffect(..), UpstreamStateNotification(..), addUpstreamAutomaticEffect, addUpstreamNotification, indexedContexts, indexedRoles)
-import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, typeUri2typeNameSpace, isTypeUri, modelUri2DomeinFileName_, qualifyWith, startsWithSegments)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, isTypeUri, qualifyWith, startsWithSegments, typeUri2typeNameSpace)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), StateTransitionE(..), SegmentedPath)
@@ -117,8 +117,8 @@ phaseThree_ ::
   MP (Either MultiplePerspectivesErrors DomeinFileRecord)
 phaseThree_ df@{_id, referredModels} postponedParts screens = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
-  indexedContexts <- unions <$> traverse (getDomeinFile <<< over DomeinFileId (unsafePartial modelUri2DomeinFileName_) >=> pure <<< indexedContexts) referredModels
-  indexedRoles <- unions <$> traverse (getDomeinFile <<< over DomeinFileId (unsafePartial modelUri2DomeinFileName_) >=> pure <<< indexedRoles) referredModels
+  indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
+  indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
   (Tuple ei {dfr}) <- runPhaseTwo_'
     (do
       checkAspectRoleReferences

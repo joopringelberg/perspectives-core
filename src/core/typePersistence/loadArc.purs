@@ -33,13 +33,11 @@ import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, keys, lookup, values)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.Checking.PerspectivesTypeChecker (checkDomeinFile)
 import Perspectives.ContextRoleParser (userData)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
-import Perspectives.Identifiers (modelUri2DomeinFileName_)
 import Perspectives.IndentParser (runIndentParser')
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances_)
@@ -86,7 +84,7 @@ loadAndCompileArcFile_ text = catchError
           (Right (DomeinFile dr'@{_id})) -> do
             dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
             -- We should load referred models if they are missing (but not the model we're compiling!).
-            for_ (delete (DomeinFileId _id) state.referredModels) (loadModelIfMissing <<< unsafePartial modelUri2DomeinFileName_ <<< unwrap)
+            for_ (delete (DomeinFileId _id) state.referredModels) (loadModelIfMissing <<< unwrap)
             (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left e

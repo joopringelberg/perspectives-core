@@ -69,7 +69,7 @@ expandNamespaces namespaces s = if isTypeUri s then s else
 defaultNamespaces :: OBJ.Object String
 defaultNamespaces = OBJ.fromFoldable
   [ Tuple "cdb" "model://perspectives.domains/Couchdb"
-  , Tuple "sys" "model://perspectives.domains/System"
+  , Tuple "sys" "model://perspectives.domains#System"
   , Tuple "usr" "model:User"
   , Tuple "ser" "model://perspectives.domains/Serialise"
   , Tuple "p" "model://perspectives.domains/Parsing"

@@ -82,26 +82,6 @@ isModelUri :: String -> Boolean
 isModelUri = isJust <<< match newModelRegex
 
 -----------------------------------------------------------
--- MODEL URI TO DOMEINFILE IDENTIFIER
------------------------------------------------------------
--- | Transform a model URI of the form 
--- |	  model://{subdomains-with-dots}.{authority-with-dots}#{LocalModelName}
--- | to:
--- |    {subdomains-with-dots}.{authority-with-dots}#{LocalModelName}
--- | The latter form is the string value of a DomeinFileId.
-modelUri2DomeinFileName :: String -> Maybe String
-modelUri2DomeinFileName s = case match newModelRegex s of
-  Nothing -> Nothing
-  Just (matches :: NonEmptyArray (Maybe String)) -> let
-    (hierarchicalNamespace :: Maybe String) = unsafePartial fromJust $ index matches 1
-    (localModelName :: Maybe String) = unsafePartial fromJust $ index matches 2
-    in 
-      append <$> hierarchicalNamespace <*> (append <$> Just "#" <*> localModelName)
-
-modelUri2DomeinFileName_ :: Partial => String -> String
-modelUri2DomeinFileName_ = fromJust <<< modelUri2DomeinFileName
-
------------------------------------------------------------
 -- MODEL URI TO MODEL URL
 -- Fetch the model from a repository using this URL.
 -----------------------------------------------------------

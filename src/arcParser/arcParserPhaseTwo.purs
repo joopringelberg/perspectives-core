@@ -31,7 +31,7 @@ import Data.Array (fromFoldable) as ARR
 import Data.Lens (over) as LN
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.Symbol (SProxy(..))
@@ -40,7 +40,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, fromFoldable, insert, union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, typeUri2typeNameSpace_, isTypeUri, modelUri2DomeinFileName, newModelRegex, qualifyWith)
+import Perspectives.Identifiers (Namespace, isTypeUri, newModelRegex, qualifyWith, typeUri2typeNameSpace_)
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyMapping(..), PropertyPart(..), RoleE(..), RoleIdentification(..), RolePart(..), ScreenE(..), StateE(..), StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpandPrefix (expandPrefix)
@@ -69,11 +69,8 @@ traverseDomain c ns = do
   -- Traverse the model parse tree and construct a DomeinFileRecord in PhaseTwoState.
   (Context {_id:namespace}) <- traverseContextE c ns
   domeinFileRecord <- getDF
-  -- Here we replace the _id with the name of the form "model:Modelname" that we derive from the namespace - or if it is
-  -- in that form already, we leave things as they are.
-  -- We also fill the namespace field.
   pure $ DomeinFile (domeinFileRecord 
-    { _id = unsafePartial fromJust $ modelUri2DomeinFileName (unwrap namespace)
+    { _id = unwrap namespace
     , namespace = unwrap namespace
     })
 

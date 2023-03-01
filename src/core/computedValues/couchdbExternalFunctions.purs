@@ -36,7 +36,7 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (empty) as Map
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
 import Data.String.Regex (test)
@@ -48,41 +48,37 @@ import Data.Tuple (Tuple(..))
 import Effect.Class.Console (logShow)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
-import Foreign.Object (Object, empty, fromFoldable, insert, lookup, union)
-import Partial.Unsafe (unsafePartial)
+import Foreign.Object (Object, empty, insert, lookup)
 import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
-import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, changeContext_me, changeRol_binding, changeRol_isMe, context_id, rol_binding, rol_context, rol_gevuldeRollen, rol_id, rol_isMe, rol_pspType, setRol_gevuldeRollen)
-import Perspectives.ContextRoleParser (parseAndCache)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>>))
+import Perspectives.ContextAndRole (changeRol_isMe, rol_context)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
-import Perspectives.Deltas (addCreatedContextToTransaction, addCreatedRoleToTransaction)
+import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
+import Perspectives.DomeinCache (saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvertedQuery(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
-import Perspectives.Error.Boundaries (handleDomeinFileError, handlePerspectRolError)
+import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (typeUri2LocalName_, getFirstMatch, modelUri2DomeinFileName_, modelUri2ModelRepository, newModelRegex)
+import Perspectives.Identifiers (getFirstMatch, newModelRegex, typeUri2LocalName_)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
-import Perspectives.Instances.Indexed (replaceIndexedNames)
-import Perspectives.Instances.ObjectGetters (contextType, isMe)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.ModelDependencies (installer, modelDescription, sysUser, systemModelName, theSystem)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Models (modelsInUse, modelsInUseRole) as Models
-import Perspectives.Names (getMySystem, getUserIdentifier, lookupIndexedContext, lookupIndexedRole)
+import Perspectives.Names (getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, getPerspectRol, saveEntiteit, saveEntiteit_, tryFetchEntiteit, tryGetPerspectEntiteit, updateRevision)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -93,13 +89,13 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
-import Perspectives.ResourceIdentifiers (createResourceIdentifier)
+import Perspectives.ResourceIdentifiers (createResourceIdentifier, resourceIdentifier2DocLocator)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Warning (PerspectivesWarning(..))
-import Prelude (Unit, bind, discard, eq, flip, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (||))
+import Prelude (Unit, bind, discard, eq, flip, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -131,7 +127,7 @@ modelsDatabaseName :: MonadPerspectives String
 modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models")
 
 -- | Retrieves all instances of a particular role type from Couchdb.
--- | For example: `user: Users = callExternal cdb:RoleInstances(sysUser) returns: model://perspectives.domains/System$PerspectivesSystem$User`
+-- | For example: `user: Users = callExternal cdb:RoleInstances(sysUser) returns: model://perspectives.domains#System$PerspectivesSystem$User`
 -- | Notice that only the first element of the array argument is actually used.
 -- | Notice, too, that the second parameter is ignored. We must provide it, however, as the query compiler
 -- | will give us an argument for it.
@@ -167,7 +163,7 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
     descriptionGetter <- lift $ getDynamicPropertyGetter modelDescription (ST Models.modelsInUseRole)
     description <- lift (modelsInUse ##= descriptionGetter)
     lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
-  Just modelName -> updateModel' (maybe false (eq "true") (head arrWithDependencies)) (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ modelName)
+  Just modelName -> updateModel' (maybe false (eq "true") (head arrWithDependencies)) (DomeinFileId modelName)
   where
     -- TODO. Note that while we have not yet the model identification as an URL, the parameter url is bound to
     -- the repository location of the model supplied in the call to updateModel.
@@ -180,21 +176,21 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
         -- Untangle the InvertedQueries of the previous model.
       forWithIndex_ invertedQueriesInOtherDomains
         \domainName queries -> do
-          (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
       forWithIndex_ upstreamStateNotifications
         \domainName notifications -> do
-          (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications removeDownStreamNotification) dfr))
       forWithIndex_ upstreamAutomaticEffects
         \domainName automaticEffects -> do
-          (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
+          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
               -- Here we must take care to preserve the screens.js attachment.
@@ -204,7 +200,7 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
       -- Install the new model, taking care of outgoing InvertedQueries.
       -- TODO. As soon as model identifiers are URLs, do not concatenate the url to the modelName.
       addModelToLocalStore' modelName false
-      DomeinFile dfr <- lift $ getDomeinFile $ DomeinFileId $ unsafePartial modelUri2DomeinFileName_ modelName
+      DomeinFile dfr <- lift $ getDomeinFile $ DomeinFileId modelName
       -- Find all models in use.
       models' <- lift (Models.modelsInUse >>= traverse getDomeinFile)
       -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
@@ -231,253 +227,9 @@ addModelToLocalStore' modelname originalLoad = if test newModelRegex modelname
   then addModelToLocalStore_newStyle modelname originalLoad
   else throwError (error $ "Not a valid model name: " <> modelname)
 
--- modelname can be both an old style modelname or a new style modelname.
-addModelToLocalStore_oldStyle :: String -> Boolean -> MonadPerspectivesTransaction Unit
-addModelToLocalStore_oldStyle modelname originalLoad = do
-  repositoryUrl <- lift publicRepository
-  docName <- pure modelname
-  df@(DomeinFile
-    { _id
-    , modelDescription
-    , crl
-    , indexedRoles
-    , indexedContexts
-    , referredModels
-    , invertedQueriesInOtherDomains
-    , upstreamStateNotifications
-    , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl docName
-
-  -- Store the model in Couchdb.
-  -- Fetch the local revision before saving: it belongs to the repository,
-  -- not the local perspect_models.
-  lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
-  lift $ updateRevision(DomeinFileId _id)
-  revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
-
-  -- Add new dependencies.
-  for_ referredModels \dfid -> do
-    mmodel <- lift $ tryGetPerspectEntiteit dfid
-    case mmodel of
-      Nothing -> addModelToLocalStore' (unwrap dfid) originalLoad
-      Just _ -> pure unit
-
-  -- Add replacements to PerspectivesState for the new indexed names introduced in this model,
-  -- unless we find existing ones left over from a previous installation of the model.
-  (iroles :: Object RoleInstance) <- for indexedRoles (\iRole -> do
-    -- iRole is the *indexed name* (not the unique name).
-    (mexistingReplacement :: Maybe RoleInstance) <- lift $ lookupIndexedRole (unwrap iRole)
-    case mexistingReplacement of
-      Just existingReplacement -> pure $ Tuple (unwrap iRole) existingReplacement
-      Nothing -> do
-        -- We don't want to look up the role type right now and we don't really need it
-        -- because it is allright for now to store this instance in the default store.
-        rid <- createResourceIdentifier (RType $ EnumeratedRoleType "")
-        pure $ Tuple (unwrap iRole) (RoleInstance rid)) >>= pure <<< fromFoldable
-
-  (icontexts :: Object ContextInstance) <- for indexedContexts (\iContext -> do
-    (mexistingReplacement :: Maybe ContextInstance) <- lift $ lookupIndexedContext (unwrap iContext)
-    case mexistingReplacement of
-      Just existingReplacement -> pure $ Tuple (unwrap iContext) existingReplacement
-      Nothing -> do
-        -- We don't want to look up the context type right now and we don't really need it
-        -- because it is allright for now to store this instance in the default store.
-        cid <- createResourceIdentifier (CType $ ContextType "")
-        pure $ Tuple (unwrap iContext) (ContextInstance cid)) >>= pure <<< fromFoldable
-
-  mySystem <- lift (ContextInstance <$> getMySystem)
-  me <- lift (RoleInstance <$> getUserIdentifier)
-  -- TODO. Do we really have to reassert Me and MySystem every time? Presumably this is for the
-  -- situation where we do not yet have model:System.
-  void $ lift $ AMA.modify \ps -> ps {indexedRoles = insert DEP.sysMe me (ps.indexedRoles `union` iroles), indexedContexts = insert DEP.mySystem mySystem (ps.indexedContexts `union` icontexts)}
-
-  -- Replace any occurrence of any indexed name in the CRL file holding the instances of this model.
-  crl' <- lift $ replaceIndexedNames crl
-
-  -- Retrieve the modelDescription from cache or database: it may have been changed if the user decided to use it in InPlace.
-  (mmodelDescription :: Maybe PerspectRol) <- case modelDescription of
-    Nothing -> throwError (error ("A model has no description: " <> modelname))
-    Just m -> lift $ tryGetPerspectEntiteit (identifier (m :: PerspectRol))
-
-  -- Parse the CRL. This will cache all roleInstances, overwriting the modelDescription and any other entities
-  -- in cache left over from a previous installation.
-  parseResult <- lift $ parseAndCache crl'
-  case parseResult of
-    Left e -> throwError (error (show e))
-    Right (Tuple contextInstances roleInstances') -> do
-      -- Add the new instances to the transaction, so their states will be computed etc.
-      -- NOTE that the model description that we store in the file is, at this point, still waiting to be
-      -- handled in the Transaction. It does therefore not have all states (particularly not the aspect states).
-      if originalLoad
-        then do
-          for_ contextInstances (addCreatedContextToTransaction <<< identifier)
-          for_ roleInstances' (addCreatedRoleToTransaction <<< identifier)
-        else pure unit
-      -- Restore the modelDescription, preferring the version left over from a previous installation
-      -- over the version that came out of the user instances in the crl file.
-      case mmodelDescription of
-        Nothing -> pure unit
-        Just (m :: PerspectRol) -> void $ lift $ cacheEntity (identifier m) m
-
-      -- Save role instances, overwriting versions left over from a previous installation.
-      (cis :: Object PerspectContext) <- execStateT
-        (forWithIndex_
-          roleInstances'
-          (\i newRole' -> do
-            -- Fetch from the database, not cache.
-            newRoleContextType <- lift $ lift ((rol_context newRole') ##>> contextType)
-            (mrole :: Maybe PerspectRol) <- lift $ lift $ tryFetchEntiteit (RoleInstance i)
-            case mrole of
-              -- If we find a previous version in the database, overwrite it.
-              -- We will have handled bindings on the previous occasion.
-              -- NOTE. There may be a snag here. Suppose the previous version
-              -- did have a binding while the current does not? Then we'd need
-              -- to readjust the inverse binding administration.
-              -- Also, the new version may not have a binding while the old version does.
-              -- This may trigger automatic effects as indeed it does for state NotInIndexedContexts.
-              -- ME. This operation should preserve the value of `isMe`.
-              Just oldRole -> do
-                newRole <- pure $ changeRol_isMe newRole' (rol_isMe oldRole)
-                case rol_binding newRole of
-                  Nothing -> case rol_binding oldRole of
-                    -- Neither the old nor the new version have a binding.
-                    Nothing -> saveRoleInstance i $ changeRevision (rev oldRole) newRole
-                    -- The old role has a binding, the new one does not.
-                    -- This code is a temporary solution. For now we choose to restore the binding relations.
-                    -- As a consequence, a model update cannot undo binding relations on model instances.
-                    -- Give the new role the binding the old role has.
-                    -- Note that we asssume the fillers have their administration intact! This might not be true
-                    -- when the filler comes from the model, as well.
-                    -- Finally note that the state administration is overwritten.
-                    -- This causes, in the case of model:System, state Update for ModelsInUse to exit silently, as it were.
-                    Just oldBindingId -> saveRoleInstance i $ changeRevision (rev oldRole) (changeRol_binding oldBindingId newRole)
-                  Just newBindingId -> case rol_binding oldRole of
-                    -- New role has binding, old role does not. Update the inverse binding administration for the new binding, if it is not a model instance.
-                    Nothing -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
-                      -- The binding comes with the other model instances and so must already have the inverse binding administration.
-                      then saveRoleInstance i $ changeRevision (rev oldRole) newRole
-                      -- The binding is on an instance outside the model. Add the inverse binding administration.
-                      else (lift $ lift $ try $ getPerspectEntiteit newBindingId) >>=
-                        handlePerspectRolError
-                          "addModelToLocalStore'"
-                          -- set the inverse binding if not already there.
-                          \newBinding -> do
-                            void $ lift $ lift ((addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole) (RoleInstance i)) >>= cacheEntity newBindingId )
-                            void $ lift $ lift $ saveEntiteit newBindingId
-                            saveRoleInstance i $ changeRevision (rev oldRole) newRole
-                    Just oldBindingId -> if newBindingId == oldBindingId
-                      -- Old and new role both have the same binding. Nothing needs to be changed.
-                      then saveRoleInstance i $ changeRevision (rev oldRole) newRole
-                      -- New role has another binding than the old role. TODO.
-                      else pure unit
-                -- As with the binding relation, we choose to restore the binder relations.
-                -- This means we cannot change them with a model update.
-                -- Find those binders on the old role that are not on the new role.
-                -- For each such binder, add it to the new role.
-                -- SHORTCUT. We just replace the binders of the new role with those of the old role.
-                -- Notice that this makes it impossible, too, to remove a binder relation between model instances.
-                -- As this is a temporary solution, that is acceptable.
-                -- Fetch the revision again, because it may have changed above.
-                updatedRole <- lift $ lift $ getPerspectRol (RoleInstance i)
-                lift $ lift $ void $ saveEntiteit_ (rol_id newRole) (changeRevision (rev updatedRole) (setRol_gevuldeRollen newRole (rol_gevuldeRollen oldRole)))
-
-              Nothing -> do
-                case rol_binding newRole' of
-                  Nothing -> saveRoleInstance i newRole'
-                  Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
-                    then saveRoleInstance i newRole'
-                    else (lift $ lift $ try $ getPerspectEntiteit newBindingId) >>=
-                      handlePerspectRolError
-                        "addModelToLocalStore'"
-                        -- set the inverse binding if not already there.
-                        \newBinding -> do
-                          void $ lift $ lift ((addRol_gevuldeRollen newBinding newRoleContextType (rol_pspType newRole') (RoleInstance i)) >>= cacheEntity newBindingId )
-                          void $ lift $ lift $ saveEntiteit newBindingId
-                          saveRoleInstance i newRole'
-                          -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
-                          -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
-                -- The new role may have a context that already existed. It will not have a reference to this new role.
-                moldCtxt <- lift $ lift $ tryFetchEntiteit (rol_context newRole')
-                case moldCtxt of
-                  Nothing -> pure unit
-                  -- We could retrieve the context from the database.
-                  -- Add the new role to the old context and save it.
-                  Just oldCtxt -> void $ lift $ lift $ saveEntiteit_ (context_id oldCtxt) 
-                    (addContext_rolInContext oldCtxt (rol_pspType newRole') (RoleInstance i))
-        ))
-        contextInstances
-
-      -- Save context instances, but prefer a version left over from a previous installation.
-      forWithIndex_ cis \(i :: String) newVersion -> do
-        -- We *must* get the revision from the database. On doing an update, the context will be put into
-        -- cache by the CRL parser. It then has no revision.
-        moldCtxt <- lift $ tryFetchEntiteit (ContextInstance i)
-        case moldCtxt of
-          Nothing -> lift $ saveEntiteit_ (ContextInstance i) newVersion
-          Just oldCtxt  -> do
-            -- We could retrieve the context from the database.
-            -- As tryFetchEntiteit does not cache, we do it now.
-            void $ lift $ cacheEntity (ContextInstance i) oldCtxt
-            pure oldCtxt
-
-  -- Distribute the SeparateInvertedQueries over the other domains.
-  forWithIndex_ invertedQueriesInOtherDomains
-    \domainName queries -> do
-      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
-        handleDomeinFileError "addModelToLocalStore'"
-        \(DomeinFile dfr) -> do
-          -- Here we must take care to preserve the screens.js attachment.
-          lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
-  
-  -- Distribute upstream state notifications over the other domains.
-  forWithIndex_ upstreamStateNotifications
-    \domainName notifications -> do
-      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
-        handleDomeinFileError "addModelToLocalStore'"
-        \(DomeinFile dfr) -> do
-          -- Here we must take care to preserve the screens.js attachment.
-          lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications addDownStreamNotification) dfr))
-
-  -- Distribute upstream automatic effects over the other domains.
-  forWithIndex_ upstreamAutomaticEffects
-    \domainName automaticEffects -> do
-      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
-        handleDomeinFileError "addModelToLocalStore'"
-        \(DomeinFile dfr) -> do
-          -- Here we must take care to preserve the screens.js attachment.
-          lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
-
-  -- Copy the attachment
-  lift $ addA repositoryUrl docName revision
-  where
-
-    -- Sets the `me` property on the role instances. Detects the ultimate bottom case: the user instance of sys:PerspectivesSystem. Note that model user instances should never comprise particular other users!
-    -- Saves the role instance both in cache and the database.
-    saveRoleInstance :: String -> PerspectRol -> StateT (Object PerspectContext) MonadPerspectivesTransaction Unit
-    saveRoleInstance i a@(PerspectRol{context, pspType}) = do
-      me <- lift $ lift $ isMe (RoleInstance i)
-      if me || pspType == (EnumeratedRoleType sysUser)
-        then do
-          void $ lift $ lift $ saveEntiteit_ (RoleInstance i) (changeRol_isMe a true)
-          void $ modify \cis -> case lookup (unwrap context) cis of
-            Nothing -> cis
-            Just c -> insert (unwrap context) (changeContext_me c (Just (RoleInstance i))) cis
-        else void $ lift $ lift $ saveEntiteit_ (RoleInstance i) a
-
-    -- url is the path to the document in the repository.
-    addA :: String -> String -> Revision_ -> MP Unit
-    addA repoName modelName rev = do
-      mAttachment <- getAttachment repoName modelName "screens.js"
-      case mAttachment of
-        Nothing -> pure unit
-        Just attachment -> do
-          perspect_models <- modelsDatabaseName
-          void $ addAttachment perspect_models modelName rev "screens.js" attachment (MediaType "text/ecmascript")
-          updateRevision (DomeinFileId modelName)
-
 addModelToLocalStore_newStyle :: String -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore_newStyle modelname originalLoad = do
-  repositoryUrl <- pure $ unsafePartial modelUri2ModelRepository modelname
-  docName <- pure $ unsafePartial modelUri2DomeinFileName_ modelname
+  {database: repositoryUrl, documentName} <- lift $ resourceIdentifier2DocLocator modelname
   df@(DomeinFile
     { _id
     -- , indexedRoles
@@ -485,16 +237,17 @@ addModelToLocalStore_newStyle modelname originalLoad = do
     , referredModels
     , invertedQueriesInOtherDomains
     , upstreamStateNotifications
-    , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl docName
+    , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl documentName
 
   -- Store the model in Couchdb, that is: in the local store of models.
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
   lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
-  lift $ updateRevision(DomeinFileId _id)
-  revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
+  revision <- lift $ saveCachedDomeinFile (DomeinFileId _id)  >>= pure <<< rev
+  -- lift $ updateRevision(DomeinFileId _id)
+  -- revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
 
   -- Copy the attachment
-  lift $ addA repositoryUrl docName revision
+  lift $ addA repositoryUrl documentName revision
 
   -- If and only if the model we load is model:System, create both the system context and the system user.
   -- This is part of the installation routine.
@@ -562,7 +315,7 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   -- Distribute the SeparateInvertedQueries over the other domains.
   forWithIndex_ invertedQueriesInOtherDomains
     \domainName queries -> do
-      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -571,7 +324,7 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   -- Distribute upstream state notifications over the other domains.
   forWithIndex_ upstreamStateNotifications
     \domainName notifications -> do
-      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -580,7 +333,7 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   -- Distribute upstream automatic effects over the other domains.
   forWithIndex_ upstreamAutomaticEffects
     \domainName automaticEffects -> do
-      (lift $ try $ getDomeinFile (DomeinFileId $ unsafePartial modelUri2DomeinFileName_ domainName)) >>=
+      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
@@ -631,12 +384,6 @@ addModelToLocalStore_newStyle modelname originalLoad = do
             , indexedRoles = insert DEP.sysMe (identifier me) ps.indexedRoles
             }
 
-
--- NOTE. Currently, these functions `documentName` and `repository` handle both old and new style model names.
-documentName :: String -> MonadPerspectivesTransaction String
-documentName url' = case getFirstMatch (unsafeRegex "^.*/(.+)$" noFlags) url' of
-  Nothing -> throwError (error ("Cannot get document name from " <> url'))
-  Just s -> pure s
 
 -- Returns string ending on forward slash (/).
 repository :: String -> MonadPerspectivesTransaction String
