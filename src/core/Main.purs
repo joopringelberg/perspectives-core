@@ -250,6 +250,7 @@ createUser userName password couchdbUrl = void $ runAff
   handleError
   (createPerspectivesUser userName password couchdbUrl)
 
+-- TODO publicRepo should be no longer important?
 createAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
 createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of

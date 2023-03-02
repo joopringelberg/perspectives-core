@@ -28,21 +28,18 @@ import Prelude
 
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Writer (runWriterT)
 import Data.Array (cons, head, intercalate)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Main.RecompileBasicModels (recompileModelsAtUrl)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, type (~~>))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (modelUri2ModelRepository)
 import Perspectives.LoadCRL (loadAndCacheCrlFile')
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -85,37 +82,20 @@ type ArcSource = String
 type CrlSource = String
 type Url = String
 
--- | Parse and compile the Arc and Crl file. Upload to the repository.
--- | If the files are not valid, nothing happens.
--- | host_ and port_ are currently ignored.
-uploadToRepository ::
-  Array ArcSource ->
-  Array CrlSource ->
-  Array Url ->
-  Array RoleInstance -> MonadPerspectivesTransaction Unit
-uploadToRepository arcSource_ crlSource_ url_ _ = case head arcSource_, head crlSource_, head url_ of
-  Just arcSource, Just _, Just _ -> do
-    r <- loadAndCompileArcFile_ arcSource
-    case r of
-      Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
-      Right (DomeinFile {_id, namespace}) -> lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelUri2ModelRepository namespace)
-  _, _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
-
 -- | Parse and compile the Arc file. Upload to the repository. Puts it in the Cache, but not in the local collection of DomeinFiles.
 -- | If the file is not valid, nothing happens.
-uploadToRepository2 ::
+uploadToRepository ::
   Array ArcSource ->
   Array RoleInstance -> MonadPerspectivesTransaction Unit
-uploadToRepository2 arcSource_ _ = case head arcSource_ of
+uploadToRepository arcSource_ _ = case head arcSource_ of
   Just arcSource -> do
     r <- loadAndCompileArcFile_ arcSource
     case r of
       Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
-      -- PROBABLY: STORE IN CACHE. model identification?
       Right df@(DomeinFile {_id, namespace}) -> do
         lift $ void $ storeDomeinFileInCache _id df
-        lift $ void $ runWriterT $ runArrayT $ CDB.uploadToRepository (DomeinFileId _id) (unsafePartial $ modelUri2ModelRepository namespace)
-  _ -> logPerspectivesError $ Custom ("uploadToRepository2 lacks arguments")
+        lift $ void $ CDB.uploadToRepository (DomeinFileId _id)
+  _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
 -- | Parse and compile all models found at the URL.
 compileRepositoryModels ::
@@ -131,7 +111,6 @@ externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1}
   , Tuple "model://perspectives.domains#Parsing$ParseAndCompileCrl" {func: unsafeCoerce parseAndCompileCrl, nArgs: 1}
-  , Tuple "model://perspectives.domains#Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 3}
-  , Tuple "model://perspectives.domains#Parsing$UploadToRepository2" {func: unsafeCoerce uploadToRepository2, nArgs: 1}
+  , Tuple "model://perspectives.domains#Parsing$UploadToRepository2" {func: unsafeCoerce uploadToRepository, nArgs: 1}
   , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1}
 ]

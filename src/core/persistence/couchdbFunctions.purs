@@ -28,6 +28,7 @@ module Perspectives.Persistence.CouchdbFunctions
 , endReplication
 , createUser
 , deleteUser
+, getDocumentFromUrl
 , deleteDocument
 , ensureSecurityDocument
 , setPassword
@@ -62,12 +63,13 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (Error, error)
 import Foreign (MultipleErrors)
-import Foreign.Class (decode)
+import Foreign.Class (class Decode, decode)
 import Foreign.Generic (decodeJSON)
 import Foreign.JSON (parseJSON)
 import Foreign.Object (fromFoldable, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted', onAccepted_)
+import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Identifiers (deconstructUserName)
 import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication)
 import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
@@ -211,6 +213,23 @@ setPassword base user password = ensureAuthentication (Authority base) \_ -> do
         onAccepted res1 [StatusCode 200, StatusCode 201] "createUser" \_ -> pure unit
 
 foreign import changePassword :: Json -> String -> Json
+
+-----------------------------------------------------------
+-- GET DOCUMENT FROM URL (COPIED FROM Perspectives.Couchdb.Databases)
+-----------------------------------------------------------
+getDocumentFromUrl :: forall d f. Revision d => Decode d => String -> MonadPouchdb f d
+getDocumentFromUrl url = ensureAuthentication (Url url) \_ -> do
+  rq <- defaultPerspectRequest
+  res <- liftAff $ AJ.request $ rq {url = url}
+  onAccepted
+    res
+    [StatusCode 200]
+    "getDocumentFromUrl"
+    \response -> do
+      (x :: Either MultipleErrors d) <- pure $ runExcept ((parseJSON >=> decode) response.body)
+      case x of
+        (Left e) -> throwError $ error ("getDocumentFromUrl: error in decoding result: " <> show e)
+        (Right doc) -> pure doc
 
 -----------------------------------------------------------
 -- DELETE DOCUMENT (COPIED FROM Perspectives.Couchdb.Databases)

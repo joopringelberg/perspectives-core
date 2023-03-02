@@ -16,7 +16,7 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.Extern.Couchdb (uploadToRepository_)
+import Perspectives.Extern.Couchdb (uploadToRepository)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Persistence.API (deleteDocument, tryGetDocument)
@@ -54,11 +54,11 @@ theSuite = suiteSkip  "Model:System" do
     r <- loadArcAndCrl "testBotActie" modelDirectory
     case r of
       Left m -> do
-        logShow m
+        logShow m 
         liftAff $ assert "There are modelerrors" false
       Right df -> do
         -- Send the model to the repository.
-        void $ runWriterT $ runArrayT (uploadToRepository_ (DomeinFileId "model:TestBotActie") "repository" df)
+        uploadToRepository (DomeinFileId "model:TestBotActie")
         -- Now remove the model instances from cache!
         void $ removeInternally (RoleInstance "model:User$TestBotActieModel_External")
         void $ removeInternally (ContextInstance "model:User$TestBotActieModel")

@@ -88,9 +88,12 @@ isModelUri = isJust <<< match newModelRegex
 -- | Transform a model URI of the form 
 -- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
 -- | to:
+-- |    { repositoryUrl: https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}
+-- |    , documentName: LocalModelName.json}
+-- | When concatenated with a forward slash in between, those two parts form:
 -- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{LocalModelName}.json
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
-modelUri2ModelUrl :: Partial => String -> String
+modelUri2ModelUrl :: Partial => String -> {repositoryUrl :: String, documentName :: String}
 modelUri2ModelUrl s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
     (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
@@ -99,7 +102,8 @@ modelUri2ModelUrl s = let
     {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in
-    "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts <> "/" <> localModelName <> ".json"
+    { repositoryUrl: "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
+    , documentName: localModelName <> ".json"}
 
 -----------------------------------------------------------
 -- MODEL URI TO REPOSITORY URL

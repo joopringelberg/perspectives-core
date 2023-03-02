@@ -4,7 +4,6 @@ domain model://perspectives.domains#Couchdb --@1.0.0
 -- externalFunctions =
 --   [ Tuple "model://perspectives.domains#Couchdb$Models" {func: unsafeCoerce models, nArgs: 0}
 --   , Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
---   , Tuple "model://perspectives.domains#Couchdb$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
 --   , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
 --   , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
 --   , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}

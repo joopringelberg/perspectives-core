@@ -45,10 +45,10 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (logShow)
 import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, empty, insert, lookup)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
@@ -64,7 +64,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvert
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (getFirstMatch, newModelRegex, typeUri2LocalName_)
+import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ModelUrl, newModelRegex, typeUri2LocalName_)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
@@ -74,7 +74,7 @@ import Perspectives.ModelDependencies as DEP
 import Perspectives.Models (modelsInUse, modelsInUseRole) as Models
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
+import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
@@ -89,7 +89,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
-import Perspectives.ResourceIdentifiers (createResourceIdentifier, resourceIdentifier2DocLocator)
+import Perspectives.ResourceIdentifiers (createResourceIdentifier)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -229,22 +229,33 @@ addModelToLocalStore' modelname originalLoad = if test newModelRegex modelname
 
 addModelToLocalStore_newStyle :: String -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore_newStyle modelname originalLoad = do
-  {database: repositoryUrl, documentName} <- lift $ resourceIdentifier2DocLocator modelname
+  -- TODO. Hier zit een denkfout. Het model is nog niet lokaal. Dus we moeten de modelUri omzetten naar een URL.
+  -- Oftewel, we moeten hier de modelname nog niet interpreteren als een resource.
+  -- splits de modelUrl in de delen database en documentName zoals hieronder. We hebben ze nog een keer nodig.
+  {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl modelname
   df@(DomeinFile
-    { _id
-    -- , indexedRoles
-    -- , indexedContexts
-    , referredModels
-    , invertedQueriesInOtherDomains
-    , upstreamStateNotifications
-    , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl documentName
+  { _id
+  -- , indexedRoles
+  -- , indexedContexts
+  , referredModels
+  , invertedQueriesInOtherDomains
+  , upstreamStateNotifications
+  , upstreamAutomaticEffects}) <- lift $ CDB.getDocumentFromUrl (repositoryUrl <> "/" <> documentName)
+
+  -- {database: repositoryUrl, documentName} <- lift $ resourceIdentifier2DocLocator modelname
+  -- df@(DomeinFile
+  --   { _id
+  --   -- , indexedRoles
+  --   -- , indexedContexts
+  --   , referredModels
+  --   , invertedQueriesInOtherDomains
+  --   , upstreamStateNotifications
+  --   , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl documentName
 
   -- Store the model in Couchdb, that is: in the local store of models.
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
   lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
   revision <- lift $ saveCachedDomeinFile (DomeinFileId _id)  >>= pure <<< rev
-  -- lift $ updateRevision(DomeinFileId _id)
-  -- revision <- lift $ saveEntiteit (DomeinFileId _id) >>= pure <<< rev
 
   -- Copy the attachment
   lift $ addA repositoryUrl documentName revision
@@ -492,47 +503,47 @@ modifyInvertedQuery add = modifyInvertedQuery'
             keys})
           enumeratedProperties }
 
--- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
--- | Notice that url should include the name of the repository database within the couchdb installation. We do
--- | not assume anything about that name here.
+-- | Take a DomeinFile from the local perspect_models database and upload it to the repository database.
+-- | Notice that repositoryUrl is derived from the DomeinFileId.
 -- | Attachments are preserved: if they were in the repository before uploading,
 -- | they will be in the repository after uploading.
-uploadToRepository :: DomeinFileId -> URL -> MPQ Unit
-uploadToRepository dfId url = do
-  logShow ("\nuploadToRepository (voor getPerspectEntiteit): " <> (unwrap dfId))
-  mdf <- lift $ lift $ try $ getPerspectEntiteit dfId
-  logShow ("\nuploadToRepository (na getPerspectEntiteit): " <> (unwrap dfId))
-  case mdf of
-    Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err)
-    Right df -> uploadToRepository_ dfId url df
+uploadToRepository :: DomeinFileId -> MonadPerspectives Unit
+uploadToRepository dfId@(DomeinFileId domeinFileName) = do
+  if isModelUri domeinFileName
+    then do
+      mdf <- try $ getPerspectEntiteit dfId
+      case mdf of
+        Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err)
+        Right df -> uploadToRepository_ dfId (unsafePartial modelUri2ModelUrl domeinFileName) df
+    else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> domeinFileName)
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
 -- | In this function we handle the difference between the database that we read from (provided as the value of 
 -- | the argument `url`), and the database that we write to (ending on "_write").
-uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit
-uploadToRepository_ dfId url df = lift $ lift do 
+uploadToRepository_ :: DomeinFileId -> {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
+uploadToRepository_ (DomeinFileId dfId) splitName df = do 
   -- Get the attachment info
-  (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument url (show dfId)
+  (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument splitName.repositoryUrl splitName.documentName
   attachments <- case atts of
     Nothing -> pure empty
     Just (DocWithAttachmentInfo {_attachments}) -> traverseWithIndex
-      (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment url (show dfId) attName)
+      (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment splitName.repositoryUrl splitName.documentName attName)
       _attachments
   -- Get the revision (if any) from the remote database, so we can overwrite.
-  (mVersion :: Maybe String) <- retrieveDocumentVersion url (show dfId)
-  (newRev :: Revision_) <- addDocument (url <> "_write") (changeRevision mVersion df) (show dfId)
+  (mVersion :: Maybe String) <- retrieveDocumentVersion splitName.repositoryUrl splitName.documentName
+  (newRev :: Revision_) <- addDocument (splitName.repositoryUrl <> "_write") (changeRevision mVersion df) splitName.documentName
   -- Now add the attachments.
-  void $ execStateT (go attachments) newRev
+  void $ execStateT (go splitName.repositoryUrl splitName.documentName attachments) newRev
 
   where
     -- As each attachment that we add will bump the document version, we have to catch it and use it on the
     -- next attachment.
-    go :: Object (Tuple MediaType (Maybe String)) -> StateT Revision_ MonadPerspectives Unit
-    go attachments = forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
+    go :: URL -> String -> Object (Tuple MediaType (Maybe String)) -> StateT Revision_ MonadPerspectives Unit
+    go documentUrl documentName attachments = forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
       Nothing -> pure unit
       Just attachment -> do
         newRev <- get
-        DeleteCouchdbDocument {rev} <- lift $ addAttachment (url <> "_write") (show dfId) newRev attName attachment mimetype
+        DeleteCouchdbDocument {rev} <- lift $ addAttachment (documentUrl <> "_write") documentName newRev attName attachment mimetype
         put rev
 
 type URL = String
@@ -667,7 +678,6 @@ externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model://perspectives.domains#Couchdb$Models" {func: unsafeCoerce models, nArgs: 0}
   , Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
-  , Tuple "model://perspectives.domains#Couchdb$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
   , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
   , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
