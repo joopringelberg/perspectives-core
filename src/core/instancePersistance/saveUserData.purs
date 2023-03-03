@@ -79,7 +79,7 @@ import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
@@ -483,7 +483,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
     -- we can fetch the model from.
     loadModel :: EnumeratedRoleType -> MonadPerspectivesTransaction Unit
     loadModel fillerType = do
-      mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (typeUri2ModelUri $ unwrap fillerType)
+      mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (DomeinFileId <$> (typeUri2ModelUri $ unwrap fillerType))
       if (isNothing mDomeinFile)
         then do
           mmodelIdentification <- lift (filler ##> getProperty (EnumeratedPropertyType "ModelIdentification"))

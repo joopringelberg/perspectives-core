@@ -29,7 +29,6 @@ import Data.Either (Either(..))
 import Data.Foldable (foldl, for_)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), isJust)
-import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, keys, lookup, values)
@@ -54,7 +53,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (loadModelIfMissing)
 import Perspectives.Types.ObjectGetters (aspectsOfRole)
-import Prelude (bind, discard, pure, show, void, ($), (<>), (==), (>=>), (<$>), (<<<))
+import Prelude (bind, discard, pure, show, void, ($), (<$>), (<>), (==), (>=>))
 import Text.Parsing.Parser (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
@@ -84,7 +83,7 @@ loadAndCompileArcFile_ text = catchError
           (Right (DomeinFile dr'@{_id})) -> do
             dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
             -- We should load referred models if they are missing (but not the model we're compiling!).
-            for_ (delete (DomeinFileId _id) state.referredModels) (loadModelIfMissing <<< unwrap)
+            for_ (delete (DomeinFileId _id) state.referredModels) loadModelIfMissing
             (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left e

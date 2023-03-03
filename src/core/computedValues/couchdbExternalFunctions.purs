@@ -196,11 +196,11 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
               -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects removeDownStreamAutomaticEffect) dfr))
       -- Clear the caches of compiled states.
-      void $ pure $ clearModelStates (DomeinFileId modelName)
+      void $ pure $ clearModelStates dfId
       -- Install the new model, taking care of outgoing InvertedQueries.
       -- TODO. As soon as model identifiers are URLs, do not concatenate the url to the modelName.
-      addModelToLocalStore' modelName false
-      DomeinFile dfr <- lift $ getDomeinFile $ DomeinFileId modelName
+      addModelToLocalStore' dfId false
+      DomeinFile dfr <- lift $ getDomeinFile $ dfId
       -- Find all models in use.
       models' <- lift (Models.modelsInUse >>= traverse getDomeinFile)
       -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
@@ -220,15 +220,15 @@ addModelToLocalStore modelNames _ = addModelsToLocalStore_ modelNames
 
 -- Elements of modelnames can be both an old style modelname or a new style modelname.
 addModelsToLocalStore_ :: Array String -> MonadPerspectivesTransaction Unit
-addModelsToLocalStore_ modelnames = for_ modelnames (flip addModelToLocalStore' true)
+addModelsToLocalStore_ modelnames = for_ modelnames ((flip addModelToLocalStore' true) <<< DomeinFileId)
 
-addModelToLocalStore' :: String -> Boolean -> MonadPerspectivesTransaction Unit
-addModelToLocalStore' modelname originalLoad = if test newModelRegex modelname 
-  then addModelToLocalStore_newStyle modelname originalLoad
-  else throwError (error $ "Not a valid model name: " <> modelname)
+addModelToLocalStore' :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
+addModelToLocalStore' dfid@(DomeinFileId domeinFileName) originalLoad = if test newModelRegex domeinFileName 
+  then addModelToLocalStore_newStyle dfid originalLoad
+  else throwError (error $ "Not a valid model name: " <> domeinFileName)
 
-addModelToLocalStore_newStyle :: String -> Boolean -> MonadPerspectivesTransaction Unit
-addModelToLocalStore_newStyle modelname originalLoad = do
+addModelToLocalStore_newStyle :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
+addModelToLocalStore_newStyle (DomeinFileId modelname) originalLoad = do
   -- TODO. Hier zit een denkfout. Het model is nog niet lokaal. Dus we moeten de modelUri omzetten naar een URL.
   -- Oftewel, we moeten hier de modelname nog niet interpreteren als een resource.
   -- splits de modelUrl in de delen database en documentName zoals hieronder. We hebben ze nog een keer nodig.
@@ -320,7 +320,7 @@ addModelToLocalStore_newStyle modelname originalLoad = do
   for_ referredModels \dfid -> do
     mmodel <- lift $ tryGetPerspectEntiteit dfid
     case mmodel of
-      Nothing -> addModelToLocalStore' (unwrap dfid) originalLoad
+      Nothing -> addModelToLocalStore' dfid originalLoad
       Just _ -> pure unit
 
   -- Distribute the SeparateInvertedQueries over the other domains.

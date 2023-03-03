@@ -111,8 +111,8 @@ retrieveDomeinFile modeluri = tryGetPerspectEntiteit (DomeinFileId modeluri) >>=
   Nothing -> throwError (error $ "Unknown model " <> modeluri)
   Just df -> pure df
 
-tryRetrieveDomeinFile :: ModelUri -> MonadPerspectives (Maybe DomeinFile)
-tryRetrieveDomeinFile modelUri = catchError (Just <$> (getPerspectEntiteit (DomeinFileId modelUri)))
+tryRetrieveDomeinFile :: DomeinFileId -> MonadPerspectives (Maybe DomeinFile)
+tryRetrieveDomeinFile dfId = catchError (Just <$> (getPerspectEntiteit dfId))
   \_ -> pure Nothing
 
 -- | A name not preceded or followed by a forward slash.

@@ -52,7 +52,7 @@ import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntite
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (RoleType(..), StateIdentifier(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
@@ -156,7 +156,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authorizedRole, deltaType, subject}) s = do
   log (show deltaType <> " for/from " <> show id <> " with ids " <> show roleInstances <> " with type " <> show roleType)
-  loadModelIfMissing (unsafePartial typeUri2ModelUri_ $ unwrap roleType)
+  loadModelIfMissing (DomeinFileId (unsafePartial typeUri2ModelUri_ $ unwrap roleType))
   case deltaType of
     ConstructEmptyRole -> do
       -- We have to check this case: a user is allowed to create himself.

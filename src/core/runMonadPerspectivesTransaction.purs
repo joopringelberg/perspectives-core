@@ -60,7 +60,7 @@ import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
 import Perspectives.PerspectivesState (addBinding, publicRepository, pushFrame, restoreFrame, transactionFlag)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getMyType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), DomeinFileId, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance, stateEvaluationAndQueryUpdatesForContext, stateEvaluationAndQueryUpdatesForRole)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRemoved)
@@ -342,15 +342,15 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
 -- | Retrieves from the repository the model, if necessary.
 -- modelname should be the string value of a DomeinFileId (NOT a model URN)
 -- TODO. This function relies on a repository URL in PerspectivesState. That is a stub.
-loadModelIfMissing :: String -> MonadPerspectivesTransaction Unit
-loadModelIfMissing modelName = do
-  mDomeinFile <- lift $ tryRetrieveDomeinFile modelName
+loadModelIfMissing :: DomeinFileId -> MonadPerspectivesTransaction Unit
+loadModelIfMissing dfId = do
+  mDomeinFile <- lift $ tryRetrieveDomeinFile dfId
   if isNothing mDomeinFile
     then do
       repositoryUrl <- lift publicRepository
-      addModelToLocalStore_newStyle modelName true
+      addModelToLocalStore_newStyle dfId true
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
-      (lift $ try $ getDomeinFile (DomeinFileId modelName)) >>=
+      (lift $ try $ getDomeinFile dfId) >>=
         handleDomeinFileError "loadModelIfMissing"
         \(DomeinFile{modelDescription}) -> do
           mySys <- lift $ getMySystem

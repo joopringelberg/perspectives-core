@@ -75,7 +75,7 @@ import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfR
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, ResourceType(..), RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, ResourceType(..), RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.ResourceIdentifiers (createResourceIdentifier)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
@@ -165,7 +165,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   logPerspectivesError $ TypeErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ TypeErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right (EnumeratedRole{context:filledContextType}) ->do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafePartial typeUri2ModelUri_ (unwrap fillerType))
+                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
                   registerSupportedEffect corrId setter (getFilledRoles filledContextType (EnumeratedRoleType predicate)) (RoleInstance subject)
             filledContextType -> (try $ getContext (ContextType filledContextType)) >>=
               case _ of
@@ -173,7 +173,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   logPerspectivesError $ ContextErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ ContextErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right _ -> do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafePartial typeUri2ModelUri_ (unwrap fillerType))
+                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
                   registerSupportedEffect corrId setter (getFilledRoles (ContextType filledContextType) (EnumeratedRoleType predicate)) (RoleInstance subject)
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
@@ -399,7 +399,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         runMonadPerspectivesTransaction' false authoringRole do
           result <- runExceptT $ traverse
             (\ctxt@(ContextSerialization{ctype}) -> do
-              lift $ loadModelIfMissing $ unsafePartial typeUri2ModelUri_ ctype
+              lift $ loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ ctype)
               constructContext Nothing ctxt)
             ctxts
           case result of
@@ -503,7 +503,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             logPerspectivesError $ RolErrorBoundary "Api.CheckBinding" (show err)
             sendResponse (Error corrId (show $ RolErrorBoundary "Api.CheckBinding" (show err))) setter
           Right (PerspectRol{pspType}) -> do
-            void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ unsafePartial typeUri2ModelUri_ (unwrap pspType))
+            void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap pspType)))
             ok <- checkBinding typeOfRolToBindTo (RoleInstance object)
             sendResponse (Result corrId [(show ok)]) setter
     Api.SetProperty -> catchError
@@ -613,7 +613,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd@{id, ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
         void $ runMonadPerspectivesTransaction authoringRole do
-          loadModelIfMissing $ unsafePartial unsafePartial typeUri2ModelUri_ ctype
+          loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ ctype)
 
           contextIdentifier <- if id == ""
             then createResourceIdentifier (CType $ ContextType ctype)
