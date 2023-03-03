@@ -44,7 +44,7 @@ import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (addModelToLocalStore_newStyle)
+import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
@@ -348,7 +348,7 @@ loadModelIfMissing dfId = do
   if isNothing mDomeinFile
     then do
       repositoryUrl <- lift publicRepository
-      addModelToLocalStore_newStyle dfId true
+      addModelToLocalStore dfId true
       -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
       (lift $ try $ getDomeinFile dfId) >>=
         handleDomeinFileError "loadModelIfMissing"

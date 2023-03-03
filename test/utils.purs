@@ -9,7 +9,7 @@ import Effect.Aff (Aff, error, throwError, try)
 import Effect.Class.Console (log)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.DomeinCache (cascadeDeleteDomeinFile)
-import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.Extern.Couchdb (addModelToLocalStore, addModelToLocalStore')
 import Perspectives.Persistence.API (createDatabase, deleteDatabase)
 import Perspectives.Persistence.State (getCouchdbBaseURL)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
@@ -17,7 +17,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectives)
-import Test.Unit.Assert as Assert 
+import Test.Unit.Assert as Assert
 
 developmentRepository :: MonadPerspectives String
 developmentRepository = pure "http://localhost:5984/repository"
@@ -106,7 +106,7 @@ withModel' m@(DomeinFileId id) a = do
   mcdbUrl <- getCouchdbBaseURL
   case mcdbUrl of
     Just cdbUrl -> do
-      void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "repository/" <> id] (RoleInstance ""))
+      void $ runSterileTransaction (addModelToLocalStore' (DomeinFileId $ cdbUrl <> "repository/" <> id) true)
       result <- try a
       void $ cascadeDeleteDomeinFile m
       case result of

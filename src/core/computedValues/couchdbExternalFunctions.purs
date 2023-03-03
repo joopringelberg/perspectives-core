@@ -215,20 +215,16 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
 -- | Load the acompanying instances, too.
 -- | Notice that the modelNames can be both an old style modelname or a new style modelname.
 -- | This function is applied with `callEffect`. Accordingly, it will get the ContextInstance of the Action as second parameter.
-addModelToLocalStore :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
-addModelToLocalStore modelNames _ = addModelsToLocalStore_ modelNames
-
--- Elements of modelnames can be both an old style modelname or a new style modelname.
-addModelsToLocalStore_ :: Array String -> MonadPerspectivesTransaction Unit
-addModelsToLocalStore_ modelnames = for_ modelnames ((flip addModelToLocalStore' true) <<< DomeinFileId)
+addModelToLocalStore_ :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
+addModelToLocalStore_ modelNames _ = for_ modelNames ((flip addModelToLocalStore' true) <<< DomeinFileId)
 
 addModelToLocalStore' :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore' dfid@(DomeinFileId domeinFileName) originalLoad = if test newModelRegex domeinFileName 
-  then addModelToLocalStore_newStyle dfid originalLoad
+  then addModelToLocalStore dfid originalLoad
   else throwError (error $ "Not a valid model name: " <> domeinFileName)
 
-addModelToLocalStore_newStyle :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
-addModelToLocalStore_newStyle (DomeinFileId modelname) originalLoad = do
+addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
+addModelToLocalStore (DomeinFileId modelname) originalLoad = do
   -- TODO. Hier zit een denkfout. Het model is nog niet lokaal. Dus we moeten de modelUri omzetten naar een URL.
   -- Oftewel, we moeten hier de modelname nog niet interpreteren als een resource.
   -- splits de modelUrl in de delen database en documentName zoals hieronder. We hebben ze nog een keer nodig.
@@ -677,7 +673,7 @@ addCredentials urls passwords _ = case head urls, head passwords of
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model://perspectives.domains#Couchdb$Models" {func: unsafeCoerce models, nArgs: 0}
-  , Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore_, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
   , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}

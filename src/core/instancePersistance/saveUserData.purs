@@ -49,17 +49,17 @@ module Perspectives.SaveUserData
   where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Control.Monad.Error.Class (throwError, try)
+import Control.Monad.Error.Class (try)
 import Control.Monad.State (lift)
 import Data.Array (concat, cons, delete, elemIndex, find, head, nub, union)
 import Data.Array.NonEmpty (singleton)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, for_, traverse)
-import Effect.Exception (error)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (values)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
 import Perspectives.Authenticate (sign)
@@ -70,16 +70,16 @@ import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findMeRequests, findResourceDependencies, findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
-import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.Identifiers (deconstructBuitenRol, typeUri2ModelUri, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, getProperty, getUnlinkedRoleInstances, isMe)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, getUnlinkedRoleInstances, isMe)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
@@ -485,11 +485,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
     loadModel fillerType = do
       mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (DomeinFileId <$> (typeUri2ModelUri $ unwrap fillerType))
       if (isNothing mDomeinFile)
-        then do
-          mmodelIdentification <- lift (filler ##> getProperty (EnumeratedPropertyType "ModelIdentification"))
-          case mmodelIdentification of
-            Nothing -> throwError (error $ "System error: no url found to load model for unknown type " <> (unwrap fillerType))
-            Just (Value modelIdentification) -> addModelToLocalStore [modelIdentification] filled
+        then addModelToLocalStore' (DomeinFileId $ unsafePartial fromJust (typeUri2ModelUri $ unwrap fillerType)) true
         else pure unit
 
 -- | If the type of the role has kind UserRole and is not the `me` role for its context,
