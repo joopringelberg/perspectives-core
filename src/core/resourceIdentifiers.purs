@@ -28,8 +28,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.NonEmpty (index)
 import Data.Map (lookup)
-import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.String (Pattern(..), stripPrefix)
+import Data.Maybe (Maybe(..), maybe)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -38,6 +37,7 @@ import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Guid as GUID
+import Perspectives.Identifiers (modelUri2ModelUrl)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
 import Perspectives.Representation.TypeIdentifiers (ResourceType)
@@ -49,6 +49,7 @@ import Perspectives.Sync.Transaction (Transaction(..))
 RESOURCE IDENTIFIYING SCHEMES
 This module is about identifiers for context- and role instances, collectively called _resources_.  It also covers DomeinFiles,
 which are resources of another kind. 
+NOTICE that this is not about DomeinFiles in repositories!
 This INCLUDES public resource identifiers: they are in the Remote scheme.
 However, it is NOT about type identifiers.
 
@@ -129,6 +130,7 @@ type LocalModelName = String
 -- | def:0083caf8_6c12_4905_a7ce_1b10a40f0ad8
 -- | loc:secretdatabase#0083caf8_6c12_4905_a7ce_1b10a40f0ad8
 -- | rem:https://perspectives.domains/cw_perspectives_domains/#0083caf8_6c12_4905_a7ce_1b10a40f0ad8
+-- | model://perspectives.domains#System
 data DecomposedResourceIdentifier = 
     Default TRANS.DbName Guid 
   | Local TRANS.DbName Guid 
@@ -182,7 +184,11 @@ parseResourceIdentifier resId =
           Just remMatches -> case index remMatches 1, index remMatches 2 of 
             Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") (url <> "_write/") g
             _, _ -> throwError (error $ "Cannot parse this as a Public resource identifier: " <> resId)
-        "model" -> getSystemIdentifier >>= \sysId -> pure $ Model (sysId <> "_models") (unsafePartial fromJust $ stripPrefix (Pattern "//") rest)
+        "model" -> do
+          sysId <- getSystemIdentifier
+          {documentName} <- pure $ unsafePartial modelUri2ModelUrl resId
+          pure $ Model (sysId <> "_models") documentName
+        -- "model" -> getSystemIdentifier >>= \sysId -> pure $ Model (sysId <> "_models") (unsafePartial fromJust $ stripPrefix (Pattern "//") (rest <> ".json"))
         -- rest is nu //perspectives.domains#System. Haal '//' eraf, maak er een Local van met default database voor modellen.
         _ -> throwError (error $ "Unknown resource identifier scheme: " <> resId)
       _, _ -> throwError (error $ "Cannot parse this resource identifier: " <> resId)
@@ -227,7 +233,7 @@ writeUrl_ (Default dbName _) = dbName
 writeUrl_ (Local dbName _) = dbName
 writeUrl_ (Remote _ dbName _) = dbName
 writeUrl_ (Public _ dbName _) = dbName
-writeUrl_ (Model _ dbName) = dbName
+writeUrl_ (Model dbName _) = dbName
 
 -- | Pouchdb constructs a database accessor object from the identifier returned from 
 -- | this ResourceIdentifier, that can be written to.

@@ -89,21 +89,21 @@ isModelUri = isJust <<< match newModelRegex
 -- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
 -- | to:
 -- |    { repositoryUrl: https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}
--- |    , documentName: LocalModelName.json}
+-- |    , documentName: {subdomains-with-underscores}_{authority-with-underscores}#{LocalModelName}.json}
 -- | When concatenated with a forward slash in between, those two parts form:
 -- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{LocalModelName}.json
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
 modelUri2ModelUrl :: Partial => String -> {repositoryUrl :: String, documentName :: String}
 modelUri2ModelUrl s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
-    (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
+    (authority :: String) = fromJust $ fromJust $ index matches 1
     (localModelName :: String) = fromJust $ fromJust $ index matches 2
-    (namespaceParts :: Array String) = split (Pattern ".") hierarchicalNamespace
+    (namespaceParts :: Array String) = split (Pattern ".") authority
     {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in
     { repositoryUrl: "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
-    , documentName: localModelName <> ".json"}
+    , documentName: (intercalate "_" namespaceParts) <> "-" <>  localModelName <> ".json"}
 
 -----------------------------------------------------------
 -- MODEL URI TO REPOSITORY URL
@@ -117,8 +117,8 @@ modelUri2ModelUrl s = let
 modelUri2ModelRepository :: Partial => String -> String
 modelUri2ModelRepository s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
-    (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
-    (namespaceParts :: Array String) = split (Pattern ".") hierarchicalNamespace
+    (authority :: String) = fromJust $ fromJust $ index matches 1
+    (namespaceParts :: Array String) = split (Pattern ".") authority
     {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in
@@ -136,8 +136,8 @@ modelUri2ModelRepository s = let
 modelUri2InstancesStore :: Partial => String -> String
 modelUri2InstancesStore s = let
     (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
-    (hierarchicalNamespace :: String) = fromJust $ fromJust $ index matches 1
-    (namespaceParts :: Array String) = split (Pattern ".") hierarchicalNamespace
+    (authority :: String) = fromJust $ fromJust $ index matches 1
+    (namespaceParts :: Array String) = split (Pattern ".") authority
     {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in

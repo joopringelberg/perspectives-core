@@ -260,8 +260,9 @@ saveEntiteit' entId mentiteit = ensureAuthentication (Resource $ unwrap entId) $
   pure entiteit'
 
 -- | Updates the revision in cache (no change to the version in database).
+-- | Version is taken from the local models database, not from the repository!
 updateRevision :: forall a i. Persistent a i => i -> MonadPerspectives Unit
 updateRevision entId = do
-  dbName <- dbLocalName entId
-  revision <- retrieveDocumentVersion dbName (unwrap entId)
+  {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
+  revision <- retrieveDocumentVersion database documentName
   setRevision entId revision

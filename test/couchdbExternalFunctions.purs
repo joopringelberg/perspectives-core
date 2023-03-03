@@ -52,7 +52,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     -- logShow models
     liftAff $ assert "There should be some models" (length models > 0)
 
-  test "upload model:Serialise to repository from files" $ runP do
+  testOnly "upload model://perspectives.domains#Serialise to repository from files" $ runP do
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     errs <- loadCompileAndCacheArcFile' "serialise" modelDirectory
     if null errs
@@ -62,7 +62,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#Serialise")
       else liftAff $ assert ("There are instance- or model errors for model:Serialise: " <> show errs) false
 
-  test "upload model:Sensor to repository from files" $ runP do
+  testOnly "upload model://perspectives.domains#Sensor to repository from files" $ runP do
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     errs <- loadCompileAndCacheArcFile' "sensor" modelDirectory
     if null errs
@@ -72,7 +72,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#Sensor")
       else liftAff $ assert ("There are instance- or model errors for perspectives.domains#Sensor: " <> show errs) false
 
-  test "upload model:Couchdb to repository from files" $ runP do
+  testOnly "upload model://perspectives.domains#Couchdb to repository from files" $ runP do
     -- Add a password for "https://localhost:6984/"
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     errs <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
@@ -82,7 +82,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#Couchdb")
       else liftAff $ assert ("There are instance- or model errors for perspectives.domains#Couchdb: " <> show errs) false
 
-  test "upload model:Utilities to repository from files" $ runP do
+  testOnly "upload model://perspectives.domains#Utilities to repository from files" $ runP do
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     errs <- loadCompileAndCacheArcFile' "utilities" modelDirectory
     if null errs
@@ -91,7 +91,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#Utilities")
       else liftAff $ assert ("There are instance- or model errors for perspectives.domains#Utilities: " <> show errs) false
 
-  test "upload model:System to repository from files" $ runP do
+  testOnly "upload model://perspectives.domains#System to repository from files" $ runP do
     -- Add a password for "https://localhost:6984/"
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
@@ -104,13 +104,13 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       then uploadToRepository (DomeinFileId "model://perspectives.domains#System")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#System: " <> show errs) false
 
-  test "upload model://perspectives.domains#Parsing to repository from files" $ runP do
+  testOnly "upload model://perspectives.domains#Parsing to repository from files" $ runP do
     errs <- loadCompileAndCacheArcFile' "parsing" modelDirectory
     if null errs
       then uploadToRepository (DomeinFileId "model://perspectives.domains#Parsing")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#Parsing: " <> show errs) false
 
-  test "upload model:perspectives.domains#BodiesWithAccounts to repository from files (without testuser)" $ runP do
+  testOnly "upload model:perspectives.domains#BodiesWithAccounts to repository from files (without testuser)" $ runP do
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
@@ -152,7 +152,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#ModelManagement")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#ModelManagement: " <> show errs) false
 
-  test "upload model:BrokerServices to repository from files (without testuser)" $ runP do
+  test "upload model://perspectives.domains#BrokerServices to repository from files (without testuser)" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "serialise" modelDirectory
@@ -165,7 +165,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#BrokerServices")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#BrokerServices: " <> show errs) false
 
-  test "upload model:SimpleChat to repository from files" $ runP do
+  test "upload model://perspectives.domains#SimpleChat to repository from files" $ runP do
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
