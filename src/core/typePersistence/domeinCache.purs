@@ -119,9 +119,9 @@ tryRetrieveDomeinFile modelUri = catchError (Just <$> (getPerspectEntiteit (Dome
 type DatabaseName = String
 
 saveCachedDomeinFile :: DomeinFileId -> MonadPerspectives DomeinFile
-saveCachedDomeinFile dfid@(DomeinFileId domeinFileName) = do
+saveCachedDomeinFile dfid = do
   updateRevision dfid
-  saveEntiteit $ DomeinFileId ("model://" <> domeinFileName)
+  saveEntiteit dfid
 
 -- | Either create or modify the DomeinFile in couchdb. Caches.
 -- | Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
