@@ -106,11 +106,11 @@ psp ln = "model:Perspectives$" <> ln
 -----------------------------------------------------------
 -- SYSTEM AND USER
 -----------------------------------------------------------
--- | Returns a Perspectives Identifier of the form "model:User$<systemIdentifier>$User".
+-- | Returns a Perspectives Identifier of the form "def:#<systemIdentifier>$User".
 getUserIdentifier :: MonadPerspectives String
 getUserIdentifier = getMySystem >>= pure <<< flip append "$User"
 
--- | Returns a Perspectives Identifier of the form "def:<guid>"
--- | To be more precise: "def:<SystemIdentifier>"
+-- | Returns a Perspectives Identifier of the form "def:#<guid>"
+-- | To be more precise: "def:#<SystemIdentifier>"
 getMySystem :: MonadPerspectives String
-getMySystem = getSystemIdentifier >>= \sysId -> pure $ "def:" <> sysId
+getMySystem = getSystemIdentifier >>= \sysId -> pure $ "def:#" <> sysId

@@ -25,10 +25,10 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Trans.Class (lift)
 import Data.Array.NonEmpty (index)
 import Data.Map (lookup)
 import Data.Maybe (Maybe(..), maybe)
+import Data.String (drop)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -90,14 +90,19 @@ ELABORATION OF THE VARIOUS SCHEMES
 DEFAULT SCHEME
 Identifiers following this scheme point to resources stored in the PDR's default resource store. 
 Currently, this is implemented as a store accessible through Pouchdb, named <userID>_entities.
+For example, if the system instance name is "dev1", it is identified by def:#dev1
 
 LOCAL SCHEME
 The local scheme allows us to store resources in _another_ database than the default resource store, albeit locally 
 (i.e. through Pouchdb with a non-url database name).
+For example, a bank account role kept safe in a separate local database where the guid would be "myAccount" would be represented with 
+loc:mybankingstuff#myAccount
 
 REMOTE SCHEME
 The remote scheme allows us to fetch and store resources through some REST interface. 
 The URL represents the endpoint where we fetch and store resources. The resources themselves are stored using the <guid> part as key.
+Same bank account role example but now stored with the bank:
+rem:https://mybank.com/customerdata#myAccount
 
 PUBLIC SCHEME
 The public scheme is just like the remote scheme. However, is is used exclusively to publish resources in a public Umwelt, or
@@ -163,10 +168,10 @@ parseResourceIdentifier resId =
     Nothing -> throwError (error $ "Cannot parse this resource identifier: " <> resId)
     Just matches -> case index matches 1, index matches 2 of 
       Just (Just scheme), Just (Just rest) -> case scheme of 
-        -- def:guid
+        -- def:#guid
         "def" -> do
           sysId <- getSystemIdentifier
-          pure $ Default (sysId <> "_entities") rest
+          pure $ Default (sysId <> "_entities") (drop 1 rest)
         -- loc:dbname#guid
         "loc" -> case match locRegex rest of
           Nothing -> throwError (error $ "Cannot parse this as a Local resource identifier: " <> resId) 
@@ -270,23 +275,29 @@ resourceIdentifier2WriteDocLocator resId = do
 -- | Such identifiers are only ever created when processing a Transaction for a publishing Proxy role.
 createResourceIdentifier :: ResourceType -> MonadPerspectivesTransaction ResourceIdentifier
 createResourceIdentifier ctype = do
-  mstorageScheme <- gets \(Transaction{typeToStorage}) -> lookup ctype typeToStorage 
   g <- show <$> liftEffect GUID.guid
+  createResourceIdentifier' ctype g  
+
+-- | This function never creates an identifier in the Public scheme.
+-- | Such identifiers are only ever created when processing a Transaction for a publishing Proxy role.
+createResourceIdentifier' :: ResourceType -> String -> MonadPerspectivesTransaction ResourceIdentifier
+createResourceIdentifier' ctype g = do
+  mstorageScheme <- gets \(Transaction{typeToStorage}) -> lookup ctype typeToStorage 
   case mstorageScheme of
-    Nothing -> createDefaultIdentifier g
-    Just (TRANS.Default dbName) -> pure $ "def:" <> dbName <> "#" <> g
-    Just (TRANS.Local dbName) -> createLocalIdentifier dbName g
-    Just (TRANS.Remote url _) -> createRemoteIdentifier url g
+    Nothing -> createDefaultIdentifier
+    Just (TRANS.Default _) -> pure $ "def:#" <> g
+    Just (TRANS.Local dbName) -> createLocalIdentifier dbName
+    Just (TRANS.Remote url _) -> createRemoteIdentifier url
 
   where
-    createDefaultIdentifier :: Guid -> MonadPerspectivesTransaction ResourceIdentifier
-    createDefaultIdentifier g = (lift getSystemIdentifier) >>= \dbName -> pure ("def:" <> dbName <> "#" <> g)
+    createDefaultIdentifier :: MonadPerspectivesTransaction ResourceIdentifier
+    createDefaultIdentifier = pure ("def:#" <> g)
 
-    createLocalIdentifier :: TRANS.DbName -> Guid -> MonadPerspectivesTransaction ResourceIdentifier
-    createLocalIdentifier dbName g = pure ("loc:" <> dbName <> "#" <> g)
+    createLocalIdentifier :: TRANS.DbName -> MonadPerspectivesTransaction ResourceIdentifier
+    createLocalIdentifier dbName = pure ("loc:" <> dbName <> "#" <> g)
 
-    createRemoteIdentifier :: TRANS.Url -> Guid -> MonadPerspectivesTransaction ResourceIdentifier
-    createRemoteIdentifier url g = pure ("rem:" <> url <> "#" <> g)
+    createRemoteIdentifier :: TRANS.Url -> MonadPerspectivesTransaction ResourceIdentifier
+    createRemoteIdentifier url = pure ("rem:" <> url <> "#" <> g)
 
 -----------------------------------------------------------
 -- GET THE SCHEME

@@ -89,7 +89,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
-import Perspectives.ResourceIdentifiers (createResourceIdentifier)
+import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier')
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -362,7 +362,8 @@ addModelToLocalStore (DomeinFileId modelname) originalLoad = do
     initSystem :: MonadPerspectivesTransaction Unit
     initSystem = do
       -- Create the model instance
-      cid <- createResourceIdentifier (CType $ ContextType theSystem)
+      sysId <- lift getSystemIdentifier
+      cid <- createResourceIdentifier' (CType $ ContextType theSystem) sysId
       r <- runExceptT $ constructEmptyContext 
         (ContextInstance cid)
         theSystem
@@ -381,7 +382,7 @@ addModelToLocalStore (DomeinFileId modelname) originalLoad = do
             (identifier system)
             (EnumeratedRoleType sysUser)
             0
-            (RoleInstance (identifier_ system <> "$" <> (typeUri2LocalName_ sysUser) <> "_0000"))
+            (RoleInstance (identifier_ system <> "$" <> (typeUri2LocalName_ sysUser)))
           lift $ void $ saveEntiteit_ (identifier me) (changeRol_isMe me true)
           -- The user role is not filled.
           -- And now add to the context.
