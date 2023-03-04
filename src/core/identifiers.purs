@@ -349,13 +349,11 @@ deconstructUserName = getFirstMatch userNameRegEx
 -----------------------------------------------------------
 -- | From a well-formed identifier of a ContextInstance, construct the identifier of its External Role.
 buitenRol :: String -> String
-buitenRol s = if isModelUri s
-  then s <> "$_External"
-  else s <> "$External"
+buitenRol s = s <> "$External"
 
--- | Returns the identifier minus the "$External" or "$_External" part.
+-- | Returns the identifier minus the "$External" part.
 deconstructBuitenRol :: String -> String
-deconstructBuitenRol s = replaceAll (Pattern "$External") (Replacement "")(replaceAll (Pattern "$_External") (Replacement "") s)
+deconstructBuitenRol s = replaceAll (Pattern "$External") (Replacement "") s
 
 isExternalRole :: String -> Boolean
 isExternalRole n = isJust $ stripSuffix (Pattern "External") n

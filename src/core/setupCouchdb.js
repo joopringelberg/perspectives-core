@@ -3,7 +3,7 @@
 
 exports.modelDescriptions = (function (doc)
 {
-  emit(doc._id, doc.contents.modelDescription);
+  emit(doc.contents._id, doc.contents.modelDescription);
 }).toString();
 
 exports.roleView = (function (doc)
@@ -14,7 +14,7 @@ exports.roleView = (function (doc)
     doc.contents.allTypes.forEach(
       function(typeId)
       {
-        emit(typeId, doc._id);
+        emit(typeId, doc.contents._id);
       }
     );
   }
@@ -26,13 +26,13 @@ exports.pendingInvitations = (function(doc)
 {
   if (doc.contents.properties["model:System$Invitation$External$Message"])
   {
-    emit(doc._id, doc._id);
+    emit(doc.contents._id, doc.contents._id);
   }
 }).toString();
 
 exports.contextView = (function (doc)
 {
-  emit(doc.contents.pspType, doc._id);
+  emit(doc.contents.pspType, doc.contents._id);
 }).toString();
 
 // We want to filter the result on two criteria:
@@ -46,7 +46,7 @@ exports.roleFromContextView = (function (doc)
      doc.contents.allTypes.forEach(
        function(typeId)
        {
-         emit([typeId, doc.contents.context], doc._id);
+         emit([typeId, doc.contents.context], doc.contents._id);
        }
      );
    }
