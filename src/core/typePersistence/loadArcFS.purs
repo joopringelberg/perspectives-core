@@ -87,7 +87,7 @@ loadAndCompileArcFile_ filePath = catchError
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
       (Right ctxt) -> do
         -- liftEffect $ log ((show ctxt) <> "\n\n\n")
-        (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord empty empty Nil
+        (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt) defaultDomeinFileRecord empty empty Nil
         case result of
           (Left e) -> pure $ Left e
           (Right (DomeinFile dr'@{_id})) -> do

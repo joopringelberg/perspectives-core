@@ -67,7 +67,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- (DomeinFile dr) <- pure defaultDomeinFile
-  --       evalPhaseTwo (traverseDomain ctxt "model:") >>=
+  --       evalPhaseTwo (traverseDomain ctxt) >>=
   --       case _ of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
@@ -91,7 +91,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- (DomeinFile dr) <- pure defaultDomeinFile
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -108,7 +108,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- logShow ctxt
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -123,7 +123,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
         -- logShow ctxt
         evalPhaseTwo (do
           addAllExternalFunctions
-          (traverseDomain ctxt "model:")) >>=
+          (traverseDomain ctxt)) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr'@{calculatedRoles})) -> do
@@ -145,7 +145,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -163,7 +163,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -181,7 +181,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -196,7 +196,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -213,7 +213,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -228,7 +228,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -245,7 +245,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -260,7 +260,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -279,7 +279,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -306,7 +306,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt) -> do
         -- log "Entering phase two"
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr)) -> do
@@ -324,7 +324,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- logShow ctxt
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -350,7 +350,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right dom) -> do
         -- logShow dom
-        evalPhaseTwo (traverseDomain dom "model:") >>=
+        evalPhaseTwo (traverseDomain dom) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -363,7 +363,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left (e :: PerspectivesError)) -> do
   --           -- logShow e
   --           assert (show e) true
@@ -378,7 +378,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- logShow ctxt
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) true
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -394,7 +394,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- logShow ctxt
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) true
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -429,7 +429,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- logShow ctxt
   --
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) true
   --         (Right (DomeinFile dr')) -> do
   --           -- logShow dr'
@@ -499,7 +499,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -517,7 +517,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left (NotWellFormedName pos _)) -> assert "The position in the error message should be" (pos == ArcPosition {line: 2, column: 11})
             otherwise -> assert "The name of the aspect is not well-formed and that should be detected." false
@@ -528,7 +528,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -544,7 +544,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr'@{enumeratedRoles})) -> do
@@ -560,7 +560,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr'@{enumeratedRoles})) -> do
@@ -573,7 +573,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- logShow ctxt
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr'@{actions})) -> do
   --           -- logShow dr'
@@ -592,7 +592,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- logShow ctxt
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr'@{actions})) -> do
   --           -- logShow dr'
@@ -611,7 +611,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   --     (Left e) -> assert (show e) false
   --     (Right ctxt@(ContextE{id})) -> do
   --       -- logShow ctxt
-  --       case evalPhaseTwo (traverseDomain ctxt "model:") of
+  --       case evalPhaseTwo (traverseDomain ctxt) of
   --         (Left e) -> assert (show e) false
   --         (Right (DomeinFile dr'@{actions})) -> do
   --           -- logShow dr'
@@ -635,7 +635,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        evalPhaseTwo (traverseDomain ctxt "model:") >>=
+        evalPhaseTwo (traverseDomain ctxt) >>=
           case _ of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do

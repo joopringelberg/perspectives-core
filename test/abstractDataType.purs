@@ -33,7 +33,7 @@ theSuite = suite  "Perspectives.Representation.ADT" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do

@@ -64,10 +64,10 @@ import Perspectives.Representation.View (View(..)) as VIEW
 import Prelude (bind, discard, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
 
 -------------------
-traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
-traverseDomain c ns = do
+traverseDomain :: ContextE -> PhaseTwo DomeinFile
+traverseDomain c = do
   -- Traverse the model parse tree and construct a DomeinFileRecord in PhaseTwoState.
-  (Context {_id:namespace}) <- traverseContextE c ns
+  (Context {_id:namespace}) <- traverseContextE c "domain"
   domeinFileRecord <- getDF
   pure $ DomeinFile (domeinFileRecord 
     { _id = unwrap namespace
@@ -80,7 +80,8 @@ traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
 traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
   contextIdentifier <- pure $ modelName id
-  context <- pure $ defaultContext contextIdentifier id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos public
+  -- Notice that we use the test ns == "domain" to establish that this context is a domain, in which case the surrounding context is Nothing.
+  context <- pure $ defaultContext contextIdentifier id kindOfContext (if ns == "domain" then Nothing else (Just ns)) pos public
   withNamespaces
     contextParts
     do

@@ -64,7 +64,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr)) -> do
@@ -85,7 +85,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -106,7 +106,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -124,7 +124,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -146,7 +146,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -168,7 +168,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -190,7 +190,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -207,7 +207,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -227,7 +227,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -252,7 +252,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -268,7 +268,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -307,7 +307,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -328,7 +328,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -351,7 +351,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert ("Parser error: " <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
@@ -381,7 +381,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert (show e) false
             (Right (DomeinFile dr')) -> do
@@ -402,7 +402,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
@@ -428,7 +428,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
@@ -454,7 +454,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
@@ -481,7 +481,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
@@ -512,7 +512,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r state) ->
           case r of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
@@ -841,7 +841,7 @@ expectErrorX theTest testName modelText resultTester = do
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r' state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r' state) ->
           case r' of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
@@ -871,7 +871,7 @@ fileTestOnly testName fileName =
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (traverseDomain ctxt "model:") >>= \(Tuple r' state) ->
+        runPhaseTwo' (traverseDomain ctxt) >>= \(Tuple r' state) ->
           case r' of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do
@@ -893,7 +893,7 @@ domainTestX theTest testName modelText domainTester = theTest testName do
       (Left e) -> assert ("Parser error:" <> show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        runPhaseTwo' (addAllExternalFunctions *> traverseDomain ctxt "model:") >>= \(Tuple r' state) ->
+        runPhaseTwo' (addAllExternalFunctions *> traverseDomain ctxt) >>= \(Tuple r' state) ->
           case r' of
             (Left e) -> assert ("PhaseTwo error:" <> show e) false
             (Right (DomeinFile dr')) -> do

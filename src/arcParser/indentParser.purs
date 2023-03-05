@@ -115,9 +115,7 @@ inSubContext :: forall a. String -> IP a -> IP a
 inSubContext subContextName p = do
   oldState@{currentContext} <- getArcParserState
   void $ modifyArcParserState \s -> s {currentContext = case unwrap currentContext of
-    "" -> if test newModelRegex subContextName 
-      then ContextType subContextName
-      else ContextType ("model:" <> subContextName)
+    "" -> ContextType subContextName
     m -> ContextType (m <> "$" <> subContextName)}
   -- getCurrentContext >>= \c -> log ("Entered context " <> show c)
   result <- p
