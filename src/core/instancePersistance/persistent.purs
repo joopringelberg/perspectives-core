@@ -132,7 +132,7 @@ postDatabaseName :: forall f. MonadPouchdb f String
 postDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_post")
 
 modelDatabaseName :: MonadPerspectives String
-modelDatabaseName = dbLocalName (DomeinFileId "") -- The argument is ignored.
+modelDatabaseName = dbLocalName (DomeinFileId "model://perspectives.domains#System")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit
