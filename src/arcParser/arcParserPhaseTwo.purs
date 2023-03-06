@@ -102,7 +102,7 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
   where
 
     modelName :: String -> String
-    modelName contextId = if ns == "model:" && test newModelRegex contextId 
+    modelName contextId = if ns == "domain" && test newModelRegex contextId 
       then contextId
       else addNamespace ns contextId
 
@@ -194,7 +194,7 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
       _, _ -> c
 
 addNamespace :: String -> String -> String
-addNamespace ns' ln = if ns' == "model:" then (ns' <> ln) else (ns' <> "$" <> ln)
+addNamespace ns' ln = if ns' == "domain" then ln else (ns' <> "$" <> ln)
 
 -- | Traverse the members of the RoleE AST type to construct a new Role type
 -- | and insert it into a DomeinFileRecord.
