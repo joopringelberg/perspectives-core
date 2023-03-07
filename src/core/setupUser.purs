@@ -40,7 +40,7 @@ modelDirectory = "./src/model"
 setupUser :: MonadPerspectives Unit
 setupUser = do
   -- First, upload model:System to perspect_models.
-  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore' (DomeinFileId systemModelName) true)
+  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore' (DomeinFileId systemModelName))
   entitiesDatabaseName >>= setRoleView
   entitiesDatabaseName >>= setRoleFromContextView
   entitiesDatabaseName >>= setPendingInvitationView

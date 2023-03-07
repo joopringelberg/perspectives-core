@@ -23,7 +23,7 @@
 module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, modify) as AA
-import Control.Monad.Error.Class (catchError, throwError, try)
+import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Reader (lift, runReaderT)
 import Data.Array (filterA, head, length, null, reverse, sort, unsafeIndex)
 import Data.Foldable (for_)
@@ -33,31 +33,24 @@ import Data.Traversable (for, traverse)
 import Effect.Aff.AVar (new, put, take, tryRead)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
-import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), MPT, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
-import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
-import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (exists')
 import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, roleType)
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Models (modelsInUseRole)
-import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Names (getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistent (getDomeinFile, tryRemoveEntiteit)
-import Perspectives.PerspectivesState (addBinding, publicRepository, pushFrame, restoreFrame, transactionFlag)
+import Perspectives.Persistent (tryRemoveEntiteit)
+import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame, transactionFlag)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getMyType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), DomeinFileId, EnumeratedRoleType(..), RoleType(..))
@@ -347,19 +340,7 @@ loadModelIfMissing dfId = do
   mDomeinFile <- lift $ tryRetrieveDomeinFile dfId
   if isNothing mDomeinFile
     then do
-      repositoryUrl <- lift publicRepository
-      addModelToLocalStore dfId true
-      -- Now create a binding of the model description in sys:PerspectivesSystem$ModelsInUse.
-      (lift $ try $ getDomeinFile dfId) >>=
-        handleDomeinFileError "loadModelIfMissing"
-        \(DomeinFile{modelDescription}) -> do
-          mySys <- lift $ getMySystem
-          case modelDescription of
-            Nothing -> pure unit
-            Just (PerspectRol{_id}) -> void $ createAndAddRoleInstance
-              modelsInUseRole
-              mySys
-              (RolSerialization{id: Nothing, properties: PropertySerialization empty, binding: Just $ unwrap _id})
+      addModelToLocalStore dfId
     else pure unit
 
 -----------------------------------------------------------

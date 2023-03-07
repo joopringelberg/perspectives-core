@@ -106,7 +106,7 @@ withModel' m@(DomeinFileId id) a = do
   mcdbUrl <- getCouchdbBaseURL
   case mcdbUrl of
     Just cdbUrl -> do
-      void $ runSterileTransaction (addModelToLocalStore' (DomeinFileId $ cdbUrl <> "repository/" <> id) true)
+      void $ runSterileTransaction (addModelToLocalStore' (DomeinFileId $ cdbUrl <> "repository/" <> id))
       result <- try a
       void $ cascadeDeleteDomeinFile m
       case result of

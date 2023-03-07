@@ -52,8 +52,8 @@ theSuite = suite "Perspectives.Instances.SerialiseAsJson" do
         (channelSerialiation :: Array ContextSerialization) <- serialiseAsJsonFor p channel
         -- log $ unsafeStringify channelSerialiation
         -- log $ "\n" <> (prettyPrint channelSerialiation)
-        liftAff $ assert "The context 'model:User$test' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$test") channelSerialiation)
-        liftAff $ assert "The context 'model:User$MyTestChannel' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == "model:User$MyTestChannel") channelSerialiation)
+        liftAff $ assert "The context 'model:User$test' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == Just "model:User$test") channelSerialiation)
+        liftAff $ assert "The context 'model:User$MyTestChannel' should have been serialised" (isJust $ findIndex (\(ContextSerialization{id}) -> id == Just "model:User$MyTestChannel") channelSerialiation)
         encodedChannelSerialization <- pure $ encode channelSerialiation
         case unwrap $ runExceptT (decode encodedChannelSerialization) of
           Left e -> liftAff $ assert "Encoded Array ContextSerialization should be decodable" false

@@ -486,7 +486,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
     loadModel fillerType = do
       mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (DomeinFileId <$> (typeUri2ModelUri $ unwrap fillerType))
       if (isNothing mDomeinFile)
-        then addModelToLocalStore' (DomeinFileId $ unsafePartial fromJust (typeUri2ModelUri $ unwrap fillerType)) true
+        then addModelToLocalStore' (DomeinFileId $ unsafePartial fromJust (typeUri2ModelUri $ unwrap fillerType))
         else pure unit
 
 -- | If the type of the role has kind UserRole and is not the `me` role for its context,

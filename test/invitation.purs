@@ -58,7 +58,7 @@ theSuite = suite "Invitation" do
             case unwrap $ runExceptT (parseJSON s >>= decode)  of
               Left (e :: MultipleErrors) -> liftAff $ assert ("Cannot decode serialization result: " <> show e) false
               Right (deserialised :: Array ContextSerialization) ->
-                case find (\(ContextSerialization{id}) -> id == "model:User$MyInvitation") deserialised of
+                case find (\(ContextSerialization{id}) -> id == Just "model:User$MyInvitation") deserialised of
                   Nothing -> liftAff $ assert "There should have been an instance named model:User$MyInvitation" false
                   otherwise -> pure unit
         getChannelId <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
@@ -90,7 +90,7 @@ theSuite = suite "Invitation" do
             case unwrap $ runExceptT (parseJSON s >>= decode)  of
               Left (e :: MultipleErrors) -> liftAff $ assert ("Cannot decode serialization result: " <> show e) false
               Right (deserialised :: Array ContextSerialization) ->
-                case find (\(ContextSerialization{id}) -> id == "model:User$MyChatInvitation") deserialised of
+                case find (\(ContextSerialization{id}) -> id == Just "model:User$MyChatInvitation") deserialised of
                   Nothing -> liftAff $ assert "There should have been an instance named model:User$MyChatInvitation" false
                   otherwise -> pure unit
         getChannelId <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"

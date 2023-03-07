@@ -94,7 +94,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Warning (PerspectivesWarning(..))
-import Prelude (Unit, bind, discard, eq, flip, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -198,7 +198,7 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
       void $ pure $ clearModelStates dfId
       -- Install the new model, taking care of outgoing InvertedQueries.
       -- TODO. As soon as model identifiers are URLs, do not concatenate the url to the modelName.
-      addModelToLocalStore' dfId false
+      addModelToLocalStore' dfId
       DomeinFile dfr <- lift $ getDomeinFile $ dfId
       -- Find all models in use.
       models' <- lift (Models.modelsInUse >>= traverse getDomeinFile)
@@ -211,22 +211,17 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
 
 -- | Retrieve the model(s) from the modelName(s) and add them to the local couchdb installation.
 -- | Load the dependencies first.
--- | Load the acompanying instances, too.
--- | Notice that the modelNames can be both an old style modelname or a new style modelname.
 -- | This function is applied with `callEffect`. Accordingly, it will get the ContextInstance of the Action as second parameter.
 addModelToLocalStore_ :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
-addModelToLocalStore_ modelNames _ = for_ modelNames ((flip addModelToLocalStore' true) <<< DomeinFileId)
+addModelToLocalStore_ modelNames _ = for_ modelNames (addModelToLocalStore' <<< DomeinFileId)
 
-addModelToLocalStore' :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
-addModelToLocalStore' dfid@(DomeinFileId domeinFileName) originalLoad = if test newModelRegex domeinFileName 
-  then addModelToLocalStore dfid originalLoad
+addModelToLocalStore' :: DomeinFileId -> MonadPerspectivesTransaction Unit
+addModelToLocalStore' dfid@(DomeinFileId domeinFileName) = if test newModelRegex domeinFileName 
+  then addModelToLocalStore dfid
   else throwError (error $ "Not a valid model name: " <> domeinFileName)
 
-addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
-addModelToLocalStore (DomeinFileId modelname) originalLoad = do
-  -- TODO. Hier zit een denkfout. Het model is nog niet lokaal. Dus we moeten de modelUri omzetten naar een URL.
-  -- Oftewel, we moeten hier de modelname nog niet interpreteren als een resource.
-  -- splits de modelUrl in de delen database en documentName zoals hieronder. We hebben ze nog een keer nodig.
+addModelToLocalStore :: DomeinFileId -> MonadPerspectivesTransaction Unit
+addModelToLocalStore (DomeinFileId modelname) = do
   {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl modelname
   df@(DomeinFile
   { _id
@@ -315,7 +310,7 @@ addModelToLocalStore (DomeinFileId modelname) originalLoad = do
   for_ referredModels \dfid -> do
     mmodel <- lift $ tryGetPerspectEntiteit dfid
     case mmodel of
-      Nothing -> addModelToLocalStore' dfid originalLoad
+      Nothing -> addModelToLocalStore' dfid
       Just _ -> pure unit
 
   -- Distribute the SeparateInvertedQueries over the other domains.

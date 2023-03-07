@@ -128,7 +128,7 @@ domain model://perspectives.domains#System
           row
             table StartContexts
               props (Name) verbs (Consult)
-        tab "User"
+        tab "User and Contacts"
           row
             form User
               props (FirstName, LastName) verbs (SetPropertyValue)
