@@ -443,7 +443,8 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
             (lift $ findBindingRequests filled) >>= addCorrelationIdentifiersToTransactie
 
             -- ISME, ME
-            if isMe then roleIsMe filled (rol_context filledRole) else pure unit
+            (EnumeratedRole{kindOfRole}) <- lift $ getEnumeratedRole (rol_pspType filledRole)
+            if isMe && kindOfRole == UserRole then roleIsMe filled (rol_context filledRole) else pure unit
 
             subject <- getSubject
             delta@(RoleBindingDelta r) <- pure $ RoleBindingDelta
@@ -601,7 +602,7 @@ changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filled
         else pure unit
 
       -- CURRENTUSER
-      -- True, iff filled bound the User of this System.
+      -- True, iff filled is bound the User of this System.
       filledIsMe <- lift $ isMe filledId
       if roleWillBeRemoved
         then if filledIsMe
@@ -629,8 +630,12 @@ changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filled
           else case mNewFiller of
             Nothing -> pure unit
             Just newFiller -> do
-              newFillerIsMe <- lift $ isMe newFiller
-              if newFillerIsMe
-                then roleIsMe filledId (rol_context filled) -- Set isMe of the role and set the role to Me of the context.
+              (EnumeratedRole{kindOfRole}) <- lift $ getEnumeratedRole (rol_pspType filled)
+              if kindOfRole == UserRole 
+                then do 
+                  newFillerIsMe <- lift $ isMe newFiller
+                  if newFillerIsMe
+                    then roleIsMe filledId (rol_context filled) -- Set isMe of the role and set the role to Me of the context.
+                    else pure unit
                 else pure unit
 
