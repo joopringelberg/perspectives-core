@@ -7,18 +7,34 @@ domain model://perspectives.domains#System
   use util for model://perspectives.domains#Utilities
 
   -- model:System (short for model://perspectives.domains#System) is booted in a unique way.
-  -- Other models rely on there being an instance of sys:PerspectivesSystem and a User role in it.
+  -- Other models rely on there being an instance of sys:PerspectivesSystem and a Installer role in it.
   -- That precondition obviously fails for this model.
   -- Consequently, we create both in code. 
   -- We also create their indexed names, so we can refer to them below.
+  -- Yet, we still have to create instances of IndexedRoles and IndexedContexts and provide the indexed names for them,
+  -- otherwise sys:Me and sys:MySystem will be lost as the initial session ends.
   -- The initialisation routine below therefore is somewhat simpler.
 
   on entry
-    do for sys:PerspectivesSystem$User
-      bind sys:MySystem >> extern to IndexedContexts in sys:MySystem
+    do for sys:PerspectivesSystem$Installer
+      letA
+        indexedcontext <- create role IndexedContexts in sys:MySystem
+        indexedrole <- create role IndexedRoles in sys:MySystem
+      in 
+        bind sys:MySystem >> extern to StartContexts in sys:MySystem
       -- NOTE that we should uncomment this role but cannot do so until this resource and its model is available. This is a Catch22 situation.
       -- bind publicrole https://perspectives.domains/cw_servers_and_repositories/perspectives_domains$External to BaseRepository in sys:MySystem
       -- Do we need to create an instance of a Manifest?
+
+        bind_ sys:MySystem >> extern to indexedcontext
+        -- TODO. Zonder kwalificatie zegt de compiler dat "Name" niet bestaat voor IndexedContexts. Maar er is een naamconflict met RootContext$Extern$Name
+        IndexedContexts$Name = sys:MySystem >> indexedName for indexedcontext
+        bind_ sys:Me to indexedrole
+        Name = sys:Me >> indexedName for indexedrole
+        -- Equivalently:
+        -- Name = "model://perspectives.domains#System$Me"
+
+  aspect user sys:PerspectivesSystem$Installer
 
   -- Used as model:System$RoleWithId$Id in the PDR code.
   thing RoleWithId
@@ -59,32 +75,27 @@ domain model://perspectives.domains#System
       view VolledigeNaam (FirstName, LastName)
       perspective on User
         defaults
-      perspective on ModelsInUse
-        defaults
-        --in object state
-        action Refresh
-          PerformUpdate = true
-        action RefreshWithDependencies
-          IncludingDependencies = true
-          PerformUpdate = true
-      perspective on IndexedContexts
+      -- perspective on ModelsInUse
+      --   defaults
+      --   --in object state
+      --   action Refresh
+      --     PerformUpdate = true
+      --   action RefreshWithDependencies
+      --     IncludingDependencies = true
+      --     PerformUpdate = true
+      perspective on StartContexts
         defaults
         action StopUsing
           remove context origin
-      -- OBSOLETE!?
-      perspective on IndexedContextOfModel
-        defaults
-      perspective on RootUsers
-        defaults
       perspective on Contacts
         props (FirstName, LastName) verbs (Consult)
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
-      perspective on Modellen
-        action StartUsing
-          callEffect cdb:AddModelToLocalStore( ModelIdentification )
-          bind origin to ModelsInUse in currentcontext
-        view Modellen$ModelPresentation verbs (Consult)
+      -- perspective on Modellen
+      --   action StartUsing
+      --     callEffect cdb:AddModelToLocalStore( ModelIdentification )
+      --     bind origin to ModelsInUse in currentcontext
+      --   view Modellen$ModelPresentation verbs (Consult)
       perspective on BasicModels
         props (ModelName, Description) verbs (Consult)
       perspective on BasicModelsInUse
@@ -100,13 +111,13 @@ domain model://perspectives.domains#System
         tab "SystemCaches"
           row
             form SystemCaches
-        tab "Manage models"
-          row
-            table Modellen
-              props (Name, Description) verbs (Consult)
-          row 
-            table ModelsInUse
-              props (Name) verbs (Consult)
+        -- tab "Manage models"
+        --   row
+        --     table Modellen
+        --       props (Name, Description) verbs (Consult)
+          -- row 
+          --   table ModelsInUse
+          --     props (Name) verbs (Consult)
         tab "Manage new models"
           row
             table BasicModels
@@ -115,7 +126,7 @@ domain model://perspectives.domains#System
               props (ModelIdentifier, Description) verbs (Consult)
         tab "Start contexts"
           row
-            table IndexedContexts
+            table StartContexts
               props (Name) verbs (Consult)
         tab "User"
           row
@@ -132,8 +143,14 @@ domain model://perspectives.domains#System
     user Contacts = filter (callExternal cdb:RoleInstances( "model://perspectives.domains#System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
     user Installer
-      perspective on IndexedContexts
+      perspective on StartContexts
         only (CreateAndFill)
+      perspective on IndexedContexts
+        only (Create, Fill)
+        props (IndexedContexts$Name) verbs (SetPropertyValue)
+      perspective on IndexedRoles
+        only (Create, Fill)
+        props (IndexedRoles$Name) verbs (SetPropertyValue)
 
     context BaseRepository filledBy ManifestCollection
 
@@ -144,56 +161,61 @@ domain model://perspectives.domains#System
         do for User
           callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelIdentifier )
 
-    -- OBSOLETE!? OF SPEELT SYNCHRONISATIE HIER EEN ROL?
-    context IndexedContextOfModel = ModelsInUse >> binding >> context >> IndexedContext
 
-    thing RootUsers = IndexedContexts >> binding >> context >> RootUser
+    -- All context types that have been declared to be 'indexed' have an instance that fills this role.
+    context IndexedContexts (mandatory) filledBy sys:RootContext
+      property Name (mandatory, String)
+
+    -- All role types that have been declared to be 'indexed' have an instance that fills this role.
+    thing IndexedRoles (relational)
+      property Name (mandatory, String)
+
 
     context Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
 
     -- This will become obsolete when we start using model:CouchdbManagement.
-    context Modellen = letE
-        showlibs <- extern >> ShowLibraries
-      in
-        filter callExternal cdb:Models() returns sys:Model$External with showlibs or (not IsLibrary)
-      view ModelPresentation (Description, Name)
+    -- context Modellen = letE
+    --     showlibs <- extern >> ShowLibraries
+    --   in
+    --     filter callExternal cdb:Models() returns sys:Model$External with showlibs or (not IsLibrary)
+    --   view ModelPresentation (Description, Name)
 
-    --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
-    context IndexedContexts (relational) filledBy sys:RootContext
+    --StartContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
+    context StartContexts (relational) filledBy sys:RootContext
 
     -- This will become obsolete when we start using model:CouchdbManagement.
-    context ModelsInUse (relational) filledBy Model
-      property PerformUpdate (Boolean)
-      property IncludingDependencies (Boolean)
-      property HasBeenInstalled (Boolean)
-      --on exit
-        --notify User
-          --"Model {origin >> binding >> ModelIdentification} has been removed completely."
-      state Update = PerformUpdate
-        on entry
-          do for User
-            callEffect cdb:UpdateModel( ModelIdentification, IncludingDependencies )
-            PerformUpdate = false
-            -- Updating without dependencies is the default.
-            IncludingDependencies = false
-          notify User
-            "Model {ModelIdentification} has been updated."
-      state NotInIndexedContexts = (not HasBeenInstalled) and exists (binding >> context >> IndexedContext >> filter binding with not exists binder IndexedContexts)
-        -- Create an entry in IndexedContexts if its model has been taken in use.
-        on entry
-          do for User
-            bind binding >> context >> IndexedContext >> binding to IndexedContexts
-            HasBeenInstalled = true
-          notify User
-            "{ binding >> ModelIdentification } added!"
-      state Dangles = (not exists binding >> context >> IndexedContext >> binding) and HasBeenInstalled
-        -- If the user has removed the App, this automatic action will clear away the corresponding entry in ModelsInuse.
-        -- We also remove the Model itself (the entry to the functionality).
-        on entry
-          do for User
-            remove context origin
-            callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelIdentification )
-      view ModelInUsePresentation (Description, Name, PerformUpdate)
+    -- context ModelsInUse (relational) filledBy Model
+    --   property PerformUpdate (Boolean)
+    --   property IncludingDependencies (Boolean)
+    --   property HasBeenInstalled (Boolean)
+    --   --on exit
+    --     --notify User
+    --       --"Model {origin >> binding >> ModelIdentification} has been removed completely."
+    --   state Update = PerformUpdate
+    --     on entry
+    --       do for User
+    --         callEffect cdb:UpdateModel( ModelIdentification, IncludingDependencies )
+    --         PerformUpdate = false
+    --         -- Updating without dependencies is the default.
+    --         IncludingDependencies = false
+    --       notify User
+    --         "Model {ModelIdentification} has been updated."
+    --   state NotInStartContexts = (not HasBeenInstalled) and exists (binding >> context >> IndexedContext >> filter binding with not exists binder StartContexts)
+    --     -- Create an entry in StartContexts if its model has been taken in use.
+    --     on entry
+    --       do for User
+    --         bind binding >> context >> IndexedContext >> binding to StartContexts
+    --         HasBeenInstalled = true
+    --       notify User
+    --         "{ binding >> ModelIdentification } added!"
+    --   state Dangles = (not exists binding >> context >> IndexedContext >> binding) and HasBeenInstalled
+    --     -- If the user has removed the App, this automatic action will clear away the corresponding entry in ModelsInuse.
+    --     -- We also remove the Model itself (the entry to the functionality).
+    --     on entry
+    --       do for User
+    --         remove context origin
+    --         callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelIdentification )
+    --   view ModelInUsePresentation (Description, Name, PerformUpdate)
 
     context PendingInvitations = callExternal cdb:PendingInvitations() returns sys:Invitation$External
 

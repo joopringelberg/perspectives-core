@@ -69,7 +69,7 @@ createChannelContext couchdbUrl channelName = case splitCouchdbUrl couchdbUrl of
   Nothing -> throwError $ error ("createChannelContext received couchdbUrl that is not well-formed: " <> couchdbUrl)
   Just (Tuple host port) -> do
     eChannel <- runExceptT $ constructContext (Just $ ENR $ EnumeratedRoleType privateChannel) $ ContextSerialization
-      { id: channelName
+      { id: Just channelName
       , prototype: Nothing
       , ctype: channel
       , rollen: fromFoldable [(Tuple channelInitiator $

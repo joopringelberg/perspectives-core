@@ -468,6 +468,12 @@ compileSimpleStep currentDomain s@(Extern pos) = do
       pure $ SQD currentDomain (QF.DataTypeGetter ExternalRoleF) (RDOM rts) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
+compileSimpleStep currentDomain s@(IndexedName pos) = do
+  case currentDomain of
+    (CDOM c) -> pure $ SQD currentDomain (QF.DataTypeGetter IndexedContextName) (VDOM PString Nothing) True False
+    (RDOM r) -> pure $ SQD currentDomain (QF.DataTypeGetter IndexedRoleName) (VDOM PString Nothing) True False
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
 -- compileSimpleStep currentDomain (CreateContext pos ident) = do
 --   -- If `ident` is not qualified, try to qualify it in the Domain.
 --   (qcontextType :: ContextType) <- if isTypeUri ident

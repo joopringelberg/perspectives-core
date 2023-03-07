@@ -125,6 +125,8 @@ simpleStep = try
   <|>
   Simple <$> (Extern <$> (getPosition <* reserved "extern"))
   <|>
+  Simple <$> (IndexedName <$> (getPosition <* reserved "indexedName"))
+  <|>
   Simple <$> (Value <$> getPosition <*> pure PDate <*> (parseDate >>= pure <<< show))
   <|>
   Simple <$> (Value <$> getPosition <*> pure PString <*> token.stringLiteral)
@@ -304,6 +306,7 @@ startOf stp = case stp of
     startOfSimple (Binder p _ _) = p
     startOfSimple (Context p) = p
     startOfSimple (Extern p) = p
+    startOfSimple (IndexedName p) = p
     startOfSimple (CreateEnumeratedRole p _) = p
     startOfSimple (SequenceFunction p _) = p
     startOfSimple (Identity p) = p
@@ -343,6 +346,7 @@ endOf stp = case stp of
     endOfSimple (Binder (ArcPosition{line, column}) _ _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
+    endOfSimple (IndexedName (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length (show fname)}
     endOfSimple (Identity (ArcPosition{line, column})) = ArcPosition{line, column: column + 4}

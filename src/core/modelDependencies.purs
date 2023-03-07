@@ -69,16 +69,16 @@ notificationMessage = "model://perspectives.domains#System$ContextWithNotificati
 -- MODEL
 ------------------------------------------------------------------------------------
 indexedRole :: String
-indexedRole = "model://perspectives.domains#System$Model$IndexedRole"
+indexedRole = "model://perspectives.domains#System$PerspectivesSystem$IndexedRoles"
 
 indexedRoleName :: String
-indexedRoleName = "model://perspectives.domains#System$Model$IndexedRole$Name"
+indexedRoleName = "model://perspectives.domains#System$PerspectivesSystem$IndexedRoles$Name"
 
 indexedContext :: String
-indexedContext = "model://perspectives.domains#System$Model$IndexedContext"
+indexedContext = "model://perspectives.domains#System$PerspectivesSystem$IndexedContexts"
 
 indexedContextName :: String
-indexedContextName = "model://perspectives.domains#System$Model$IndexedContext$Name"
+indexedContextName = "model://perspectives.domains#System$PerspectivesSystem$IndexedContexts$Name"
 
 modelDescription :: String
 modelDescription = "model://perspectives.domains#System$Model$External$Description"

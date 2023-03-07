@@ -64,7 +64,7 @@ import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleType(..))
-import Perspectives.ResourceIdentifiers (createResourceIdentifier, guid)
+import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', guid)
 import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (>>=))
@@ -77,7 +77,9 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (>
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
 constructContext :: Maybe RoleType -> ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
 constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
-  contextInstanceId <- ContextInstance <$> (lift $ createResourceIdentifier (CType $ ContextType ctype))
+  contextInstanceId <- case id of
+    Nothing -> ContextInstance <$> (lift $ createResourceIdentifier (CType $ ContextType ctype))
+    Just cname -> ContextInstance <$> (lift $ createResourceIdentifier' (CType $ ContextType ctype) cname)
   localName <- lift $ lift $ guid (unwrap contextInstanceId)
   (mc :: Maybe PerspectContext) <- lift $ lift $ tryGetPerspectEntiteit contextInstanceId
   case mc of

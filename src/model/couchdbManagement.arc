@@ -18,14 +18,17 @@ domain model://perspectives.domains#CouchdbManagement
           -- We must first create the context and then later bind it.
           -- If we try to create and bind it in a single statement, 
           -- we find that the Installer can just create RootContexts
-          -- as they are the allowed binding of IndexedContexts.
+          -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
           app <- create context CouchdbManagementApp
+          indexedcontext <- create role IndexedContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
-          -- of IndexedContexts with it.
-          bind app >> extern to IndexedContexts in sys:MySystem
+          -- of StartContexts with it.
+          bind app >> extern to StartContexts in sys:MySystem
           Name = "Couchdb Management App" for app >> extern
+          bind_ app >> extern to indexedcontext
+          IndexedContexts$Name = app >> indexedName for indexedcontext
 
   aspect user sys:PerspectivesSystem$Installer
   -------------------------------------------------------------------------------

@@ -285,7 +285,7 @@ createResourceIdentifier' ctype g = do
   mstorageScheme <- gets \(Transaction{typeToStorage}) -> lookup ctype typeToStorage 
   case mstorageScheme of
     Nothing -> createDefaultIdentifier
-    Just (TRANS.Default _) -> pure $ "def:#" <> g
+    Just (TRANS.Default _) -> createDefaultIdentifier
     Just (TRANS.Local dbName) -> createLocalIdentifier dbName
     Just (TRANS.Remote url _) -> createRemoteIdentifier url
 

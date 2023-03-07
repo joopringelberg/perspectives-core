@@ -88,7 +88,7 @@ hasContextBeenDone :: forall m. Monad m => ContextInstance -> (ContextsDone m) B
 hasContextBeenDone c = gets \ctxts -> isJust $ find hasId ctxts
   where
     hasId :: ContextSerialization -> Boolean
-    hasId (ContextSerialization{id}) = eq id (unwrap c)
+    hasId (ContextSerialization{id}) = eq id (Just $ unwrap c)
 
 -- | Save work done.
 contextHasBeenDone :: forall m. Monad m => ContextSerialization -> (ContextsDone m) (Array ContextSerialization)
@@ -111,7 +111,7 @@ serialiseAsJsonFor_ userType cid = do
   PerspectRol{properties} <- lift $ getPerspectRol (externalRole cid)
   (externeProperties :: OBJ.Object (Array String)) <- lift $ execWriterT $ forWithIndex_ properties serialisePropertiesFor
   void $ contextHasBeenDone $ ContextSerialization
-    { id: (unwrap cid)
+    { id: Just (unwrap cid)
     , prototype: Nothing
     , ctype: (unwrap pspType)
     , rollen

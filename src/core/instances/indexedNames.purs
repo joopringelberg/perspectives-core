@@ -64,9 +64,9 @@ indexedRoles_ roleIds = do
   where
     f :: PerspectRol -> MonadPerspectives (Tuple String RoleInstance)
     f r = case rol_binding r of
-      Nothing -> throwError (error ("An instance of sys:Model$IndexedRole has no binding: " <> identifier_ r))
+      Nothing -> throwError (error ("An instance of sys:PerspectivesSystem$IndexedRoles has no binding: " <> identifier_ r))
       Just b -> case head $ rol_property r (EnumeratedPropertyType indexedRoleName) of
-        Nothing -> throwError (error ("An instance of sys:Model$IndexedRole$Name has no value: " <> identifier_ r))
+        Nothing -> throwError (error ("An instance of sys:PerspectivesSystem$IndexedRoles$Name has no value: " <> identifier_ r))
         Just (Value iname) -> pure (Tuple ("model:" <> iname) b)
 
 -- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
@@ -84,9 +84,9 @@ indexedContexts_ contextRoleIds = do
   where
     f :: PerspectRol -> MonadPerspectives (Tuple String ContextInstance)
     f r = case head $ rol_property r (EnumeratedPropertyType indexedContextName) of
-        Nothing -> throwError (error ("An instance of sys:Model$IndexedContext$Name has no value: " <> identifier_ r))
+        Nothing -> throwError (error ("An instance of sys:PerspectivesSystem$IndexedContexts$Name has no value: " <> identifier_ r))
         Just (Value iname) -> do
           mcontextId <- (identifier r) ##> binding >=> context
           case mcontextId of
-            Nothing -> throwError (error ("An instance of sys:Model$IndexedContext has no context bound to it: " <> identifier_ r))
+            Nothing -> throwError (error ("An instance of sys:PerspectivesSystem$IndexedContexts has no context bound to it: " <> identifier_ r))
             Just c -> pure (Tuple ("model:" <> iname) c)

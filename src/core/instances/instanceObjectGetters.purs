@@ -48,7 +48,10 @@ import Perspectives.Instances.Combinators (disjunction)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.Action (Action)
+import Perspectives.Representation.Class.PersistentType (getContext, getEnumeratedRole)
 import Perspectives.Representation.Class.Role (actionsOfRoleType)
+import Perspectives.Representation.Context (Context(..)) as CONTEXT
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
@@ -139,6 +142,13 @@ getContextActions userRoleType userRoleInstance cid = ArrayT do
 -- | Returns the name of the model that defines the context type as a String Value.
 contextModelName :: ContextInstance ~~> Value
 contextModelName (ContextInstance cid) = maybe empty (pure <<< Value) (typeUri2ModelUri cid)
+
+indexedContextName :: ContextInstance ~~> Value
+indexedContextName = contextType >=> \cType -> ArrayT $ do
+  (CONTEXT.Context c) <- lift $ getContext cType
+  case c.indexedContext of 
+    Nothing -> pure []
+    Just i -> pure [Value $ unwrap i]
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE
@@ -453,3 +463,10 @@ getRoleName :: RoleInstance ~~> Value
 getRoleName = disjunction
   (getUnqualifiedProperty "Name")
   (roleType >=> ArrayT <<< pure <<< map Value <<< (maybe [] singleton) <<< typeUri2LocalName <<< deconstructBuitenRol <<< unwrap)
+
+indexedRoleName :: RoleInstance ~~> Value
+indexedRoleName = roleType >=> \rType -> ArrayT $ do
+  (EnumeratedRole r) <- lift $ getEnumeratedRole rType
+  case r.indexedRole of 
+    Nothing -> pure []
+    Just i -> pure [Value $ unwrap i]

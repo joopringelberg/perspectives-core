@@ -40,7 +40,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, null, snoc)
+import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, nub, null, snoc)
 import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Either (Either(..))
@@ -615,6 +615,8 @@ withAuthoringRole authoringRole mp = do
 -- Get the contextualised versions of a role type in a specific context,
 -- under the additional condition that the authoring user (in the Transaction)
 -- has a perspective on it.
+-- If there are no specialisations, just the EnumeratedRoleType passed in will be returned.
+-- If there are specialisations, it will be left out.
 -----------------------------------------------------------
 roleContextualisations :: ContextInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction (Array EnumeratedRoleType)
 roleContextualisations ctxt qualifiedRoleIdentifier = do 
@@ -629,7 +631,7 @@ roleContextualisations ctxt qualifiedRoleIdentifier = do
   -- Then, if we have no type, use the qualifiedRoleIdentifier anyway.
   roleTypesToCreate' <- if null roleTypesToCreate
     then pure [qualifiedRoleIdentifier]
-    else pure roleTypesToCreate
+    else pure $ nub roleTypesToCreate
   -- Get the user role type that is executing.
   (user :: RoleType) <- gets (_.authoringRole <<< unwrap)
   -- Filter the object role types, keeping only those that the user role type has a perspective on.

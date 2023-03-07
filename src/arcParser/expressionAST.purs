@@ -107,6 +107,7 @@ data SimpleStep =
   | Binder ArcPosition String (Maybe String)
   | Context ArcPosition
   | Extern ArcPosition
+  | IndexedName ArcPosition
   | SequenceFunction ArcPosition QF.FunctionName
   | Identity ArcPosition
   | Modelname ArcPosition
@@ -196,6 +197,7 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
     Just ec -> " " <> ec)
   prettyPrint' t (Context _) = "Context"
   prettyPrint' t (Extern _) = "Extern"
+  prettyPrint' t (IndexedName _) = "IndexedName"
   prettyPrint' t (SequenceFunction _ s) = "SequenceFunction " <> show s
   prettyPrint' t (Identity _ ) = "Identity"
   prettyPrint' t (Modelname _) = "Modelname"

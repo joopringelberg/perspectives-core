@@ -53,7 +53,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, isMe, makeBoolean, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseBool, parseDate, parseInt)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
@@ -104,6 +104,10 @@ compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
   PC.calculation cp >>= compileFunction
 
 compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ unsafeCoerce externalRole
+
+compileFunction (SQD _ (DataTypeGetter IndexedContextName) _ _ _) = pure $ unsafeCoerce indexedContextName
+
+compileFunction (SQD _ (DataTypeGetter IndexedRoleName) _ _ _) = pure $ unsafeCoerce (indexedRoleName)
 
 compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ unsafeCoerce context
 

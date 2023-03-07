@@ -399,6 +399,8 @@ removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
 
 -- | Retrieve all instances of sys:Model$IndexedRole and sys:Model$IndexedContext and create a table of
 -- | all known indexed names and their private replacements in PerspectivesState.
+-- | By retrieving the role and context instances directly from Couchdb using a view, we don't have to 
+-- | rely on model://perspectives.domains$System in this early stage of starting up.
 addIndexedNames :: MonadPerspectives Unit
 addIndexedNames = do
   (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb [indexedRole] (ContextInstance "")))

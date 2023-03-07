@@ -48,6 +48,8 @@ data FunctionName =
   ContextF
   | BindingF
   | ExternalRoleF
+  | IndexedContextName
+  | IndexedRoleName
   | IdentityF           -- TODO IN QUERYCOMPILER
   | ModelNameF
   | SequenceF
@@ -99,6 +101,8 @@ instance showFunctionName :: Show FunctionName where
     show ContextF = "context"
     show BindingF = "binding"
     show ExternalRoleF = "external" -- TODO klopt dit met de parser?
+    show IndexedContextName = "indexedContext"
+    show IndexedRoleName = "indexedRole"
     show IdentityF = "identity"
     show ModelNameF = "Namespace"
     show SequenceF = "sequence"
@@ -145,6 +149,8 @@ isFunctionalFunction fn = case fn of
   ContextF -> True
   BindingF -> True
   ExternalRoleF -> True
+  IndexedRoleName -> True
+  IndexedContextName -> True
   IdentityF -> Unknown
   ModelNameF -> True
   SequenceF -> Unknown
@@ -186,6 +192,8 @@ isMandatoryFunction fn = case fn of
   ContextF -> True
   BindingF -> False
   ExternalRoleF -> True
+  IndexedRoleName -> False
+  IndexedContextName -> False
   IdentityF -> True
   ModelNameF -> True
   SequenceF -> True

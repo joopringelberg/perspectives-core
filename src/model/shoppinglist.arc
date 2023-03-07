@@ -14,7 +14,7 @@ domain model://perspectives.domains#Shopping@1.0.0
         letA
           app <- create context ShoppingApp
         in
-          bind app >> extern to IndexedContexts in sys:MySystem
+          bind app >> extern to StartContexts in sys:MySystem
           Name = "Shared Shopping Lists" for app >> extern
 
   aspect user sys:PerspectivesSystem$Installer
