@@ -1,11 +1,6 @@
 // SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-exports.modelDescriptions = (function (doc)
-{
-  emit(doc.contents._id, doc.contents.modelDescription);
-}).toString();
-
 exports.roleView = (function (doc)
 {
   // a proxy for being a role:

@@ -73,7 +73,6 @@ createPerspectivesUser usr pwd couchdbUrl =
 initRepository :: forall f. MonadPouchdb f Unit
 initRepository = do
   createDatabase "repository"
-  setModelDescriptionsView
   void $ withCouchdbUrl \url -> setSecurityDocument url "repository"
       (SecurityDocument {admins: {names: Just [], roles: ["_admin"]}, members: {names: Just [], roles: []}})
 
@@ -104,17 +103,6 @@ createUserDatabases user = do
   -- Now set the security document such that there is no role restriction for members.
   void $ withCouchdbUrl \url -> setSecurityDocument url (user <> "_models")
       (SecurityDocument {admins: {names: Just [], roles: ["_admin"]}, members: {names: Just [], roles: []}})
-
------------------------------------------------------------
--- THE VIEW 'MODELDESCRIPTIONS'
------------------------------------------------------------
--- | Add a view to the couchdb installation in the 'repository' db.
-setModelDescriptionsView :: forall f. MonadPouchdb f Unit
-setModelDescriptionsView = do
-  void $ addViewToDatabase "repository" "defaultViews" "modeldescriptions" ({map: modelDescriptions, reduce: Nothing})
-
--- | Import the view definition as a String.
-foreign import modelDescriptions :: String
 
 -----------------------------------------------------------
 -- THE VIEW 'ROLE'

@@ -25,7 +25,7 @@
 module Perspectives.Extern.Couchdb where
 
 import Control.Monad.AvarMonadAsk (modify) as AMA
-import Control.Monad.Error.Class (catchError, throwError, try)
+import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.State (State, StateT, execState, execStateT, get, modify, put)
 import Control.Monad.Trans.Class (lift)
@@ -42,7 +42,7 @@ import Data.Newtype (over, unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Data.Traversable (for, traverse)
+import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
@@ -54,7 +54,7 @@ import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
 import Perspectives.ContextAndRole (changeRol_isMe, rol_context)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
@@ -78,7 +78,6 @@ import Perspectives.Persistence.Authentication (addCredentials) as Authenticatio
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
-import Perspectives.PerspectivesState (publicRepository)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
@@ -96,31 +95,6 @@ import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(.
 import Perspectives.Warning (PerspectivesWarning(..))
 import Prelude (Unit, bind, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
-
--- | Retrieve from the repository the external roles of instances of sys:Model.
--- | These are kept in the field "modelDescription" of DomeinFile.
--- | TODO: provide a repository parameter, so the URL is taken from the repository rather than hardcoded.
-models :: ContextInstance -> MPQ RoleInstance
-models _ = ArrayT do
-  sysId <- lift getSystemIdentifier
-  lift $ getExternalRoles
-
-  where
-
-    getExternalRoles :: MP (Array RoleInstance)
-    getExternalRoles = do
-      repo <- publicRepository
-      (roles :: Array PerspectRol) <- catchError (getViewOnDatabase repo "defaultViews/modeldescriptions" (Nothing :: Maybe Unit))
-        \e -> do
-          logPerspectivesError $ Custom ("getExternalRoles failed, because: " <> show e)
-          pure []
-      for roles \r@(PerspectRol{_id}) -> do
-        -- If the model is already in use, this role has been saved before.
-        (savedRole :: Maybe PerspectRol) <- tryGetPerspectEntiteit _id
-        case savedRole of
-          Nothing -> void $ cacheEntity _id r
-          Just _ -> pure unit
-        pure _id
 
 modelsDatabaseName :: MonadPerspectives String
 modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models")
@@ -666,8 +640,7 @@ addCredentials urls passwords _ = case head urls, head passwords of
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Couchdb$Models" {func: unsafeCoerce models, nArgs: 0}
-  , Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore_, nArgs: 1}
+  [ Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore_, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
   , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}

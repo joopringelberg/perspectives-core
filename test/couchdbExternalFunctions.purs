@@ -190,18 +190,6 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#Competition")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#Competition: " <> show errs) false
 
-  test "setModelDescriptionsView" do
-    assertEqual "The retrieved document should equal the sent document"
-      (do
-        setModelDescriptionsView
-        mddoc <- tryGetDocument "repository" "_design/defaultViews"
-        case mddoc of
-          Nothing -> throwError (error "No design doc, impossible!")
-          Just ddoc -> do
-            views <- pure $ designDocumentViews ddoc
-            pure $ isJust $ lookup "modeldescriptions" views)
-      true
-
   test "setRoleView" do
     assertEqual "The retrieved document should equal the sent document"
       (do
