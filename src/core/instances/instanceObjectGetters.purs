@@ -54,9 +54,8 @@ import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
-import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (isInPublicScheme)
-import Perspectives.TypesForDeltas (SubjectOfAction(..))
 import Prelude (bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
@@ -417,24 +416,6 @@ filledByCombinator sourceOfFillerRoles filled = ArrayT do
   if null bools
     then pure [Value $ show false]
     else pure [Value $ show $ ala Conj foldMap bools]
-
--- subjectForContextInstance :: ContextInstance -> MonadPerspectivesTransaction SubjectOfAction
--- subjectForContextInstance contextId = do
---   msubject <- lift $ lift (contextId ##> getMe)
---   lift $ lift $ case msubject of
---     Nothing -> UserType <$> (contextId ##>> getMyType)
---     Just me -> pure $ UserInstance me
---
--- subjectForRoleInstance :: RoleInstance -> MonadPerspectivesTransaction SubjectOfAction
--- subjectForRoleInstance roleId = do
---   msubject <- lift $ lift (roleId ##> context >=> getMe)
---   lift $ lift $ case msubject of
---     Nothing -> UserType <$> (roleId ##>> context >=> getMyType)
---     Just me -> pure $ UserInstance me
-
-typeOfSubjectOfAction :: SubjectOfAction -> MonadPerspectives RoleType
-typeOfSubjectOfAction (UserInstance r) = (r ##>> roleType) >>= pure <<< ENR
-typeOfSubjectOfAction (UserType t) = pure t
 
 -- | Returns all the instances of the same role (including the argument instance!).
 siblings :: RoleInstance ~~> RoleInstance

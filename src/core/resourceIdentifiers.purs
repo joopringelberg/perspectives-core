@@ -315,6 +315,18 @@ isInPublicScheme :: ResourceIdentifier -> Boolean
 isInPublicScheme s = maybe false (eq "pub") (getResourceIdentifierScheme s)
 
 -----------------------------------------------------------
+-- STRIP THE SCHEME FROM A RESOURCE IDENTIFIER
+-----------------------------------------------------------
+-- | Strips a ResourceIdentifier of its scheme.
+-- | Notice that identifiers that are not well-shaped are returned as if they were stripped
+stripScheme :: ResourceIdentifier -> String
+stripScheme s = case match resourceIdentifierRegEx s of
+  Nothing -> s
+  Just matches -> case index matches 1, index matches 2 of
+    Just (Just _), Just (Just id) -> id
+    _, _ -> s
+
+-----------------------------------------------------------
 -- TEST THE SHAPE OF A PUBLIC RESOURCE URL
 -----------------------------------------------------------
 -- | A pattern to match https://{authority}/cw_{databasename}/{SegmentedIdentifier} exactly.

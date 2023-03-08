@@ -24,7 +24,7 @@ module Perspectives.Sync.HandleTransaction where
 
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Except (lift, runExcept)
-import Data.Array.NonEmpty (NonEmptyArray, head)
+import Data.Array.NonEmpty (head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -45,7 +45,7 @@ import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (buitenRol, typeUri2typeNameSpace_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (roleType, typeOfSubjectOfAction)
+import Perspectives.Instances.ObjectGetters (roleType)
 import Perspectives.ModelDependencies (rootContext, sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntiteit)
@@ -60,7 +60,7 @@ import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (hasAspect, roleAspectsClosure)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<<), (<>), (>>=), (<$>), (==))
 
 -- TODO. Each of the executing functions must catch errors that arise from unknown types.
@@ -138,7 +138,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
             contextInstance <- pure
               (PerspectContext defaultContextRecord
                 { _id = id
-                , displayName = unwrap id
+                , displayName = unwrap id 
                 , pspType = contextType
                 , buitenRol = RoleInstance $ buitenRol $ unwrap id
                 , universeContextDelta = signedDelta
@@ -148,9 +148,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
             (lift $ findRoleRequests (ContextInstance "def:AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
             addCreatedContextToTransaction id
           else pure unit
-    else do
-      (subjectType :: RoleType) <- lift $ typeOfSubjectOfAction subject
-      logPerspectivesError $ UnauthorizedForContext "auteur" subjectType contextType
+    else logPerspectivesError $ UnauthorizedForContext "auteur" subject contextType
 
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
@@ -197,8 +195,8 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
     where
       userCreatesThemselves :: Boolean
       userCreatesThemselves = case subject of
-        (UserInstance r) -> r == (head ((toNonEmptyArray roleInstances) :: NonEmptyArray RoleInstance))
-        otherwise -> false
+        ENR r -> r == roleType
+        _ -> false
 
       constructAnotherRole_ :: MonadPerspectivesTransaction Unit
       constructAnotherRole_ = do

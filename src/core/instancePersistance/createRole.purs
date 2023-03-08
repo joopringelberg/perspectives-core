@@ -45,10 +45,11 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType, cacheEntity)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.ResourceIdentifiers (stripScheme)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
-import Perspectives.TypesForDeltas (UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (bind, discard, pure, void, ($))
 
 -- | `localName` should be the local name of the roleType.
@@ -71,8 +72,8 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
     , occurrence = i
     , universeRoleDelta =
         SignedDelta
-          { author
-          , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
+          { author: stripScheme author
+          , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
             { id: contextInstance
             , roleInstances: (SNEA.singleton rolInstanceId)
             , roleType

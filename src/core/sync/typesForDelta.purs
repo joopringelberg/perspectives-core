@@ -23,18 +23,19 @@
 module Perspectives.TypesForDeltas where
 
 import Data.Eq (class Eq)
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
+import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (class Newtype, over)
 import Data.Show.Generic (genericShow)
-import Data.Maybe (Maybe)
-import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType)
-import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray)
+import Perspectives.ResourceIdentifiers (stripScheme)
+import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Show, show, (<>), (==), (&&))
+import Prelude (class Show, map, show, (&&), (<<<), (<>), (==))
 
 -----------------------------------------------------------
 -- GENERIC
@@ -44,27 +45,7 @@ import Prelude (class Show, show, (<>), (==), (&&))
 -- | and with an object that corresponds to the resource being modified by the delta.
 -- | This is often taken from the transacton in which modifications are made. It is the member 'authoringRole'
 -- | (not to be confused with member 'author', who must be an instance of sys:PerspectivesSystem$User).
-type DeltaRecord f = {subject :: SubjectOfAction | f}
-
------------------------------------------------------------
--- SUBJECTOFACTION
------------------------------------------------------------
--- UserInstance is all but unused (only in the ContextRoleParser)
-data SubjectOfAction = UserInstance RoleInstance | UserType RoleType
-
-derive instance genericSubjectOfAction :: Generic SubjectOfAction _
-
-instance showSubjectOfAction :: Show SubjectOfAction where
-  show = genericShow
-
-instance prettyPrintSubjectOfAction :: PrettyPrint SubjectOfAction where
-  prettyPrint' t (UserInstance r) = prettyPrint' t r
-  prettyPrint' t (UserType r) = prettyPrint' t r
-
-instance encodeSubjectOfAction :: Encode SubjectOfAction where
-  encode = genericEncode defaultOptions
-instance decodeSubjectOfAction :: Decode SubjectOfAction where
-  decode = genericDecode defaultOptions
+type DeltaRecord f = {subject :: RoleType | f}
 
 -----------------------------------------------------------
 -- UNIVERSECONTEXTDELTA
@@ -88,6 +69,11 @@ instance encodeUniverseContextDelta :: Encode UniverseContextDelta where
   encode = genericEncode defaultOptions
 instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
   decode = genericDecode defaultOptions
+
+instance StrippedDelta UniverseContextDelta where
+  stripResourceSchemes (UniverseContextDelta r) = UniverseContextDelta r 
+    { id = over ContextInstance stripScheme r.id
+    }
 
 -----------------------------------------------------------
 -- UNIVERSECONTEXTDELTATYPE
@@ -144,6 +130,12 @@ instance decodeUniverseRoleDelta :: Decode UniverseRoleDelta where
 instance prettyPrintUniverseRoleDelta :: PrettyPrint UniverseRoleDelta where
   prettyPrint' t (UniverseRoleDelta r) = "UniverseRoleDelta " <> prettyPrint' (t <> "  ") r
 
+instance StrippedDelta UniverseRoleDelta where
+  stripResourceSchemes (UniverseRoleDelta r) = UniverseRoleDelta r 
+    { id = over ContextInstance stripScheme r.id
+    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance stripScheme)) r.roleInstances
+    }
+
 -----------------------------------------------------------
 -- UNIVERSEROLEDELTATYPE
 -----------------------------------------------------------
@@ -189,6 +181,13 @@ instance decodeContextDelta :: Decode ContextDelta where
 
 instance prettyPrintContextDelta :: PrettyPrint ContextDelta where
   prettyPrint' t (ContextDelta r) = "ContextDelta " <> prettyPrint' (t <> "  ") r
+
+instance StrippedDelta ContextDelta where
+  stripResourceSchemes (ContextDelta r) = ContextDelta r 
+    { contextInstance = over ContextInstance stripScheme r.contextInstance
+    , roleInstance = over RoleInstance stripScheme r.roleInstance
+    , destinationContext = maybe Nothing (Just <<< (over ContextInstance stripScheme)) r.destinationContext
+    }
 
 -----------------------------------------------------------
 -- CONTEXTDELTATYPE
@@ -239,6 +238,13 @@ instance decodeRoleDelta :: Decode RoleBindingDelta where
 instance prettyPrintRoleBindingDelta :: PrettyPrint RoleBindingDelta where
   prettyPrint' t (RoleBindingDelta r) = "RoleBindingDelta " <> prettyPrint' (t <> "  ") r
 
+instance StrippedDelta RoleBindingDelta where
+  stripResourceSchemes (RoleBindingDelta r) = RoleBindingDelta r 
+    { filled = over RoleInstance stripScheme r.filled
+    , filler = maybe Nothing (Just <<< (over RoleInstance stripScheme)) r.filler
+    , oldFiller = maybe Nothing (Just <<< (over RoleInstance stripScheme)) r.oldFiller
+    }
+
 -----------------------------------------------------------
 -- ROLEBINDINGDELTATYPE
 -----------------------------------------------------------
@@ -286,6 +292,11 @@ instance decodePropertyDelta :: Decode RolePropertyDelta where
 instance prettyPrintRolePropertyDelta :: PrettyPrint RolePropertyDelta where
   prettyPrint' t (RolePropertyDelta r) = "RolePropertyDelta " <> prettyPrint' (t <> "  ") r
 
+instance StrippedDelta RolePropertyDelta where
+  stripResourceSchemes (RolePropertyDelta r) = RolePropertyDelta r 
+    { id = over RoleInstance stripScheme r.id
+    }
+
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTATYPE
 -----------------------------------------------------------
@@ -304,3 +315,9 @@ instance decodeRolePropertyDeltaType :: Decode RolePropertyDeltaType where
 
 instance prettyPrintRolePropertyDeltaType :: PrettyPrint RolePropertyDeltaType where
   prettyPrint' t = show
+
+-----------------------------------------------------------
+-- STRIPPING RESOURCE IDENTIFIERS IN A DELTA
+-----------------------------------------------------------
+class StrippedDelta d where
+  stripResourceSchemes :: d -> d

@@ -75,12 +75,13 @@ import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPrope
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
+import Perspectives.ResourceIdentifiers (stripScheme)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (getRoleAspectSpecialisations, hasPerspectiveOnRole, indexedContextName, indexedRoleName, isUnlinked_, propertyAliases)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 
 -----------------------------------------------------------
 -- UPDATE A CONTEXT (SET THE PREFERRED USER ROLE TYPE)
@@ -166,8 +167,8 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
       delta <- case receivedDelta of
         Just d -> pure d
         _ -> pure $ SignedDelta
-          { author
-          , encryptedDelta: sign $ encodeJSON $ ContextDelta
+          { author: stripScheme author
+          , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ ContextDelta
             { contextInstance : contextId
             , roleType: rolName
             , deltaType: AddRoleInstancesToContext
@@ -204,8 +205,8 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
   addDelta $ DeltaInTransaction
     { users
     , delta: SignedDelta
-      { author
-      , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
+      { author: stripScheme author
+      , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
         { id: contextId
         , roleInstances: (SerializableNonEmptyArray rolInstances)
         , roleType: rolName
@@ -328,8 +329,8 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                       , subject
                       }
                     pure $ SignedDelta
-                      { author
-                      , encryptedDelta: sign $ encodeJSON $ delta}
+                      { author: stripScheme author
+                      , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
                   Just signedDelta -> pure signedDelta
                 addDelta (DeltaInTransaction { users, delta: delta })
                 pure (Tuple (unwrap value) delta)
@@ -403,8 +404,8 @@ removeProperty rids propertyName values = case ARR.head rids of
               }
             author <- getAuthor
             signedDelta <- pure $ SignedDelta
-              { author
-              , encryptedDelta: sign $ encodeJSON $ delta}
+              { author: stripScheme author
+              , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
             addDelta (DeltaInTransaction { users, delta: signedDelta})
             (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
             (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -444,8 +445,8 @@ deleteProperty rids propertyName = case ARR.head rids of
                 }
               author <- getAuthor
               signedDelta <- pure $ SignedDelta
-                { author
-                , encryptedDelta: sign $ encodeJSON $ delta}
+                { author: stripScheme author
+                , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
               addDelta (DeltaInTransaction { users, delta: signedDelta})
               (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
               (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -501,8 +502,8 @@ setMe cid me = do
 
 -- | Returns the role instance having the perspective that allows resource modification 
 -- | (not necessarily and usually not an instance of sys:PerspectivesSystem$User)
-getSubject :: MonadPerspectivesTransaction SubjectOfAction
-getSubject = UserType <$> gets (_.authoringRole <<< unwrap)
+getSubject :: MonadPerspectivesTransaction RoleType
+getSubject = gets (_.authoringRole <<< unwrap)
 
 -- | Returns the instance of sys:PerspectivesSystem$User who signs deltas.
 getAuthor :: MonadPerspectivesTransaction String

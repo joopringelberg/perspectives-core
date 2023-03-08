@@ -23,9 +23,10 @@ import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedP
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType, externalRoleType)
+import Perspectives.ResourceIdentifiers (stripScheme)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
-import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (>>=))
 
 
@@ -55,8 +56,8 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , pspType = pspType
       , buitenRol = externalRole
       , universeContextDelta = SignedDelta
-        { author
-        , encryptedDelta: sign $ encodeJSON $ UniverseContextDelta
+        { author: stripScheme author
+        , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseContextDelta
             { id: contextInstanceId
             , contextType: pspType
             , deltaType: ConstructEmptyContext
@@ -73,8 +74,8 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , binding = Nothing
       , universeRoleDelta =
           SignedDelta
-            { author
-            , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
+            { author: stripScheme author
+            , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id: contextInstanceId
               , roleInstances: (SNEA.singleton externalRole)
               , roleType: externalRoleType pspType

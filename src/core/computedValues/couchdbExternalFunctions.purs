@@ -87,11 +87,11 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
-import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier')
+import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', stripScheme)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
+import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
 import Perspectives.Warning (PerspectivesWarning(..))
 import Prelude (Unit, bind, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (>=>))
 import Unsafe.Coerce (unsafeCoerce)
@@ -268,8 +268,8 @@ addModelToLocalStore (DomeinFileId modelname) = do
     , subject
     }
   signedDelta <- pure $ SignedDelta
-    { author
-    , encryptedDelta: sign $ encodeJSON $ delta}
+    { author: stripScheme author
+    , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
 
   -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
   (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)

@@ -74,12 +74,14 @@ import Perspectives.Extern.Couchdb (addModelToLocalStore')
 import Perspectives.Identifiers (deconstructBuitenRol, typeUri2ModelUri, isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, getUnlinkedRoleInstances, isMe)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.ResourceIdentifiers (stripScheme)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
@@ -88,7 +90,7 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), SubjectOfAction(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>), (==), (>>=), (<$>), (<<<), (||))
  
 -- | This function takes care of
@@ -210,8 +212,8 @@ stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
       addDelta $ DeltaInTransaction
         { users: nub $ users1 <> users2
         , delta: SignedDelta
-            { author: me
-            , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
+            { author: stripScheme me
+            , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id
               , roleType: externalRoleType contextType
               , authorizedRole
@@ -289,7 +291,7 @@ statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, pspType:roleType,
         , filler
         , oldFiller: Nothing
         , deltaType: RemoveBinding
-        , subject: UserInstance (RoleInstance "") -- is not used
+        , subject: ENR $ EnumeratedRoleType sysUser -- is not used
       })
       -- Do not run forwards query!
       false
@@ -310,8 +312,8 @@ synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contex
         addDelta $ DeltaInTransaction
           { users
           , delta: SignedDelta
-            { author
-            , encryptedDelta: sign $ encodeJSON $ UniverseRoleDelta
+            { author: stripScheme author
+            , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id: contextId
               , roleInstances: (SerializableNonEmptyArray (singleton roleId))
               , roleType
@@ -462,8 +464,8 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
             author <- getAuthor
             signedDelta <-  case msignedDelta of
               Nothing -> pure $ SignedDelta
-                { author
-                , encryptedDelta: sign $ encodeJSON $ delta}
+                { author: stripScheme author
+                , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
               Just signedDelta -> pure signedDelta
 
             -- SYNCHRONISATION
@@ -556,8 +558,8 @@ removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectEntiteit
             author <- getAuthor
             signedDelta <- case msignedDelta of
               Nothing ->  pure $ SignedDelta
-                { author
-                , encryptedDelta: sign $ encodeJSON $ delta}
+                { author: stripScheme author
+                , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
               Just signedDelta -> pure signedDelta
             handleNewPeer filled
             addDelta (DeltaInTransaction { users, delta: signedDelta})
