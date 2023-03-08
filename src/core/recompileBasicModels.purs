@@ -75,7 +75,6 @@ recompileModelsAtUrl repository = do
       do
         log ("Recompiling " <> _id)
         r <- lift $ loadAndCompileArcFile_ contents.arc
-        -- r <- lift $ loadArcAndCrl' contents.arc contents.crl
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModelsAtUrl: " <> show m)
           Right df@(DomeinFile dfr) -> lift $ lift do

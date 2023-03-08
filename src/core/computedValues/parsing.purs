@@ -40,7 +40,6 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.LoadCRL (loadAndCacheCrlFile')
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
@@ -65,18 +64,6 @@ parseAndCompileArc arcSource_ _ = case head arcSource_ of
           warnings <- lift $ lift $ getWarnings
           pure $ Value $ intercalate "\n" (cons "OK" warnings)
     \e -> ArrayT $ pure [Value (show e)]
-
--- | Read the .crl file, parse it and try to compile it.
-parseAndCompileCrl :: Array CrlSource -> (ContextInstance ~~> Value)
-parseAndCompileCrl crlSource_ _ = case head crlSource_ of
-  Nothing -> pure $ Value "No crl source given!"
-  Just crlSource -> catchError
-    do
-      r <- lift $ lift $ loadAndCacheCrlFile' crlSource
-      case r of
-        Left errs -> ArrayT $ pure (Value <<< show <$> errs)
-        Right _ -> pure $ Value "OK"
-    \e -> ArrayT $ pure [(Value $ show e)]
 
 type ArcSource = String
 type CrlSource = String
@@ -110,7 +97,6 @@ compileRepositoryModels url_ _ = case head url_ of
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1}
-  , Tuple "model://perspectives.domains#Parsing$ParseAndCompileCrl" {func: unsafeCoerce parseAndCompileCrl, nArgs: 1}
   , Tuple "model://perspectives.domains#Parsing$UploadToRepository2" {func: unsafeCoerce uploadToRepository, nArgs: 1}
   , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1}
 ]

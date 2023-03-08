@@ -15,7 +15,6 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console (log, logShow)
 import Perspectives.CoreTypes (PerspectivesState, (##=), (##>), (##>>))
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getEnumeratedRoleInstances, getFilledRoles)
-import Perspectives.LoadCRL.FS (loadAndSaveCrlFile)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (deleteDatabase, documentsInDatabase, tryGetDocument)
 import Perspectives.Persistence.CouchdbFunctions (endReplication)
@@ -50,7 +49,7 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
           -- channelContext <- getPerspectEntiteit channel
           -- logShow channelContext
           -- load a second user
-          void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+          -- void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
           void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
       getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
       RoleInstance "model:User$joop$User" ##> getter
@@ -94,7 +93,7 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
     (channelId :: Maybe (Maybe String)) <- runPCor $ withSystem $ withCouchdbUrl \url -> do
       (channelA :: Array ContextInstance) <- runMonadPerspectivesTransaction do
         channel <- createChannel url
-        void $ lift $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+        -- void $ lift $ loadAndSaveCrlFile "userJoop.crl" testDirectory
         addPartnerToChannel (RoleInstance "model:User$joop$User") channel
         -- setYourAddress "http://127.0.0.1" 5984 channel
         -- We now have a channel with two partners.

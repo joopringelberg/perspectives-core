@@ -12,7 +12,6 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes ((##>), (##>>))
 import Perspectives.Instances.ObjectGetters (externalRole)
-import Perspectives.LoadCRL.FS (loadAndSaveCrlFile)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistence.API (addDocument, createDatabase, deleteDatabase, tryGetDocument)
 import Perspectives.Persistence.CouchdbFunctions (endReplication)
@@ -56,7 +55,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
         -- load a second user
         -- channelContext <- getPerspectEntiteit channel
         -- logShow channelContext
-        void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+        -- void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
         void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
 
     getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
@@ -117,7 +116,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
   test "setChannelReplication" $ runP $ withSystem $ void $ withCouchdbUrl \url -> do
     achannel <- runMonadPerspectivesTransaction do
       channel <- createChannel url
-      void $ lift $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+      -- void $ lift $ loadAndSaveCrlFile "userJoop.crl" testDirectory
       addPartnerToChannel (RoleInstance "model:User$joop$User") channel
       setYourAddress "http://127.0.0.1" 5984 channel
       -- We now have a channel with two partners.
@@ -157,7 +156,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
         -- load a second user
         -- channelContext <- getPerspectEntiteit channel
         -- logShow channelContext
-        void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+        -- void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
         void $ runMonadPerspectivesTransaction $ addPartnerToChannel (RoleInstance "model:User$joop$User") channel
         getYou <- getRoleFunction "sys:Channel$You"
         myou <- channel ##> getYou

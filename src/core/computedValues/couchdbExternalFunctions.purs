@@ -68,10 +68,10 @@ import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ModelUrl, n
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.ModelDependencies as DEP
-import Perspectives.Models (modelsInUse, modelsInUseRole) as Models
-import Perspectives.Names (getUserIdentifier)
+import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
@@ -93,7 +93,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Warning (PerspectivesWarning(..))
-import Prelude (Unit, bind, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 
 modelsDatabaseName :: MonadPerspectives String
@@ -128,18 +128,18 @@ pendingInvitations _ = ArrayT do
 -- | Overwrites the model currently residing in the local models database.
 -- | Takes care of inverted queries.
 -- | Clears compiled states from cache.
--- | The first argument should contain the string version of the model name ("model:Something")
--- | The second argument is an array with an instance of the role ModelsInuse.
+-- | The first argument should contain the string version of the model name ("model://some.domain#Something")
+-- | The second argument should contain the string representation of a boolean value.
+-- | The third argument is an array with an instance of the role ModelsInuse.
 updateModel :: Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
 updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWithModelName of
   Nothing -> do
-    descriptionGetter <- lift $ getDynamicPropertyGetter DEP.modelDescription (ST Models.modelsInUseRole)
+    descriptionGetter <- lift $ getDynamicPropertyGetter DEP.modelDescription (ST (EnumeratedRoleType DEP.modelsInUse))
     description <- lift (modelsInUse ##= descriptionGetter)
     lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
+  -- TODO: add a check on the form of the modelName.
   Just modelName -> updateModel' (maybe false (eq "true") (head arrWithDependencies)) (DomeinFileId modelName)
   where
-    -- TODO. Note that while we have not yet the model identification as an URL, the parameter url is bound to
-    -- the repository location of the model supplied in the call to updateModel.
     updateModel' :: Boolean -> DomeinFileId -> MonadPerspectivesTransaction Unit
     updateModel' withDependencies dfId@(DomeinFileId modelName) = do
       DomeinFile{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects, referredModels} <- lift $ getDomeinFile dfId
@@ -171,17 +171,26 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
       -- Clear the caches of compiled states.
       void $ pure $ clearModelStates dfId
       -- Install the new model, taking care of outgoing InvertedQueries.
-      -- TODO. As soon as model identifiers are URLs, do not concatenate the url to the modelName.
       addModelToLocalStore' dfId
       DomeinFile dfr <- lift $ getDomeinFile $ dfId
       -- Find all models in use.
-      models' <- lift (Models.modelsInUse >>= traverse getDomeinFile)
+      models' <- lift (allModelsInUse >>= traverse getDomeinFile)
       -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
       lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
         forWithIndex_ invertedQueries
           \domainName queries -> if domainName == modelName
             then for_ queries addInvertedQuery
             else pure unit) dfr))
+    
+    allModelsInUse :: MonadPerspectives (Array DomeinFileId)
+    allModelsInUse = do
+      system <- getMySystem
+      propertyGetter <- getDynamicPropertyGetter
+        DEP.modelExternalModelIdentification
+        (ST $ EnumeratedRoleType DEP.modelsInUse)
+      values <- (ContextInstance system) ##= (getEnumeratedRoleInstances (EnumeratedRoleType DEP.modelsInUse) >=> propertyGetter)
+      pure $ DomeinFileId <<< unwrap <$> values
+
 
 -- | Retrieve the model(s) from the modelName(s) and add them to the local couchdb installation.
 -- | Load the dependencies first.
@@ -205,16 +214,6 @@ addModelToLocalStore (DomeinFileId modelname) = do
   , invertedQueriesInOtherDomains
   , upstreamStateNotifications
   , upstreamAutomaticEffects}) <- lift $ CDB.getDocumentFromUrl (repositoryUrl <> "/" <> documentName)
-
-  -- {database: repositoryUrl, documentName} <- lift $ resourceIdentifier2DocLocator modelname
-  -- df@(DomeinFile
-  --   { _id
-  --   -- , indexedRoles
-  --   -- , indexedContexts
-  --   , referredModels
-  --   , invertedQueriesInOtherDomains
-  --   , upstreamStateNotifications
-  --   , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl documentName
 
   -- Store the model in Couchdb, that is: in the local store of models.
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
