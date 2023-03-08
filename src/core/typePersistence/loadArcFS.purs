@@ -24,27 +24,19 @@ module Perspectives.TypePersistence.LoadArc.FS where
 
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (delete, filterA, findIndex, head)
+import Data.Array (delete)
 import Data.Either (Either(..))
-import Data.Foldable (foldl)
 import Data.List (List(..))
-import Data.Maybe (Maybe(..), isJust)
-import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
-import Foreign.Object (Object, empty, keys, lookup, values)
+import Foreign.Object (empty)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Node.Process (cwd)
-import Perspectives.ContextRoleParser (userData)
-import Perspectives.CoreTypes (MonadPerspectives, (##=), (###=))
-import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache, storeDomeinFileInCouchdb)
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.DomeinCache (storeDomeinFileInCache, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
-import Perspectives.IndentParser (runIndentParser')
-import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, context, getEnumeratedRoleInstances_)
-import Perspectives.ModelDependencies (indexedContext, indexedRole, modelExternal)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
@@ -52,11 +44,9 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
-import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), DomeinFileId(..))
-import Perspectives.Types.ObjectGetters (aspectsOfRole)
-import Prelude (bind, discard, pure, show, void, ($), (*>), (<>), (==), (>=>), (<$>))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
+ 
+import Prelude (bind, pure, show, ($), (*>), (<>))
 import Text.Parsing.Parser (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
@@ -108,80 +98,14 @@ loadAndCompileArcFile_ filePath = catchError
 
 type Persister = String -> DomeinFile -> MonadPerspectives MultiplePerspectivesErrors
 
--- | Loads an .arc file and expects a .crl file with the same name. Adds the .crl
--- | file to the DomeinFile. Adds the model description instance to the DomeinFile.
--- | NOTICE that the model instances are added to cache!
-loadArcAndCrl :: String -> String -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFile)
-loadArcAndCrl fileName directoryName = do
-  procesDir <- liftEffect cwd
-  loadArcAndCrl'
-    (Path.concat [procesDir, directoryName, fileName <> ".arc"])
-    (Path.concat [procesDir, directoryName, fileName <> ".crl"])
-
 type ArcPath = String
 type CrlPath = String
-
-loadArcAndCrl' :: ArcPath -> CrlPath -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFile)
-loadArcAndCrl' arcPath crlPath = do
-  r <- loadAndCompileArcFile_ arcPath
-  case r of
-    Left m -> pure $ Left m
-    Right df@(DomeinFile drf@{_id}) -> do
-      void $ storeDomeinFileInCache _id df
-      x <- addModelDescriptionAndCrl drf
-      removeDomeinFileFromCache _id
-      case x of
-        (Left e) -> pure $ Left e
-        (Right withInstances) -> do
-          pure $ Right (DomeinFile withInstances)
-  where
-    addModelDescriptionAndCrl :: DomeinFileRecord -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFileRecord)
-    addModelDescriptionAndCrl df = do
-      procesDir <- liftEffect cwd
-      source <- lift $ readTextFile UTF8 crlPath
-      (Tuple parseResult {roleInstances, prefixes}) <- runIndentParser' source userData
-      case parseResult of
-        Left e -> pure $ Left $ [Custom (show e)]
-        Right _ -> do
-          (modelDescription :: Maybe PerspectRol) <- head <$> filterA
-            (\(PerspectRol{pspType}) -> if pspType == (EnumeratedRoleType modelExternal)
-                then pure true
-                else do
-                  aspects <- pspType ###= aspectsOfRole
-                  pure $ isJust $ findIndex ((==) (EnumeratedRoleType modelExternal)) aspects)
-            (values roleInstances)
-          -- modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType modelExternal) roleInstances
-          (Tuple indexedRoles indexedContexts) <- case modelDescription of
-            Nothing -> pure $ Tuple [] []
-            Just m -> do
-              collectIndexedNames (identifier m)
-          pure $ Right (df
-            { modelDescription = modelDescription
-            , crl = foldl (replacePrefix prefixes) source (keys prefixes)
-            , indexedRoles = indexedRoles
-            , indexedContexts = indexedContexts})
-
-    -- Prefixes are stored in ParserState with a colon appended.
-    replacePrefix :: Object String -> String -> String -> String
-    replacePrefix prefixes crl prefix = case lookup prefix prefixes of
-      Nothing -> crl
-      Just r -> replaceAll (Pattern prefix) (Replacement (r <> "$")) crl
-
-    collectIndexedNames :: RoleInstance -> MonadPerspectives (Tuple (Array RoleInstance) (Array ContextInstance))
-    collectIndexedNames modelDescription = do
-      -- Notice that we MUST use the function that does no model reflection to get role instances from a context!
-      -- This is because on compiling model:System, these roles are not yet defined.
-      iroles <- modelDescription ##= context >=> getEnumeratedRoleInstances_ (EnumeratedRoleType indexedRole) >=> binding
-      icontexts <- modelDescription ##= context >=> getEnumeratedRoleInstances_ (EnumeratedRoleType indexedContext) >=> binding >=> context
-      pure $ Tuple iroles icontexts
 
 -- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl
 -- | file to the DomeinFile. Adds the model description instance. Persists that DomeinFile.
 loadAndPersistArcFile :: Boolean -> Persister -> String -> String -> MonadPerspectives MultiplePerspectivesErrors
 loadAndPersistArcFile loadCRL persist fileName directoryName = do
-  r <- if loadCRL
-    then loadArcAndCrl fileName directoryName
-    else loadAndCompileArcFile fileName directoryName
+  r <- loadAndCompileArcFile fileName directoryName
   case r of
     Left m -> pure m
     Right df@(DomeinFile {_id}) -> persist _id df *> pure []

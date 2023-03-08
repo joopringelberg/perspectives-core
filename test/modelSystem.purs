@@ -25,7 +25,7 @@ import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), cacheEntity, removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc.FS (loadArcAndCrl, loadCompileAndSaveArcFile')
+import Perspectives.TypePersistence.LoadArc.FS (loadAndCompileArcFile, loadCompileAndSaveArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, runMonadPerspectivesTransaction)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -51,7 +51,7 @@ theSuite = suiteSkip  "Model:System" do
       else pure unit
     -- setupUser
     -- Read and compile the model and its instances, but do not save or cache them.
-    r <- loadArcAndCrl "testBotActie" modelDirectory
+    r <- loadAndCompileArcFile "testBotActie" modelDirectory
     case r of
       Left m -> do
         logShow m 

@@ -69,10 +69,6 @@ indexedRoles_ roleIds = do
         Nothing -> throwError (error ("An instance of sys:PerspectivesSystem$IndexedRoles$Name has no value: " <> identifier_ r))
         Just (Value iname) -> pure (Tuple ("model:" <> iname) b)
 
--- | From an instance of sys:Model$External, return combinations of the indexed name and the private role instance.
-indexedContexts :: RoleInstance -> MonadPerspectives (Object ContextInstance)
-indexedContexts modelDescription = (modelDescription ##= context >=> getEnumeratedRoleInstances (EnumeratedRoleType indexedContext)) >>= indexedContexts_
-
 indexedContexts_ :: Array RoleInstance -> MonadPerspectives (Object ContextInstance)
 indexedContexts_ contextRoleIds = do
   rows <- foldM

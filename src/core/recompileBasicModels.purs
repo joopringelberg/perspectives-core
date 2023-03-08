@@ -50,17 +50,13 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder) as TOP
 import Perspectives.Extern.Couchdb (addInvertedQuery)
 import Perspectives.Identifiers (isModelUri)
-import Perspectives.ModelDependencies (modelManagementDescription)
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Persistence.API (addAttachment, addDocument, documentsInDatabase, getAttachment, includeDocs)
 import Perspectives.Persistence.Types (Url)
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadArcAndCrl')
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
+import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
 import Simple.JSON (class ReadForeign, read, read')
-
-modelDescription :: EnumeratedRoleType
-modelDescription = EnumeratedRoleType modelManagementDescription
 
 recompileModelsAtUrl :: Url -> MonadPerspectivesTransaction Unit
 recompileModelsAtUrl repository = do
@@ -78,9 +74,10 @@ recompileModelsAtUrl repository = do
     recompileModelAtUrl model@(UninterpretedDomeinFile{_id, _rev, contents}) =
       do
         log ("Recompiling " <> _id)
-        r <- lift $ loadArcAndCrl' contents.arc contents.crl
+        r <- lift $ loadAndCompileArcFile_ contents.arc
+        -- r <- lift $ loadArcAndCrl' contents.arc contents.crl
         case r of
-          Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
+          Left m -> logPerspectivesError $ Custom ("recompileModelsAtUrl: " <> show m)
           Right df@(DomeinFile dfr) -> lift $ lift do
             log $  "Recompiled '" <> _id <> "' succesfully!"
             -- storeDomeinFileInCouchdbPreservingAttachments df
@@ -95,7 +92,7 @@ recompileModel :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors 
 recompileModel model@(UninterpretedDomeinFile{_id, _rev, contents}) =
   do
     log ("Recompiling " <> _id)
-    r <- lift $ loadArcAndCrl' contents.arc contents.crl
+    r <- lift $ loadAndCompileArcFile_ contents.arc
     case r of
       Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
       Right df@(DomeinFile drf@{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects}) -> lift $ lift do

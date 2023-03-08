@@ -41,7 +41,6 @@ import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision,
 import Perspectives.Data.EncodableMap (EncodableMap, addAll, removeAll)
 import Perspectives.Data.EncodableMap (empty) as EM
 import Perspectives.Identifiers (typeUri2ModelUri)
-import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Representation.Action (AutomaticAction)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
@@ -50,7 +49,6 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), InvertedQueryKey)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.ScreenDefinition (ScreenDefinition, ScreenKey)
 import Perspectives.Representation.State (State(..), Notification) as PEState
 import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedRoleType, RoleType, StateIdentifier(..))
@@ -71,12 +69,7 @@ type DomeinFileRecord =
   , calculatedProperties :: Object CalculatedProperty
   , views :: Object View
   , states :: Object PEState.State
-  , crl :: String
   , arc :: String
-  -- These are instances of types in this model that have been declared 'indexed'.
-  , indexedRoles :: Array RoleInstance
-  , indexedContexts :: Array ContextInstance
-  , modelDescription :: Maybe PerspectRol
   , referredModels :: Array DomeinFileId
   -- Keys are DomeinFileIds.
   , invertedQueriesInOtherDomains :: Object (Array SeparateInvertedQuery)
@@ -198,11 +191,7 @@ defaultDomeinFileRecord =
   , calculatedProperties: empty
   , views: empty
   , states: empty
-  , crl: ""
   , arc: ""
-  , indexedRoles: []
-  , indexedContexts: []
-  , modelDescription: Nothing
   , referredModels: []
   , invertedQueriesInOtherDomains: empty
   , upstreamStateNotifications: empty
