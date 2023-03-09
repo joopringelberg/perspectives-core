@@ -57,7 +57,7 @@ import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>), (##=), (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -75,7 +75,7 @@ import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPrope
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
-import Perspectives.ResourceIdentifiers (stripScheme)
+import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -128,7 +128,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
             if unlinked
 
               then if isDefaultContextDelta contextDelta
-                then f role pe unlinked
+                then f role pe unlinked 
                 -- Apparently we've constructed a real ContextDelta before, so do not add a second time.
                 else pure unit
 
@@ -167,13 +167,15 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
       delta <- case receivedDelta of
         Just d -> pure d
         _ -> pure $ SignedDelta
-          { author: stripScheme author
+          { author: takeGuid author
           , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ ContextDelta
             { contextInstance : contextId
+            , contextType: context_pspType pe
             , roleType: rolName
             , deltaType: AddRoleInstancesToContext
             , roleInstance: _id
             , destinationContext: Nothing
+            , destinationContextType: Nothing
             , subject
             } }
       addDelta $ DeltaInTransaction {users, delta}
@@ -192,38 +194,38 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
 -- | QUERY UPDATES
 -- | CURRENTUSER for contextId and one of rolInstances.
 removeRoleInstancesFromContext :: ContextInstance -> EnumeratedRoleType -> (Updater (NonEmptyArray RoleInstance))
-removeRoleInstancesFromContext contextId rolName rolInstances = do
-  -- Guarantees STATE EVALUATION because contexts with a vantage point are added to
-  -- the transaction, too.
-  -- As a side effect, usersWithPerspectiveOnRoleInstance adds Deltas to the transaction for the continuation of the
-  -- path beyond the given role instance.
-  -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from doing this.
-  users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances) false
-  subject <- getSubject
--- SYNCHRONISATION
-  author <- getAuthor
-  addDelta $ DeltaInTransaction
-    { users
-    , delta: SignedDelta
-      { author: stripScheme author
-      , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
-        { id: contextId
-        , roleInstances: (SerializableNonEmptyArray rolInstances)
-        , roleType: rolName
-        , authorizedRole: Nothing
-        , deltaType: RemoveRoleInstance
-        , subject } }}
-
-  -- QUERY UPDATES.
-  (lift $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
-  -- Modify the context: remove the role instances from those recorded with the role type.
-  (roles :: Array PerspectRol) <- foldM
-    (\roles roleId -> (lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "removeRoleInstancesFromContext" roles (pure <<< (flip cons roles))))
-    []
-    (toArray rolInstances)
-  (lift $ try $ getPerspectContext contextId) >>=
+removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ getPerspectContext contextId) >>=
     handlePerspectContextError "removeRoleInstancesFromContext"
       \(pe :: PerspectContext) -> do
+        -- Guarantees STATE EVALUATION because contexts with a vantage point are added to
+        -- the transaction, too.
+        -- As a side effect, usersWithPerspectiveOnRoleInstance adds Deltas to the transaction for the continuation of the
+        -- path beyond the given role instance.
+        -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from doing this.
+        users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances) false
+        subject <- getSubject
+      -- SYNCHRONISATION
+        author <- getAuthor
+        addDelta $ DeltaInTransaction
+          { users
+          , delta: SignedDelta
+            { author: takeGuid author
+            , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
+              { id: contextId
+              , contextType: context_pspType pe
+              , roleInstances: (SerializableNonEmptyArray rolInstances)
+              , roleType: rolName
+              , authorizedRole: Nothing
+              , deltaType: RemoveRoleInstance
+              , subject } }}
+
+        -- QUERY UPDATES.
+        (lift $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
+        -- Modify the context: remove the role instances from those recorded with the role type.
+        (roles :: Array PerspectRol) <- foldM
+          (\roles roleId -> (lift $ try $ getPerspectRol roleId) >>= (handlePerspectRolError' "removeRoleInstancesFromContext" roles (pure <<< (flip cons roles))))
+          []
+          (toArray rolInstances)
         unlinked <- lift $ isUnlinked_ rolName
         changedContext <- if unlinked
           then pure pe
@@ -323,13 +325,14 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                     -- replacement property (if any), because that describes the structural change.
                     delta <- pure $ RolePropertyDelta
                       { id : rid
+                      , roleType: rol_pspType pe
                       , property: replacementProperty
                       , deltaType: AddProperty
                       , values: [value]
                       , subject
                       }
                     pure $ SignedDelta
-                      { author: stripScheme author
+                      { author: takeGuid author
                       , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
                   Just signedDelta -> pure signedDelta
                 addDelta (DeltaInTransaction { users, delta: delta })
@@ -397,6 +400,7 @@ removeProperty rids propertyName values = case ARR.head rids of
             -- Create a delta for all values at once.
             delta <- pure $ RolePropertyDelta
               { id : rid
+              , roleType: rol_pspType pe
               , property: replacementProperty
               , deltaType: RemoveProperty
               , values: values
@@ -404,7 +408,7 @@ removeProperty rids propertyName values = case ARR.head rids of
               }
             author <- getAuthor
             signedDelta <- pure $ SignedDelta
-              { author: stripScheme author
+              { author: takeGuid author
               , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
             addDelta (DeltaInTransaction { users, delta: signedDelta})
             (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
@@ -438,6 +442,7 @@ deleteProperty rids propertyName = case ARR.head rids of
               -- Create a delta for all values.
               delta <- pure $ RolePropertyDelta
                 { id : rid
+                , roleType: rol_pspType pe
                 , property: replacementProperty
                 , deltaType: DeleteProperty
                 , values: []
@@ -445,7 +450,7 @@ deleteProperty rids propertyName = case ARR.head rids of
                 }
               author <- getAuthor
               signedDelta <- pure $ SignedDelta
-                { author: stripScheme author
+                { author: takeGuid author
                 , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
               addDelta (DeltaInTransaction { users, delta: signedDelta})
               (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie

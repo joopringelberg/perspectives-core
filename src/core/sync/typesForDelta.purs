@@ -25,17 +25,20 @@ module Perspectives.TypesForDeltas where
 import Data.Eq (class Eq)
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
+import Data.Map (Map)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, over)
 import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType)
-import Perspectives.ResourceIdentifiers (stripScheme)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, ResourceType(..), RoleType)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, takeGuid)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
+import Perspectives.Sync.Transaction (StorageScheme)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Show, map, show, (&&), (<<<), (<>), (==))
+import Prelude (class Show, map, show, ($), (&&), (<<<), (<>), (==))
 
 -----------------------------------------------------------
 -- GENERIC
@@ -72,7 +75,13 @@ instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
 
 instance StrippedDelta UniverseContextDelta where
   stripResourceSchemes (UniverseContextDelta r) = UniverseContextDelta r 
-    { id = over ContextInstance stripScheme r.id
+    { id = over ContextInstance takeGuid r.id
+    }
+  addResourceSchemes storageSchemes (UniverseContextDelta r) =  UniverseContextDelta r 
+    { id = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.id
+    }
+  addPublicResourceScheme url (UniverseContextDelta r) = UniverseContextDelta r
+    { id = over ContextInstance (createPublicIdentifier url) r.id
     }
 
 -----------------------------------------------------------
@@ -102,6 +111,7 @@ instance prettyPrintUniverseContextDeltaType :: PrettyPrint UniverseContextDelta
 -----------------------------------------------------------
 newtype UniverseRoleDelta = UniverseRoleDelta (DeltaRecord
   ( id :: ContextInstance
+  , contextType :: ContextType
   , roleType :: EnumeratedRoleType
   -- To be provided when deltaType is ConstructExternalRole or RemoveUnboundExternalRoleInstance or RemoveExternalRoleInstance.
   -- It is the context role type that binds the external role; this is the role type that the user is authorized to construct and fill.
@@ -132,8 +142,16 @@ instance prettyPrintUniverseRoleDelta :: PrettyPrint UniverseRoleDelta where
 
 instance StrippedDelta UniverseRoleDelta where
   stripResourceSchemes (UniverseRoleDelta r) = UniverseRoleDelta r 
-    { id = over ContextInstance stripScheme r.id
-    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance stripScheme)) r.roleInstances
+    { id = over ContextInstance takeGuid r.id
+    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance takeGuid)) r.roleInstances
+    }
+  addResourceSchemes storageSchemes (UniverseRoleDelta r) =  UniverseRoleDelta r 
+    { id = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.id
+    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)))) r.roleInstances
+    }
+  addPublicResourceScheme url (UniverseRoleDelta r) = UniverseRoleDelta r
+    { id = over ContextInstance (createPublicIdentifier url) r.id
+    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance (createPublicIdentifier url))) r.roleInstances
     }
 
 -----------------------------------------------------------
@@ -159,9 +177,11 @@ instance prettyPrintUniverseRoleDeltaType :: PrettyPrint UniverseRoleDeltaType w
 -----------------------------------------------------------
 newtype ContextDelta = ContextDelta (DeltaRecord
   ( contextInstance :: ContextInstance
+  , contextType :: ContextType
   , roleType :: EnumeratedRoleType
   , roleInstance :: RoleInstance
   , destinationContext :: Maybe ContextInstance
+  , destinationContextType :: Maybe ContextType
   , deltaType :: ContextDeltaType
   ))
 
@@ -172,7 +192,7 @@ instance showContextDelta :: Show ContextDelta where
   show = genericShow
 
 instance eqContextDelta :: Eq ContextDelta where
-  eq (ContextDelta {contextInstance:i1, roleType:r1, roleInstance:ri1, destinationContext: dc1, deltaType:d1}) (ContextDelta {contextInstance:i2, roleType:r2, roleInstance:ri2, destinationContext: dc2, deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && dc1 == dc2 && d1 == d2
+  eq (ContextDelta {contextInstance:i1, roleType:r1, roleInstance:ri1, {-destinationContext: dc1,-} deltaType:d1}) (ContextDelta {contextInstance:i2, roleType:r2, roleInstance:ri2, {-destinationContext: dc2,-} deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && {-dc1 == dc2 &&-} d1 == d2
 
 instance encodeContextDelta :: Encode ContextDelta where
   encode = genericEncode defaultOptions
@@ -184,9 +204,21 @@ instance prettyPrintContextDelta :: PrettyPrint ContextDelta where
 
 instance StrippedDelta ContextDelta where
   stripResourceSchemes (ContextDelta r) = ContextDelta r 
-    { contextInstance = over ContextInstance stripScheme r.contextInstance
-    , roleInstance = over RoleInstance stripScheme r.roleInstance
-    , destinationContext = maybe Nothing (Just <<< (over ContextInstance stripScheme)) r.destinationContext
+    { contextInstance = over ContextInstance takeGuid r.contextInstance
+    , roleInstance = over RoleInstance takeGuid r.roleInstance
+    , destinationContext = maybe Nothing (Just <<< (over ContextInstance takeGuid)) r.destinationContext
+    }
+  addResourceSchemes storageSchemes (ContextDelta r) =  ContextDelta r 
+    { contextInstance = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.contextInstance
+    , roleInstance = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)) r.roleInstance
+    , destinationContext = unsafePartial case r.destinationContext, r.destinationContextType of
+        Just dc, Just dct -> Just $ over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType dct)) dc
+        _, _ -> Nothing
+    }
+  addPublicResourceScheme url (ContextDelta r) = ContextDelta r
+    { contextInstance = over ContextInstance (createPublicIdentifier url) r.contextInstance
+    , roleInstance = over RoleInstance (createPublicIdentifier url) r.roleInstance
+    , destinationContext = maybe Nothing (Just <<< (over ContextInstance (createPublicIdentifier url))) r.destinationContext
     }
 
 -----------------------------------------------------------
@@ -215,8 +247,11 @@ instance prettyPrintContextDeltaType :: PrettyPrint ContextDeltaType where
 -----------------------------------------------------------
 newtype RoleBindingDelta = RoleBindingDelta (DeltaRecord
   ( filled :: RoleInstance
+  , filledType :: EnumeratedRoleType
   , filler :: Maybe RoleInstance
+  , fillerType :: Maybe EnumeratedRoleType
   , oldFiller :: Maybe RoleInstance
+  , oldFillerType :: Maybe EnumeratedRoleType
   , deltaType :: RoleBindingDeltaType
   -- Remove, Change
   ))
@@ -240,11 +275,24 @@ instance prettyPrintRoleBindingDelta :: PrettyPrint RoleBindingDelta where
 
 instance StrippedDelta RoleBindingDelta where
   stripResourceSchemes (RoleBindingDelta r) = RoleBindingDelta r 
-    { filled = over RoleInstance stripScheme r.filled
-    , filler = maybe Nothing (Just <<< (over RoleInstance stripScheme)) r.filler
-    , oldFiller = maybe Nothing (Just <<< (over RoleInstance stripScheme)) r.oldFiller
+    { filled = over RoleInstance takeGuid r.filled
+    , filler = maybe Nothing (Just <<< (over RoleInstance takeGuid)) r.filler
+    , oldFiller = maybe Nothing (Just <<< (over RoleInstance takeGuid)) r.oldFiller
     }
-
+  addResourceSchemes storageSchemes (RoleBindingDelta r) =  RoleBindingDelta r 
+    { filled = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.filledType)) r.filled
+    , filler = case r.filler, r.fillerType of
+        Just f, Just ft -> Just $ over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType ft)) f
+        _, _ -> Nothing
+    , oldFiller = unsafePartial case r.oldFiller, r.oldFillerType of
+        Just f, Just ft -> Just $ over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType ft)) f
+        _, _ -> Nothing
+    }
+  addPublicResourceScheme url (RoleBindingDelta r) = RoleBindingDelta r
+    { filled = over RoleInstance (createPublicIdentifier url) r.filled 
+    , filler = maybe Nothing (Just <<< (over RoleInstance (createPublicIdentifier url))) r.filler
+    , oldFiller = maybe Nothing (Just <<< (over RoleInstance (createPublicIdentifier url))) r.oldFiller
+    }
 -----------------------------------------------------------
 -- ROLEBINDINGDELTATYPE
 -----------------------------------------------------------
@@ -270,6 +318,7 @@ instance prettyPrintRoleBindingDeltaType :: PrettyPrint RoleBindingDeltaType whe
 -----------------------------------------------------------
 newtype RolePropertyDelta = RolePropertyDelta (DeltaRecord
   ( id :: RoleInstance
+  , roleType :: EnumeratedRoleType
   , property :: EnumeratedPropertyType
   , values :: Array Value
   , deltaType :: RolePropertyDeltaType
@@ -294,8 +343,13 @@ instance prettyPrintRolePropertyDelta :: PrettyPrint RolePropertyDelta where
 
 instance StrippedDelta RolePropertyDelta where
   stripResourceSchemes (RolePropertyDelta r) = RolePropertyDelta r 
-    { id = over RoleInstance stripScheme r.id
+    { id = over RoleInstance takeGuid r.id
     }
+  addResourceSchemes storageSchemes (RolePropertyDelta r) =  RolePropertyDelta r 
+    { id = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)) r.id
+    }
+  addPublicResourceScheme url (RolePropertyDelta r) = RolePropertyDelta r
+    { id = over RoleInstance (createPublicIdentifier url) r.id }
 
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTATYPE
@@ -321,3 +375,5 @@ instance prettyPrintRolePropertyDeltaType :: PrettyPrint RolePropertyDeltaType w
 -----------------------------------------------------------
 class StrippedDelta d where
   stripResourceSchemes :: d -> d
+  addResourceSchemes :: Map ResourceType StorageScheme -> d -> d
+  addPublicResourceScheme :: String -> d -> d 

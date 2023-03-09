@@ -22,6 +22,7 @@
 
 module Perspectives.Sync.HandleTransaction where
 
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Except (lift, runExcept)
 import Data.Array.NonEmpty (head)
@@ -60,7 +61,7 @@ import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (hasAspect, roleAspectsClosure)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
 import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<<), (<>), (>>=), (<$>), (==))
 
 -- TODO. Each of the executing functions must catch errors that arise from unknown types.
@@ -72,7 +73,7 @@ import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<
 -- or update to the newer model version (have the end user consent).
 
 executeContextDelta :: ContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
-executeContextDelta (ContextDelta{deltaType, contextInstance, roleType, roleInstance, destinationContext, subject} ) signedDelta = do
+executeContextDelta (ContextDelta{deltaType, contextInstance, contextType, roleType, roleInstance, destinationContext, subject} ) signedDelta = do
   log (show deltaType <> " to/from " <> show contextInstance <> " and " <> show roleInstance)
   case deltaType of
     -- The subject must be allowed to change the role: they must have a perspective on it that includes:
@@ -238,7 +239,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
           then lift $ void $ saveEntiteit externalRole
           else pure unit
 
--- | Execute all Deltas in a run that does not distrubute.
+-- | Execute all Deltas in a run that does not distribute.
 executeTransaction :: TransactionForPeer -> MonadPerspectives Unit
 executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectivesTransaction'
     false
@@ -251,16 +252,48 @@ executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectives
         executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
         -- For now, we fail silently on deltas that cannot be authenticated.
         executeDelta Nothing = pure unit
-        executeDelta (Just stringifiedDelta) = catchError
-          (case runExcept $ decodeJSON stringifiedDelta of
-            Right d1 -> executeRolePropertyDelta d1 s
-            Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-              Right d2 -> executeRoleBindingDelta d2 s
+        executeDelta (Just stringifiedDelta) = do 
+          storageSchemes <- lift $ gets _.typeToStorage
+          catchError
+            (case runExcept $ decodeJSON stringifiedDelta of
+              Right d1 -> executeRolePropertyDelta (addResourceSchemes storageSchemes d1) s
               Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                Right d3 -> executeContextDelta d3 s
+                Right d2 -> executeRoleBindingDelta (addResourceSchemes storageSchemes d2) s
                 Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                  Right d4 -> executeUniverseRoleDelta d4 s
+                  Right d3 -> executeContextDelta (addResourceSchemes storageSchemes d3) s
                   Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                    Right d5 -> executeUniverseContextDelta d5 s
-                    Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
-          (\e -> liftEffect $ log (show e))
+                    Right d4 -> executeUniverseRoleDelta ((addResourceSchemes storageSchemes d4)) s
+                    Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                      Right d5 -> executeUniverseContextDelta (addResourceSchemes storageSchemes d5) s
+                      Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
+            (\e -> liftEffect $ log (show e))
+
+executeTransactionForPublicRole :: TransactionForPeer -> MonadPerspectives Unit
+executeTransactionForPublicRole t@(TransactionForPeer{deltas}) = do 
+  storageUrl <- pure ""
+  void $ (runMonadPerspectivesTransaction'
+      false
+      (ENR $ EnumeratedRoleType sysUser)
+      (for_ deltas (f storageUrl)))
+  where
+    f :: String -> SignedDelta -> MonadPerspectivesTransaction Unit
+    f storageUrl s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta
+      where
+        executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
+        -- For now, we fail silently on deltas that cannot be authenticated.
+        executeDelta Nothing = pure unit
+        executeDelta (Just stringifiedDelta) = do 
+          storageSchemes <- lift $ gets _.typeToStorage
+          catchError
+            (case runExcept $ decodeJSON stringifiedDelta of
+              Right d1 -> executeRolePropertyDelta (addPublicResourceScheme storageUrl d1) s
+              Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                Right d2 -> executeRoleBindingDelta (addPublicResourceScheme storageUrl d2) s
+                Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                  Right d3 -> executeContextDelta (addPublicResourceScheme storageUrl d3) s
+                  Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                    Right d4 -> executeUniverseRoleDelta ((addPublicResourceScheme storageUrl d4)) s
+                    Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                      Right d5 -> executeUniverseContextDelta (addPublicResourceScheme storageUrl d5) s
+                      Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
+            (\e -> liftEffect $ log (show e)) 

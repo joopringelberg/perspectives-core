@@ -43,7 +43,7 @@ import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId, EnumeratedRoleType(..), ResourceType, RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.ScheduledAssignment (ScheduledAssignment)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
@@ -72,7 +72,6 @@ newtype Transaction = Transaction (TransactionRecord
   , untouchableContexts :: Array ContextInstance
   , untouchableRoles :: Array RoleInstance
   , userRoleBottoms :: MAP.Map RoleInstance RoleInstance
-  , typeToStorage :: MAP.Map ResourceType StorageScheme
   ))
 
 type TransactionRecord f =
@@ -121,7 +120,6 @@ instance decodeTransactie :: Decode Transaction where
       , untouchableRoles: []
       , untouchableContexts: []
       , userRoleBottoms: empty
-      , typeToStorage: empty
       }
 
 instance decodeTransactie' :: Decode Transaction' where
@@ -145,7 +143,6 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , untouchableRoles: if length untouchableRoles > length ur then untouchableRoles else ur
       , untouchableContexts: if length untouchableContexts > length uc then untouchableContexts else uc
       , userRoleBottoms: userRoleBottoms `MAP.union` urb
-      , typeToStorage: MAP.empty
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
@@ -176,11 +173,10 @@ createTransaction authoringRole author =
       , untouchableContexts: []
       , untouchableRoles: []
       , userRoleBottoms: MAP.empty
-      , typeToStorage: MAP.empty
     }
 
 cloneEmptyTransaction :: Transaction -> Transaction
-cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms, typeToStorage}) = Transaction
+cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms}) = Transaction
   { author
   , timeStamp
   , authoringRole
@@ -196,7 +192,6 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchabl
   , untouchableRoles
   , untouchableContexts
   , userRoleBottoms
-  , typeToStorage
 }
 
 -- | We consider a Transaction to be 'empty' when it shows no difference to the clone of the original.

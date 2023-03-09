@@ -25,8 +25,9 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (throwError)
+import Control.Monad.Trans.Class (lift)
 import Data.Array.NonEmpty (index)
-import Data.Map (lookup)
+import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), maybe)
 import Data.String (drop)
 import Data.String.Regex (Regex, match, test)
@@ -37,12 +38,12 @@ import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Guid as GUID
-import Perspectives.Identifiers (modelUri2ModelUrl)
+import Perspectives.Identifiers (isUrl, modelUri2ModelUrl)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
 import Perspectives.Representation.TypeIdentifiers (ResourceType)
 import Perspectives.Sync.Transaction (StorageScheme(..), WriteUrl, Url, DbName) as TRANS
-import Perspectives.Sync.Transaction (Transaction(..))
+import Perspectives.Sync.Transaction (StorageScheme)
 
 {------------------------------------------------------------
 ------------------------------------------------------------
@@ -282,22 +283,44 @@ createResourceIdentifier ctype = do
 -- | Such identifiers are only ever created when processing a Transaction for a publishing Proxy role.
 createResourceIdentifier' :: ResourceType -> String -> MonadPerspectivesTransaction ResourceIdentifier
 createResourceIdentifier' ctype g = do
-  mstorageScheme <- gets \(Transaction{typeToStorage}) -> lookup ctype typeToStorage 
+  mstorageScheme <- lift $ gets \({typeToStorage}) -> lookup ctype typeToStorage 
   case mstorageScheme of
-    Nothing -> createDefaultIdentifier
-    Just (TRANS.Default _) -> createDefaultIdentifier
-    Just (TRANS.Local dbName) -> createLocalIdentifier dbName
-    Just (TRANS.Remote url _) -> createRemoteIdentifier url
+    Nothing -> pure $ createDefaultIdentifier g
+    Just (TRANS.Default _) -> pure $ createDefaultIdentifier g
+    Just (TRANS.Local dbName) -> pure $ createLocalIdentifier dbName g
+    Just (TRANS.Remote url _) -> pure $ createRemoteIdentifier url g
 
-  where
-    createDefaultIdentifier :: MonadPerspectivesTransaction ResourceIdentifier
-    createDefaultIdentifier = pure ("def:#" <> g)
+createDefaultIdentifier :: String -> ResourceIdentifier
+createDefaultIdentifier g = "def:#" <> g
 
-    createLocalIdentifier :: TRANS.DbName -> MonadPerspectivesTransaction ResourceIdentifier
-    createLocalIdentifier dbName = pure ("loc:" <> dbName <> "#" <> g)
+createLocalIdentifier :: TRANS.DbName -> String -> ResourceIdentifier
+createLocalIdentifier dbName g = "loc:" <> dbName <> "#" <> g
 
-    createRemoteIdentifier :: TRANS.Url -> MonadPerspectivesTransaction ResourceIdentifier
-    createRemoteIdentifier url = pure ("rem:" <> url <> "#" <> g)
+createRemoteIdentifier :: TRANS.Url -> String -> ResourceIdentifier
+createRemoteIdentifier url g = "rem:" <> url <> "#" <> g
+
+addPublicScheme :: String -> ResourceIdentifier
+addPublicScheme s = "public:" <> s
+
+createPublicIdentifier :: String -> String -> ResourceIdentifier
+createPublicIdentifier url s = "public:" <> url <> "#" <> s
+
+-----------------------------------------------------------
+-- ADD SCHEME TO IDENTIFIER
+-----------------------------------------------------------
+-- | Add a storage scheme to an identifier based on the users own preferences.
+-- | If no preference is available, use the Public scheme if the given identifier has the form of 
+-- | an URL; make it a Default scheme otherwise
+-- | This function will never create a resource identifier with the model: scheme.
+addSchemeToResourceIdentifier :: Map ResourceType StorageScheme -> ResourceType -> String -> ResourceIdentifier
+addSchemeToResourceIdentifier map t s = case lookup t map of
+  Nothing -> if isUrl s
+    then addPublicScheme s
+    else createDefaultIdentifier s
+  Just (TRANS.Default _) -> createDefaultIdentifier s
+  Just (TRANS.Local dbName) -> createLocalIdentifier dbName s
+  Just (TRANS.Remote url _) -> createRemoteIdentifier url s
+  
 
 -----------------------------------------------------------
 -- GET THE SCHEME
@@ -325,6 +348,20 @@ stripScheme s = case match resourceIdentifierRegEx s of
   Just matches -> case index matches 1, index matches 2 of
     Just (Just _), Just (Just id) -> id
     _, _ -> s
+
+-- | Captures everything following the "#" as its first and only captureing group.
+discardStorageRegex :: Regex
+discardStorageRegex = unsafeRegex "^[^#$]+#(.+)" noFlags
+
+-- | Just retains the (unique) identifier of the ResourceIdentifier; 
+-- | discards all storage information such as scheme, database name or url.
+-- TODO: IMPLEMENT
+takeGuid :: ResourceIdentifier -> String
+takeGuid s = case match discardStorageRegex s of
+  Nothing -> s
+  Just matches -> case index matches 1 of
+    Just (Just g) -> g
+    _ -> s
 
 -----------------------------------------------------------
 -- TEST THE SHAPE OF A PUBLIC RESOURCE URL
