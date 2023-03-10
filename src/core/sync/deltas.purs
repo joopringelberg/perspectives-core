@@ -52,7 +52,7 @@ import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
@@ -73,8 +73,16 @@ distributeTransactie' t = do
   (customizedTransacties :: TransactionPerUser) <- transactieForEachUser t
   _ <- forWithIndex customizedTransacties 
     -- If we have the visitor user, handle it by augmenting resources in the public store with the deltas.
-    sendTransactieToUserUsingAMQP
+    sendTransactie
   pure unit
+
+sendTransactie :: String -> TransactionForPeer -> MonadPerspectives Unit
+sendTransactie userId t = do 
+  userType <- roleType_ (RoleInstance userId)
+  case userType of
+    (EnumeratedRoleType DEP.sysUser) -> sendTransactieToUserUsingAMQP userId t
+    (EnumeratedRoleType DEP.visitor) -> 
+    _ -> throwError ()
 
 -- | Send a transaction using the Couchdb Channel.
 sendTransactieToUserUsingCouchdb :: Url -> String -> TransactionForPeer -> MonadPerspectives Unit
@@ -89,6 +97,9 @@ sendTransactieToUserUsingCouchdb cdbUrl userId t = do
       transactionNumber <- nextTransactionNumber
       void $ addDocument (cdbUrl <> channel) t (transactieID t <> "_" <> show transactionNumber)
 
+-- | `userId` WILL be either 
+-- |   * a model://perspectives.domains#System$PerspectivesSystem$User instance, or
+-- |   * an instance of the Visitor role.
 sendTransactieToUserUsingAMQP :: String -> TransactionForPeer -> MonadPerspectives Unit
 sendTransactieToUserUsingAMQP userId t = do
   connected <- connectedToAMQPBroker
@@ -123,15 +134,18 @@ type TransactionPerUser = Object TransactionForPeer
 
 -- | The Transaction holds Deltas and each Delta names user instances who should receive that Delta.
 -- | This function builds a custom version of the Transaction for each such user.
--- | `users` in DeltaInTransaction will not always be model:System$PerspectivesSystem$User instances.
+-- | `users` in DeltaInTransaction will not always be model://perspectives.domains#System$PerspectivesSystem$User instances.
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
 transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas, userRoleBottoms}) = do
   execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do
-    -- Compute the instances of sys:PerspectivesSystem$User for all users in the delta.
+    -- Lookup the ultimate filler for all users in the delta.
     sysUsers <- pure $ catMaybes (flip Map.lookup userRoleBottoms <$> users)
     addDeltaToCustomisedTransactie delta (nub sysUsers))
     empty
   where
+    -- `sysUsers` WILL be either 
+    --    * model://perspectives.domains#System$PerspectivesSystem$User instances, or
+    --    * instances of the Visitor role.
     addDeltaToCustomisedTransactie :: SignedDelta -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
     addDeltaToCustomisedTransactie d@(SignedDelta {author: deltaAuthor}) sysUsers = for_
       sysUsers
