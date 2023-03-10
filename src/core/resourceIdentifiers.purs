@@ -302,8 +302,11 @@ createRemoteIdentifier url g = "rem:" <> url <> "#" <> g
 addPublicScheme :: String -> ResourceIdentifier
 addPublicScheme s = "public:" <> s
 
+-- | Add the public scheme and the url unless the identifier is already in the public scheme.
 createPublicIdentifier :: String -> String -> ResourceIdentifier
-createPublicIdentifier url s = "public:" <> url <> "#" <> s
+createPublicIdentifier url s = if isInPublicScheme s
+  then s
+  else "public:" <> url <> "#" <> s
 
 -----------------------------------------------------------
 -- ADD SCHEME TO IDENTIFIER
@@ -338,16 +341,15 @@ isInPublicScheme :: ResourceIdentifier -> Boolean
 isInPublicScheme s = maybe false (eq "pub") (getResourceIdentifierScheme s)
 
 -----------------------------------------------------------
--- STRIP THE SCHEME FROM A RESOURCE IDENTIFIER
+-- TRANSFORM A SCHEMED RESOURCE IDENTIFIER INTO AN IDENTIFIER IN A DELTA
 -----------------------------------------------------------
--- | Strips a ResourceIdentifier of its scheme.
--- | Notice that identifiers that are not well-shaped are returned as if they were stripped
-stripScheme :: ResourceIdentifier -> String
-stripScheme s = case match resourceIdentifierRegEx s of
-  Nothing -> s
-  Just matches -> case index matches 1, index matches 2 of
-    Just (Just _), Just (Just id) -> id
-    _, _ -> s
+-- | For the public scheme, just retain the entire ResourceIdentifier.
+-- | For all other schemes, take the guid.
+-- | Notice that identifiers that are not well-shaped are returned as such.
+stripNonPublicIdentifiers :: ResourceIdentifier -> String
+stripNonPublicIdentifiers s = if isInPublicScheme s
+  then s
+  else takeGuid s
 
 -- | Captures everything following the "#" as its first and only captureing group.
 discardStorageRegex :: Regex

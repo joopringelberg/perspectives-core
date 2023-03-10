@@ -85,6 +85,9 @@ type EnumeratedRoleRecord =
 
   , unlinked :: Boolean
 
+  -- This should be the URL of a public store of instances.
+  , publicUrl :: Maybe String
+
   }
 
 defaultEnumeratedRole :: String -> String -> RoleKind -> String -> Boolean -> ArcPosition -> EnumeratedRole
@@ -119,6 +122,7 @@ defaultEnumeratedRole qname dname kindOfRole context declaredAsPrivate pos = Enu
 
   , indexedRole: Nothing
   , unlinked: false
+  , publicUrl: Nothing
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _

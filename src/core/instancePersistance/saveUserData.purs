@@ -82,7 +82,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
-import Perspectives.ResourceIdentifiers (takeGuid)
+import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
@@ -218,7 +218,7 @@ stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
       addDelta $ DeltaInTransaction
         { users: nub $ users1 <> users2
         , delta: SignedDelta
-            { author: takeGuid me
+            { author: stripNonPublicIdentifiers me
             , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id
               , contextType
@@ -324,7 +324,7 @@ synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contex
         addDelta $ DeltaInTransaction
           { users
           , delta: SignedDelta
-            { author: takeGuid author
+            { author: stripNonPublicIdentifiers author
             , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id: contextId
               , contextType
@@ -480,7 +480,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
             author <- getAuthor
             signedDelta <-  case msignedDelta of
               Nothing -> pure $ SignedDelta
-                { author: takeGuid author
+                { author: stripNonPublicIdentifiers author
                 , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
               Just signedDelta -> pure signedDelta
 
@@ -581,7 +581,7 @@ removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectEntiteit
             author <- getAuthor
             signedDelta <- case msignedDelta of
               Nothing ->  pure $ SignedDelta
-                { author: takeGuid author
+                { author: stripNonPublicIdentifiers author
                 , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
               Just signedDelta -> pure signedDelta
             handleNewPeer filled

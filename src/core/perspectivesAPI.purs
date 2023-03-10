@@ -387,7 +387,10 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.ImportTransaction -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) TransactionForPeer) -> sendResponse (Error corrId (show e)) setter
       (Right tfp@(TransactionForPeer _)) -> do
-        executeTransaction tfp
+        (runMonadPerspectivesTransaction'
+          false
+          (ENR $ EnumeratedRoleType sysUser)
+          (executeTransaction tfp))
         sendResponse (Result corrId []) setter
     -- TODO/NOTE that we cannot provide a context role type that will bind these contexts.
     -- This can only be correct if the contexts have the aspect RootContext.

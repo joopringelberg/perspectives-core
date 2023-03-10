@@ -38,9 +38,12 @@ import Effect.Exception (error)
 import Foreign (MultipleErrors)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesExtraState)
-import Perspectives.Persistent.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Persistence.API (MonadPouchdb, deleteDocument)
 import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
+import Perspectives.Persistent.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.Sync.Channel (postDbName)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
@@ -73,7 +76,10 @@ incomingPost url = do
         Right (Tuple id (Just t)) -> do
           -- Delete the document
           _ <- lift $ deleteDocument database id Nothing
-          lift $ executeTransaction t
+          lift (runMonadPerspectivesTransaction'
+            false
+            (ENR $ EnumeratedRoleType sysUser)
+            (executeTransaction t))
 
 -----------------------------------------------------------
 -- GETCOUCHDBBASEURLWITHCREDENTIALS

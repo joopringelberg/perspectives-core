@@ -75,7 +75,7 @@ import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPrope
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
-import Perspectives.ResourceIdentifiers (takeGuid)
+import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -167,7 +167,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
       delta <- case receivedDelta of
         Just d -> pure d
         _ -> pure $ SignedDelta
-          { author: takeGuid author
+          { author: stripNonPublicIdentifiers author
           , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ ContextDelta
             { contextInstance : contextId
             , contextType: context_pspType pe
@@ -209,7 +209,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ ge
         addDelta $ DeltaInTransaction
           { users
           , delta: SignedDelta
-            { author: takeGuid author
+            { author: stripNonPublicIdentifiers author
             , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id: contextId
               , contextType: context_pspType pe
@@ -332,7 +332,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                       , subject
                       }
                     pure $ SignedDelta
-                      { author: takeGuid author
+                      { author: stripNonPublicIdentifiers author
                       , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
                   Just signedDelta -> pure signedDelta
                 addDelta (DeltaInTransaction { users, delta: delta })
@@ -408,7 +408,7 @@ removeProperty rids propertyName values = case ARR.head rids of
               }
             author <- getAuthor
             signedDelta <- pure $ SignedDelta
-              { author: takeGuid author
+              { author: stripNonPublicIdentifiers author
               , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
             addDelta (DeltaInTransaction { users, delta: signedDelta})
             (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
@@ -450,7 +450,7 @@ deleteProperty rids propertyName = case ARR.head rids of
                 }
               author <- getAuthor
               signedDelta <- pure $ SignedDelta
-                { author: takeGuid author
+                { author: stripNonPublicIdentifiers author
                 , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
               addDelta (DeltaInTransaction { users, delta: signedDelta})
               (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie

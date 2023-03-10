@@ -15,6 +15,7 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console (log, logShow)
 import Perspectives.CoreTypes (PerspectivesState, (##=), (##>), (##>>))
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getEnumeratedRoleInstances, getFilledRoles)
+import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (deleteDatabase, documentsInDatabase, tryGetDocument)
 import Perspectives.Persistence.CouchdbFunctions (endReplication)
@@ -22,7 +23,8 @@ import Perspectives.Persistence.State (withCouchdbUrl)
 import Perspectives.Persistent.ChangesFeed (EventSource, closeEventSource)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, localReplication)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
@@ -69,7 +71,11 @@ theSuite = suiteSkip "Perspectives.Sync.HandleTransaction" do
                 Nothing -> liftAff $ assert "There should be a transaction document" false
                 Just t -> do
                   -- log $ prettyPrint t
-                  executeTransaction t
+                  runMonadPerspectivesTransaction'
+                    false
+                    (ENR $ EnumeratedRoleType sysUser)
+                    (executeTransaction t)
+
                   -- Now check:
                   --  * there should be a channel document
                   --  * with two instances of model:System$Channel$ConnectedPartner

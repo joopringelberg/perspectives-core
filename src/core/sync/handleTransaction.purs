@@ -40,14 +40,16 @@ import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, de
 import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (###>>), (##>>), (###=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=), (###>>), (##=), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
+import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.Identifiers (buitenRol, typeUri2typeNameSpace_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType)
-import Perspectives.ModelDependencies (rootContext, sysUser)
+import Perspectives.ModelDependencies (rootContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
@@ -55,7 +57,6 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cach
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction', loadModelIfMissing)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -239,12 +240,28 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
           then lift $ void $ saveEntiteit externalRole
           else pure unit
 
+-----------------------------------------------------------
+-- LOADMODELIFMISSING
+-----------------------------------------------------------
+-- | Retrieves from the repository the model by its Model URI, if necessary.
+loadModelIfMissing :: DomeinFileId -> MonadPerspectivesTransaction Unit
+loadModelIfMissing dfId = do
+  mDomeinFile <- lift $ tryRetrieveDomeinFile dfId
+  if isNothing mDomeinFile
+    then do
+      addModelToLocalStore dfId
+    else pure unit
+
+
 -- | Execute all Deltas in a run that does not distribute.
-executeTransaction :: TransactionForPeer -> MonadPerspectives Unit
-executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectivesTransaction'
-    false
-    (ENR $ EnumeratedRoleType sysUser)
-    (for_ deltas f))
+-- executeTransaction :: TransactionForPeer -> MonadPerspectives Unit
+-- executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectivesTransaction'
+--     false
+--     (ENR $ EnumeratedRoleType sysUser)
+--     (for_ deltas f))
+
+executeTransaction :: TransactionForPeer -> MonadPerspectivesTransaction Unit
+executeTransaction t@(TransactionForPeer{deltas}) = for_ deltas f
   where
     f :: SignedDelta -> MonadPerspectivesTransaction Unit
     f s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta
@@ -268,22 +285,17 @@ executeTransaction t@(TransactionForPeer{deltas}) = void $ (runMonadPerspectives
                       Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
             (\e -> liftEffect $ log (show e))
 
-executeTransactionForPublicRole :: TransactionForPeer -> MonadPerspectives Unit
-executeTransactionForPublicRole t@(TransactionForPeer{deltas}) = do 
-  storageUrl <- pure ""
-  void $ (runMonadPerspectivesTransaction'
-      false
-      (ENR $ EnumeratedRoleType sysUser)
-      (for_ deltas (f storageUrl)))
+executeTransactionForPublicRole :: TransactionForPeer -> String -> MonadPerspectivesTransaction Unit
+executeTransactionForPublicRole t@(TransactionForPeer{deltas}) storageUrl = for_ deltas f
   where
-    f :: String -> SignedDelta -> MonadPerspectivesTransaction Unit
-    f storageUrl s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta
+    f :: SignedDelta -> MonadPerspectivesTransaction Unit
+    f s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta
       where
         executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
-        -- For now, we fail silently on deltas that cannot be authenticated.
+        -- For now, we fail silently on deltas that cannot be authenticated. Notice that this will never happen for
+        -- these deltas as they were constructed by the user himself!
         executeDelta Nothing = pure unit
         executeDelta (Just stringifiedDelta) = do 
-          storageSchemes <- lift $ gets _.typeToStorage
           catchError
             (case runExcept $ decodeJSON stringifiedDelta of
               Right d1 -> executeRolePropertyDelta (addPublicResourceScheme storageUrl d1) s

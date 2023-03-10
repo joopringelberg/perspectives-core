@@ -27,12 +27,14 @@ import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Reader (lift, runReaderT)
 import Data.Array (filterA, head, length, null, reverse, sort, unsafeIndex)
 import Data.Foldable (for_)
+import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Effect.Aff.AVar (new, put, take, tryRead)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
+import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), MPT, liftToInstanceLevel, (##=), (##>), (##>>))
@@ -45,21 +47,22 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHi
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.Instances.Combinators (exists')
-import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, roleType)
+import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, roleType, roleType_)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (tryRemoveEntiteit)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame, transactionFlag)
 import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getMyType)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), DomeinFileId, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance, stateEvaluationAndQueryUpdatesForContext, stateEvaluationAndQueryUpdatesForRole)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRemoved)
+import Perspectives.Sync.HandleTransaction (executeTransactionForPublicRole)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
-import Perspectives.Types.ObjectGetters (roleRootStates, contextRootStates)
+import Perspectives.Types.ObjectGetters (contextRootStates, publicUrl_, roleRootStates)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (=<<), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -94,7 +97,19 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       ft@(Transaction{correlationIdentifiers}) <- AA.get >>= runAllAutomaticActions
 
       -- 3. Send deltas to other participants, save changed domeinfiles.
-      if share then lift $ distributeTransaction ft else pure unit
+      publicRoleTransactions <- if share 
+        then lift $ distributeTransaction ft 
+        else pure empty
+
+      -- This may result in transactions for public roles. We don't send them anywhere but execute them
+      -- right here. Notice that no changes to local state will result from executing such a transaction.
+      forWithIndex_ publicRoleTransactions
+        \userId publicRoleTransaction -> do
+          userType <- lift $ roleType_ (RoleInstance userId)
+          mUrl <- lift $ publicUrl_ userType
+          case mUrl of
+            Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> userId <> "')")
+            Just url -> executeTransactionForPublicRole publicRoleTransaction url
 
       -- 4. Run effects.
       log "==========RUNNING EFFECTS============"
@@ -332,9 +347,7 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
 -----------------------------------------------------------
 -- LOADMODELIFMISSING
 -----------------------------------------------------------
--- | Retrieves from the repository the model, if necessary.
--- modelname should be the string value of a DomeinFileId (NOT a model URN)
--- TODO. This function relies on a repository URL in PerspectivesState. That is a stub.
+-- | Retrieves from the repository the model by its Model URI, if necessary.
 loadModelIfMissing :: DomeinFileId -> MonadPerspectivesTransaction Unit
 loadModelIfMissing dfId = do
   mDomeinFile <- lift $ tryRetrieveDomeinFile dfId

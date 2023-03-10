@@ -46,7 +46,7 @@ import Perspectives.Instances.ObjectGetters (contextType_)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType, cacheEntity)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.ResourceIdentifiers (takeGuid)
+import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
@@ -74,7 +74,7 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
     , occurrence = i
     , universeRoleDelta =
         SignedDelta
-          { author: takeGuid author
+          { author: stripNonPublicIdentifiers author
           , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
             { id: contextInstance
             , contextType

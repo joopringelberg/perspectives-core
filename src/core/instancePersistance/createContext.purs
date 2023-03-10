@@ -23,7 +23,7 @@ import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedP
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType, externalRoleType)
-import Perspectives.ResourceIdentifiers (takeGuid)
+import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
@@ -56,7 +56,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , pspType = pspType
       , buitenRol = externalRole
       , universeContextDelta = SignedDelta
-        { author: takeGuid author
+        { author: stripNonPublicIdentifiers author
         , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseContextDelta
             { id: contextInstanceId
             , contextType: pspType
@@ -74,7 +74,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , binding = Nothing
       , universeRoleDelta =
           SignedDelta
-            { author: takeGuid author
+            { author: stripNonPublicIdentifiers author
             , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id: contextInstanceId
               , contextType: pspType

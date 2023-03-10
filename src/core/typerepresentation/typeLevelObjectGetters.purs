@@ -117,6 +117,12 @@ indexedRoleName rtype = getEnumeratedRole rtype >>= pure <<< _.indexedRole <<< u
 propertyAliases :: EnumeratedRoleType -> MP (OBJ.Object EnumeratedPropertyType)
 propertyAliases rtype = getEnumeratedRole rtype >>= pure <<< _.propertyAliases <<< unwrap 
 
+publicUrl_ :: EnumeratedRoleType -> MonadPerspectives (Maybe String)
+publicUrl_ et = getEnumeratedRole et >>= pure <<< _.publicUrl <<< unwrap
+
+isPublicRole :: EnumeratedRoleType -> MonadPerspectives Boolean
+isPublicRole = publicUrl_ >=> pure <<< isJust
+
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
 ----------------------------------------------------------------------------------------

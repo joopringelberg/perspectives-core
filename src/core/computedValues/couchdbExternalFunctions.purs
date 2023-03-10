@@ -87,7 +87,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
-import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', takeGuid)
+import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -271,7 +271,7 @@ addModelToLocalStore (DomeinFileId modelname) = do
     , subject
     }
   signedDelta <- pure $ SignedDelta
-    { author: takeGuid author
+    { author: stripNonPublicIdentifiers author
     , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
 
   -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.

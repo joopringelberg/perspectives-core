@@ -92,7 +92,10 @@ incomingPost = do
             -- That is why we acknowledge first.
             -- The risk is that the PDR may not handle the message fully and then it is lost.
             lift $ acknowledge ack
-            lift $ executeTransaction body
+            lift (runMonadPerspectivesTransaction'
+              false
+              (ENR $ EnumeratedRoleType sysUser)
+              (executeTransaction body))
 
     setConnectionState :: Boolean -> MonadPerspectives Unit
     setConnectionState c = do

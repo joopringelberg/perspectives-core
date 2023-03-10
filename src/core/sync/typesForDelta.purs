@@ -34,7 +34,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, ResourceType(..), RoleType)
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, takeGuid)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, stripNonPublicIdentifiers)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Transaction (StorageScheme)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
@@ -75,7 +75,7 @@ instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
 
 instance StrippedDelta UniverseContextDelta where
   stripResourceSchemes (UniverseContextDelta r) = UniverseContextDelta r 
-    { id = over ContextInstance takeGuid r.id
+    { id = over ContextInstance stripNonPublicIdentifiers r.id
     }
   addResourceSchemes storageSchemes (UniverseContextDelta r) =  UniverseContextDelta r 
     { id = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.id
@@ -142,8 +142,8 @@ instance prettyPrintUniverseRoleDelta :: PrettyPrint UniverseRoleDelta where
 
 instance StrippedDelta UniverseRoleDelta where
   stripResourceSchemes (UniverseRoleDelta r) = UniverseRoleDelta r 
-    { id = over ContextInstance takeGuid r.id
-    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance takeGuid)) r.roleInstances
+    { id = over ContextInstance stripNonPublicIdentifiers r.id
+    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance stripNonPublicIdentifiers)) r.roleInstances
     }
   addResourceSchemes storageSchemes (UniverseRoleDelta r) =  UniverseRoleDelta r 
     { id = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.id
@@ -204,9 +204,9 @@ instance prettyPrintContextDelta :: PrettyPrint ContextDelta where
 
 instance StrippedDelta ContextDelta where
   stripResourceSchemes (ContextDelta r) = ContextDelta r 
-    { contextInstance = over ContextInstance takeGuid r.contextInstance
-    , roleInstance = over RoleInstance takeGuid r.roleInstance
-    , destinationContext = maybe Nothing (Just <<< (over ContextInstance takeGuid)) r.destinationContext
+    { contextInstance = over ContextInstance stripNonPublicIdentifiers r.contextInstance
+    , roleInstance = over RoleInstance stripNonPublicIdentifiers r.roleInstance
+    , destinationContext = maybe Nothing (Just <<< (over ContextInstance stripNonPublicIdentifiers)) r.destinationContext
     }
   addResourceSchemes storageSchemes (ContextDelta r) =  ContextDelta r 
     { contextInstance = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.contextInstance
@@ -275,9 +275,9 @@ instance prettyPrintRoleBindingDelta :: PrettyPrint RoleBindingDelta where
 
 instance StrippedDelta RoleBindingDelta where
   stripResourceSchemes (RoleBindingDelta r) = RoleBindingDelta r 
-    { filled = over RoleInstance takeGuid r.filled
-    , filler = maybe Nothing (Just <<< (over RoleInstance takeGuid)) r.filler
-    , oldFiller = maybe Nothing (Just <<< (over RoleInstance takeGuid)) r.oldFiller
+    { filled = over RoleInstance stripNonPublicIdentifiers r.filled
+    , filler = maybe Nothing (Just <<< (over RoleInstance stripNonPublicIdentifiers)) r.filler
+    , oldFiller = maybe Nothing (Just <<< (over RoleInstance stripNonPublicIdentifiers)) r.oldFiller
     }
   addResourceSchemes storageSchemes (RoleBindingDelta r) =  RoleBindingDelta r 
     { filled = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.filledType)) r.filled
@@ -343,7 +343,7 @@ instance prettyPrintRolePropertyDelta :: PrettyPrint RolePropertyDelta where
 
 instance StrippedDelta RolePropertyDelta where
   stripResourceSchemes (RolePropertyDelta r) = RolePropertyDelta r 
-    { id = over RoleInstance takeGuid r.id
+    { id = over RoleInstance stripNonPublicIdentifiers r.id
     }
   addResourceSchemes storageSchemes (RolePropertyDelta r) =  RolePropertyDelta r 
     { id = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)) r.id
