@@ -94,7 +94,8 @@ data RolePart =
   RoleAspect String ArcPosition (Maybe PropertyMapping) |
   IndexedRole String ArcPosition |
   ROLESTATE StateE |
-  Screen ScreenE
+  Screen ScreenE |
+  PublicUrl Step
 
 --------------------------------------------------------------------------------
 ---- PROPERTYMAPPING

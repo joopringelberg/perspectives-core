@@ -185,11 +185,16 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
       TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR _id) gebruikerRol of
         Nothing -> cons (ENR _id) gebruikerRol
         (Just _) -> gebruikerRol}
+      -- This is the Enumerated variant of the public role:
+      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR _id) gebruikerRol of
+        Nothing -> cons (ENR _id) gebruikerRol
+        (Just _) -> gebruikerRol}
 
     insertRoleInto (C (CalculatedRole {_id, kindOfRole})) c = case kindOfRole, c of
       TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR _id) rolInContext}
       TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR _id) contextRol}
       TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR _id) gebruikerRol}
+      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR _id) gebruikerRol}
       -- A catchall case that just returns the context. Calculated roles for ExternalRole and UserRole should be ignored.
       _, _ -> c
 
@@ -324,6 +329,11 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
         pure e
       else throwError (ScreenForUserRoleOnly start end)
 
+    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{}) (PublicUrl calc) = do 
+      expandedCalc <- expandPrefix calc
+      pure $ EnumeratedRole (roleUnderConstruction {publicUrl = Just $ S expandedCalc})
+
+
     -- We we add roleName as another disjunct of a sum type.
     -- Notice that we treat roles as units here; not as collections of properties!
     addToADT :: ADT RoleInContext -> RoleInContext -> ADT RoleInContext
@@ -434,6 +444,7 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
   pure (C role')
 
   where
+    -- Notice that we ignore an eventual PublicUrl RolePart; it is not useful for the Calculated version of the Public role. 
     handleParts :: CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     -- Parse the query expression.
 

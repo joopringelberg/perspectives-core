@@ -53,7 +53,7 @@ import Perspectives.ModelDependencies (rootUser)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Persistent.PublicStore (PublicStore)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
+import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce, toDisjunctiveNormalForm, equalsOrSpecialisesADT_)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
@@ -117,7 +117,7 @@ indexedRoleName rtype = getEnumeratedRole rtype >>= pure <<< _.indexedRole <<< u
 propertyAliases :: EnumeratedRoleType -> MP (OBJ.Object EnumeratedPropertyType)
 propertyAliases rtype = getEnumeratedRole rtype >>= pure <<< _.propertyAliases <<< unwrap 
 
-publicUrl_ :: EnumeratedRoleType -> MonadPerspectives (Maybe String)
+publicUrl_ :: EnumeratedRoleType -> MonadPerspectives (Maybe Calculation)
 publicUrl_ et = getEnumeratedRole et >>= pure <<< _.publicUrl <<< unwrap
 
 isPublicRole :: EnumeratedRoleType -> MonadPerspectives Boolean

@@ -53,8 +53,9 @@ import Perspectives.Names (getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (tryRemoveEntiteit)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame, transactionFlag)
-import Perspectives.Query.UnsafeCompiler (getCalculatedRoleInstances, getMyType)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Query.UnsafeCompiler (context2propertyValue, getCalculatedRoleInstances, getMyType)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), DomeinFileId, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance, stateEvaluationAndQueryUpdatesForContext, stateEvaluationAndQueryUpdatesForRole)
@@ -109,7 +110,12 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
           mUrl <- lift $ publicUrl_ userType
           case mUrl of
             Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> userId <> "')")
-            Just url -> executeTransactionForPublicRole publicRoleTransaction url
+            Just (Q qfd) -> do 
+              ctxt <- lift $ ((RoleInstance userId) ##>> context)
+              urlComputer <- lift $ context2propertyValue qfd
+              (Value url) <- lift (ctxt ##>> urlComputer)
+              executeTransactionForPublicRole publicRoleTransaction url
+            Just (S _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
 
       -- 4. Run effects.
       log "==========RUNNING EFFECTS============"

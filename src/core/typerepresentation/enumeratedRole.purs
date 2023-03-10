@@ -37,7 +37,7 @@ import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Data.EncodableMap (EncodableMap, empty, lookup, insert)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Query.QueryTypes (RoleInContext(..))
+import Perspectives.Query.QueryTypes (Calculation, RoleInContext(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -58,6 +58,7 @@ type EnumeratedRoleRecord =
   , kindOfRole :: RoleKind
   -- An EnumeratedRole instance is public if its context is public,
   -- unless it has been explicitly declared private.
+  -- TODO. This may be obsolete by now (March 10 2023)
   , declaredAsPrivate :: Boolean
   , context :: ContextType
   , views :: Array ViewType
@@ -86,7 +87,7 @@ type EnumeratedRoleRecord =
   , unlinked :: Boolean
 
   -- This should be the URL of a public store of instances.
-  , publicUrl :: Maybe String
+  , publicUrl :: Maybe Calculation
 
   }
 

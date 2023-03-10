@@ -50,7 +50,7 @@ import Perspectives.CoreTypes (type (~~~>), MP, MonadPerspectives, forceTypeArra
 import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
 import Perspectives.Data.EncodableMap (addAll)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
+import Perspectives.DomeinCache (modifyEnumeratedRoleInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutomaticEffect(..), UpstreamStateNotification(..), addUpstreamAutomaticEffect, addUpstreamNotification, indexedContexts, indexedRoles)
 import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, isTypeUri, qualifyWith, startsWithSegments, typeUri2typeNameSpace)
 import Perspectives.InvertedQuery (RelevantProperties(..))
@@ -128,6 +128,8 @@ phaseThree_ df@{_id, referredModels} postponedParts screens = do
       compileCalculatedRoles
       requalifyBindingsToCalculatedRoles
       compileCalculatedProperties
+      -- As all Calculated roles and Properties are now compiled, we can safely compile public Url calculations.
+      compilePublicUrls
       qualifyPropertyReferences
       handlePostponedStateQualifiedParts
       compileStateQueries
@@ -415,6 +417,47 @@ compileCalculatedProperties = do
             -- which in turn is lexically embedded in a Context definition.
             -- Hence we can use the context type for the RoleInContext.
             S stp -> void $ compileAndSaveProperty (RDOM (ST $ QT.RoleInContext{context,role})) stp cp
+
+
+compilePublicUrls :: PhaseThree Unit
+compilePublicUrls = do
+  df@{_id} <- lift $ State.gets _.dfr
+  -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (compilePublicUrls' df)
+  where
+    compilePublicUrls' :: DomeinFileRecord -> PhaseThree Unit
+    compilePublicUrls' {_id, enumeratedRoles} = do
+      traverse_ compilePublicUrlExpr (identifier <$> enumeratedRoles)
+      -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
+      -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
+      -- We will not have errors on trying to retrieve the DomeinFile here.
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId _id)
+      modifyDF \dfr -> modifiedDomeinFile
+      where
+        compilePublicUrlExpr :: EnumeratedRoleType -> PhaseThree Unit
+        compilePublicUrlExpr roleType = do
+          cr@(EnumeratedRole er@{publicUrl, context, pos}) <- lift2 $ getEnumeratedRole roleType
+          case publicUrl of
+            Nothing -> pure unit
+            Just (Q _) -> pure unit
+            -- Compiles the parsed expression and stores the modified CalculatedRole in
+            -- the DomeinCache.
+            Just (S stp) -> do
+              expressionWithEnvironment <- pure $ addContextualBindingsToExpression
+                [ makeIdentityStep "currentcontext" (startOf stp)
+                , makeIdentityStep "origin" (startOf stp)
+                ]
+                stp
+              compiledExpression <- compileExpression (CDOM $ ST context) expressionWithEnvironment
+              -- Check.
+              case range compiledExpression of
+                -- Save the result in DomeinCache.
+                VDOM PString _ -> lift2 $ void $ modifyEnumeratedRoleInDomeinFile _id (EnumeratedRole er {publicUrl = Just $ Q compiledExpression})
+                ran -> throwError (NotAStringDomain compiledExpression pos pos)
+
 
 handlePostponedStateQualifiedParts  :: PhaseThree Unit
 handlePostponedStateQualifiedParts = do

@@ -137,6 +137,11 @@ contextE = withPos do
                 CSQP _ -> false
                 STATE _ -> false
                 _ -> true) otherContextParts
+              enumeratedPublicDuplicates <- do
+                publicRoles <- pure $ filter (case _ of
+                  RE (RoleE {kindOfRole}) -> kindOfRole == Public
+                  _ -> false) otherContextParts
+                pure (enumeratedPublicDuplicate <$> publicRoles)
               -- The root state of this context. Every context has a root state; it may be empty.
               state <- pure $ STATE $ StateE
                 { id: (ContextState subContext Nothing)
@@ -147,6 +152,7 @@ contextE = withPos do
               pure $ (state : (ind <>
                 uses <>
                 aspects <>
+                enumeratedPublicDuplicates <>
                 rolesAndContexts))))
     else pure $ singleton $ STATE $ StateE
       { id: (ContextState (ContextType uname) Nothing)
@@ -159,6 +165,16 @@ contextE = withPos do
 
   where
 
+    -- Remove the Calculation
+    enumeratedPublicDuplicate :: ContextPart -> ContextPart
+    enumeratedPublicDuplicate (RE (RoleE r)) = RE $ RoleE r
+      { roleParts = filter (case _ of 
+        Calculation _ -> false
+        _ -> true) r.roleParts
+      }
+    -- This case is redundant in the sense that we only apply enumeratedPublicDuplicate to RE parts anyway.
+    enumeratedPublicDuplicate p = p
+
     contextPart :: IP ContextPart
     contextPart = do
       keyword <- scanIdentifier
@@ -170,6 +186,7 @@ contextE = withPos do
         "activity" -> contextE
         "thing" -> explicitObjectState >>= flip withArcParserState thingRoleE
         "user" -> explicitSubjectState >>= flip withArcParserState userRoleE
+        "public" -> explicitSubjectState >>= flip withArcParserState publicRoleE
         "context" -> explicitObjectState >>= flip withArcParserState contextRoleE
         "external" -> externalRoleState >>= flip withArcParserState externalRoleE
         "state" -> STATE <$> stateE
@@ -324,6 +341,33 @@ userRoleE = do
           setSubject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
           enumeratedRole_ uname kind pos
 
+publicRoleE :: IP ContextPart
+publicRoleE = do
+  -- `state` will be a role state specification.
+  {state} <- getArcParserState
+  protectSubject $ withEntireBlock
+    (\{uname, knd, pos, parts, isEnumerated, declaredAsPrivate} elements -> RE $ RoleE
+      { id: uname
+      , kindOfRole: knd
+      , roleParts: elements <> parts
+      , declaredAsPrivate
+      , pos
+      })
+    public_
+    rolePart
+  where
+    public_  :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
+    public_ = do
+      pos <- getPosition
+      knd <- reserved "public" *> pure Public
+      uname <- arcIdentifier
+      -- at <expression>
+      -- where <expression> should evaluate to a url.
+      url <- PublicUrl <$> (reserved "at" *> step)
+      ct@(ContextType ctxt) <- getCurrentContext
+      calculation <- reserved "=" *> step >>= pure <<< Calculation
+      pure {uname, knd, pos, parts: (url : calculation : Nil), isEnumerated: false, declaredAsPrivate: false}
+
 thingRoleE :: IP ContextPart
 thingRoleE = do
   -- `state` will be a role state specification.
@@ -412,12 +456,14 @@ externalRoleE = do
       setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$External")) pos)
       pure {uname: "External", knd, pos, parts: Nil, isEnumerated: true, declaredAsPrivate: false}
 
-calculatedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
+calculatedRole_ :: String -> RoleKind -> ArcPosition 
+  -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
 calculatedRole_ uname knd pos = do
   calculation <- reserved "=" *> step >>= pure <<< Calculation
   pure {uname, knd, pos, parts: Cons calculation Nil, isEnumerated: false, declaredAsPrivate: false}
 
-enumeratedRole_ :: String -> RoleKind -> ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
+enumeratedRole_ :: String -> RoleKind -> ArcPosition 
+  -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
 enumeratedRole_ uname knd pos = do
   attributes <- option Nil roleAttributes
   filledBy' <- filledBy
