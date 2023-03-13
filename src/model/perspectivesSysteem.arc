@@ -78,6 +78,10 @@ domain model://perspectives.domains#System
         callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#CouchdbManagement" )
       action ReloadCouchdb
         callEffect cdb:UpdateModel( "model://perspectives.domains#CouchdbManagement", false )
+      action UploadTestPublicRole
+        callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#TestPublicRole" )
+      action ReloadTestPublicRole
+        callEffect cdb:UpdateModel( "model://perspectives.domains#TestPublicRole", false )
       perspective on User
         defaults
       -- perspective on ModelsInUse

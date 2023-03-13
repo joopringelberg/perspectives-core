@@ -34,9 +34,10 @@ import Effect.Aff.AVar (AVar, put, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (DomeinFileName, ModelUri)
+import Perspectives.Identifiers (DomeinFileName, ModelUri, modelUri2ModelUrl)
 import Perspectives.Persistence.API (addAttachment, getAttachment)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
@@ -132,21 +133,16 @@ storeDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) = do
 
 storeDomeinFileInCouchdbPreservingAttachments :: DomeinFile -> MonadPerspectives Unit
 storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{_id}) = do
-  mattachment <- getDomeinFileScreens df
+  {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl _id
+  mAttachment <- getAttachment repositoryUrl documentName "screens.js"
   void $ storeDomeinFileInCache _id df
   (DomeinFile {_rev}) <- saveCachedDomeinFile (DomeinFileId _id)
-  case mattachment of
+  case mAttachment of
     Nothing -> pure unit
     Just attachment -> do
-      db <- getSystemIdentifier >>= pure <<< (_ <> "_models")
-      void $ addAttachment db _id _rev "screens.js" attachment (MediaType "text/ecmascript")
-      updateRevision (DomeinFileId _id)
-
-
-getDomeinFileScreens :: DomeinFile -> MonadPerspectives (Maybe String)
-getDomeinFileScreens (DomeinFile {_id}) = do
-  user <- getSystemIdentifier
-  getAttachment (user <> "_models") _id "screens.js"
+      perspect_models <- getSystemIdentifier >>= pure <<< (_ <> "_models")
+      void $ addAttachment perspect_models documentName _rev "screens.js" attachment (MediaType "text/ecmascript")
+      updateRevision (DomeinFileId documentName)
 
 -- | Remove the file from couchb. Removes the model from cache.
 removeDomeinFileFromCouchdb :: DomeinFileName -> MonadPerspectives Unit
