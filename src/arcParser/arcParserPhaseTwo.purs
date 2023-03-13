@@ -471,6 +471,8 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
         pure e
       else throwError (ScreenForUserRoleOnly start end)
 
+    handleParts crole (PublicUrl _) = pure crole
+
     handleParts crole p = throwError $ Custom ("Cannot handle part '" <> show p <> "' in PhaseTwo in a CalculatedRole: " <> show roleName)
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type

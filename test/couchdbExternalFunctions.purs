@@ -8,7 +8,7 @@ import Control.Monad.Free (Free)
 import Data.Array (length, null)
 import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Effect.Exception (error)
 import Foreign.Object (insert, lookup)
 import Perspectives.CoreTypes ((##=))
@@ -17,6 +17,7 @@ import Perspectives.Extern.Couchdb (createUser, uploadToRepository)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Persistence.API (tryGetDocument)
 import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.PerspectivesState (domeinCache)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
@@ -91,7 +92,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#Utilities")
       else liftAff $ assert ("There are instance- or model errors for perspectives.domains#Utilities: " <> show errs) false
 
-  testOnly "upload model://perspectives.domains#System to repository from files" $ runP do
+  test "upload model://perspectives.domains#System to repository from files" $ runP do
     -- Add a password for "https://localhost:6984/"
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
@@ -100,6 +101,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     _ <- loadCompileAndCacheArcFile' "sensor" modelDirectory
     _ <- loadCompileAndCacheArcFile' "utilities" modelDirectory
     errs <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    dCache <- domeinCache
     if null errs
       then uploadToRepository (DomeinFileId "model://perspectives.domains#System")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#System: " <> show errs) false
@@ -109,6 +111,20 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     if null errs
       then uploadToRepository (DomeinFileId "model://perspectives.domains#Parsing")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#Parsing: " <> show errs) false
+
+  testOnly "upload model://perspectives.domains#TestPublicRole to repository from files" $ runP do
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    addAllExternalFunctions
+    _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "sensor" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "utilities" modelDirectory
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    dCache <- domeinCache
+    errs <- loadCompileAndCacheArcFile' "testPublicRole" modelDirectory
+    if null errs
+      then uploadToRepository (DomeinFileId "model://perspectives.domains#TestPublicRole")
+      else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#TestPublicRole: " <> show errs) false
 
   test "upload model:perspectives.domains#BodiesWithAccounts to repository from files (without testuser)" $ runP do
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}

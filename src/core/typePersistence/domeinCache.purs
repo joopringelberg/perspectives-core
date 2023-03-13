@@ -30,7 +30,7 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
-import Effect.Aff.AVar (AVar, take)
+import Effect.Aff.AVar (AVar, put, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert)
@@ -66,8 +66,7 @@ modifyDomeinFileInCache modifier modelUri =
         df <- liftAff $ take avar
         -- Because we modify the existing Entiteit, we do not overwrite the version number -
         -- unless that is what our modifier does.
-        _ <- cacheEntity (DomeinFileId modelUri) (modifier df)
-        pure unit
+        liftAff $ put (modifier df) avar
 
 -----------------------------------------------------------
 -- MODIFY ELEMENTS OF A DOMEINFILE

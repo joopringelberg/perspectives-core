@@ -26,6 +26,7 @@ domain model://perspectives.domains#System
       -- bind publicrole https://perspectives.domains/cw_servers_and_repositories/perspectives_domains$External to BaseRepository in sys:MySystem
       -- Do we need to create an instance of a Manifest?
 
+        Name = "My System" for sys:MySystem >> extern
         bind_ sys:MySystem >> extern to indexedcontext
         -- TODO. Zonder kwalificatie zegt de compiler dat "Name" niet bestaat voor IndexedContexts. Maar er is een naamconflict met RootContext$Extern$Name
         IndexedContexts$Name = sys:MySystem >> indexedName for indexedcontext
@@ -73,6 +74,10 @@ domain model://perspectives.domains#System
       -- property Id = callExternal util:RoleIdentifier() returns String
       indexed sys:Me
       view VolledigeNaam (FirstName, LastName)
+      action UploadCouchdb
+        callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#CouchdbManagement" )
+      action ReloadCouchdb
+        callEffect cdb:UpdateModel( "model://perspectives.domains#CouchdbManagement", false )
       perspective on User
         defaults
       -- perspective on ModelsInUse

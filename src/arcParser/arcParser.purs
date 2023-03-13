@@ -42,6 +42,7 @@ import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelUri)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, prefixedName, qualifiedName, reserved, stringUntilNewline)
@@ -165,11 +166,12 @@ contextE = withPos do
 
   where
 
-    -- Remove the Calculation
+    -- Remove the Calculation, a Screen (if any)
     enumeratedPublicDuplicate :: ContextPart -> ContextPart
-    enumeratedPublicDuplicate (RE (RoleE r)) = RE $ RoleE r
+    enumeratedPublicDuplicate (RE (RoleE r@({id}))) = RE $ replaceIdentifier (id <> "Proxy") $ RoleE r
       { roleParts = filter (case _ of 
         Calculation _ -> false
+        Screen _ -> false
         _ -> true) r.roleParts
       }
     -- This case is redundant in the sense that we only apply enumeratedPublicDuplicate to RE parts anyway.
@@ -186,7 +188,7 @@ contextE = withPos do
         "activity" -> contextE
         "thing" -> explicitObjectState >>= flip withArcParserState thingRoleE
         "user" -> explicitSubjectState >>= flip withArcParserState userRoleE
-        "public" -> explicitSubjectState >>= flip withArcParserState publicRoleE
+        "public" -> getCurrentState >>= flip withArcParserState publicRoleE
         "context" -> explicitObjectState >>= flip withArcParserState contextRoleE
         "external" -> externalRoleState >>= flip withArcParserState externalRoleE
         "state" -> STATE <$> stateE
@@ -365,6 +367,7 @@ publicRoleE = do
       -- where <expression> should evaluate to a url.
       url <- PublicUrl <$> (reserved "at" *> step)
       ct@(ContextType ctxt) <- getCurrentContext
+      setSubject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
       calculation <- reserved "=" *> step >>= pure <<< Calculation
       pure {uname, knd, pos, parts: (url : calculation : Nil), isEnumerated: false, declaredAsPrivate: false}
 

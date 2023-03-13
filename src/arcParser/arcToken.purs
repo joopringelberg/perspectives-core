@@ -81,6 +81,7 @@ perspectDef = LanguageDef
                   , "external"
                   , "properties"
                   , "for"
+                  , "at"
 
                   -- Properties
                   , "property"
