@@ -38,6 +38,24 @@ domain model://perspectives.domains#TestPublicRole
       aspect sys:RootContext$External
 
     user Manager = sys:Me
+      action MakeTeaRoom
+        letA
+          tearoom <- create context TeaRoom
+        in
+          bind tearoom >> extern to TeaRooms
+          bind sys:Me to TeaRoomOperator in tearoom
+
+      perspective on TeaRooms
+        only (CreateAndFill, Remove)
+      perspective on TeaRooms >> binding >> context >> TeaRoomOperator
+        only (Create, Fill)
+
+
+    context TeaRooms (relational) filledBy TeaRoom
+
+  case TeaRoom
+
+    user TeaRoomOperator filledBy Manager
       perspective on Thee
         only (Create)
         props (Soort) verbs (SetPropertyValue)
