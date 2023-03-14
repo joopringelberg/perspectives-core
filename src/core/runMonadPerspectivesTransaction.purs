@@ -42,7 +42,7 @@ import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
@@ -359,7 +359,7 @@ loadModelIfMissing dfId = do
   mDomeinFile <- lift $ tryRetrieveDomeinFile dfId
   if isNothing mDomeinFile
     then do
-      addModelToLocalStore dfId
+      addModelToLocalStore dfId isInitialLoad
     else pure unit
 
 -----------------------------------------------------------

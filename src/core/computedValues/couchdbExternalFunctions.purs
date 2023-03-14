@@ -171,7 +171,7 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
       -- Clear the caches of compiled states.
       void $ pure $ clearModelStates dfId
       -- Install the new model, taking care of outgoing InvertedQueries.
-      addModelToLocalStore' dfId
+      addModelToLocalStore dfId isUpdate
       DomeinFile dfr <- lift $ getDomeinFile $ dfId
       -- Find all models in use.
       models' <- lift (allModelsInUse >>= traverse getDomeinFile)
@@ -200,11 +200,18 @@ addModelToLocalStore_ modelNames _ = for_ modelNames (addModelToLocalStore' <<< 
 
 addModelToLocalStore' :: DomeinFileId -> MonadPerspectivesTransaction Unit
 addModelToLocalStore' dfid@(DomeinFileId domeinFileName) = if test newModelRegex domeinFileName 
-  then addModelToLocalStore dfid
+  then addModelToLocalStore dfid isInitialLoad
   else throwError (error $ "Not a valid model name: " <> domeinFileName)
 
-addModelToLocalStore :: DomeinFileId -> MonadPerspectivesTransaction Unit
-addModelToLocalStore (DomeinFileId modelname) = do
+isUpdate :: Boolean
+isUpdate = false
+
+isInitialLoad :: Boolean
+isInitialLoad = true
+
+-- | Parameter `isUpdate` should be true iff the model has been added to the local installation before.
+addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
+addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl modelname
   df@(DomeinFile
   { _id
@@ -223,71 +230,75 @@ addModelToLocalStore (DomeinFileId modelname) = do
   -- Copy the attachment
   lift $ addA repositoryUrl documentName revision
 
-  -- If and only if the model we load is model:System, create both the system context and the system user.
-  -- This is part of the installation routine.
-  if modelname == DEP.systemModelName
-    then initSystem
+  if isInitialLoad'
+    then do
+      -- If and only if the model we load is model:System, create both the system context and the system user.
+      -- This is part of the installation routine.
+      if modelname == DEP.systemModelName
+        then initSystem
+        else pure unit
+      
+      -- Create the model instance
+      cid <- createResourceIdentifier (CType $ ContextType modelname)
+      r <- runExceptT $ constructEmptyContext 
+        (ContextInstance cid)
+        modelname
+        "model root context"
+        (PropertySerialization empty)
+        Nothing
+      case r of 
+        Left e -> logPerspectivesError (Custom (show e))
+        Right (ctxt :: PerspectContext) -> do 
+          lift $ void $ saveEntiteit_ (identifier ctxt) ctxt
+          addCreatedContextToTransaction (identifier ctxt)
+
+      -- Now create the Installer user role IN THE DOMAIN INSTANCE (it is cached automatically)
+      -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
+      -- it would introduce module imnport circularity.
+      (installerRole :: PerspectRol) <- constructEmptyRole
+        (ContextInstance cid)
+        (EnumeratedRoleType DEP.installer)
+        0
+        (RoleInstance (cid <> "$" <> (typeUri2LocalName_ DEP.installer) <> "_0000"))
+
+      -- Fill the installerRole with sys:Me (all these operations cache the roles that are involved).
+      me <- RoleInstance <$> (lift $ getUserIdentifier)
+      (identifier installerRole) `filledPointsTo` me
+      me `fillerPointsTo` (identifier installerRole)
+      roleIsMe (identifier installerRole) (rol_context installerRole)
+
+      subject <- getSubject
+      author <- getAuthor
+      delta@(RoleBindingDelta _) <- pure $ RoleBindingDelta
+        { filled : (identifier installerRole)
+        , filledType: (EnumeratedRoleType DEP.installer)
+        , filler: Just me
+        , fillerType: Just (EnumeratedRoleType DEP.sysUser)
+        , oldFiller: Nothing
+        , oldFillerType: Nothing
+        , deltaType: SetFirstBinding
+        , subject
+        }
+      signedDelta <- pure $ SignedDelta
+        { author: stripNonPublicIdentifiers author
+        , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+
+      -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
+      (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)
+      cacheAndSave (identifier installerRole) 
+        (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) installerRole')
+
+      -- And now add to the context.
+      void $ addRoleInstanceToContext (ContextInstance cid) (EnumeratedRoleType DEP.installer) (Tuple (identifier installerRole) Nothing)
+
+      -- Add new dependencies.
+      for_ referredModels \dfid -> do
+        mmodel <- lift $ tryGetPerspectEntiteit dfid
+        case mmodel of
+          Nothing -> addModelToLocalStore' dfid
+          Just _ -> pure unit
+    
     else pure unit
-  
-  -- Create the model instance
-  cid <- createResourceIdentifier (CType $ ContextType modelname)
-  r <- runExceptT $ constructEmptyContext 
-    (ContextInstance cid)
-    modelname
-    "model root context"
-    (PropertySerialization empty)
-    Nothing
-  case r of 
-    Left e -> logPerspectivesError (Custom (show e))
-    Right (ctxt :: PerspectContext) -> do 
-      lift $ void $ saveEntiteit_ (identifier ctxt) ctxt
-      addCreatedContextToTransaction (identifier ctxt)
-
-  -- Now create the Installer user role IN THE DOMAIN INSTANCE (it is cached automatically)
-  -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
-  -- it would introduce module imnport circularity.
-  (installerRole :: PerspectRol) <- constructEmptyRole
-    (ContextInstance cid)
-    (EnumeratedRoleType DEP.installer)
-    0
-    (RoleInstance (cid <> "$" <> (typeUri2LocalName_ DEP.installer) <> "_0000"))
-
-  -- Fill the installerRole with sys:Me (all these operations cache the roles that are involved).
-  me <- RoleInstance <$> (lift $ getUserIdentifier)
-  (identifier installerRole) `filledPointsTo` me
-  me `fillerPointsTo` (identifier installerRole)
-  roleIsMe (identifier installerRole) (rol_context installerRole)
-
-  subject <- getSubject
-  author <- getAuthor
-  delta@(RoleBindingDelta _) <- pure $ RoleBindingDelta
-    { filled : (identifier installerRole)
-    , filledType: (EnumeratedRoleType DEP.installer)
-    , filler: Just me
-    , fillerType: Just (EnumeratedRoleType DEP.sysUser)
-    , oldFiller: Nothing
-    , oldFillerType: Nothing
-    , deltaType: SetFirstBinding
-    , subject
-    }
-  signedDelta <- pure $ SignedDelta
-    { author: stripNonPublicIdentifiers author
-    , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
-
-  -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
-  (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)
-  cacheAndSave (identifier installerRole) 
-    (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) installerRole')
-
-  -- And now add to the context.
-  void $ addRoleInstanceToContext (ContextInstance cid) (EnumeratedRoleType DEP.installer) (Tuple (identifier installerRole) Nothing)
-
-  -- Add new dependencies.
-  for_ referredModels \dfid -> do
-    mmodel <- lift $ tryGetPerspectEntiteit dfid
-    case mmodel of
-      Nothing -> addModelToLocalStore' dfid
-      Just _ -> pure unit
 
   -- Distribute the SeparateInvertedQueries over the other domains.
   forWithIndex_ invertedQueriesInOtherDomains

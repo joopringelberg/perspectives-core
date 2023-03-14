@@ -45,7 +45,7 @@ import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedCon
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (addModelToLocalStore)
+import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad)
 import Perspectives.Identifiers (buitenRol, typeUri2typeNameSpace_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType)
@@ -249,7 +249,7 @@ loadModelIfMissing dfId = do
   mDomeinFile <- lift $ tryRetrieveDomeinFile dfId
   if isNothing mDomeinFile
     then do
-      addModelToLocalStore dfId
+      addModelToLocalStore dfId isInitialLoad
     else pure unit
 
 

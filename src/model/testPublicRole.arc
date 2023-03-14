@@ -40,7 +40,7 @@ domain model://perspectives.domains#TestPublicRole
     user Manager = sys:Me
       perspective on Thee
         only (Create)
-        props (Soort) verbs (Consult)
+        props (Soort) verbs (SetPropertyValue)
 
     thing Thee
       property Soort (String)
