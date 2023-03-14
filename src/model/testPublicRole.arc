@@ -40,10 +40,9 @@ domain model://perspectives.domains#TestPublicRole
     user Manager = sys:Me
       action MakeTeaRoom
         letA
-          tearoom <- create context TeaRoom
+          tearoom <- create context TeaRoom bound to TeaRooms
         in
-          bind tearoom >> extern to TeaRooms
-          bind sys:Me to TeaRoomOperator in tearoom
+          bind sys:Me to TeaRoomOperator in tearoom >> binding >> context
 
       perspective on TeaRooms
         only (CreateAndFill, Remove)
