@@ -300,13 +300,13 @@ createRemoteIdentifier :: TRANS.Url -> String -> ResourceIdentifier
 createRemoteIdentifier url g = "rem:" <> url <> "#" <> g
 
 addPublicScheme :: String -> ResourceIdentifier
-addPublicScheme s = "public:" <> s
+addPublicScheme s = "pub:" <> s
 
 -- | Add the public scheme and the url unless the identifier is already in the public scheme.
 createPublicIdentifier :: String -> String -> ResourceIdentifier
 createPublicIdentifier url s = if isInPublicScheme s
   then s
-  else "public:" <> url <> "#" <> s
+  else "pub:" <> url <> "#" <> s
 
 -----------------------------------------------------------
 -- ADD SCHEME TO IDENTIFIER

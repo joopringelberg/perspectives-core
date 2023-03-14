@@ -24,7 +24,7 @@ module Perspectives.Deltas where
 
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (catMaybes, elemIndex, filter, foldl, insertAt, length, nub, snoc, union)
+import Data.Array (catMaybes, elemIndex, filter, filterA, foldl, insertAt, length, nub, snoc, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Map (insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -60,7 +60,8 @@ import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
-import Prelude (Unit, bind, discard, eq, flip, map, not, notEq, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>>>))
+import Perspectives.Types.ObjectGetters (isPublicRole)
+import Prelude (Unit, bind, discard, eq, flip, map, not, notEq, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>>>), (>>=), (<*>), (>=>), (||))
 
 -- | Splits the transaction in versions specific for each peer and sends them.
 -- | If a public roles are involved, will return their TransactionForPeer instances.
@@ -166,8 +167,7 @@ addDomeinFileToTransactie dfId = AA.modify (over Transaction \(t@{changedDomeinF
 -- | Add the delta at the end of the array, unless it is already in the transaction!
 addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
 addDelta dt@(DeltaInTransaction{users}) = do
-  -- bottom_ can be idempotent if a role has no binding. Hence we filter away the tuples where fst == snd.
-  newUserBottoms <- lift $ filter (\(Tuple r b) -> r `notEq` b) <$> (for users \user -> Tuple user <$> bottom_ user)  
+  newUserBottoms <- (for users \user -> Tuple user <$> lift (bottom_ user)) >>= filterA isUserBottomOrPublic
   AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
     { deltas =
       if isJust $ elemIndex dt deltas
@@ -175,6 +175,11 @@ addDelta dt@(DeltaInTransaction{users}) = do
         else snoc deltas dt
     , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms
     })
+
+-- bottom_ can be idempotent if a role has no binding. Hence we filter away the tuples where fst == snd.
+-- However, we should keep roles that are a public role proxy.
+isUserBottomOrPublic :: Tuple RoleInstance RoleInstance -> MonadPerspectivesTransaction Boolean
+isUserBottomOrPublic (Tuple r b) = (||) <$> (pure (r `notEq` b)) <*> (lift $ (roleType_ >=> isPublicRole) r)
 
 -- | Insert the delta at the index, unless it is already in the transaction.
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
