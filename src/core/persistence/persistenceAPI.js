@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// TODO. Webpack switch voor pouchdb-browser?
+// NOTE. We have to decide in coding time whether to include the browser or the Node version
+// Otherwise, we'd carry the Node code to the browser and vice versa.
 var PouchDB = require('pouchdb-browser').default;
 // var PouchDB = require('pouchdb');
 

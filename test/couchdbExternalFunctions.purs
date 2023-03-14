@@ -92,7 +92,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
         uploadToRepository (DomeinFileId "model://perspectives.domains#Utilities")
       else liftAff $ assert ("There are instance- or model errors for perspectives.domains#Utilities: " <> show errs) false
 
-  test "upload model://perspectives.domains#System to repository from files" $ runP do
+  testOnly "upload model://perspectives.domains#System to repository from files" $ runP do
     -- Add a password for "https://localhost:6984/"
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
@@ -112,7 +112,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       then uploadToRepository (DomeinFileId "model://perspectives.domains#Parsing")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#Parsing: " <> show errs) false
 
-  testOnly "upload model://perspectives.domains#TestPublicRole to repository from files" $ runP do
+  test "upload model://perspectives.domains#TestPublicRole to repository from files" $ runP do
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
