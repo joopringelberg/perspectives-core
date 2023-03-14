@@ -48,10 +48,11 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), snd)
+import Foreign.Object (empty)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addRoleInstanceToContext, setProperty)
 import Perspectives.ContextAndRole (getNextRolIndex)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
 import Perspectives.Deltas (addCreatedContextToTransaction, deltaIndex, insertDelta)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
@@ -63,11 +64,12 @@ import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntitei
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleType(..), roletype2string)
 import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', guid)
 import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (>>=))
+import Perspectives.Types.ObjectGetters (publicUserRole)
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (>>=), (<<<))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setFirstBinding on each role.
@@ -120,8 +122,12 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
       lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) (i + 1)
       -- Add the context as a createdContext to the transaction
       lift $ addCreatedContextToTransaction contextInstanceId
-      pure contextInstanceId
+      -- If the context type has a public role, create an instance of its proxy.
+      publicRoles <- lift $ lift ((ContextType ctype) ###= publicUserRole)
+      for_ (EnumeratedRoleType <<< roletype2string <$> publicRoles) \t -> (lift $ createAndAddRoleInstance t (unwrap contextInstanceId) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing}))
+      pure contextInstanceId 
   where
+
 
     -- Constructed with a UniverseRoleDelta but no RoleBindingDelta.
     constructSingleRoleInstance ::
