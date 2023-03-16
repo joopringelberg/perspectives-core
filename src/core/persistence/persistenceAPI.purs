@@ -29,17 +29,17 @@ module Perspectives.Persistence.API
 
 where
 
-import Perspectives.Persistence.Types (AttachmentName, CouchdbUrl, DatabaseName, DocumentName, DocumentWithRevision, MonadPouchdb, Password, PouchError, PouchdbDatabase, PouchdbExtraState, PouchdbState, PouchdbUser, SystemIdentifier, Url, UserName, ViewName, decodePouchdbUser', encodePouchdbUser', readPouchError, runMonadPouchdb)
 import Prelude
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (lift)
+import Data.Array.NonEmpty (index)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.MediaType (MediaType)
 import Data.Nullable (Nullable, toNullable)
-import Data.String.Regex (Regex, test)
+import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
@@ -58,6 +58,7 @@ import Perspectives.Persistence.Authentication (AuthoritySource(..), ensureAuthe
 import Perspectives.Persistence.Errors (handlePouchError, handleNotFound)
 import Perspectives.Persistence.RunEffectAff (runEffectFnAff2, runEffectFnAff3, runEffectFnAff6)
 import Perspectives.Persistence.State (getCouchdbBaseURL)
+import Perspectives.Persistence.Types (AttachmentName, CouchdbUrl, DatabaseName, DocumentName, DocumentWithRevision, MonadPouchdb, Password, PouchError, PouchdbDatabase, PouchdbExtraState, PouchdbState, PouchdbUser, SystemIdentifier, Url, UserName, ViewName, decodePouchdbUser', encodePouchdbUser', readPouchError, runMonadPouchdb)
 import Simple.JSON (read, readImpl, write)
 
 -----------------------------------------------------------
@@ -66,11 +67,13 @@ import Simple.JSON (read, readImpl, write)
 -- | Creates a new Pouchdb db object and adds it to PouchdbState with the given name as key.
 -- | If PouchdbState contains a couchdbUrl, creates a database on that endpoint.
 -- | If dbname is a full url, creates a database on that endpoint.
--- | Ensures authentication.
+-- | Ensures authentication for non-pouchdb databases.
 -- | Database names must comply to rules given in https://docs.couchdb.org/en/stable/api/database/common.html#db
 createDatabase :: forall f. DatabaseName -> MonadPouchdb f Unit
 createDatabase dbname = if startsWithDatabaseEndpoint dbname
   then do
+    -- A remote database is actually created immediately if it does not exist.
+    -- If the server indicates we're not authenticated, ensureAuthentication requests a session and then repeats the action.
     pdb <- ensureAuthentication (Url dbname) (\_ -> liftEffect $ runEffectFn1 createDatabaseImpl dbname)
     modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
   else do
@@ -80,6 +83,8 @@ createDatabase dbname = if startsWithDatabaseEndpoint dbname
         pdb <- liftEffect $ runEffectFn1 createDatabaseImpl dbname
         modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
       Just prefix -> do
+        -- A remote database is actually created immediately if it does not exist.
+        -- If the server indicates we're not authenticated, ensureAuthentication requests a session and then repeats the action.
         pdb <- ensureAuthentication (Authority prefix) (\_ -> liftEffect $ runEffectFn2 createRemoteDatabaseImpl dbname prefix)
         modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
 
@@ -124,25 +129,6 @@ foreign import deleteDatabaseImpl :: PouchdbDatabase -> EffectFnAff Foreign
 -----------------------------------------------------------
 -- ENSUREDATABASE
 -----------------------------------------------------------
--- | Creates the database if it does not exist.
--- | Makes a default request, so databases are actually created remotely and authentication is triggered.
-ensureDatabase :: forall f. DatabaseName -> MonadPouchdb f PouchdbDatabase
-ensureDatabase dbName = do
-  mdb <- gets \{databases} -> lookup dbName databases
-  case mdb of
-    Nothing -> do
-      createDatabase dbName
-      -- Access the database to trigger authentication.
-      db <- gets \{databases} -> unsafePartial $ fromJust $ lookup dbName databases
-      lift $ void $ fromEffectFnAff $ databaseInfoImpl db
-      pure db
-    Just db -> do 
-      -- Access the database and throw error if it failed to trigger authentication.
-      f <- lift $ fromEffectFnAff $ databaseInfoImpl db 
-      case read f of 
-        Left e -> throwError (error "unauthorized")
-        (Right (i :: DatabaseInfo)) -> pure unit
-      pure db
 
 -----------------------------------------------------------
 -- WITHDATABASE
@@ -154,14 +140,50 @@ withDatabase :: forall f a.
   (PouchdbDatabase -> MonadPouchdb f a) ->
   MonadPouchdb f a
 withDatabase dbName fun = do
-  db <- if startsWithDatabaseEndpoint dbName
-    then ensureAuthentication (Url dbName) (\_ -> ensureDatabase dbName)
+  if startsWithDatabaseEndpoint dbName
+    then ensureAuthentication (Url dbName) 
+      (\_ -> do
+        db <- ensureDatabase
+        fun db)
     else do 
       mprefix <- getCouchdbBaseURL
       case mprefix of
-        Nothing -> ensureDatabase dbName
-        Just prefix -> ensureAuthentication (Authority prefix) (\_ -> ensureDatabase dbName)
-  fun db
+        Nothing -> do 
+          db <- ensureDatabase
+          fun db
+        Just prefix -> ensureAuthentication (Authority prefix) 
+          (\_ -> do 
+            db <- ensureDatabase
+            fun db)
+
+  where
+
+  -- | Creates the database if it does not exist.
+  -- | Makes a default request, so databases are actually created remotely and authentication is triggered.
+  -- Only used in withDatabase.
+  ensureDatabase :: MonadPouchdb f PouchdbDatabase
+  ensureDatabase = do
+    mdb <- gets \{databases} -> lookup dbName databases
+    case mdb of
+      Nothing -> do
+        -- actually creates a remote database and authenticates if necessary.
+        -- If a Pouchdb database, doesn't create and doesn't authenticate. 
+        -- However, neither are necessary.
+        createDatabase dbName
+        db <- gets \{databases} -> unsafePartial $ fromJust $ lookup dbName databases
+        -- Access the database to trigger authentication.
+        -- lift $ void $ fromEffectFnAff $ databaseInfoImpl db
+        pure db
+      Just db -> do 
+        -- We have accessed this database before, but we don't know whether
+        -- we still have a valide session.
+        -- Access the database and throw error if unauthorized.
+        f <- lift $ fromEffectFnAff $ databaseInfoImpl db 
+        case read f of 
+          Left e -> throwError (error "unauthorized")
+          (Right (i :: DatabaseInfo)) -> pure unit
+        pure db
+
 
 -----------------------------------------------------------
 -- DATABASEINFO
@@ -171,6 +193,8 @@ type DatabaseInfo =
   , doc_count :: Int
   }
 
+-- This is only used in Main when clearing the local models database, in setupPerspectivesInCouchdb
+-- and in createUserDatabases.
 databaseInfo :: forall f. DatabaseName -> MonadPouchdb f DatabaseInfo
 databaseInfo dbName = withDatabase dbName
   \db -> do
@@ -504,3 +528,27 @@ foreign import getViewOnDatabaseImpl ::
     ViewName
     (Nullable Foreign)
     Foreign
+
+-----------------------------------------------------------
+-- SPLIT AN URL INTO A COUCHDB DATABASE URL AND A DOCUMENT NAME
+-----------------------------------------------------------
+-- | This code is for the use case of files stored in Couchdb databases that are used as 
+-- |    * Perspectives Repositories
+-- |    * or instances databases.
+-- | We consequently make strong assumptions here:
+-- |    * that the URL is about a Couchdb installation;
+-- |    * that the scheme is https (this is because all repositories)
+-- | Consequently, we split the URL on the last forward slash. E.g.:
+-- |    https://perspectives.domains/models_perspectives_domains/perspectives_domains-System.json
+-- | will be split into
+-- |    {database: https://perspectives.domains/models_perspectives_domains/, document: perspectives_domains-System.json}
+
+repositoryFileRegex :: Regex
+repositoryFileRegex = unsafeRegex "^https://([^/]+/)(.*)$" noFlags
+
+splitRepositoryFileUrl :: String -> Maybe {database :: String, document :: String}
+splitRepositoryFileUrl s = case match repositoryFileRegex s of
+  (Just matches) -> case index matches 1, index matches 2 of
+    Just (Just database), Just (Just document) -> Just {database, document}
+    _, _ -> Nothing
+  _ -> Nothing

@@ -28,14 +28,9 @@ module Perspectives.Persistence.CouchdbFunctions
 , endReplication
 , createUser
 , deleteUser
-, getDocumentFromUrl
-, deleteDocument
 , ensureSecurityDocument
 , setPassword
-, createDatabase
-, deleteDatabase
 , user2couchdbuser
-, databaseExists
 )
 
 where

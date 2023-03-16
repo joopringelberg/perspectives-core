@@ -73,7 +73,8 @@ import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInverted
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, addDocument, getAttachment, getViewOnDatabase, retrieveDocumentVersion, tryGetDocument)
+import Perspectives.Persistence.API (addAttachment, addDocument, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, splitRepositoryFileUrl, tryGetDocument, withDatabase)
+import Perspectives.Persistence.API (deleteDocument) as Persistence
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
@@ -93,7 +94,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
 import Perspectives.Warning (PerspectivesWarning(..))
-import Prelude (Unit, bind, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (>=>))
+import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 modelsDatabaseName :: MonadPerspectives String
@@ -220,7 +221,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   , referredModels
   , invertedQueriesInOtherDomains
   , upstreamStateNotifications
-  , upstreamAutomaticEffects}) <- lift $ CDB.getDocumentFromUrl (repositoryUrl <> "/" <> documentName)
+  , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl documentName
 
   -- Store the model in Couchdb, that is: in the local store of models.
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
@@ -541,18 +542,14 @@ type Url = String
 createCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 createCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
-  Just databaseUrl, Just databaseName -> do 
-    exists <- lift $ CDB.databaseExists $ databaseUrl <> databaseName
-    if exists
-      then pure unit
-      else do lift $ CDB.createDatabase (databaseUrl <> databaseName)
+  Just databaseUrl, Just databaseName -> lift $ withDatabase (databaseUrl <> databaseName) (pure <<< const unit)
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 deleteCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 deleteCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
-  Just databaseUrl, Just databaseName -> lift $ CDB.deleteDatabase (databaseUrl <> databaseName)
+  Just databaseUrl, Just databaseName -> lift $ deleteDatabase (databaseUrl <> databaseName)
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
@@ -574,7 +571,9 @@ endReplication databaseUrls sources targets _ = case head databaseUrls, head sou
 
 deleteDocument :: Array Url -> RoleInstance -> MonadPerspectivesTransaction Unit
 deleteDocument url_ _ = case head url_ of
-  Just url -> void $ lift $ CDB.deleteDocument url Nothing 
+  Just url -> case splitRepositoryFileUrl url of
+    Nothing -> pure unit
+    Just {database, document} -> lift $ void $ Persistence.deleteDocument database document Nothing
   _ -> pure unit
 
 type UserName = String

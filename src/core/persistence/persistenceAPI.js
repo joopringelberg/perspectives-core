@@ -64,14 +64,22 @@ function convertPouchError( e )
   }
 }
 
+// On the assumption that we never persist files to the Inplace (or MyContexts) domains,
+// every request will be a cors request.
+function captureFetch(url, opts)
+{
+  opts.mode = "cors";
+  return fetch(url, opts);
+}
+
 exports.createDatabaseImpl = function( databaseName )
 {
-  return new PouchDB( databaseName );
+  return new PouchDB( databaseName, {fetch: captureFetch} );
 }
 
 exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
 {
-  var P = PouchDB.defaults({ prefix: couchdbUrl });
+  var P = PouchDB.defaults({ prefix: couchdbUrl, fetch: captureFetch });
   return new P(databaseName);
 }
 
