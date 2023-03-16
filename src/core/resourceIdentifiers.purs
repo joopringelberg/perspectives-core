@@ -375,7 +375,7 @@ takeGuid s = case match discardStorageRegex s of
 -- | index 2 is the database name.
 -- | index 3 is the resource name.
 publicResourcePattern :: String
-publicResourcePattern = "^(https://[^/]+/cw_[^/]+)/(.+)$"
+publicResourcePattern = "^(https://[^/]+/cw_[^/]+)/#(.+)$"
 
 publicResourceRegex :: Regex
 publicResourceRegex = unsafeRegex publicResourcePattern noFlags
