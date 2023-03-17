@@ -248,6 +248,14 @@ runSterileTransaction a =
   >>= lift <<< new
   >>= runReaderT a
 
+-- | Run a transaction even though another was already running.
+-- | The transaction flag embedded in PerspectivesState enables us to run just one transaction at a time.
+-- | We use this to execute transactions of various peers (including the own user) one by one,
+-- | not mingling the effects.
+-- | However, we have occasions where we want to run a transaction irrespective of whether another was running.
+-- | Obviously, we should only do this when we can reason that no harm will be done.
+-- | This is the case, for example, when we want to parse an ARC file, or when we want to add another model
+-- | to the installation.
 runEmbeddedTransaction :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
@@ -268,6 +276,30 @@ runEmbeddedTransaction authoringRole a = do
       _ <- lift $ take t
       pure result
     else throwError (error "runEmbeddedTransaction is not run inside another transaction.")
+
+-- | Runs an embedded transaction if a transaction is being run; just runs it otherwise.
+runEmbeddedIfNecessary :: forall o.
+  Boolean ->
+  RoleType ->
+  MonadPerspectivesTransaction o
+  -> (MonadPerspectives o)
+runEmbeddedIfNecessary share authoringRole a = do
+  t <- transactionFlag
+  flagIsDown <- isNothing <$> (lift $ tryRead t)
+  if flagIsDown
+    then do
+      -- Because the transactionFlag AVar is empty (== the flag is down), we know a transaction is running.
+      -- 1. Raise the flag, put 0 in it (we don't count embedded transactions)
+      _ <- lift $ put 0 t
+      log "Starting embedded transaction."
+      -- 2. Run the transaction (this will lower and raise the flag again, setting it to 1).
+      result <- runMonadPerspectivesTransaction' share authoringRole a
+      -- 2. Lower it again.
+      log "Ending embedded transaction."
+      _ <- lift $ take t
+      pure result
+    else runMonadPerspectivesTransaction' share authoringRole a
+
 
 -- | Evaluates state transitions. Executes automatic actions. Notifies users. Collects deltas in a new transaction.
 -- | If any are collected, recursively calls itself.

@@ -70,7 +70,7 @@ import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
-import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
@@ -148,7 +148,7 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
       case modelLoad of
         -- NOTE. Maybe it should be an embedded transaction.
         LoadModel dfId -> runPerspectivesWithState 
-          (runMonadPerspectivesTransaction' 
+          (runEmbeddedIfNecessary
             doNotShareWithPeers 
             (ENR $ EnumeratedRoleType sysUser) 
             (catchError (addModelToLocalStore dfId isInitialLoad *> (liftAff $ put ModelLoaded modelToLoadAVar))
