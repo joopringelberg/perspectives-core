@@ -30,14 +30,14 @@ import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, MonadPerspectives, PerspectivesState, RepeatingTransaction)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
 import Perspectives.Persistence.API (PouchdbUser, Url)
 import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 
-newPerspectivesState :: PouchdbUser -> Url -> AVar Int -> AVar RepeatingTransaction -> PerspectivesState
-newPerspectivesState uinfo publicRepo transFlag transactionWithTiming =
+newPerspectivesState :: PouchdbUser -> Url -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> PerspectivesState
+newPerspectivesState uinfo publicRepo transFlag transactionWithTiming modelToLoad =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
@@ -61,6 +61,7 @@ newPerspectivesState uinfo publicRepo transFlag transactionWithTiming =
   , warnings: []
   , transactionFlag: transFlag
   , transactionWithTiming
+  , modelToLoad
   , transactionFibers: Map.empty
   , typeToStorage: Map.empty
   }
@@ -118,6 +119,9 @@ setStompClient bs = modify \s -> s {stompClient = Just bs}
 
 getWarnings :: MonadPerspectives (Array String)
 getWarnings = gets _.warnings
+
+getModelToLoad :: MonadPerspectives (AVar JustInTimeModelLoad)
+getModelToLoad = gets _.modelToLoad
 
 -----------------------------------------------------------
 -- RESETTING CACHES

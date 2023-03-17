@@ -52,7 +52,7 @@ import Perspectives.Persistence.Types (PouchdbState)
 import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.Repetition (Duration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, ResourceType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId, EnumeratedPropertyType, EnumeratedRoleType, ResourceType, RoleType, StateIdentifier)
 import Perspectives.Sync.Transaction (Transaction, StorageScheme)
 import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, ($), (<<<), (<>), (>>=))
 
@@ -102,6 +102,8 @@ type PerspectivesExtraState =
 
   , transactionWithTiming :: AVar RepeatingTransaction
 
+  , modelToLoad :: AVar JustInTimeModelLoad
+
   , transactionFibers :: Map (Tuple String StateIdentifier) (Fiber Unit)
 
   , typeToStorage :: Map ResourceType StorageScheme
@@ -128,6 +130,8 @@ data RepeatingTransaction = TransactionWithTiming
   , startMoment :: Maybe Duration
   , endMoment :: Maybe Duration
   }
+
+data JustInTimeModelLoad = LoadModel DomeinFileId | ModelLoaded | LoadingFailed String
 
 -----------------------------------------------------------
 -- ASSUMPTIONS

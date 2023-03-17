@@ -76,7 +76,13 @@ runMonadPerspectivesTransaction :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives o)
-runMonadPerspectivesTransaction authoringRole a = runMonadPerspectivesTransaction' true authoringRole a
+runMonadPerspectivesTransaction authoringRole a = runMonadPerspectivesTransaction' shareWithPeers authoringRole a
+
+shareWithPeers :: Boolean
+shareWithPeers = true
+
+doNotShareWithPeers :: Boolean
+doNotShareWithPeers = false
 
 runMonadPerspectivesTransaction' :: forall o.
   Boolean ->

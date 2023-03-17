@@ -39,6 +39,7 @@ import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
 import Effect.Aff (Aff, Error, Fiber, Milliseconds(..), catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
 import Effect.Aff.AVar (AVar, empty, new, put, take)
+import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Now (now)
@@ -47,12 +48,12 @@ import Foreign.Object (fromFoldable)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (setupApi)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), (##=), (##>>))
+import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (modelsDatabaseName, roleInstancesFromCouchdb)
+import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad, modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (isModelUri)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
@@ -69,7 +70,7 @@ import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), StateIdentifier)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
@@ -111,10 +112,14 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
     Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
       transactionWithTiming <- empty
-      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
+      modelToLoad <- empty
+      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
       
       -- Fork aff to capture transactions to run.
       void $ forkAff $ forkTimedTransactions transactionWithTiming state
+
+      -- Fork aff to load models just in time.
+      void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
 
       runPerspectivesWithState (do
         addAllExternalFunctions
@@ -137,6 +142,22 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
           \e -> do
             logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
   where
+    forkJustInTimeModelLoader :: AVar JustInTimeModelLoad -> AVar PerspectivesState -> Aff Unit
+    forkJustInTimeModelLoader modelToLoadAVar state = do
+      modelLoad <- take modelToLoadAVar
+      case modelLoad of
+        -- NOTE. Maybe it should be an embedded transaction.
+        LoadModel dfId -> runPerspectivesWithState 
+          (runMonadPerspectivesTransaction' 
+            doNotShareWithPeers 
+            (ENR $ EnumeratedRoleType sysUser) 
+            (catchError (addModelToLocalStore dfId isInitialLoad *> (liftAff $ put ModelLoaded modelToLoadAVar))
+              \e -> liftAff $ put (LoadingFailed $ show e) modelToLoadAVar
+              ))
+          state
+        -- Other cases should not happen; we just ignore them here.
+        _ -> pure unit
+
     forkTimedTransactions :: AVar RepeatingTransaction -> AVar PerspectivesState -> Aff Unit
     forkTimedTransactions repeatingTransactionAVar state = do
       repeatingTransaction <- take repeatingTransactionAVar
@@ -216,6 +237,7 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
           (Milliseconds interval) <- pure $ fromDuration d
           pure $ instant $ Milliseconds (start + interval)
 
+    -- Register the fiber so it can be stopped if the instance exits the state.
     registerTransactionFiber :: Fiber Unit -> String -> StateIdentifier -> AVar PerspectivesState -> Aff Unit
     registerTransactionFiber f instanceId stateId stateAVar = do
       s@{transactionFibers} <- take stateAVar
@@ -258,7 +280,8 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
     Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
       transactionWithTiming <- empty
-      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
+      modelToLoad <- empty
+      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
       runPerspectivesWithState
         (do
           addAllExternalFunctions
@@ -285,7 +308,8 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
       Right (pouchdbUser :: PouchdbUser) -> do
         transactionFlag <- new 0
         transactionWithTiming <- empty
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
+        modelToLoad <- empty
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
         runPerspectivesWithState
           (do
             (catchError do
@@ -371,7 +395,8 @@ removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
           }
         transactionFlag <- new 0
         transactionWithTiming <- empty
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
+        modelToLoad <- empty
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
         runPerspectivesWithState
           do
             -- Get all Channels
@@ -423,7 +448,8 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
       Right (pouchdbUser :: PouchdbUser) -> do
         transactionFlag <- new 0
         transactionWithTiming <- empty
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming
+        modelToLoad <- empty
+        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
         runPerspectivesWithState
           (do
             addAllExternalFunctions
@@ -455,7 +481,7 @@ retrieveAllCredentials :: MonadPerspectives Unit
 retrieveAllCredentials = do
   (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb [userWithCredentials] (ContextInstance "")))
   rows <- foldM
-    (\rows' roleId -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsPassword))) >>=
+    (\rows' roleId -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsPassword))) >>= 
       handlePerspectRolError' "retrieveAllCredentials_Password" rows'
         \pw -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsAuthorizedDomain))) >>=
           handlePerspectRolError' "retrieveAllCredentials_AuthorizedDomain" rows' 

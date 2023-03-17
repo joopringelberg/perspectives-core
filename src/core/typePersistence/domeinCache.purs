@@ -35,13 +35,13 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (DomeinFileName, ModelUri, modelUri2ModelUrl)
 import Perspectives.Persistence.API (addAttachment, getAttachment)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
-import Perspectives.PerspectivesState (domeinCacheRemove)
+import Perspectives.PerspectivesState (domeinCacheRemove, getModelToLoad)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
@@ -107,8 +107,14 @@ modifyStateInDomeinFile modeluri sr@(State {id}) = modifyDomeinFileInCache modif
 retrieveDomeinFile :: ModelUri -> MonadPerspectives DomeinFile
 retrieveDomeinFile modeluri = tryGetPerspectEntiteit (DomeinFileId modeluri) >>= case _ of 
   -- Now retrieve the DomeinFile from a remote repository and store it in the local "models" database of this user.
-  -- Nothing -> addModelToLocalStore' modeluri true
-  Nothing -> throwError (error $ "Unknown model " <> modeluri)
+  Nothing -> do 
+    modelToLoadAVar <- getModelToLoad
+    liftAff $ put (LoadModel (DomeinFileId modeluri)) modelToLoadAVar
+    result <- liftAff $ take modelToLoadAVar
+    case result of 
+      ModelLoaded -> retrieveDomeinFile modeluri
+      LoadingFailed reason -> throwError (error $ "Cannot get " <> modeluri <> " from a repository. Reason: " <> reason)
+      _ -> throwError (error $ "Model retrieval from repository was not executed for " <> modeluri <> ".")
   Just df -> pure df
 
 tryRetrieveDomeinFile :: DomeinFileId -> MonadPerspectives (Maybe DomeinFile)
