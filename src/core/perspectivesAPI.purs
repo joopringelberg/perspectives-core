@@ -38,16 +38,16 @@ import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect (Effect)
-import Effect.Aff (Aff, catchError, try)
+import Effect.Aff (catchError, try)
 import Effect.Class (liftEffect)
-import Effect.Uncurried (EffectFn3, runEffectFn3)
+import Effect.Uncurried (EffectFn1, EffectFn3, runEffectFn1, runEffectFn3)
 import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.Generic (encodeJSON)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
-import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
+import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), RecordWithCorrelationidentifier(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (deleteProperty, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CompileAssignment (compileAssignment)
@@ -100,27 +100,53 @@ foreign import createRequestEmitterImpl :: EffectFn3
 createRequestEmitter :: Emitter Effect Foreign Unit -> Effect Unit
 createRequestEmitter = runEffectFn3 createRequestEmitterImpl Emit Finish
 
+foreign import retrieveRequestEmitterImpl :: EffectFn1
+  (Emitter Effect Foreign Unit)
+  Unit
+
+-- createRequestEmitter :: Emitter Foreign Unit
+retrieveRequestEmitter :: Emitter Effect Foreign Unit -> Effect Unit
+retrieveRequestEmitter = runEffectFn1 retrieveRequestEmitterImpl
+
 -- A Producer for Requests.
 requestProducer :: Producer Foreign (MonadPerspectives) Unit
 requestProducer = produce' createRequestEmitter
 
+resumeApi :: MonadPerspectives Unit
+resumeApi = runProcess $ ((produce' retrieveRequestEmitter) $~ (forever (transform decodeRequest))) $$ consumeRequest
+
 -- | Create a process that consumes requests from a producer fed by the user interface.
 setupApi :: MonadPerspectives Unit
 setupApi = runProcess $ (requestProducer $~ (forever (transform decodeRequest))) $$ consumeRequest
-  where
-    decodeRequest :: Foreign -> Request
-    decodeRequest f = case unwrap $ runExceptT (decode f) of
-      (Right r) -> r
-      (Left e) -> Request
+
+decodeRequest :: Foreign -> Request
+decodeRequest f = case unwrap $ runExceptT (decode f) of
+  (Right r) -> r
+  (Left e) -> case unwrap $ runExceptT (decode f) of
+    -- If we have a correlation identifier and a callback, we can send a message back to the client.
+    Right (RecordWithCorrelationidentifier {corrId, reactStateSetter}) -> 
+      Request
+        { request: Api.WrongRequest
+        , subject: ("Perspectives could not decode this request: '" <> show e <> "'")
+        , predicate: (unsafeStringify f)
+        , object: ""
+        , corrId
+        , reactStateSetter
+        , contextDescription: unsafeToForeign ""
+        , rolDescription: Nothing
+        , authoringRole: Nothing}
+    -- NOTE that this request will never lead to a response to the client.
+    Left _ -> Request
         { request: Api.WrongRequest
         , subject: ("Perspectives could not decode this request: '" <> show e <> "'")
         , predicate: (unsafeStringify f)
         , object: ""
         , corrId: -1
-        , reactStateSetter: Just $ unsafeToForeign (\_ -> pure unit :: Aff Unit)
+        , reactStateSetter: Just $ unsafeToForeign (\_ -> pure unit :: Effect Unit)
         , contextDescription: unsafeToForeign ""
         , rolDescription: Nothing
         , authoringRole: Nothing}
+
 
 consumeRequest :: Consumer Request MonadPerspectives Unit
 consumeRequest = forever do

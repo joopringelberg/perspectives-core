@@ -47,7 +47,7 @@ import Foreign (Foreign)
 import Foreign.Object (fromFoldable)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
-import Perspectives.Api (setupApi)
+import Perspectives.Api (resumeApi, setupApi)
 import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -127,13 +127,14 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
         retrieveAllCredentials
         retrieveBrokerService)
         state
-      void $ forkAff $ forever do
-        apiFiber <- forkAff $ do
-          log "(Re)starting the API listener."
-          runPerspectivesWithState setupApi state
-        catchError (joinFiber apiFiber)
-          \e -> do
-            logPerspectivesError $ Custom $ "API stopped and restarted because of: " <> show e
+      void $ forkAff $ run state
+      -- void $ forkAff $ forever do
+      --   apiFiber <- forkAff $ do
+      --     log "(Re)starting the API listener."
+      --     runPerspectivesWithState setupApi state
+      --   catchError (joinFiber apiFiber)
+      --     \e -> do
+      --       logPerspectivesError $ Custom $ "API stopped and restarted because of: " <> show e
       -- Trial and error shows us that if we apply the pattern used for setupApi to incomingPost,
       -- The application will not run well.
       void $ forkAff $ do
@@ -142,6 +143,24 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
           \e -> do
             logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
   where
+    run :: AVar PerspectivesState -> Aff Unit
+    run state = catchError 
+      (do 
+        log "Starting the Perspectives API."
+        runPerspectivesWithState setupApi state)
+      \e -> do
+        logPerspectivesError $ Custom $ "API stopped because: " <> show e
+        resumeRun state
+
+    resumeRun :: AVar PerspectivesState -> Aff Unit
+    resumeRun state = catchError 
+      (do 
+        log "Resuming the Perspectives API."
+        runPerspectivesWithState resumeApi state)
+      \e -> do
+        logPerspectivesError $ Custom $ "API stopped because: " <> show e
+        resumeRun state
+
     forkJustInTimeModelLoader :: AVar JustInTimeModelLoad -> AVar PerspectivesState -> Aff Unit
     forkJustInTimeModelLoader modelToLoadAVar state = do
       modelLoad <- take modelToLoadAVar
