@@ -98,8 +98,8 @@ setPreferredUserRoleType contextId userRoleTypes = (lift $ try $ getPerspectCont
     \(pe :: PerspectContext) -> do
       case ARR.head userRoleTypes of
         -- PERSISTENCE
-        Nothing -> cacheAndSave contextId $ changeContext_preferredUserRoleType pe Nothing
-        Just ut -> cacheAndSave contextId $ changeContext_preferredUserRoleType pe (Just ut)
+        Nothing -> lift $ cacheAndSave contextId $ changeContext_preferredUserRoleType pe Nothing
+        Just ut -> lift $ cacheAndSave contextId $ changeContext_preferredUserRoleType pe (Just ut)
       -- QUERY UPDATES.
       (lift $ findMeRequests contextId) >>= addCorrelationIdentifiersToTransactie
 
@@ -150,8 +150,8 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
         then do
           (lift $ findMeRequests contextId) >>= addCorrelationIdentifiersToTransactie
           -- CURRENTUSER
-          cacheAndSave contextId (changeContext_me changedContext (Just roleId))
-        else cacheAndSave contextId changedContext
+          lift $ cacheAndSave contextId (changeContext_me changedContext (Just roleId))
+        else lift $ cacheAndSave contextId changedContext
 
       -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
       -- the transaction, too.
@@ -179,7 +179,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
             , subject
             } }
       addDelta $ DeltaInTransaction {users, delta}
-      cacheAndSave _id $ PerspectRol r { contextDelta = delta }
+      lift $ cacheAndSave _id $ PerspectRol r { contextDelta = delta }
       -- QUERY UPDATES
       (lift $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
 
@@ -232,12 +232,12 @@ removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ ge
           else lift (modifyContext_rolInContext pe rolName (flip difference (toArray rolInstances)))
         -- PERSISTENCE.
         case find rol_isMe roles of
-          Nothing -> cacheAndSave contextId changedContext
+          Nothing -> lift $ cacheAndSave contextId changedContext
           Just _ -> do
             (lift $ findMeRequests contextId) >>= addCorrelationIdentifiersToTransactie
             -- CURRENTUSER.
             -- TODO. Is dit voldoende? Moet er niet een andere rol gevonden worden?
-            cacheAndSave contextId (changeContext_me changedContext Nothing)
+            lift $ cacheAndSave contextId (changeContext_me changedContext Nothing)
 
 -- | Detach the role instances from their current context and attach them to the new context.
 -- | This is not just a convenience function. The combination of removeRoleInstancesFromContext and addRoleInstanceToContext would add UniverseRoleDeltas, which we don't need here.
@@ -343,7 +343,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
             -- Apply all changes to the role and then save it:
             --  - change the property values in one go
             --  - add all propertyDeltas.
-            cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (OBJ.union (fromFoldable deltas)) propertyDeltas}) (addRol_property pe replacementProperty values))
+            lift $ cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (OBJ.union (fromFoldable deltas)) propertyDeltas}) (addRol_property pe replacementProperty values))
 
 -- | Get the property bearing role individual in the chain.
 -- | If the property is defined on role instance's type (either directly or by Aspect), return it; otherwise
@@ -416,7 +416,7 @@ removeProperty rids propertyName values = case ARR.head rids of
             -- Apply all changes to the role and then save it:
             --  - change the property values in one go
             --  - remove all propertyDeltas.
-            cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (filterKeys (\key -> isJust $ elemIndex (Value key) values)) propertyDeltas}) (removeRol_property pe replacementProperty values))
+            lift $ cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (filterKeys (\key -> isJust $ elemIndex (Value key) values)) propertyDeltas}) (removeRol_property pe replacementProperty values))
 
 -- | Delete all property values from the role for the EnumeratedPropertyType.
 -- | If there are no values for the property on the role instance, this is a no-op.
@@ -458,7 +458,7 @@ deleteProperty rids propertyName = case ARR.head rids of
               -- Apply all changes to the role and then save it:
               --  - change the property values in one go
               --  - remove all propertyDeltas for this property.
-              cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (const empty) propertyDeltas}) (deleteRol_property pe replacementProperty))
+              lift $ cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (const empty) propertyDeltas}) (deleteRol_property pe replacementProperty))
 
 -- | Modify the role instance with the new property values.
 -- | When all new values are in fact already in the set of values for the property of the role instance, this is
@@ -484,13 +484,13 @@ setProperty rids propertyName values = do
 -- CACHEANDSAVE
 -----------------------------------------------------------
 -- Save the entity in cache and in couchdb.
-cacheAndSave :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
+cacheAndSave :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives Unit
 cacheAndSave rid rol = void $ cacheAndSave_ rid rol
 
-cacheAndSave_ :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction a
+cacheAndSave_ :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
 cacheAndSave_ rid rol = do
-  lift $ void $ cacheEntity rid rol
-  lift $ Instances.saveEntiteit rid
+  void $ cacheEntity rid rol
+  Instances.saveEntiteit rid
 
 -----------------------------------------------------------
 -- SET ME
@@ -502,7 +502,7 @@ setMe cid me = do
   (lift $ try $ getPerspectContext cid) >>=
     handlePerspectContextError "setMe"
       \ctxt -> do
-        cacheAndSave cid (changeContext_me ctxt me)
+        lift $ cacheAndSave cid (changeContext_me ctxt me)
         (lift $ findMeRequests cid) >>= addCorrelationIdentifiersToTransactie
 
 -- | Returns the role instance having the perspective that allows resource modification 
@@ -531,7 +531,7 @@ setActiveContextState :: StateIdentifier -> ContextInstance -> MonadPerspectives
 setActiveContextState stateId contextId = (lift $ try $ getPerspectContext contextId) >>=
     handlePerspectContextError "setActiveContextState"
       \(pe :: PerspectContext) -> do
-        cacheAndSave contextId $ pushContext_state pe stateId
+        lift $ cacheAndSave contextId $ pushContext_state pe stateId
         (lift $ findContextStateRequests contextId) >>= addCorrelationIdentifiersToTransactie
 
 -----------------------------------------------------------
@@ -557,7 +557,7 @@ setInActiveContextState :: StateIdentifier -> ContextInstance -> MonadPerspectiv
 setInActiveContextState stateId contextId = (lift $ try $ getPerspectContext contextId) >>=
     handlePerspectContextError "setInActiveContextState"
       \(pe :: PerspectContext) -> do
-        cacheAndSave contextId $ popContext_state pe stateId
+        lift$ cacheAndSave contextId $ popContext_state pe stateId
         (lift $ findContextStateRequests contextId) >>= addCorrelationIdentifiersToTransactie
 
 -----------------------------------------------------------
@@ -577,7 +577,7 @@ setActiveRoleState :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransa
 setActiveRoleState stateId roleId = (lift $ try $ getPerspectRol roleId) >>=
     handlePerspectContextError "setActiveRoleState"
       \(pe :: PerspectRol) -> do
-        cacheAndSave roleId $ pushRol_state pe stateId
+        lift $ cacheAndSave roleId $ pushRol_state pe stateId
         (lift $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
 
 -----------------------------------------------------------
@@ -603,7 +603,7 @@ setInActiveRoleState :: StateIdentifier -> RoleInstance -> MonadPerspectivesTran
 setInActiveRoleState stateId roleId = (lift $ try $ getPerspectRol roleId) >>=
     handlePerspectContextError "setInActiveRoleState"
       \(pe :: PerspectRol) -> do
-        cacheAndSave roleId $ popRol_state pe stateId
+        lift $ cacheAndSave roleId $ popRol_state pe stateId
         (lift $ findRoleStateRequests roleId) >>= addCorrelationIdentifiersToTransactie
 
 -- | Set the the authoringRole in the Transaction for the duration of the monadic action.

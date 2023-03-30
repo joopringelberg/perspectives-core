@@ -81,6 +81,7 @@ distributeTransactie' t = do
 -- | If we have the visitor user, handle it by augmenting resources in the public store with the deltas.
 sendTransactie :: String -> TransactionForPeer -> MonadPerspectives (Maybe TransactionForPeer)
 sendTransactie userId t = do 
+  -- Dit gaat fout als userId verwijderd is!
   userType <- roleType_ (RoleInstance userId)
   if userType == (EnumeratedRoleType DEP.sysUser)
     then sendTransactieToUserUsingAMQP userId t *> pure Nothing

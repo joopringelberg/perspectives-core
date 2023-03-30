@@ -66,7 +66,7 @@ import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (addRoleObservingContexts, usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, (##=), (##>), (##>>), (###=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findMeRequests, findResourceDependencies, findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
@@ -188,13 +188,13 @@ removeContextIfUnbound roleInstance@(RoleInstance rid) rtype = do
 -- | Remove the context instance plus roles after detaching all its roles.
 -- | Does NOT remove the context role binding the external role.
 -- | Logs an error if the context does not exist, but does not break.
--- | PERSISTENCE
-removeContextInstance :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
+-- | PERSISTENCE ()
+removeContextInstance :: ContextInstance -> Maybe RoleType -> MonadPerspectives Unit
 removeContextInstance id authorizedRole = do
-  (lift $ try $ getPerspectContext id) >>=
+  (try $ getPerspectContext id) >>=
     handlePerspectContextError "removeContextInstance"
     \(ctxt@(PerspectContext{pspType:contextType, rolInContext, buitenRol})) -> do
-      lift $ do
+      do
         unlinkedRoleTypes <- contextType ###= allUnlinkedRoles
         unlinkedInstances <- concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
         for_ (unlinkedInstances <> (concat $ values rolInContext)) removeEntiteit
@@ -231,15 +231,15 @@ stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
 
 -- | Modifies the context instance by detaching the given role instances.
 -- | PERSISTENCE of the context instance.
-removeRoleInstance :: RoleInstance -> MonadPerspectivesTransaction Unit
-removeRoleInstance roleId = (lift $ try $ (getPerspectRol roleId)) >>= handlePerspectRolError "removeRoleInstance"
+removeRoleInstance :: RoleInstance -> MonadPerspectives Unit
+removeRoleInstance roleId = (try $ (getPerspectRol roleId)) >>= handlePerspectRolError "removeRoleInstance"
   \role@(PerspectRol{pspType:roleType, context:contextId, binding}) -> do
     -- PERSISTENCE (remove role instance from context).
     removeRoleInstanceFromContext role
     -- PERSISTENCE (severe the binding links of the incoming FILLS relation).
     severeBindingLinks role
     -- PERSISTENCE (finally remove the role instance from cache and database).
-    lift $ removeEntiteit roleId
+    removeEntiteit roleId
 
 -- | SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
 -- | STATE EVALUATION
@@ -268,7 +268,7 @@ handleRoleOnContextRemoval roleId = (lift $ try $ (getPerspectRol roleId)) >>= h
     queryUpdatesForRoleRemoval role
     -- PERSISTENCE (Remove the incoming links on both the incoming and outgoing
     -- binding relations).
-    severeBindingLinks role
+    lift $ severeBindingLinks role
     pure users
 
 -- | Returns peers with a perspective on the instance.
@@ -350,31 +350,31 @@ queryUpdatesForRoleRemoval role@(PerspectRol{_id:roleId, pspType:roleType, conte
 
 -- | PERSISTENCE. Remove the role instance from context.
 -- | Logs an error if the role doesn't exist but does not break.
-removeRoleInstanceFromContext :: PerspectRol -> MonadPerspectivesTransaction Unit
+removeRoleInstanceFromContext :: PerspectRol -> MonadPerspectives Unit
 removeRoleInstanceFromContext role@(PerspectRol{_id:roleId, pspType:roleType, context:contextId}) = do
-  (lift $ try $ getPerspectContext contextId) >>=
+  (try $ getPerspectContext contextId) >>=
     handlePerspectContextError "removeRoleInstance"
       \(pe :: PerspectContext) -> do
-        unlinked <- lift $ isUnlinked_ roleType
+        unlinked <- isUnlinked_ roleType
         -- Modify the context: remove the role instances from those recorded with the role type.
         changedContext <- if unlinked
           then pure pe
-          else lift (modifyContext_rolInContext pe roleType (delete roleId))
+          else modifyContext_rolInContext pe roleType (delete roleId)
         if rol_isMe role
           then do
             -- CURRENTUSER.
-            mmyType <- lift (contextId ##> getMyType)
+            mmyType <- contextId ##> getMyType
             case mmyType of
               Nothing -> cacheAndSave contextId (changeContext_me changedContext Nothing)
               Just myType -> do
-                mme <- lift (contextId ##> getRoleInstances myType)
+                mme <- contextId ##> getRoleInstances myType
                 cacheAndSave contextId (changeContext_me changedContext mme)
                 -- and set isMe of mme!
           else cacheAndSave contextId changedContext
 
 -- | PERSISTENCE. Remove the incoming links on both the incoming and outgoing
 -- | binding relations.
-severeBindingLinks :: PerspectRol -> MonadPerspectivesTransaction Unit
+severeBindingLinks :: PerspectRol -> MonadPerspectives Unit
 severeBindingLinks (PerspectRol{_id:roleId, pspType:roleType, binding, filledRoles}) = do
   -- Severe the binding links of the incoming FILLS relation:
   case binding of
@@ -393,7 +393,7 @@ severeBindingLinks (PerspectRol{_id:roleId, pspType:roleType, binding, filledRol
 removeAllRoleInstances :: EnumeratedRoleType -> Updater ContextInstance
 removeAllRoleInstances et cid = do
   instances <- lift (cid ##= getRoleInstances (ENR et))
-  for_ instances removeRoleInstance
+  lift $ for_ instances removeRoleInstance
 
 --------------------------
 -- UPDATE A ROLE (ADD OR REMOVE A BINDING)
@@ -449,8 +449,8 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
             loadModel fillerType
 
             -- PERSISTENCE
-            filled `filledPointsTo` filler
-            filler `fillerPointsTo` filled
+            lift (filled `filledPointsTo` filler)
+            lift (filler `fillerPointsTo` filled)
 
             -- QUERY EVALUATION
             filledContextType <- lift (rol_context filledRole ##>> contextType)
@@ -491,7 +491,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
 
             -- PERSISTENCE
             (modifiedFilled :: PerspectRol) <- lift $ getPerspectEntiteit filled
-            cacheAndSave filled (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) modifiedFilled)
+            lift $ cacheAndSave filled (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) modifiedFilled)
 
             pure users
 
@@ -611,7 +611,7 @@ changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filled
 
       -- Regardless of the filled will be removed, we'll have to remove the pointer from the filler to it.
       case rol_binding filled of
-        Just filler -> filler `fillerNoLongerPointsTo` filledId
+        Just filler -> lift (filler `fillerNoLongerPointsTo` filledId)
         _ -> pure unit
 
       if not roleWillBeRemoved
@@ -620,10 +620,10 @@ changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filled
           case mNewFiller of
             Nothing -> case rol_binding filled of
               Nothing -> pure unit
-              Just filler -> filledId `filledNoLongerPointsTo` filler
+              Just filler -> lift (filledId `filledNoLongerPointsTo` filler)
             Just newFiller -> do
-              filledId `filledPointsTo` newFiller
-              newFiller `fillerPointsTo` filledId
+              lift (filledId `filledPointsTo` newFiller)
+              lift (newFiller `fillerPointsTo` filledId)
         else pure unit
 
       -- CURRENTUSER

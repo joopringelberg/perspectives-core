@@ -101,7 +101,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       r <- a
 
       -- 2. Now run all actions.
-      ft@(Transaction{correlationIdentifiers}) <- AA.get >>= runAllAutomaticActions
+      ft@(Transaction{correlationIdentifiers, scheduledAssignments}) <- AA.get >>= runAllAutomaticActions
 
       -- 3. Send deltas to other participants, save changed domeinfiles.
       publicRoleTransactions <- if share 
@@ -112,16 +112,25 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- right here. Notice that no changes to local state will result from executing such a transaction.
       forWithIndex_ publicRoleTransactions
         \userId publicRoleTransaction -> do
+          -- Dit gaat fout als userId verwijderd is!
           userType <- lift $ roleType_ (RoleInstance userId)
           mUrl <- lift $ publicUrl_ userType
           case mUrl of
             Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> userId <> "')")
             Just (Q qfd) -> do 
+              -- Dit gaat fout als userId verwijderd is!
               ctxt <- lift $ ((RoleInstance userId) ##>> context)
               urlComputer <- lift $ context2propertyValue qfd
               (Value url) <- lift (ctxt ##>> urlComputer)
               executeTransactionForPublicRole publicRoleTransaction url
             Just (S _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
+
+      -- Now finally remove contexts and roles.
+      for_ (reverse scheduledAssignments) case _ of
+        ContextRemoval ctxt authorizedRole -> lift (log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole)
+        RoleRemoval rid -> lift (log ("Remove role " <> unwrap rid) *> removeRoleInstance rid)
+        -- TODO: moeten we msignedDelta niet meegeven?
+        _ -> pure unit
 
       -- 4. Run effects.
       log "==========RUNNING EFFECTS============"
@@ -156,11 +165,10 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       void $ AA.modify cloneEmptyTransaction
       -- Detach and remove instances, collecting new information in the fresh Transaction.
       for_ (reverse scheduledAssignments) case _ of
-        ContextRemoval ctxt authorizedRole -> log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole
-        RoleRemoval rid -> log ("Remove role " <> unwrap rid) *> removeRoleInstance rid
-        -- TODO: moeten we msignedDelta niet meegeven?
+        -- NOTICE that we do not remove contexts and roles yet. Distributing deltas for public proxies requires access to removed user roles and their contexts!
         RoleUnbinding filled mNewFiller msignedDelta -> log ("Remove filler of " <> unwrap filled) *> changeRoleBinding filled mNewFiller
         ExecuteDestructiveEffect functionName origin values -> log ("DestructiveEffect: " <> functionName) *> executeEffect functionName origin values
+        _ -> pure unit
       -- log ("Will remove these models: " <> show modelsToBeRemoved)
       lift $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- Now state has changed. Re-evaluate the resources that may change state.

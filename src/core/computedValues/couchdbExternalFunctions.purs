@@ -264,8 +264,8 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
 
       -- Fill the installerRole with sys:Me (all these operations cache the roles that are involved).
       me <- RoleInstance <$> (lift $ getUserIdentifier)
-      (identifier installerRole) `filledPointsTo` me
-      me `fillerPointsTo` (identifier installerRole)
+      lift ((identifier installerRole) `filledPointsTo` me)
+      lift (me `fillerPointsTo` (identifier installerRole))
       roleIsMe (identifier installerRole) (rol_context installerRole)
 
       subject <- getSubject
@@ -286,7 +286,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
 
       -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
       (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)
-      cacheAndSave (identifier installerRole) 
+      lift $ cacheAndSave (identifier installerRole) 
         (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) installerRole')
 
       -- And now add to the context.
