@@ -55,15 +55,20 @@ function convertPouchError( originalE )
     }
     else
     {
-      return new Error( "ignore this");
+      return new Error( JSON.stringify(
+        { status: originalE.status
+        , name: originalE.constructor.name
+        , message: originalE.message
+        , error: originalE.error}));
     }
   }
   catch(ignore)
   {
     return new Error( JSON.stringify(
-      { name: originalE.constructor.name
+      { status: originalE.status
+      , name: originalE.constructor.name
       , message: originalE.message
-      , error: originalE.stack}));
+      , error: originalE.error}));
   }
 }
 
