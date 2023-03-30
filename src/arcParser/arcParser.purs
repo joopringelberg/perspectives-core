@@ -168,7 +168,7 @@ contextE = withPos do
 
     -- Remove the Calculation, a Screen (if any)
     enumeratedPublicDuplicate :: ContextPart -> ContextPart
-    enumeratedPublicDuplicate (RE (RoleE r@({id}))) = RE $ replaceIdentifier (id <> "Proxy") $ RoleE r
+    enumeratedPublicDuplicate (RE (RoleE r@({id}))) = RE $ replaceIdentifier id "Proxy" $ RoleE r 
       { roleParts = filter (case _ of 
         Calculation _ -> false
         Screen _ -> false
@@ -345,13 +345,16 @@ userRoleE = do
 
 publicRoleE :: IP ContextPart
 publicRoleE = do
-  -- `state` will be a role state specification.
-  {state} <- getArcParserState
+  -- `state` will be a context state specification.
+  state <- publicState
   protectSubject $ withEntireBlock
     (\{uname, knd, pos, parts, isEnumerated, declaredAsPrivate} elements -> RE $ RoleE
       { id: uname
       , kindOfRole: knd
-      , roleParts: elements <> parts
+      -- Notice that we add a state, even though we consider a public role to be calculated.
+      -- This is because we need the Enumerated duplicate (the proxy) to have a state.
+      -- We'll filter it away from the Calculated version.
+      , roleParts: (createRoleState pos (state) elements) <> elements <> parts
       , declaredAsPrivate
       , pos
       })
@@ -370,6 +373,13 @@ publicRoleE = do
       setSubject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
       calculation <- reserved "=" *> step >>= pure <<< Calculation
       pure {uname, knd, pos, parts: (url : calculation : Nil), isEnumerated: false, declaredAsPrivate: false}
+
+    publicState :: IP StateSpecification
+    publicState = do
+      segments <- lookAhead (reserved "public" *> token.identifier)
+      ctxt@(ContextType ccontext) <- getCurrentContext
+      pos <- getPosition
+      pure $ SubjectState (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
 
 thingRoleE :: IP ContextPart
 thingRoleE = do

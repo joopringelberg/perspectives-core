@@ -445,6 +445,7 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
 
   where
     -- Notice that we ignore an eventual PublicUrl RolePart; it is not useful for the Calculated version of the Public role. 
+    -- The same holds for the State part.
     handleParts :: CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     -- Parse the query expression.
 
@@ -472,6 +473,9 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
       else throwError (ScreenForUserRoleOnly start end)
 
     handleParts crole (PublicUrl _) = pure crole
+
+    handleParts crole (ROLESTATE _) = pure crole
+
 
     handleParts crole p = throwError $ Custom ("Cannot handle part '" <> show p <> "' in PhaseTwo in a CalculatedRole: " <> show roleName)
 

@@ -2,87 +2,103 @@ module Perspectives.Parsing.Arc.AST.ReplaceIdentifiers  where
 
 import Prelude
 
+import Data.Maybe (Maybe(..))
+import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 
+type OriginalId = String
+type Addendum = String
+
 class ReplaceIdentifiers a where
-  replaceIdentifier :: String -> a -> a
+  replaceIdentifier :: OriginalId -> Addendum -> a -> a
 
 instance ReplaceIdentifiers RoleE where 
-  replaceIdentifier newId (RoleE r@({id,roleParts})) = RoleE (r 
-    { id = newId
-    , roleParts = replaceIdentifier newId <$> roleParts
+  replaceIdentifier original addendum (RoleE r@({id,roleParts})) = RoleE (r 
+    { id = if endsWithSegments id original then id <> addendum else original
+    , roleParts = replaceIdentifier original addendum <$> roleParts
     })
 
 instance ReplaceIdentifiers RolePart where
-  replaceIdentifier newId (SQP parts) = SQP $ replaceIdentifier newId <$> parts
-  replaceIdentifier newId (ROLESTATE s) = ROLESTATE $ replaceIdentifier newId s
-  replaceIdentifier newId rp = rp
+  replaceIdentifier original addendum (SQP parts) = SQP $ replaceIdentifier original addendum <$> parts
+  replaceIdentifier original addendum (ROLESTATE s) = ROLESTATE $ replaceIdentifier original addendum s
+  replaceIdentifier original addendum rp = rp
 
 instance ReplaceIdentifiers StateQualifiedPart where
-  replaceIdentifier newId (R r) = R $ replaceIdentifier newId r
-  replaceIdentifier newId (P r) = P $ replaceIdentifier newId r
-  replaceIdentifier newId (AC r) = AC $ replaceIdentifier newId r
-  replaceIdentifier newId (CA r) = CA $ replaceIdentifier newId r
-  replaceIdentifier newId (SO r) = SO $ replaceIdentifier newId r
-  replaceIdentifier newId (N r) = N $ replaceIdentifier newId r
-  replaceIdentifier newId (AE r) = AE $ replaceIdentifier newId r
-  replaceIdentifier newId (SUBSTATE r) = SUBSTATE $ replaceIdentifier newId r
+  replaceIdentifier original addendum (R r) = R $ replaceIdentifier original addendum r
+  replaceIdentifier original addendum (P r) = P $ replaceIdentifier original addendum r
+  replaceIdentifier original addendum (AC r) = AC $ replaceIdentifier original addendum r
+  replaceIdentifier original addendum (CA r) = CA $ replaceIdentifier original addendum r
+  replaceIdentifier original addendum (SO r) = SO $ replaceIdentifier original addendum r
+  replaceIdentifier original addendum (N r) = N $ replaceIdentifier original addendum r
+  replaceIdentifier original addendum (AE r) = AE $ replaceIdentifier original addendum r
+  replaceIdentifier original addendum (SUBSTATE r) = SUBSTATE $ replaceIdentifier original addendum r
 
 instance ReplaceIdentifiers StateE where
-  replaceIdentifier newId (StateE r@{id, stateParts, subStates}) = StateE $ r 
-    { id = replaceIdentifier newId id
-    , stateParts = replaceIdentifier newId <$> stateParts
-    , subStates = replaceIdentifier newId <$> subStates
+  replaceIdentifier original addendum (StateE r@{id, stateParts, subStates}) = StateE $ r 
+    { id = replaceIdentifier original addendum id
+    , stateParts = replaceIdentifier original addendum <$> stateParts
+    , subStates = replaceIdentifier original addendum <$> subStates
     }
 
 instance ReplaceIdentifiers StateSpecification where
-  replaceIdentifier newId (SubjectState rid mp) = SubjectState (replaceIdentifier newId rid) mp
-  replaceIdentifier newId ss = ss
+  replaceIdentifier original addendum (SubjectState rid mp) = SubjectState 
+    (replaceIdentifier original addendum rid) 
+    -- if the last segment equals the original, add the addendum
+    (case mp of
+      Nothing -> Nothing
+      Just segments -> if endsWithSegments segments original
+        then Just $ segments <> addendum
+        else Just segments)
+  replaceIdentifier original addendum ss = ss
 
 instance ReplaceIdentifiers RoleIdentification where
-  replaceIdentifier newId (ExplicitRole ct rt pos) = ExplicitRole ct (replaceIdentifier newId rt) pos
-  replaceIdentifier newId rid = rid
+  replaceIdentifier original addendum (ExplicitRole ct rt pos) = ExplicitRole ct (replaceIdentifier original addendum rt) pos
+  replaceIdentifier original addendum rid = rid
 
 instance ReplaceIdentifiers RoleType where
-  replaceIdentifier newId r@(ENR _) = r
-  replaceIdentifier newId (CR (CalculatedRoleType id)) = ENR $ EnumeratedRoleType newId
+  replaceIdentifier original addendum r@(ENR (EnumeratedRoleType id)) = if endsWithSegments id original
+    then ENR $ EnumeratedRoleType (id <> addendum)
+    else r
+  replaceIdentifier original addendum r@(CR (CalculatedRoleType id)) = if endsWithSegments id original
+    then ENR $ EnumeratedRoleType (id <> addendum)
+    else r
 
 instance ReplaceIdentifiers RoleVerbE where
-  replaceIdentifier newId (RoleVerbE r@{subject, state}) = RoleVerbE $ r
-    { subject = replaceIdentifier newId subject
-    , state = replaceIdentifier newId state}
+  replaceIdentifier original addendum (RoleVerbE r@{subject, state}) = RoleVerbE $ r
+    { subject = replaceIdentifier original addendum subject
+    , state = replaceIdentifier original addendum state}
 
 instance ReplaceIdentifiers PropertyVerbE where
-  replaceIdentifier newId (PropertyVerbE r@{subject, state}) = PropertyVerbE $ r
-    { subject = replaceIdentifier newId subject
-    , state = replaceIdentifier newId state}
+  replaceIdentifier original addendum (PropertyVerbE r@{subject, state}) = PropertyVerbE $ r
+    { subject = replaceIdentifier original addendum subject
+    , state = replaceIdentifier original addendum state}
 
 instance ReplaceIdentifiers ContextActionE where
-  replaceIdentifier newId (ContextActionE r@{subject, state}) = ContextActionE $ r
-    { subject = replaceIdentifier newId subject
-    , state = replaceIdentifier newId state}
+  replaceIdentifier original addendum (ContextActionE r@{subject, state}) = ContextActionE $ r
+    { subject = replaceIdentifier original addendum subject
+    , state = replaceIdentifier original addendum state}
 
 instance ReplaceIdentifiers SelfOnly where
-  replaceIdentifier newId (SelfOnly r@{subject, state}) = SelfOnly $ r
-    { subject = replaceIdentifier newId subject
-    , state = replaceIdentifier newId state}
+  replaceIdentifier original addendum (SelfOnly r@{subject, state}) = SelfOnly $ r
+    { subject = replaceIdentifier original addendum subject
+    , state = replaceIdentifier original addendum state}
 
 instance ReplaceIdentifiers ActionE where
-  replaceIdentifier newId (ActionE r@{subject, state}) = ActionE $ r
-    { subject = replaceIdentifier newId subject
-    , state = replaceIdentifier newId state}
+  replaceIdentifier original addendum (ActionE r@{subject, state}) = ActionE $ r
+    { subject = replaceIdentifier original addendum subject
+    , state = replaceIdentifier original addendum state}
 
 instance ReplaceIdentifiers NotificationE where
-  replaceIdentifier newId (NotificationE r@{user, transition}) = NotificationE $ r
-    { user = replaceIdentifier newId user
-    , transition = replaceIdentifier newId transition}
+  replaceIdentifier original addendum (NotificationE r@{user, transition}) = NotificationE $ r
+    { user = replaceIdentifier original addendum user
+    , transition = replaceIdentifier original addendum transition}
 
 instance ReplaceIdentifiers StateTransitionE where
-  replaceIdentifier newId (Entry spec) = Entry $ replaceIdentifier newId spec
-  replaceIdentifier newId (Exit spec) = Exit $ replaceIdentifier newId spec
+  replaceIdentifier original addendum (Entry spec) = Entry $ replaceIdentifier original addendum spec
+  replaceIdentifier original addendum (Exit spec) = Exit $ replaceIdentifier original addendum spec
 
 instance ReplaceIdentifiers AutomaticEffectE where
-  replaceIdentifier newId (AutomaticEffectE r@{subject, transition}) = AutomaticEffectE $ r
-    { subject = replaceIdentifier newId subject
-    , transition = replaceIdentifier newId transition}
+  replaceIdentifier original addendum (AutomaticEffectE r@{subject, transition}) = AutomaticEffectE $ r
+    { subject = replaceIdentifier original addendum subject
+    , transition = replaceIdentifier original addendum transition}

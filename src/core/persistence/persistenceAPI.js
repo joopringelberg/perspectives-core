@@ -21,7 +21,7 @@ exports.addNameAndVersionHack = function( doc, name, rev)
   return doc;
 }
 
-function convertPouchError( e )
+function convertPouchError( originalE )
 {
   // Pouchdb returns an object in case of promise rejection.
   // But sometimes it returns a TypeError. We convert that to the same form.
@@ -31,36 +31,39 @@ function convertPouchError( e )
   // This is caught by catchError in Purescript, e.g. in addDocument.
   // It even sometimes (e.g. in addAttachment) returns a Response type object.
 
-  if ( e instanceof TypeError )
+  if ( originalE instanceof TypeError )
   {
     return new Error( JSON.stringify(
-      { name: e.name
-      , message: e.message
-      , error: e.stack})
+      { name: originalE.name
+      , message: originalE.message
+      , error: originalE.stack})
     );
   }
   else try
   {
-    // Apparently, 'Response' is unknown in the Node distribution...
-    if (e instanceof Response)
+    // Apparently, 'Response' is unknown in the Node distribution and then this fails.
+    if (originalE instanceof Response)
     {
       return new Error( JSON.stringify(
-        { status: e.status
+        { status: originalE.status
         , name: "response"
-        , message: e.statusText
+        , message: originalE.statusText
         , error: true
-        , docId: e.url
+        , docId: originalE.url
         }
       ));
     }
     else
     {
-      return new Error( JSON.stringify( e ) );
+      return new Error( "ignore this");
     }
   }
   catch(ignore)
   {
-    return new Error( JSON.stringify( e ) );
+    return new Error( JSON.stringify(
+      { name: originalE.constructor.name
+      , message: originalE.message
+      , error: originalE.stack}));
   }
 }
 
@@ -74,12 +77,24 @@ function captureFetch(url, opts)
 
 exports.createDatabaseImpl = function( databaseName )
 {
-  return new PouchDB( databaseName, {fetch: captureFetch} );
+  return new PouchDB( 
+    databaseName
+    // NOTE. We have to decide in coding time whether to include the browser or the Node version.
+    // Node doesn't know fetch.
+    // Outcomment when running Node!
+    , {fetch: captureFetch} 
+    );
 }
 
 exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
 {
-  var P = PouchDB.defaults({ prefix: couchdbUrl, fetch: captureFetch });
+  var P = PouchDB.defaults(
+    { prefix: couchdbUrl
+    // NOTE. We have to decide in coding time whether to include the browser or the Node version.
+    // Node doesn't know fetch.
+    // Outcomment when running Node!
+    , fetch: captureFetch 
+    });
   return new P(databaseName);
 }
 
