@@ -46,7 +46,7 @@ import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad)
-import Perspectives.Identifiers (buitenRol, typeUri2typeNameSpace_, typeUri2ModelUri_)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType)
 import Perspectives.ModelDependencies (rootContext)
@@ -193,7 +193,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove]) >>= case _ of
         Left e -> handleError e
         -- As external roles are always stored the same as their contexts, we can reliably retrieve the context instance id from the role id.
-        Right _ -> for_ (ContextInstance <<< typeUri2typeNameSpace_ <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)
+        Right _ -> for_ (ContextInstance <<< deconstructBuitenRol <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)
     where
       userCreatesThemselves :: Boolean
       userCreatesThemselves = case subject of

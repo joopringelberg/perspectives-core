@@ -193,7 +193,6 @@ fetchEntiteit id = ensureAuthentication (Resource $ unwrap id) $ \_ -> catchErro
   do
     v <- representInternally id
 
-    -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
     {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
     doc <- getDocument database documentName
 

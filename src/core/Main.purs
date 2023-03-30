@@ -25,7 +25,6 @@ where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (runExceptT)
-import Control.Monad.Rec.Class (forever)
 import Control.Monad.Writer (runWriterT)
 import Data.Array (catMaybes, cons, filter, foldM)
 import Data.DateTime.Instant (Instant, instant, unInstant)

@@ -112,17 +112,16 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- right here. Notice that no changes to local state will result from executing such a transaction.
       forWithIndex_ publicRoleTransactions
         \userId publicRoleTransaction -> do
-          -- Dit gaat fout als userId verwijderd is!
           userType <- lift $ roleType_ (RoleInstance userId)
           mUrl <- lift $ publicUrl_ userType
           case mUrl of
             Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> userId <> "')")
             Just (Q qfd) -> do 
-              -- Dit gaat fout als userId verwijderd is!
               ctxt <- lift $ ((RoleInstance userId) ##>> context)
               urlComputer <- lift $ context2propertyValue qfd
               (Value url) <- lift (ctxt ##>> urlComputer)
-              executeTransactionForPublicRole publicRoleTransaction url
+              -- Run embedded, do not share.
+              lift $ runEmbeddedIfNecessary false authoringRole (executeTransactionForPublicRole publicRoleTransaction url)
             Just (S _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
 
       -- Now finally remove contexts and roles.
