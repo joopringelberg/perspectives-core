@@ -89,14 +89,30 @@ runMonadPerspectivesTransaction' :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives o)
-runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= lift <<< createTransaction authoringRole >>= lift <<< new >>= runReaderT run
+runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= lift <<< createTransaction authoringRole >>= lift <<< new >>= runReaderT whenFlagIsDown
   where
-    run :: MonadPerspectivesTransaction o
-    run = do
+    -- | Wait until the TransactionFlag can be taken down, then run the action; raise it again.
+    whenFlagIsDown :: MonadPerspectivesTransaction o
+    whenFlagIsDown = do 
       -- 0. Only execute the transaction when we can take the flag down.
-      t <- lift transactionFlag
+      t <- lift $ transactionFlag
       transactionNumber <- lift $ lift $ take t
       log ("Starting transaction " <> show transactionNumber)
+      catchError 
+        do 
+          r <- run
+          -- 5. Raise the flag
+          log ("Ending transaction " <> show transactionNumber)
+          _ <- lift $ lift $ put (transactionNumber + 1) t
+          pure r
+        \e -> do 
+          -- 5. Raise the flag
+          log ("Ending transaction " <> show transactionNumber)
+          _ <- lift $ lift $ put (transactionNumber + 1) t
+          throwError e
+
+    run :: MonadPerspectivesTransaction o
+    run = do
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
 
@@ -141,9 +157,6 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
           (Just {runner}) -> do
             -- logShow corrId
             lift $ runner unit
-      -- 5. Raise the flag
-      log ("Ending transaction " <> show transactionNumber)
-      _ <- lift $ lift $ put (transactionNumber + 1) t
       pure r
 
     runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction
@@ -276,15 +289,24 @@ runEmbeddedTransaction authoringRole a = do
       -- 1. Raise the flag, put 0 in it (we don't count embedded transactions)
       _ <- lift $ put 0 t
       log "Starting embedded transaction."
-      -- 2. Run the transaction (this will lower and raise the flag again, setting it to 1).
-      result <- runMonadPerspectivesTransaction authoringRole a
-      -- 2. Lower it again.
-      log "Ending embedded transaction."
-      _ <- lift $ take t
-      pure result
+      catchError 
+        do
+          -- 2. Run the transaction (this will lower and raise the flag again, setting it to 1).
+          -- runMonadPerspectivesTransaction has an internal Error Boundary that guarantees the flag is handled.
+          -- In other words, it is guaranteed to be up again when it is finished. But it may throw!
+          result <- runMonadPerspectivesTransaction authoringRole a
+          -- 2. Lower it again.
+          log "Ending embedded transaction."
+          _ <- lift $ take t
+          pure result
+        \e -> do
+          log "Ending embedded transaction in failure."
+          _ <- lift $ take t
+          throwError e
     else throwError (error "runEmbeddedTransaction is not run inside another transaction.")
 
 -- | Runs an embedded transaction if a transaction is being run; just runs it otherwise.
+-- | Has an internal error boundary that guarantees that the flag is restored.
 runEmbeddedIfNecessary :: forall o.
   Boolean ->
   RoleType ->
@@ -299,12 +321,19 @@ runEmbeddedIfNecessary share authoringRole a = do
       -- 1. Raise the flag, put 0 in it (we don't count embedded transactions)
       _ <- lift $ put 0 t
       log "Starting embedded transaction."
-      -- 2. Run the transaction (this will lower and raise the flag again, setting it to 1).
-      result <- runMonadPerspectivesTransaction' share authoringRole a
-      -- 2. Lower it again.
-      log "Ending embedded transaction."
-      _ <- lift $ take t
-      pure result
+      -- 2. Run the transaction (this is guaranteed to lower and raise the flag again because of an internal error boundary, setting it to 1 - but it may throw again!).
+      catchError 
+        do
+          result <- runMonadPerspectivesTransaction' share authoringRole a
+          -- 2. Lower it again.
+          log "Ending embedded transaction."
+          _ <- lift $ take t
+          pure result
+        \e -> do
+          log "Ending embedded transaction in failure."
+          _ <- lift $ take t
+          throwError e
+
     else runMonadPerspectivesTransaction' share authoringRole a
 
 
@@ -358,7 +387,10 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
           stateEvaluationAndQueryUpdatesForRole rid
           -- Error boundary.
           catchError (for_ states (exitingRoleState rid))
-            \e -> logPerspectivesError $ Custom ("Cannot exit role state, because " <> show e)
+            \e -> do 
+              logPerspectivesError $ Custom ("Cannot exit role state, because " <> show e)
+              lift $ restoreFrame oldFrame
+              throwError e
           lift $ restoreFrame oldFrame
   -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
   contextsThatHaveNotExited <- lift $ filterA (\sa -> case sa of

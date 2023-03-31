@@ -40,6 +40,7 @@ import Perspectives.Persistence.Types (DocumentName, PouchError, readPouchError)
 -----------------------------------------------------------
 -- | Handle Htpp status codes in case of low level errors in interaction with Couchdb by Pouchdb.
 -- | Guarantees to give the same messages as perspectives-couchdb.
+-- | Always re-throws.
 handlePouchError :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m a
 handlePouchError funcName docName e = parsePouchError funcName docName e >>=
   \({status, message} :: PouchError) -> case status of

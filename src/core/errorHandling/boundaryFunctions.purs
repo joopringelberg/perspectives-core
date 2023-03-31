@@ -36,6 +36,8 @@ handlePerspectRolError boundaryName f erole = case erole of
     _ <- f role
     pure unit
 
+-- | Error boundary with a default value. The default is returned instead of the result that the 
+-- | failed computation should have returned.
 handlePerspectRolError' :: forall a m r. MonadEffect m => String -> a -> (r -> m a) -> Either Error r -> m a
 handlePerspectRolError' boundaryName default f erole = case erole of
   Left err -> (logPerspectivesError $ RolErrorBoundary boundaryName (show err)) *> pure default
@@ -48,6 +50,8 @@ handlePerspectContextError boundaryName f econtext = case econtext of
     _ <- f ctxt
     pure unit
 
+-- | Error boundary with a default value. The default is returned instead of the result that the 
+-- | failed computation should have returned.
 handlePerspectContextError' :: forall a m r. MonadEffect m => String -> a -> (r -> m a) -> Either Error r -> m a
 handlePerspectContextError' boundaryName default f econtext = case econtext of
   Left err -> (logPerspectivesError $ ContextErrorBoundary boundaryName (show err)) *> pure default
@@ -60,6 +64,8 @@ handleDomeinFileError boundaryName f dfile = case dfile of
     _ <- f ctxt
     pure unit
 
+-- | Error boundary with a default value. The default is returned instead of the result that the 
+-- | failed computation should have returned.
 handleDomeinFileError' :: forall a m r. MonadEffect m => String -> a -> (r -> m a) -> Either Error r -> m a
 handleDomeinFileError' boundaryName default f dfile = case dfile of
   Left err -> (logPerspectivesError $ DomeinFileErrorBoundary boundaryName (show err)) *> pure default

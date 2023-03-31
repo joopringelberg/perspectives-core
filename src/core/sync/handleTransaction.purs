@@ -296,16 +296,14 @@ executeTransactionForPublicRole t@(TransactionForPeer{deltas}) storageUrl = for_
         -- these deltas as they were constructed by the user himself!
         executeDelta Nothing = pure unit
         executeDelta (Just stringifiedDelta) = do 
-          catchError
-            (case runExcept $ decodeJSON stringifiedDelta of
-              Right d1 -> executeRolePropertyDelta (addPublicResourceScheme storageUrl d1) s
+          (case runExcept $ decodeJSON stringifiedDelta of
+            Right d1 -> executeRolePropertyDelta (addPublicResourceScheme storageUrl d1) s
+            Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+              Right d2 -> executeRoleBindingDelta (addPublicResourceScheme storageUrl d2) s
               Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                Right d2 -> executeRoleBindingDelta (addPublicResourceScheme storageUrl d2) s
+                Right d3 -> executeContextDelta (addPublicResourceScheme storageUrl d3) s
                 Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                  Right d3 -> executeContextDelta (addPublicResourceScheme storageUrl d3) s
+                  Right d4 -> executeUniverseRoleDelta ((addPublicResourceScheme storageUrl d4)) s
                   Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                    Right d4 -> executeUniverseRoleDelta ((addPublicResourceScheme storageUrl d4)) s
-                    Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                      Right d5 -> executeUniverseContextDelta (addPublicResourceScheme storageUrl d5) s
-                      Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
-            (\e -> liftEffect $ log (show e)) 
+                    Right d5 -> executeUniverseContextDelta (addPublicResourceScheme storageUrl d5) s
+                    Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))

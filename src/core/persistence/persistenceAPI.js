@@ -34,7 +34,8 @@ function convertPouchError( originalE )
   if ( originalE instanceof TypeError )
   {
     return new Error( JSON.stringify(
-      { name: originalE.name
+      { status: originalE.status
+      , name: originalE.name
       , message: originalE.message
       , error: originalE.stack})
     );

@@ -246,7 +246,6 @@ saveEntiteit' entId mentiteit = ensureAuthentication (Resource $ unwrap entId) $
       Just e -> pure e
     Just e -> pure e
 
-  -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
   {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
   (rev :: Revision_) <- addDocument database entiteit documentName
   
