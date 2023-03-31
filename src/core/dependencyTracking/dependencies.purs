@@ -78,10 +78,13 @@ registerSupportedEffect :: forall a b x. Persistent x a => Newtype b String =>
   ApiEffect ->
   (a ~~> b) ->
   a ->
+  Boolean ->
   MP Unit
-registerSupportedEffect corrId ef q arg = do
+registerSupportedEffect corrId ef q arg onlyOnce = do
   -- Add a new effect to activeSupportedEffects, for now with zero assumptions.
-  _ <- pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
+  _ <- if onlyOnce 
+    then pure unit
+    else void $ pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
   -- then execute the SupportedEffect once
   apiEffectRunner unit
   where

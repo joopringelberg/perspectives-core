@@ -134,7 +134,8 @@ decodeRequest f = case unwrap $ runExceptT (decode f) of
         , reactStateSetter
         , contextDescription: unsafeToForeign ""
         , rolDescription: Nothing
-        , authoringRole: Nothing}
+        , authoringRole: Nothing
+        , onlyOnce: false}
     -- NOTE that this request will never lead to a response to the client.
     Left _ -> Request
         { request: Api.WrongRequest
@@ -145,7 +146,8 @@ decodeRequest f = case unwrap $ runExceptT (decode f) of
         , reactStateSetter: Just $ unsafeToForeign (\_ -> pure unit :: Effect Unit)
         , contextDescription: unsafeToForeign ""
         , rolDescription: Nothing
-        , authoringRole: Nothing}
+        , authoringRole: Nothing
+        , onlyOnce: false}
 
 
 consumeRequest :: Consumer Request MonadPerspectives Unit
@@ -159,7 +161,7 @@ consumeRequest = forever do
     )
 
 dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
-dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription, authoringRole: as} = do
+dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription, authoringRole: as, onlyOnce} = do
   -- The authoringRole is the System User by default.
   authoringRole <- case as of
     Nothing -> pure $ ENR $ EnumeratedRoleType sysUser
@@ -170,7 +172,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     --   (f :: RoleGetter) <- (getRoleFunction predicate)
     --   registerSupportedEffect corrId setter (f >=> binding) (ContextInstance subject)
     -- Given the rolinstance;
-    Api.GetBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject)
+    Api.GetBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject) onlyOnce
     -- Api.GetBindingType -> registerSupportedEffect corrId setter (binding >=> roleType) (RoleInstance subject)
 
     -- {request: "GetRoleBinders", subject: <RoleInstance>, predicate: <EnumeratedRoleType>, object: Maybe <ContextType>}
@@ -191,7 +193,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   sendResponse (Error corrId (show $ TypeErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right (EnumeratedRole{context:filledContextType}) ->do
                   void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
-                  registerSupportedEffect corrId setter (getFilledRoles filledContextType (EnumeratedRoleType predicate)) (RoleInstance subject)
+                  registerSupportedEffect corrId setter (getFilledRoles filledContextType (EnumeratedRoleType predicate)) (RoleInstance subject) onlyOnce
             filledContextType -> (try $ getContext (ContextType filledContextType)) >>=
               case _ of
                 Left err -> do
@@ -199,10 +201,10 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   sendResponse (Error corrId (show $ ContextErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right _ -> do
                   void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
-                  registerSupportedEffect corrId setter (getFilledRoles (ContextType filledContextType) (EnumeratedRoleType predicate)) (RoleInstance subject)
+                  registerSupportedEffect corrId setter (getFilledRoles (ContextType filledContextType) (EnumeratedRoleType predicate)) (RoleInstance subject) onlyOnce
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
-      registerSupportedEffect corrId setter f (ContextInstance subject)
+      registerSupportedEffect corrId setter f (ContextInstance subject) onlyOnce
 
     Api.GetUnqualifiedRol -> do
       mctype <- (ContextInstance subject) ##> contextType
@@ -214,10 +216,16 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
             (Just (rtype :: RoleType)) -> do
               (f :: RoleGetter) <- (getRoleFunction (roletype2string rtype))
-              registerSupportedEffect corrId setter f (ContextInstance subject)
-    Api.GetRolContext -> registerSupportedEffect corrId setter context (RoleInstance subject)
-    Api.GetContextType -> registerSupportedEffect corrId setter contextType (ContextInstance subject)
-    Api.GetRolType -> registerSupportedEffect corrId setter roleType (RoleInstance subject)
+              registerSupportedEffect corrId setter f (ContextInstance subject) onlyOnce
+    Api.GetRolContext -> do
+      res <- (RoleInstance subject) ##= context
+      sendResponse (Result corrId (unwrap <$> res)) setter
+    Api.GetContextType -> do
+      res <- (ContextInstance subject) ##= contextType
+      sendResponse (Result corrId (unwrap <$> res)) setter
+    Api.GetRolType -> do
+      res <- (RoleInstance subject) ##= roleType
+      sendResponse (Result corrId (unwrap <$> res)) setter
     Api.GetRoleKind -> do
       kind <- ((getEnumeratedRole $ EnumeratedRoleType subject) >>= pure <<< kindOfRole) <|> ((getCalculatedRole $ CalculatedRoleType subject) >>= pure <<< kindOfRole)
       sendResponse (Result corrId [show kind]) setter
@@ -244,7 +252,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       result <- try (getDynamicPropertyGetter predicate adt)
       case result of
         Left e -> sendResponse (Error corrId ("No propertytype '" <> predicate <> "' found on roletype '" <> object <> "': " <> show e)) setter
-        Right (f :: PropertyValueGetter) -> registerSupportedEffect corrId setter f (RoleInstance subject)
+        Right (f :: PropertyValueGetter) -> registerSupportedEffect corrId setter f (RoleInstance subject) onlyOnce
 
     -- Looks up a property on the role instance and recursively on its binding,
     -- given its local name.
@@ -254,7 +262,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       result <- try (getDynamicPropertyGetterFromLocalName predicate adt)
       case result of
         Left e -> sendResponse (Error corrId ("No propertytype '" <> predicate <> "' found on roletype '" <> object <> "': " <> show e)) setter
-        Right (f :: PropertyValueGetter) -> registerSupportedEffect corrId setter f (RoleInstance subject)
+        Right (f :: PropertyValueGetter) -> registerSupportedEffect corrId setter f (RoleInstance subject) onlyOnce
 
       -- For a Role and a View, return the properties in that View.
       -- If View equals "allProperties", return all properties of the Role.
@@ -278,15 +286,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetMeForContext -> do
       roleKind <- roleType_ (RoleInstance subject) >>= getEnumeratedRole >>= pure <<< kindOfRole
       case roleKind of
-        ContextRole -> registerSupportedEffect corrId setter (map toRoleType_ <<< (binding >=> context >=> getMyType)) (RoleInstance subject)
-        _ -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject)
+        ContextRole -> registerSupportedEffect corrId setter (map toRoleType_ <<< (binding >=> context >=> getMyType)) (RoleInstance subject) onlyOnce
+        _ -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject) onlyOnce
     -- `subject` is a role instance. Returns all RoleTypes that sys:Me
     -- ultimately fills an instance of in the corresponding context instance.
     Api.GetAllMyRoleTypes -> do
       allUserRoleTypes <- (RoleInstance subject) ##= (context >=> getAllMyRoleTypes)
       sendResponse (Result corrId (roletype2string <$> allUserRoleTypes)) setter
     -- { request: "GetLocalRoleSpecialisation", subject: contextInstance, predicate: localAspectName}
-    Api.GetLocalRoleSpecialisation -> registerSupportedEffect corrId setter (contextType >=> (liftToInstanceLevel $ localRoleSpecialisation predicate)) (ContextInstance subject)
+    Api.GetLocalRoleSpecialisation -> registerSupportedEffect corrId setter (contextType >=> (liftToInstanceLevel $ localRoleSpecialisation predicate)) (ContextInstance subject) onlyOnce
     -- {request: "matchContextName", subject: name}
     Api.MatchContextName -> do
       matches <- matchIndexedContextNames subject
@@ -300,6 +308,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       setter
       getRoleName
       (RoleInstance object)
+       onlyOnce
     Api.GetUserIdentifier -> do
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
@@ -316,6 +325,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           setter
           (perspectivesForContextAndUser userRoleInstance userRoleType)
           (ContextInstance object)
+          onlyOnce
 
     -- { request: "GetPerspective", subject: UserRoleType OPTIONAL, predicate: RoleInstance, object: ContextInstance OPTIONAL }
     Api.GetPerspective -> do
@@ -342,6 +352,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
               setter
               (perspectiveForContextAndUser userRoleInstance userRoleType (ENR objectRoleType))
               contextInstance
+              onlyOnce
 
     -- { request: "GetScreen", subject: UserRoleType, predicate: ContextType, object: ContextInstance }
     Api.GetScreen -> do
@@ -355,7 +366,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           setter
           (screenForContextAndUser userRoleInstance userRoleType (ContextType predicate))
           (ContextInstance object)
-
+          onlyOnce
     -- { request: GetContextActions
     -- , subject: RoleType // the user role type
     -- , object: ContextInstance
@@ -366,12 +377,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       muserRoleInstance <- (ContextInstance object) ##> subjectGetter
       case muserRoleInstance of
         Nothing -> sendResponse (Error corrId ("There is no user role instance for role type '" <> subject <> "' in context instance '" <> object <> "'!")) setter
-        -- The computation of actions depends on subject- and context state.
-        Just userRoleInstance -> registerSupportedEffect
-          corrId
-          setter
-          (getContextActions userRoleType userRoleInstance)
-          (ContextInstance object)
+        -- The computation of actions depends on subject- and context state, but the client will always send a new request.
+        Just userRoleInstance -> do
+          res <- (ContextInstance object) ##= getContextActions userRoleType userRoleInstance
+          sendResponse (Result corrId (unwrap <$> res)) setter
+          
 
     -- { request: "GetRolesWithProperties", object: ContextInstance, predicate: roleType}
     -- Api.GetRolesWithProperties ->
