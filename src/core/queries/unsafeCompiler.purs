@@ -506,6 +506,7 @@ order (VDOM ran _) a b f c = ArrayT do
       RAN.PDate -> singleton <<< show <$> (fDate <$> parseDate a' <*> parseDate b')
       -- Compare email addresses as strings.
       RAN.PEmail -> pure [show $ fString a' b']
+      RAN.PFile -> pure [show $ fString a' b']
     _, _ -> pure []
   where
     fString :: String -> String -> Boolean

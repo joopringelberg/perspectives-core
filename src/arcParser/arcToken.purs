@@ -94,6 +94,8 @@ perspectDef = LanguageDef
                   , "DateTime"
                   , "Boolean"
                   , "verbs"
+                  , "File"
+                  , "Email"
 
                   -- PropertyFacets
                   , "minLength"

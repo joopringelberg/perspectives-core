@@ -40,12 +40,13 @@ import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (Error, error, try)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
 import Effect.Unsafe (unsafePerformEffect)
-import Foreign (ForeignError, readInt, unsafeToForeign)
+import Foreign (ForeignError, MultipleErrors, readInt, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Prelude (bind, ($), pure, (<>), show, (<<<), (<$>), (<*>))
+import Simple.JSON (readJSON)
 
 -- TODO. We gebruiken hier Error, het javascript error type. Liever zou ik een
 -- PerspectivesRuntimeError type gebruiken. Maar dan moeten we MonadPerspectives aanpassen.
@@ -123,3 +124,12 @@ date2Value (SerializableDateTime sdt) = Value $ show (unwrap $ unInstant (fromDa
 defaultDateTime :: DateTime
 defaultDateTime = unsafePartial fromJust $ DateTime <$> (canonicalDate <$> (toEnum 2022) <*> (toEnum 1) <*> (toEnum 1)) <*>
   (Time <$> (toEnum 0) <*> (toEnum 0) <*> (toEnum 0) <*> (toEnum 0))
+
+-----------------------------------------------------------
+-- PERSPECTIVESFILE
+-----------------------------------------------------------
+type MIME = String
+type PerspectivesFile = { name :: String, mimeType :: MIME}
+
+parsePerspectivesFile :: String -> Either MultipleErrors PerspectivesFile
+parsePerspectivesFile = readJSON

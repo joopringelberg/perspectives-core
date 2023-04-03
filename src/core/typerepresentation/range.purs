@@ -22,8 +22,8 @@
 
 module Perspectives.Representation.Range where
 
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
+import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
@@ -36,7 +36,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 -- RANGE
 -----------------------------------------------------------
 -- | PDate is represented as SerializableDateTime.
-data Range = PString | PBool | PNumber | PDate | PEmail
+data Range = PString | PBool | PNumber | PDate | PEmail | PFile
 
 derive instance genericRange :: Generic Range _
 

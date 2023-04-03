@@ -663,6 +663,7 @@ propertyE = do
             <|> reserved "String" *> (pure $ Ran PString)
             <|> reserved "DateTime" *> (pure $ Ran PDate)
             <|> reserved "Email" *> (pure $ Ran PEmail)
+            <|> reserved "File" *> (pure $ Ran PFile)
             )
 
     propertyFacets :: Range -> IP (List PropertyFacet)
@@ -675,13 +676,14 @@ propertyE = do
         case facet of
           "minLength" -> reserved "=" *> (MinLength <$> token.integer)
           "maxLength" -> reserved "=" *> (MaxLength <$> token.integer)
-          "enumeration" -> reserved "=" *> (Enumeration <<< fromFoldable <$> token.parens (token.commaSep1 typedValue))
+          "enumeration" -> reserved "=" *> (Enumeration <<< fromFoldable <$> token.parens (token.commaSep1 (unsafePartial typedValue)))
           "pattern" -> reserved "=" *> (Pattern <$> regexExpression <*> token.stringLiteral)
           "maxInclusive" -> reserved "=" *> (MaxInclusive <$> boundaryValue)
           "minInclusive" -> reserved "=" *> (MinInclusive <$> boundaryValue)
           kw -> fail ("Expected `minLength`, `maxLength`, `enumeration` but got: " <> kw <> ". ")
 
-      typedValue :: IP String
+      -- Partial, because we cannot have File instances in the ARC syntax.
+      typedValue :: Partial => IP String
       typedValue = case r of
         PString -> token.stringLiteral
         PBool -> boolean
