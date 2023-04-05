@@ -254,7 +254,7 @@ catch (e)
 // db.putAttachment(docId, attachmentId, [rev], attachment, type, [callback]);
 exports.addAttachmentImpl = function ( database, docName, attachmentId, mrev, attachment, type) {
   return function (onError, onSuccess) {
-    database.putAttachment(docName, attachmentId, mrev, b2a(attachment), type, function(err, response)
+    database.putAttachment(docName, attachmentId, mrev, attachment, type, function(err, response)
       {
         if (err != null)
         {
@@ -286,18 +286,7 @@ exports.getAttachmentImpl = function( database, docName, attachmentId )
         }
         else
         {
-          // blob is a Buffer on node. Then use toString().
-          if (blob.text)
-          {
-            blob.text().then( function(t)
-            {
-              onSucces(t);
-            });
-          }
-          else
-          {
-            onSucces( blob.toString() );
-          }
+          onSucces(t);
         }
       });
     // Return a canceler, which is just another Aff effect.

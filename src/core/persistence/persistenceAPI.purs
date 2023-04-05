@@ -417,10 +417,9 @@ retrieveDocumentVersion dbName docName = withDatabase dbName
 -----------------------------------------------------------
 -- ADDATTACHMENT
 -----------------------------------------------------------
--- | Just handles attachments whose representation is a String.
 -- | Requires a revision if the document exists prior to adding the attachment.
 -- | Notice that the revision of the document changes if an attachment is added succesfully!
-addAttachment :: forall f. DatabaseName -> DocumentName -> Revision_ -> AttachmentName -> String -> MediaType -> MonadPouchdb f DeleteCouchdbDocument
+addAttachment :: forall f attachmentType. DatabaseName -> DocumentName -> Revision_ -> AttachmentName -> attachmentType -> MediaType -> MonadPouchdb f DeleteCouchdbDocument
 addAttachment dbName docName rev attachmentName attachment mimetype = withDatabase dbName
   \db -> do
     catchError
@@ -431,27 +430,27 @@ addAttachment dbName docName rev attachmentName attachment mimetype = withDataba
           Right d -> pure d
       (handlePouchError "addAttachment" docName)
 
-foreign import addAttachmentImpl :: EffectFn6
+foreign import addAttachmentImpl :: forall attachmentType. EffectFn6
   PouchdbDatabase
   DocumentName
   AttachmentName
   (Nullable String)
-  String
+  attachmentType
   MediaType
   Foreign
 
 -----------------------------------------------------------
 -- GETATTACHMENT
 -----------------------------------------------------------
--- | Just handles attachments whose representation is a String.
-getAttachment :: forall f. DatabaseName -> DocumentName -> AttachmentName -> MonadPouchdb f (Maybe String)
+getAttachment :: forall f. DatabaseName -> DocumentName -> AttachmentName -> MonadPouchdb f (Maybe Foreign)
 getAttachment dbName docName attachmentName = withDatabase dbName
   \db -> catchError
-    do
-      f <- lift $ fromEffectFnAff $ runEffectFnAff3 getAttachmentImpl db docName attachmentName
-      case runExcept $ decode f of
-        Left e -> throwError $ error ("addAttachment : error in decoding result: " <> show e)
-        Right d -> pure $ Just d
+    (lift $ Just <$> (fromEffectFnAff $ runEffectFnAff3 getAttachmentImpl db docName attachmentName))
+    -- do
+      -- f <- lift $ fromEffectFnAff $ runEffectFnAff3 getAttachmentImpl db docName attachmentName
+      -- case runExcept $ decode f of
+      --   Left e -> throwError $ error ("addAttachment : error in decoding result: " <> show e)
+      --   Right d -> pure $ Just d
     (handleNotFound "getAttachment" docName)
 
 foreign import getAttachmentImpl :: EffectFn3

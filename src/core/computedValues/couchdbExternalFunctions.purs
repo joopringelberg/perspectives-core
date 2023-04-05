@@ -46,7 +46,7 @@ import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
-import Foreign.Generic (encodeJSON)
+import Foreign.Generic (Foreign, encodeJSON)
 import Foreign.Object (Object, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..))
@@ -516,7 +516,7 @@ uploadToRepository_ (DomeinFileId dfId) splitName df = do
   where
     -- As each attachment that we add will bump the document version, we have to catch it and use it on the
     -- next attachment.
-    go :: URL -> String -> Object (Tuple MediaType (Maybe String)) -> StateT Revision_ MonadPerspectives Unit
+    go :: URL -> String -> Object (Tuple MediaType (Maybe Foreign)) -> StateT Revision_ MonadPerspectives Unit
     go documentUrl documentName attachments = forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
       Nothing -> pure unit
       Just attachment -> do
