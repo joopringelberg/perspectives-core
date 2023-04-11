@@ -339,3 +339,9 @@ exports.getViewOnDatabaseImpl = function( database, viewname, key )
     };
   };
 }
+
+
+exports.toFileImpl = function( fileName, mimeType, arrayBuffer )
+{
+  return new File( [arrayBuffer], fileName, {type: mimeType});
+}

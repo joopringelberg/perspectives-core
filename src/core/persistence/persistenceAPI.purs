@@ -37,7 +37,7 @@ import Control.Monad.Reader (lift)
 import Data.Array.NonEmpty (index)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.MediaType (MediaType)
+import Data.MediaType (MediaType(..))
 import Data.Nullable (Nullable, toNullable)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
@@ -58,7 +58,7 @@ import Perspectives.Persistence.Authentication (AuthoritySource(..), ensureAuthe
 import Perspectives.Persistence.Errors (handlePouchError, handleNotFound)
 import Perspectives.Persistence.RunEffectAff (runEffectFnAff2, runEffectFnAff3, runEffectFnAff6)
 import Perspectives.Persistence.State (getCouchdbBaseURL)
-import Perspectives.Persistence.Types (AttachmentName, CouchdbUrl, DatabaseName, DocumentName, DocumentWithRevision, MonadPouchdb, Password, PouchError, PouchdbDatabase, PouchdbExtraState, PouchdbState, PouchdbUser, SystemIdentifier, Url, UserName, ViewName, decodePouchdbUser', encodePouchdbUser', readPouchError, runMonadPouchdb)
+import Perspectives.Persistence.Types (AttachmentName, CouchdbUrl, DatabaseName, DocumentName, DocumentWithRevision, MonadPouchdb, Password, PouchError, PouchdbDatabase, PouchdbExtraState, PouchdbState, PouchdbUser, SystemIdentifier, UserName, ViewName, Url, decodePouchdbUser', encodePouchdbUser', readPouchError, runMonadPouchdb)
 import Simple.JSON (read, readImpl, write)
 
 -----------------------------------------------------------
@@ -415,6 +415,15 @@ retrieveDocumentVersion dbName docName = withDatabase dbName
       (handleNotFound "retrieveDocumentVersion" docName)
 
 -----------------------------------------------------------
+-- SAVEFILE
+-----------------------------------------------------------
+-- | From a Foreign value that represents an ArrayBuffer, create a File and save it with a role instance document.
+saveFile :: forall f. String -> String -> String -> MimeType -> Foreign -> MonadPouchdb f DeleteCouchdbDocument
+saveFile database documentName attachmentName mimeType arrayBuf = do
+  theFile <- liftEffect $ toFile attachmentName mimeType arrayBuf
+  addAttachment database documentName Nothing attachmentName theFile (MediaType mimeType)
+ 
+-----------------------------------------------------------
 -- ADDATTACHMENT
 -----------------------------------------------------------
 -- | Requires a revision if the document exists prior to adding the attachment.
@@ -551,3 +560,20 @@ splitRepositoryFileUrl s = case match repositoryFileRegex s of
     Just (Just database), Just (Just document) -> Just {database, document}
     _, _ -> Nothing
   _ -> Nothing
+
+-----------------------------------------------------------
+-- FILE
+-----------------------------------------------------------
+type FileName = String
+type MimeType = String
+
+foreign import data File :: Type
+
+foreign import toFileImpl :: EffectFn3
+  FileName
+  MimeType
+  Foreign -- ArrayBuffer argument to be turned into a file
+  File
+
+toFile :: FileName -> MimeType -> Foreign -> Effect File
+toFile = runEffectFn3 toFileImpl

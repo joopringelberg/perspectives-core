@@ -57,13 +57,15 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Fuzzysort (matchIndexedContextNames)
-import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2ModelUri_)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2LocalName_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getRoleName, roleType, roleType_, siblings)
+import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.API (saveFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
@@ -77,7 +79,8 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction', loadModelIfMissing)
+import Perspectives.ResourceIdentifiers (resourceIdentifier2DocLocator)
+import Perspectives.RunMonadPerspectivesTransaction (loadModelIfMissing, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding, scheduleContextRemoval, scheduleRoleRemoval)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
@@ -86,6 +89,7 @@ import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForCont
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
 import Simple.JSON (unsafeStringify, read)
+
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -554,6 +558,49 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (do
         void $ runMonadPerspectivesTransaction authoringRole (deleteProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate))
         sendResponse (Result corrId ["Ok"]) setter)
+      (\e -> sendResponse (Error corrId (show e)) setter)
+    -- { request: "SaveFile"
+    -- , subject: rolID
+    -- , predicate: propertyName
+    -- , object: mimeType
+    -- , contextDescription: buf
+    -- , authoringRole: myroletype
+    -- , onlyOnce: true}
+    Api.SaveFile -> catchError      
+      (do
+        (adt :: ADT EnumeratedRoleType) <- getRoleType subject >>= rangeOfRoleCalculation
+        result <- try (getDynamicPropertyGetter predicate adt)
+        case result of
+          Left e -> sendResponse (Error corrId ("No propertytype '" <> predicate <> "' found on roletype '" <> subject <> "': " <> show e)) setter
+          Right (f :: PropertyValueGetter) -> do
+            mval <- (RoleInstance subject) ##> f
+            {database, documentName} <- resourceIdentifier2DocLocator subject
+            case mval of 
+              -- A rare case. Just save the file with the property name.
+              Nothing -> runMonadPerspectivesTransaction authoringRole
+                do 
+                  void $ lift $ saveFile database documentName (typeUri2LocalName_ predicate) object contextDescription
+                  newVal <- pure $ writePerspectivesFile 
+                    { name: (typeUri2LocalName_ predicate) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
+                    , mimeType: object
+                    , database: Just database
+                    , roleFileName: Just documentName
+                    }
+                  setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
+                  lift $ sendResponse (Result corrId [newVal]) setter
+              Just val -> 
+                -- Interpret the property
+                case parsePerspectivesFile (unwrap val) of
+                  Left e -> sendResponse (Error corrId ("Could not parse '" <> unwrap val <> "' trying to save file:" <> show e)) setter
+                  Right rec -> (runMonadPerspectivesTransaction authoringRole
+                    do 
+                      -- The actual ArrayBuffer is stored in contextDescription.
+                      -- Save as attachment.
+                      void $ lift $ saveFile database documentName (typeUri2LocalName_ predicate) object contextDescription
+                      newVal <- pure $ writePerspectivesFile (rec {database= Just database, roleFileName= Just documentName})
+                      setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
+                      lift $ sendResponse (Result corrId [newVal]) setter)
+      )
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- { request: Action
     -- , subject: <user role instance>

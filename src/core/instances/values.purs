@@ -46,7 +46,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Prelude (bind, ($), pure, (<>), show, (<<<), (<$>), (<*>))
-import Simple.JSON (readJSON)
+import Simple.JSON (readJSON, writeJSON)
 
 -- TODO. We gebruiken hier Error, het javascript error type. Liever zou ik een
 -- PerspectivesRuntimeError type gebruiken. Maar dan moeten we MonadPerspectives aanpassen.
@@ -129,7 +129,18 @@ defaultDateTime = unsafePartial fromJust $ DateTime <$> (canonicalDate <$> (toEn
 -- PERSPECTIVESFILE
 -----------------------------------------------------------
 type MIME = String
-type PerspectivesFile = { name :: String, mimeType :: MIME}
+
+-- Use database and roleFileName to retrieve the role instance; 
+-- use the local name of the PFile property to retrieve the attachment.
+type PerspectivesFile = 
+  { name :: String                  -- The name associated with the file on creating or uploading it. Use only client side.
+  , mimeType :: MIME
+  , database :: Maybe String        -- The database where the role instance is stored. 
+  , roleFileName :: Maybe String    -- The name of the role instance document. 
+  }
 
 parsePerspectivesFile :: String -> Either MultipleErrors PerspectivesFile
 parsePerspectivesFile = readJSON
+
+writePerspectivesFile :: PerspectivesFile -> String
+writePerspectivesFile = writeJSON

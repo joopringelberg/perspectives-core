@@ -61,6 +61,7 @@ domain model://perspectives.domains#TestPublicRole
 
     thing Thee
       property Soort (String)
+      property Beschrijving (File)
     
     public Visitor at "https://perspectives.domains/cw_servers_and_repositories/" = sys:Me
       perspective on Thee
