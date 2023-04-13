@@ -53,6 +53,7 @@ import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>), (###>))
+import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -70,9 +71,10 @@ import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getRoleFunction, getRoleInstances)
-import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..)) as ACTION
-import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.Cacheable (removeInternally)
+import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, rev)
 import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation, roleKindOfRoleType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -568,8 +570,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- , onlyOnce: true}
     Api.SaveFile -> catchError      
       (do
-        (adt :: ADT EnumeratedRoleType) <- getRoleType subject >>= rangeOfRoleCalculation
-        result <- try (getDynamicPropertyGetter predicate adt)
+        -- Retrieve the type of the role instance.
+        (rt :: EnumeratedRoleType) <- roleType_ (RoleInstance subject)
+        result <- try (getDynamicPropertyGetter predicate (ST rt))
         case result of
           Left e -> sendResponse (Error corrId ("No propertytype '" <> predicate <> "' found on roletype '" <> subject <> "': " <> show e)) setter
           Right (f :: PropertyValueGetter) -> do
@@ -579,27 +582,37 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
               -- A rare case. Just save the file with the property name.
               Nothing -> runMonadPerspectivesTransaction authoringRole
                 do 
-                  void $ lift $ saveFile database documentName (typeUri2LocalName_ predicate) object contextDescription
-                  newVal <- pure $ writePerspectivesFile 
-                    { name: (typeUri2LocalName_ predicate) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
-                    , mimeType: object
-                    , database: Just database
-                    , roleFileName: Just documentName
-                    }
-                  setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
-                  lift $ sendResponse (Result corrId [newVal]) setter
+                  prol <- lift $ getPerspectRol (RoleInstance subject)
+                  DeleteCouchdbDocument{ok, rev} <- lift $ saveFile database documentName (typeUri2LocalName_ predicate) object (rev prol) contextDescription
+                  case ok of 
+                    Just true -> do 
+                      void $ lift $ removeInternally  (RoleInstance subject)
+                      newVal <- pure $ writePerspectivesFile 
+                        { name: (typeUri2LocalName_ predicate) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
+                        , mimeType: object
+                        , database: Just database
+                        , roleFileName: Just documentName
+                        }
+                      setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
+                      lift $ sendResponse (Result corrId [newVal]) setter
+                    _ -> lift $ sendResponse (Error corrId ("Could not save file in the database")) setter
               Just val -> 
                 -- Interpret the property
                 case parsePerspectivesFile (unwrap val) of
                   Left e -> sendResponse (Error corrId ("Could not parse '" <> unwrap val <> "' trying to save file:" <> show e)) setter
-                  Right rec -> (runMonadPerspectivesTransaction authoringRole
+                  Right rec -> runMonadPerspectivesTransaction authoringRole
                     do 
                       -- The actual ArrayBuffer is stored in contextDescription.
                       -- Save as attachment.
-                      void $ lift $ saveFile database documentName (typeUri2LocalName_ predicate) object contextDescription
-                      newVal <- pure $ writePerspectivesFile (rec {database= Just database, roleFileName= Just documentName})
-                      setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
-                      lift $ sendResponse (Result corrId [newVal]) setter)
+                      prol <- lift $ getPerspectRol (RoleInstance subject)
+                      DeleteCouchdbDocument{ok, rev} <- lift $ saveFile database documentName (typeUri2LocalName_ predicate) object (rev prol) contextDescription 
+                      case ok of 
+                        Just true -> do 
+                          void $ lift $ removeInternally  (RoleInstance subject)
+                          newVal <- pure $ writePerspectivesFile (rec {database= Just database, roleFileName= Just documentName})
+                          setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
+                          lift $ sendResponse (Result corrId [newVal]) setter
+                        _ -> lift $ sendResponse (Error corrId ("Could not save file in the database")) setter
       )
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- { request: Action

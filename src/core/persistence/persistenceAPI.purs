@@ -38,6 +38,7 @@ import Data.Array.NonEmpty (index)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.MediaType (MediaType(..))
+import Data.Newtype (unwrap)
 import Data.Nullable (Nullable, toNullable)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
@@ -47,11 +48,12 @@ import Effect (Effect)
 import Effect.Aff (catchError, error, throwError)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
 import Effect.Class (liftEffect)
-import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn6, runEffectFn1, runEffectFn2, runEffectFn3)
+import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn4, EffectFn6, runEffectFn1, runEffectFn2, runEffectFn3, runEffectFn4)
 import Foreign (Foreign, unsafeFromForeign, F)
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Foreign.Object (Object, delete, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
+import Persistence.Attachment (class Attachment, getAttachments, getRawAttachments, setAttachment)
 import Perspectives.Couchdb (DeleteCouchdbDocument(..), PutCouchdbDocument(..), ViewResult(..), ViewResultRow(..))
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev, rev)
 import Perspectives.Persistence.Authentication (AuthoritySource(..), ensureAuthentication)
@@ -250,7 +252,7 @@ type PouchdbAllDocs =
 -- | The semantics of this operation depends critically on using generic encode.
 -- | This allows us to control the value of the _id member of the json representation independently of 
 -- | that of the ContextRecord or the RolRecord.
-addDocument :: forall d f. Encode d => Revision d => DatabaseName -> d -> DocumentName -> MonadPouchdb f Revision_
+addDocument :: forall d f. Attachment d => Encode d => Revision d => DatabaseName -> d -> DocumentName -> MonadPouchdb f Revision_
 addDocument dbName doc docName = withDatabase dbName
   \db -> do
     -- Because generic encoding results in a json document having this shape:
@@ -261,7 +263,8 @@ addDocument dbName doc docName = withDatabase dbName
     --   "tag": "PerspectRol"
     -- }
     -- but Couchdb needs the "id_" and "rev_" members, we have to add them here.
-    doc' <- liftEffect (addNameAndVersion (encode doc) docName (maybe "" identity (rev doc)))
+    -- The same holds for attachments, if any.
+    doc' <- liftEffect (addNameVersionAndAttachments (encode doc) docName (maybe "" identity (rev doc)) (maybe (write "") unwrap (getAttachments doc)))
     catchError
       do
         f <- lift $ fromEffectFnAff $ runEffectFnAff2 addDocumentImpl db doc'
@@ -287,11 +290,11 @@ addDocument_ dbName doc docName = withDatabase dbName
 
 foreign import addDocumentImpl :: EffectFn2 PouchdbDatabase Foreign Foreign
 
-foreign import addNameAndVersionHack :: EffectFn3 Foreign DocumentName String Foreign
+foreign import addNameAndVersionHack :: EffectFn4 Foreign DocumentName String Foreign Foreign
 
 -- TODO. Zodra we een encoding toepassen waarbij _rev en _id bewaard blijven, is deze functie overbodig.
-addNameAndVersion :: Foreign -> DocumentName -> String -> Effect Foreign
-addNameAndVersion = runEffectFn3 addNameAndVersionHack
+addNameVersionAndAttachments :: Foreign -> DocumentName -> String -> Foreign -> Effect Foreign
+addNameVersionAndAttachments = runEffectFn4 addNameAndVersionHack
 
 -----------------------------------------------------------
 -- DELETE DOCUMENT
@@ -330,38 +333,41 @@ deleteDocument dbName docName mrev = case mrev of
 -- TODO. Zolang we de generic encode gebruiken die een tagged versie oplevert zonder _id en _rev members,
 -- moeten we de _rev van de entiteit overschrijven met die van de envelope.
 -- Zodra dat niet meer nodig is, kunnen we getDocument vervangen door getDocument_
-getDocument :: forall d f. Revision d => Decode d => DatabaseName -> DocumentName -> MonadPouchdb f d
+getDocument :: forall d f. Attachment d => Revision d => Decode d => DatabaseName -> DocumentName -> MonadPouchdb f d
 getDocument dbName docName = withDatabase dbName
   \db -> do
     f <- catchError
       (lift $ fromEffectFnAff $ runEffectFnAff2 getDocumentImpl db docName)
       (handlePouchError "getDocument" docName)
     case (runExcept do
-      -- Get the _rev from the envelope.
-      rev <- getRev f
-      a <- decode f
-      -- Set the obtained rev in the inner value, the entity.
-      pure ((changeRevision rev) a)) of
+        -- Get the _rev from the envelope.
+        rev <- getRev f
+        ma <- getRawAttachments f
+        a <- decode f
+        -- Set the obtained rev in the inner value, the entity.
+        pure (setAttachment (changeRevision rev a) ma)) of
       Left e -> throwError $ error ("getDocument : error in decoding result: " <> show e)
       Right result -> pure result
 
-tryGetDocument :: forall d f. Revision d => Decode d => DatabaseName -> DocumentName -> MonadPouchdb f (Maybe d)
+tryGetDocument :: forall d f. Attachment d => Revision d => Decode d => DatabaseName -> DocumentName -> MonadPouchdb f (Maybe d)
 tryGetDocument dbName docName = withDatabase dbName
   \db -> do
     catchError
       do
         f <- lift $ fromEffectFnAff $ runEffectFnAff2 getDocumentImpl db docName
         case (runExcept do
-          -- Get the _rev from the envelope.
-          rev <- getRev f
-          (a :: d) <- decode f
-          -- Set the obtained rev in the inner value, the entity.
-          pure ((changeRevision rev) a)) of
+            -- Get the _rev from the envelope.
+            rev <- getRev f
+            ma <- getRawAttachments f
+            (a :: d) <- decode f
+            -- Set the obtained rev in the inner value, the entity.
+            pure (setAttachment (changeRevision rev a) ma)) of
           Left e -> throwError $ error ("tryGetDocument : error in decoding result: " <> show e)
           Right result -> pure $ Just result
+      -- Returns Nothing if the document is not in the database; re-throws other errors.
       (handleNotFound "tryGetDocument" docName)
 
--- | Similar to getDocument but without the requirement that the resulting document is an instance of Revision.
+-- | Similar to getDocument but without the requirement that the resulting document is an instance of Revision or Attachment.
 -- NOTE: this function replaces getDocument as soon as we have an encoding that preserves _rev.
 getDocument_ :: forall d f. Decode d => DatabaseName -> DocumentName -> MonadPouchdb f d
 getDocument_ dbName docName = withDatabase dbName
@@ -374,7 +380,7 @@ getDocument_ dbName docName = withDatabase dbName
           Right result -> pure result
       (handlePouchError "getDocument_" docName)
 
--- | Similar to tryGetDocument but without the requirement that the resulting document is an instance of Revision.
+-- | Similar to tryGetDocument but without the requirement that the resulting document is an instance of Revision or Attachment.
 -- NOTE: this function replaces tryGetDocument as soon as we have an encoding that preserves _rev.
 tryGetDocument_ :: forall d f. Decode d => DatabaseName -> DocumentName -> MonadPouchdb f (Maybe d)
 tryGetDocument_ dbName docName = withDatabase dbName
@@ -387,7 +393,7 @@ tryGetDocument_ dbName docName = withDatabase dbName
     (handleNotFound "tryGetDocument_" docName)
 
 -- | Similar to getDocument but without the requirement that the resulting document is an instance of Revision
--- | or Decode.
+-- | or Decode or Attachment.
 getDocument__ :: forall f. DatabaseName -> DocumentName -> MonadPouchdb f Foreign
 getDocument__ dbName docName = withDatabase dbName
   \db -> do
@@ -418,16 +424,17 @@ retrieveDocumentVersion dbName docName = withDatabase dbName
 -- SAVEFILE
 -----------------------------------------------------------
 -- | From a Foreign value that represents an ArrayBuffer, create a File and save it with a role instance document.
-saveFile :: forall f. String -> String -> String -> MimeType -> Foreign -> MonadPouchdb f DeleteCouchdbDocument
-saveFile database documentName attachmentName mimeType arrayBuf = do
+saveFile :: forall f. String -> String -> String -> MimeType -> Revision_ -> Foreign -> MonadPouchdb f DeleteCouchdbDocument
+saveFile database documentName attachmentName mimeType rev arrayBuf = do
   theFile <- liftEffect $ toFile attachmentName mimeType arrayBuf
-  addAttachment database documentName Nothing attachmentName theFile (MediaType mimeType)
+  addAttachment database documentName rev attachmentName theFile (MediaType mimeType)
  
 -----------------------------------------------------------
 -- ADDATTACHMENT
 -----------------------------------------------------------
 -- | Requires a revision if the document exists prior to adding the attachment.
 -- | Notice that the revision of the document changes if an attachment is added succesfully!
+-- TODO. We moeten het document ophalen en teruggeven. We willen immers de attachments bewaren!
 addAttachment :: forall f attachmentType. DatabaseName -> DocumentName -> Revision_ -> AttachmentName -> attachmentType -> MediaType -> MonadPouchdb f DeleteCouchdbDocument
 addAttachment dbName docName rev attachmentName attachment mimetype = withDatabase dbName
   \db -> do

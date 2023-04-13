@@ -25,12 +25,14 @@ module Perspectives.Sync.OutgoingTransaction where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
+
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
 import Prelude (class Eq, class Ord, class Show, compare, eq)
@@ -67,3 +69,7 @@ instance eqOutgoingTransaction :: Eq OutgoingTransaction where
 
 instance ordOutgoingTransaction :: Ord OutgoingTransaction where
   compare (OutgoingTransaction {transaction: t1}) (OutgoingTransaction {transaction: t2}) = compare t1 t2
+
+instance Attachment OutgoingTransaction where
+  getAttachments o = Nothing
+  setAttachment o _ = o

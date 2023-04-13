@@ -70,6 +70,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic.Class (class GenericEncode)
+import Persistence.Attachment (class Attachment)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -115,7 +116,7 @@ instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId wher
   -- -- It's only through uploadToRepository that we write to remote and public databases (Repositories).
   writeDbName (DomeinFileId id) = writeUrl id
 
-getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
+getPerspectEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
   do
     (av :: Maybe (AVar a)) <- retrieveInternally id
@@ -144,20 +145,20 @@ getPerspectRol = getPerspectEntiteit
 getDomeinFile :: DomeinFileId -> MP DomeinFile
 getDomeinFile = getPerspectEntiteit
 
-tryGetPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives (Maybe a)
+tryGetPerspectEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
   \e -> do 
     -- logPerspectivesError (Custom $ show e)
     pure Nothing
 
-entityExists :: forall a i. Persistent a i => i -> MonadPerspectives Boolean
+entityExists :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives Boolean
 entityExists id = catchError ((getPerspectEntiteit id) >>= (pure <<< const true))
   \e ->  do 
     -- logPerspectivesError (Custom $ show e)
     pure false
 
 -- | Remove from Couchdb if possible and remove from the cache, too.
-removeEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
+removeEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
 removeEntiteit entId = do
   entiteit <- getPerspectEntiteit entId
   removeEntiteit_ entId entiteit
@@ -180,7 +181,7 @@ removeEntiteit_ entId entiteit =
         -- void $ deleteDocument dbName (couchdbResourceIdentifier $ unwrap entId) (Just rev)
         pure entiteit
 
-tryRemoveEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives Unit
+tryRemoveEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives Unit
 tryRemoveEntiteit entId = do
   mentiteit <- tryGetPerspectEntiteit entId
   case mentiteit of
@@ -188,7 +189,7 @@ tryRemoveEntiteit entId = do
     Just entiteit -> void $ removeEntiteit_ entId entiteit
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
-fetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
+fetchEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
 fetchEntiteit id = ensureAuthentication (Resource $ unwrap id) $ \_ -> catchError
   do
     v <- representInternally id
@@ -217,9 +218,8 @@ fetchEntiteit id = ensureAuthentication (Resource $ unwrap id) $ \_ -> catchErro
 
 
 -- | Fetch the definition of a document if it can be found. DOES NOT CACHE THE ENTITY!
-tryFetchEntiteit :: forall a i. Revision a => Persistent a i => i -> MonadPerspectives (Maybe a)
+tryFetchEntiteit :: forall a i. Attachment a => Revision a => Persistent a i => i -> MonadPerspectives (Maybe a)
 tryFetchEntiteit id = do
-  -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
   {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
   catchError (Just <$> getDocument database documentName)
     \e -> pure Nothing
@@ -228,16 +228,16 @@ tryFetchEntiteit id = do
   -- catchError (Just <$> getDocument dbName (couchdbResourceIdentifier $ unwrap id))
   --   \e -> pure Nothing
 
-saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
+saveEntiteit :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveEntiteit id = saveEntiteit' id Nothing
 
 -- | Save the given entity to the database and puts it, with a correct (new) revision,
 -- | in the cache, assuming the current revision of the entiteit equals that in the database.
-saveEntiteit_ :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
+saveEntiteit_ :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
 saveEntiteit_ entId entiteit = saveEntiteit' entId (Just entiteit)
 
 -- | Save an Entiteit and set its new _rev parameter in the cache.
-saveEntiteit' :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
+saveEntiteit' :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
 saveEntiteit' entId mentiteit = ensureAuthentication (Resource $ unwrap entId) $ \_ -> do
   mentityFromCache <- tryTakeEntiteitFromCache entId
   entiteit <- case mentiteit of
@@ -263,4 +263,4 @@ updateRevision :: forall a i. Persistent a i => i -> MonadPerspectives Unit
 updateRevision entId = do
   {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
   revision <- retrieveDocumentVersion database documentName
-  setRevision entId revision
+  setRevision entId revision 

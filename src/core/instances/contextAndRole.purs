@@ -206,6 +206,7 @@ defaultRolRecord =
   , states: []
   , roleAliases: empty
   , contextAliases: empty
+  , attachments: Nothing
   }
 
 isDefaultContextDelta :: SignedDelta -> Boolean

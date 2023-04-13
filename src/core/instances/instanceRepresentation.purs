@@ -23,19 +23,20 @@
 module Perspectives.InstanceRepresentation where
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap, over)
+import Data.Show.Generic (genericShow)
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object) as F
+import Persistence.Attachment (class Attachment, Attachments)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta)
-import Prelude (class Show, class Eq, (==), (<<<), eq, bind, pure)
+import Prelude (class Eq, class Show, bind, eq, pure, (<<<), (==))
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT TYPE CLASS
@@ -99,6 +100,10 @@ instance revisionPerspectContext :: Revision PerspectContext where
   rev = _._rev <<< unwrap
   changeRevision s = over PerspectContext (\vr -> vr {_rev = s})
 
+instance Attachment PerspectContext where
+  setAttachment c _ = c
+  getAttachments _ = Nothing
+
 -----------------------------------------------------------
 -- PERSPECTROL
 -----------------------------------------------------------
@@ -127,6 +132,7 @@ type RolRecord =
   , states :: Array StateIdentifier
   , roleAliases :: F.Object String
   , contextAliases :: F.Object String
+  , attachments :: Maybe Attachments
   }
 
 derive instance genericRepPerspectRol :: Generic PerspectRol _
@@ -157,8 +163,12 @@ instance identifiablePerspectRol :: Identifiable PerspectRol RoleInstance where
   identifier (PerspectRol{_id}) = _id
   displayName (PerspectRol{_id}) = unwrap _id
 
+instance Attachment PerspectRol where
+  setAttachment (PerspectRol r) ma = PerspectRol (r {attachments = ma})
+  getAttachments (PerspectRol {attachments}) = attachments
+
 -----------------------------------------------------------
--- REVISION, BINDING
+-- BINDING
 -----------------------------------------------------------
 type Binding = Maybe RoleInstance
 
@@ -166,3 +176,4 @@ binding :: RoleInstance -> Binding
 binding id = case id of
   RoleInstance "" -> Nothing
   otherwise -> (Just id)
+

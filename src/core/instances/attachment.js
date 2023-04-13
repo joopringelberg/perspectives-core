@@ -1,0 +1,1 @@
+exports.getAttachmentsImpl = function (r) { return r._attachments}

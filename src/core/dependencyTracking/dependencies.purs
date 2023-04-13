@@ -36,6 +36,7 @@ import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Foreign.Object (Object, insert, lookup, singleton, values)
+import Persistence.Attachment (class Attachment)
 import Perspectives.ApiTypes (ApiEffect, Response(..), CorrelationIdentifier)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery, (###=))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
@@ -73,7 +74,7 @@ activeSupportedEffects = GLS.new unit
 -- | As a result:
 -- |  1. we have cached a new SupportedEffect in the ActiveSupportedEffects.
 -- |  2. we have registered the dependency of this SupportedEffect in the AssumptionRegister in the PerspectivesState.
-registerSupportedEffect :: forall a b x. Persistent x a => Newtype b String =>
+registerSupportedEffect :: forall a b x. Attachment x => Persistent x a => Newtype b String =>
   CorrelationIdentifier ->
   ApiEffect ->
   (a ~~> b) ->

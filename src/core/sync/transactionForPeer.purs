@@ -25,13 +25,15 @@ module Perspectives.Sync.TransactionForPeer where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
+
 import Data.Array (elemIndex, snoc)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.DateTime (SerializableDateTime)
 import Perspectives.Sync.SignedDelta (SignedDelta)
@@ -58,6 +60,10 @@ instance encodeTransactionForPeer :: Encode TransactionForPeer where
 
 instance decodeTransactie :: Decode TransactionForPeer where
   decode = genericDecode defaultOptions
+
+instance Attachment TransactionForPeer where 
+  getAttachments _ = Nothing
+  setAttachment t _ = t
 
 -- | Add the new delta to the end of the array, in the Transaction.
 addToTransactionForPeer :: SignedDelta -> TransactionForPeer -> TransactionForPeer

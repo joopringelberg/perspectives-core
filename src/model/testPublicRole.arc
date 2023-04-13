@@ -57,7 +57,7 @@ domain model://perspectives.domains#TestPublicRole
     user TeaRoomOperator filledBy Manager
       perspective on Thee
         only (Create, Remove)
-        props (Soort) verbs (SetPropertyValue)
+        props (Soort, Beschrijving) verbs (SetPropertyValue)
 
     thing Thee
       property Soort (String)

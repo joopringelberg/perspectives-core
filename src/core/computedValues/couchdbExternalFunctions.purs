@@ -73,7 +73,7 @@ import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInverted
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, addDocument, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, splitRepositoryFileUrl, tryGetDocument, withDatabase)
+import Perspectives.Persistence.API (addAttachment, addDocument, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, splitRepositoryFileUrl, tryGetDocument_, withDatabase)
 import Perspectives.Persistence.API (deleteDocument) as Persistence
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions as CDB
@@ -501,7 +501,7 @@ uploadToRepository dfId@(DomeinFileId domeinFileName) = do
 uploadToRepository_ :: DomeinFileId -> {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
 uploadToRepository_ (DomeinFileId dfId) splitName df = do 
   -- Get the attachment info
-  (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument splitName.repositoryUrl splitName.documentName
+  (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
   attachments <- case atts of
     Nothing -> pure empty
     Just (DocWithAttachmentInfo {_attachments}) -> traverseWithIndex

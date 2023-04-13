@@ -47,6 +47,7 @@ handlePouchError funcName docName e = parsePouchError funcName docName e >>=
     Nothing -> throwError e
     Just s -> handleError s empty (funcName <> " for " <> docName <> " (" <> message <> ")")
 
+-- | Returns Nothing if the status code is 404; throws an error instead.
 handleNotFound :: forall m a. MonadError Error m => String -> DocumentName -> Error -> m (Maybe a)
 handleNotFound funcName docName e = parsePouchError funcName docName e >>=
   \err -> case err.status of

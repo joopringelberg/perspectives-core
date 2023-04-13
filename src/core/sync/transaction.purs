@@ -39,6 +39,7 @@ import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Foreign.Class (class Decode, class Encode, encode, decode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Persistence.Attachment (class Attachment)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.ModelDependencies (sysUser)
@@ -153,6 +154,10 @@ instance revisionTransaction :: Revision Transaction where
 
 instance prettyPrintTransaction :: PrettyPrint Transaction where
   prettyPrint' t (Transaction r) = "Transaction " <> prettyPrint' (t <> "  ") r
+
+instance Attachment Transaction where
+  setAttachment t _ = t
+  getAttachments t = Nothing
 
 createTransaction :: RoleType -> String -> Aff Transaction
 createTransaction authoringRole author =

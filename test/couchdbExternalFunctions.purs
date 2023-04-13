@@ -15,7 +15,7 @@ import Perspectives.CoreTypes ((##=))
 import Perspectives.Couchdb (designDocumentViews)
 import Perspectives.Extern.Couchdb (createUser, uploadToRepository)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
-import Perspectives.Persistence.API (tryGetDocument)
+import Perspectives.Persistence.API (tryGetDocument_)
 import Perspectives.Persistent (entitiesDatabaseName)
 import Perspectives.PerspectivesState (domeinCache)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
@@ -210,7 +210,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     assertEqual "The retrieved document should equal the sent document"
       (do
         entitiesDatabaseName >>= setRoleView
-        mddoc <- entitiesDatabaseName >>= \db -> tryGetDocument db "defaultViews"
+        mddoc <- entitiesDatabaseName >>= \db -> tryGetDocument_ db "defaultViews"
         case mddoc of
           Nothing -> throwError (error "No design doc, impossible!")
           Just ddoc -> do

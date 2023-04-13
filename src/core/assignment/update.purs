@@ -55,6 +55,7 @@ import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, lookup)
 import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
+import Persistence.Attachment (class Attachment)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
@@ -484,10 +485,10 @@ setProperty rids propertyName values = do
 -- CACHEANDSAVE
 -----------------------------------------------------------
 -- Save the entity in cache and in couchdb.
-cacheAndSave :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives Unit
+cacheAndSave :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives Unit
 cacheAndSave rid rol = void $ cacheAndSave_ rid rol
 
-cacheAndSave_ :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
+cacheAndSave_ :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
 cacheAndSave_ rid rol = do
   void $ cacheEntity rid rol
   Instances.saveEntiteit rid

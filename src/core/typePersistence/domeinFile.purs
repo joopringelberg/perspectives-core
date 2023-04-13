@@ -37,6 +37,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
+import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
 import Perspectives.Data.EncodableMap (EncodableMap, addAll, removeAll)
 import Perspectives.Data.EncodableMap (empty) as EM
@@ -105,6 +106,11 @@ instance identifiableDomeinFile :: Identifiable DomeinFile DomeinFileId where
 instance revisionDomeinFile :: Revision DomeinFile where
   rev = _._rev <<< unwrap
   changeRevision s = over DomeinFile (\vr -> vr {_rev = s})
+
+instance Attachment DomeinFile where
+  setAttachment d _ = d
+  -- TODO. Handle screen attachments here!
+  getAttachments _ = Nothing
 
 -------------------------------------------------------------------------------
 ---- UPSTREAMSTATENOTIFICATION
