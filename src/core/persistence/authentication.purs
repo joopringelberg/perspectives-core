@@ -43,9 +43,9 @@ import Effect.Aff.Class (liftAff)
 import Foreign.Object (fromFoldable, insert, lookup)
 import Perspectives.Couchdb (onAccepted_)
 import Perspectives.Identifiers (url2Authority)
-import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
+import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
-import Perspectives.ResourceIdentifiers (DecomposedResourceIdentifier(..), parseResourceIdentifier)
+import Perspectives.ResourceIdentifiers (databaseLocation)
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -75,14 +75,7 @@ ensureAuthentication authSource a = catchJust
   where 
 
   authSource2Authority :: AuthoritySource -> MonadPouchdb f (Maybe Authority)
-  authSource2Authority (Resource s) = do
-    r <- parseResourceIdentifier s 
-    case r of 
-      Default _ _ -> getCouchdbBaseURL
-      Local _ _ -> getCouchdbBaseURL
-      Model _ _ -> getCouchdbBaseURL
-      Remote url _ _ -> pure $ Just url
-      Public url _ _ -> pure $ Just url
+  authSource2Authority (Resource s) = Just <$> databaseLocation s
   authSource2Authority (Authority s) = pure $ Just s
   authSource2Authority (Url s) = pure $ url2Authority s
 

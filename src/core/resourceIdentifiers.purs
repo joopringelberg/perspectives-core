@@ -28,7 +28,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.NonEmpty (index)
 import Data.Map (Map, lookup)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.String (drop)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
@@ -36,10 +36,10 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives)
 import Perspectives.Guid as GUID
 import Perspectives.Identifiers (isUrl, modelUri2ModelUrl)
-import Perspectives.Persistence.State (getSystemIdentifier)
+import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
 import Perspectives.Representation.TypeIdentifiers (ResourceType)
 import Perspectives.Sync.Transaction (StorageScheme(..), WriteUrl, Url, DbName) as TRANS
@@ -228,6 +228,23 @@ pouchdbDatabaseName_ (Local dbName _) = dbName
 pouchdbDatabaseName_ (Remote dbName _ _) = dbName
 pouchdbDatabaseName_ (Public dbName _ _) = dbName
 pouchdbDatabaseName_ (Model dbName _) = dbName
+
+-----------------------------------------------------------
+-- THE DATABASE LOCATION (POSSIBLY A URL) OF A RESOURCE IDENTIFIER TO READ FROM
+-----------------------------------------------------------
+-- | Returns an URL for all databases except for IndexedDB.
+databaseLocation :: forall f. ResourceIdentifier -> MonadPouchdb f TRANS.Url
+databaseLocation s = do
+  r <- parseResourceIdentifier s 
+  case r of 
+    Default dbName _ -> unsafePartial $ addBase dbName
+    Local dbName _ -> unsafePartial $ addBase dbName
+    Model dbName _ -> unsafePartial $ addBase dbName
+    Remote url _ _ -> pure url
+    Public url _ _ -> pure url
+  where 
+  addBase :: Partial => String -> MonadPouchdb f String
+  addBase dbname = ((flip append) dbname) <<< fromJust <$> getCouchdbBaseURL
 
 -----------------------------------------------------------
 -- THE DATABASE PART (POSSIBLY A URL) OF A RESOURCE IDENTIFIER TO WRITE TO

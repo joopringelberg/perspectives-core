@@ -81,7 +81,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
-import Perspectives.ResourceIdentifiers (resourceIdentifier2DocLocator)
+import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator)
 import Perspectives.RunMonadPerspectivesTransaction (loadModelIfMissing, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding, scheduleContextRemoval, scheduleRoleRemoval)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
@@ -587,10 +587,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   case ok of 
                     Just true -> do 
                       void $ lift $ removeInternally  (RoleInstance subject)
+                      dbLoc <- lift $ databaseLocation subject
                       newVal <- pure $ writePerspectivesFile 
                         { name: (typeUri2LocalName_ predicate) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
                         , mimeType: object
-                        , database: Just database
+                        , database: Just dbLoc
                         , roleFileName: Just documentName
                         }
                       setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
@@ -609,7 +610,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                       case ok of 
                         Just true -> do 
                           void $ lift $ removeInternally  (RoleInstance subject)
-                          newVal <- pure $ writePerspectivesFile (rec {database= Just database, roleFileName= Just documentName})
+                          dbLoc <- lift $ databaseLocation subject
+                          newVal <- pure $ writePerspectivesFile (rec 
+                            { database= Just dbLoc -- we need the actual url.
+                            , roleFileName= Just documentName
+                            })
                           setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
                           lift $ sendResponse (Result corrId [newVal]) setter
                         _ -> lift $ sendResponse (Error corrId ("Could not save file in the database")) setter
