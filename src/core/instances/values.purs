@@ -133,7 +133,7 @@ type MIME = String
 -- Use database and roleFileName to retrieve the role instance; 
 -- use the local name of the PFile property to retrieve the attachment.
 type PerspectivesFile = 
-  { name :: String                  -- The name associated with the file on creating or uploading it. Use only client side.
+  { fileName :: String                  -- The name associated with the file on creating or uploading it. Use only client side.
   , mimeType :: MIME
   , database :: Maybe String        -- The database where the role instance is stored. 
   , roleFileName :: Maybe String    -- The name of the role instance document. 

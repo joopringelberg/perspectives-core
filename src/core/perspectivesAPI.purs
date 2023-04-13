@@ -589,7 +589,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                       void $ lift $ removeInternally  (RoleInstance subject)
                       dbLoc <- lift $ databaseLocation subject
                       newVal <- pure $ writePerspectivesFile 
-                        { name: (typeUri2LocalName_ predicate) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
+                        { fileName: (typeUri2LocalName_ predicate) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
                         , mimeType: object
                         , database: Just dbLoc
                         , roleFileName: Just documentName
