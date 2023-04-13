@@ -38,7 +38,7 @@ module Perspectives.Assignment.Update where
 import Prelude
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Control.Monad.Error.Class (catchError, try)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, nub, null, snoc)
 import Data.Array (head) as ARR
@@ -47,10 +47,13 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
-import Foreign.Generic (encodeJSON)
+import Effect.Class (liftEffect)
+import Effect.Exception (error)
+import Foreign.Generic (Foreign, encodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, lookup)
 import Foreign.Object (union) as OBJ
@@ -59,24 +62,27 @@ import Persistence.Attachment (class Attachment)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (##>>), (##=), (###=))
+import Perspectives.CoreTypes (MonadPerspectives, Updater, MonadPerspectivesTransaction, (###=), (##=), (##>>), (##>))
+import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findMeRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
-import Perspectives.Identifiers (startsWithSegments)
+import Perspectives.Identifiers (startsWithSegments, typeUri2LocalName_)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding_, contextType, getPropertyFromTelescope, roleType)
+import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty, getPropertyFromTelescope, roleType)
+import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError)
+import Perspectives.Persistence.API (addAttachment, toFile)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity, removeInternally, rev)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
-import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator, stripNonPublicIdentifiers)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -481,6 +487,68 @@ setProperty rids propertyName values = do
       vals <- lift (rid ##= getPropertyFromTelescope propertyName)
       pure $ (not $ null (difference values vals)) || (not $ null (difference vals values))
 
+-----------------------------------------------------------
+-- SAVEFILE
+-----------------------------------------------------------
+-- | From a Foreign value that represents an ArrayBuffer, create a File and save it with a role instance document.
+saveFile :: RoleInstance -> EnumeratedPropertyType -> Foreign -> String -> MonadPerspectivesTransaction String
+saveFile r property arrayBuf mimeType = do
+  -- Look for the contextualised property first: if we find a replacement for the requested property on a role instance,
+  -- that is the instance we will work with - and the (replacing) local property we will work with!
+  mrid <- lift $ getPropertyBearingRoleInstance property r
+  RoleProp rid replacementProperty <- case mrid of 
+    -- Notice that we now assume the property is indeed represented on instances of this type.
+    -- This may go wrong when we actually have no property value yet but it should NOT be represented on the given instance.
+    Nothing -> pure $ RoleProp r property
+    Just x -> pure x
+  pe :: PerspectRol <- lift $ getPerspectEntiteit rid
+      -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
+  users <- aisInPropertyDelta rid property replacementProperty (rol_pspType pe)
+  subject <- getSubject
+  author <- getAuthor
+  dbLoc <- lift $ databaseLocation $ unwrap rid
+  {database, documentName} <- lift $ resourceIdentifier2DocLocator (unwrap rid)
+  mval <- lift (rid ##> getProperty replacementProperty)
+  usedVal <- case mval of 
+    Nothing -> pure $ writePerspectivesFile
+      { fileName: (typeUri2LocalName_ $ unwrap replacementProperty) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
+      , mimeType
+      , database: Just dbLoc
+      , roleFileName: Just documentName
+      }
+    Just val -> pure $ unwrap val
+  case parsePerspectivesFile usedVal of
+    Left e -> throwError $ error ("Could not parse '" <> usedVal <> "' trying to save file:" <> show e)
+    Right rec -> do
+      roleInstance <- lift $ getPerspectRol rid
+      theFile <- liftEffect $ toFile (typeUri2LocalName_ (unwrap replacementProperty)) rec.mimeType arrayBuf
+      DeleteCouchdbDocument{ok, rev} <- lift $ addAttachment database documentName (rev roleInstance) (typeUri2LocalName_ (unwrap replacementProperty)) theFile (MediaType rec.mimeType)
+      case ok of 
+        Just true -> do
+          -- The revision on the cached version is no longer valid.
+          void $ lift $ removeInternally rid
+          -- Add a delta.
+          delta <- pure $ RolePropertyDelta
+            { id : rid
+            , roleType: rol_pspType roleInstance
+            , property: replacementProperty
+            , deltaType: UploadFile
+            , values: [Value usedVal]
+            , subject
+            }
+          signedDelta <- pure $ SignedDelta
+                { author: stripNonPublicIdentifiers author
+                , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+          addDelta (DeltaInTransaction 
+            { users
+            , delta: SignedDelta
+              { author: stripNonPublicIdentifiers author
+              , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta} })
+          setProperty [rid] replacementProperty [Value usedVal]
+          pure usedVal
+        _ -> throwError (error ("Could not save file in the database"))
+
+ 
 -----------------------------------------------------------
 -- CACHEANDSAVE
 -----------------------------------------------------------

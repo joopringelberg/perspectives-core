@@ -48,40 +48,35 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), RecordWithCorrelationidentifier(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (deleteProperty, setPreferredUserRoleType, setProperty)
+import Perspectives.Assignment.Update (deleteProperty, saveFile, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>), (###>))
-import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Fuzzysort (matchIndexedContextNames)
-import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2LocalName_, typeUri2ModelUri_)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getRoleName, roleType, roleType_, siblings)
-import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (saveFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getRoleFunction, getRoleInstances)
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
-import Perspectives.Representation.Class.Cacheable (removeInternally)
-import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, rev)
+import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation, roleKindOfRoleType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
-import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator)
 import Perspectives.RunMonadPerspectivesTransaction (loadModelIfMissing, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding, scheduleContextRemoval, scheduleRoleRemoval)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
@@ -570,55 +565,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- , onlyOnce: true}
     Api.SaveFile -> catchError      
       (do
-        -- Retrieve the type of the role instance.
-        (rt :: EnumeratedRoleType) <- roleType_ (RoleInstance subject)
-        result <- try (getDynamicPropertyGetter predicate (ST rt))
-        case result of
-          Left e -> sendResponse (Error corrId ("No propertytype '" <> predicate <> "' found on roletype '" <> subject <> "': " <> show e)) setter
-          Right (f :: PropertyValueGetter) -> do
-            mval <- (RoleInstance subject) ##> f
-            {database, documentName} <- resourceIdentifier2DocLocator subject
-            case mval of 
-              -- A rare case. Just save the file with the property name.
-              Nothing -> runMonadPerspectivesTransaction authoringRole
-                do 
-                  prol <- lift $ getPerspectRol (RoleInstance subject)
-                  DeleteCouchdbDocument{ok, rev} <- lift $ saveFile database documentName (typeUri2LocalName_ predicate) object (rev prol) contextDescription
-                  case ok of 
-                    Just true -> do 
-                      void $ lift $ removeInternally  (RoleInstance subject)
-                      dbLoc <- lift $ databaseLocation subject
-                      newVal <- pure $ writePerspectivesFile 
-                        { fileName: (typeUri2LocalName_ predicate) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
-                        , mimeType: object
-                        , database: Just dbLoc
-                        , roleFileName: Just documentName
-                        }
-                      setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
-                      lift $ sendResponse (Result corrId [newVal]) setter
-                    _ -> lift $ sendResponse (Error corrId ("Could not save file in the database")) setter
-              Just val -> 
-                -- Interpret the property
-                case parsePerspectivesFile (unwrap val) of
-                  Left e -> sendResponse (Error corrId ("Could not parse '" <> unwrap val <> "' trying to save file:" <> show e)) setter
-                  Right rec -> runMonadPerspectivesTransaction authoringRole
-                    do 
-                      -- The actual ArrayBuffer is stored in contextDescription.
-                      -- Save as attachment.
-                      prol <- lift $ getPerspectRol (RoleInstance subject)
-                      DeleteCouchdbDocument{ok, rev} <- lift $ saveFile database documentName (typeUri2LocalName_ predicate) object (rev prol) contextDescription 
-                      case ok of 
-                        Just true -> do 
-                          void $ lift $ removeInternally  (RoleInstance subject)
-                          dbLoc <- lift $ databaseLocation subject
-                          newVal <- pure $ writePerspectivesFile (rec 
-                            { database= Just dbLoc -- we need the actual url.
-                            , roleFileName= Just documentName
-                            })
-                          setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [Value newVal]
-                          lift $ sendResponse (Result corrId [newVal]) setter
-                        _ -> lift $ sendResponse (Error corrId ("Could not save file in the database")) setter
-      )
+        newVal <- runMonadPerspectivesTransaction authoringRole 
+          (saveFile (RoleInstance subject) (EnumeratedPropertyType predicate) contextDescription object)
+        sendResponse (Result corrId [newVal]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- { request: Action
     -- , subject: <user role instance>

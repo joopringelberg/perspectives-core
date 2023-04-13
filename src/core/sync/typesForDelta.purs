@@ -354,7 +354,7 @@ instance StrippedDelta RolePropertyDelta where
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTATYPE
 -----------------------------------------------------------
-data RolePropertyDeltaType = AddProperty | RemoveProperty | DeleteProperty
+data RolePropertyDeltaType = AddProperty | RemoveProperty | DeleteProperty | UploadFile
 
 derive instance genericRolePropertyDeltaType :: Generic RolePropertyDeltaType _
 derive instance eqRolePropertyDeltaType :: Eq RolePropertyDeltaType

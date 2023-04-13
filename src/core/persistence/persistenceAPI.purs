@@ -37,7 +37,7 @@ import Control.Monad.Reader (lift)
 import Data.Array.NonEmpty (index)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.MediaType (MediaType(..))
+import Data.MediaType (MediaType)
 import Data.Newtype (unwrap)
 import Data.Nullable (Nullable, toNullable)
 import Data.String.Regex (Regex, match, test)
@@ -420,15 +420,6 @@ retrieveDocumentVersion dbName docName = withDatabase dbName
           Right (a :: DocumentWithRevision) -> pure a._rev
       (handleNotFound "retrieveDocumentVersion" docName)
 
------------------------------------------------------------
--- SAVEFILE
------------------------------------------------------------
--- | From a Foreign value that represents an ArrayBuffer, create a File and save it with a role instance document.
-saveFile :: forall f. String -> String -> String -> MimeType -> Revision_ -> Foreign -> MonadPouchdb f DeleteCouchdbDocument
-saveFile database documentName attachmentName mimeType rev arrayBuf = do
-  theFile <- liftEffect $ toFile attachmentName mimeType arrayBuf
-  addAttachment database documentName rev attachmentName theFile (MediaType mimeType)
- 
 -----------------------------------------------------------
 -- ADDATTACHMENT
 -----------------------------------------------------------

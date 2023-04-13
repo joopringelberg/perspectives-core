@@ -30,6 +30,7 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
+import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
@@ -40,23 +41,26 @@ import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, de
 import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=), (###>>), (##=), (##>>))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=), (###>>), (##=), (##>>), (##>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad)
-import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, typeUri2ModelUri_)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, typeUri2LocalName_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (roleType)
+import Perspectives.Instances.ObjectGetters (getProperty, roleType)
+import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (rootContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistent (entityExists, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistence.API (addAttachment, getAttachment)
+import Perspectives.Persistent (entityExists, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
+import Perspectives.ResourceIdentifiers (isInPublicScheme, resourceIdentifier2DocLocator)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -101,7 +105,7 @@ executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) s
 
 -- TODO. Wat met SetPropertyValue?
 executeRolePropertyDelta :: RolePropertyDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
-executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, subject}) signedDelta = do
+executeRolePropertyDelta d@(RolePropertyDelta{id, deltaType, values, property, subject}) signedDelta = do
   log (show deltaType <> " for " <> show id <> " and property " <> show property)
   case deltaType of
     AddProperty -> do
@@ -116,6 +120,31 @@ executeRolePropertyDelta (RolePropertyDelta{id, deltaType, values, property, sub
     DeleteProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.DeleteProperty) >>= case _ of
       Left e -> handleError e
       Right _ -> deleteProperty [id] property
+    UploadFile -> do
+      -- Do this only when we're interpreting the Delta for a public role.
+      if isInPublicScheme (unwrap id)
+        then do
+          -- Currently, the id is in the public scheme. Transform to the local scheme.
+          storageSchemes <- lift $ gets _.typeToStorage
+          case addResourceSchemes storageSchemes d of
+            RolePropertyDelta{id:localId} -> do
+              {database, documentName} <- lift $ resourceIdentifier2DocLocator (unwrap localId)
+              -- Retrieve the attachment from the local version of the role. 
+              -- Use the last segment of the property type as the attachments name.
+              matt <- lift $ getAttachment database documentName (typeUri2LocalName_ (unwrap property))
+              case matt of 
+                Nothing -> pure unit
+                Just att -> do 
+                  -- Add the attachment to the public version of the role.
+                  {database:pubDatabase} <- lift $ resourceIdentifier2DocLocator (unwrap id)
+                  prol <- lift $ getPerspectRol id
+                  mvalue <- lift (id ##> getProperty property)
+                  case mvalue of 
+                    Nothing -> pure unit
+                    Just val -> case parsePerspectivesFile (unwrap val) of
+                      Left e -> pure unit
+                      Right rec -> void $ lift $ addAttachment pubDatabase documentName (rev prol) (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
+        else pure unit
 
 -- TODO. Wat we nodig hebben, is een secundair kanaal naar de client waarin we
 -- fouten en waarschuwingen kunnen sturen.
