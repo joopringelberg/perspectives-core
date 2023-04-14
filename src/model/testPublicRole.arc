@@ -65,5 +65,5 @@ domain model://perspectives.domains#TestPublicRole
     
     public Visitor at "https://perspectives.domains/cw_servers_and_repositories/" = sys:Me
       perspective on Thee
-        props (Soort) verbs (Consult)
+        props (Soort, Beschrijving) verbs (Consult)
         

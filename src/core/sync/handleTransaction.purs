@@ -58,9 +58,9 @@ import Perspectives.Persistent (entityExists, getPerspectRol, saveEntiteit, tryG
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), RoleType(..), StateIdentifier(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
-import Perspectives.ResourceIdentifiers (isInPublicScheme, resourceIdentifier2DocLocator)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -105,7 +105,7 @@ executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) s
 
 -- TODO. Wat met SetPropertyValue?
 executeRolePropertyDelta :: RolePropertyDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
-executeRolePropertyDelta d@(RolePropertyDelta{id, deltaType, values, property, subject}) signedDelta = do
+executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, property, subject}) signedDelta = do
   log (show deltaType <> " for " <> show id <> " and property " <> show property)
   case deltaType of
     AddProperty -> do
@@ -121,29 +121,33 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, deltaType, values, property, s
       Left e -> handleError e
       Right _ -> deleteProperty [id] property
     UploadFile -> do
-      -- Do this only when we're interpreting the Delta for a public role.
+      -- Do this only when we're executing the Delta for a public role. 
+      -- As this is a RolePropertyDelta, it was created when a file was added to the role for a property with a File range. 
+      -- The only 'user' whose resource identifiers are all in the public scheme, is the virtual user for whom we make things public.
+      -- This 'user' never changes a resource himself - he is not an active actor.
+      -- Consequently, if we find, on executing this Delta, that its id is a public resource, we're acting for the public role.
+      -- NOT for the 'real' user who uploaded the file.
+      -- So, testing whether the id is in the public scheme is an adequate test to detect this case.
       if isInPublicScheme (unwrap id)
         then do
           -- Currently, the id is in the public scheme. Transform to the local scheme.
           storageSchemes <- lift $ gets _.typeToStorage
-          case addResourceSchemes storageSchemes d of
-            RolePropertyDelta{id:localId} -> do
-              {database, documentName} <- lift $ resourceIdentifier2DocLocator (unwrap localId)
-              -- Retrieve the attachment from the local version of the role. 
-              -- Use the last segment of the property type as the attachments name.
-              matt <- lift $ getAttachment database documentName (typeUri2LocalName_ (unwrap property))
-              case matt of 
+          {database, documentName} <- lift $ resourceIdentifier2DocLocator $ (addSchemeToResourceIdentifier storageSchemes (RType roleType)) (takeGuid (unwrap id))
+          -- Retrieve the attachment from the local version of the role. 
+          -- Use the last segment of the property type as the attachments name.
+          matt <- lift $ getAttachment database documentName (typeUri2LocalName_ (unwrap property))
+          case matt of 
+            Nothing -> pure unit
+            Just att -> do 
+              -- Add the attachment to the public version of the role.
+              {database:pubDatabase} <- lift $ resourceIdentifier2DocLocator (unwrap id)
+              prol <- lift $ getPerspectRol id
+              mvalue <- lift (id ##> getProperty property)
+              case mvalue of 
                 Nothing -> pure unit
-                Just att -> do 
-                  -- Add the attachment to the public version of the role.
-                  {database:pubDatabase} <- lift $ resourceIdentifier2DocLocator (unwrap id)
-                  prol <- lift $ getPerspectRol id
-                  mvalue <- lift (id ##> getProperty property)
-                  case mvalue of 
-                    Nothing -> pure unit
-                    Just val -> case parsePerspectivesFile (unwrap val) of
-                      Left e -> pure unit
-                      Right rec -> void $ lift $ addAttachment pubDatabase documentName (rev prol) (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
+                Just val -> case parsePerspectivesFile (unwrap val) of
+                  Left e -> pure unit
+                  Right rec -> void $ lift $ addAttachment pubDatabase documentName (rev prol) (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
         else pure unit
 
 -- TODO. Wat we nodig hebben, is een secundair kanaal naar de client waarin we
@@ -321,8 +325,8 @@ executeTransactionForPublicRole t@(TransactionForPeer{deltas}) storageUrl = for_
     f s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta
       where
         executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
-        -- For now, we fail silently on deltas that cannot be authenticated. Notice that this will never happen for
-        -- these deltas as they were constructed by the user himself!
+        -- For now, we fail silently on deltas that cannot be authenticated. Notice that in an ideal world this will 
+        -- never happen for these deltas as they were constructed by the user himself!
         executeDelta Nothing = pure unit
         executeDelta (Just stringifiedDelta) = do 
           (case runExcept $ decodeJSON stringifiedDelta of

@@ -294,7 +294,7 @@ exports.getAttachmentImpl = function( database, docName, attachmentId )
         }
         else
         {
-          onSucces(t);
+          onSucces(blob);
         }
       });
     // Return a canceler, which is just another Aff effect.
