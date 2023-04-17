@@ -39,10 +39,11 @@ import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
+import Foreign (unsafeToForeign)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, roleContextualisations, setProperty, lookupOrCreateRoleInstance, lookupOrCreateContextInstance)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, lookupOrCreateContextInstance, lookupOrCreateRoleInstance, moveRoleInstanceToAnotherContext, removeProperty, roleContextualisations, saveFile, setProperty)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, Updater, MonadPerspectivesTransaction, (###>>), (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Error.Boundaries (handlePerspectRolError)
@@ -56,6 +57,7 @@ import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstan
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as OG
 import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
+import Perspectives.Instances.Values (writePerspectivesFile)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
@@ -65,7 +67,7 @@ import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (bindingOfRole, contextOfADT)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
@@ -263,6 +265,23 @@ compileAssignment (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQf
     (roles :: Array RoleInstance) <- lift (contextId ##= roleGetter)
     (values :: Array Value) <- lift (contextId ##= valueGetter)
     setProperty roles qualifiedProperty values
+
+compileAssignment (BQD _ (QF.CreateFileF fileName mimeType qualifiedProperty) contentQfd roleQfd _ _ _) = do
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
+  (contentGetter :: (ContextInstance ~~> Value)) <- context2propertyValue contentQfd
+  pure \contextId -> do
+    (roles :: Array RoleInstance) <- lift (contextId ##= roleGetter)
+    (contents :: Array Value) <- lift (contextId ##= contentGetter)
+    case head roles, head contents of
+      -- Notice that the content is a string. It is eventually passed on to toFile as a Foreign value and 
+      -- then passed on to the File constructor. This constructor accepts Strings just as well as ArrayBuffers.
+      Just roleInstance, Just content -> do
+        setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, database: Nothing, roleFileName: Nothing}]
+        void $ saveFile roleInstance qualifiedProperty (unsafeToForeign content) mimeType
+      Just roleInstance, Nothing -> do
+        setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, database: Nothing, roleFileName: Nothing}]
+        void $ saveFile roleInstance qualifiedProperty (unsafeToForeign "") mimeType
+      Nothing, _ -> throwError (error $ "No role instance found to attach the file '" <> fileName <> "' to.")
 
 -- Even though SequenceF is compiled in the QueryCompiler, we need to handle it here, too.
 -- In the QueryCompiler, the components will be variable bindings.

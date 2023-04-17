@@ -281,6 +281,8 @@ data QueryFunction
   | AddPropertyValue EnumeratedPropertyType
   | RemovePropertyValue EnumeratedPropertyType
   | SetPropertyValue EnumeratedPropertyType
+  -- CreateFileF fileName mimemType property
+  | CreateFileF String String EnumeratedPropertyType
   | ExternalEffectFullFunction String
   | ExternalDestructiveFunction String
   | ForeignEffectFullFunction String

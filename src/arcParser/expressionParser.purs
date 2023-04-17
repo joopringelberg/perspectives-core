@@ -162,7 +162,7 @@ simpleStep = try
   ) <?> "binding, binder, context, extern, this, modelname, contextType, roleTypes, specialisesRoleType, a valid variablename (lowercase only) or a number, boolean, string (between double quotes), date (between single quotes), email address or a monoid function (sum, product, minimum, maximum) or count"
 
 -- | Parses just the regular expression; not "matches", which is interpreted like ">>".
--- | We expect an expression like this: /.../gimyu
+-- | We expect an expression like this: "..."gimyu
 -- | where all flags are optional.
 regexExpression :: IP RegExP
 regexExpression = do

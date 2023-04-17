@@ -95,6 +95,7 @@ perspectDef = LanguageDef
                   , "Boolean"
                   , "verbs"
                   , "File"
+                  , "file"
                   , "Email"
 
                   -- PropertyFacets

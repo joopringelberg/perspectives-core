@@ -56,6 +56,7 @@ data Assignment =
   | CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
   | CreateContext (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe Step, roleTypeIdentifier :: Maybe String, contextExpression :: Maybe Step))
   | CreateContext_ (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe Step, roleExpression :: Step))
+  | CreateFile (WithTextRange (fileName :: String, mimeType :: String, propertyIdentifier :: String, roleExpression :: Maybe Step, contentExpression :: Step))
   | Move (WithTextRange (roleExpression :: Step, contextExpression :: Maybe Step))
   | Bind (WithTextRange (bindingExpression :: Step, roleIdentifier :: String, contextExpression :: Maybe Step))
   | Bind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
@@ -75,6 +76,7 @@ startOfAssignment (RemoveContext{start}) = start
 startOfAssignment (CreateRole{start}) = start
 startOfAssignment (CreateContext{start}) = start
 startOfAssignment (CreateContext_{start}) = start
+startOfAssignment (CreateFile{start}) = start
 startOfAssignment (Move{start}) = start
 startOfAssignment (Bind{start}) = start
 startOfAssignment (Bind_{start}) = start
@@ -93,6 +95,7 @@ endOfAssignment (RemoveContext{end}) = end
 endOfAssignment (CreateRole{end}) = end
 endOfAssignment (CreateContext{end}) = end
 endOfAssignment (CreateContext_{end}) = end
+endOfAssignment (CreateFile{end}) = end
 endOfAssignment (Move{end}) = end
 endOfAssignment (Bind{end}) = end
 endOfAssignment (Bind_{end}) = end
@@ -156,6 +159,7 @@ instance prettyPrintAssignment :: PrettyPrint Assignment where
     in
       "CreateContext " <> contextTypeIdentifier <> boundTo <> " in " <> context
   prettyPrint' t (CreateContext_ {contextTypeIdentifier, roleExpression}) = "CreateContext_ " <> contextTypeIdentifier <> " bound to " <> prettyPrint' t roleExpression
+  prettyPrint' t (CreateFile {fileName, mimeType, roleExpression, contentExpression}) = "CreateFile " <> fileName <> " as " <> mimeType <> if isNothing roleExpression then "" else prettyPrint' t roleExpression <> "\n" <> t <> "  " <> prettyPrint' (t <> "  ") contentExpression
   prettyPrint' t (Move {roleExpression, contextExpression}) = "Move " <> prettyPrint' t roleExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
   prettyPrint' t (Bind {bindingExpression, contextExpression}) = "Bind " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
   prettyPrint' t (Bind_ {bindingExpression, binderExpression}) = "Bind_ " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") binderExpression

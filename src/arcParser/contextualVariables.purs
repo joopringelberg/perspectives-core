@@ -132,6 +132,11 @@ assignmentContainsReference varName (PropertyAssignment {valueExpression, roleEx
   ||
   maybe false (stepContainsVariableReference varName) roleExpression
 
+assignmentContainsReference varName (CreateFile {roleExpression, contentExpression}) = 
+  stepContainsVariableReference varName contentExpression
+  ||
+  maybe false (stepContainsVariableReference varName) roleExpression
+
 assignmentContainsReference varName (ExternalEffect {arguments}) =
   ala Disj foldMap $ stepContainsVariableReference varName <$> arguments
 

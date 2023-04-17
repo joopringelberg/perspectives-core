@@ -58,10 +58,15 @@ domain model://perspectives.domains#TestPublicRole
       perspective on Thee
         only (Create, Remove)
         props (Soort, Beschrijving) verbs (SetPropertyValue)
+      
+        action MakeArcFile
+          create file "myModel.arc" as "text/arc" in Beschrijving for origin
+            "domain model://perspectives.domains#MyModel"
 
     thing Thee
-      property Soort (String)
       property Beschrijving (File)
+        pattern = "^text/arc$" "Only .arc files (Perspectives Language source files) are allowed, so use `text//arc."
+      property Soort (String)
     
     public Visitor at "https://perspectives.domains/cw_servers_and_repositories/" = sys:Me
       perspective on Thee

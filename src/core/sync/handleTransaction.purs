@@ -56,11 +56,11 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment, getAttachment)
 import Perspectives.Persistent (entityExists, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, rev)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, removeInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, takeGuid)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -140,14 +140,18 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
             Nothing -> pure unit
             Just att -> do 
               -- Add the attachment to the public version of the role.
-              {database:pubDatabase} <- lift $ resourceIdentifier2DocLocator (unwrap id)
+              {database:pubDatabase} <- lift $ resourceIdentifier2WriteDocLocator (unwrap id)
               prol <- lift $ getPerspectRol id
               mvalue <- lift (id ##> getProperty property)
               case mvalue of 
                 Nothing -> pure unit
                 Just val -> case parsePerspectivesFile (unwrap val) of
                   Left e -> pure unit
-                  Right rec -> void $ lift $ addAttachment pubDatabase documentName (rev prol) (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
+                  Right rec -> do 
+                    void $ lift $ addAttachment pubDatabase documentName (rev prol) (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
+                    -- Remove the cached value, if any; it will have an outdated revision.
+                    void $ lift $ removeInternally id
+
         else pure unit
 
 -- TODO. Wat we nodig hebben, is een secundair kanaal naar de client waarin we

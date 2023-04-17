@@ -26,12 +26,15 @@ import Control.Alt ((<|>))
 import Data.Array (fromFoldable)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), isJust)
+import Data.String.Regex (Regex, match)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (VarBinding(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, lowerCaseName, reserved)
 import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, outdented', sameOrOutdented')
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetStep(..), LetABinding(..))
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<>), (>>=))
 import Text.Parsing.Indent (indented', withPos)
@@ -175,6 +178,7 @@ isPropertyAssignment = do
   case first, second of
     "delete", "property" -> pure true
     "delete", "role" -> pure false
+    "create", "file" -> pure true
     _, _ -> isJust <$> optionMaybe (lookAhead (arcIdentifier *> assignmentOperator))
   -- keyword <- option "" (lookAhead reservedIdentifier)
   -- case keyword of
@@ -186,6 +190,7 @@ propertyAssignment = do
   keyword <- option "" (lookAhead reservedIdentifier)
   case keyword of
     "delete" -> propertyDeletion
+    "create" -> fileCreation
     _ -> propertyAssignment'
   where
     propertyAssignment' :: IP Assignment
@@ -207,7 +212,50 @@ propertyAssignment = do
       roleExpression <- optionMaybe (reserved "from" *> step)
       end <- getPosition
       pure $ DeleteProperty {start, end, propertyIdentifier, roleExpression}
+    
+    -- create file "myModel.arc" as "text/arc" in Model [for origin]
+    --    "domain ..."
+    fileCreation :: IP Assignment
+    fileCreation = do 
+      start <- getPosition
+      reserved "create"
+      reserved "file"
+      fileName <- parseFileName
+      mimeType <- reserved "as" *> parseMimeType
+      propertyIdentifier <- reserved "in" *> arcIdentifier
+      roleExpression <- optionMaybe (reserved "for" *> step)
+      -- next line, indented
+      contentExpression <- indented' *> step
+      end <- getPosition
+      pure $ CreateFile
+        { start
+        , end
+        , fileName
+        , mimeType
+        , propertyIdentifier
+        , roleExpression 
+        , contentExpression
+          }
+      where 
+      fileRegex :: Regex
+      fileRegex = unsafeRegex "^[^\\./]+\\.[^\\./]+$" noFlags
 
+      parseFileName :: IP String
+      parseFileName = do 
+        f <- token.stringLiteral
+        case match fileRegex f of 
+          Nothing -> fail ("The string '" <> f <> "' is not a valid file name!")
+          Just _ -> pure f
+
+      mimeRegex :: Regex
+      mimeRegex = unsafeRegex "^[^\\./]+/[^\\./]+$" noFlags
+
+      parseMimeType :: IP String
+      parseMimeType = do 
+        m <- token.stringLiteral
+        case match mimeRegex m of
+          Nothing -> fail ("The string '" <> m <> "' is not a valid text MIME type")
+          Just _ -> pure m
 
 assignmentOperator :: IP AssignmentOperator
 assignmentOperator =
