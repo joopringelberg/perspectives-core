@@ -425,7 +425,6 @@ retrieveDocumentVersion dbName docName = withDatabase dbName
 -----------------------------------------------------------
 -- | Requires a revision if the document exists prior to adding the attachment.
 -- | Notice that the revision of the document changes if an attachment is added succesfully!
--- TODO. We moeten het document ophalen en teruggeven. We willen immers de attachments bewaren!
 addAttachment :: forall f attachmentType. DatabaseName -> DocumentName -> Revision_ -> AttachmentName -> attachmentType -> MediaType -> MonadPouchdb f DeleteCouchdbDocument
 addAttachment dbName docName rev attachmentName attachment mimetype = withDatabase dbName
   \db -> do

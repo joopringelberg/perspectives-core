@@ -94,7 +94,11 @@ overwriteEntity id e = do
       (av :: AVar a) <- representInternally id
       liftAff $ put e av
       pure av
-    Just avar -> liftAff $ put e avar *> pure avar
+    Just avar -> do 
+      -- Make the AVar empty.
+      _ <- liftAff $ take avar
+      -- Put the new value in place.
+      liftAff $ put e avar *> pure avar
 
 -- | Returns an entity. Throws an error if the resource is not represented in cache or not
 -- | immediately available in cache.

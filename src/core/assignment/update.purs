@@ -74,15 +74,15 @@ import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty,
 import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError)
-import Perspectives.Persistence.API (addAttachment, toFile)
+import Perspectives.Persistence.API (addAttachment, getDocument, toFile)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity, removeInternally, rev)
+import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity, overwriteEntity, removeInternally, rev)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
-import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator, stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, stripNonPublicIdentifiers)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -444,15 +444,17 @@ deleteProperty rids propertyName = case ARR.head rids of
         Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectEntiteit rid) >>=
             handlePerspectRolError
             "deleteProperty"
-            \(pe :: PerspectRol) -> do
-              users <- aisInPropertyDelta rid propertyName replacementProperty (rol_pspType pe)
+            \(pe@(PerspectRol{properties, pspType})) -> do
+              users <- aisInPropertyDelta rid propertyName replacementProperty pspType
               -- Create a delta for all values.
+              -- We must add the current values, otherwise a Transaction can only have a single 
+              -- DeleteProperty delta.
               delta <- pure $ RolePropertyDelta
                 { id : rid
-                , roleType: rol_pspType pe
+                , roleType: pspType
                 , property: replacementProperty
                 , deltaType: DeleteProperty
-                , values: []
+                , values: maybe [] identity (lookup (unwrap replacementProperty) properties)
                 , subject
                 }
               author <- getAuthor
@@ -491,6 +493,7 @@ setProperty rids propertyName values = do
 -- SAVEFILE
 -----------------------------------------------------------
 -- | From a Foreign value that represents an ArrayBuffer, create a File and save it with a role instance document.
+-- | Updates the revision of the role instance.
 saveFile :: RoleInstance -> EnumeratedPropertyType -> Foreign -> String -> MonadPerspectivesTransaction String
 saveFile r property arrayBuf mimeType = do
   -- Look for the contextualised property first: if we find a replacement for the requested property on a role instance,
@@ -501,9 +504,9 @@ saveFile r property arrayBuf mimeType = do
     -- This may go wrong when we actually have no property value yet but it should NOT be represented on the given instance.
     Nothing -> pure $ RoleProp r property
     Just x -> pure x
-  pe :: PerspectRol <- lift $ getPerspectEntiteit rid
+  roleInstance :: PerspectRol <- lift $ getPerspectEntiteit rid
       -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
-  users <- aisInPropertyDelta rid property replacementProperty (rol_pspType pe)
+  users <- aisInPropertyDelta rid property replacementProperty (rol_pspType roleInstance)
   subject <- getSubject
   author <- getAuthor
   dbLoc <- lift $ databaseLocation $ unwrap rid
@@ -516,17 +519,33 @@ saveFile r property arrayBuf mimeType = do
       , database: Just dbLoc
       , roleFileName: Just documentName
       }
-    Just val -> pure $ unwrap val
+    Just val -> case parsePerspectivesFile $ unwrap val of
+      Left e -> pure $ writePerspectivesFile
+        { fileName: (typeUri2LocalName_ $ unwrap replacementProperty) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
+        , mimeType
+        , database: Just dbLoc
+        , roleFileName: Just documentName
+        }
+      Right rec ->  pure $ writePerspectivesFile $ rec {database = Just dbLoc, roleFileName = Just documentName}
   case parsePerspectivesFile usedVal of
     Left e -> throwError $ error ("Could not parse '" <> usedVal <> "' trying to save file:" <> show e)
     Right rec -> do
-      roleInstance <- lift $ getPerspectRol rid
       theFile <- liftEffect $ toFile (typeUri2LocalName_ (unwrap replacementProperty)) rec.mimeType arrayBuf
       DeleteCouchdbDocument{ok, rev} <- lift $ addAttachment database documentName (rev roleInstance) (typeUri2LocalName_ (unwrap replacementProperty)) theFile (MediaType rec.mimeType)
       case ok of 
         Just true -> do
           -- The revision on the cached version is no longer valid.
+          -- Neither does it have the new attachment info.
           void $ lift $ removeInternally rid
+          -- Retrieve again so it includes the new attachment info and revision.
+          -- But, because replication from the write database to the read database takes some time,
+          -- if we were to retrieve from the write database, we are likely to retrieve the previous version,
+          -- with neither attachments nor updated revision.
+          -- So we read from the write database.
+          {database:rdb, documentName:rdn} <- lift $ resourceIdentifier2WriteDocLocator (unwrap rid)
+          roleInstance' :: PerspectRol <- lift $ getDocument rdb rdn
+          -- save version in cache. If we use cacheEntity, the revision will not be overwritten!
+          lift $ void $ overwriteEntity rid roleInstance'
           -- Add a delta.
           delta <- pure $ RolePropertyDelta
             { id : rid

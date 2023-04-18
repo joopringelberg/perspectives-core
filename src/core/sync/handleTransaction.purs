@@ -23,7 +23,7 @@
 module Perspectives.Sync.HandleTransaction where
 
 import Control.Monad.AvarMonadAsk (gets)
-import Control.Monad.Error.Class (catchError)
+import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except (lift, runExcept)
 import Data.Array.NonEmpty (head)
 import Data.Either (Either(..))
@@ -35,6 +35,7 @@ import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
+import Effect.Exception (error)
 import Foreign.Generic (decodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
@@ -42,6 +43,7 @@ import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=), (###>>), (##=), (##>>), (##>))
+import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.DomeinCache (tryRetrieveDomeinFile)
@@ -53,10 +55,10 @@ import Perspectives.Instances.ObjectGetters (getProperty, roleType)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (rootContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, getAttachment)
+import Perspectives.Persistence.API (addAttachment, getAttachment, getDocument)
 import Perspectives.Persistent (entityExists, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, removeInternally, rev)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity, removeInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
@@ -130,7 +132,7 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
       -- So, testing whether the id is in the public scheme is an adequate test to detect this case.
       if isInPublicScheme (unwrap id)
         then do
-          -- Currently, the id is in the public scheme. Transform to the local scheme.
+          -- Currently, the id is in the public scheme. Transform to the local scheme, so we can retrieve the attachment locally.
           storageSchemes <- lift $ gets _.typeToStorage
           {database, documentName} <- lift $ resourceIdentifier2DocLocator $ (addSchemeToResourceIdentifier storageSchemes (RType roleType)) (takeGuid (unwrap id))
           -- Retrieve the attachment from the local version of the role. 
@@ -148,9 +150,22 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
                 Just val -> case parsePerspectivesFile (unwrap val) of
                   Left e -> pure unit
                   Right rec -> do 
-                    void $ lift $ addAttachment pubDatabase documentName (rev prol) (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
-                    -- Remove the cached value, if any; it will have an outdated revision.
-                    void $ lift $ removeInternally id
+                    DeleteCouchdbDocument{ok, rev} <- lift $ addAttachment pubDatabase documentName (rev prol) (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
+                    case ok of 
+                      Just true -> do
+                        -- The revision on the cached version is no longer valid.
+                        -- Neither does it have the new attachment info.
+                        void $ lift $ removeInternally id
+                        -- Retrieve again so it includes the new attachment info and revision.
+                        -- But, because replication from the write database to the read database takes some time,
+                        -- if we were to retrieve from the write database, we are likely to retrieve the previous version,
+                        -- with neither attachments nor updated revision.
+                        -- So we read from the write database.
+                        {database:rdb, documentName:rdn} <- lift $ resourceIdentifier2WriteDocLocator (unwrap id)
+                        roleInstance :: PerspectRol <- lift $ getDocument rdb rdn
+                        -- save version in cache. If we use cacheEntity, the revision will not be overwritten!
+                        lift $ void $ overwriteEntity id roleInstance
+                      _ -> throwError (error ("Could not save file in the database"))
 
         else pure unit
 
