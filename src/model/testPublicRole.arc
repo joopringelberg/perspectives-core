@@ -65,7 +65,7 @@ domain model://perspectives.domains#TestPublicRole
 
     thing Thee
       property Beschrijving (File)
-        pattern = "^text/arc$" "Only .arc files (Perspectives Language source files) are allowed, so use `text//arc."
+        pattern = "text/arc" "Only .arc files (Perspectives Language source files) are allowed, so use `text//arc."
       property Soort (String)
     
     public Visitor at "https://perspectives.domains/cw_servers_and_repositories/" = sys:Me
