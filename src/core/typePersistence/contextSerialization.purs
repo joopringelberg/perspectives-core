@@ -26,6 +26,7 @@ module Perspectives.TypePersistence.ContextSerialisation where
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
+import Data.Array (length)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
@@ -63,13 +64,24 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
 constructDefaultScreen :: RoleInstance -> RoleType -> ContextInstance -> AssumptionTracking ScreenDefinition
 constructDefaultScreen userRoleInstance userRoleType cid = do
   (perspectives :: Array SerialisedPerspective') <- runArrayT $ perspectivesForContextAndUser' userRoleInstance userRoleType cid
-  tabs <- pure $ Just $ makeTab <$> perspectives
-  pure $ ScreenDefinition
-    { title: ""
-    , tabs
-    , rows: Nothing
-    , columns: Nothing
-    }
+  -- If there is just a single perspective, don't make tabs but make a row with a widget instead.
+  if length perspectives == 1
+    then do 
+      row <- pure $ Just $ makeRow <$> perspectives
+      pure $ ScreenDefinition
+        { title: ""
+        , tabs: Nothing
+        , rows: row
+        , columns: Nothing
+        }
+    else do
+      tabs <- pure $ Just $ makeTab <$> perspectives
+      pure $ ScreenDefinition
+        { title: ""
+        , tabs
+        , rows: Nothing
+        , columns: Nothing
+        }
     where
       makeTab :: SerialisedPerspective' -> TabDef
       makeTab p@{displayName, isFunctional} =
@@ -90,6 +102,20 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
           , elements: [
             RowElementD (RowDef [ element ])
           ]}
+      makeRow :: SerialisedPerspective' -> ScreenElementDef
+      makeRow p@{displayName, isFunctional} = let
+          widgetCommonFields =
+            { title: Nothing
+            , perspective: Just p
+            , perspectiveId: ""
+            , propertyVerbs: Nothing
+            , roleVerbs: []
+            , userRole: userRoleType
+            }
+        in 
+          if isFunctional
+            then FormElementD $ FormDef widgetCommonFields
+            else TableElementD $ TableDef widgetCommonFields
 
 -----------------------------------------------------------
 -- CLASS ADDPERSPECTIVES
