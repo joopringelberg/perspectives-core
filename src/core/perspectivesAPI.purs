@@ -48,7 +48,7 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), RecordWithCorrelationidentifier(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (deleteProperty, saveFile, setPreferredUserRoleType, setProperty)
+import Perspectives.Assignment.Update (RoleProp(..), deleteProperty, getPropertyBearingRoleInstance, saveFile, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
@@ -57,13 +57,15 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Fuzzysort (matchIndexedContextNames)
-import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2ModelUri_)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2LocalName_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getRoleName, roleType, roleType_, siblings)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getProperty, getRoleName, roleType, roleType_, siblings)
+import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.API (getAttachment, toFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
@@ -77,6 +79,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
+import Perspectives.ResourceIdentifiers (resourceIdentifier2DocLocator)
 import Perspectives.RunMonadPerspectivesTransaction (loadModelIfMissing, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding, scheduleContextRemoval, scheduleRoleRemoval)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
@@ -86,6 +89,7 @@ import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForCont
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
 import Simple.JSON (unsafeStringify, read)
+import Unsafe.Coerce (unsafeCoerce)
 
 
 -----------------------------------------------------------
@@ -568,6 +572,36 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         newVal <- runMonadPerspectivesTransaction authoringRole 
           (saveFile (RoleInstance subject) (EnumeratedPropertyType predicate) contextDescription object)
         sendResponse (Result corrId [newVal]) setter)
+      (\e -> sendResponse (Error corrId (show e)) setter)
+    -- { request: "GetFile"
+    -- , subject: RoleInstance
+    -- , predicate: propertyName
+    -- }
+    Api.GetFile -> catchError
+      (do 
+        mrid <- getPropertyBearingRoleInstance (EnumeratedPropertyType predicate) (RoleInstance subject)
+        RoleProp rid replacementProperty <- case mrid of 
+          -- Notice that we now assume the property is indeed represented on instances of this type.
+          -- This may go wrong when we actually have no property value yet but it should NOT be represented on the given instance.
+          Nothing -> pure $ RoleProp (RoleInstance subject) (EnumeratedPropertyType predicate)
+          Just x -> pure x
+        {database, documentName} <- resourceIdentifier2DocLocator (unwrap rid)
+        ma <- getAttachment database documentName (typeUri2LocalName_ predicate)
+        case ma of
+          Nothing -> sendResponse (Error corrId ("No file found for property " <> (typeUri2LocalName_ predicate) <> ".")) setter
+          -- NOTE that we force the Foreign value through the api. This MUST be handled correctly in the proxy!
+          Just a -> do
+            mv <- rid ##> getProperty replacementProperty
+            case mv of
+              Nothing -> sendResponse (Error corrId ("No file information found for property " <> (typeUri2LocalName_ predicate) <> ".")) setter
+              Just (Value v) -> case parsePerspectivesFile v of
+                Left e -> sendResponse (Error corrId ("Could not parse the value of this property, because: " <> show e)) setter
+                Right rec -> do
+                  file <- liftEffect $ toFile rec.fileName rec.mimeType a
+                  -- Notice that we force the foreign value to comply to String. 
+                  -- The proxy will handle it!
+                  sendResponse (Result corrId [unsafeCoerce file]) setter
+      )
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- { request: Action
     -- , subject: <user role instance>
