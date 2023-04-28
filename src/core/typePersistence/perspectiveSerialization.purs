@@ -39,11 +39,11 @@ import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectives
 import Perspectives.Data.EncodableMap (lookup) as EM
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (isExternalRole)
-import Perspectives.Instances.ObjectGetters (contextType, getActiveRoleStates, getActiveStates)
+import Perspectives.Instances.ObjectGetters (binding_, context, contextType, getActiveRoleStates, getActiveStates, roleType_)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
-import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter)
+import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter, getPublicUrl)
 import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
@@ -55,8 +55,9 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), expandPropSet, expandPropertyVerbs, expandVerbs)
 import Perspectives.Representation.ScreenDefinition (WidgetCommonFieldsDef)
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), PropertyType(..), RoleType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
+import Perspectives.ResourceIdentifiers (createPublicIdentifier, guid)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
 import Perspectives.Types.ObjectGetters (getContextAspectSpecialisations)
 import Prelude (append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
@@ -386,12 +387,30 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps subjectContex
           pure $ Tuple (propertytype2string propertyType)
             { values: unwrap <$> vals
             , propertyVerbs: show <$> intersect restrictingVerbs (unsafePartial fromJust $ lookup (propertytype2string propertyType) localVerbsPerProperty)}
+      kind <- lift $ lift (roleType_ roleId >>= roleKindOfRoleType <<< ENR)
+      publicUrl <-  case kind of 
+        -- Only report a result for ContextRole kinds. 
+        ContextRole -> (do
+          meRole <- lift $ lift $ binding_ roleId
+          case meRole of 
+            Nothing -> pure Nothing
+            -- We'll look for public roles in the (type of the) context of the filler of the ContextRole instance.
+            Just erole -> do
+              ctxt <- lift $ lift (erole ##>> context)
+              murl <- lift $ lift $ getPublicUrl ctxt
+              case murl of 
+                Nothing -> pure Nothing
+                Just url -> do 
+                  schemeLess <- lift $ lift $ guid (unwrap erole)
+                  pure $ Just (createPublicIdentifier url schemeLess))
+        _ -> pure Nothing
       pure $ Just
         { roleId: (unwrap roleId)
         , objectStateBasedRoleVerbs
         , propertyValues: fromFoldable valuesAndVerbs
         , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates))
         , objectStateBasedProperties
+        , publicUrl
       }
 
 -- | The verbs in this type contain both those based on context- and subject state,
