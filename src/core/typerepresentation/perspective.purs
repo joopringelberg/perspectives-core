@@ -66,6 +66,8 @@ type PerspectiveRecord =
   , roleVerbs :: EncodableMap StateSpec RoleVerbList
   , propertyVerbs :: EncodableMap StateSpec (Array PropertyVerbs)
   , actions :: EncodableMap StateSpec (Object Action)
+  -- SelfOnly is just for a user's perspective on his own role. So the object of this perspective
+  -- must be a user role and the perspective _is of_ that user role, too.
   , selfOnly :: Boolean
   , isSelfPerspective :: Boolean
   , automaticStates :: Array StateIdentifier

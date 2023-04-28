@@ -63,6 +63,9 @@ domain model://perspectives.domains#TestPublicRole
           create file "myModel.arc" as "text/arc" in Beschrijving for origin
             "domain model://perspectives.domains#MyModel"
 
+      perspective on Contracts
+        props (AccountName) verbs (Consult)
+
     thing Thee
       property Beschrijving (File)
         pattern = "text/arc" "Only .arc files (Perspectives Language source files) are allowed, so use `text//arc."
@@ -71,4 +74,37 @@ domain model://perspectives.domains#TestPublicRole
     public Visitor at "https://perspectives.domains/cw_servers_and_repositories/" = sys:Me
       perspective on Thee
         props (Soort, Beschrijving) verbs (Consult)
+      
+      -- Hier hebben we een nieuwe versie van selfOnly nodig?
+      perspective on Contracts
+        only (CreateAndFill)
+        props (AccountName) verbs (Consult)
+
+      perspective on Contracts >> binding >> context >> Account
+        only (Create, Fill)
+      
+      perspective on TeaRoomOperator
+        props (FirstName) verbs (Consult)
+      
+      action MakeContract
+        letA
+          c <- create context Contract bound to Contracts
+        in
+          bind sys:Me to Account in c >> binding >> context
+          bind TeaRoomOperator to Admin in c >> binding >> context
+    
+    context Contracts (relational, unlinked) filledBy Contract
+
+  case Contract
+    external
+      property AccountName = context >> Account >> FirstName
+
+    user Account filledBy sys:PerspectivesSystem$User
+      perspective on Admin
+      perspective on extern
+        props (AccountName) verbs (Consult)
+
+    user Admin filledBy TeaRoomOperator
+      perspective on Account
+        props (FirstName) verbs (Consult)
         

@@ -55,7 +55,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
-import Perspectives.ResourceIdentifiers (isInPublicScheme)
+import Perspectives.ResourceIdentifiers (guid, isInPublicScheme)
 import Prelude (bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
@@ -79,7 +79,14 @@ getEnumeratedRoleInstances_ rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c 
     \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
 
 getUnlinkedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
-getUnlinkedRoleInstances rn c = ArrayT $ try ((lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/roleFromContext" (Just $ [unwrap rn, unwrap c])) >>=
+getUnlinkedRoleInstances rn c = ArrayT $ try 
+  (do
+    db <- lift entitiesDatabaseName
+    -- Compare the identifier without the scheme, as the view consists of schemeless identifiers, too.
+    -- We do this to abstract from the way resources have been stored.
+    schemelessId <- lift $ guid $ unwrap c
+    lift $ getViewOnDatabase db "defaultViews/roleFromContext" (Just $ [unwrap rn, schemelessId]))
+  >>=
   handlePerspectRolError' "getUnlinkedRoleInstances" []
     \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure roles
 

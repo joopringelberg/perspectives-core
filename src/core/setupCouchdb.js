@@ -33,15 +33,21 @@ exports.contextView = (function (doc)
 // We want to filter the result on two criteria:
 //  * the pspType should be a certain value
 //  * the context should be a certain value.
+// In order to abstract from the storage scheme, we only emit
+// the part of the context identifier following the hash (#).
 exports.roleFromContextView = (function (doc)
  {
+    function takeGuid(s)
+    {
+      return s.substring( s.lastIndexOf("#") + 1 );
+    }
    // a proxy for being a role:
    if (doc.contents.universeRoleDelta)
    {
      doc.contents.allTypes.forEach(
        function(typeId)
        {
-         emit([typeId, doc.contents.context], doc.contents._id);
+         emit([typeId, takeGuid( doc.contents.context )], doc.contents._id);
        }
      );
    }
