@@ -59,7 +59,7 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, roleAspectsADT, typeIncludingAspects)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, roleAspectsADT, roleKindOfRoleType, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -67,10 +67,11 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
 import Perspectives.Utilities (addUnique)
-import Prelude (Unit, append, bind, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
+import Prelude (Unit, append, bind, eq, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -120,8 +121,8 @@ propertyAliases rtype = getEnumeratedRole rtype >>= pure <<< _.propertyAliases <
 publicUrl_ :: EnumeratedRoleType -> MonadPerspectives (Maybe Calculation)
 publicUrl_ et = getEnumeratedRole et >>= pure <<< _.publicUrl <<< unwrap
 
-isPublicRole :: EnumeratedRoleType -> MonadPerspectives Boolean
-isPublicRole = publicUrl_ >=> pure <<< isJust
+isPublicRole :: RoleType -> MonadPerspectives Boolean
+isPublicRole = roleKindOfRoleType >=> pure <<< eq TI.Public
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -171,12 +172,7 @@ enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspe
     isEnumerated (CR _) = false
 
 publicUserRole :: ContextType ~~~> RoleType
-publicUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> filterA isPublic <<< ContextClass.userRole)
-  where
-    isPublic :: RoleType -> MonadPerspectives Boolean
-    isPublic (ENR t) = isPublicRole t
-    isPublic (CR _) = pure false
-
+publicUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> filterA isPublicRole <<< ContextClass.userRole)
 
 -- | Returns User RoleTypes that are guaranteed to be Calculated.
 calculatedUserRole :: ContextType ~~~> RoleType

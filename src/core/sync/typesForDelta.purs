@@ -43,7 +43,6 @@ import Prelude (class Show, map, show, ($), (&&), (<<<), (<>), (==))
 -----------------------------------------------------------
 -- GENERIC
 -----------------------------------------------------------
--- type DeltaRecord f = {users :: Array RoleInstance, sequenceNumber :: Int, subject :: SubjectOfAction | f}
 -- | The subject is the user role with the perspective that should include the right verbs to allow the delta
 -- | and with an object that corresponds to the resource being modified by the delta.
 -- | This is often taken from the transacton in which modifications are made. It is the member 'authoringRole'

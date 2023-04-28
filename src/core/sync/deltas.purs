@@ -53,7 +53,7 @@ import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
@@ -179,7 +179,7 @@ addDelta dt@(DeltaInTransaction{users}) = do
 -- bottom_ can be idempotent if a role has no binding. Hence we filter away the tuples where fst == snd.
 -- However, we should keep roles that are a public role proxy.
 isUserBottomOrPublic :: Tuple RoleInstance RoleInstance -> MonadPerspectivesTransaction Boolean
-isUserBottomOrPublic (Tuple r b) = (||) <$> (pure (r `notEq` b)) <*> (lift $ (roleType_ >=> isPublicRole) r)
+isUserBottomOrPublic (Tuple r b) = (||) <$> (pure (r `notEq` b)) <*> (lift $ (map ENR <<< roleType_ >=> isPublicRole) r)
 
 -- | Insert the delta at the index, unless it is already in the transaction.
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit

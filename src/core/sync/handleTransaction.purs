@@ -67,8 +67,8 @@ import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replace
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (hasAspect, roleAspectsClosure)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
+import Perspectives.Types.ObjectGetters (hasAspect, isPublicRole, roleAspectsClosure)
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), DeltaRecord, addPublicResourceScheme, addResourceSchemes)
 import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<<), (<>), (>>=), (<$>), (==))
 
 -- TODO. Each of the executing functions must catch errors that arise from unknown types.
@@ -312,6 +312,7 @@ loadModelIfMissing dfId = do
 --     (ENR $ EnumeratedRoleType sysUser)
 --     (for_ deltas f))
 
+-- TODO #29 Refactor delta decoding for performance
 executeTransaction :: TransactionForPeer -> MonadPerspectivesTransaction Unit
 executeTransaction t@(TransactionForPeer{deltas}) = for_ deltas f
   where
@@ -349,13 +350,17 @@ executeTransactionForPublicRole t@(TransactionForPeer{deltas}) storageUrl = for_
         executeDelta Nothing = pure unit
         executeDelta (Just stringifiedDelta) = do 
           (case runExcept $ decodeJSON stringifiedDelta of
-            Right d1 -> executeRolePropertyDelta (addPublicResourceScheme storageUrl d1) s
+            Right d1 -> notWhenPublicSubject (unwrap d1) (executeRolePropertyDelta (addPublicResourceScheme storageUrl d1) s)
             Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-              Right d2 -> executeRoleBindingDelta (addPublicResourceScheme storageUrl d2) s
+              Right d2 -> notWhenPublicSubject (unwrap d2) (executeRoleBindingDelta (addPublicResourceScheme storageUrl d2) s)
               Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                Right d3 -> executeContextDelta (addPublicResourceScheme storageUrl d3) s
+                Right d3 -> notWhenPublicSubject (unwrap d3) (executeContextDelta (addPublicResourceScheme storageUrl d3) s)
                 Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                  Right d4 -> executeUniverseRoleDelta ((addPublicResourceScheme storageUrl d4)) s
+                  Right d4 -> notWhenPublicSubject (unwrap d4) (executeUniverseRoleDelta ((addPublicResourceScheme storageUrl d4)) s)
                   Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                    Right d5 -> executeUniverseContextDelta (addPublicResourceScheme storageUrl d5) s
+                    Right d5 -> notWhenPublicSubject (unwrap d5) (executeUniverseContextDelta (addPublicResourceScheme storageUrl d5) s)
                     Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
+    
+    notWhenPublicSubject :: forall f. DeltaRecord f -> MonadPerspectivesTransaction Unit -> MonadPerspectivesTransaction Unit
+    notWhenPublicSubject {subject} a = (lift $ isPublicRole subject) >>= if _ then pure unit else a
+
