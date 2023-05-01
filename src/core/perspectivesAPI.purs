@@ -318,8 +318,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
     Api.GetPublicUrl -> do
-      ctxt <- (RoleInstance subject) ##>> context
-      mrepoUrl <- getPublicUrl ctxt
+      mrepoUrl <- getPublicUrl (ContextInstance subject)
       case mrepoUrl of 
         Nothing -> sendResponse (Result corrId []) setter
         Just repoUrl -> do
