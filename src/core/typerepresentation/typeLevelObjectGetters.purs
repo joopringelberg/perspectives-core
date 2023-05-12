@@ -171,8 +171,16 @@ enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspe
     isEnumerated (ENR _) = true
     isEnumerated (CR _) = false
 
+-- | Just returns the Enumerated proxies!
 publicUserRole :: ContextType ~~~> RoleType
-publicUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> filterA isPublicRole <<< ContextClass.userRole)
+publicUserRole = ArrayT <<< 
+  (((getPerspectType :: ContextType -> MonadPerspectives Context) >=> 
+    filterA isPublicRole <<< ContextClass.userRole) >=> 
+    pure <<< filter isEnumerated )
+  where
+    isEnumerated :: RoleType -> Boolean
+    isEnumerated (ENR _) = true
+    isEnumerated (CR _) = false
 
 -- | Returns User RoleTypes that are guaranteed to be Calculated.
 calculatedUserRole :: ContextType ~~~> RoleType
