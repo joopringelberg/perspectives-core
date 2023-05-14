@@ -451,6 +451,7 @@ compileContextAssignment (UQD _ (QF.CreateRootContext qualifiedContextTypeIdenti
       for_ ctxts \ctxt -> do
         r <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
           { ctype = unwrap qualifiedContextTypeIdentifier
+          , id = localName
           })
         case r of
           Left e -> logPerspectivesError e
@@ -482,6 +483,7 @@ compileContextAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifie
           do 
             newContext <- runExceptT $ constructContext (Just $ ENR roleTypeToFill) (ContextSerialization defaultContextSerializationRecord
               { ctype = unwrap contextTypeToCreate
+              , id = localName
               })
             case newContext of 
               Left e -> do
@@ -604,6 +606,7 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
       (r :: Array (Maybe String)) <- for ctxts \ctxt -> do
         contextCreationResult <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
           { ctype = unwrap qualifiedContextTypeIdentifier
+          , id = localName
           })
         case contextCreationResult of 
           Left e -> do
