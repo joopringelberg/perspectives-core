@@ -54,7 +54,7 @@ import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
 import Perspectives.ContextAndRole (changeRol_isMe, rol_context)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectivesTransaction, MonadPerspectives, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
@@ -523,6 +523,9 @@ uploadToRepository_ (DomeinFileId dfId) splitName df = do
         newRev <- get
         DeleteCouchdbDocument {rev} <- lift $ addAttachment (documentUrl <> "_write") documentName newRev attName attachment mimetype
         put rev
+
+removeFromRepository_ :: {repositoryUrl :: String, documentName :: String} -> MonadPerspectives Boolean
+removeFromRepository_ splitName = Persistence.deleteDocument splitName.repositoryUrl splitName.documentName Nothing
 
 type URL = String
 

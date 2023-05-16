@@ -33,13 +33,16 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Main.RecompileBasicModels (recompileModelsAtUrl)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, type (~~>))
+import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectivesTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.Extern.Couchdb (removeFromRepository_)
 import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
+import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelUrl)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
@@ -84,6 +87,16 @@ uploadToRepository arcSource_ _ = case head arcSource_ of
         lift $ void $ CDB.uploadToRepository (DomeinFileId _id)
   _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
+removeFromRepository :: 
+  Array ModelUri ->
+  Array RoleInstance -> MonadPerspectivesTransaction Unit
+removeFromRepository modelUris _ = case head modelUris of
+  Just modelUri -> if isModelUri modelUri
+    then void $ lift $ removeFromRepository_ (unsafePartial modelUri2ModelUrl modelUri)
+    else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> modelUri)
+  _ -> logPerspectivesError $ Custom ("removeFromRepository lacks the ModelURI argument.")
+
+
 -- | Parse and compile all models found at the URL.
 compileRepositoryModels ::
   Array Url ->
@@ -98,5 +111,6 @@ externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1}
   , Tuple "model://perspectives.domains#Parsing$UploadToRepository2" {func: unsafeCoerce uploadToRepository, nArgs: 1}
+  , Tuple "model://perspectives.domains#Parsing$RemoveFromRepository" {func: unsafeCoerce removeFromRepository, nArgs: 1}
   , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1}
 ]
