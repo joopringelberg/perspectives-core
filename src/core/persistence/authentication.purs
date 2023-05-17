@@ -72,32 +72,32 @@ ensureAuthentication authSource a = catchJust
   (a unit)
   (\_ -> (requestAuthentication authSource) *> (a unit))
 
+requestAuthentication :: forall f. AuthoritySource -> MonadPouchdb f Unit
+requestAuthentication authSource = do
+  mauthority <- authSource2Authority authSource
+  usr <- getSystemIdentifier
+  case mauthority of 
+    Just authority -> do
+      mpwd <- getCredentials authority
+      case mpwd of 
+        Just pwd -> do
+          (rq :: (AJ.Request String)) <- defaultPerspectRequest
+          res <- liftAff $ AJ.request $ rq {method = Left POST, url = (authority <> "_session"), content = Just $ RequestBody.json (fromObject (fromFoldable [Tuple "name" (unsafeCoerce usr), Tuple "password" (unsafeCoerce pwd)]))}
+          onAccepted_
+            (\response _ -> throwError (error $ "Failure in requestAuthentication. " <> "HTTP statuscode " <> show response.status))
+            res
+            [StatusCode 200, StatusCode 203]
+            "requestAuthentication"
+            \_ -> pure unit
+        Nothing -> throwError (error $ "No password found for " <> authority)
+    Nothing -> throwError (error $ "Impossible case in requestAuthentication for " <> show authSource)
+
   where 
 
   authSource2Authority :: AuthoritySource -> MonadPouchdb f (Maybe Authority)
   authSource2Authority (Resource s) = Just <$> databaseLocation s
   authSource2Authority (Authority s) = pure $ Just s
   authSource2Authority (Url s) = pure $ url2Authority s
-
-  requestAuthentication :: AuthoritySource -> MonadPouchdb f Unit
-  requestAuthentication auth = do
-    mauthority <- authSource2Authority auth
-    usr <- getSystemIdentifier
-    case mauthority of 
-      Just authority -> do
-        mpwd <- getCredentials authority
-        case mpwd of 
-          Just pwd -> do
-            (rq :: (AJ.Request String)) <- defaultPerspectRequest
-            res <- liftAff $ AJ.request $ rq {method = Left POST, url = (authority <> "_session"), content = Just $ RequestBody.json (fromObject (fromFoldable [Tuple "name" (unsafeCoerce usr), Tuple "password" (unsafeCoerce pwd)]))}
-            onAccepted_
-              (\response _ -> throwError (error $ "Failure in requestAuthentication. " <> "HTTP statuscode " <> show response.status))
-              res
-              [StatusCode 200, StatusCode 203]
-              "requestAuthentication"
-              \_ -> pure unit
-          Nothing -> throwError (error $ "No password found for " <> authority)
-      Nothing -> throwError (error $ "Impossible case in requestAuthentication for " <> show authSource)
 
 defaultPerspectRequest :: forall f. MonadPouchdb f (AJ.Request String)
 defaultPerspectRequest = pure

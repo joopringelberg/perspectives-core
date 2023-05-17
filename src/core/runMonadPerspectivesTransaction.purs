@@ -300,7 +300,7 @@ runEmbeddedTransaction authoringRole a = do
           _ <- lift $ take t
           pure result
         \e -> do
-          log "Ending embedded transaction in failure."
+          log ("Ending embedded transaction in failure. " <> show e)
           _ <- lift $ take t
           throwError e
     else throwError (error "runEmbeddedTransaction is not run inside another transaction.")
@@ -330,7 +330,7 @@ runEmbeddedIfNecessary share authoringRole a = do
           _ <- lift $ take t
           pure result
         \e -> do
-          log "Ending embedded transaction in failure."
+          log ("Ending embedded transaction in failure. " <> show e)
           _ <- lift $ take t
           throwError e
 

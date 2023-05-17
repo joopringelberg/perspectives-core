@@ -178,7 +178,7 @@ withDatabase dbName fun = do
         pure db
       Just db -> do 
         -- We have accessed this database before, but we don't know whether
-        -- we still have a valide session.
+        -- we still have a valid session.
         -- Access the database and throw error if unauthorized.
         f <- lift $ fromEffectFnAff $ databaseInfoImpl db 
         case read f of 

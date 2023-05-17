@@ -66,7 +66,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted', onAccepted_)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Identifiers (deconstructUserName)
-import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication)
+import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication, requestAuthentication)
 import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
 import Perspectives.Persistence.Types (DatabaseName, Url, MonadPouchdb)
 import Simple.JSON (writeJSON)
@@ -90,7 +90,9 @@ import Simple.JSON (writeJSON)
 -- | Set the security document in the database.
 -- | Authentication ensured.
 setSecurityDocument :: forall f. Url -> DatabaseName -> SecurityDocument -> MonadPouchdb f Unit
-setSecurityDocument base db doc = ensureAuthentication (Authority base) \_ -> do
+setSecurityDocument base db doc = do 
+  -- Couchdb does not return recognizable "you are not authorized" information. Hence we authenticate anyway.
+  requestAuthentication (Authority base)
   rq <- defaultPerspectRequest
   -- Security documents have no versions.
   res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> db <> "/_security"), content = Just $ RequestBody.string (writeJSON $ unwrap doc)}
