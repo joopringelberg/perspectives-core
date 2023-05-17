@@ -50,6 +50,7 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), snd)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
+import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, setProperty)
 import Perspectives.ContextAndRole (getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=))
@@ -92,7 +93,6 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
       -- Get the number of deltas in the transaction. Insert the
       -- UniverseContextDelta and the UniverseRoleDelta after that point.
       i <- lift deltaIndex
-      -- TODO. Add the role instance for the role type with kind Visitor here.
       -- Add instances for each role type to the new empty context.
       (Tuple rolInstances users) <- runWriterT $ forWithIndex rollen \rolTypeId rolDescriptions -> do
         -- Construct all instances of this type without binding first, then add them to the context.
@@ -124,7 +124,19 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
       lift $ addCreatedContextToTransaction contextInstanceId
       -- If the context type has a public role, create an instance of its proxy.
       publicRoles <- lift $ lift ((ContextType ctype) ###= publicUserRole)
-      for_ (EnumeratedRoleType <<< roletype2string <$> publicRoles) \t -> (lift $ createAndAddRoleInstance t (unwrap contextInstanceId) (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing}))
+      for_ (EnumeratedRoleType <<< roletype2string <$> publicRoles) 
+        \t -> (do 
+          mproxy <- lift $ createAndAddRoleInstance 
+            t 
+            (unwrap contextInstanceId) 
+            (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+          case mproxy of 
+            -- As the proxy of the public role is just another user, we have to make sure it will receive all deltas necessary
+            -- according to its perspectives.
+            Just proxy -> lift (contextInstanceId `serialisedAsDeltasFor` proxy)
+            -- This will never happen.
+            Nothing -> pure unit
+            )
       pure contextInstanceId 
   where
 
