@@ -22,7 +22,7 @@
 
 module Perspectives.Representation.Perspective where
 
-import Data.Array (concat, findIndex, foldl, fromFoldable, null)
+import Data.Array (concat, elemIndex, findIndex, foldl, fromFoldable, length, null)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
 import Data.List (findIndex) as LST
@@ -42,7 +42,7 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, allPropertyVerbs, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
-import Prelude (class Eq, class Ord, class Show, flip, ($), (&&), (<#>), (<$>), (<>), (||))
+import Prelude (class Eq, class Ord, class Show, flip, ($), (&&), (<#>), (<$>), (<>), (||), (>))
 import Simple.JSON (class WriteForeign, write)
 
 -----------------------------------------------------------
@@ -182,6 +182,13 @@ expandPropSet :: Array PropertyType -> ExplicitSet PropertyType -> Array Propert
 expandPropSet allProps Universal = allProps
 expandPropSet _ Empty = []
 expandPropSet _ (PSet as) = as
+
+
+isMutatingVerbSet :: ExplicitSet PropertyVerb -> Boolean
+isMutatingVerbSet s = case expandVerbs s of
+  x | length x > 1 -> true
+  x | isJust $ elemIndex Consult x -> false
+  _ -> true
 
 -----------------------------------------------------------
 -- MODIFICATIONSUMMARY

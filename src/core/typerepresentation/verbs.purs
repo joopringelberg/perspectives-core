@@ -87,6 +87,7 @@ instance ordPropertyVerb :: Ord PropertyVerb where
 
 allPropertyVerbs :: Array PropertyVerb
 allPropertyVerbs = [Consult, RemovePropertyValue, DeleteProperty, AddPropertyValue, SetPropertyValue]
+
 -----------------------------------------------------------
 -- ROLEVERBLIST
 -----------------------------------------------------------

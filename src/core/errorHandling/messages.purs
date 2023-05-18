@@ -88,6 +88,7 @@ data PerspectivesError
     | NotAPureLet LetStep
     | CannotCreateCalculatedRole CalculatedRoleType ArcPosition ArcPosition
     | CannotCreateCalculatedProperty CalculatedPropertyType ArcPosition ArcPosition
+    | CannotModifyCalculatedProperty String ArcPosition ArcPosition
     | NotAContextDomain QueryFunctionDescription Domain ArcPosition ArcPosition
     | NotARoleDomain Domain ArcPosition ArcPosition
     | NotAStringDomain QueryFunctionDescription ArcPosition ArcPosition
@@ -175,6 +176,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotAPureLet (LetStep{start, end})) = "(NotAPureLet) This let*-expression has an assignment in its body but it is used in a pure expression, so its body should be a pure expression, too. From " <> show start <> " to " <> show end
   show (CannotCreateCalculatedRole cr start end) = "(CannotCreateCalculatedRole) Can not create an instance of a calculated role (" <> show cr <> ") between: " <> show start <> " and: " <> show end
   show (CannotCreateCalculatedProperty pt start end) = "(CannotCreateCalculatedProperty) Can not change the value of a property that is calculated, between: " <> show start <> " and: " <> show end
+  show (CannotModifyCalculatedProperty props start end) = "(CannotModifyCalculatedProperty) Can not change the value these calculated properties (" <> props <> "), between: " <> show start <> " and: " <> show end
   show (NotARoleDomain dom start end) = "(NotARoleDomain) This expression should have a role type: " <> show dom <> ", between " <> show start <> " and " <> show end
   show (NotAStringDomain qfd start end) = "(NotAStringDomain) This expression should have a string type: " <> show qfd <> ", between " <> show start <> " and " <> show end
   show (NotAContextRole start end) = "(NotAContextRole) All role types in this expression should be context roles (binding the external role of a context), between " <> show start <> " and " <> show end

@@ -69,7 +69,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspective
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName, qualifyLocalContextName)
 import Perspectives.Query.Kinked (completeInversions)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleInContext, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Query.StatementCompiler (compileStatement)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, reduce)
@@ -82,7 +82,7 @@ import Perspectives.Representation.Class.Role (Role(..), allProperties, displayN
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
@@ -862,9 +862,19 @@ handlePostponedStateQualifiedParts = do
       objectQfd <- roleIdentificationToQueryFunctionDescription object start
       objectMustBeRole (Just objectQfd) start end
       propertyTypes <- unsafePartial collectPropertyTypes propsOrView object start
+      -- We must expand the propertyTypes.
+      allProps <- lift2 $ allProperties (roleInContext2Role <$> (domain2roleInContext (range objectQfd)))
+      expandedProps <- pure $ expandPropSet allProps propertyTypes
+      if isMutatingVerbSet propertyVerbs
+        then case filter (case _ of 
+          CP _ -> true
+          _ -> false) expandedProps of
+          s | null s -> pure unit
+          calculatedProps -> throwError $ CannotModifyCalculatedProperty (intercalate "," $ propertytype2string <$> calculatedProps) start end
+        else pure unit
       (propertyVerbs' :: PropertyVerbs) <- pure $ PropertyVerbs propertyTypes propertyVerbs
       -- ... for these states only...
-      stateSpecs <- stateSpecificationToStateSpec state -- HIER!!
+      stateSpecs <- stateSpecificationToStateSpec state
       -- ... the action.
       modifyAllSubjectPerspectives qualifiedUsers objectQfd propertyVerbs' stateSpecs
       -- Add StateDependentPerspectives to the states.
