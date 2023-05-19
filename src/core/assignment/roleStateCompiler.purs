@@ -32,13 +32,13 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (elemIndex, foldMap, index, null)
+import Data.Array (elemIndex, filterA, foldMap, index, null)
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, delete, lookup)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (ala, alaF, unwrap)
+import Data.Newtype (alaF, unwrap)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
@@ -54,11 +54,10 @@ import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole, withAuthoringRole)
 import Perspectives.CompileTimeFacets (addTimeFacets)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
-import Perspectives.Instances.ObjectGetters (filledBy, contextType, getActiveRoleStates_)
+import Perspectives.Instances.ObjectGetters (contextType, filledBy, fills_, getActiveRoleStates_)
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
@@ -211,11 +210,11 @@ whenRightUser roleId contextGetter allowedUser updater = do
   contextId <- lift $ (roleId ##>> contextGetter)
   me <- lift getUserIdentifier
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
-  bools <- lift $ (currentactors ##= ((\_ -> ArrayT $ pure currentactors) >=> filledBy (RoleInstance me)))
-  if ala Conj foldMap bools
-    -- TODO. #5 Run the updater only with the subset of currentactors that are actually filled with `me`. Currently, we check whether one of them is me and then execute the action for all of them.
-    then updater currentactors contextId roleId
-    else pure unit
+  -- Find the actor(s) that the system user ultimately fills.
+  actorsThatAreMe <- lift (filterA (fills_ (RoleInstance me)) currentactors)
+  if null actorsThatAreMe
+    then pure unit
+    else updater actorsThatAreMe contextId roleId
 
 notify :: CompiledSentence RoleInstance -> (RoleInstance ~~> ContextInstance) -> RoleInstance -> MonadPerspectivesTransaction Unit
 notify compiledSentence contextGetter roleId = do
