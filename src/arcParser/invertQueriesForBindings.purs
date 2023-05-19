@@ -34,7 +34,7 @@ module Perspectives.Parsing.Arc.InvertQueriesForBindings where
 import Prelude
 
 import Control.Monad.Reader (ReaderT, lift)
-import Data.Array (concat, elemIndex, foldMap, fromFoldable, intersect, length, nub, cons)
+import Data.Array (concat, cons, elemIndex, foldMap, fromFoldable, intersect, length, nub, null)
 import Data.Foldable (for_)
 import Data.Map (Map, filterKeys, values, singleton)
 import Data.Map (lookup) as Map
@@ -168,7 +168,9 @@ setInvertedQueriesForUserAndRole backwards users (PROD terms) props invertedQ se
   x <- traverse
     (\t -> setInvertedQueriesForUserAndRole backwards users t props invertedQ selfOnly)
     terms
-  pure $ ala Conj foldMap x
+  if null x
+    then pure false
+    else pure $ ala Conj foldMap x
 
 setInvertedQueriesForUserAndRole backwards users (SUM terms) props invertedQ selfOnly = do
   x <- traverse

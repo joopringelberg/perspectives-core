@@ -139,6 +139,7 @@ exists' source id = ArrayT do
   r <- runArrayT $ source id
   pure $ [HA.not $ null r]
 
+-- | Note that if source yields no results, the end result will still be true!
 every :: forall m s. Monad m =>
   (s -> ArrayT m Boolean) ->
   (s -> ArrayT m Boolean)
