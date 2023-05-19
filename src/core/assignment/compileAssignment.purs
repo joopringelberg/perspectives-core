@@ -59,6 +59,7 @@ import Perspectives.Instances.ObjectGetters (allRoleBinders, getFilledRoles) as 
 import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
 import Perspectives.Instances.Values (writePerspectivesFile)
 import Perspectives.ModelDependencies (sysUser)
+import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
@@ -448,14 +449,18 @@ compileContextAssignment (UQD _ (QF.CreateRootContext qualifiedContextTypeIdenti
         Nothing -> pure Nothing
       -- As root contexts should be constructed by sys:PerspectivesSystem$User, we set the authoringRole of the transaction temporarily to that value.
       -- Since all indexed contexts are bound in sys:MySystem, we cannot have a root context that is indexed.
-      for_ ctxts \ctxt -> do
-        r <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
-          { ctype = unwrap qualifiedContextTypeIdentifier
-          , id = localName
-          })
-        case r of
-          Left e -> logPerspectivesError e
-          _ -> pure unit
+      for_ ctxts \ctxt -> lookupOrCreateContextInstance
+        qualifiedContextTypeIdentifier
+        do
+          r <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+            { ctype = unwrap qualifiedContextTypeIdentifier
+            , id = localName
+            })
+          case r of
+            Left e -> do 
+              logPerspectivesError e
+              pure $ Left e
+            Right (ContextInstance newContext) -> pure $ Right newContext
 
 compileContextAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) mnameGetterDescription = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleGetterDescription
@@ -603,18 +608,20 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
         Just nameGetter -> lift $ Just <$> (contextId ##>> nameGetter)
         Nothing -> pure Nothing
       -- As root contexts should be constructed by sys:PerspectivesSystem$User, we set the authoringRole of the transaction temporarily to that value.
-      (r :: Array (Maybe String)) <- for ctxts \ctxt -> do
-        contextCreationResult <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
-          { ctype = unwrap qualifiedContextTypeIdentifier
-          , id = localName
-          })
-        case contextCreationResult of 
-          Left e -> do
-            logPerspectivesError e
-            pure Nothing
-          Right (ContextInstance ctxtId) -> pure $ Just ctxtId
+      (r :: Array (Either PerspectivesError String)) <- for ctxts \ctxt -> lookupOrCreateContextInstance
+        qualifiedContextTypeIdentifier
+        do
+          contextCreationResult <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+            { ctype = unwrap qualifiedContextTypeIdentifier
+            , id = localName
+            })
+          case contextCreationResult of 
+            Left e -> do
+              logPerspectivesError e
+              pure $ Left e
+            Right (ContextInstance ctxtId) -> pure $ Right ctxtId
       modify (over Transaction \t -> t {authoringRole = originalRole})
-      pure $ catMaybes r
+      pure $ catMaybes (hush <$> r)
 
 -- | Temporarily change the subject of effects to a particular role type (not necessarily the instance of sys:PerspectivesSystem$User)
 withAuthoringRole :: forall a. RoleType -> Updater a -> a -> MonadPerspectivesTransaction Unit

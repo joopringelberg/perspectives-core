@@ -453,14 +453,18 @@ compileContextAssignmentFromRole (UQD _ (QF.CreateRootContext qualifiedContextTy
       localName <- case mNameGetter of
         Just nameGetter -> lift $ Just <$> (roleId ##>> nameGetter)
         Nothing -> pure Nothing
-      for_ ctxts \ctxt -> do
-        r <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
-          { ctype = unwrap qualifiedContextTypeIdentifier
-          , id = localName
-          })
-        case r of
-          Left e -> logPerspectivesError e
-          _ -> pure unit
+      for_ ctxts \ctxt -> lookupOrCreateContextInstance 
+        qualifiedContextTypeIdentifier
+        do
+          r <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+            { ctype = unwrap qualifiedContextTypeIdentifier
+            , id = localName
+            })
+          case r of
+            Left e -> do 
+              logPerspectivesError e
+              pure $ Left e
+            Right (ContextInstance newContext) -> pure $ Right newContext
 
 compileContextAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) mnameGetterDescription = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleGetterDescription
@@ -609,18 +613,20 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
       localName <- case mNameGetter of
         Just nameGetter -> lift $ Just <$> (roleId ##>> nameGetter)
         Nothing -> pure Nothing
-      r <- for ctxts \ctxt -> do
-        contextCreationResult <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
-          { ctype = unwrap qualifiedContextTypeIdentifier
-          , id = localName
-          })
-        case contextCreationResult of
-          Left e -> do
-            logPerspectivesError e
-            pure Nothing
-          Right (ContextInstance ctxtId) -> pure $ Just ctxtId
+      r <- for ctxts \ctxt -> lookupOrCreateContextInstance 
+        qualifiedContextTypeIdentifier
+        do
+          contextCreationResult <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+            { ctype = unwrap qualifiedContextTypeIdentifier
+            , id = localName
+            })
+          case contextCreationResult of
+            Left e -> do
+              logPerspectivesError e
+              pure $ Left e
+            Right (ContextInstance ctxtId) -> pure $ Right ctxtId
       modify (over Transaction \t -> t {authoringRole = originalRole})
-      pure $ catMaybes r
+      pure $ catMaybes (hush <$> r)
 
 withAuthoringRole :: forall a. RoleType -> Updater a -> Updater a
 withAuthoringRole aRole updater a = do
