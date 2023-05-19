@@ -77,6 +77,15 @@ createDatabase dbname = if startsWithDatabaseEndpoint dbname
     -- A remote database is actually created immediately if it does not exist.
     -- If the server indicates we're not authenticated, ensureAuthentication requests a session and then repeats the action.
     pdb <- ensureAuthentication (Url dbname) (\_ -> liftEffect $ runEffectFn1 createDatabaseImpl dbname)
+    -- Make sure the database is created.
+    catchError
+      do
+        f <- lift $ fromEffectFnAff $ databaseInfoImpl pdb
+        case (read f) of
+          Left e -> throwError $ error ("databaseInfo: error in decoding result: " <> show e)
+          (Right (dbInfo :: DatabaseInfo)) -> pure unit
+      -- Convert the incoming message to a PouchError type.
+      (handlePouchError "databaseInfo" dbname)
     modify \(s@{databases}) -> s {databases = insert dbname pdb databases}
   else do
     mprefix <- getCouchdbBaseURL
@@ -199,15 +208,14 @@ type DatabaseInfo =
 -- and in createUserDatabases.
 databaseInfo :: forall f. DatabaseName -> MonadPouchdb f DatabaseInfo
 databaseInfo dbName = withDatabase dbName
-  \db -> do
-    catchError
-      do
-        f <- lift $ fromEffectFnAff $ databaseInfoImpl db
-        case (read f) of
-          Left e -> throwError $ error ("databaseInfo: error in decoding result: " <> show e)
-          Right info -> pure info
-      -- Convert the incoming message to a PouchError type.
-      (handlePouchError "databaseInfo" dbName)
+  \db -> catchError
+    do
+      f <- lift $ fromEffectFnAff $ databaseInfoImpl db
+      case (read f) of
+        Left e -> throwError $ error ("databaseInfo: error in decoding result: " <> show e)
+        Right info -> pure info
+    -- Convert the incoming message to a PouchError type.
+    (handlePouchError "databaseInfo" dbName)
 
 foreign import databaseInfoImpl :: PouchdbDatabase -> EffectFnAff Foreign
 
