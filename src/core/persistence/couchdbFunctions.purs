@@ -141,6 +141,7 @@ replicateContinuously couchdbUrl name source target selector = do
         Left _ -> pure unit
         Right auth -> setReplicationDocument couchdbUrl (ReplicationDocument
             { _id: name
+            , _rev: Nothing
             , source: ReplicationEndpoint {url: source, headers: singleton "Authorization" ("Basic " <> auth)}
             , target: ReplicationEndpoint {url: target, headers: singleton "Authorization" ("Basic " <> auth)}
             , create_target: false
@@ -151,14 +152,16 @@ replicateContinuously couchdbUrl name source target selector = do
 
 -- | Authentication ensured.
 setReplicationDocument :: forall f. Url -> ReplicationDocument -> MonadPouchdb f Unit
-setReplicationDocument base rd@(ReplicationDocument{_id}) = ensureAuthentication (Authority base) \_ -> do
+setReplicationDocument base (ReplicationDocument rd@{_id}) = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
-  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_replicator/" <> _id), content = Just $ RequestBody.string (writeJSON $ unwrap rd)}
+  rev <- retrieveDocumentVersion (base <> "_replicator/" <> _id)
+  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_replicator/" <> _id), content = Just $ RequestBody.string (writeJSON (rd {_rev = rev}))}
   onAccepted res [StatusCode 200, StatusCode 201, StatusCode 202] "setReplicationDocument" (\_ -> pure unit)
 
 -----------------------------------------------------------
 -- ENDREPLICATION
 -----------------------------------------------------------
+-- | End replication by throwing away the replication document.
 -- | Authentication ensured.
 endReplication :: forall f. Url -> DatabaseName -> DatabaseName -> MonadPouchdb f Boolean
 endReplication couchdbUrl source target = deleteDocument (couchdbUrl <> "_replicator/" <> source <> "_" <> target) Nothing

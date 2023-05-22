@@ -558,12 +558,16 @@ deleteCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, hea
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 replicateContinuously :: Array Url -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 replicateContinuously databaseUrls sources targets _ = case head databaseUrls, head sources, head targets of
-  Just databaseUrl, Just source, Just target -> lift $ CDB.replicateContinuously
-    databaseUrl
-    (source <> "_" <> target)
-    (databaseUrl <> source)
-    (databaseUrl <> target)
-    Nothing
+  Just databaseUrl, Just source, Just target -> do 
+    -- The replication may have been configured before. Overwriting the document will lead to unexpected results.
+    -- Stop replication first, then reconfigure.
+    void $ lift $ CDB.endReplication databaseUrl source target
+    lift $ CDB.replicateContinuously
+      databaseUrl
+      (source <> "_" <> target)
+      (databaseUrl <> source)
+      (databaseUrl <> target)
+      Nothing
   _, _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
