@@ -40,7 +40,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for_, traverse)
 import Foreign.Object (Object, keys, lookup, union) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), type (~~~>), MP, MonadPerspectives, (###=), (###>>))
+import Perspectives.CoreTypes (type (~~>), type (~~~>), MP, MonadPerspectives, (###=), (###>>), (###>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -241,6 +241,12 @@ getPublicStore_ ctype = getContext ctype >>= pure <<< _.public <<< unwrap
 
 indexedContextName :: ContextType -> MonadPerspectives (Maybe ContextInstance)
 indexedContextName ctype = getContext ctype >>= pure <<< _.indexedContext <<< unwrap 
+
+publicUrlComputation :: ContextType -> MonadPerspectives (Maybe Calculation)
+publicUrlComputation ctype = 
+  (ctype ###> publicUserRole) >>= case _ of 
+    Just (ENR r) -> publicUrl_ r
+    _ -> pure Nothing
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON STATE

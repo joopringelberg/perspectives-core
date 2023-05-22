@@ -126,6 +126,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
 
       -- This may result in transactions for public roles. We don't send them anywhere but execute them
       -- right here. Notice that no changes to local state will result from executing such a transaction.
+      -- (except that public instances will be cached)
       forWithIndex_ publicRoleTransactions
         \userId publicRoleTransaction -> do
           userType <- lift $ roleType_ (RoleInstance userId)

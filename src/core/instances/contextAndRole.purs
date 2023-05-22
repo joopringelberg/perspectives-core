@@ -43,6 +43,7 @@ import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
 import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Identifiers (Namespace, typeUri2typeNameSpace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
+import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Representation.Class.PersistentType (getContext)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
@@ -185,6 +186,7 @@ defaultContextRecord =
   , preferredUserRoleType: Nothing
   , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord"}
   , states: []
+  , publicUrl: Nothing
   }
 
 defaultRolRecord :: RolRecord
@@ -211,6 +213,12 @@ defaultRolRecord =
 
 isDefaultContextDelta :: SignedDelta -> Boolean
 isDefaultContextDelta (SignedDelta {encryptedDelta}) = encryptedDelta `eq` "ContextDelta from defaultRolRecord"
+
+context_publicUrl :: PerspectContext -> Maybe PublicUrl
+context_publicUrl (PerspectContext{publicUrl}) = publicUrl
+
+change_context_publicUrl :: PerspectContext -> Maybe PublicUrl -> PerspectContext
+change_context_publicUrl (PerspectContext cr) murl = PerspectContext cr {publicUrl = murl}
 
 -- ROL
 

@@ -37,13 +37,14 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
+import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (disjunction)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
@@ -156,6 +157,10 @@ indexedContextName = contextType >=> \cType -> ArrayT $ do
     Nothing -> pure []
     Just i -> pure [Value $ unwrap i]
 
+publicUrl :: ContextInstance -> MonadPerspectives (Maybe PublicUrl)
+publicUrl ci = (try $ getContextMember context_publicUrl ci) >>=
+  (handlePerspectContextError' "publicUrl" Nothing (pure <<< identity))
+
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE
 -----------------------------------------------------------
@@ -176,6 +181,9 @@ context_ :: RoleInstance -> MonadPerspectives (Array ContextInstance)
 context_ rid = (try $ getPerspectEntiteit rid) >>=
   handlePerspectRolError' "context_" []
   (pure <<< singleton <<< rol_context)
+
+context' :: RoleInstance -> MonadPerspectives ContextInstance
+context' rid = getPerspectEntiteit rid >>=  pure <<< rol_context
 
 binding :: RoleInstance ~~> RoleInstance
 binding r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=

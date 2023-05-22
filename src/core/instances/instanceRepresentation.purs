@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.InstanceRepresentation where
+module Perspectives.InstanceRepresentation where 
 
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
@@ -32,6 +32,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object) as F
 import Persistence.Attachment (class Attachment, Attachments)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
+import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, StateIdentifier)
@@ -69,6 +70,7 @@ type ContextRecord =
   , preferredUserRoleType :: Maybe RoleType
   , universeContextDelta :: SignedDelta
   , states :: Array StateIdentifier
+  , publicUrl :: Maybe PublicUrl
   }
 
 derive instance genericRepPerspectContext :: Generic PerspectContext _

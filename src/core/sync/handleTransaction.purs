@@ -42,7 +42,7 @@ import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, de
 import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=), (###>>), (##=), (##>>), (##>))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=), (###>>), (##=), (##>), (##>>))
 import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
@@ -69,7 +69,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (hasAspect, isPublicRole, roleAspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), DeltaRecord, addPublicResourceScheme, addResourceSchemes)
-import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<<<), (<>), (>>=), (<$>), (==))
+import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<$>), (<<<), (<>), (==), (>>=))
 
 -- TODO. Each of the executing functions must catch errors that arise from unknown types.
 -- Inspect the model version of an unknown type and establish whether the resident model is newer or older than
@@ -350,15 +350,15 @@ executeTransactionForPublicRole t@(TransactionForPeer{deltas}) storageUrl = for_
         executeDelta Nothing = pure unit
         executeDelta (Just stringifiedDelta) = do 
           (case runExcept $ decodeJSON stringifiedDelta of
-            Right d1 -> notWhenPublicSubject (unwrap d1) (executeRolePropertyDelta (addPublicResourceScheme storageUrl d1) s)
+            Right d1 -> notWhenPublicSubject (unwrap d1) ((lift $ addPublicResourceScheme storageUrl d1) >>= (flip executeRolePropertyDelta s))
             Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-              Right d2 -> notWhenPublicSubject (unwrap d2) (executeRoleBindingDelta (addPublicResourceScheme storageUrl d2) s)
+              Right d2 -> notWhenPublicSubject (unwrap d2) ((lift $ addPublicResourceScheme storageUrl d2) >>= (flip executeRoleBindingDelta s))
               Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                Right d3 -> notWhenPublicSubject (unwrap d3) (executeContextDelta (addPublicResourceScheme storageUrl d3) s)
+                Right d3 -> notWhenPublicSubject (unwrap d3) ((lift $ addPublicResourceScheme storageUrl d3) >>= (flip executeContextDelta s))
                 Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                  Right d4 -> notWhenPublicSubject (unwrap d4) (executeUniverseRoleDelta ((addPublicResourceScheme storageUrl d4)) s)
+                  Right d4 -> notWhenPublicSubject (unwrap d4) ((lift $ addPublicResourceScheme storageUrl d4) >>= (flip executeUniverseRoleDelta s))
                   Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                    Right d5 -> notWhenPublicSubject (unwrap d5) (executeUniverseContextDelta (addPublicResourceScheme storageUrl d5) s)
+                    Right d5 -> notWhenPublicSubject (unwrap d5) ((lift $ addPublicResourceScheme storageUrl d5) >>= (flip executeUniverseContextDelta s))
                     Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
     
     notWhenPublicSubject :: forall f. DeltaRecord f -> MonadPerspectivesTransaction Unit -> MonadPerspectivesTransaction Unit
