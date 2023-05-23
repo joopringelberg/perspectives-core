@@ -70,13 +70,14 @@ import Perspectives.DependencyTracking.Dependency (findContextStateRequests, fin
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.Identifiers (startsWithSegments, typeUri2LocalName_)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty, getPropertyFromTelescope, roleType)
+import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty, roleType, roleType_)
 import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistence.API (addAttachment, getDocument, toFile)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
+import Perspectives.Query.UnsafeCompiler (getDynamicEnumeratedPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity, overwriteEntity, removeInternally, rev)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
@@ -486,7 +487,8 @@ setProperty rids propertyName values = do
   where
     hasDifferentValues :: RoleInstance -> MonadPerspectivesTransaction Boolean
     hasDifferentValues rid = do
-      vals <- lift (rid ##= getPropertyFromTelescope propertyName)
+      rtype <- lift $ roleType_ rid
+      vals <- lift (rid ##= getDynamicEnumeratedPropertyGetter propertyName (ST rtype))
       pure $ (not $ null (difference values vals)) || (not $ null (difference vals values))
 
 -----------------------------------------------------------

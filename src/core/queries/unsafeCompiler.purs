@@ -730,6 +730,9 @@ getHiddenFunction = unsafeCoerce $ compileFunction
 
 -- | From a string that represents either a Calculated or an Enumerated property,
 -- | for a given abstract datatype of roles, retrieve the values from a role instance.
+-- | This function can return an empty value even while somewhere on the chain the property 
+-- | actually has a value. This is because it looks for the value on the FIRST role instance
+-- | that COULD have the property.
 getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
 getDynamicPropertyGetter p adt = do
   (pt :: PropertyType) <- getProperType p
@@ -769,6 +772,31 @@ getDynamicPropertyGetter p adt = do
       (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd
       getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)
       getter bnd
+
+getDynamicEnumeratedPropertyGetter :: EnumeratedPropertyType -> ADT EnumeratedRoleType -> RoleInstance ~~> Value
+getDynamicEnumeratedPropertyGetter eprop adt rid = do
+  -- We must take aliases of the actual role type into account.
+  (roleType :: EnumeratedRoleType) <- lift $ lift $ roleType_ rid
+  -- NOTE. UP TILL version v0.20.0 we have a very specific problem with the external roles of the specialisations
+  -- of model:System$Model. These roles are fetched before the models themselves are fetched; indeed, we don't mean to 
+  -- get the models until the end user explicitly asks for it.
+  -- This situation will go away in the next version.
+  aliases <- catchError (lift $ lift $ propertyAliases roleType)
+    \e -> pure OBJ.empty
+  case OBJ.lookup (unwrap eprop) aliases of
+    Just destination -> do 
+      getProperty destination rid
+    Nothing -> do
+      allProps <- lift $ lift $ allLocallyRepresentedProperties adt
+      if isJust $ elemIndex (ENP eprop) allProps
+        then do 
+          getProperty eprop rid
+        else (binding >=> f) rid
+  where
+    f :: RoleInstance ~~> Value
+    f bnd = do
+      (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd
+      getDynamicEnumeratedPropertyGetter eprop (ST bndType) bnd
 
 -- | From a string that represents part of the name of either a Calculated or an Enumerated property,
 -- | for a given abstract datatype of roles, retrieve the values from a role instance.
