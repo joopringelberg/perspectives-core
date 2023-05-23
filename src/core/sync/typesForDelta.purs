@@ -22,12 +22,13 @@
 
 module Perspectives.TypesForDeltas where
 
+import Control.Monad.AvarMonadAsk (gets)
 import Data.Eq (class Eq)
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (class Newtype, over)
+import Data.Newtype (class Newtype, over, unwrap)
 import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -40,7 +41,7 @@ import Perspectives.Query.UnsafeCompiler (getPublicUrl)
 import Perspectives.Representation.Class.Cacheable (cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, ResourceType(..), RoleType)
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (ResourceIdentifier, addSchemeToResourceIdentifier, createPublicIdentifier, stripNonPublicIdentifiers)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Transaction (StorageScheme)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
@@ -86,7 +87,7 @@ instance StrippedDelta UniverseContextDelta where
     { id = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.id
     }
   addPublicResourceScheme url (UniverseContextDelta r) = do
-    curl <- getUrlForPublishing url r.id
+    curl <- addOwnStorageScheme (CType r.contextType) (unwrap r.id) >>= getUrlForPublishing url <<< ContextInstance
     pure $ UniverseContextDelta r
       { id = over ContextInstance (createPublicIdentifier curl) r.id
       }
@@ -157,7 +158,7 @@ instance StrippedDelta UniverseRoleDelta where
     , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)))) r.roleInstances
     }
   addPublicResourceScheme url (UniverseRoleDelta r) = do
-    curl <- getUrlForPublishing url r.id
+    curl <- addOwnStorageScheme (CType r.contextType) (unwrap r.id) >>= getUrlForPublishing url <<< ContextInstance
     pure $ UniverseRoleDelta r
       { id = over ContextInstance (createPublicIdentifier curl) r.id
       , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance (createPublicIdentifier curl))) r.roleInstances
@@ -225,10 +226,10 @@ instance StrippedDelta ContextDelta where
         _, _ -> Nothing
     }
   addPublicResourceScheme url (ContextDelta r) = do 
-    curl <- getUrlForPublishing url r.contextInstance
-    durl <- case r.destinationContext of 
-      Nothing -> pure Nothing
-      Just dc -> Just <$> getUrlForPublishing url dc
+    curl <- addOwnStorageScheme (CType r.contextType) (unwrap r.contextInstance) >>= getUrlForPublishing url <<< ContextInstance
+    durl <- case r.destinationContext, r.destinationContextType of 
+      Just dc, Just dctype -> Just <$> (addOwnStorageScheme (CType dctype) (unwrap dc) >>= getUrlForPublishing url <<< ContextInstance)
+      _, _ -> pure Nothing
     pure $ ContextDelta r
       { contextInstance = over ContextInstance (createPublicIdentifier curl) r.contextInstance
       , roleInstance = over RoleInstance (createPublicIdentifier curl) r.roleInstance
@@ -305,10 +306,10 @@ instance StrippedDelta RoleBindingDelta where
         _, _ -> Nothing
     }
   addPublicResourceScheme url (RoleBindingDelta r) = do
-    fillerUrl <- case r.filler of 
-      Nothing -> pure url 
-      Just f -> context' f >>= getUrlForPublishing url
-    filledUrl <- context' r.filled >>= getUrlForPublishing url
+    fillerUrl <- case r.filler, r.fillerType of 
+      Just f, Just ftype -> addOwnStorageScheme (RType ftype) (unwrap f) >>= context' <<< RoleInstance >>= getUrlForPublishing url
+      _, _ -> pure url 
+    filledUrl <- addOwnStorageScheme (RType r.filledType) (unwrap r.filled) >>= context' <<< RoleInstance >>= getUrlForPublishing url
     pure $ RoleBindingDelta r
       { filled = over RoleInstance (createPublicIdentifier filledUrl) r.filled 
       , filler = maybe Nothing (Just <<< (over RoleInstance (createPublicIdentifier fillerUrl))) r.filler
@@ -370,7 +371,7 @@ instance StrippedDelta RolePropertyDelta where
     { id = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)) r.id
     }
   addPublicResourceScheme url (RolePropertyDelta r) = do
-    ctxt <- context' r.id
+    ctxt <- addOwnStorageScheme (RType r.roleType) (unwrap r.id) >>= context' <<< RoleInstance
     url' <- getUrlForPublishing url ctxt
     pure $ RolePropertyDelta r
         { id = over RoleInstance (createPublicIdentifier url') r.id }
@@ -426,3 +427,8 @@ getUrlForPublishing defaultUrl cid =  publicUrl cid >>= case _ of
     ctxt <- getPerspectContext cid
     void $ cacheEntity cid ctxt
     void $ saveEntiteit cid
+
+addOwnStorageScheme :: ResourceType -> String -> MonadPerspectives ResourceIdentifier
+addOwnStorageScheme rtype s = do 
+  storageSchemes <- gets _.typeToStorage
+  pure $ addSchemeToResourceIdentifier storageSchemes rtype s
