@@ -85,3 +85,12 @@ exports.roleSpecialisations = (function( doc )
      }
    );
  }.toString());
+
+ exports.credentials = (function (doc)
+ {
+    // Only PerspectRol instances have an isMe field. roleAliases
+    if (doc.contents.isMe && doc.contents.allTypes.find( t => t == "model://perspectives.domains#System$WithCredentials"))
+    {
+      emit(doc.contents._id, doc.contents._id);
+    }
+ }).toString();

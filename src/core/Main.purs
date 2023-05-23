@@ -57,10 +57,10 @@ import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (isModelUri)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
-import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser, userWithCredentials, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword)
+import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, includeDocs)
+import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, getViewOnDatabase, includeDocs)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
@@ -497,7 +497,7 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
 
 retrieveAllCredentials :: MonadPerspectives Unit
 retrieveAllCredentials = do
-  (roleInstances :: Array RoleInstance) <- fst <$> runWriterT (runArrayT (roleInstancesFromCouchdb [userWithCredentials] (ContextInstance "")))
+  (roleInstances :: Array RoleInstance) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/credentialsView" (Nothing :: Maybe String)
   rows <- foldM
     (\rows' roleId -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsPassword))) >>= 
       handlePerspectRolError' "retrieveAllCredentials_Password" rows'

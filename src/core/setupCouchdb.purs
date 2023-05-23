@@ -110,8 +110,7 @@ createUserDatabases user = do
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
 setRoleView :: forall f. String -> MonadPouchdb f Unit
-setRoleView dbname = do
-  void $ addViewToDatabase dbname "defaultViews" "roleView" ({map: roleView, reduce: Nothing})
+setRoleView dbname = void $ addViewToDatabase dbname "defaultViews" "roleView" ({map: roleView, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import roleView :: String
@@ -121,8 +120,7 @@ foreign import roleView :: String
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
 setRoleFromContextView :: forall f. String -> MonadPouchdb f Unit
-setRoleFromContextView dbname = do
-  void $ addViewToDatabase dbname "defaultViews" "roleFromContext" ({map: roleFromContextView, reduce: Nothing})
+setRoleFromContextView dbname = void $ addViewToDatabase dbname "defaultViews" "roleFromContext" ({map: roleFromContextView, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import roleFromContextView :: String
@@ -133,8 +131,7 @@ foreign import roleFromContextView :: String
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
 setPendingInvitationView :: forall f. String -> MonadPouchdb f Unit
-setPendingInvitationView dbname = do
-  void $ addViewToDatabase dbname "defaultViews" "pendingInvitations" ({map: pendingInvitations, reduce: Nothing})
+setPendingInvitationView dbname = void $ addViewToDatabase dbname "defaultViews" "pendingInvitations" ({map: pendingInvitations, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import pendingInvitations :: String
@@ -145,32 +142,40 @@ foreign import pendingInvitations :: String
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
 setContextView :: forall f. String -> MonadPouchdb f Unit
-setContextView dbname = do
-  void $ addViewToDatabase dbname "defaultViews" "contextView" ({map: contextView, reduce: Nothing})
+setContextView dbname = void $ addViewToDatabase dbname "defaultViews" "contextView" ({map: contextView, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import contextView :: String
 
 -----------------------------------------------------------
--- THE VIEW 'SETROLESPECIALISATIONVIEW'
+-- THE VIEW 'ROLESPECIALISATIONVIEW'
 -- This view collects instances of a particular role type.
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
 setRoleSpecialisationsView :: forall f. String -> MonadPouchdb f Unit
-setRoleSpecialisationsView dbname = do
-  void $ addViewToDatabase dbname "defaultViews" "roleSpecialisationsView" ({map: roleSpecialisations, reduce: Nothing})
+setRoleSpecialisationsView dbname = void $ addViewToDatabase dbname "defaultViews" "roleSpecialisationsView" ({map: roleSpecialisations, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import roleSpecialisations :: String
 
 -----------------------------------------------------------
--- THE VIEW 'SETROLESPECIALISATIONVIEW'
+-- THE VIEW 'CONTEXTSPECIALISATIONVIEW'
 -- This view collects instances of a particular context type.
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
 setContextSpecialisationsView :: forall f. String -> MonadPouchdb f Unit
-setContextSpecialisationsView dbname = do
-  void $ addViewToDatabase dbname "defaultViews" "contextSpecialisationsView" ({map: contextSpecialisations, reduce: Nothing})
+setContextSpecialisationsView dbname = void $ addViewToDatabase dbname "defaultViews" "contextSpecialisationsView" ({map: contextSpecialisations, reduce: Nothing})
 
 -- | Import the view definition as a String.
 foreign import contextSpecialisations :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'CREDENTIALSVIEW'
+-- This view collects instances of roles of type "model://perspectives.domains#System$WithCredentials".
+-- However, only instances whose `isMe` value is true, are returned.
+-----------------------------------------------------------
+setCredentialsView :: forall f. String -> MonadPouchdb f Unit
+setCredentialsView dbname = void $ addViewToDatabase dbname "defaultViews" "credentialsView" ({map: credentials, reduce: Nothing})
+
+-- | Import the view definition as a String.
+foreign import credentials :: String

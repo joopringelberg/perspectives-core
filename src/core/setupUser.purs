@@ -28,7 +28,7 @@ import Perspectives.ModelDependencies (sysUser, systemModelName)
 import Perspectives.Persistent (entitiesDatabaseName, modelDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SetupCouchdb (setContextSpecialisationsView, setContextView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
+import Perspectives.SetupCouchdb (setContextSpecialisationsView, setContextView, setCredentialsView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
 import Prelude (Unit, void, ($), discard, (>>=))
 
 modelDirectory :: String
@@ -45,5 +45,6 @@ setupUser = do
   entitiesDatabaseName >>= setRoleFromContextView
   entitiesDatabaseName >>= setPendingInvitationView
   entitiesDatabaseName >>= setContextView
+  entitiesDatabaseName >>= setCredentialsView
   modelDatabaseName >>= setRoleSpecialisationsView
   modelDatabaseName >>= setContextSpecialisationsView

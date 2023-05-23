@@ -35,6 +35,11 @@ import Perspectives.Persistence.Types (MonadPouchdb, Url)
 -----------------------------------------------------------
 -- STATE UTILITIES
 -----------------------------------------------------------
+-- | The value of field systemIdentifier of the PouchdbUser object that is passed in to runPDR.
+-- | Currently, this is the raw username that is used to log into MyContexts.
+-- | So if that raw username is "dev1", that is the value returned by getSystemIdentifier.
+-- | The result of getMySystem would be def:#dev1.
+-- | The result of getUserIdentifier would be def:#dev1$User.
 getSystemIdentifier :: forall f. MonadPouchdb f String
 getSystemIdentifier = gets _.systemIdentifier
 
