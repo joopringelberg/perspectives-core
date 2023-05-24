@@ -37,7 +37,7 @@ import Data.Array (catMaybes, elemIndex, findIndex, foldl, head, index, length, 
 import Data.DateTime (DateTime)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
-import Data.String (Pattern(..), stripSuffix)
+import Data.String (Pattern(..), lastIndexOf, stripSuffix, length) as STRING
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -591,7 +591,7 @@ mapNumericOperator :: Partial => FunctionName -> Domain -> (String -> String ~~>
 mapNumericOperator AddF (VDOM RAN.PNumber _) = wrapNumericOperator (+)
 mapNumericOperator AddF (VDOM RAN.PString _) = \s1 s2 -> pure (s1 <> s2)
 mapNumericOperator SubtractF (VDOM RAN.PNumber _) = wrapNumericOperator (-)
-mapNumericOperator SubtractF (VDOM RAN.PString _) = \s1 s2 -> case (Pattern s1) `stripSuffix` s2 of
+mapNumericOperator SubtractF (VDOM RAN.PString _) = \s1 s2 -> case (STRING.Pattern s1) `STRING.stripSuffix` s2 of
   Nothing -> pure s1
   Just r -> pure r
 mapNumericOperator DivideF (VDOM RAN.PNumber _) = wrapNumericOperator (/)
@@ -898,5 +898,12 @@ getPublicUrl ctxt = do
       Just (Q qfd) -> do
         urlComputer <- context2propertyValue qfd
         (Value url) <- ctxt ##>> urlComputer
-        pure $ Just url
+        pure $ Just $ ensureTerminalSlash url
       _ -> pure Nothing
+
+ensureTerminalSlash :: String -> String
+ensureTerminalSlash s = case STRING.lastIndexOf (STRING.Pattern "/") s of
+  Nothing -> s <> "/"
+  Just i -> if STRING.length s == i + 1
+    then s
+    else s <> "/"
