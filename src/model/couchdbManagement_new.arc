@@ -36,6 +36,8 @@ domain model://perspectives.domains#CouchdbManagement
   -------------------------------------------------------------------------------
   -- The INDEXED context cm:MyCouchdbApp, that is the starting point containing all CouchdbServers.
   -- There is NO PUBLIC PERSPECTIVE on this case.
+  -- The end user user (playing Manager) should have a Server Admin account for each CouchdbServer that is added to the App.
+  -- The credentials of each such Server Admin go into the CouchdbServer$Admin roles.
   case CouchdbManagementApp
     indexed cm:MyCouchdbApp
     aspect sys:RootContext
@@ -50,10 +52,12 @@ domain model://perspectives.domains#CouchdbManagement
     -- This manager should be the Server admin of each CouchdbServer,
     -- in order to create databases and members.
     -- Becoming a Couchdb Server Admin should be managed outside Perspectives.
+    -- The username should be the PerspectivesSystem$User ID.
     user Manager = sys:Me
       perspective on CouchdbServers
         only (CreateAndFill, Remove, Delete)
-        props (Name, Url) verbs (SetPropertyValue)
+        props (Name) verbs (Consult)
+        props (Url, AdminPassword) verbs (SetPropertyValue)
 
       -- Manager needs this action so he can set the Url before the CouchdbServer$Visitor tries to publish.
       action CreateServer
@@ -68,16 +72,36 @@ domain model://perspectives.domains#CouchdbManagement
     context CouchdbServers (relational) filledBy CouchdbServer
       property Url (mandatory, String)
         pattern = "^https://[^\\/]+\\/$" "An url with the https scheme, ending on a slash"
+      -- The Password of Manager (and therefore CouchdbServer$Admin) for Url.
+      -- The username of this account at Url should be PerspectivesSystem$User (the ID).
+      property AdminPassword (mandatory, String)
 
-      state CreateServer = exists Url
+      -- Add credentials to Perspectives State (not to the Couchdb_).
+      -- This means that the PDR can now authenticate on behalf of the Admin with Couchdb_.
+      state AddCredentials = (exists Url) and exists AdminPassword
         on entry
           do for Manager
-            create_ context CouchdbServer bound to origin
+            callEffect cdb:AddCredentials( Url, AdminPassword)
+
+        state CreateServer = exists Url
+          on entry
+            do for Manager
+              -- Create the databases in CouchdbServer_.
+              -- Notice that Pouchdb only creates a database if it does not yet exist.
+              -- This allows us to reconnect to a CouchdbServer_ if its CouchdbServer had been lost.
+              callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories" )
+              callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories_write" )
+              callEffect cdb:ReplicateContinuously( Url, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
+              callEffect cdb:MakeDatabasePublic( Url, "cw_servers_and_repositories" )
+              -- As the databases are now ready, we can create and publish the CouchdbServer.
+              create_ context CouchdbServer bound to origin
 
       state NoAdmin = (exists binding) and not exists binding >> context >> CouchdbServer$Admin
         on entry
           do for Manager
             bind context >> Manager to Admin in binding >> context
+            AuthorizedDomain = Url for  binding >> context >> Admin
+            Password = AdminPassword for binding >> context >> Admin
 
   -------------------------------------------------------------------------------
   ---- COUCHDBSERVER
@@ -97,7 +121,6 @@ domain model://perspectives.domains#CouchdbManagement
       -- The location of the CouchdbServer_. 
       property ServerUrl = binder CouchdbServers >> Url
       property Name (String)
-      property HasDatabase (Boolean)
 
       -- This covers the case we get a CouchdbServer that we did not create ourselves.
       -- If we do not refer to my indexed version of the CouchdbApp, this condition will fail because another user
@@ -116,25 +139,7 @@ domain model://perspectives.domains#CouchdbManagement
           notify Accounts
             "You now have an account with CouchdbServer {Name}"
 
-      -- Add credentials to Perspectives State (not to the Couchdb_).
-      -- This means that the PDR can now authenticate on behalf of the Admin with Couchdb_.
-      state AddCredentials = (exists ServerUrl) and exists context >> Admin >> Password
-        on entry
-          do for Admin
-            callEffect cdb:AddCredentials( ServerUrl, context >> Admin >> Password)
         
-        state CreateDatabases = not HasDatabase
-          on entry
-            do for Admin
-              -- Create the databases in CouchdbServer_.
-              -- Notice that Pouchdb only creates a database if it does not yet exist.
-              -- This allows us to reconnect to a CouchdbServer_ if its CouchdbServer had been lost.
-              callEffect cdb:CreateCouchdbDatabase( ServerUrl, "cw_servers_and_repositories" )
-              callEffect cdb:CreateCouchdbDatabase( ServerUrl, "cw_servers_and_repositories_write" )
-              callEffect cdb:ReplicateContinuously( ServerUrl, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
-              callEffect cdb:MakeDatabasePublic( ServerUrl, "cw_servers_and_repositories" )
-              HasDatabase = true
-
       -- Exiting CouchdbServer$External
       on exit
         do for Admin
@@ -149,15 +154,22 @@ domain model://perspectives.domains#CouchdbManagement
 
     -- This role should be in public space insofar that e.g. acc:Body$Guest should be able to see it.
     -- Admin in Couchdb of a particular server.
+    -- TODO Hernoem dit naar ServerAdmin.
     user Admin filledBy CouchdbManagementApp$Manager 
       -- As acc:Body$Admin, has full perspective on Accounts.
+      -- These properties come from sys:WithCredentials
+      -- WithCredentials$UserName - CALCULATED, computes the ID of the PerspectivesSystem$User.
+      -- The next two properties are set on creating the admin (state CouchdbServerApp$CouchdbServers$NoAdmin)
+      -- WithCredentials$Password
+      -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Admin
 
       action CreateRepository
         create role Repositories
 
       perspective on extern
-        props (ServerUrl, Name) verbs (Consult)
+        props (ServerUrl) verbs (Consult)
+        props (Name) verbs (SetPropertyValue, Consult)
 
       perspective on Repositories
         all roleverbs
@@ -180,6 +192,8 @@ domain model://perspectives.domains#CouchdbManagement
             table Repositories
 
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
+      -- WithCredentials$Password
+      -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Accounts
 
     -- The instance of CouchdbServer is published in the cw_servers_and_repositories database.
@@ -208,11 +222,14 @@ domain model://perspectives.domains#CouchdbManagement
       state CreateRepository = exists Repositories$NameSpace
         on entry
           do for Admin
-            create_ context Repository bound to origin
-            -- Copy the namespace to the Repository, but replace dots with underscores.
-            NameSpace_ = Repositories$NameSpace >> callExternal util:Replace( ".", "_" ) returns String for origin >> binding
+            letA
+              reponame <- Repositories$NameSpace >> callExternal util:Replace( ".", "_" ) returns String
+            in
+              create_ context Repository named reponame bound to origin
+              -- Copy the namespace to the Repository, but replace dots with underscores.
+              NameSpace_ = reponame for origin >> binding
 
-      state CreateDatabases = (exists NameSpace_) and AdminEndorses
+      state CreateDatabases = (exists NameSpace_) and AdminEndorses and exists context >> Admin >> Password
         on entry
           do for Admin
             letA
@@ -278,6 +295,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- This is the namespace of the models in this repository, but dots are replaced by underscores.
       -- It is computed from Repositories$NameSpace on creating the repository.
       property NameSpace_ (mandatory, String)
+      -- The toplevel domain with at least one subdomain, such as perspectives.domains or professional.joopringelberg.nl.
       property NameSpace = binder Repositories >> Repositories$NameSpace
       property ReadModels = "models_" + NameSpace_
       property WriteModels = "models_" + NameSpace_ + "_write"
@@ -285,6 +303,7 @@ domain model://perspectives.domains#CouchdbManagement
       property WriteInstances = "cw_" + NameSpace_ + "_write"
       -- The location of the CouchdbServer_. 
       property ServerUrl = binder Repositories >> context >> extern >> ServerUrl
+      property RepositoryUrl = "https://" + NameSpace + "/"
       property AdminLastName = context >> Admin >> LastName
 
     -- We need the ServerAdmin in this context in order to configure the local Admin.
@@ -292,12 +311,18 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Admin
         only (Create, Fill, RemoveFiller, Remove)
         props (FirstName, LastName) verbs (Consult)
+        props (AuthorizedDomain, Password) verbs (SetPropertyValue)
 
+    -- The filler provides autentication on Couchdb_.
+    -- Should also be able to give them read access to the repo,
+    -- and to retract that again.
     user Admin filledBy CouchdbServer$Admin
-      -- As Admin, has a full perspective on Accounts.
-      -- Should also be able to give them read access to the repo,
-      -- and to retract that again.
       aspect acc:Body$Admin
+        -- WithCredentials$UserName
+        -- We must use the next two properties to provide the autentication details to the PDR for the RepositoryUrl.
+        -- WithCredentials$Password
+        -- WithCredentials$AuthorizedDomain
+        -- As Admin, has a full perspective on Accounts.
 
       action CreateManifest
         create role Manifests
@@ -313,13 +338,16 @@ domain model://perspectives.domains#CouchdbManagement
             letA
               serverurl <- context >> extern >> ServerUrl
             in
-              callEffect cdb:MakeMemberOf( serverurl, "cw_servers_and_repositories", UserName )
+              callEffect cdb:MakeMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
               -- models
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteModels, UserName )
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ReadModels, UserName )
               -- instances
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteInstances, UserName )
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ReadInstances, UserName )
+              -- Make autentication details available to the PDR
+              AuthorizedDomain = context >> extern >> RepositoryUrl
+              Password = binding >> WithCredentials$Password
 
         on exit
           do for ServerAdmin
@@ -340,6 +368,7 @@ domain model://perspectives.domains#CouchdbManagement
       
       perspective on External
         props (IsPublic, NameSpace_) verbs (Consult)
+        props ()
 
       -- The desogm pattern for nested public contexts requires that Admin has write access
       -- to both the cw_servers_and_repositories and to the Repository database.
@@ -354,14 +383,17 @@ domain model://perspectives.domains#CouchdbManagement
       screen "Repository"
         tab "This repository"
           row 
-            form External
+            form "Repository information" External
           row
-            form Admin
+            form "Administrator" Admin
         tab "Manifests"
           row
             table Manifests
       
     user Authors (relational) filledBy CouchdbServer$Admin
+    
+    -- Levert een pattern match failure in Perspectives.Representation.Perspective (line 220, column 29 - line 220, column 51): CP
+    user Accounts (relational, unlinked) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
 
     -- The instances of Repository are published in the cw_servers_and_repositories database.
     public Visitor at extern >> ServerUrl + "cw_servers_and_repositories/" = sys:Me
@@ -387,6 +419,8 @@ domain model://perspectives.domains#CouchdbManagement
 
     external
       aspect sys:ModelManifest$External
+      -- ModelManifest$External$Description (mandatory, String)
+      -- IsLibrary (mandatory, Boolean)
       -- Notice that we have to register the LocalModelName on the filled context role in the collection,
       -- so we can create ModelManifest with a user-defined name. 
       -- Here we repeat that name so we can conveniently use it within ModelManifest.
@@ -412,7 +446,17 @@ domain model://perspectives.domains#CouchdbManagement
         create role Versions
     
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
-    public Visitor at extern >> ServerUrl + Repository >> ReadInstances = sys:Me
+    public Visitor at extern >> ServerUrl + Repository >> ReadInstances + "/" = sys:Me
+      perspective on extern
+        props (LocalModelName, ModelManifest$External$Description) verbs (Consult)
+      perspective on Versions
+        props (Versions$Version, VersionedModelManifest$External$Description) verbs (Consult)
+
+    -- In order to add this model to one's installation, one should become an ActiveUser of the Manifest.
+    -- BUT HOW?
+    user ActiveUser filledBy Repository$Accounts
+      perspective on Versions
+        props (Versions$Version, VersionedModelManifest$External$Description) verbs (Consult)
 
     context Versions (relational) filledBy VersionedModelManifest
       aspect sys:ModelManifest$Versions
@@ -476,4 +520,14 @@ domain model://perspectives.domains#CouchdbManagement
             ArcFeedback = "Explicitly restoring state"
           action CompileArc
             delete property ArcFeedback
+
+    user ActiveUser = extern >> binder Versions >> context >> ActiveUser
+      perspective on Author
+        props (FirstName, LastName) verbs (Consult)
+      perspective on extern
+        props (Version, DomeinFile) verbs (Consult)
+
+      screen "Manifest"
+        row
+          form External
 
