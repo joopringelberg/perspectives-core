@@ -35,6 +35,14 @@ domain model://perspectives.domains#System
         -- Equivalently:
         -- Name = "model://perspectives.domains#System$Me"
 
+        -- NOTE that we should uncomment this line but cannot do so until 
+        --    * this resource and its model is available;
+        --    * we can compile model://perspectives.domains/System in a MyContexts installation that holds model://perspectives.domains/CouchdbManagement.
+        -- This is because the line below is a forward reference to a CouchdbManagement type.
+        -- This is a Catch22 situation.
+        -- Now add the perspectives.domains repository as BaseRepository:
+        -- bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem
+
   aspect user sys:PerspectivesSystem$Installer
 
   -- Used as model:System$RoleWithId$Id in the PDR code.
@@ -42,6 +50,8 @@ domain model://perspectives.domains#System
     property Id = callExternal util:RoleIdentifier() returns String
 
   user WithCredentials filledBy sys:PerspectivesSystem$User
+    -- | The value of field systemIdentifier of the PouchdbUser object that is passed in to runPDR.
+    -- | Currently, this is the raw username that is used to log into MyContexts, e.g. "dev1".
     property UserName = callExternal util:SystemIdentifier() returns String
     property Password (String)
     property AuthorizedDomain (String)
@@ -82,8 +92,12 @@ domain model://perspectives.domains#System
         callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#TestPublicRole" )
       action ReloadTestPublicRole
         callEffect cdb:UpdateModel( "model://perspectives.domains#TestPublicRole", false )
+      action ReloadSystem
+        callEffect cdb:UpdateModel( "model://perspectives.domains#System", false )
       perspective on User
-        defaults
+        only (CreateAndFill)
+        props (LastName, FirstName) verbs (SetPropertyValue)
+        props (Channel) verbs (Consult)
       -- perspective on ModelsInUse
       --   defaults
       --   --in object state
@@ -106,10 +120,10 @@ domain model://perspectives.domains#System
       --     bind origin to ModelsInUse in currentcontext
       --   view Modellen$ModelPresentation verbs (Consult)
       perspective on BasicModels
-        props (ModelName, Description) verbs (Consult)
+        props (LocalModelName, Description) verbs (Consult)
       perspective on BasicModelsInUse
         only (Remove)
-        props (ModelIdentifier, Description) verbs (Consult)
+        props (DomeinFileName, Description) verbs (Consult)
 
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
@@ -132,7 +146,7 @@ domain model://perspectives.domains#System
             table BasicModels
           row 
             table BasicModelsInUse
-              props (ModelIdentifier, Description) verbs (Consult)
+              props (DomeinFileName, Description) verbs (Consult)
         tab "Start contexts"
           row
             table StartContexts
@@ -168,7 +182,7 @@ domain model://perspectives.domains#System
     context BasicModelsInUse (relational) filledBy sys:VersionedModelManifest
       on exit
         do for User
-          callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelIdentifier )
+          callDestructiveEffect cdb:RemoveModelFromLocalStore ( DomeinFileName )
 
 
     -- All context types that have been declared to be 'indexed' have an instance that fills this role.
@@ -370,7 +384,8 @@ domain model://perspectives.domains#System
   case ManifestCollection
     context Manifests (relational) filledBy ModelManifest
       -- This is the local name, unqualified, of the model, e.g. "JoopsModel" or "System".
-      property ModelName (String)
+      -- It must be entered through a form.
+      property LocalModelName (String)
 
   case ModelManifest
     aspect sys:RootContext
@@ -383,25 +398,28 @@ domain model://perspectives.domains#System
       perspective on Versions
         props (Version, Description) verbs (Consult)
         action StartUsing
-          callEffect cdb:AddModelToLocalStore( Versions$ModelIdentifier )
+          callEffect cdb:AddModelToLocalStore( Versions$DomeinFileName )
           -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
           -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
           -- and complain that the author has no rights to modify it.
           bind origin >> binding to BasicModelsInUse in sys:MySystem
 
     context Versions (relational) filledBy VersionedModelManifest
+      -- This value must be entered by the user.
       property Version (mandatory, String)
+      -- E.g. "System@1.0.0"
+      property LocalModelName = context >> extern >> binder Manifests >> LocalModelName + "@" + Version
       -- The value of this property will be set by the Couchdb:VersionedModelManifest$Author.
-      property ModelIdentifier (mandatory, String)
-      property ModelUrl (mandatory, String)
+      -- It must be a DomeinFileId, e.g. perspectives_domains-System@1.0.0.json
+      property DomeinFileName (mandatory, String)
 
   case VersionedModelManifest
     external
       property Description (mandatory, String)
-      -- Notice that we have to register the ModelIdentifier on the context role in the collection (ModelManifest$Versions),
+      -- Notice that we have to register the DomeinFileName on the context role in the collection (ModelManifest$Versions),
       -- to serve in the pattern that creates a DNS URI, so it can be a public resource.
-      property ModelIdentifier = binder Versions >> Versions$ModelIdentifier
+      property DomeinFileName = binder Versions >> Versions$DomeinFileName
     user Visitor = sys:Me
       perspective on extern
-        props (Description, ModelIdentifier) verbs (Consult)
+        props (Description, DomeinFileName) verbs (Consult)
     
