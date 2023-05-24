@@ -429,6 +429,8 @@ domain model://perspectives.domains#CouchdbManagement
       property ModelURI = "model://" + context >> Repository >> Repository$External$NameSpace + "#" + LocalModelName
       -- The location of the CouchdbServer_. 
       property ServerUrl = binder Manifests >> context >> extern >> ServerUrl
+      -- The location where we publish ModelManifest and its versions.
+      property PublicUrl = ServerUrl + context >> Repository >> ReadInstances + "/"
     
     -- The external role of the Repository.
     context Repository = extern >> binder Manifests >> context >> extern
@@ -442,11 +444,12 @@ domain model://perspectives.domains#CouchdbManagement
         props (Versions$Version, VersionedModelManifest$External$Description) verbs (SetPropertyValue)
       perspective on Versions >> binding >> context >> Author
         only (Fill, Create)
+        props (FirstName, LastName) verbs (Consult)
       action CreateVersion
         create role Versions
     
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
-    public Visitor at extern >> ServerUrl + Repository >> ReadInstances + "/" = sys:Me
+    public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
         props (LocalModelName, ModelManifest$External$Description) verbs (Consult)
       perspective on Versions
@@ -467,12 +470,14 @@ domain model://perspectives.domains#CouchdbManagement
         on entry
           do for Author
             -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
-            create_ context VersionedModelManifest named LocalModelName bound to origin
+            create_ context VersionedModelManifest named Versions$LocalModelName bound to origin
             DomeinFileName = (context >> Repository >> NameSpace_ + "-" + Versions$LocalModelName + ".json") for origin
             bind currentactor to VersionedModelManifest$Author in origin >> binding >> context
 
   case VersionedModelManifest
     aspect sys:VersionedModelManifest
+      -- Description
+      -- DomeinFileName, a calculated role that retrieves Versions$DomeinFileName.
     aspect sys:ContextWithNotification
     state UploadToRepository = extern >> (ArcOK and SourcesChanged)
       on entry
@@ -496,6 +501,7 @@ domain model://perspectives.domains#CouchdbManagement
       property ArcOK = ArcFeedback matches regexp "^OK"
       property SourcesChanged (Boolean)
       property DomeinFile (File)
+      property PublicUrl = binder Versions >> context >> extern >> PublicUrl
       
       on exit
         do for Author
@@ -520,6 +526,18 @@ domain model://perspectives.domains#CouchdbManagement
             ArcFeedback = "Explicitly restoring state"
           action CompileArc
             delete property ArcFeedback
+    
+    public Visitor at (extern >> PublicUrl) = sys:Me
+      perspective on extern
+        props (Version, Description) verbs (Consult) -- ModelURI geeft een probleem.
+        action StartUsing
+          -- TODO. Vermoedelijk kan dit naar Couchdb$ModelManifest$Visitor en kan deze Visitor weg.
+          callEffect cdb:AddModelToLocalStore( DomeinFileName )
+          -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
+          -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
+          -- and complain that the author has no rights to modify it.
+          bind origin to BasicModelsInUse in sys:MySystem
+
 
     user ActiveUser = extern >> binder Versions >> context >> ActiveUser
       perspective on Author
