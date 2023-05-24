@@ -124,5 +124,5 @@ pubParser = try do
   void whiteSpace
   s <- pure (fromCharArray chars)
   if hasPublicResourceShape s
-    then pure $ "pub:" <> s
+    then pure s
     else fail "Not a valid public resource url." 

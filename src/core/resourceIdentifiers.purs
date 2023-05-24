@@ -155,14 +155,6 @@ resourceIdentifierRegEx = unsafeRegex "^(\\w+):(.*)$" noFlags
 locRegex :: Regex
 locRegex = unsafeRegex "^(\\w+)#([_\\w\\d]+)$" noFlags
 
--- TODO: replace the first part of the match by a regex that captures a URL;
--- replace the second part by a regex that captures a GUID.
--- Match a string starting with "https://" followed by arbitrary characters, separated by "#" from a
--- string built from word characters, digits and underscore.
--- pub:https://perspectives.domains/cw_servers_and_repositories/perspectives_domains$External
-remRegex :: Regex
-remRegex = unsafeRegex "^(https://[^#]+)#([_\\w\\d]+)$" noFlags
-
 parseResourceIdentifier :: forall f. ResourceIdentifier -> MonadPouchdb f DecomposedResourceIdentifier
 parseResourceIdentifier resId = 
   case match resourceIdentifierRegEx resId of 
@@ -180,12 +172,12 @@ parseResourceIdentifier resId =
             Just (Just dbName), Just (Just g) -> pure $ Local dbName g
             _, _ -> throwError (error $ "Cannot parse this as a Local resource identifier: " <> resId)
         -- rem:url#guid
-        "rem" -> case match publicResourceRegex rest of
+        "rem" -> case match publicResourceUrlRegex rest of
           Nothing -> throwError (error $ "Cannot parse this as a Remote resource identifier: " <> resId)
           Just remMatches -> case index remMatches 1, index remMatches 2 of 
             Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") (url <> "_write/") g
             _, _ -> throwError (error $ "Cannot parse this as a Remote resource identifier: " <> resId)
-        "pub" -> case match publicResourceRegex rest of
+        "pub" -> case match publicResourceUrlRegex rest of
           Nothing -> throwError (error $ "Cannot parse this as a Public resource identifier: " <> resId)
           Just remMatches -> case index remMatches 1, index remMatches 2 of 
             Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") (url <> "_write/") g
@@ -391,11 +383,17 @@ takeGuid s = case match discardStorageRegex s of
 -- | index 1 is the authority (scheme plus domain name).
 -- | index 2 is the database name.
 -- | index 3 is the resource name.
-publicResourcePattern :: String
-publicResourcePattern = "^(https://[^/]+/cw_[^/]+)/#(.+)$"
+publicResourceUrlPattern :: String
+publicResourceUrlPattern = "^(https://[^/]+/cw_[^/]+)/#(.+)$"
 
+publicResourceUrlRegex :: Regex
+publicResourceUrlRegex = unsafeRegex publicResourceUrlPattern noFlags
+
+-----------------------------------------------------------
+-- TEST THE SHAPE OF A PUBLIC RESOURCE IDENTIFIER
+-----------------------------------------------------------
 publicResourceRegex :: Regex
-publicResourceRegex = unsafeRegex publicResourcePattern noFlags
+publicResourceRegex = unsafeRegex "^pub:https://[^/]+/cw_[^/]+/#(.+)$" noFlags
 
 hasPublicResourceShape :: String -> Boolean
 hasPublicResourceShape = test publicResourceRegex
