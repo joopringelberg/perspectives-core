@@ -440,7 +440,7 @@ domain model://perspectives.domains#CouchdbManagement
         props (LocalModelName) verbs (Consult)
         props (Description) verbs (SetPropertyValue)
       perspective on Versions
-        only (Create, Fill, Remove)
+        only (Create, Fill, Remove, CreateAndFill)
         props (Versions$Version, VersionedModelManifest$External$Description) verbs (SetPropertyValue)
       perspective on Versions >> binding >> context >> Author
         only (Fill, Create)
