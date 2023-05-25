@@ -25,7 +25,7 @@ module Perspectives.TypePersistence.PerspectiveSerialisation where
 
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, concat, cons, elemIndex, filter, filterA, find, findIndex, foldl, head, intersect, modifyAt, null, uncons, union)
+import Data.Array (catMaybes, concat, cons, elemIndex, filter, filterA, find, findIndex, foldl, head, intersect, modifyAt, nub, null, uncons, union)
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
@@ -159,6 +159,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     >>= lift <<< traverse getEnumeratedRole
     >>= pure <<< map (_.context <<< unwrap)
     >>= \as -> lift $ ( (append as) <<< concat <$> (for as (runArrayT <<< getContextAspectSpecialisations)))
+    >>= \as' -> pure $ nub as'
   identifyingProperty <- computeIdentifyingProperty serialisedProps roleInstances
   cType <- lift (cid ##>> contextType)
       
