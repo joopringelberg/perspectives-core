@@ -45,8 +45,8 @@ type Found a = StateT Boolean MonadPerspectives a
 hasBeenFound :: Found Boolean
 hasBeenFound = get
 
--- | True iff the user role represented by the RoleType argument has a perspective
--- | on the role type (in any state) with PropertyVerbs
+-- | True iff the user role represented by the subject argument has a perspective
+-- | on the RoleType (in any state) with PropertyVerbs
 -- |  * whose properties include the property,
 -- |  * whose verbs include the given Verb.
 roleHasPerspectiveOnPropertyWithVerb :: RoleType -> RoleInstance -> EnumeratedPropertyType -> PropertyVerb -> MonadPerspectives (Either PerspectivesError Boolean)
@@ -57,9 +57,9 @@ roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
       then pure $ Right true
       else pure $ Left $ UnauthorizedForProperty "Auteur" subject (ENR roleType') (ENP property) verb'
 
--- | True if the user role represented by the RoleType argument has a perspective
--- | on the role type that includes an Action with the given Verb,
--- | OR if the role type has the aspect "sys:RootContext$RootUser"
+-- | True if the user role represented by the subject argument has a perspective
+-- | on the RoleType that includes an Action with the given Verb,
+-- | OR if the subject has the aspect "sys:RootContext$RootUser"
 roleHasPerspectiveOnRoleWithVerb :: RoleType -> EnumeratedRoleType -> Array RoleVerb -> MonadPerspectives (Either PerspectivesError Boolean)
 roleHasPerspectiveOnRoleWithVerb subject roleType verbs = do
   hasPerspective <- unsafePartial (roleType ###>> hasPerspectiveOnRoleWithVerbs verbs subject)

@@ -136,6 +136,7 @@ phaseThree_ df@{_id, referredModels} postponedParts screens = do
       addAspectsToExternalRoles
       contextualisePerspectives
       -- Now all perspectives are available.
+      -- Check whether actions are allowed given perspectives.
       handleScreens screens
       invertPerspectiveObjects
       -- combinePerspectives
