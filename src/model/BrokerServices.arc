@@ -1,16 +1,38 @@
 -- Copyright Joop Ringelberg and Cor Baars, 2020, 2021 -15
 -- A model to maintain AMQP Broker Services.
-domain BrokerServices
-  use sys for model:System
-  use bs for model:BrokerServices
-  use util for model:Utilities
-  use rabbit for model:RabbitMQ
+domain model://perspectives.domains#BrokerServices
+  use sys for model://perspectives.domains#System
+  use bs for model://perspectives.domains#BrokerServices
+  use util for model://perspectives.domains#Utilities
+  use rabbit for model://perspectives.domains#RabbitMQ
 
-  -- The model description case.
-  case Model
-    aspect sys:Model
-    external
-      aspect sys:Model$External
+  -------------------------------------------------------------------------------
+  ---- SETTING UP
+  -------------------------------------------------------------------------------
+  state ReadyToInstall = exists sys:PerspectivesSystem$Installer
+    on entry
+      do for sys:PerspectivesSystem$Installer
+        letA
+          -- We must first create the context and then later bind it.
+          -- If we try to create and bind it in a single statement, 
+          -- we find that the Installer can just create RootContexts
+          -- as they are the allowed binding of StartContexts.
+          -- As a consequence, no context is created.
+          app <- create context BrokerServices
+          indexedcontext <- create role IndexedContexts in sys:MySystem
+        in
+          -- Being a RootContext, too, Installer can fill a new instance
+          -- of StartContexts with it.
+          bind app >> extern to StartContexts in sys:MySystem
+          Name = "Broker services app" for app >> extern
+          bind_ app >> extern to indexedcontext
+          IndexedContexts$Name = app >> indexedName for indexedcontext
+
+  aspect user sys:PerspectivesSystem$Installer
+
+  -------------------------------------------------------------------------------
+  ---- BROKER SERVICES
+  -------------------------------------------------------------------------------
 
   -- The entry point (the `application`), available as bs:MyBrokers.
   case BrokerServices
@@ -133,7 +155,7 @@ domain BrokerServices
               QueueName
             ) returns String
              
-      -- Now we now who the AccountHolder is, we bind his identity to his queue, so other users can reach him.
+      -- Now we know who the AccountHolder is, we bind his identity to his queue, so other users can reach him.
       state SetBinding = exists binding
         on entry
           do for BrokerContract$Administrator

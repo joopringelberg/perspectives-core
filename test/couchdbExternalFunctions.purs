@@ -112,7 +112,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       then uploadToRepository (DomeinFileId "model://perspectives.domains#Parsing")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#Parsing: " <> show errs) false
 
-  testOnly "upload model://perspectives.domains#TestPublicRole to repository from files" $ runP do
+  test "upload model://perspectives.domains#TestPublicRole to repository from files" $ runP do
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
@@ -152,7 +152,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       then uploadToRepository (DomeinFileId "model://perspectives.domains#BodiesWithAccounts")
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#BodiesWithAccounts: " <> show errs) false
 
-  test "upload model://perspectives.domains#CouchdbManagement to repository from files (without testuser)" $ runP do
+  testOnly "upload model://perspectives.domains#CouchdbManagement_new to repository from files (without testuser)" $ runP do
     modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
@@ -162,7 +162,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     _ <- loadCompileAndCacheArcFile' "bodiesWithAccounts" modelDirectory
     _ <- loadCompileAndCacheArcFile' "parsing" modelDirectory
-    errs <- loadCompileAndCacheArcFile' "couchdbManagement" modelDirectory
+    errs <- loadCompileAndCacheArcFile' "couchdbManagement_new" modelDirectory
     if null errs
       then uploadToRepository (DomeinFileId "model://perspectives.domains#CouchdbManagement")
       else liftAff $ assert ("There are instance- or model errors for model//perspectives.domains#CouchdbManagement: " <> show errs) false

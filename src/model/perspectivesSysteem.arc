@@ -22,10 +22,6 @@ domain model://perspectives.domains#System
         indexedrole <- create role IndexedRoles in sys:MySystem
       in 
         bind sys:MySystem >> extern to StartContexts in sys:MySystem
-      -- NOTE that we should uncomment this role but cannot do so until this resource and its model is available. This is a Catch22 situation.
-      -- bind publicrole https://perspectives.domains/cw_servers_and_repositories/perspectives_domains$External to BaseRepository in sys:MySystem
-      -- Do we need to create an instance of a Manifest?
-
         Name = "My System" for sys:MySystem >> extern
         bind_ sys:MySystem >> extern to indexedcontext
         -- TODO. Zonder kwalificatie zegt de compiler dat "Name" niet bestaat voor IndexedContexts. Maar er is een naamconflict met RootContext$Extern$Name
@@ -398,6 +394,7 @@ domain model://perspectives.domains#System
       perspective on Versions
         props (Version, Description) verbs (Consult)
         action StartUsing
+          -- TODO. Vermoedelijk kan dit naar Couchdb$ModelManifest$Visitor en kan deze Visitor weg.
           callEffect cdb:AddModelToLocalStore( Versions$DomeinFileName )
           -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
           -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
@@ -409,7 +406,7 @@ domain model://perspectives.domains#System
       property Version (mandatory, String)
       -- E.g. "System@1.0.0"
       property LocalModelName = context >> extern >> binder Manifests >> LocalModelName + "@" + Version
-      -- The value of this property will be set by the Couchdb:VersionedModelManifest$Author.
+      -- The value of this property will be set automatically by the Couchdb:VersionedModelManifest$Author.
       -- It must be a DomeinFileId, e.g. perspectives_domains-System@1.0.0.json
       property DomeinFileName (mandatory, String)
 

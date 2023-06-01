@@ -35,6 +35,7 @@ domain model://perspectives.domains#CouchdbManagement
   ---- INDEXED CONTEXT
   -------------------------------------------------------------------------------
   -- The INDEXED context cm:MyCouchdbApp, that is the starting point containing all CouchdbServers.
+  -- There is NO PUBLIC PERSPECTIVE on this App.
   case CouchdbManagementApp
     indexed cm:MyCouchdbApp
     aspect sys:RootContext
@@ -68,6 +69,7 @@ domain model://perspectives.domains#CouchdbManagement
         in object state Ready
           action CreateCouchdbServer
             letA 
+              -- Dit kunnen we vervangen door een publiek perspectief in CouchdbServer dat gepubliceerd wordt in Serverurl/cw_servers_and_repositories
               server <- create context CouchdbServer named (ServerUrl + "cw_servers_and_repositories/" + ServerName) bound to CouchdbServers
             in
               Url = ServerUrl for server
@@ -99,7 +101,7 @@ domain model://perspectives.domains#CouchdbManagement
   -------------------------------------------------------------------------------
   ---- PRIVATELYMANAGEDSERVER
   -------------------------------------------------------------------------------
-  -- This context is not public. It allows us to 
+  -- There is NO PUBLIC PERSPECTIVE on this context. It allows us to 
   --    * register credentials for the ServerAdmin;
   --    * create the default database `servers_and_repositories`;
   --    * create a public CouchdbServer from it.
@@ -116,7 +118,7 @@ domain model://perspectives.domains#CouchdbManagement
           do for PManager
             -- Notice that Pouchdb only creates a database if it does not yet exist.
             -- This allows us to reconnect to a CouchdbServer_ if its CouchdbServer had been lost.
-            AuthorizedDomain = ServerUrl for context >> PManager
+            -- AuthorizedDomain = ServerUrl for context >> PManager
             -- Adds credentials to Perspectives State; not to the Couchdb_!
             callEffect cdb:AddCredentials( ServerUrl, context >> PManager >> Password)
             callEffect cdb:CreateCouchdbDatabase( ServerUrl, "cw_servers_and_repositories" )
@@ -147,7 +149,10 @@ domain model://perspectives.domains#CouchdbManagement
   -------------------------------------------------------------------------------
   ---- COUCHDBSERVER
   -------------------------------------------------------------------------------
-  -- PUBLIC
+  -- This context has a PUBLIC USER Visitor that causes a version of the context to be published.
+  -- Visitor cn see the Repositories and their descriptions, and sign up.
+  -- To sign up, he should be able to see the admin.
+  
   -- This contexts implements the BodyWithAccounts pattern.
   -- NOTE: a PerspectivesSystem$User should only fill either Admin, or Accounts!
   -- The PDR looks for credentials in either role and should find them just once.
@@ -241,9 +246,9 @@ domain model://perspectives.domains#CouchdbManagement
     -- The aspect acc:Body introduces a Guest role
     -- with a perspective that allows it to request an Account when he has none
     -- and to synchronize that with Admin.
+    -- LET OP: deze rol gaat er waarschijnlijk (voorlopig) uit. De modellering met dit aspect wordt te complex.
     aspect user acc:Body$Guest
 
-    -- This role should be in private space.
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User private
       aspect acc:Body$Accounts
 
@@ -313,6 +318,14 @@ domain model://perspectives.domains#CouchdbManagement
             table PublicRepositories
 
     user WaitingAccounts = filter Accounts with (not IsRejected) and not IsAccepted
+
+    public Visitor at Url = sys:Me
+      perspective on PublicRepositories
+        props (RepositoryName) verbs (Consult)
+      
+      -- Perspective on Admin in order to be able to sign up as an Account.
+      perspective on Admin
+        props (FirstName, LastName) verbs (Consult)
 
     context MyRepositories = filter Repositories with binding >> context >> Repository$Admin filledBy sys:Me
 
@@ -384,7 +397,7 @@ domain model://perspectives.domains#CouchdbManagement
   -------------------------------------------------------------------------------
   ---- REPOSITORY
   -------------------------------------------------------------------------------
-  -- PUBLIC
+  -- This context has a public perspective that allows the visitor to see the models.
   -- This contexts implements the BodyWithAccounts pattern.
   case Repository
     aspect acc:Body
@@ -566,6 +579,10 @@ domain model://perspectives.domains#CouchdbManagement
     -- Note that the aspect acc:Body introduces a Guest role
     -- with a perspective that allows it to create an Account.
 
+    public Visitor at extern >> InstancesUrl
+      perspective on Manifests
+        props (ModelName) verbs (Consult)
+
     -- This role should be stored in public space. These are all models that
     -- are stored in this Repository.
     context Manifests filledBy ModelManifest
@@ -576,6 +593,7 @@ domain model://perspectives.domains#CouchdbManagement
             create_ context ModelManifest named (context >> extern >> InstancesUrl + origin >> Manifests$ModelName) bound to origin
             bind currentactor to Author in origin >> binding >> context
 
+  -- This context has NO PUBLIC PERSPECTIVE.
   case ModelManifest
     aspect sys:ModelManifest
 
@@ -595,7 +613,7 @@ domain model://perspectives.domains#CouchdbManagement
     
     context Repository = extern >> binder Manifests >> context >> extern
 
-    user Author filledBy Repository$Admin
+    user Author filledBy Repository$Author
       perspective on extern
         props (ModelName) verbs (Consult)
         props (Description) verbs (SetPropertyValue)
@@ -607,6 +625,11 @@ domain model://perspectives.domains#CouchdbManagement
       action CreateVersion
         create role Versions
     
+    -- In order to add this model to one's installation, one should become an ActiveUser of the Manifest.
+    user ActiveUser filledBy Repository$Account
+      perspective on Versions
+        props (Version) verbs (Consult)
+
     context Versions (relational) filledBy VersionedModelManifest
       aspect sys:ModelManifest$Versions
       state ReadyToMake = (exists Versions$Version) and not exists binding
@@ -623,6 +646,7 @@ domain model://perspectives.domains#CouchdbManagement
             create_ context VersionedModelManifest named ( context >> (Repository >> InstancesUrl + extern >> ModelName) + "@" + Versions$Version) bound to origin
             bind currentactor to VersionedModelManifest$Author in origin >> binding >> context
 
+  -- This context has NO PUBLIC PERSPECTIVE.
   case VersionedModelManifest
     aspect sys:VersionedModelManifest
     aspect sys:ContextWithNotification
@@ -644,6 +668,7 @@ domain model://perspectives.domains#CouchdbManagement
         minLength = 81
       property ArcOK = ArcFeedback matches regexp "^OK"
       property SourcesChanged (Boolean)
+      property DomeinFile (File)
       
       on exit
         do for Author
@@ -668,6 +693,12 @@ domain model://perspectives.domains#CouchdbManagement
             ArcFeedback = "Explicitly restoring state"
           action CompileArc
             delete property ArcFeedback
+
+    user ActiveUser = extern >> binder Versions >> context >> ActiveUser
+      perspective on Author
+        props (FirstName, LastName) verbs (Consult)
+      perspective on extern
+        props (Version, ArcSource, DomeinFile)
 
       screen "Manifest"
         row
