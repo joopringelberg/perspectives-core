@@ -315,6 +315,7 @@ foreign import deleteDocumentImpl :: EffectFn3
 
 -- | Deletes the document.
 -- | Returns true if no revision is supplied, or if the document is deleted correctly.
+-- | May return false if the document did not exist to start with!
 -- | Note: if the database did not exist, it will exist after calling this function!
 -- | Authentication ensured.
 deleteDocument :: forall f. DatabaseName -> DocumentName -> Revision_ -> MonadPouchdb f Boolean
@@ -331,7 +332,11 @@ deleteDocument dbName docName mrev = case mrev of
               Nothing -> pure false
         -- Promise rejected. Convert the incoming message to a PouchError type.
         (handlePouchError "deleteDocument" docName)
-  Nothing -> retrieveDocumentVersion dbName docName >>= deleteDocument dbName docName
+  Nothing -> retrieveDocumentVersion dbName docName >>= case _ of 
+    -- This takes care of a situation where we do not have the revision in cache.
+    -- Without this analysis, we get an infinite loop if the document doesn't exist.
+    Nothing -> pure false
+    Just rev -> deleteDocument dbName docName (Just rev)
 
 -----------------------------------------------------------
 -- GET DOCUMENT
