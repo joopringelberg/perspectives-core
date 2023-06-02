@@ -36,6 +36,10 @@ import Test.Unit.Assert (assert)
 -- "request to https://perspectives.domains/models_perspectives_domains/ failed, reason: unable to verify the first certificate","type":"system","errno":"UNABLE_TO_VERIFY_LEAF_SIGNATURE","code":"UNABLE_TO_VERIFY_LEAF_SIGNATURE"
 -- Later, I experienced a  {"name":"FetchError","message":"request to https://perspectives.domains/models_perspectives_domains/ failed, reason: self signed certificate"} problem. Evaded it with:
 -- export NODE_TLS_REJECT_UNAUTHORIZED="0"
+-- NOTE that this script will only work properly if the /etc/hosts file contains an entry for perspectives.domains:
+-- 127.0.0.1 perspectives.domains
+-- 127.0.0.1 www.perspectives.domains
+
 models_perspectives_domains :: String
 models_perspectives_domains = "https://localhost:6984/models_perspectives_domains"
 

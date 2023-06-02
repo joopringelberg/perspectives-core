@@ -45,7 +45,7 @@ import Perspectives.ResourceIdentifiers (ResourceIdentifier, addSchemeToResource
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Transaction (StorageScheme)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Show, Unit, map, pure, show, ($), (&&), (<<<), (<>), (==), (>>=), bind, discard, void, (<$>))
+import Prelude (class Ord, class Show, Unit, bind, discard, map, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
 
 -----------------------------------------------------------
 -- GENERIC
@@ -78,6 +78,8 @@ instance encodeUniverseContextDelta :: Encode UniverseContextDelta where
   encode = genericEncode defaultOptions
 instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
   decode = genericDecode defaultOptions
+
+derive instance Ord UniverseContextDelta
 
 instance StrippedDelta UniverseContextDelta where
   stripResourceSchemes (UniverseContextDelta r) = UniverseContextDelta r 
@@ -114,6 +116,8 @@ instance prettyPrintUniverseContextDelta :: PrettyPrint UniverseContextDelta whe
 instance prettyPrintUniverseContextDeltaType :: PrettyPrint UniverseContextDeltaType where
   prettyPrint' t = show
 
+derive instance Ord UniverseContextDeltaType
+
 -----------------------------------------------------------
 -- UNIVERSEROLEDELTA
 -----------------------------------------------------------
@@ -147,6 +151,8 @@ instance decodeUniverseRoleDelta :: Decode UniverseRoleDelta where
 
 instance prettyPrintUniverseRoleDelta :: PrettyPrint UniverseRoleDelta where
   prettyPrint' t (UniverseRoleDelta r) = "UniverseRoleDelta " <> prettyPrint' (t <> "  ") r
+
+derive instance Ord UniverseRoleDelta
 
 instance StrippedDelta UniverseRoleDelta where
   stripResourceSchemes (UniverseRoleDelta r) = UniverseRoleDelta r 
@@ -182,6 +188,7 @@ instance decodeUniverseRoleDeltaType :: Decode UniverseRoleDeltaType where
 instance prettyPrintUniverseRoleDeltaType :: PrettyPrint UniverseRoleDeltaType where
   prettyPrint' t = show
 
+derive instance Ord UniverseRoleDeltaType
 -----------------------------------------------------------
 -- CONTEXTDELTA
 -----------------------------------------------------------
@@ -211,6 +218,8 @@ instance decodeContextDelta :: Decode ContextDelta where
 
 instance prettyPrintContextDelta :: PrettyPrint ContextDelta where
   prettyPrint' t (ContextDelta r) = "ContextDelta " <> prettyPrint' (t <> "  ") r
+
+derive instance Ord ContextDelta
 
 instance StrippedDelta ContextDelta where
   stripResourceSchemes (ContextDelta r) = ContextDelta r 
@@ -259,6 +268,8 @@ instance decodeContextDeltaType :: Decode ContextDeltaType where
 instance prettyPrintContextDeltaType :: PrettyPrint ContextDeltaType where
   prettyPrint' t = show
 
+derive instance Ord ContextDeltaType
+
 -----------------------------------------------------------
 -- ROLEBINDINGDELTA
 -----------------------------------------------------------
@@ -289,6 +300,8 @@ instance decodeRoleDelta :: Decode RoleBindingDelta where
 
 instance prettyPrintRoleBindingDelta :: PrettyPrint RoleBindingDelta where
   prettyPrint' t (RoleBindingDelta r) = "RoleBindingDelta " <> prettyPrint' (t <> "  ") r
+
+derive instance Ord RoleBindingDelta
 
 instance StrippedDelta RoleBindingDelta where
   stripResourceSchemes (RoleBindingDelta r) = RoleBindingDelta r 
@@ -335,6 +348,8 @@ instance decodeRoleBindingDeltaType :: Decode RoleBindingDeltaType where
 instance prettyPrintRoleBindingDeltaType :: PrettyPrint RoleBindingDeltaType where
   prettyPrint' t = show
 
+derive instance Ord RoleBindingDeltaType
+
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTA
 -----------------------------------------------------------
@@ -362,6 +377,8 @@ instance decodePropertyDelta :: Decode RolePropertyDelta where
 
 instance prettyPrintRolePropertyDelta :: PrettyPrint RolePropertyDelta where
   prettyPrint' t (RolePropertyDelta r) = "RolePropertyDelta " <> prettyPrint' (t <> "  ") r
+
+derive instance Ord RolePropertyDelta
 
 instance StrippedDelta RolePropertyDelta where
   stripResourceSchemes (RolePropertyDelta r) = RolePropertyDelta r 
@@ -394,6 +411,8 @@ instance decodeRolePropertyDeltaType :: Decode RolePropertyDeltaType where
 
 instance prettyPrintRolePropertyDeltaType :: PrettyPrint RolePropertyDeltaType where
   prettyPrint' t = show
+
+derive instance Ord RolePropertyDeltaType
 
 -----------------------------------------------------------
 -- STRIPPING RESOURCE IDENTIFIERS IN A DELTA
@@ -432,3 +451,4 @@ addOwnStorageScheme :: ResourceType -> String -> MonadPerspectives ResourceIdent
 addOwnStorageScheme rtype s = do 
   storageSchemes <- gets _.typeToStorage
   pure $ addSchemeToResourceIdentifier storageSchemes rtype s
+

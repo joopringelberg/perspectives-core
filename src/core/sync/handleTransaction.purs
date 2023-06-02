@@ -25,13 +25,16 @@ module Perspectives.Sync.HandleTransaction where
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except (lift, runExcept)
+import Data.Array (catMaybes)
 import Data.Array.NonEmpty (head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
+import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
@@ -68,8 +71,9 @@ import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (hasAspect, isPublicRole, roleAspectsClosure)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), DeltaRecord, addPublicResourceScheme, addResourceSchemes)
-import Prelude (Unit, bind, discard, flip, pure, show, unit, void, ($), (+), (<$>), (<<<), (<>), (==), (>>=))
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
+import Prelude (class Eq, class Ord, Unit, bind, compare, discard, flip, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
+import Data.Ordering (Ordering(..))
 
 -- TODO. Each of the executing functions must catch errors that arise from unknown types.
 -- Inspect the model version of an unknown type and establish whether the resident model is newer or older than
@@ -364,3 +368,57 @@ executeTransactionForPublicRole t@(TransactionForPeer{deltas}) storageUrl = for_
     notWhenPublicSubject :: forall f. DeltaRecord f -> MonadPerspectivesTransaction Unit -> MonadPerspectivesTransaction Unit
     notWhenPublicSubject {subject} a = (lift $ isPublicRole subject) >>= if _ then pure unit else a
 
+-- | All identifiers in deltas in a transaction have been stripped from their storage schemes, except for those with the pub: scheme.
+-- | This function adds public resource schemes for the given storageUrl or, when a different publishing point is found for an identifier,
+-- | that specific url.
+expandDeltas :: TransactionForPeer -> String -> MonadPerspectivesTransaction (Array Delta)
+expandDeltas t@(TransactionForPeer{deltas}) storageUrl = catMaybes <$> (for deltas expandDelta)
+  where
+
+  expandDelta :: SignedDelta -> MonadPerspectivesTransaction (Maybe Delta)
+  expandDelta s@(SignedDelta{author, encryptedDelta}) = expandDelta' $ authenticate (RoleInstance author) encryptedDelta
+    where
+      expandDelta' :: Maybe String -> MonadPerspectivesTransaction (Maybe Delta)
+      expandDelta' Nothing = pure Nothing
+      expandDelta' (Just stringifiedDelta) = do 
+        case runExcept $ decodeJSON stringifiedDelta of
+          Right (d1 :: RolePropertyDelta) -> notWhenPublicSubject (unwrap d1) (lift $ (Just <<< RPD s <$> addPublicResourceScheme storageUrl d1))
+          Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+            Right (d2 :: RoleBindingDelta) -> notWhenPublicSubject (unwrap d2) (lift $ (Just <<< RBD s <$> addPublicResourceScheme storageUrl d2))
+            Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+              Right (d3 :: ContextDelta) -> notWhenPublicSubject (unwrap d3) (lift $ (Just <<< CDD s <$> addPublicResourceScheme storageUrl d3))
+              Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                Right (d4 :: UniverseRoleDelta) -> notWhenPublicSubject (unwrap d4) (lift $ (Just <<< URD s <$> addPublicResourceScheme storageUrl d4))
+                Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                  Right (d5 :: UniverseContextDelta) -> notWhenPublicSubject (unwrap d5) (lift $ (Just <<< UCD s <$> addPublicResourceScheme storageUrl d5))
+                  Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta) *> pure Nothing
+
+      notWhenPublicSubject :: forall f. DeltaRecord f -> MonadPerspectivesTransaction (Maybe Delta) -> MonadPerspectivesTransaction (Maybe Delta)
+      notWhenPublicSubject rec a = (lift $ isPublicRole rec.subject) >>= if _ then pure Nothing else a
+
+executeDeltas :: Array Delta -> MonadPerspectivesTransaction Unit
+executeDeltas deltas = for_ deltas case _ of 
+  UCD s d -> executeUniverseContextDelta d s
+  URD s d -> executeUniverseRoleDelta d s
+  CDD s d -> executeContextDelta d s
+  RBD s d -> executeRoleBindingDelta d s
+  RPD s d -> executeRolePropertyDelta d s
+
+-----------------------------------------------------------
+-- COLLECTING DELTAS
+-----------------------------------------------------------
+data Delta = UCD SignedDelta UniverseContextDelta
+  | URD SignedDelta UniverseRoleDelta
+  | CDD SignedDelta ContextDelta
+  | RBD SignedDelta RoleBindingDelta
+  | RPD SignedDelta RolePropertyDelta
+
+derive instance Generic Delta _
+derive instance Eq Delta
+instance Ord Delta where 
+  compare (UCD _ u1) (UCD _ u2) = compare u1 u2
+  compare (URD _ u1) (URD _ u2) = compare u1 u2
+  compare (CDD _ u1) (CDD _ u2) = compare u1 u2
+  compare (RBD _ u1) (RBD _ u2) = compare u1 u2
+  compare (RPD _ u1) (RPD _ u2) = compare u1 u2
+  compare _ _ = LT
