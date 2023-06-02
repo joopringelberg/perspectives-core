@@ -556,19 +556,19 @@ deleteCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, hea
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
-replicateContinuously :: Array Url -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
-replicateContinuously databaseUrls sources targets _ = case head databaseUrls, head sources, head targets of
-  Just databaseUrl, Just source, Just target -> do 
+replicateContinuously :: Array Url -> Array Url -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+replicateContinuously databaseUrls couchdbUrls sources targets _ = case head databaseUrls, head couchdbUrls, head sources, head targets of
+  Just databaseUrl, Just couchdbUrl, Just source, Just target -> do 
     -- The replication may have been configured before. Overwriting the document will lead to unexpected results.
     -- Stop replication first, then reconfigure.
     void $ lift $ CDB.endReplication databaseUrl source target
     lift $ CDB.replicateContinuously
       databaseUrl
       (source <> "_" <> target)
-      (databaseUrl <> source)
-      (databaseUrl <> target)
+      (couchdbUrl <> source)
+      (couchdbUrl <> target)
       Nothing
-  _, _, _ -> pure unit
+  _, _, _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 endReplication :: Array Url -> Array DatabaseName -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -667,7 +667,7 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
   , Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
   , Tuple "model://perspectives.domains#Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
-  , Tuple "model://perspectives.domains#Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 4}
   , Tuple "model://perspectives.domains#Couchdb$EndReplication" {func: unsafeCoerce endReplication, nArgs: 3}
   , Tuple "model://perspectives.domains#Couchdb$DeleteDocument" {func: unsafeCoerce deleteDocument, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}

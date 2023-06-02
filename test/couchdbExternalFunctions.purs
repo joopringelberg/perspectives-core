@@ -23,7 +23,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.SetupCouchdb (setRoleView)
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile')
-import Test.Perspectives.Utils (assertEqual, developmentRepository, runMonadPerspectivesTransaction, runP, withSystem)
+import Test.Perspectives.Utils (assertEqual, developmentRepository, runMonadPerspectivesTransaction, runP, runTestadmin, withSystem)
 import Test.Unit (TestF, suiteOnly, test, testOnly)
 import Test.Unit.Assert (assert)
  
@@ -34,6 +34,8 @@ import Test.Unit.Assert (assert)
 -- export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
 -- It exports the root certificate. Without that, the following error will be thrown:
 -- "request to https://perspectives.domains/models_perspectives_domains/ failed, reason: unable to verify the first certificate","type":"system","errno":"UNABLE_TO_VERIFY_LEAF_SIGNATURE","code":"UNABLE_TO_VERIFY_LEAF_SIGNATURE"
+-- Later, I experienced a  {"name":"FetchError","message":"request to https://perspectives.domains/models_perspectives_domains/ failed, reason: self signed certificate"} problem. Evaded it with:
+-- export NODE_TLS_REJECT_UNAUTHORIZED="0"
 models_perspectives_domains :: String
 models_perspectives_domains = "https://localhost:6984/models_perspectives_domains"
 

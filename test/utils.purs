@@ -38,6 +38,9 @@ runP_ username = runPerspectives username "geheim" username couchdbHost couchdbP
 runP :: forall a. MonadPerspectives a -> Aff a
 runP = runP_ "joopdev"
 
+runTestadmin :: forall a. MonadPerspectives a -> Aff a
+runTestadmin = runP_ "testadmin"
+
 runPJoop :: forall a. MonadPerspectives a -> Aff a
 runPJoop = runP_ "joop"
 

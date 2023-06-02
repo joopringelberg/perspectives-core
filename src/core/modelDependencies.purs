@@ -93,7 +93,7 @@ modelExternal :: String
 modelExternal = "model://perspectives.domains#System$Model$External"
 
 modelExternalModelIdentification :: String
-modelExternalModelIdentification = "model://perspectives.domains#System$VersionedModelManifest$External$ModelIdentifier"
+modelExternalModelIdentification = "model://perspectives.domains#System$VersionedModelManifest$External$DomeinFileName"
 
 ------------------------------------------------------------------------------------
 -- INVITATION

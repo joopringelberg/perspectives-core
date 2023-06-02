@@ -72,6 +72,8 @@ domain model://perspectives.domains#CouchdbManagement
     context CouchdbServers (relational) filledBy CouchdbServer
       property Url (mandatory, String)
         pattern = "^https://[^\\/]+\\/$" "An url with the https scheme, ending on a slash"
+      property CouchdbPort (mandatory, String)
+        pattern = "^\\d{1,5}$" "A port number written as a string, consisting of up to 5 digits, maximally 65535."
       -- The Password of Manager (and therefore CouchdbServer$Admin) for Url.
       -- The username of this account at Url should be PerspectivesSystem$User (the ID).
       property AdminPassword (mandatory, String)
@@ -89,12 +91,15 @@ domain model://perspectives.domains#CouchdbManagement
               -- Create the databases in CouchdbServer_.
               -- Notice that Pouchdb only creates a database if it does not yet exist.
               -- This allows us to reconnect to a CouchdbServer_ if its CouchdbServer had been lost.
-              callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories" )
-              callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories_write" )
-              callEffect cdb:ReplicateContinuously( Url, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
-              callEffect cdb:MakeDatabasePublic( Url, "cw_servers_and_repositories" )
-              -- As the databases are now ready, we can create and publish the CouchdbServer.
-              create_ context CouchdbServer bound to origin
+              letA 
+                couchdburl <- "http://localhost:" + CouchdbServers$CouchdbPort + "/"
+              in 
+                callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories" )
+                callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories_write" )
+                callEffect cdb:ReplicateContinuously( Url, couchdburl, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
+                callEffect cdb:MakeDatabasePublic( Url, "cw_servers_and_repositories" )
+                -- As the databases are now ready, we can create and publish the CouchdbServer.
+                create_ context CouchdbServer bound to origin
 
       state NoAdmin = (exists binding) and not exists binding >> context >> CouchdbServer$Admin
         on entry
@@ -120,6 +125,7 @@ domain model://perspectives.domains#CouchdbManagement
     external
       -- The location of the CouchdbServer_. 
       property ServerUrl = binder CouchdbServers >> Url
+      property CouchdbPort = binder CouchdbServers >> CouchdbServers$CouchdbPort
       property Name (String)
 
       -- This covers the case we get a CouchdbServer that we did not create ourselves.
@@ -234,6 +240,7 @@ domain model://perspectives.domains#CouchdbManagement
           do for Admin
             letA
               baseurl <- context >> extern >> ServerUrl
+              couchdburl <- "http://localhost:" + context >> extern >> CouchdbPort + "/"
               readmodels <- "models_" + NameSpace_
               writemodels <- "models_" + NameSpace_ + "_write"
               readinstances <- "cw_" + NameSpace_
@@ -243,12 +250,12 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:CreateCouchdbDatabase( baseurl, readmodels )
               callEffect cdb:MakeDatabasePublic( baseurl, readmodels )
               callEffect cdb:CreateCouchdbDatabase( baseurl, writemodels )
-              callEffect cdb:ReplicateContinuously( baseurl, writemodels, readmodels )
+              callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writemodels, readmodels )
               -- instances
               callEffect cdb:CreateCouchdbDatabase( baseurl, readinstances )
               callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
               callEffect cdb:CreateCouchdbDatabase( baseurl, writeinstances )
-              callEffect cdb:ReplicateContinuously( baseurl, writeinstances, readinstances )
+              callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writeinstances, readinstances )
         on exit
           do for Admin
             letA
@@ -348,6 +355,8 @@ domain model://perspectives.domains#CouchdbManagement
               -- Make autentication details available to the PDR
               AuthorizedDomain = context >> extern >> RepositoryUrl
               Password = binding >> WithCredentials$Password
+              callEffect cdb:AddCredentials( AuthorizedDomain, Password)
+
 
         on exit
           do for ServerAdmin
