@@ -479,9 +479,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       if kind == ContextRole
         then do
           void $ runMonadPerspectivesTransaction authoringRole do
-            scheduleRoleRemoval (RoleInstance subject)
             contextToBeRemoved <- lift ((RoleInstance subject) ##>> binding >=> context)
             scheduleContextRemoval (Just autorizedRole) contextToBeRemoved
+            scheduleRoleRemoval (RoleInstance subject)
           sendResponse (Result corrId []) setter
         else sendResponse (Error corrId ("Cannot remove a context from a non-context role kind: " <> show autorizedRole )) setter
     Api.DeleteRole -> do

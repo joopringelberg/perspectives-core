@@ -193,6 +193,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       -- Now state has changed. Re-evaluate the resources that may change state.
       (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
       log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
+      -- NOTICE THAT NEGATION BY FAILURE BREAKS DOWN HERE, because we have not yet actually removed resources!!
       for_ stateEvaluations \s -> case s of
         ContextStateEvaluation stateId contextId roleType -> do
           -- Provide a new frame for the current context variable binding.

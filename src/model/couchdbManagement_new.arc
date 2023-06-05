@@ -57,7 +57,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on CouchdbServers
         only (CreateAndFill, Remove, Delete)
         props (Name) verbs (Consult)
-        props (Url, AdminPassword) verbs (SetPropertyValue)
+        props (Url, CouchdbServers$CouchdbPort, AdminPassword) verbs (SetPropertyValue)
 
       -- Manager needs this action so he can set the Url before the CouchdbServer$Visitor tries to publish.
       action CreateServer
@@ -185,22 +185,45 @@ domain model://perspectives.domains#CouchdbManagement
           props (AdminEndorses) verbs (SetPropertyValue)
         in object state CreateDatabases
           props (IsPublic) verbs (SetPropertyValue)
+        
+        -- This is currently not very useful, because a Repositories instance will not enter state WithoutManifests 
+        -- when its last Manifest is deleted. Negation by failure breaks on removing instances!
+        -- in object state WithoutManifests
+        --   action RemoveRepository
+        --     remove role origin
       
       screen "Couchdb Server"
         tab "The server"
           row
             form External
               props (ServerUrl, Name) verbs (Consult)
+              --props (Name) verbs (SetPropertyValue)
           row
             form Admin
         tab "Repositories"
           row 
             table Repositories
+        tab "Accounts"
+          row
+            table Accounts
 
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       -- WithCredentials$Password
       -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Accounts
+      on entry
+        do for Admin
+          letA
+            serverurl <- context >> extern >> ServerUrl
+          in
+            callEffect cdb:MakeMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+      on exit
+        do for Admin
+          letA
+            serverurl <- context >> extern >> ServerUrl
+          in
+            callEffect cdb:RemoveAsMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+
 
     -- The instance of CouchdbServer is published in the cw_servers_and_repositories database.
     public Visitor at extern >> ServerUrl + "cw_servers_and_repositories/" = sys:Me
@@ -273,9 +296,14 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:EndReplication( baseurl, writeinstances, readinstances )
               callEffect cdb:DeleteCouchdbDatabase( baseurl, readinstances )
               callEffect cdb:DeleteCouchdbDatabase( baseurl, writeinstances )
-              remove role binding >> context >> Repository$Admin
+              -- remove role binding >> context >> Repository$Admin
+
+      -- THIS STATE WILL NOT BE REVISITED WHEN ALL MANIFESTS ARE REMOVED,
+      -- because the role instance state is re-evaluated BEFORE the instance is actually thrown away.
+      -- state WithoutManifests = not exists binding >> context >> Manifests
 
       state WithoutExternalDatabase = (not exists NameSpace_) or not AdminEndorses
+
         -- Ad Admin may exist already if the Repository is created by Accounts.
         -- state NoAdmin = AdminEndorses and not exists binding >> context >> Repository$Admin
         --   on entry
@@ -292,9 +320,10 @@ domain model://perspectives.domains#CouchdbManagement
     aspect acc:Body
     aspect sys:ManifestCollection
 
-    -- on exit
-    --   do for Admin
-    --     delete context bound to Manifests
+    -- Embedded contexts are not removed automatically with their embedder!
+    on exit
+      do for Admin
+        delete context bound to Manifests
 
     external
       -- Only public repositories will be visible to Accounts of CouchdbServers.
@@ -345,7 +374,6 @@ domain model://perspectives.domains#CouchdbManagement
             letA
               serverurl <- context >> extern >> ServerUrl
             in
-              callEffect cdb:MakeMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
               -- models
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteModels, UserName )
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ReadModels, UserName )
@@ -364,13 +392,12 @@ domain model://perspectives.domains#CouchdbManagement
               serverurl <- context >> extern >> ServerUrl
             in
               -- models
-              callEffect cdb:RemoveAsMemberOf( serverurl, "cw_servers_and_repositories", UserName )
               callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> WriteModels, UserName )
               callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> ReadModels, UserName )
               -- instances
               callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> WriteInstances, UserName )
               callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> ReadInstances, UserName )
-              remove role origin
+
       on exit 
         notify "You are no longer the administrator of the repository { context >> extern >> NameSpace_ }."
 
@@ -423,7 +450,7 @@ domain model://perspectives.domains#CouchdbManagement
             create_ context ModelManifest named Manifests$LocalModelName bound to origin
             bind currentactor to Author in origin >> binding >> context
 
-  case ModelManifest
+  case ModelManifest 
     aspect sys:ModelManifest
 
     external
@@ -441,6 +468,11 @@ domain model://perspectives.domains#CouchdbManagement
       -- The location where we publish ModelManifest and its versions.
       property PublicUrl = ServerUrl + context >> Repository >> ReadInstances + "/"
     
+      -- Embedded contexts are not removed automatically with their embedder!
+      on exit
+        do for Author
+          delete context bound to Versions
+
     -- The external role of the Repository.
     context Repository = extern >> binder Manifests >> context >> extern
 
@@ -502,7 +534,8 @@ domain model://perspectives.domains#CouchdbManagement
       -- VersionedModelManifest$DomeinFileName
       -- The Version property is registered on ModelManifest$Versions so we can use it to create a DNS URN for it (it must be a public resource)
       property Version = binder Versions >> Versions$Version
-      property ModelURI = binder Versions >> context >> extern >> ModelURI + VersionedModelManifest$External$Version
+      property ModelURI = binder Versions >> context >> extern >> ModelManifest$External$ModelURI
+      property VersionedModelURI = VersionedModelManifest$External$ModelURI + VersionedModelManifest$External$Version
       property ArcSource (mandatory, String)
         minLength = 81 -- shows as a textarea
       property ArcFeedback (String)
@@ -515,7 +548,7 @@ domain model://perspectives.domains#CouchdbManagement
       on exit
         do for Author
           -- Delete the DomeinFile.
-          callEffect p:RemoveFromRepository( ModelURI )
+          callEffect p:RemoveFromRepository( VersionedModelManifest$External$ModelURI )
 
       state ReadyToCompile = ((exists ArcSource) and exists External$Version)
 
@@ -538,7 +571,7 @@ domain model://perspectives.domains#CouchdbManagement
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (Version, Description) verbs (Consult) -- ModelURI geeft een probleem.
+        props (Version, Description) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
         action StartUsing
           -- TODO. Vermoedelijk kan dit naar Couchdb$ModelManifest$Visitor en kan deze Visitor weg.
           callEffect cdb:AddModelToLocalStore( DomeinFileName )

@@ -342,32 +342,6 @@ executeTransaction t@(TransactionForPeer{deltas}) = for_ deltas f
                       Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
             (\e -> liftEffect $ log (show e))
 
-executeTransactionForPublicRole :: TransactionForPeer -> String -> MonadPerspectivesTransaction Unit
-executeTransactionForPublicRole t@(TransactionForPeer{deltas}) storageUrl = for_ deltas f
-  where
-    f :: SignedDelta -> MonadPerspectivesTransaction Unit
-    f s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta
-      where
-        executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
-        -- For now, we fail silently on deltas that cannot be authenticated. Notice that in an ideal world this will 
-        -- never happen for these deltas as they were constructed by the user himself!
-        executeDelta Nothing = pure unit
-        executeDelta (Just stringifiedDelta) = do 
-          (case runExcept $ decodeJSON stringifiedDelta of
-            Right d1 -> notWhenPublicSubject (unwrap d1) ((lift $ addPublicResourceScheme storageUrl d1) >>= (flip executeRolePropertyDelta s))
-            Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-              Right d2 -> notWhenPublicSubject (unwrap d2) ((lift $ addPublicResourceScheme storageUrl d2) >>= (flip executeRoleBindingDelta s))
-              Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                Right d3 -> notWhenPublicSubject (unwrap d3) ((lift $ addPublicResourceScheme storageUrl d3) >>= (flip executeContextDelta s))
-                Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                  Right d4 -> notWhenPublicSubject (unwrap d4) ((lift $ addPublicResourceScheme storageUrl d4) >>= (flip executeUniverseRoleDelta s))
-                  Left _ -> case runExcept $ decodeJSON stringifiedDelta of
-                    Right d5 -> notWhenPublicSubject (unwrap d5) ((lift $ addPublicResourceScheme storageUrl d5) >>= (flip executeUniverseContextDelta s))
-                    Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
-    
-    notWhenPublicSubject :: forall f. DeltaRecord f -> MonadPerspectivesTransaction Unit -> MonadPerspectivesTransaction Unit
-    notWhenPublicSubject {subject} a = (lift $ isPublicRole subject) >>= if _ then pure unit else a
-
 -- | All identifiers in deltas in a transaction have been stripped from their storage schemes, except for those with the pub: scheme.
 -- | This function adds public resource schemes for the given storageUrl or, when a different publishing point is found for an identifier,
 -- | that specific url.
