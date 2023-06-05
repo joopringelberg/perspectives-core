@@ -25,7 +25,7 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
-import Data.Array (concat, cons, difference, filterA, foldM, foldl, head, nub, null, union)
+import Data.Array (concat, cons, difference, filterA, foldM, foldl, head, nub, null, union, filter)
 import Data.Array.NonEmpty (fromArray, singleton) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
@@ -169,7 +169,15 @@ handleSelfOnlyQuery (InvertedQuery{backwardsCompiled, forwardsCompiled, descript
         Just fw -> do
           (peersAndPaths :: Array (DependencyPath)) <- lift ((singletonPath (R argForForwardsQuery)) ##= interpret fw)
           -- Add Deltas
-          for peersAndPaths
+
+          for 
+            (filter (\{head} -> case head of
+                R rid -> true
+                -- If not a role domain, just return false. This will be a similar case to
+                -- computeUsersFromState.computeUsersFromState, case Orole. For example forward queries resulting
+                -- from inverted filtered queries end up in a Boolean, not in the object.
+                otherwise -> false)
+              peersAndPaths)
             -- Each DependencyPath result is a peer.
             \path -> do
               peer <- pure $ unsafePartial roleAtHead path
