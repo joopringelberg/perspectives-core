@@ -616,7 +616,7 @@ removeAsAdminFromDb = updateSecurityDocument \userName (SecurityDocument r) -> S
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
 makeMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
-makeMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {members = {names: Just (maybe [userName] (ARR.union [userName]) r.members.names), roles: r.admins.roles}}
+makeMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {members = {names: Just (maybe [userName] (ARR.union [userName]) r.members.names), roles: r.members.roles}}
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
 removeAsMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -638,7 +638,7 @@ makeDatabasePublic databaseUrls databaseNames roleId = lift $
         databaseUrl 
         databaseName 
         (SecurityDocument $ sdoc { members = 
-          { names: Nothing
+          { names: Just []
           , roles: []}})
     _, _ -> pure unit
 
