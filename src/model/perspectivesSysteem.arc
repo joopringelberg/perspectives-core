@@ -37,7 +37,7 @@ domain model://perspectives.domains#System
         -- This is because the line below is a forward reference to a CouchdbManagement type.
         -- This is a Catch22 situation.
         -- Now add the perspectives.domains repository as BaseRepository:
-        -- bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem
+        bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem
 
   aspect user sys:PerspectivesSystem$Installer
 
@@ -170,6 +170,8 @@ domain model://perspectives.domains#System
       perspective on IndexedRoles
         only (Create, Fill)
         props (IndexedRoles$Name) verbs (SetPropertyValue)
+      perspective on BaseRepository
+        only (CreateAndFill)
 
     context BaseRepository filledBy ManifestCollection
 
@@ -419,4 +421,3 @@ domain model://perspectives.domains#System
     user Visitor = sys:Me
       perspective on extern
         props (Description, DomeinFileName) verbs (Consult)
-    
