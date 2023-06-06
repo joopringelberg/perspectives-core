@@ -436,7 +436,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Manifests
         props (Manifests$LocalModelName) verbs (Consult)
       perspective on extern
-        props (NameSpace_) verbs (Consult)
+        props (NameSpace_, NameSpace) verbs (Consult)
 
     -- This role is in the public Visitor perspective. These are all models that
     -- are stored in this Repository.
@@ -495,6 +495,12 @@ domain model://perspectives.domains#CouchdbManagement
         props (LocalModelName, ModelManifest$External$Description) verbs (Consult)
       perspective on Versions
         props (Versions$Version, VersionedModelManifest$External$Description) verbs (Consult)
+        action StartUsing
+          callEffect cdb:AddModelToLocalStore( context >> extern >> ModelManifest$External$ModelURI )
+          -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
+          -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
+          -- and complain that the author has no rights to modify it.
+          bind origin >> binding to BasicModelsInUse in sys:MySystem
 
     -- In order to add this model to one's installation, one should become an ActiveUser of the Manifest.
     -- BUT HOW?
