@@ -542,18 +542,19 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         void $ runMonadPerspectivesTransaction authoringRole $ removeBinding (RoleInstance subject)
         sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
-    -- Check whether a role exists for contextType with the localRolName and whether it allows RolID as binding.
+    -- Check whether the role type in predicate allows RolID as binding.
     -- The context type given in object must be described in a locally installed model.
-    -- {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
-    Api.CheckBinding -> withLocalName predicate (ContextType subject)
-      \(typeOfRolToBindTo :: RoleType) -> (try $ getPerspectRol (RoleInstance object)) >>=
+    -- {request: "CheckBinding", predicate: localRolName, object: rolInstance}
+    Api.CheckBinding -> do 
+      typeOfRoleToBindTo <- string2RoleType predicate
+      (try $ getPerspectRol (RoleInstance object)) >>=
         case _ of
           Left err -> do
             logPerspectivesError $ RolErrorBoundary "Api.CheckBinding" (show err)
             sendResponse (Error corrId (show $ RolErrorBoundary "Api.CheckBinding" (show err))) setter
           Right (PerspectRol{pspType}) -> do
             void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap pspType)))
-            ok <- checkBinding typeOfRolToBindTo (RoleInstance object)
+            ok <- checkBinding typeOfRoleToBindTo (RoleInstance object)
             sendResponse (Result corrId [(show ok)]) setter
     Api.SetProperty -> catchError
       (do
