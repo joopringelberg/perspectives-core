@@ -175,7 +175,7 @@ domain model://perspectives.domains#System
 
     context BaseRepository filledBy ManifestCollection
 
-    context BasicModels = BaseRepository >> binding >> context >> Manifests
+    context BasicModels = filter BaseRepository >> binding >> context >> Manifests with not IsLibrary
 
     context BasicModelsInUse (relational) filledBy sys:VersionedModelManifest
       on exit
@@ -193,13 +193,6 @@ domain model://perspectives.domains#System
 
 
     context Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
-
-    -- This will become obsolete when we start using model:CouchdbManagement.
-    -- context Modellen = letE
-    --     showlibs <- extern >> ShowLibraries
-    --   in
-    --     filter callExternal cdb:Models() returns sys:Model$External with showlibs or (not IsLibrary)
-    --   view ModelPresentation (Description, Name)
 
     --StartContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context StartContexts (relational) filledBy sys:RootContext
@@ -249,6 +242,25 @@ domain model://perspectives.domains#System
     thing AllNotifications = callExternal cdb:RoleInstances( "model://perspectives.domains#System$ContextWithNotification$Notifications" ) returns sys:ContextWithNotification$Notifications
 
     context SystemCaches (mandatory) filledBy Caches
+
+  -- This will become obsolete when we start using model:CouchdbManagement.
+  -- case Model public NAMESPACESTORE
+  --   aspect sys:RootContext
+  --   external
+  --     aspect sys:RootContext$External
+  --     property Description (mandatory, String)
+  --     property ModelIdentification (mandatory, String)
+  --     property Url (mandatory, String)
+  --     property IsLibrary (mandatory, Boolean)
+  --     view ModelPresentation (Description, ModelIdentification, IsLibrary)
+  --   user Author filledBy User
+  --     aspect sys:RootContext$RootUser
+  --     perspective on extern
+  --   context IndexedContext (mandatory) filledBy sys:RootContext
+  --     -- Dit wordt alleen gebruikt in model:System.
+  --     property Name (mandatory, String)
+  --   thing IndexedRole (relational)
+  --     property Name (mandatory, String)
 
   -- A Collection of System Caches.
   case Caches
@@ -325,26 +337,6 @@ domain model://perspectives.domains#System
     user Me = filter (Initiator either ConnectedPartner) with filledBy sys:Me
     user You = filter (Initiator either ConnectedPartner) with not filledBy sys:Me
 
-
-  -- This will become obsolete when we start using model:CouchdbManagement.
-  case Model public NAMESPACESTORE
-    aspect sys:RootContext
-    external
-      aspect sys:RootContext$External
-      property Description (mandatory, String)
-      property ModelIdentification (mandatory, String)
-      property Url (mandatory, String)
-      property IsLibrary (mandatory, Boolean)
-      view ModelPresentation (Description, ModelIdentification, IsLibrary)
-    user Author filledBy User
-      aspect sys:RootContext$RootUser
-      perspective on extern
-    context IndexedContext (mandatory) filledBy sys:RootContext
-      -- Dit wordt alleen gebruikt in model:System.
-      property Name (mandatory, String)
-    thing IndexedRole (relational)
-      property Name (mandatory, String)
-
   case RootContext
     external
       property Name (mandatory, String)
@@ -391,17 +383,6 @@ domain model://perspectives.domains#System
       aspect sys:RootContext$External
       property Description (mandatory, String)
       property IsLibrary (mandatory, Boolean)
-
-    user Visitor = sys:Me
-      perspective on Versions
-        props (Version, Description) verbs (Consult)
-        action StartUsing
-          -- TODO. Vermoedelijk kan dit naar Couchdb$ModelManifest$Visitor en kan deze Visitor weg.
-          callEffect cdb:AddModelToLocalStore( Versions$DomeinFileName )
-          -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
-          -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
-          -- and complain that the author has no rights to modify it.
-          bind origin >> binding to BasicModelsInUse in sys:MySystem
 
     context Versions (relational) filledBy VersionedModelManifest
       -- This value must be entered by the user.

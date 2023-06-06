@@ -479,7 +479,7 @@ domain model://perspectives.domains#CouchdbManagement
     user Author filledBy Repository$Authors, Repository$Admin
       perspective on extern
         props (LocalModelName) verbs (Consult)
-        props (Description) verbs (SetPropertyValue)
+        props (Description, IsLibrary) verbs (SetPropertyValue)
       perspective on Versions
         only (Create, Fill, Remove, CreateAndFill)
         props (Versions$Version, VersionedModelManifest$External$Description) verbs (SetPropertyValue)
@@ -492,7 +492,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
     public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
-        props (LocalModelName, ModelManifest$External$Description) verbs (Consult)
+        props (LocalModelName, ModelManifest$External$Description, IsLibrary) verbs (Consult)
       perspective on Versions
         props (Versions$Version, VersionedModelManifest$External$Description) verbs (Consult)
         action StartUsing
@@ -500,6 +500,7 @@ domain model://perspectives.domains#CouchdbManagement
           -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
           -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
           -- and complain that the author has no rights to modify it.
+          -- NOTE: dit werkt nog niet.
           bind origin >> binding to BasicModelsInUse in sys:MySystem
 
     -- In order to add this model to one's installation, one should become an ActiveUser of the Manifest.
