@@ -22,8 +22,9 @@
 
 module Perspectives.Query.Kinked where
 
+import Control.Alternative (guard)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, cons, elemIndex, foldr, intercalate, null, uncons, unsnoc)
+import Data.Array (catMaybes, elemIndex, foldr, intercalate, unsnoc)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Show.Generic (genericShow)
@@ -32,8 +33,8 @@ import Perspectives.CoreTypes (MP)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, throwError, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.Inversion (compose, queryFunctionIsFunctional, queryFunctionIsMandatory, invertFunction)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, makeComposition, range, replaceDomain, roleInContext2Role)
+import Perspectives.Query.Inversion (compose, composeOverMaybe, invertFunction, queryFunctionIsFunctional, queryFunctionIsMandatory)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, domain, makeComposition, range, replaceDomain, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
@@ -47,7 +48,7 @@ import Prelude (class Show, append, bind, discard, join, map, pure, ($), (<$>), 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
 --------------------------------------------------------------------------------------------------------------
--- This we use in the invert_ function.
+-- This we use in the invert_ function. The first part is backwards-facing (inverted). The second part is forwards-facing (not inverted).
 data QueryWithAKink_ = ZQ_ (Array QueryFunctionDescription) (Maybe QueryFunctionDescription)
 
 derive instance genericQueryWithAKink_ :: Generic QueryWithAKink_ _
@@ -125,6 +126,11 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
     invert_ (compose conj1 (replaceDomain r (range conj1))) <*>
     invert_ (compose conj2 (replaceDomain r (range conj2)))
 
+  (BQD _ (BinaryCombinator SequenceF) qfd1 qfd2 ran _ _) -> do
+    q1 <- invert_ qfd1
+    q2 <- invert_ qfd2
+    pure $ join $ [q1, q2]
+
   qq@(SQD _ (VariableLookup varName) _ _ _) -> do
     varExpr <- lookupVariableBinding varName
     case varExpr of
@@ -132,32 +138,21 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
       Just qfd | qq == qfd -> pure []
       Just qfd -> invert_ (compose qfd r)
 
-  (BQD _ (BinaryCombinator SequenceF) qfd1 qfd2 ran _ _) -> do
-    q1 <- invert_ qfd1
-    q2 <- invert_ qfd2
-    pure $ join $ [q1, q2]
-
   otherwise -> do
-    (left :: Array QueryWithAKink_) <- invert_ l
-    case uncons left of
-      Just {head:(ZQ_ l_ _), tail} -> if null tail
-        then do
-          -- The inversion of left yielded just a single QueryWithAKink_.
-          -- Now invert the right term of the composition. This will yield all
-          -- possible ways to `kink` the right term.
-          zippedQueries <- invert_ r
-          -- Add the bottom case, consisting of the inverted left term
-          -- and the original right term...
-          pure $ cons (ZQ_ l_ (Just r))
-            -- To the rest of the cases. These consist of the combination of the inverted left term
-            -- with all results of the right term.
-            -- Each right-term-inversion-result consists of a backwards- and forwards facing part.
-            -- We must add the inverted left term to THE END of the backwards facing part of each.
-            (map (\(ZQ_ r_ q') -> ZQ_ (r_ <> l_) q') zippedQueries)
-        -- TODO. In het algemene geval kan de linkerkant wel degelijk meerdere
-        -- resultaten opleveren: denk aan een CalculatedRole met een join.
-        else throwError (Custom $ "Perspectives.Query.Zipped invert_: expected single term on the left in composition:\n" <> prettyPrint left)
-      Nothing -> pure []
+    (lefts :: Array QueryWithAKink_) <- invert_ l
+    (zippedQueries :: Array QueryWithAKink_) <- invert_ r
+    pure do
+      (ZQ_ left_inverted_steps mLeft_forward) <- lefts
+      (ZQ_ right_inverted_steps mRight_forward) <- zippedQueries
+      -- The range of mLeft_forward must equal the domain of mRight_forward.
+      guard $ case range <$> mLeft_forward, domain <$> mRight_forward of
+        Just ran, Just domn -> ran == domn
+        -- If the forward of the left part is Nothing, left has been inverted entirely and 
+        -- may be combined with any inversion of right.
+        Nothing, _ -> true
+        _, _ -> false
+      pure $ ZQ_ (right_inverted_steps <> left_inverted_steps) -- v4.value0 <> v3.value0
+                  (mLeft_forward `composeOverMaybe` mRight_forward)
 
 invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ (compose source criterium)
 

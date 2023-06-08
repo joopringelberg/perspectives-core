@@ -178,6 +178,12 @@ compose f1 f2 = BQD
   (and (functional f1)(functional f2))
   (and (mandatory f1)(mandatory f2))
 
+composeOverMaybe :: Maybe QueryFunctionDescription -> Maybe QueryFunctionDescription -> Maybe QueryFunctionDescription
+composeOverMaybe (Just left) (Just right) = Just $ compose left right
+composeOverMaybe Nothing (Just right) = Just right
+composeOverMaybe (Just left) Nothing = Just left
+composeOverMaybe _ _ = Nothing
+
 -- | Paths is the general representation of the result of invertFunction. It holds a main path (the first member)
 -- | and an array of secondary paths.
 data Paths = Paths Path (Array Path)
