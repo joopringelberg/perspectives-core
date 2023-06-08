@@ -492,14 +492,14 @@ uploadToRepository dfId@(DomeinFileId domeinFileName) = do
       mdf <- try $ getPerspectEntiteit dfId
       case mdf of
         Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err)
-        Right df -> uploadToRepository_ dfId (unsafePartial modelUri2ModelUrl domeinFileName) df
+        Right df -> uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
     else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> domeinFileName)
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
 -- | In this function we handle the difference between the database that we read from (provided as the value of 
 -- | the argument `url`), and the database that we write to (ending on "_write").
-uploadToRepository_ :: DomeinFileId -> {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
-uploadToRepository_ (DomeinFileId dfId) splitName df = do 
+uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
+uploadToRepository_ splitName df = do 
   -- Get the attachment info
   (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
   attachments <- case atts of

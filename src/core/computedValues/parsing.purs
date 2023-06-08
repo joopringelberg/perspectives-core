@@ -36,23 +36,23 @@ import Main.RecompileBasicModels (recompileModelsAtUrl)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectivesTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (removeFromRepository_)
-import Perspectives.Extern.Couchdb (uploadToRepository) as CDB
+import Perspectives.Extern.Couchdb (uploadToRepository_) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelWriteUrl)
+import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelUrl, modelUri2ModelWriteUrl)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runEmbeddedTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
 import Unsafe.Coerce (unsafeCoerce)
 
--- | Read the .arc file, parse it and try to compile it.
+-- | Read the .arc file, parse it and try to compile it. Does neither cache nor store.
+-- | However, will load, cache and store dependencies of the model.
 parseAndCompileArc :: Array ArcSource -> (ContextInstance ~~> Value)
 parseAndCompileArc arcSource_ _ = case head arcSource_ of
   Nothing -> pure $ Value "No arc source given!"
@@ -72,20 +72,22 @@ type ArcSource = String
 type CrlSource = String
 type Url = String
 
--- | Parse and compile the Arc file. Upload to the repository. Puts it in the Cache, but not in the local collection of DomeinFiles.
+-- | Parse and compile the Arc file. Upload to the repository. Does neither cache, nor stores it in the local collection of DomeinFiles.
 -- | If the file is not valid, nothing happens.
 uploadToRepository ::
+  Array String -> 
   Array ArcSource ->
   Array RoleInstance -> MonadPerspectivesTransaction Unit
-uploadToRepository arcSource_ _ = case head arcSource_ of
-  Just arcSource -> do
+uploadToRepository domeinFileName_ arcSource_ _ = case head domeinFileName_, head arcSource_ of
+  Just domeinFileName, Just arcSource -> do
     r <- loadAndCompileArcFile_ arcSource
     case r of
       Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
       Right df@(DomeinFile {_id, namespace}) -> do
-        lift $ void $ storeDomeinFileInCache _id df
-        lift $ void $ CDB.uploadToRepository (DomeinFileId _id)
-  _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
+        -- lift $ void $ storeDomeinFileInCache _id df
+        -- lift $ void $ CDB.uploadToRepository (DomeinFileId _id)
+        lift $ void $ CDB.uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
+  _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 
 removeFromRepository :: 
   Array ModelUri ->
@@ -110,7 +112,7 @@ compileRepositoryModels url_ _ = case head url_ of
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1}
-  , Tuple "model://perspectives.domains#Parsing$UploadToRepository2" {func: unsafeCoerce uploadToRepository, nArgs: 1}
+  , Tuple "model://perspectives.domains#Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
   , Tuple "model://perspectives.domains#Parsing$RemoveFromRepository" {func: unsafeCoerce removeFromRepository, nArgs: 1}
   , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1}
 ]
