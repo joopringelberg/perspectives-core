@@ -105,7 +105,7 @@ domain model://perspectives.domains#System
       perspective on StartContexts
         defaults
         action StopUsing
-          remove context origin
+          callDestructiveEffect cdb:RemoveModelFromLocalStore ()
       perspective on Contacts
         props (FirstName, LastName) verbs (Consult)
       perspective on External
@@ -171,9 +171,9 @@ domain model://perspectives.domains#System
     context BasicModels = filter BaseRepository >> binding >> context >> Manifests with not IsLibrary
 
     context BasicModelsInUse (relational) filledBy sys:VersionedModelManifest
-      on exit
-        do for User
-          callDestructiveEffect cdb:RemoveModelFromLocalStore ( DomeinFileName )
+      -- on exit
+      --   do for User
+      --     callDestructiveEffect cdb:RemoveModelFromLocalStore ( DomeinFileName )
 
 
     -- All context types that have been declared to be 'indexed' have an instance that fills this role.

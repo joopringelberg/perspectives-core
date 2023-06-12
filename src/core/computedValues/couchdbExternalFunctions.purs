@@ -62,13 +62,13 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvertedQuery(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
 import Perspectives.Error.Boundaries (handleDomeinFileError)
-import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
+import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ModelUrl, newModelRegex, typeUri2LocalName_, unversionedModelUri)
+import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ModelUrl, newModelRegex, typeUri2LocalName_, typeUri2ModelUri_, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, roleType_)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
@@ -90,10 +90,10 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
 import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
+import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
-import Perspectives.Warning (PerspectivesWarning(..))
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -133,21 +133,21 @@ pendingInvitations _ = ArrayT do
 -- | The second argument should contain the string representation of a boolean value.
 -- | The third argument is an array with an instance of the role ModelsInuse.
 updateModel :: Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
-updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWithModelName of
-  Nothing -> do
-    descriptionGetter <- lift $ getDynamicPropertyGetter DEP.modelDescription (ST (EnumeratedRoleType DEP.modelsInUse))
-    description <- lift (modelsInUse ##= descriptionGetter)
-    lift $ warnModeller Nothing (ModelLacksModelId (maybe "(without a description..)" unwrap (head description)))
+updateModel arrWithModelName arrWithDependencies versions = case head arrWithModelName of
+  -- fail silently
+  Nothing -> pure unit
   -- TODO: add a check on the form of the modelName.
   Just modelName -> updateModel' (maybe false (eq "true") (head arrWithDependencies)) (DomeinFileId modelName)
   where
     updateModel' :: Boolean -> DomeinFileId -> MonadPerspectivesTransaction Unit
-    updateModel' withDependencies dfId@(DomeinFileId modelName) = do
-      DomeinFile{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects, referredModels} <- lift $ getDomeinFile dfId
+    updateModel' withDependencies (DomeinFileId modelName) = do
+      {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl modelName
+      DomeinFile{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects, referredModels} <- lift $ getDocument repositoryUrl documentName
       if withDependencies
         then for_ referredModels (updateModel' withDependencies)
         else pure unit
         -- Untangle the InvertedQueries of the previous model.
+      unversionedModelname <- pure $ unversionedModelUri modelName
       forWithIndex_ invertedQueriesInOtherDomains
         \domainName queries -> do
           (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
@@ -170,16 +170,16 @@ updateModel arrWithModelName arrWithDependencies modelsInUse = case head arrWith
               -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects removeDownStreamAutomaticEffect) dfr))
       -- Clear the caches of compiled states.
-      void $ pure $ clearModelStates dfId
+      void $ pure $ clearModelStates (DomeinFileId unversionedModelname)
       -- Install the new model, taking care of outgoing InvertedQueries.
-      addModelToLocalStore dfId isUpdate
-      DomeinFile dfr <- lift $ getDomeinFile $ dfId
+      addModelToLocalStore (DomeinFileId unversionedModelname) isUpdate
+      DomeinFile dfr <- lift $ getDomeinFile $ (DomeinFileId unversionedModelname)
       -- Find all models in use.
       models' <- lift (allModelsInUse >>= traverse getDomeinFile)
       -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
       lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
         forWithIndex_ invertedQueries
-          \domainName queries -> if domainName == modelName
+          \domainName queries -> if domainName == unversionedModelname
             then for_ queries addInvertedQuery
             else pure unit) dfr))
     
@@ -531,11 +531,15 @@ removeFromRepository_ splitName = Persistence.deleteDocument splitName.repositor
 
 type URL = String
 
--- | The argument of type Array String contains a model identifier.
-removeModelFromLocalStore :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
-removeModelFromLocalStore rs _ = case head rs of
-  Nothing -> pure unit
-  Just r -> scheduleDomeinFileRemoval (DomeinFileId r)
+-- | The role argument will be the external role of the root context of the model (the 'app').
+-- | In fact, it does not matter what type the instance actually has, as long as it is in the namespace 
+-- | of the model we want to remove.
+removeModelFromLocalStore :: RoleInstance -> MonadPerspectivesTransaction Unit
+removeModelFromLocalStore rid = do 
+  aModelType <- lift $ unsafePartial typeUri2ModelUri_ <<< unwrap  <$> roleType_ rid
+  cid <- createResourceIdentifier (CType $ ContextType aModelType)  
+  scheduleContextRemoval Nothing (ContextInstance cid)
+  scheduleDomeinFileRemoval (DomeinFileId aModelType)
 
 scheduleDomeinFileRemoval :: DomeinFileId -> MonadPerspectivesTransaction Unit
 scheduleDomeinFileRemoval id = AMA.modify (over Transaction \t@{modelsToBeRemoved} -> t {modelsToBeRemoved = cons id modelsToBeRemoved})
@@ -664,7 +668,7 @@ externalFunctions =
   [ Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore_, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
-  , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 0}
   , Tuple "model://perspectives.domains#Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
   , Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
