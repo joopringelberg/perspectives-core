@@ -27,7 +27,7 @@ where
 import Data.Array (intercalate, null, uncons, unsnoc)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.String (Pattern(..), Replacement(..), replaceAll, split, stripPrefix, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), indexOf, replaceAll, split, stripPrefix, splitAt, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -127,6 +127,16 @@ modelUri2ModelRepository s = let
     {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
   in
     "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
+
+-----------------------------------------------------------
+-- STRIP A MODEL URI FROM ITS VERSION
+-----------------------------------------------------------
+unversionedModelUri :: String -> String
+unversionedModelUri s = case indexOf (Pattern "@") s of 
+  Nothing -> s
+  Just u -> case splitAt u s of 
+    {before} -> before
+
 
 -----------------------------------------------------------
 -- MODEL URI TO INSTANCES STORE

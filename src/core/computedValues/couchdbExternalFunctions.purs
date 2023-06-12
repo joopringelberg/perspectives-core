@@ -64,7 +64,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvert
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ModelUrl, newModelRegex, typeUri2LocalName_)
+import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ModelUrl, newModelRegex, typeUri2LocalName_, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
@@ -231,19 +231,21 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   -- Copy the attachment
   lift $ addA repositoryUrl documentName revision
 
+  unversionedModelname <- pure $ unversionedModelUri modelname
+
   if isInitialLoad'
     then do
       -- If and only if the model we load is model:System, create both the system context and the system user.
       -- This is part of the installation routine.
-      if modelname == DEP.systemModelName
+      if unversionedModelname == DEP.systemModelName
         then initSystem
         else pure unit
       
       -- Create the model instance
-      cid <- createResourceIdentifier (CType $ ContextType modelname)
+      cid <- createResourceIdentifier (CType $ ContextType unversionedModelname)
       r <- runExceptT $ constructEmptyContext 
         (ContextInstance cid)
-        modelname
+        unversionedModelname
         "model root context"
         (PropertySerialization empty)
         Nothing
