@@ -30,6 +30,16 @@ domain model://perspectives.domains#CouchdbManagement
           bind_ app >> extern to indexedcontext
           IndexedContexts$Name = app >> indexedName for indexedcontext
 
+  -- This does not compile.
+  -- on exit
+  --   do for sys:PerspectivesSystem$Installer
+  --     letA
+  --       indexedcontext <- filter sys:MySystem >> IndexedContexts with binds (cm:MyCouchdbApp >> extern)
+  --       startcontext <- filter sys:MySystem >> StartContexts with binds (cm:MyCouchdbApp >> extern)
+  --     in
+  --       remove context indexedcontext
+  --       remove role startcontext
+
   aspect user sys:PerspectivesSystem$Installer
   -------------------------------------------------------------------------------
   ---- INDEXED CONTEXT
@@ -44,9 +54,12 @@ domain model://perspectives.domains#CouchdbManagement
     external
       aspect sys:RootContext$External
     
+    -- the exit is triggered on removing a role instance of StartContexts
     on exit
       do for Manager
         delete context bound to CouchdbServers
+        -- remove this context from PerspectivesSystem$IndexedContexts
+        -- remove the model from BasicModelsInUse
 
     -- Every user manages his own CouchdbServers.
     -- This manager should be the Server admin of each CouchdbServer,
@@ -493,15 +506,18 @@ domain model://perspectives.domains#CouchdbManagement
     public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
         props (LocalModelName, ModelManifest$External$Description, IsLibrary) verbs (Consult)
+      perspective on sys:MySystem >> BasicModelsInUse
+        only (Fill, Remove)
       perspective on Versions
-        props (Versions$Version, VersionedModelManifest$External$Description) verbs (Consult)
+        props (Versions$Version, VersionedModelManifest$External$Description, VersionedModelURI) verbs (Consult)
         action StartUsing
-          callEffect cdb:AddModelToLocalStore( context >> extern >> ModelManifest$External$ModelURI )
-          -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
-          -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
-          -- and complain that the author has no rights to modify it.
+          callEffect cdb:AddModelToLocalStore( VersionedModelURI )
           -- NOTE: dit werkt nog niet.
           bind origin >> binding to BasicModelsInUse in sys:MySystem
+        action UpdateModel
+          callEffect cdb:UpdateModel( VersionedModelURI, false )
+        action UpdateModelWithDependencies
+          callEffect cdb:UpdateModel( VersionedModelURI, true )
 
     -- In order to add this model to one's installation, one should become an ActiveUser of the Manifest.
     -- BUT HOW?
@@ -524,32 +540,30 @@ domain model://perspectives.domains#CouchdbManagement
 
   case VersionedModelManifest
     aspect sys:VersionedModelManifest
-      -- Description
-      -- DomeinFileName, a calculated role that retrieves Versions$DomeinFileName.
     aspect sys:ContextWithNotification
     state UploadToRepository = extern >> (ArcOK and SourcesChanged)
       on entry
         do for Author
-          callEffect p:UploadToRepository2( extern >> ArcSource )
+          callEffect p:UploadToRepository( extern >> VersionedModelManifest$External$VersionedModelURI, extern >> ArcSource )
           SourcesChanged = false for extern
         notify Author
           "Version {extern >> Version} has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace}."
 
     external
       aspect sys:VersionedModelManifest$External
-      -- VersionedModelManifest$Description
-      -- VersionedModelManifest$DomeinFileName
+      -- VersionedModelManifest$External$Description
+      -- VersionedModelManifest$External$DomeinFileName
       -- The Version property is registered on ModelManifest$Versions so we can use it to create a DNS URN for it (it must be a public resource)
       property Version = binder Versions >> Versions$Version
       property ModelURI = binder Versions >> context >> extern >> ModelManifest$External$ModelURI
-      property VersionedModelURI = VersionedModelManifest$External$ModelURI + VersionedModelManifest$External$Version
+      property VersionedModelURI = VersionedModelManifest$External$ModelURI + "@" + VersionedModelManifest$External$Version
       property ArcSource (mandatory, String)
         minLength = 81 -- shows as a textarea
       property ArcFeedback (String)
         minLength = 81
       property ArcOK = ArcFeedback matches regexp "^OK"
       property SourcesChanged (Boolean)
-      property DomeinFile (File)
+      -- property DomeinFile (File)
       property PublicUrl = binder Versions >> context >> extern >> PublicUrl
       
       on exit
@@ -579,22 +593,14 @@ domain model://perspectives.domains#CouchdbManagement
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
         props (Version, Description) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
-        action StartUsing
-          -- TODO. Vermoedelijk kan dit naar Couchdb$ModelManifest$Visitor en kan deze Visitor weg.
-          callEffect cdb:AddModelToLocalStore( DomeinFileName )
-          -- NB. Visitor doesn't have a perspective on PerspectivesSystem$BasicModelsInUse. However,
-          -- that role is never shared with other users, so no PDR will ever receive a Delta on that role
-          -- and complain that the author has no rights to modify it.
-          bind origin to BasicModelsInUse in sys:MySystem
 
 
     user ActiveUser = extern >> binder Versions >> context >> ActiveUser
       perspective on Author
         props (FirstName, LastName) verbs (Consult)
       perspective on extern
-        props (Version, DomeinFile) verbs (Consult)
+        props (Version) verbs (Consult)
 
       screen "Manifest"
         row
           form External
-

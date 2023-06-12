@@ -130,13 +130,6 @@ domain model://perspectives.domains#System
         tab "SystemCaches"
           row
             form SystemCaches
-        -- tab "Manage models"
-        --   row
-        --     table Modellen
-        --       props (Name, Description) verbs (Consult)
-          -- row 
-          --   table ModelsInUse
-          --     props (Name) verbs (Consult)
         tab "Manage new models"
           row
             table BasicModels
@@ -194,7 +187,8 @@ domain model://perspectives.domains#System
 
     context Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
 
-    --StartContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
+    -- StartContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
+    -- These are the 'apps' of Perspectives.
     context StartContexts (relational) filledBy sys:RootContext
 
     -- This will become obsolete when we start using model:CouchdbManagement.
@@ -374,7 +368,8 @@ domain model://perspectives.domains#System
   case ManifestCollection
     context Manifests (relational) filledBy ModelManifest
       -- This is the local name, unqualified, of the model, e.g. "JoopsModel" or "System".
-      -- It must be entered through a form.
+      -- It must be entered through a form. We need it on this role so we can create an instance
+      -- of ModelManifest with this name.
       property LocalModelName (String)
 
   case ModelManifest
@@ -385,7 +380,9 @@ domain model://perspectives.domains#System
       property IsLibrary (mandatory, Boolean)
 
     context Versions (relational) filledBy VersionedModelManifest
-      -- This value must be entered by the user.
+      -- This value must be entered by the user. 
+      -- We need it on this role so we can create an instance of VersionedModelManifest based on
+      -- the Version value.
       property Version (mandatory, String)
       -- E.g. "System@1.0.0"
       property LocalModelName = context >> extern >> binder Manifests >> LocalModelName + "@" + Version

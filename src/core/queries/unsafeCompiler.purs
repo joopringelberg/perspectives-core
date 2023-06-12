@@ -62,7 +62,6 @@ import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
@@ -98,10 +97,22 @@ compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType
   g <- getDynamicPropertyGetter pt (roleInContext2Role <$> roleAdt)
   pure $ unsafeCoerce g
 
-compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
-  (cp :: CalculatedProperty) <- getPerspectType pt
-  -- TODO moeten we hier de currentobject pushen?
-  PC.calculation cp >>= compileFunction
+compileFunction (SQD (RDOM roleAdt) (PropertyGetter (CP (CalculatedPropertyType pt))) _ _ _) = do
+  g <- getDynamicPropertyGetter pt (roleInContext2Role <$> roleAdt)
+  pure $ unsafeCoerce g
+
+-- compileFunction (SQD _ (PropertyGetter (CP pt@(CalculatedPropertyType id))) _ _ _) = do
+--   case lookupPropertyValueGetterByName id of
+--     Nothing -> do
+--       (cp :: CalculatedProperty) <- getPerspectType pt
+--       -- PC.calculation cp >>= compileFunction
+--       functional <- PC.functional cp
+--       mandatory <- PC.mandatory cp
+--       getter <- PC.calculation cp >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentObject)
+--       void $ pure $ propertyGetterCacheInsert id (unsafeCoerce getter) functional mandatory
+--       pure getter
+--     Just getter -> pure (unsafeCoerce getter)
+
 
 compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ unsafeCoerce externalRole
 
