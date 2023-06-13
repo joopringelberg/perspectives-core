@@ -460,7 +460,7 @@ domain model://perspectives.domains#CouchdbManagement
         on entry
           do for Admin
             -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
-            create_ context ModelManifest named Manifests$LocalModelName bound to origin
+            create_ context ModelManifest named (context >> extern >> NameSpace_ + "-" + Manifests$LocalModelName) bound to origin
             bind currentactor to Author in origin >> binding >> context
 
   case ModelManifest 

@@ -32,7 +32,7 @@ import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Eq, class Show, append, eq, flip, identity, join, map, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (||))
+import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||))
 
 -- | The unsafeRegex function takes a string `pattern` as first argument and uses it as is in a new Regex(`pattern`).
 -- | Hence, in Purescript, we can follow the rules for the new Regex("your pattern") approach.
@@ -107,6 +107,26 @@ modelUri2ModelUrl s = let
 
 modelUri2ModelWriteUrl :: Partial => String -> {repositoryUrl :: String, documentName :: String}
 modelUri2ModelWriteUrl s = case modelUri2ModelUrl s of
+  rec -> rec { repositoryUrl = rec.repositoryUrl <> "_write"}
+
+-----------------------------------------------------------
+-- MODEL URI TO MANIFEST URL
+-- The Manifest is served from this Repository Url.
+-----------------------------------------------------------
+modelUri2ManifestUrl :: Partial => String -> {repositoryUrl :: String, manifestName :: String}
+modelUri2ManifestUrl s = let
+    (matches :: NonEmptyArray (Maybe String)) = fromJust $ match newModelRegex s
+    (authority :: String) = fromJust $ fromJust $ index matches 1
+    (localModelName :: String) = fromJust $ fromJust $ index matches 2
+    (namespaceParts :: Array String) = split (Pattern ".") authority
+    {init:lowerParts, last:toplevel} = fromJust $ unsnoc namespaceParts
+    {init:subNamespaces, last:secondLevel} = fromJust $ unsnoc lowerParts
+  in
+    { repositoryUrl: "https://" <> secondLevel <> "." <> toplevel <> "/cw_" <> intercalate "_" namespaceParts
+    , manifestName: (intercalate "_" namespaceParts) <> "-" <>  localModelName}
+
+modelUri2ManifestWriteUrl :: Partial => String -> {repositoryUrl :: String, manifestName :: String}
+modelUri2ManifestWriteUrl s = case modelUri2ManifestUrl s of
   rec -> rec { repositoryUrl = rec.repositoryUrl <> "_write"}
 
 -----------------------------------------------------------
@@ -399,77 +419,4 @@ urlRegEx = unsafeRegex "^http" noFlags
 
 isUrl :: String -> Boolean
 isUrl = test urlRegEx
-
------------------------------------------------------------
--- FUNCTIONS IN THIS SECTION ARE ONLY USED IN THE CONTEXTROLE PARSER.
--- Remove them with the ContextRole Parser.
------------------------------------------------------------
-publicResourceIdentifier2LocalName_ :: Partial => String -> String
-publicResourceIdentifier2LocalName_ = fromJust <<< publicResourceIdentifier2LocalName
-  where
-      -- | Transform a resource URI of the form 
-    -- |	  https://{authority}/cw_{databasename}/{SegmentedIdentifier}
-    -- | to:
-    -- |    SegmentedIdentifier
-    -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
-    publicResourceIdentifier2LocalName :: String -> Maybe String
-    publicResourceIdentifier2LocalName s = let
-        (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
-        (hierarchicalNamespace :: (Maybe String)) = join $ join $ flip index 3 <$> matches
-      in
-        hierarchicalNamespace
-
--- ONLY USED IN THE CONTEXTROLE PARSER.
-publicResourceIdentifier2repository_ :: Partial => String -> String
-publicResourceIdentifier2repository_ = fromJust <<< publicResourceIdentifier2repository
-
-  where
-
-  publicResourceIdentifier2repository :: String -> Maybe String
-  publicResourceIdentifier2repository = (map (flip append "/")) <<< publicResourceIdentifier2repository'
-
-  publicResourceIdentifier2repository' :: String -> Maybe String
-  publicResourceIdentifier2repository' s = let
-      (matches :: Maybe (NonEmptyArray (Maybe String))) = match publicResourceRegex s
-      (authority :: (Maybe String)) = join $ join $ flip index 1 <$> matches
-      (database :: (Maybe String)) = join $ join $ flip index 2 <$> matches
-    in
-      append <$> Just "https://" <*> (append <$> authority <*> (append <$> (Just "/") <*> database))
-
--- | A pattern to match https://{authority}/cw_{databasename}/{SegmentedIdentifier} exactly.
--- | It is very permissive, allowing any character in the authority except the forward slash.
--- | The model name must start on an upper case alphabetic character.
--- | index 1 is the authority (scheme plus domain name).
--- | index 2 is the database name.
--- | index 3 is the resource name.
-publicResourcePattern :: String
-publicResourcePattern = "^https://([^/]+)/(cw_[^/]+)/(.+)$"
-
-publicResourceRegex :: Regex
-publicResourceRegex = unsafeRegex publicResourcePattern noFlags
-
--- | Abstracts over identifiers for Perspect, used in the CRL parser. There are two instances: ModelName and QualifiedName.
-class PerspectEntiteitIdentifier a where
-  pe_namespace :: a -> Namespace
-  pe_localName :: a -> Maybe LocalName
-
-instance peIdentifierModelName :: PerspectEntiteitIdentifier ModelName where
-  pe_namespace (ModelName ns) = ns
-  pe_localName _ = Nothing
-
-instance peIdentifierQualifiedName :: PerspectEntiteitIdentifier QualifiedName where
-  pe_namespace (QualifiedName ns _) = ns
-  pe_localName (QualifiedName _ ln) = Just ln
-
-
--- | Only a psp:Context can have a ModelName. In other words, if something has a ModelName, its pspType is psp:Context.
--- | However, a psp:Context may have a QualifiedName!
--- Only used in ContextRoleParser
-newtype ModelName = ModelName Namespace
-
-instance showModelName :: Show ModelName where
-  show (ModelName mn) = mn
-
-instance eqModelName :: Eq ModelName where
-  eq (ModelName n1) (ModelName n2) = n1 == n2
 
