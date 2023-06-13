@@ -56,7 +56,7 @@ import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQuerie
 import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2roleType, functional, mandatory, propertyOfRange, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -582,16 +582,23 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
     Union pos -> do
       f1 <- compileStep currentDomain left
       f2 <- compileStep currentDomain right
-      case (range f1), (range f2) of
-        (RDOM _ ), (RDOM _ ) -> pure $ BQD currentDomain (QF.BinaryCombinator UnionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
-        _, _ -> throwError $ NotARoleDomain currentDomain (startOf left) (endOf right)
+      if equalDomainKinds (range f1) (range f2)
+        then pure $ BQD currentDomain (QF.BinaryCombinator UnionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
+        else throwError $ IncompatibleDomains (startOf left) (endOf right)
     Intersection pos -> do
       f1 <- compileStep currentDomain left
       f2 <- compileStep currentDomain right
       -- TODO. Als de types een lege doorsnede hebben, een waarschuwing geven?
-      case (range f1), (range f2) of
-        (RDOM _), (RDOM _) -> pure $ BQD currentDomain (QF.BinaryCombinator IntersectionF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
-        _, _ -> throwError $ NotARoleDomain currentDomain (startOf left) (endOf right)
+      if equalDomainKinds (range f1) (range f2)
+        then pure $ BQD currentDomain (QF.BinaryCombinator IntersectionF) f1 f2 (unsafePartial $ fromJust $ productOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
+        else throwError $ IncompatibleDomains (startOf left) (endOf right)
+    OrElse pos -> do 
+      f1 <- compileStep currentDomain left
+      f2 <- compileStep currentDomain right
+      -- TODO. Als de types een lege doorsnede hebben, een waarschuwing geven?
+      if equalDomainKinds (range f1) (range f2)
+        then pure $ BQD currentDomain (QF.BinaryCombinator OrElseF) f1 f2 (unsafePartial $ fromJust $ sumOfDomains (range f1)(range f2)) False (THREE.and (mandatory f1)(mandatory f2))
+        else throwError $ IncompatibleDomains (startOf left) (endOf right)
     BindsOp pos -> do
       f1 <- compileStep currentDomain left
       f2 <- compileStep currentDomain right
@@ -636,6 +643,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Filter"
         Union _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Union"
         Intersection _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Intersection"
+        OrElse _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: OrElse"
         BindsOp _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: BindsOp"
         Matches _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Matches"
 

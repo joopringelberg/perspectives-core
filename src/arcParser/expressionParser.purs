@@ -249,22 +249,25 @@ operator =
   <|>
   (Multiply <$> (getPosition <* token.reservedOp "*"))
   <|>
-  (Union <$> (getPosition <* token.reservedOp "either"))
+  (Union <$> (getPosition <* token.reservedOp "union"))
   <|>
-  (Intersection <$> (getPosition <* token.reservedOp "both"))
+  (OrElse <$> (getPosition <* token.reservedOp "orElse"))
+  <|>
+  (Intersection <$> (getPosition <* token.reservedOp "intersection"))
   <|>
   (BindsOp <$> (getPosition <* token.reserved "filledBy"))
   <|>
   -- NOTICE the trick here: we map "matches" to Compose, so we can use it as an infix operator while it
   -- builds on the result of the previous step.
   (Compose <$> (getPosition <* token.reserved "matches"))
-  ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, either, both, filledBy"
+  ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, union, intersection, otherwise, filledBy"
 
 operatorPrecedence :: Operator -> Int
 operatorPrecedence (Compose _) = 9
 
 operatorPrecedence (Union _) = 8
 operatorPrecedence (Intersection _) = 8
+operatorPrecedence (OrElse _) = 8
 operatorPrecedence (Sequence _) = 7
 
 operatorPrecedence (Multiply _) = 6

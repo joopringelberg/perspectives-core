@@ -45,7 +45,7 @@ import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspec
 import Perspectives.Identifiers (LocalName, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
-import Perspectives.Instances.Combinators (disjunction)
+import Perspectives.Instances.Combinators (orElse)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.Action (Action)
@@ -456,7 +456,7 @@ roleModelName (RoleInstance rid) = maybe empty (pure <<< Value) (typeUri2ModelUr
 
 -- | Return the value of the local property "Name", or return the last segment of the role type name.
 getRoleName :: RoleInstance ~~> Value
-getRoleName = disjunction
+getRoleName = orElse
   (getUnqualifiedProperty "Name")
   (roleType >=> ArrayT <<< pure <<< map Value <<< (maybe [] singleton) <<< typeUri2LocalName <<< deconstructBuitenRol <<< unwrap)
 

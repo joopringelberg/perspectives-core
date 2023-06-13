@@ -40,7 +40,7 @@ import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, 
 import Perspectives.Couchdb (selectOnFieldEqual, selectOnFieldNotEqual)
 import Perspectives.Identifiers (getFirstMatch, getSecondMatch)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
-import Perspectives.Instances.Combinators (filter, disjunction)
+import Perspectives.Instances.Combinators (filter, orElse)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.ModelDependencies (addressHost, addressPort, addressRelayHost, addressRelayPort, channel, channelDatabase, channelInitiator, channelPartner, privateChannel)
 import Perspectives.Names (getUserIdentifier)
@@ -114,7 +114,7 @@ getMeFromChannel :: MonadPerspectives (ContextInstance ~~> RoleInstance)
 getMeFromChannel = do
   getConnectedPartner <- (getRoleFunction "sys:Channel$ConnectedPartner")
   getInitiator <- (getRoleFunction "sys:Channel$Initiator")
-  pure $ disjunction
+  pure $ orElse
     (filter getConnectedPartner (lift <<< lift <<< isMe))
     (filter getInitiator (lift <<< lift <<< isMe))
 
@@ -123,7 +123,7 @@ getYouFromChannel :: MonadPerspectives (ContextInstance ~~> RoleInstance)
 getYouFromChannel = do
   getConnectedPartner <- (getRoleFunction "sys:Channel$ConnectedPartner")
   getInitiator <- (getRoleFunction "sys:Channel$Initiator")
-  pure $ disjunction
+  pure $ orElse
     (filter getConnectedPartner (lift <<< lift <<< isMe >=> pure <<< not))
     (filter getInitiator (lift <<< lift <<< isMe >=> pure <<< not))
 

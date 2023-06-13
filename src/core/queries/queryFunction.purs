@@ -62,6 +62,7 @@ data FunctionName =
   | ComposeSequenceF
   | UnionF
   | IntersectionF
+  | OrElseF
   | CreateContextF      -- TODO
   | CreateRoleF         -- TODO
   | GetRoleInstancesForContextFromDatabaseF
@@ -113,8 +114,9 @@ instance showFunctionName :: Show FunctionName where
     show FilterF = "filter"
     show ComposeF = "compose"
     show ComposeSequenceF = "composeSequence"
-    show UnionF = "either"
-    show IntersectionF = "both"
+    show UnionF = "union"
+    show IntersectionF = "intersection"
+    show OrElseF = "otherwise"
     show CreateContextF = "createContext"
     show CreateRoleF = "createRole"
     show GetRoleInstancesForContextFromDatabaseF = "GetRoleInstancesForContextFromDatabaseF"
@@ -163,6 +165,7 @@ isFunctionalFunction fn = case fn of
   ComposeSequenceF -> True
   UnionF -> False
   IntersectionF -> False
+  OrElseF -> False
   CreateContextF -> True
   CreateRoleF -> True
   GetRoleInstancesForContextFromDatabaseF -> False
@@ -206,6 +209,7 @@ isMandatoryFunction fn = case fn of
   ComposeSequenceF -> Unknown
   UnionF -> False
   IntersectionF -> False
+  OrElseF -> False
   CreateContextF -> True
   CreateRoleF -> True
   GetRoleInstancesForContextFromDatabaseF -> False

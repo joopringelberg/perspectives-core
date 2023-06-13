@@ -78,6 +78,7 @@ data PerspectivesError
     | RoleDoesNotBind ArcPosition RoleType (ADT RoleInContext)
     | LocalRoleDoesNotBind ArcPosition ArcPosition String (ADT RoleInContext)
     | IncompatibleComposition ArcPosition Range Domain
+    | IncompatibleDomains ArcPosition ArcPosition
     | TypesCannotBeCompared ArcPosition Range Range
     | NotABoolean ArcPosition
     | WrongTypeForOperator ArcPosition (Array RAN.Range) Domain
@@ -166,6 +167,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (RoleDoesNotBind pos rtype adt) = "(RoleDoesNotBind) The role '" <> show rtype <> "' does not bind roles of type '" <> show adt <> "', at: " <> show pos
   show (LocalRoleDoesNotBind start end lname adt) = "(LocalRoleDoesNotBind) The roles that name '" <> lname <> "' (from " <> show start <> " to " <> show end <> ") can be matched to, do not bind '" <> show adt <> "'."
   show (IncompatibleComposition pos left right) = "(IncompatibleComposition) The result of the left operand (" <> show left <> ") and the argument of the right operand (" <> show right <> ") are incompatible."
+  show (IncompatibleDomains pos1 pos2) = "(IncompatibleDomains) The result of the expression at " <> show pos1 <> " and " <> show pos2 <> " have incompatible domains (both must be contexts, roles or values)."
   show (TypesCannotBeCompared pos left right) = "(TypesCannotBeCompared) The result of the left operand (" <> show left <> ") and of the right operand (" <> show right <> ") are incompatible in: " <> show pos
   show (NotABoolean pos) = "(NotABoolean) The expression starting at " <> show pos <> " does not result in a boolean value."
   show (WrongTypeForOperator pos allowedOps dom) = "(WrongTypeForOperator) This operator requires its arguments to be (one of): " <> show allowedOps <> ", but was given: " <> show dom <> ", at position " <> show pos

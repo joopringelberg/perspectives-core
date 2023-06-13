@@ -164,7 +164,6 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
     forkJustInTimeModelLoader modelToLoadAVar state = do
       modelLoad <- take modelToLoadAVar
       case modelLoad of
-        -- NOTE. Maybe it should be an embedded transaction.
         LoadModel dfId -> runPerspectivesWithState 
           (runEmbeddedIfNecessary
             doNotShareWithPeers 

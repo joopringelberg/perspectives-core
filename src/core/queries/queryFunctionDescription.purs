@@ -399,6 +399,14 @@ domain2roleType (RDOM r) = r
 domain2contextType :: Partial => Domain -> ADT ContextType
 domain2contextType (CDOM c) = c
 
+equalDomainKinds :: Domain -> Domain -> Boolean
+equalDomainKinds (CDOM _) (CDOM _) = true
+equalDomainKinds (RDOM _) (RDOM _) = true
+equalDomainKinds (VDOM _ _) (VDOM _ _) = true
+equalDomainKinds ContextKind ContextKind = true
+equalDomainKinds RoleKind RoleKind = true
+equalDomainKinds _ _ = false
+
 -----------------------
 data Calculation = S Step | Q QueryFunctionDescription
 

@@ -160,6 +160,7 @@ data Operator =
   | Sequence ArcPosition
   | Union ArcPosition
   | Intersection ArcPosition
+  | OrElse ArcPosition
   | BindsOp ArcPosition
   | Matches ArcPosition
 
@@ -287,6 +288,7 @@ instance prettyPrintOperator :: PrettyPrint Operator where
   prettyPrint' t (Sequence _) = "Sequence"
   prettyPrint' t (Union _) = "Union"
   prettyPrint' t (Intersection _) = "Intersection"
+  prettyPrint' t (OrElse _) = "OrElse"
   prettyPrint' t (BindsOp _) = "FilledBy"
   prettyPrint' t (Matches _) = "Matches"
 

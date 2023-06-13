@@ -51,7 +51,7 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHi
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
-import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
+import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseBool, parseDate, parseInt)
@@ -314,7 +314,7 @@ compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
 compileFunction (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
-  pure $ Combinators.disjunction f1' f2'
+  pure $ Combinators.intersection f1' f2'
 
 compileFunction (BQD _ (BinaryCombinator FilledByF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) = do
   sourceOfFilledRoles' <- compileFunction sourceOfBindingRoles
@@ -326,10 +326,16 @@ compileFunction (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) = do
   f2' <- compileFunction f2
   pure $ Combinators.conjunction f1' f2'
 
+compileFunction (BQD _ (BinaryCombinator OrElseF) f1 f2 _ _ _) = do
+  f1' <- compileFunction f1
+  f2' <- compileFunction f2
+  pure $ Combinators.orElse f1' f2'
+
 -- The compiler only allows f1 and f2 if they're functional.
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [EqualsF, NotEqualsF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
+
   pure $ unsafeCoerce $ compare f1' f2' (unsafePartial $ compareFunction g)
 
 compileFunction (BQD dom (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do

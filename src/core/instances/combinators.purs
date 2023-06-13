@@ -25,7 +25,7 @@ module Perspectives.Instances.Combinators where
 import Control.Monad.Error.Class (class MonadError)
 import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (guard, map)
-import Data.Array (cons, elemIndex, foldM, foldMap, head, null, union)
+import Data.Array (cons, elemIndex, foldM, foldMap, head, intersect, null, union)
 import Data.HeytingAlgebra (not, (&&)) as HA
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Conj (Conj(..))
@@ -82,11 +82,11 @@ cond condition thenPart elsePart id = do
   if passes then thenPart id else elsePart id
 
 -- | Prefer the left solution over the right one.
-disjunction :: forall m s o. Monad m =>
+orElse :: forall m s o. Monad m =>
   (s -> ArrayT m o) ->
   (s -> ArrayT m o) ->
   (s -> ArrayT m o)
-disjunction left right id = ArrayT do
+orElse left right id = ArrayT do
   r <- runArrayT $ left id
   if null r
     then runArrayT $ right id
@@ -101,6 +101,16 @@ conjunction left right id = ArrayT do
   l <- runArrayT $ left id
   r <- runArrayT $ right id
   pure $ union l r
+
+-- | Intersect the results.
+intersection :: forall m s o. Eq o => Monad m =>
+  (s -> ArrayT m o) ->
+  (s -> ArrayT m o) ->
+  (s -> ArrayT m o)
+intersection left right id = ArrayT do
+  l <- runArrayT $ left id
+  r <- runArrayT $ right id
+  pure $ intersect l r
 
 logicalAnd :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->
@@ -177,8 +187,8 @@ available' ids = do
           mc <- tryGetPerspectEntiteit (ContextInstance resId)
           case mc of
             Nothing -> pure false
-            otherwise -> pure allAvailable
-        otherwise -> pure allAvailable)
+            _ -> pure allAvailable
+        _ -> pure allAvailable)
     true
     ids
   pure (result HA.&& (HA.not (null ids)))
