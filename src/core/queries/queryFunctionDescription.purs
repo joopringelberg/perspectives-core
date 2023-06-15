@@ -381,6 +381,7 @@ sumOfDomains :: Domain -> Domain -> Maybe Domain
 sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))
 -- sumOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (SUM [a, b]) Nothing)
 sumOfDomains (CDOM a) (CDOM b) = Just (CDOM (SUM [a, b]))
+sumOfDomains (VDOM r1 _) (VDOM r2 _) = if r1 == r2 then Just $ VDOM r1 Nothing else Nothing
 sumOfDomains _ _ = Nothing
 
 productOfDomains :: Domain -> Domain -> Maybe Domain
@@ -388,6 +389,7 @@ productOfDomains :: Domain -> Domain -> Maybe Domain
 -- productOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (PROD [a, b]) Nothing)
 productOfDomains (RDOM a) (RDOM b) = Just (RDOM (PROD [a, b]))
 productOfDomains (CDOM a) (CDOM b) = Just (CDOM (PROD [a, b]))
+productOfDomains (VDOM r1 _) (VDOM r2 _) = if r1 == r2 then Just $ VDOM r1 Nothing else Nothing
 productOfDomains _ _ = Nothing
 
 domain2roleInContext :: Partial => Domain -> ADT RoleInContext
@@ -402,7 +404,7 @@ domain2contextType (CDOM c) = c
 equalDomainKinds :: Domain -> Domain -> Boolean
 equalDomainKinds (CDOM _) (CDOM _) = true
 equalDomainKinds (RDOM _) (RDOM _) = true
-equalDomainKinds (VDOM _ _) (VDOM _ _) = true
+equalDomainKinds (VDOM r1 _) (VDOM r2 _) = r1 == r2
 equalDomainKinds ContextKind ContextKind = true
 equalDomainKinds RoleKind RoleKind = true
 equalDomainKinds _ _ = false

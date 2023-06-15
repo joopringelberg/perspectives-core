@@ -184,6 +184,13 @@ perspectDef = LanguageDef
                   , "modelname"
                   , "returns"
 
+                  -- Operators in expressions
+                  , "union"
+                  , "intersection"
+                  , "orElse"
+                  , "and"
+                  , "or"
+
                   -- Screens
                   , "screen"
                   , "tab"

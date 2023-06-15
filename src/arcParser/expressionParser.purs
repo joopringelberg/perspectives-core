@@ -237,9 +237,9 @@ operator =
   <|>
   (GreaterThanEqual <$> (getPosition <* token.reservedOp ">="))
   <|>
-  (LogicalAnd <$> (getPosition <* token.reservedOp "and"))
+  (LogicalAnd <$> (getPosition <* reserved "and"))
   <|>
-  (LogicalOr <$> (getPosition <* token.reservedOp "or"))
+  (LogicalOr <$> (getPosition <* reserved "or"))
   <|>
   (Add <$> (getPosition <* token.reservedOp "+"))
   <|>
@@ -249,11 +249,11 @@ operator =
   <|>
   (Multiply <$> (getPosition <* token.reservedOp "*"))
   <|>
-  (Union <$> (getPosition <* token.reservedOp "union"))
+  (Union <$> (getPosition <* reserved "union"))
   <|>
-  (OrElse <$> (getPosition <* token.reservedOp "orElse"))
+  (OrElse <$> (getPosition <* reserved "orElse"))
   <|>
-  (Intersection <$> (getPosition <* token.reservedOp "intersection"))
+  (Intersection <$> (getPosition <* reserved "intersection"))
   <|>
   (BindsOp <$> (getPosition <* token.reserved "filledBy"))
   <|>
