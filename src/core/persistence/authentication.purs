@@ -42,6 +42,7 @@ import Effect.Aff (Error, error, throwError)
 import Effect.Aff.Class (liftAff)
 import Foreign.Object (fromFoldable, insert, lookup)
 import Perspectives.Couchdb (onAccepted_)
+import Perspectives.ErrorLogging (logError)
 import Perspectives.Identifiers (url2Authority)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
@@ -89,7 +90,8 @@ requestAuthentication authSource = do
             [StatusCode 200, StatusCode 203]
             "requestAuthentication"
             \_ -> pure unit
-        Nothing -> throwError (error $ "No password found for " <> authority)
+        -- we do not throw an error, because authentication may have been requested in a situation where it was not necessary.
+        Nothing -> logError (error $ "No password found for " <> authority)
     Nothing -> throwError (error $ "Impossible case in requestAuthentication for " <> show authSource)
 
   where 

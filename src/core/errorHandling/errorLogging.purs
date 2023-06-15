@@ -27,17 +27,16 @@ import Prelude
 import Control.Monad.AvarMonadAsk (modify)
 import Data.Array (cons)
 import Data.Maybe (Maybe)
-import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Class.Console (log)
+import Effect.Class.Console (log, warn)
 import Effect.Exception (Error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Warning (PerspectivesWarning)
 
-logError :: forall m. MonadEffect m => Error -> Effect Unit
-logError = liftEffect <<< log <<< show
+logError :: forall m. MonadEffect m => Error -> m Unit
+logError = liftEffect <<< warn <<< show
 
 logPerspectivesError :: forall m. MonadEffect m => PerspectivesError -> m Unit
 logPerspectivesError = liftEffect <<< log <<< show
@@ -47,4 +46,4 @@ logPerspectivesError = liftEffect <<< log <<< show
 warnModeller :: Maybe RoleInstance -> PerspectivesWarning -> MonadPerspectives Unit
 warnModeller mModeller warning = do
   modify \(s@{warnings}) -> s { warnings = cons (show warning) warnings }
-  log $ show warning
+  warn $ show warning
