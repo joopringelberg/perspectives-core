@@ -62,6 +62,11 @@ domain model://perspectives.domains#System
         do for User
           create context Caches bound to SystemCaches
 
+    state NoBaseRepository = not exists BaseRepository
+      perspective of User
+        action UploadCouchdb
+          callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#CouchdbManagement" )
+
     external
       aspect sys:RootContext$External
       property ConnectedToAMQPBroker (Boolean)
@@ -73,14 +78,14 @@ domain model://perspectives.domains#System
     user User (mandatory)
       property LastName (mandatory, relational, String)
       property FirstName (mandatory, relational, String)
-      property Channel = (binder Initiator either binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
+      property Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       -- User instances need not have a value for this property. It is used in the PDR to
       -- ensure serialisation of the User role.
       property Id (String)
       -- property Id = callExternal util:RoleIdentifier() returns String
       indexed sys:Me
       view VolledigeNaam (FirstName, LastName)
-      action UploadCouchdb
+      action UploadCouchdb_old
         callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#CouchdbManagement" )
       action ReloadCouchdb
         callEffect cdb:UpdateModel( "model://perspectives.domains#CouchdbManagement", false )
@@ -110,11 +115,6 @@ domain model://perspectives.domains#System
         props (FirstName, LastName) verbs (Consult)
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
-      -- perspective on Modellen
-      --   action StartUsing
-      --     callEffect cdb:AddModelToLocalStore( ModelIdentification )
-      --     bind origin to ModelsInUse in currentcontext
-      --   view Modellen$ModelPresentation verbs (Consult)
       perspective on BasicModels
         props (LocalModelName, Description) verbs (Consult)
       perspective on BasicModelsInUse
@@ -185,7 +185,7 @@ domain model://perspectives.domains#System
       property Name (mandatory, String)
 
 
-    context Channels = User >> (binder Initiator either binder ConnectedPartner) >> context >> extern
+    context Channels = User >> (binder Initiator union binder ConnectedPartner) >> context >> extern
 
     -- StartContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     -- These are the 'apps' of Perspectives.
@@ -328,8 +328,8 @@ domain model://perspectives.domains#System
       aspect sys:PhysicalContext$UserWithAddress
       perspective on Initiator
       perspective on ConnectedPartner
-    user Me = filter (Initiator either ConnectedPartner) with filledBy sys:Me
-    user You = filter (Initiator either ConnectedPartner) with not filledBy sys:Me
+    user Me = filter (Initiator union ConnectedPartner) with filledBy sys:Me
+    user You = filter (Initiator union ConnectedPartner) with not filledBy sys:Me
 
   case RootContext
     external
