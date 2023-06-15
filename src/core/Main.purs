@@ -254,19 +254,28 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
       callback true
 
 forkJustInTimeModelLoader :: AVar JustInTimeModelLoad -> AVar PerspectivesState -> Aff Unit
-forkJustInTimeModelLoader modelToLoadAVar state = do
-  modelLoad <- take modelToLoadAVar
-  case modelLoad of
-    LoadModel dfId -> runPerspectivesWithState 
-      (runEmbeddedIfNecessary
-        doNotShareWithPeers 
-        (ENR $ EnumeratedRoleType sysUser) 
-        (catchError (addModelToLocalStore dfId isInitialLoad *> (liftAff $ put ModelLoaded modelToLoadAVar))
-          \e -> liftAff $ put (LoadingFailed $ show e) modelToLoadAVar
-          ))
-      state
-    -- Other cases should not happen; we just ignore them here.
-    _ -> pure unit
+forkJustInTimeModelLoader modelToLoadAVar state = run
+  where
+    run :: Aff Unit
+    run = do
+      modelLoad <- take modelToLoadAVar
+      case modelLoad of
+        LoadModel dfId -> do
+          runPerspectivesWithState 
+            (runEmbeddedIfNecessary
+              doNotShareWithPeers 
+              (ENR $ EnumeratedRoleType sysUser) 
+              (catchError 
+                (do 
+                  void $ addModelToLocalStore dfId isInitialLoad 
+                  liftAff $ put ModelLoaded modelToLoadAVar)
+                \e -> liftAff $ put (LoadingFailed $ show e) modelToLoadAVar
+                ))
+            state
+          run
+        Stop -> pure unit
+        -- Other cases should not happen; we just ignore them here.
+        _ -> run
 
 
 handleError :: forall a. (Either Error a -> Effect Unit)
@@ -310,6 +319,8 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
           setupUser
           )
         state
+      -- and stop
+      put Stop modelToLoad
   where
     handler :: Either Error Unit -> Effect Unit
     handler (Left e) = do

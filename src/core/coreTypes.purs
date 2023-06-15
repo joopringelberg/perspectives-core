@@ -133,7 +133,7 @@ data RepeatingTransaction = TransactionWithTiming
   , endMoment :: Maybe Duration
   }
 
-data JustInTimeModelLoad = LoadModel DomeinFileId | ModelLoaded | LoadingFailed String
+data JustInTimeModelLoad = LoadModel DomeinFileId | ModelLoaded | LoadingFailed String | Stop
 
 -----------------------------------------------------------
 -- ASSUMPTIONS

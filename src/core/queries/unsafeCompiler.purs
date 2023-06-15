@@ -254,7 +254,7 @@ compileFunction (MQD dom (ExternalCorePropertyGetter functionName) args _ _ _) =
       _ -> throwError (error "Too many arguments for external core module: maximum is 6")
     )
 
-compileFunction (SQD dom (VariableLookup varName) range _ _) = pure $ unsafeCoerce (lookup varName)
+compileFunction (SQD dom (VariableLookup varName) range _ _) = pure $ lookup varName
 
 -- If the second term is a constant, we can ignore the left term. This is an optimalisation.
 compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (Constant _ _) _ _ _) _ _ _) = compileFunction f2
