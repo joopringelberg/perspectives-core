@@ -31,14 +31,14 @@ domain model://perspectives.domains#CouchdbManagement
           IndexedContexts$Name = app >> indexedName for indexedcontext
 
   -- This does not compile.
-  on exit
-    do for sys:PerspectivesSystem$Installer
-      letA
-        indexedcontext <- filter sys:MySystem >> IndexedContexts with binds (cm:MyCouchdbApp >> extern)
-        startcontext <- filter sys:MySystem >> StartContexts with binds (cm:MyCouchdbApp >> extern)
-      in
-        remove context indexedcontext
-        remove role startcontext
+  -- on exit
+  --   do for sys:PerspectivesSystem$Installer
+  --     letA
+  --       indexedcontext <- filter sys:MySystem >> IndexedContexts with binds (cm:MyCouchdbApp >> extern)
+  --       startcontext <- filter sys:MySystem >> StartContexts with binds (cm:MyCouchdbApp >> extern)
+  --     in
+  --       remove context indexedcontext
+  --       remove role startcontext
 
   aspect user sys:PerspectivesSystem$Installer
   -------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ domain model://perspectives.domains#CouchdbManagement
           do for Manager
             callEffect cdb:AddCredentials( Url, AdminPassword)
 
-        state CreateServer = exists Url
+        state CreateServer = exists Url -- This might be replaced by 'true'.
           on entry
             do for Manager
               -- Create the databases in CouchdbServer_.
@@ -480,11 +480,19 @@ domain model://perspectives.domains#CouchdbManagement
       property ServerUrl = binder Manifests >> context >> extern >> ServerUrl
       -- The location where we publish ModelManifest and its versions.
       property PublicUrl = ServerUrl + context >> Repository >> ReadInstances + "/"
+      -- The highest version number
+      property HighestVersion = context >> Versions >> Versions$Version >>= maximum
+      -- The version recommended by the Author
+      property RecommendedVersion = (filter context >> Versions with IsRecommended) >> Versions$Version
+      -- The version to install. It depends on a calculation, but we have to store it explicitly 
+      -- so we can even retrieve it on system startup.
+      -- This property must be published.
+      property VersionToInstall (String)
     
-      -- Embedded contexts are not removed automatically with their embedder!
-      on exit
-        do for Author
-          delete context bound to Versions
+    -- Embedded contexts are not removed automatically with their embedder!
+    on exit
+      do for Author
+        delete context bound to Versions
 
     -- The external role of the Repository.
     context Repository = extern >> binder Manifests >> context >> extern
@@ -492,7 +500,7 @@ domain model://perspectives.domains#CouchdbManagement
     user Author filledBy Repository$Authors, Repository$Admin
       perspective on extern
         props (LocalModelName) verbs (Consult)
-        props (Description, IsLibrary) verbs (SetPropertyValue)
+        props (Description, IsLibrary, VersionToInstall) verbs (SetPropertyValue)
       perspective on Versions
         only (Create, Fill, Remove, CreateAndFill)
         props (Versions$Version, VersionedModelManifest$External$Description) verbs (SetPropertyValue)
@@ -505,7 +513,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
     public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
-        props (LocalModelName, ModelManifest$External$Description, IsLibrary) verbs (Consult)
+        props (LocalModelName, ModelManifest$External$Description, IsLibrary, VersionToInstall) verbs (Consult)
       perspective on sys:MySystem >> BasicModelsInUse
         only (Fill, Remove)
       perspective on Versions
@@ -533,10 +541,15 @@ domain model://perspectives.domains#CouchdbManagement
       state ReadyToMake = (exists Versions$Version) and not exists binding
         on entry
           do for Author
-            -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
-            create_ context VersionedModelManifest named Versions$LocalModelName bound to origin
-            DomeinFileName = (context >> Repository >> NameSpace_ + "-" + Versions$LocalModelName + ".json") for origin
-            bind currentactor to VersionedModelManifest$Author in origin >> binding >> context
+            letA
+              v <- (context >> extern >> RecommendedVersion) orElse (context >> extern >> HighestVersion)
+            in
+              -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
+              create_ context VersionedModelManifest named (context >> Repository >> NameSpace_ + "-" + Versions$LocalModelName) bound to origin
+              DomeinFileName = (context >> Repository >> NameSpace_ + "-" + Versions$LocalModelName + ".json") for origin
+              bind currentactor to VersionedModelManifest$Author in origin >> binding >> context
+              -- NOTE that we conceivably might add a version with a lower number than the highest.
+              VersionToInstall = v for context >> extern
 
   case VersionedModelManifest
     aspect sys:VersionedModelManifest
@@ -565,6 +578,19 @@ domain model://perspectives.domains#CouchdbManagement
       property SourcesChanged (Boolean)
       -- property DomeinFile (File)
       property PublicUrl = binder Versions >> context >> extern >> PublicUrl
+      -- Only one VersionedModelManifest can be the recommended version at a time.
+      property IsRecommended (Boolean)
+
+      state BecomesRecommended = IsRecommended
+        on entry
+          do for Author
+            letA
+              previousversion <- binder Versions >> context >> extern >> VersionToInstall
+            in
+              -- no other version can be recommended
+              IsRecommended = false for filter binder Versions >> context >> Versions with Versions$Version == previousversion
+              -- Set the version to download.
+              VersionToInstall = Version for binder Versions >> context >> extern
       
       on exit
         do for Author
@@ -582,17 +608,19 @@ domain model://perspectives.domains#CouchdbManagement
     user Author filledBy cm:ModelManifest$Author
       perspective on extern
         props (DomeinFileName, Version, ArcOK) verbs (Consult)
-        props (ArcSource, ArcFeedback, Description) verbs (SetPropertyValue)
+        props (ArcSource, ArcFeedback, Description, IsRecommended) verbs (SetPropertyValue)
 
         in object state ReadyToCompile
           action RestoreState
             ArcFeedback = "Explicitly restoring state"
           action CompileArc
             delete property ArcFeedback
+      perspective on extern >> binder Versions >> context >> extern
+        props (VersionToInstall) verbs (SetPropertyValue)
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (Version, Description) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
+        props (Version, Description, IsRecommended) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
 
 
     user ActiveUser = extern >> binder Versions >> context >> ActiveUser

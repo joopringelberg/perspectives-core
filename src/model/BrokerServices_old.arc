@@ -25,14 +25,15 @@ domain model://perspectives.domains#BrokerServices
           Name = "Broker Services App" for app >> extern
           bind_ app >> extern to indexedcontext
           IndexedContexts$Name = app >> indexedName for indexedcontext
-  on exit
-    do for sys:PerspectivesSystem$Installer
-      letA
-        indexedcontext <- filter sys:MySystem >> IndexedContexts with binds (bs:MyBrokers >> extern)
-        startcontext <- filter sys:MySystem >> StartContexts with binds (bs:MyBrokers >> extern)
-      in
-        remove context indexedcontext
-        remove role startcontext
+  -- DIT COMPILEERT NIET
+  -- on exit
+  --   do for sys:PerspectivesSystem$Installer
+  --     letA
+  --       indexedcontext <- filter sys:MySystem >> IndexedContexts with binds (bs:MyBrokers >> extern)
+  --       startcontext <- filter sys:MySystem >> StartContexts with binds (bs:MyBrokers >> extern)
+  --     in
+  --       remove context indexedcontext
+  --       remove role startcontext
 
   aspect user sys:PerspectivesSystem$Installer
 
