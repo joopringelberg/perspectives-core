@@ -20,15 +20,15 @@ domain model://perspectives.domains#CouchdbManagement
           -- we find that the Installer can just create RootContexts
           -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
-          app <- create context CouchdbManagementApp
+          couchdbapp <- create context CouchdbManagementApp
           indexedcontext <- create role IndexedContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
           -- of StartContexts with it.
-          bind app >> extern to StartContexts in sys:MySystem
-          Name = "Couchdb Management App" for app >> extern
-          bind_ app >> extern to indexedcontext
-          IndexedContexts$Name = app >> indexedName for indexedcontext
+          bind couchdbapp >> extern to StartContexts in sys:MySystem
+          Name = "Couchdb Management App" for couchdbapp >> extern
+          bind_ couchdbapp >> extern to indexedcontext
+          IndexedContexts$Name = couchdbapp >> indexedName for indexedcontext
 
   -- This does not compile.
   -- on exit
