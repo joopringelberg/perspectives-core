@@ -99,9 +99,9 @@ fillerNoLongerPointsTo fillerId filledId = (try $ getPerspectEntiteit fillerId) 
 -- | PERSISTENCE
 fillerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectives Unit
 fillerPointsTo fillerId filledId = (try $ getPerspectEntiteit fillerId) >>=
-  handlePerspectRolError' "fillerNoLongerPointsTo" unit
+  handlePerspectRolError' "fillerPointsTo" unit
     \(filler :: PerspectRol) -> (try $ getPerspectEntiteit filledId) >>=
-      handlePerspectRolError' "fillerNoLongerPointsTo" unit
+      handlePerspectRolError' "fillerPointsTo" unit
       \(filled :: PerspectRol) -> do
         filledContextType <- rol_context filled ##>> contextType
         filler' <- addRol_gevuldeRollen filler filledContextType (rol_pspType filled) filledId

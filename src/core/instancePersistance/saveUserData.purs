@@ -80,7 +80,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
-import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (isInPublicScheme, stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
@@ -90,7 +90,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<>), (==), (>>=), (<$>), (<<<), (||))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
  
 -- | This function takes care of
 -- | PERSISTENCE
@@ -448,7 +448,9 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
 
             -- PERSISTENCE
             lift (filled `filledPointsTo` filler)
-            lift (filler `fillerPointsTo` filled)
+            if isInPublicScheme (unwrap filler)
+              then pure unit
+              else lift (filler `fillerPointsTo` filled)
 
             -- QUERY EVALUATION
             filledContextType <- lift (rol_context filledRole ##>> contextType)
@@ -494,19 +496,10 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
             pure users
 
   where
-    -- If the type of the new binding is unknown, load the model. There is only one
-    -- circumstance that we can have a RoleInstance of an unknown type and that is when
-    -- it is the external role of a sys:Model context. This role has a property Url that
-    -- we can fetch the model from.
     loadModel :: EnumeratedRoleType -> MonadPerspectivesTransaction Unit
     loadModel fillerType = case (typeUri2ModelUri $ unwrap fillerType) of
       Nothing -> pure unit
       Just modelUri -> lift $ void $ retrieveDomeinFile modelUri
-    -- loadModel fillerType = do
-    --   mDomeinFile <- lift $ traverse tryRetrieveDomeinFile (DomeinFileId <$> (typeUri2ModelUri $ unwrap fillerType))
-    --   if (isNothing mDomeinFile)
-    --     then addModelToLocalStore' (DomeinFileId $ unsafePartial fromJust (typeUri2ModelUri $ unwrap fillerType))
-    --     else pure unit
 
 -- | If the type of the role has kind UserRole and is not the `me` role for its context,
 -- | we add a new user to the context. This user should have access to
@@ -624,7 +617,11 @@ changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filled
               Just filler -> lift (filledId `filledNoLongerPointsTo` filler)
             Just newFiller -> do
               lift (filledId `filledPointsTo` newFiller)
-              lift (newFiller `fillerPointsTo` filledId)
+              -- lift (newFiller `fillerPointsTo` filledId)
+              if isInPublicScheme (unwrap newFiller)
+                then pure unit
+                else lift (newFiller `fillerPointsTo` filledId)
+
         else pure unit
 
       -- CURRENTUSER
