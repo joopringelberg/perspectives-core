@@ -79,8 +79,8 @@ domain SimpleChat
 
     thing PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
-    user Me = filter (Initiator either Partner) with filledBy sys:Me
-    user You = filter (Initiator either Partner) with not filledBy sys:Me
+    user Me = filter (Initiator union Partner) with filledBy sys:Me
+    user You = filter (Initiator union Partner) with not filledBy sys:Me
 
     aspect user sys:Invitation$Guest
 

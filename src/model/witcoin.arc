@@ -474,9 +474,9 @@ domain WitCoin
     -------------------------------------------------------------------------------
     ---- TRANSACTIONPARTNER
     -------------------------------------------------------------------------------
-    user TransactionPartner = filter (Debitor either Creditor) with not filledBy sys:Me
+    user TransactionPartner = filter (Debitor union Creditor) with not filledBy sys:Me
 
     -------------------------------------------------------------------------------
     ---- MEINTRANSACTION
     -------------------------------------------------------------------------------
-    user MeInTransaction = filter (Debitor either Creditor) with filledBy sys:Me
+    user MeInTransaction = filter (Debitor union Creditor) with filledBy sys:Me
