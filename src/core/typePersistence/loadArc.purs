@@ -26,12 +26,14 @@ import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (delete, null)
 import Data.Either (Either(..))
-import Data.Foldable (for_) 
+import Data.Foldable (for_)
 import Data.List (List(..))
+import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (empty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkDomeinFile)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
+import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
@@ -41,8 +43,7 @@ import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
-import Perspectives.RunMonadPerspectivesTransaction (loadModelIfMissing)
-import Prelude (bind, discard, pure, show, ($))
+import Prelude (bind, discard, pure, show, ($), (<<<))
 import Text.Parsing.Parser (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
@@ -72,7 +73,7 @@ loadAndCompileArcFile_ text = catchError
           (Right (DomeinFile dr'@{_id})) -> do
             dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
             -- We should load referred models if they are missing (but not the model we're compiling!).
-            for_ (delete (DomeinFileId _id) state.referredModels) loadModelIfMissing
+            for_ (delete (DomeinFileId _id) state.referredModels) (lift <<< retrieveDomeinFile <<< unwrap)
             (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left e

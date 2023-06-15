@@ -40,9 +40,7 @@ import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, e
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), MPT, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.Deltas (TransactionPerUser, distributeTransaction)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
-import Perspectives.DomeinCache (tryRetrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
@@ -56,7 +54,7 @@ import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame, tran
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, getCalculatedRoleInstances, getMyType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), DomeinFileId, EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance, stateEvaluationAndQueryUpdatesForContext, stateEvaluationAndQueryUpdatesForRole)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRemoved)
@@ -432,20 +430,6 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
           catchError (for_ states (exitingState ctxt))
             \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
           lift $ restoreFrame oldFrame
-
-      
-
------------------------------------------------------------
--- LOADMODELIFMISSING
------------------------------------------------------------
--- | Retrieves from the repository the model by its Model URI, if necessary.
-loadModelIfMissing :: DomeinFileId -> MonadPerspectivesTransaction Unit
-loadModelIfMissing dfId = do
-  mDomeinFile <- lift $ tryRetrieveDomeinFile dfId
-  if isNothing mDomeinFile
-    then do
-      addModelToLocalStore dfId isInitialLoad
-    else pure unit
 
 -----------------------------------------------------------
 -- EXECUTEEFFECT

@@ -55,6 +55,7 @@ import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>), (###>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
+import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Fuzzysort (matchIndexedContextNames)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2LocalName_, typeUri2ModelUri_)
@@ -77,10 +78,10 @@ import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfR
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.ResourceIdentifiers (createPublicIdentifier, guid, resourceIdentifier2DocLocator)
-import Perspectives.RunMonadPerspectivesTransaction (loadModelIfMissing, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding, scheduleContextRemoval, scheduleRoleRemoval)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
@@ -197,7 +198,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   logPerspectivesError $ TypeErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ TypeErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right (EnumeratedRole{context:filledContextType}) ->do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
+                  void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
                   registerSupportedEffect corrId setter (getFilledRoles filledContextType (EnumeratedRoleType predicate)) (RoleInstance subject) onlyOnce
             filledContextType -> (try $ getContext (ContextType filledContextType)) >>=
               case _ of
@@ -205,7 +206,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   logPerspectivesError $ ContextErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ ContextErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right _ -> do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
+                  void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
                   registerSupportedEffect corrId setter (getFilledRoles (ContextType filledContextType) (EnumeratedRoleType predicate)) (RoleInstance subject) onlyOnce
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
@@ -448,7 +449,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         runMonadPerspectivesTransaction' false authoringRole do
           result <- runExceptT $ traverse
             (\ctxt@(ContextSerialization{ctype}) -> do
-              lift $ loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ ctype)
+              void $ lift $ lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ ctype)
               constructContext Nothing ctxt)
             ctxts
           case result of
@@ -553,7 +554,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             logPerspectivesError $ RolErrorBoundary "Api.CheckBinding" (show err)
             sendResponse (Error corrId (show $ RolErrorBoundary "Api.CheckBinding" (show err))) setter
           Right (PerspectRol{pspType}) -> do
-            void $ runMonadPerspectivesTransaction' false authoringRole (loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ (unwrap pspType)))
+            void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ (unwrap pspType)))
             ok <- checkBinding typeOfRoleToBindTo (RoleInstance object)
             sendResponse (Result corrId [(show ok)]) setter
     Api.SetProperty -> catchError
@@ -706,7 +707,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right cd@(ContextSerialization {ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
         void $ runMonadPerspectivesTransaction authoringRole do
-          loadModelIfMissing $ DomeinFileId (unsafePartial typeUri2ModelUri_ ctype)
+          void $ lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ ctype)
           ctxt <- runExceptT $ constructContext mroleType cd
           case ctxt of
             (Left messages) -> lift $ sendResponse (Error corrId (show messages)) setter

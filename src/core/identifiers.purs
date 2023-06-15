@@ -90,6 +90,7 @@ isModelUri = isJust <<< match newModelRegex
 -- | to:
 -- |    { repositoryUrl: https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}
 -- |    , documentName: {subdomains-with-underscores}_{authority-with-underscores}#{LocalModelName}.json}
+-- | Where LocalModelName may include a Semantic Version Number, as in "System@1.0.0"
 -- | When concatenated with a forward slash in between, those two parts form:
 -- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{LocalModelName}.json
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
@@ -157,6 +158,14 @@ unversionedModelUri s = case indexOf (Pattern "@") s of
   Just u -> case splitAt u s of 
     {before} -> before
 
+-----------------------------------------------------------
+-- GET THE VERSION OF A MODEL URI
+-----------------------------------------------------------
+modelUriVersion :: String -> Maybe String
+modelUriVersion s = case indexOf (Pattern "@") s of
+  Nothing -> Nothing
+  Just u -> case splitAt u s of
+    {after} -> Just after
 
 -----------------------------------------------------------
 -- MODEL URI TO INSTANCES STORE

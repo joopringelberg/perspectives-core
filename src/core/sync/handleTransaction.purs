@@ -34,6 +34,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
+import Data.Ordering (Ordering(..))
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
@@ -49,9 +50,8 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=), (###>>), (#
 import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
-import Perspectives.DomeinCache (tryRetrieveDomeinFile)
+import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, typeUri2LocalName_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getProperty, roleType)
@@ -63,7 +63,7 @@ import Perspectives.Persistent (entityExists, getPerspectRol, saveEntiteit, tryG
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity, removeInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
@@ -73,7 +73,6 @@ import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (hasAspect, isPublicRole, roleAspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
 import Prelude (class Eq, class Ord, Unit, bind, compare, discard, flip, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
-import Data.Ordering (Ordering(..))
 
 -- TODO. Each of the executing functions must catch errors that arise from unknown types.
 -- Inspect the model version of an unknown type and establish whether the resident model is newer or older than
@@ -212,7 +211,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authorizedRole, deltaType, subject}) s = do
   log (show deltaType <> " for/from " <> show id <> " with ids " <> show roleInstances <> " with type " <> show roleType)
-  loadModelIfMissing (DomeinFileId (unsafePartial typeUri2ModelUri_ $ unwrap roleType))
+  void $ lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ $ unwrap roleType)
   case deltaType of
     ConstructEmptyRole -> do
       -- We have to check this case: a user is allowed to create himself.
@@ -295,19 +294,6 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         constructEmptyRole_ id 0 externalRole >>= if _
           then lift $ void $ saveEntiteit externalRole
           else pure unit
-
------------------------------------------------------------
--- LOADMODELIFMISSING
------------------------------------------------------------
--- | Retrieves from the repository the model by its Model URI, if necessary.
-loadModelIfMissing :: DomeinFileId -> MonadPerspectivesTransaction Unit
-loadModelIfMissing dfId = do
-  mDomeinFile <- lift $ tryRetrieveDomeinFile dfId
-  if isNothing mDomeinFile
-    then do
-      addModelToLocalStore dfId isInitialLoad
-    else pure unit
-
 
 -- | Execute all Deltas in a run that does not distribute.
 -- executeTransaction :: TransactionForPeer -> MonadPerspectives Unit

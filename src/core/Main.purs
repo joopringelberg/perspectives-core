@@ -160,21 +160,6 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
         logPerspectivesError $ Custom $ "API stopped because: " <> show e
         resumeRun state
 
-    forkJustInTimeModelLoader :: AVar JustInTimeModelLoad -> AVar PerspectivesState -> Aff Unit
-    forkJustInTimeModelLoader modelToLoadAVar state = do
-      modelLoad <- take modelToLoadAVar
-      case modelLoad of
-        LoadModel dfId -> runPerspectivesWithState 
-          (runEmbeddedIfNecessary
-            doNotShareWithPeers 
-            (ENR $ EnumeratedRoleType sysUser) 
-            (catchError (addModelToLocalStore dfId isInitialLoad *> (liftAff $ put ModelLoaded modelToLoadAVar))
-              \e -> liftAff $ put (LoadingFailed $ show e) modelToLoadAVar
-              ))
-          state
-        -- Other cases should not happen; we just ignore them here.
-        _ -> pure unit
-
     forkTimedTransactions :: AVar RepeatingTransaction -> AVar PerspectivesState -> Aff Unit
     forkTimedTransactions repeatingTransactionAVar state = do
       repeatingTransaction <- take repeatingTransactionAVar
@@ -268,6 +253,22 @@ runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
       logPerspectivesError $ Custom $ "Started the PDR for: " <> usr
       callback true
 
+forkJustInTimeModelLoader :: AVar JustInTimeModelLoad -> AVar PerspectivesState -> Aff Unit
+forkJustInTimeModelLoader modelToLoadAVar state = do
+  modelLoad <- take modelToLoadAVar
+  case modelLoad of
+    LoadModel dfId -> runPerspectivesWithState 
+      (runEmbeddedIfNecessary
+        doNotShareWithPeers 
+        (ENR $ EnumeratedRoleType sysUser) 
+        (catchError (addModelToLocalStore dfId isInitialLoad *> (liftAff $ put ModelLoaded modelToLoadAVar))
+          \e -> liftAff $ put (LoadingFailed $ show e) modelToLoadAVar
+          ))
+      state
+    -- Other cases should not happen; we just ignore them here.
+    _ -> pure unit
+
+
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)
 handleError (Right _) = pure unit
@@ -299,10 +300,12 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
       transactionWithTiming <- empty
       modelToLoad <- empty
       state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
+      -- Fork aff to load models just in time.
+      void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
+      -- Set up.
       runPerspectivesWithState
         (do
           addAllExternalFunctions
-          -- TODO. Vermoedelijk is dit overbodig voor Pouchdb.
           getSystemIdentifier >>= createUserDatabases
           setupUser
           )

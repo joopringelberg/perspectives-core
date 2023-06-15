@@ -96,6 +96,12 @@ modelExternalModelIdentification :: String
 modelExternalModelIdentification = "model://perspectives.domains#System$VersionedModelManifest$External$DomeinFileName"
 
 ------------------------------------------------------------------------------------
+-- COUCHDBMANAGEMENT
+------------------------------------------------------------------------------------
+versionToInstall :: String
+versionToInstall = "model://perspectives.domains#CouchdbManagement$ModelManifest$External$VersionToInstall"
+
+------------------------------------------------------------------------------------
 -- INVITATION
 ------------------------------------------------------------------------------------
 privateChannel :: String

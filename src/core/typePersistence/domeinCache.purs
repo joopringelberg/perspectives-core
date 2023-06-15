@@ -25,22 +25,25 @@ module Perspectives.DomeinCache
 
 where
 
-import Control.Monad.Except (catchError, throwError)
+import Control.Monad.Except (throwError)
+import Data.Array (head)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (AVar, put, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Object (insert)
+import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (DomeinFileName, ModelUri, modelUri2ModelUrl)
-import Perspectives.Persistence.API (addAttachment, getAttachment)
+import Perspectives.Identifiers (DomeinFileName, ModelUri, buitenRol, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, unversionedModelUri)
+import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.ModelDependencies (versionToInstall)
+import Perspectives.Persistence.API (addAttachment, getAttachment, tryGetDocument)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
+import Perspectives.Persistent (removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove, getModelToLoad)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -48,7 +51,7 @@ import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInterna
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (<$>), (>>=))
+import Prelude (Unit, bind, discard, identity, pure, unit, void, ($), (*>), (<<<), (<>), (>>=))
 
 storeDomeinFileInCache :: DomeinFileName -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
 storeDomeinFileInCache domeinFileName df= cacheEntity (DomeinFileId domeinFileName) df
@@ -73,25 +76,25 @@ modifyDomeinFileInCache modifier modelUri =
 -- MODIFY ELEMENTS OF A DOMEINFILE
 -----------------------------------------------------------
 modifyCalculatedRoleInDomeinFile :: ModelUri -> CalculatedRole -> MonadPerspectives CalculatedRole
-modifyCalculatedRoleInDomeinFile modeluri cr@(CalculatedRole {_id}) = modifyDomeinFileInCache modifier modeluri *> pure cr
+modifyCalculatedRoleInDomeinFile modelUri cr@(CalculatedRole {_id}) = modifyDomeinFileInCache modifier modelUri *> pure cr
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{calculatedRoles}) = DomeinFile dff {calculatedRoles = insert (unwrap _id) cr calculatedRoles}
 
 modifyEnumeratedRoleInDomeinFile :: ModelUri -> EnumeratedRole -> MonadPerspectives EnumeratedRole
-modifyEnumeratedRoleInDomeinFile modeluri er@(EnumeratedRole {_id}) = modifyDomeinFileInCache modifier modeluri *> pure er
+modifyEnumeratedRoleInDomeinFile modelUri er@(EnumeratedRole {_id}) = modifyDomeinFileInCache modifier modelUri *> pure er
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{enumeratedRoles}) = DomeinFile dff {enumeratedRoles = insert (unwrap _id) er enumeratedRoles}
 
 modifyCalculatedPropertyInDomeinFile :: ModelUri -> CalculatedProperty -> MonadPerspectives CalculatedProperty
-modifyCalculatedPropertyInDomeinFile modeluri cr@(CalculatedProperty {_id}) = modifyDomeinFileInCache modifier modeluri *> pure cr
+modifyCalculatedPropertyInDomeinFile modelUri cr@(CalculatedProperty {_id}) = modifyDomeinFileInCache modifier modelUri *> pure cr
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{calculatedProperties}) = DomeinFile dff {calculatedProperties = insert (unwrap _id) cr calculatedProperties}
 
 modifyStateInDomeinFile :: ModelUri -> State -> MonadPerspectives State
-modifyStateInDomeinFile modeluri sr@(State {id}) = modifyDomeinFileInCache modifier modeluri *> pure sr
+modifyStateInDomeinFile modelUri sr@(State {id}) = modifyDomeinFileInCache modifier modelUri *> pure sr
   where
     modifier :: DomeinFile -> DomeinFile
     modifier (DomeinFile dff@{states}) = DomeinFile dff {states = insert (unwrap id) sr states}
@@ -100,26 +103,44 @@ modifyStateInDomeinFile modeluri sr@(State {id}) = modifyDomeinFileInCache modif
 -- DOMEINFILE PERSISTENCE
 -----------------------------------------------------------
 -- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the local models database and caches it.
-
--- | Retrieve a domain file.
--- | Searches the cache with the local model name.
 -- | If not found, tries to fetch the file from its repository and add it to the local models and the cache.
+-- | Tries to get the version recommended by the Author and otherwise the version with the highest version number.
+-- | If that cannot be established, settles for the document without version.
+-- | The modelUri parameter may be bound to a Versioned ModelURI.
 retrieveDomeinFile :: ModelUri -> MonadPerspectives DomeinFile
-retrieveDomeinFile modeluri = tryGetPerspectEntiteit (DomeinFileId modeluri) >>= case _ of 
+retrieveDomeinFile modelUri = tryGetPerspectEntiteit (DomeinFileId $ unversionedModelUri modelUri) >>= case _ of 
   -- Now retrieve the DomeinFile from a remote repository and store it in the local "models" database of this user.
   Nothing -> do 
+    version <- case modelUriVersion modelUri of 
+      Nothing -> getVersionToInstall modelUri
+      Just v -> pure $ Just v
     modelToLoadAVar <- getModelToLoad
-    liftAff $ put (LoadModel (DomeinFileId modeluri)) modelToLoadAVar
+    liftAff $ put (LoadModel (DomeinFileId ((unversionedModelUri modelUri) <> (maybe "" ((<>) "@") version)))) modelToLoadAVar
     result <- liftAff $ take modelToLoadAVar
     case result of 
-      ModelLoaded -> retrieveDomeinFile modeluri
-      LoadingFailed reason -> throwError (error $ "Cannot get " <> modeluri <> " from a repository. Reason: " <> reason)
-      _ -> throwError (error $ "Model retrieval from repository was not executed for " <> modeluri <> ".")
+      -- The stop condition for this recursion is tryGetPerspectEntiteit!
+      ModelLoaded -> retrieveDomeinFile modelUri
+      LoadingFailed reason -> throwError (error $ "Cannot get " <> modelUri <> " from a repository. Reason: " <> reason)
+      _ -> throwError (error $ "Model retrieval from repository was not executed for " <> modelUri <> ".")
   Just df -> pure df
 
-tryRetrieveDomeinFile :: DomeinFileId -> MonadPerspectives (Maybe DomeinFile)
-tryRetrieveDomeinFile dfId = catchError (Just <$> (getPerspectEntiteit dfId))
-  \_ -> pure Nothing
+-- | Retrieve a string that is a Semantic Version Number.
+-- | It is either the version number designated by the Author of the model to be installed,
+-- | or it is the latest version.
+-- | If no manifest is found, the empty string is returned. This causes retrieveDomainFile to retrieve a versionless document!
+-- | This function must be able to run without any type information, as it is run on system install, too.
+getVersionToInstall :: ModelUri -> MonadPerspectives (Maybe String)
+getVersionToInstall modelUri = case unsafePartial modelUri2ManifestUrl modelUri of 
+  -- Retrieve the property from the external role of the manifest that indicates the version we should install.
+  -- To achieve this, we have an Enumerated property that reflects the version to install in the external role of the Manifest.
+  -- We retrieve this role as a Couchdb document and read that value directly from its structure.
+  {repositoryUrl, manifestName} -> do
+    mRol <- tryGetDocument repositoryUrl (buitenRol manifestName)
+    case mRol of 
+      Just (PerspectRol{properties}) -> case head $ maybe [] identity (lookup versionToInstall properties) of 
+        Nothing -> pure Nothing
+        Just v -> pure $ Just $ unwrap v
+      _ -> pure Nothing
 
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String
