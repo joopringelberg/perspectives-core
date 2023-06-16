@@ -117,11 +117,18 @@ retrieveDomeinFile modelUri = tryGetPerspectEntiteit (DomeinFileId $ unversioned
     modelToLoadAVar <- getModelToLoad
     liftAff $ put (LoadModel (DomeinFileId ((unversionedModelUri modelUri) <> (maybe "" ((<>) "@") version)))) modelToLoadAVar
     result <- liftAff $ take modelToLoadAVar
+    -- Now the forking process waits (blocks) untiel retrieveFromDomeinFile fills it with another LoadModel request.
     case result of 
-      -- The stop condition for this recursion is tryGetPerspectEntiteit!
-      ModelLoaded -> retrieveDomeinFile modelUri
-      LoadingFailed reason -> throwError (error $ "Cannot get " <> modelUri <> " from a repository. Reason: " <> reason)
-      _ -> throwError (error $ "Model retrieval from repository was not executed for " <> modelUri <> ".")
+      -- We now take up communication with the forked process that actually loads the model:
+      HotLine hotline -> do 
+        loadingResult <- liftAff $ take hotline
+        case loadingResult of
+          -- The stop condition for this recursion is tryGetPerspectEntiteit!
+          ModelLoaded -> retrieveDomeinFile modelUri
+          LoadingFailed reason -> throwError (error $ "Cannot get " <> modelUri <> " from a repository. Reason: " <> reason)
+          _ -> throwError (error $ "Model retrieval from repository was not executed for " <> modelUri <> ".")
+      -- This should not happen
+      _ -> throwError (error $ "Wrong communication from the forked model loading process!")
   Just df -> pure df
 
 -- | Retrieve a string that is a Semantic Version Number.

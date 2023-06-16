@@ -261,17 +261,25 @@ forkJustInTimeModelLoader modelToLoadAVar state = run
       modelLoad <- take modelToLoadAVar
       case modelLoad of
         LoadModel dfId -> do
-          runPerspectivesWithState 
-            (runEmbeddedIfNecessary
-              doNotShareWithPeers 
-              (ENR $ EnumeratedRoleType sysUser) 
-              (catchError 
-                (do 
-                  void $ addModelToLocalStore dfId isInitialLoad 
-                  liftAff $ put ModelLoaded modelToLoadAVar)
-                \e -> liftAff $ put (LoadingFailed $ show e) modelToLoadAVar
-                ))
-            state
+          -- Create an AVar for communication between the requester and the fiber we'll fork shortly:
+          hotline <- empty
+          -- Return the hotline to the requester:
+          put (HotLine hotline) modelToLoadAVar
+          -- now fork a process that will actually load the model (and it will use the HotLine to 
+          -- return the results to the requester):
+          _ <- forkAff $
+            runPerspectivesWithState 
+              (runEmbeddedIfNecessary
+                doNotShareWithPeers 
+                (ENR $ EnumeratedRoleType sysUser) 
+                (catchError 
+                  (do 
+                    void $ addModelToLocalStore dfId isInitialLoad 
+                    liftAff $ put ModelLoaded hotline)
+                  \e -> liftAff $ put (LoadingFailed $ show e) hotline
+                  ))
+              state
+          -- and repeat
           run
         Stop -> pure unit
         -- Other cases should not happen; we just ignore them here.
