@@ -364,7 +364,7 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
       lift $ addBinding "currentcontext" [unwrap ctxt]
       -- Error boundary.
       catchError (for_ states (enteringState ctxt))
-        \e -> logPerspectivesError $ Custom ("Cannot enter state, because " <> show e)
+        \e -> logPerspectivesError $ Custom ("Cannot enter context state for " <> show ctxt <>  ", because " <> show e)
       lift $ restoreFrame oldFrame
   -- Enter the rootState of roles that are created.
   for_ createdRoles
@@ -394,7 +394,7 @@ runEntryAndExitActions previousTransaction@(Transaction{createdContexts, created
           -- Error boundary.
           catchError (for_ states (exitingRoleState rid))
             \e -> do 
-              logPerspectivesError $ Custom ("Cannot exit role state, because " <> show e)
+              logPerspectivesError $ Custom ("Cannot exit role state for " <> show rid <> ", because " <> show e)
               lift $ restoreFrame oldFrame
               throwError e
           lift $ restoreFrame oldFrame

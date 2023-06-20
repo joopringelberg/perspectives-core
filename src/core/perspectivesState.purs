@@ -32,7 +32,7 @@ import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, new
 import Perspectives.AMQP.Stomp (StompClient)
 import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
+import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser, Url)
 import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 

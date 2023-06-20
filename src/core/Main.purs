@@ -267,18 +267,20 @@ forkJustInTimeModelLoader modelToLoadAVar state = run
           put (HotLine hotline) modelToLoadAVar
           -- now fork a process that will actually load the model (and it will use the HotLine to 
           -- return the results to the requester):
-          _ <- forkAff $
+          loadingProcess <- forkAff $ do
             runPerspectivesWithState 
               (runEmbeddedIfNecessary
                 doNotShareWithPeers 
                 (ENR $ EnumeratedRoleType sysUser) 
-                (catchError 
-                  (do 
-                    void $ addModelToLocalStore dfId isInitialLoad 
-                    liftAff $ put ModelLoaded hotline)
-                  \e -> liftAff $ put (LoadingFailed $ show e) hotline
-                  ))
+                (void $ addModelToLocalStore dfId isInitialLoad))
               state
+            -- Report back to retrieveDomeinFile on the Aff level, i.e. when the embedded loading on the level of
+            -- MonadPerspectives has been run.
+            liftAff $ put ModelLoaded hotline
+          catchError (joinFiber loadingProcess)
+            \e -> do
+              logPerspectivesError $ Custom $ "Embedded (just in time) model load failed, because: " <> show e
+              liftAff $ put (LoadingFailed $ show e) hotline
           -- and repeat
           run
         Stop -> pure unit

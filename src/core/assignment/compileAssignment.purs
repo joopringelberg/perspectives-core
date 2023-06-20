@@ -309,21 +309,18 @@ compileAssignment (UQD _ WithFrame f1 _ _ _) = do
     void $ lift $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
     r <- f1' c
     void $ lift $ modify \s@{variableBindings} -> s {variableBindings = old}
-    pure unit
 
 compileAssignment (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- context2string f1
   pure \contextId -> do
     v <- lift (contextId ##= f1')
     lift $ addBinding varName (unsafeCoerce v)
-    pure unit
 
 compileAssignment (UQD _ (BindResultFromCreatingAssignment varName) f1 _ _ _) = do
   f1' <- compileCreatingAssignments f1
   pure \contextId -> do
     v <- f1' contextId
-    lift $ addBinding varName (unsafeCoerce v)
-    pure unit
+    lift $ addBinding varName v
 
 compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
