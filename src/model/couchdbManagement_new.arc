@@ -521,9 +521,11 @@ domain model://perspectives.domains#CouchdbManagement
         action StartUsing
           callEffect cdb:AddModelToLocalStore( VersionedModelURI )
           -- This must be commented out until we have unlinked fillers.
-          -- bind origin >> binding to BasicModelsInUse in sys:MySystem
+          bind origin >> binding to BasicModelsInUse in sys:MySystem
         action UpdateModel
           callEffect cdb:UpdateModel( VersionedModelURI, false )
+          -- notify Visitor
+          --   "You updated {LocalModelName} to version {Versions$Version}."
         action UpdateModelWithDependencies
           callEffect cdb:UpdateModel( VersionedModelURI, true )
 
