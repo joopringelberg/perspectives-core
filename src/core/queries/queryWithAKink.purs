@@ -140,19 +140,22 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
 
   otherwise -> do
     (lefts :: Array QueryWithAKink_) <- invert_ l
-    (zippedQueries :: Array QueryWithAKink_) <- invert_ r
-    pure do
-      (ZQ_ left_inverted_steps mLeft_forward) <- lefts
-      (ZQ_ right_inverted_steps mRight_forward) <- zippedQueries
-      -- The range of mLeft_forward must equal the domain of mRight_forward.
-      guard $ case range <$> mLeft_forward, domain <$> mRight_forward of
-        Just ran, Just domn -> ran == domn
-        -- If the forward of the left part is Nothing, left has been inverted entirely and 
-        -- may be combined with any inversion of right.
-        Nothing, _ -> true
-        _, _ -> false
-      pure $ ZQ_ (right_inverted_steps <> left_inverted_steps) -- v4.value0 <> v3.value0
-                  (mLeft_forward `composeOverMaybe` mRight_forward)
+    (rights :: Array QueryWithAKink_) <- invert_ r
+    case lefts, rights of 
+      [], _ -> pure rights
+      _, [] -> pure lefts
+      _, _ -> pure do
+        (ZQ_ left_inverted_steps mLeft_forward) <- lefts
+        (ZQ_ right_inverted_steps mRight_forward) <- rights
+        -- The range of mLeft_forward must equal the domain of mRight_forward.
+        guard $ case range <$> mLeft_forward, domain <$> mRight_forward of
+          Just ran, Just domn -> ran == domn
+          -- If the forward of the left part is Nothing, left has been inverted entirely and 
+          -- may be combined with any inversion of right.
+          Nothing, _ -> true
+          _, _ -> false
+        pure $ ZQ_ (right_inverted_steps <> left_inverted_steps) -- v4.value0 <> v3.value0
+                    (mLeft_forward `composeOverMaybe` mRight_forward)
 
 invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ (compose source criterium)
 
