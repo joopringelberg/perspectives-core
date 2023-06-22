@@ -448,7 +448,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
 
             -- PERSISTENCE
             lift (filled `filledPointsTo` filler)
-            if isInPublicScheme (unwrap filler)
+            if isInPublicScheme (unwrap filler) && not isInPublicScheme (unwrap filled)
               then pure unit
               else lift (filler `fillerPointsTo` filled)
 
@@ -618,7 +618,7 @@ changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filled
             Just newFiller -> do
               lift (filledId `filledPointsTo` newFiller)
               -- lift (newFiller `fillerPointsTo` filledId)
-              if isInPublicScheme (unwrap newFiller)
+              if isInPublicScheme (unwrap newFiller) && not isInPublicScheme (unwrap filledId)
                 then pure unit
                 else lift (newFiller `fillerPointsTo` filledId)
 
