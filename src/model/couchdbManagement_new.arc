@@ -30,15 +30,14 @@ domain model://perspectives.domains#CouchdbManagement
           bind_ couchdbapp >> extern to indexedcontext
           IndexedContexts$Name = couchdbapp >> indexedName for indexedcontext
 
-  -- This does not compile.
-  -- on exit
-  --   do for sys:PerspectivesSystem$Installer
-  --     letA
-  --       indexedcontext <- filter sys:MySystem >> IndexedContexts with binds (cm:MyCouchdbApp >> extern)
-  --       startcontext <- filter sys:MySystem >> StartContexts with binds (cm:MyCouchdbApp >> extern)
-  --     in
-  --       remove context indexedcontext
-  --       remove role startcontext
+  on exit
+    do for sys:PerspectivesSystem$Installer
+      letA
+        indexedcontext <- filter sys:MySystem >> IndexedContexts with filledBy (cm:MyCouchdbApp >> extern)
+        startcontext <- filter sys:MySystem >> StartContexts with filledBy (cm:MyCouchdbApp >> extern)
+      in
+        remove context indexedcontext
+        remove role startcontext
 
   aspect user sys:PerspectivesSystem$Installer
   -------------------------------------------------------------------------------

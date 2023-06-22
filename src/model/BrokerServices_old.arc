@@ -25,15 +25,15 @@ domain model://perspectives.domains#BrokerServices
           Name = "Broker Services App" for app >> extern
           bind_ app >> extern to indexedcontext
           IndexedContexts$Name = app >> indexedName for indexedcontext
-  -- DIT COMPILEERT NIET
-  -- on exit
-  --   do for sys:PerspectivesSystem$Installer
-  --     letA
-  --       indexedcontext <- filter sys:MySystem >> IndexedContexts with binds (bs:MyBrokers >> extern)
-  --       startcontext <- filter sys:MySystem >> StartContexts with binds (bs:MyBrokers >> extern)
-  --     in
-  --       remove context indexedcontext
-  --       remove role startcontext
+  
+  on exit
+    do for sys:PerspectivesSystem$Installer
+      letA
+        indexedcontext <- filter sys:MySystem >> IndexedContexts with filledBy (bs:MyBrokers >> extern)
+        startcontext <- filter sys:MySystem >> StartContexts with filledBy (bs:MyBrokers >> extern)
+      in
+        remove context indexedcontext
+        remove role startcontext
 
   aspect user sys:PerspectivesSystem$Installer
 
@@ -46,6 +46,9 @@ domain model://perspectives.domains#BrokerServices
 
     -- The BrokerServices I manage.
     context ManagedBrokers (relational) filledBy BrokerService
+      -- state NoAdministrator = (exists binding) and not exists binding >> context >> Administrator
+      --   do for Guest
+      --     bind sys:Me to Administrator in binding >> context
 
     -- The BrokerServices I use (have a contract with).
     context Contracts = sys:Me >> binder AccountHolder >> context >> extern

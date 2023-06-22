@@ -173,9 +173,11 @@ domain model://perspectives.domains#System
     context BasicModels = filter BaseRepository >> binding >> context >> Manifests with not IsLibrary
 
     context BasicModelsInUse (relational) filledBy sys:VersionedModelManifest
-      -- on exit
-      --   do for User
-      --     callDestructiveEffect cdb:RemoveModelFromLocalStore ( DomeinFileName )
+      on exit
+        do for User
+          callDestructiveEffect cdb:RemoveModelFromLocalStore ()
+        notify User
+          "Model {VersionedModelManifest$External$LocalModelName} has been removed completely."
 
 
     -- All context types that have been declared to be 'indexed' have an instance that fills this role.
@@ -238,25 +240,6 @@ domain model://perspectives.domains#System
     thing AllNotifications = callExternal cdb:RoleInstances( "model://perspectives.domains#System$ContextWithNotification$Notifications" ) returns sys:ContextWithNotification$Notifications
 
     context SystemCaches (mandatory) filledBy Caches
-
-  -- This will become obsolete when we start using model:CouchdbManagement.
-  -- case Model public NAMESPACESTORE
-  --   aspect sys:RootContext
-  --   external
-  --     aspect sys:RootContext$External
-  --     property Description (mandatory, String)
-  --     property ModelIdentification (mandatory, String)
-  --     property Url (mandatory, String)
-  --     property IsLibrary (mandatory, Boolean)
-  --     view ModelPresentation (Description, ModelIdentification, IsLibrary)
-  --   user Author filledBy User
-  --     aspect sys:RootContext$RootUser
-  --     perspective on extern
-  --   context IndexedContext (mandatory) filledBy sys:RootContext
-  --     -- Dit wordt alleen gebruikt in model:System.
-  --     property Name (mandatory, String)
-  --   thing IndexedRole (relational)
-  --     property Name (mandatory, String)
 
   -- A Collection of System Caches.
   case Caches
