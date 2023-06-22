@@ -5,36 +5,14 @@
 --  * a date marking the end of the Account;
 --  * credentials like username and password to provide access to resources of the Body.
 --  * a fee due for Accountship;
+-- Because types in this model are only used as Aspects, we do not create an entry for it in StartContexts.
 
 domain model://perspectives.domains#BodiesWithAccounts
   use sys for model://perspectives.domains#System
   use bwa for model://perspectives.domains#BodiesWithAccounts
   use util for model://perspectives.domains#Utilities
 
-  state ReadyToInstall = exists sys:PerspectivesSystem$Installer
-    on entry
-      do for sys:PerspectivesSystem$Installer
-        letA
-          -- We must first create the context and then later bind it.
-          -- If we try to create and bind it in a single statement, 
-          -- we find that the Installer can just create RootContexts
-          -- as they are the allowed binding of StartContexts.
-          -- As a consequence, no context is created.
-          app <- create context BodiesWithAccountsApp
-          indexedcontext <- create role IndexedContexts in sys:MySystem
-        in
-          -- Being a RootContext, too, Installer can fill a new instance
-          -- of StartContexts with it.
-          bind app >> extern to StartContexts in sys:MySystem
-          Name = "Bodies with Accounts" for app >> extern
-          -- Register the indexed context in MySystem.
-          bind_ app >> extern to indexedcontext
-          IndexedContexts$Name = app >> indexedName for indexedcontext
-
-  aspect user sys:PerspectivesSystem$Installer
-
   case BodiesWithAccountsApp
-    indexed bwa:App
     aspect sys:RootContext
     external
       aspect sys:RootContext$External
