@@ -50,7 +50,7 @@ nodesEndpoint :: String
 nodesEndpoint = "api/nodes/"
 
 virtualHost :: String
-virtualHost = "inplace"
+virtualHost = "mycontexts"
 
 type RabbitState = 
   { virtualHost :: VirtualHost
