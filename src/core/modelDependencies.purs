@@ -4,7 +4,7 @@ module Perspectives.ModelDependencies  where
 -- | None of these identifiers can be changed in their models without breaking the PDR.
 -- | Relevant models are:
 -- |    * model://perspectives.domains#System
--- |    * model://perspectives.domains/BrokerServices
+-- |    * model://perspectives.domains#BrokerServices
 
 ------------------------------------------------------------------------------------
 -- SYSTEM
@@ -84,7 +84,7 @@ modelDescription :: String
 modelDescription = "model://perspectives.domains#System$Model$External$Description"
 
 modelManagementDescription :: String
-modelManagementDescription = "model://perspectives.domains/ModelManagement$ManagedModel$ModelDescription"
+modelManagementDescription = "model://perspectives.domains#ModelManagement$ManagedModel$ModelDescription"
 
 modelUrl :: String
 modelUrl = "model://perspectives.domains#System$Model$External$Url"
@@ -141,31 +141,31 @@ addressRelayPort = "model://perspectives.domains#System$PhysicalContext$UserWith
 -- BROKERSERVICES
 ------------------------------------------------------------------------------------
 brokerService :: String
-brokerService = "model://perspectives.domains/BrokerServices$BrokerService"
+brokerService = "model://perspectives.domains#BrokerServices$BrokerService"
 
 brokerServiceAccounts :: String
-brokerServiceAccounts = "model://perspectives.domains/BrokerServices$BrokerService$Accounts"
+brokerServiceAccounts = "model://perspectives.domains#BrokerServices$BrokerService$Accounts"
 
 brokerEndpoint :: String
-brokerEndpoint = "model://perspectives.domains/BrokerServices$BrokerService$External$Url"
+brokerEndpoint = "model://perspectives.domains#BrokerServices$BrokerService$External$Url"
 
 brokerServiceExchange :: String
-brokerServiceExchange = "model://perspectives.domains/BrokerServices$BrokerService$External$Exchange"
+brokerServiceExchange = "model://perspectives.domains#BrokerServices$BrokerService$External$Exchange"
 
 brokerContract :: String
-brokerContract = "model://perspectives.domains/BrokerServices$BrokerContract"
+brokerContract = "model://perspectives.domains#BrokerServices$BrokerContract"
 
 accountHolder :: String
-accountHolder = "model://perspectives.domains/BrokerServices$BrokerContract$AccountHolder"
+accountHolder = "model://perspectives.domains#BrokerServices$BrokerContract$AccountHolder"
 
 accountHolderName :: String
-accountHolderName = "model://perspectives.domains/BrokerServices$BrokerContract$AccountHolder$AccountName"
+accountHolderName = "model://perspectives.domains#BrokerServices$BrokerContract$AccountHolder$AccountName"
 
 accountHolderPassword :: String
-accountHolderPassword = "model://perspectives.domains/BrokerServices$BrokerContract$AccountHolder$AccountPassword"
+accountHolderPassword = "model://perspectives.domains#BrokerServices$BrokerContract$AccountHolder$AccountPassword"
 
 accountHolderQueueName :: String
-accountHolderQueueName = "model://perspectives.domains/BrokerServices$BrokerContract$AccountHolder$QueueName"
+accountHolderQueueName = "model://perspectives.domains#BrokerServices$BrokerContract$AccountHolder$QueueName"
 
 -- "model:perspectives.domains#Couchdb$ContextInstances"
 
