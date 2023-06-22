@@ -172,7 +172,7 @@ updateModel arrWithModelName arrWithDependencies versions = case head arrWithMod
       -- Clear the caches of compiled states.
       void $ pure $ clearModelStates (DomeinFileId unversionedModelname)
       -- Install the new model, taking care of outgoing InvertedQueries.
-      addModelToLocalStore (DomeinFileId unversionedModelname) isUpdate
+      addModelToLocalStore (DomeinFileId modelName) isUpdate
       DomeinFile dfr <- lift $ getDomeinFile $ (DomeinFileId unversionedModelname)
       -- Find all models in use.
       models' <- lift (allModelsInUse >>= traverse getDomeinFile)
