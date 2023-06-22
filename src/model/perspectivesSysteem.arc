@@ -116,10 +116,12 @@ domain model://perspectives.domains#System
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
       perspective on BasicModels
-        props (LocalModelName, Description) verbs (Consult)
+        props (Manifests$LocalModelName, Description) verbs (Consult)
+      -- Notice that these roles are filled with the public version of VersionedModelManifest$External.
+      -- We can actually only show properties that are in that perspective.
       perspective on BasicModelsInUse
         only (Remove)
-        props (DomeinFileName, Description) verbs (Consult)
+        props (VersionedModelManifest$External$LocalModelName, Description) verbs (Consult)
 
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
@@ -135,7 +137,7 @@ domain model://perspectives.domains#System
             table BasicModels
           row 
             table BasicModelsInUse
-              props (DomeinFileName, Description) verbs (Consult)
+              props (VersionedModelManifest$External$LocalModelName, Description) verbs (Consult)
         tab "Start contexts"
           row
             table StartContexts
@@ -385,7 +387,7 @@ domain model://perspectives.domains#System
       -- the Version value.
       property Version (mandatory, String)
       -- E.g. "System@1.0.0"
-      property LocalModelName = context >> extern >> binder Manifests >> LocalModelName + "@" + Version
+      property LocalModelName = context >> extern >> binder Manifests >> Manifests$LocalModelName + "@" + Versions$Version
       -- The value of this property will be set automatically by the Couchdb:VersionedModelManifest$Author.
       -- It must be a DomeinFileId, e.g. perspectives_domains-System@1.0.0.json
       property DomeinFileName (mandatory, String)
@@ -396,6 +398,8 @@ domain model://perspectives.domains#System
       -- Notice that we have to register the DomeinFileName on the context role in the collection (ModelManifest$Versions),
       -- to serve in the pattern that creates a DNS URI, so it can be a public resource.
       property DomeinFileName = binder Versions >> Versions$DomeinFileName
+      property Version = binder Versions >> Versions$Version
+      property LocalModelName = binder Versions >> Versions$LocalModelName
     user Visitor = sys:Me
       perspective on extern
         props (Description, DomeinFileName) verbs (Consult)
