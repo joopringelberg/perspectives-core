@@ -19,7 +19,7 @@ exports.roleView = (function (doc)
 
 exports.pendingInvitations = (function(doc)
 {
-  if (doc.contents.properties["model:System$Invitation$External$Message"])
+  if (doc.contents.properties["model://perspectives.domains#System$Invitation$External$Message"])
   {
     emit(doc.contents._id, doc.contents._id);
   }
