@@ -378,7 +378,9 @@ severeBindingLinks (PerspectRol{_id:roleId, pspType:roleType, binding, filledRol
   case binding of
     Nothing -> pure unit
     -- (Remove from the filledRoles, in other words: change filler)
-    Just b -> b `fillerNoLongerPointsTo` roleId
+    Just b -> if isInPublicScheme (unwrap b) && not isInPublicScheme (unwrap roleId)
+      then pure unit
+      else b `fillerNoLongerPointsTo` roleId
   -- Severe the binding links of the outgoing FILLS relation:
   for_ filledRoles \roleMap ->
     for_ roleMap (\filledRoles' ->
@@ -605,7 +607,9 @@ changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filled
 
       -- Regardless of the filled will be removed, we'll have to remove the pointer from the filler to it.
       case rol_binding filled of
-        Just filler -> lift (filler `fillerNoLongerPointsTo` filledId)
+        Just filler -> if isInPublicScheme (unwrap filler) && not isInPublicScheme (unwrap filledId)
+          then pure unit
+          else lift (filler `fillerNoLongerPointsTo` filledId)
         _ -> pure unit
 
       if not roleWillBeRemoved
