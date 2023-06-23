@@ -34,12 +34,12 @@ ln -s ../../../purescript-kishimen v1.1.0
 
 cd ..
 
-#### PERSPECTIVES-v2.13.3 #####
+#### PERSPECTIVES-v2.14.0 #####
 cd apitypes
 
-rm -Rf v2.13.3
+rm -Rf v2.14.0
 
-ln -s ../../../perspectives-apitypes v2.13.3
+ln -s ../../../perspectives-apitypes v2.14.0
 
 cd ..
 
@@ -59,12 +59,12 @@ ln -s ../../../serialisable-nonempty-arrays v1.1.0
 
 cd ..
 
-##### PERSPECTIVES-v2.8.6 #####
+##### PERSPECTIVES-v2.8.7 #####
 cd perspectives-couchdb/
 
-rm -Rf v2.8.6
+rm -Rf v2.8.7
 
-ln -s ../../../perspectives-couchdb v2.8.6
+ln -s ../../../perspectives-couchdb v2.8.7
 
 cd ..
 
@@ -86,12 +86,12 @@ ln -s ../../../purescript-parsing v7.0.0-transformer-tagged
 
 cd ..
 
-##### v1.0.0 #####
+##### v1.1.0 #####
 cd lrucache
 
-rm -Rf v1.0.0
+rm -Rf v1.1.0
 
-ln -s ../../../purescript-lru-cache v1.0.0
+ln -s ../../../purescript-lru-cache v1.1.0
 
 cd ..
 
