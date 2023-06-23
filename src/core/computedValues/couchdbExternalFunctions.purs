@@ -534,12 +534,14 @@ type URL = String
 -- | The role argument will be the external role of the root context of the model (the 'app').
 -- | In fact, it does not matter what type the instance actually has, as long as it is in the namespace 
 -- | of the model we want to remove.
-removeModelFromLocalStore :: RoleInstance -> MonadPerspectivesTransaction Unit
-removeModelFromLocalStore rid = do 
-  aModelType <- lift $ unsafePartial typeUri2ModelUri_ <<< unwrap  <$> roleType_ rid
-  cid <- createResourceIdentifier (CType $ ContextType aModelType)  
-  scheduleContextRemoval Nothing (ContextInstance cid)
-  scheduleDomeinFileRemoval (DomeinFileId aModelType)
+removeModelFromLocalStore :: Array RoleInstance ->  RoleInstance -> MonadPerspectivesTransaction Unit
+removeModelFromLocalStore roleInDomainA rid = case head roleInDomainA of 
+  Just roleInDomain -> do 
+    aModelType <- lift $ unsafePartial typeUri2ModelUri_ <<< unwrap  <$> roleType_ roleInDomain
+    cid <- createResourceIdentifier (CType $ ContextType aModelType)  
+    scheduleContextRemoval Nothing (ContextInstance cid)
+    scheduleDomeinFileRemoval (DomeinFileId aModelType)
+  _ -> pure unit
 
 scheduleDomeinFileRemoval :: DomeinFileId -> MonadPerspectivesTransaction Unit
 scheduleDomeinFileRemoval id = AMA.modify (over Transaction \t@{modelsToBeRemoved} -> t {modelsToBeRemoved = cons id modelsToBeRemoved})
@@ -668,7 +670,7 @@ externalFunctions =
   [ Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore_, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
-  , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 0}
+  , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
   , Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}

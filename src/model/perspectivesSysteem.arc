@@ -108,9 +108,7 @@ domain model://perspectives.domains#System
       --     IncludingDependencies = true
       --     PerformUpdate = true
       perspective on StartContexts
-        defaults
-        action StopUsing
-          callDestructiveEffect cdb:RemoveModelFromLocalStore ()
+        props (Name) verbs (Consult)
       perspective on Contacts
         props (FirstName, LastName) verbs (Consult)
       perspective on External
@@ -175,7 +173,7 @@ domain model://perspectives.domains#System
     context BasicModelsInUse (relational) filledBy sys:VersionedModelManifest
       on exit
         do for User
-          callDestructiveEffect cdb:RemoveModelFromLocalStore ()
+          callDestructiveEffect cdb:RemoveModelFromLocalStore ( binding )
         notify User
           "Model {VersionedModelManifest$External$LocalModelName} has been removed completely."
 
