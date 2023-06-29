@@ -46,7 +46,7 @@ import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, liftToInstanceLevel, (##>>), (###=))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), firstOfSequence, runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
@@ -440,6 +440,8 @@ compileSequenceFunction (SQD dom (UnaryCombinator sequenceFunctionName) _ _ _) |
     -- pure (\numbers -> pure $ foldl (\cumulator str -> cumulator + str) "" numbers)
     (VDOM RAN.PString _) -> pure \strings -> ArrayT $ pure [foldl (\cumulator str -> cumulator <> str) "" strings]
     _ -> throwError (error $ "compileSequenceFunction cannot handle domain '" <> show dom <> "' for 'add'.")
+  FirstF -> pure firstOfSequence
+
   op -> throwError (error $ "compileSequenceFunction cannot handle sequence function: '" <> show op <> "'.")
 -- Catch all
 compileSequenceFunction qd = throwError (error $ "compileSequenceFunction cannot create a function out of '" <> prettyPrint qd <> "'.")

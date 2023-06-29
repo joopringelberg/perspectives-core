@@ -29,6 +29,7 @@ module Perspectives.DependencyTracking.Array.Trans where
 -- | The `ArrayT` monad transformer.
 -- |
 -- | This monad transformer extends the base monad.
+
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError, class MonadThrow, catchError, throwError, try)
@@ -36,9 +37,9 @@ import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Control.MonadZero (class Alternative, class MonadZero)
 import Control.Plus (class Alt, class Plus)
 import Data.Array (catMaybes) as Arr
-import Data.Array (concat, null, singleton)
+import Data.Array (concat, head, null, singleton)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
 import Effect.Aff.Class (class MonadAff, liftAff)
@@ -135,3 +136,8 @@ instance monadEffectArrayT :: MonadEffect m => MonadEffect (ArrayT m) where
 
 instance monadAffArrayT ∷ MonadAff m => MonadAff (ArrayT m) where
   liftAff a = lift (liftAff a)
+
+firstOfSequence :: forall f a. Monad f => Array a -> ArrayT f a
+firstOfSequence as = case head as of 
+  Nothing -> ArrayT $ pure []
+  Just a -> ArrayT $ pure [a]

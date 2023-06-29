@@ -87,6 +87,8 @@ data FunctionName =
   | RoleTypesF
   | SpecialisesRoleTypeF
 
+  | FirstF
+
 
 derive instance genericFunctionName :: Generic FunctionName _
 instance encodeFunctionName :: Encode FunctionName where
@@ -139,6 +141,7 @@ instance showFunctionName :: Show FunctionName where
     show TypeOfContextF = "TypeOfContextF"
     show RoleTypesF = "RoleTypesF"
     show SpecialisesRoleTypeF = "SpecialisesRoleTypeF"
+    show FirstF = "first"
 
 instance writeForeignFunctionName :: WriteForeign FunctionName where
   writeImpl a = writeImpl( genericSumToVariant a )
@@ -188,6 +191,7 @@ isFunctionalFunction fn = case fn of
   TypeOfContextF -> True
   RoleTypesF -> False
   SpecialisesRoleTypeF -> True
+  FirstF -> True
 
 -- | False if the function can return an empty result.
 isMandatoryFunction :: FunctionName -> ThreeValuedLogic
@@ -232,6 +236,7 @@ isMandatoryFunction fn = case fn of
   TypeOfContextF -> True
   RoleTypesF -> True
   SpecialisesRoleTypeF -> True
+  FirstF -> False
 
 ---------------------------------------------------------------------------------------
 ---- QUERYFUNCTION

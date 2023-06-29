@@ -55,6 +55,7 @@ type EnumeratedPropertyRecord =
 
   , pos :: ArcPosition
 
+  -- The keys are the string versions of EnumeratedRoleTypes.
   , onPropertyDelta :: Object (Array InvertedQuery)
 
   , constrainingFacets :: Array PropertyFacet
