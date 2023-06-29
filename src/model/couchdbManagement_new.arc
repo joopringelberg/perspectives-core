@@ -518,13 +518,23 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Versions
         props (Versions$Version, VersionedModelManifest$External$Description, VersionedModelURI) verbs (Consult)
         action StartUsing
-          callEffect cdb:AddModelToLocalStore( VersionedModelURI )
-          -- This must be commented out until we have unlinked fillers.
-          bind origin >> binding to BasicModelsInUse in sys:MySystem
+          letA
+            bm <- create role BasicModelsInUse in sys:MySystem
+          in
+            callEffect cdb:AddModelToLocalStore( VersionedModelURI )
+            bind_ origin >> binding to bm
+            -- We need this to be able to remove.
+            ModelToRemove = VersionedModelURI for bm
         action UpdateModel
-          callEffect cdb:UpdateModel( VersionedModelURI, false )
+          letA
+            -- Notice that because Versions is a published role, there are no backlinks to roles it fills.
+            basicmodel <- (filter sys:MySystem >> BasicModelsInUse with filledBy (origin >> binding)) >>= first
+          in 
+            callEffect cdb:UpdateModel( VersionedModelURI, false )
+            ModelToRemove = VersionedModelURI for basicmodel
+            bind_ origin >> binding to basicmodel
           -- notify Visitor
-          --   "You updated {LocalModelName} to version {Versions$Version}."
+          --   "You updated to version {VersionedModelURI}."
         action UpdateModelWithDependencies
           callEffect cdb:UpdateModel( VersionedModelURI, true )
 
@@ -561,16 +571,16 @@ domain model://perspectives.domains#CouchdbManagement
           callEffect p:UploadToRepository( extern >> VersionedModelManifest$External$VersionedModelURI, extern >> ArcSource )
           SourcesChanged = false for extern
         notify Author
-          "Version {extern >> Version} has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace}."
+          "Version {extern >> External$Version} has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace}."
 
     external
       aspect sys:VersionedModelManifest$External
       -- VersionedModelManifest$External$Description
       -- VersionedModelManifest$External$DomeinFileName
+      -- VersionedModelManifest$External$Version
       -- The Version property is registered on ModelManifest$Versions so we can use it to create a DNS URN for it (it must be a public resource)
-      property Version = binder Versions >> Versions$Version
       property ModelURI = binder Versions >> context >> extern >> ModelManifest$External$ModelURI
-      property VersionedModelURI = VersionedModelManifest$External$ModelURI + "@" + VersionedModelManifest$External$Version
+      property VersionedModelURI = VersionedModelManifest$External$ModelURI + "@" + External$Version
       property ArcSource (mandatory, String)
         minLength = 81 -- shows as a textarea
       property ArcFeedback (String)
@@ -621,14 +631,14 @@ domain model://perspectives.domains#CouchdbManagement
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (Version, Description, IsRecommended) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
+        props (External$Version, Description, IsRecommended) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
 
 
     user ActiveUser = extern >> binder Versions >> context >> ActiveUser
       perspective on Author
         props (FirstName, LastName) verbs (Consult)
       perspective on extern
-        props (Version) verbs (Consult)
+        props (External$Version) verbs (Consult)
 
       screen "Manifest"
         row

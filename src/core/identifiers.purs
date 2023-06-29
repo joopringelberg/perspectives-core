@@ -32,7 +32,7 @@ import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||))
+import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||), (+))
 
 -- | The unsafeRegex function takes a string `pattern` as first argument and uses it as is in a new Regex(`pattern`).
 -- | Hence, in Purescript, we can follow the rules for the new Regex("your pattern") approach.
@@ -89,10 +89,10 @@ isModelUri = isJust <<< match newModelRegex
 -- |	  model://{subdomains-with-dots}.{authority-with-dots}/{LocalModelName}
 -- | to:
 -- |    { repositoryUrl: https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}
--- |    , documentName: {subdomains-with-underscores}_{authority-with-underscores}#{LocalModelName}.json}
+-- |    , documentName: {subdomains-with-underscores}_{authority-with-underscores}-{LocalModelName}.json}
 -- | Where LocalModelName may include a Semantic Version Number, as in "System@1.0.0"
 -- | When concatenated with a forward slash in between, those two parts form:
--- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{LocalModelName}.json
+-- |    https://{authority-with-dots}/models_{subdomains-with-underscores}_{authority-with-underscores}/{subdomains-with-underscores}_{authority-with-underscores}-{LocalModelName}.json
 -- | The function is Partial because it should only be applied to a string that matches newModelPattern.
 modelUri2ModelUrl :: Partial => String -> {repositoryUrl :: String, documentName :: String}
 modelUri2ModelUrl s = let
@@ -164,7 +164,7 @@ unversionedModelUri s = case indexOf (Pattern "@") s of
 modelUriVersion :: String -> Maybe String
 modelUriVersion s = case indexOf (Pattern "@") s of
   Nothing -> Nothing
-  Just u -> case splitAt u s of
+  Just u -> case splitAt (u + 1) s of
     {after} -> Just after
 
 -----------------------------------------------------------

@@ -119,7 +119,7 @@ domain model://perspectives.domains#System
       -- We can actually only show properties that are in that perspective.
       perspective on BasicModelsInUse
         only (Remove)
-        props (VersionedModelManifest$External$LocalModelName, Description) verbs (Consult)
+        props (VersionedModelManifest$External$LocalModelName, Description, Version) verbs (Consult)
 
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
@@ -135,7 +135,7 @@ domain model://perspectives.domains#System
             table BasicModels
           row 
             table BasicModelsInUse
-              props (VersionedModelManifest$External$LocalModelName, Description) verbs (Consult)
+              props (VersionedModelManifest$External$LocalModelName, Version, Description) verbs (Consult)
         tab "Start contexts"
           row
             table StartContexts
@@ -171,11 +171,12 @@ domain model://perspectives.domains#System
     context BasicModels = filter BaseRepository >> binding >> context >> Manifests with not IsLibrary
 
     context BasicModelsInUse (relational) filledBy sys:VersionedModelManifest
+      property ModelToRemove (String)
       on exit
+        -- notify User
+        --   "Model {ModelToRemove} has been removed completely."
         do for User
-          callDestructiveEffect cdb:RemoveModelFromLocalStore ( binding )
-        notify User
-          "Model {VersionedModelManifest$External$LocalModelName} has been removed completely."
+          callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelToRemove )
 
 
     -- All context types that have been declared to be 'indexed' have an instance that fills this role.

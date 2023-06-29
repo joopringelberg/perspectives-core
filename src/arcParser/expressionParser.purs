@@ -179,6 +179,7 @@ sequenceFunction = (token.symbol "sum" *> pure AddF
   <|> token.symbol "minimum" *> pure MinimumF
   <|> token.symbol "maximum" *> pure MaximumF
   <|> token.symbol "count" *> pure CountF
+  <|> token.symbol "first" *> pure FirstF
   ) <?> "sum, product, minimum,\
 \ maximum or count"
 
@@ -319,7 +320,7 @@ startOf stp = case stp of
     startOfSimple (TypeOfContext p) = p
     startOfSimple (RoleTypes p) = p
     startOfSimple (SpecialisesRoleType p _) = p
-
+    
     startOfSimple (TypeTimeOnlyContext p _) = p
     startOfSimple (TypeTimeOnlyEnumeratedRole p _ _) = p
     startOfSimple (TypeTimeOnlyCalculatedRole p _) = p
@@ -359,7 +360,7 @@ endOf stp = case stp of
     endOfSimple (TypeOfContext (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}
     endOfSimple (RoleTypes (ArcPosition{line, column})) = ArcPosition{line, column: column + 9}
     endOfSimple (SpecialisesRoleType (ArcPosition{line, column}) ident) = ArcPosition{line, column: column + 19 + length ident}
-
+    
     endOfSimple (TypeTimeOnlyContext p _) = p
     endOfSimple (TypeTimeOnlyEnumeratedRole p _ _) = p
     endOfSimple (TypeTimeOnlyCalculatedRole p _) = p

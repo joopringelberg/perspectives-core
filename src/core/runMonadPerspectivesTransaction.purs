@@ -115,7 +115,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       r <- a
 
       -- 2. Now run all actions.
-      ft@(Transaction{correlationIdentifiers, scheduledAssignments}) <- AA.get >>= runAllAutomaticActions
+      ft@(Transaction{correlationIdentifiers, scheduledAssignments, modelsToBeRemoved}) <- AA.get >>= runAllAutomaticActions
 
       -- 3. Send deltas to other participants, save changed domeinfiles.
       (publicRoleTransactions :: TransactionPerUser) <- if share 
@@ -149,8 +149,9 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
       for_ (reverse scheduledAssignments) case _ of
         ContextRemoval ctxt authorizedRole -> lift (log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole)
         RoleRemoval rid -> lift (log ("Remove role " <> unwrap rid) *> removeRoleInstance rid)
-        -- TODO: moeten we msignedDelta niet meegeven?
         _ -> pure unit
+      log ("Will remove these models: " <> show modelsToBeRemoved)
+      lift $ for_ modelsToBeRemoved tryRemoveEntiteit
 
       -- 4. Run effects.
       log "==========RUNNING EFFECTS============"
@@ -186,8 +187,6 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
         RoleUnbinding filled mNewFiller msignedDelta -> log ("Remove filler of " <> unwrap filled) *> changeRoleBinding filled mNewFiller
         ExecuteDestructiveEffect functionName origin values -> log ("DestructiveEffect: " <> functionName) *> executeEffect functionName origin values
         _ -> pure unit
-      -- log ("Will remove these models: " <> show modelsToBeRemoved)
-      lift $ for_ modelsToBeRemoved tryRemoveEntiteit
       -- Now state has changed. Re-evaluate the resources that may change state.
       (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
       log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")

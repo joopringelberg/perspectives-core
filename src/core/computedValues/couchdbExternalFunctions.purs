@@ -59,16 +59,16 @@ import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAtt
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
+import Perspectives.DomeinCache (getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvertedQuery(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ModelUrl, newModelRegex, typeUri2LocalName_, typeUri2ModelUri_, unversionedModelUri)
+import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, newModelRegex, typeUri2LocalName_, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
-import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances, roleType_)
+import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
@@ -88,7 +88,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
-import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -213,7 +213,10 @@ isInitialLoad = true
 -- | Parameter `isUpdate` should be true iff the model has been added to the local installation before.
 addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
-  {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl modelname
+  version <- case modelUriVersion modelname of
+    Just v -> pure $ Just v
+    Nothing -> lift $ getVersionToInstall modelname
+  {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl ((unversionedModelUri modelname) <> (maybe "" ((<>) "@") version))
   df@(DomeinFile
   { _id
   -- , indexedRoles
@@ -242,7 +245,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
         else pure unit
       
       -- Create the model instance
-      cid <- createResourceIdentifier (CType $ ContextType unversionedModelname)
+      cid <- pure $ createDefaultIdentifier ((unsafePartial modelUri2ManifestUrl unversionedModelname).manifestName <> "_modelRootContext")
       r <- runExceptT $ constructEmptyContext 
         (ContextInstance cid)
         unversionedModelname
@@ -531,16 +534,14 @@ removeFromRepository_ splitName = Persistence.deleteDocument splitName.repositor
 
 type URL = String
 
--- | The role argument will be the external role of the root context of the model (the 'app').
--- | In fact, it does not matter what type the instance actually has, as long as it is in the namespace 
--- | of the model we want to remove.
-removeModelFromLocalStore :: Array RoleInstance ->  RoleInstance -> MonadPerspectivesTransaction Unit
-removeModelFromLocalStore roleInDomainA rid = case head roleInDomainA of 
-  Just roleInDomain -> do 
-    aModelType <- lift $ unsafePartial typeUri2ModelUri_ <<< unwrap  <$> roleType_ roleInDomain
-    cid <- createResourceIdentifier (CType $ ContextType aModelType)  
+-- | The argument may be a versioned or unversioned modelURI, e.g. model://perspectives.domains#System@1.1.0
+removeModelFromLocalStore :: Array String ->  RoleInstance -> MonadPerspectivesTransaction Unit
+removeModelFromLocalStore versionedModelURIA rid = case head versionedModelURIA of 
+  Just versionedModelURI -> do 
+    let unversionedURI = unversionedModelUri versionedModelURI
+    let cid = createDefaultIdentifier ((unsafePartial modelUri2ManifestUrl unversionedURI).manifestName <> "_modelRootContext")
     scheduleContextRemoval Nothing (ContextInstance cid)
-    scheduleDomeinFileRemoval (DomeinFileId aModelType)
+    scheduleDomeinFileRemoval (DomeinFileId unversionedURI)
   _ -> pure unit
 
 scheduleDomeinFileRemoval :: DomeinFileId -> MonadPerspectivesTransaction Unit

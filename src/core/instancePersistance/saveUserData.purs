@@ -167,7 +167,7 @@ scheduleRoleRemoval id = do
 -- | (we build a last-in, last-out stack of destructive effects)
 scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
 scheduleContextRemoval authorizedRole id = (lift $ try $ getPerspectContext id) >>=
-  handlePerspectContextError "removeContextInstance"
+  handlePerspectContextError "scheduleContextRemoval"
   \(ctxt@(PerspectContext{rolInContext, buitenRol, pspType:contextType})) -> do
     unlinkedRoleTypes <- lift (contextType ###= allUnlinkedRoles)
     unlinkedInstances <- lift $ concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
@@ -205,7 +205,7 @@ removeContextInstance id authorizedRole = do
 stateEvaluationAndQueryUpdatesForContext :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
 stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
   (lift $ try $ getPerspectContext id) >>=
-    handlePerspectContextError "removeContextInstance"
+    handlePerspectContextError "stateEvaluationAndQueryUpdatesForContext"
     \(ctxt@(PerspectContext{pspType:contextType, rolInContext, buitenRol})) -> do
       users1 <- concat <$> for (concat $ values rolInContext) handleRoleOnContextRemoval
       users2 <- handleRoleOnContextRemoval buitenRol
