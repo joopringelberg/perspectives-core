@@ -129,9 +129,10 @@ pendingInvitations _ = ArrayT do
 -- | Overwrites the model currently residing in the local models database.
 -- | Takes care of inverted queries.
 -- | Clears compiled states from cache.
--- | The first argument should contain the string version of the model name ("model://some.domain#Something")
+-- | The first argument should contain the model name ("model://some.domain#Something@<SemVer>"), 
 -- | The second argument should contain the string representation of a boolean value.
 -- | The third argument is an array with an instance of the role ModelsInuse.
+-- | If no SemVer is given, will try to load the unversioned model (if any).
 updateModel :: Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
 updateModel arrWithModelName arrWithDependencies versions = case head arrWithModelName of
   -- fail silently

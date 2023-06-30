@@ -113,6 +113,7 @@ domain model://perspectives.domains#System
       perspective on BaseRepository
         props (Domain) verbs (Consult)
       perspective on Repositories
+        verbs (CreateAndFill, Remove)
         props (Domain) verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
