@@ -416,7 +416,7 @@ compileFunction qd = throwError (error $ "Cannot create a function out of '" <> 
 -- We also require that the VDOM should have an EnumeratedPropertyType.
 -- TODO. Het probleem is dat we (String ~~> String) moeten opleveren!
 compileSequenceFunction :: QueryFunctionDescription -> MP (Array String -> MonadPerspectivesQuery String)
-compileSequenceFunction (SQD dom (UnaryCombinator sequenceFunctionName) _ _ _) | isJust $ elemIndex sequenceFunctionName [CountF, MinimumF, MaximumF, AddF]  = case sequenceFunctionName of
+compileSequenceFunction (SQD dom (UnaryCombinator sequenceFunctionName) _ _ _) | isJust $ elemIndex sequenceFunctionName [CountF, MinimumF, MaximumF, AddF, FirstF]  = case sequenceFunctionName of
   CountF -> pure \things -> pure (show $ length things)
   MinimumF -> case dom of
     (VDOM RAN.PNumber _) -> pure \numbers -> ArrayT do

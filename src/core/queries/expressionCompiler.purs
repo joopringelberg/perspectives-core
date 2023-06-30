@@ -678,7 +678,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
                 (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
               OrF -> ensureDomainIsRange dom [PBool] pos
                 (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
-              FirstF -> pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeF) f1 f2' ran True True
+              FirstF -> pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True
               _ -> throwError $ ArgumentMustBeSequenceFunction pos
             _ -> throwError $ ArgumentMustBeSequenceFunction pos
 

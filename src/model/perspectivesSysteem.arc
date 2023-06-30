@@ -113,14 +113,17 @@ domain model://perspectives.domains#System
         props (FirstName, LastName) verbs (Consult)
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
-      perspective on BasicModels
+      perspective on Models
         props (Manifests$LocalModelName, Description) verbs (Consult)
       -- Notice that these roles are filled with the public version of VersionedModelManifest$External.
       -- We can actually only show properties that are in that perspective.
-      perspective on BasicModelsInUse
+      perspective on ModelsInUse
         only (Remove)
         props (VersionedModelManifest$External$LocalModelName, Description, Version) verbs (Consult)
-
+      perspective on BaseRepository
+        props (Domain) verbs (Consult)
+      perspective on Repositories
+        props (Domain) verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
       perspective on SystemCaches
@@ -131,10 +134,11 @@ domain model://perspectives.domains#System
           row
             form SystemCaches
         tab "Manage new models"
+          form BaseRepository
           row
-            table BasicModels
+            table Repositories
           row 
-            table BasicModelsInUse
+            table ModelsInUse
               props (VersionedModelManifest$External$LocalModelName, Version, Description) verbs (Consult)
         tab "Start contexts"
           row
@@ -168,9 +172,13 @@ domain model://perspectives.domains#System
 
     context BaseRepository filledBy ManifestCollection
 
-    context BasicModels = filter BaseRepository >> binding >> context >> Manifests with not IsLibrary
+    context Repositories (relational) filledBy ManifestCollection
 
-    context BasicModelsInUse (relational) filledBy sys:VersionedModelManifest
+    context AllRepositories = BaseRepository union Repositories
+
+    context Models = filter AllRepositories >> binding >> context >> Manifests with not IsLibrary
+
+    context ModelsInUse (relational) filledBy sys:VersionedModelManifest
       property ModelToRemove (String)
       on exit
         -- notify User
@@ -350,6 +358,13 @@ domain model://perspectives.domains#System
 
   -- To be used as Aspect in model:CouchdbManagement$Repository
   case ManifestCollection
+    external
+      -- This is the namespace of the models in this repository, but dots are replaced by underscores.
+      -- It is computed from Repositories$NameSpace on creating the repository (CouchdbManagement)
+      property NameSpace_ (mandatory, String)
+      -- This we show on screen.
+      property Domain = NameSpace_ >> callExternal util:Replace( "_", "." ) returns String
+    
     context Manifests (relational) filledBy ModelManifest
       -- This is the local name, unqualified, of the model, e.g. "JoopsModel" or "System".
       -- It must be entered through a form. We need it on this role so we can create an instance

@@ -58,7 +58,7 @@ domain model://perspectives.domains#CouchdbManagement
       do for Manager
         delete context bound to CouchdbServers
         -- remove this context from PerspectivesSystem$IndexedContexts
-        -- remove the model from BasicModelsInUse
+        -- remove the model from ModelsInUse
 
     -- Every user manages his own CouchdbServers.
     -- This manager should be the Server admin of each CouchdbServer,
@@ -338,11 +338,11 @@ domain model://perspectives.domains#CouchdbManagement
         delete context bound to Manifests
 
     external
+      aspect sys:ManifestCollection$External
+        -- NameSpace_
+        -- Domain
       -- Only public repositories will be visible to Accounts of CouchdbServers.
       property IsPublic (mandatory, Boolean)
-      -- This is the namespace of the models in this repository, but dots are replaced by underscores.
-      -- It is computed from Repositories$NameSpace on creating the repository.
-      property NameSpace_ (mandatory, String)
       -- The toplevel domain with at least one subdomain, such as perspectives.domains or professional.joopringelberg.nl.
       property NameSpace = binder Repositories >> Repositories$NameSpace
       property ReadModels = "models_" + NameSpace_
@@ -513,13 +513,13 @@ domain model://perspectives.domains#CouchdbManagement
     public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
         props (LocalModelName, ModelManifest$External$Description, IsLibrary, VersionToInstall) verbs (Consult)
-      perspective on sys:MySystem >> BasicModelsInUse
+      perspective on sys:MySystem >> ModelsInUse
         only (Fill, Remove)
       perspective on Versions
         props (Versions$Version, VersionedModelManifest$External$Description, VersionedModelURI) verbs (Consult)
         action StartUsing
           letA
-            bm <- create role BasicModelsInUse in sys:MySystem
+            bm <- create role ModelsInUse in sys:MySystem
           in
             callEffect cdb:AddModelToLocalStore( VersionedModelURI )
             bind_ origin >> binding to bm
@@ -528,7 +528,7 @@ domain model://perspectives.domains#CouchdbManagement
         action UpdateModel
           letA
             -- Notice that because Versions is a published role, there are no backlinks to roles it fills.
-            basicmodel <- (filter sys:MySystem >> BasicModelsInUse with filledBy (origin >> binding)) >>= first
+            basicmodel <- (filter sys:MySystem >> ModelsInUse with filledBy (origin >> binding)) >>= first
           in 
             callEffect cdb:UpdateModel( VersionedModelURI, false )
             ModelToRemove = VersionedModelURI for basicmodel

@@ -29,7 +29,7 @@ idProperty :: String
 idProperty = "model://perspectives.domains#System$PerspectivesSystem$User$Id"
 
 modelsInUse :: String
-modelsInUse = "model://perspectives.domains#System$PerspectivesSystem$BasicModelsInUse"
+modelsInUse = "model://perspectives.domains#System$PerspectivesSystem$ModelsInUse"
 
 connectedToAMQPBroker :: String
 connectedToAMQPBroker = "model://perspectives.domains#System$PerspectivesSystem$External$ConnectedToAMQPBroker"
