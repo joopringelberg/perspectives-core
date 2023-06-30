@@ -69,7 +69,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on CouchdbServers
         only (CreateAndFill, Remove, Delete)
         props (Name) verbs (Consult)
-        props (Url, CouchdbServers$CouchdbPort, AdminPassword) verbs (SetPropertyValue)
+        props (Url, CouchdbServers$CouchdbPort, AdminPassword, Name) verbs (SetPropertyValue)
 
       -- Manager needs this action so he can set the Url before the CouchdbServer$Visitor tries to publish.
       action CreateServer
@@ -78,6 +78,13 @@ domain model://perspectives.domains#CouchdbManagement
       -- Manager needs this perspective for others to accept Admins created in state CouchdbServers$NoAdmin.
       perspective on CouchdbServers >> binding >> context >> CouchdbServer$Admin
         only (Create, Fill)
+      
+      screen "Couchdb Server Administration"
+        row
+          table CouchdbServers
+            -- No restriction on properties, but no role verbs allowed.
+            only ()
+
       
     -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
     -- filled with CouchdbManagementApp$Admin.

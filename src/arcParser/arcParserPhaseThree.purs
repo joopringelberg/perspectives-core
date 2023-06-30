@@ -1390,7 +1390,7 @@ handleScreens screenEs = do
                       , perspectiveId
                       , perspective: Nothing
                       , propertyVerbs: Nothing
-                      , roleVerbs: maybe [] roleVerbList2Verbs roleVerbs
+                      , roleVerbs: maybe Nothing (Just <<< roleVerbList2Verbs) roleVerbs
                       , userRole: subjectRoleType
                       }
                     pOrV, pVerbs -> do
@@ -1401,7 +1401,7 @@ handleScreens screenEs = do
                         , perspectiveId
                         , perspective: Nothing
                         , propertyVerbs: Just $ PropertyVerbs propertyTypes pVerbs
-                        , roleVerbs: maybe [] roleVerbList2Verbs roleVerbs
+                        , roleVerbs: maybe Nothing (Just <<< roleVerbList2Verbs) roleVerbs
                         , userRole: subjectRoleType
                         }
             checkVerbsAndProps :: Array PropertyType -> ExplicitSet PropertyType -> Array PropertyVerb -> Perspective -> RoleType -> PhaseThree Unit

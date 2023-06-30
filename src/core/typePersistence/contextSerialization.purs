@@ -91,7 +91,7 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
             , perspective: Just p
             , perspectiveId: ""
             , propertyVerbs: Nothing
-            , roleVerbs: []
+            , roleVerbs: Nothing
             , userRole: userRoleType
             }
           element = if isFunctional
@@ -109,7 +109,7 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
             , perspective: Just p
             , perspectiveId: ""
             , propertyVerbs: Nothing
-            , roleVerbs: []
+            , roleVerbs: Nothing
             , userRole: userRoleType
             }
         in 

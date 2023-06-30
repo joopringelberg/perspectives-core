@@ -83,7 +83,7 @@ type WidgetCommonFieldsDefWithoutPerspective f =
   -- These three fields are not serialised runtime; they are used to
   -- create the restricted serialised perspective.
   , propertyVerbs :: Maybe PropertyVerbs
-  , roleVerbs :: Array RoleVerb
+  , roleVerbs :: Maybe (Array RoleVerb)
   , userRole :: RoleType
   | f
   }

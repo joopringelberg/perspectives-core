@@ -75,7 +75,7 @@ perspectiveForContextAndUser subject userRoleType objectRoleType cid = ArrayT do
   subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
   allPerspectives <- lift$  perspectivesOfRoleType userRoleType
   traverse
-    ((serialisePerspective contextStates subjectStates cid userRoleType Nothing []) >=> pure <<< SerialisedPerspective <<< writeJSON)
+    ((serialisePerspective contextStates subjectStates cid userRoleType Nothing Nothing) >=> pure <<< SerialisedPerspective <<< writeJSON)
     (filter
       (isJust <<< elemIndex objectRoleType <<< _.roleTypes <<< unwrap)
       allPerspectives)
@@ -108,7 +108,7 @@ perspectivesForContextAndUser' subject userRoleType cid = ArrayT do
   -- NOTE that we ignore perspectives that the user role's aspects may have!
   -- These have been added in compile time.
   perspectives <- lift $ perspectivesOfRoleType userRoleType
-  (traverse (serialisePerspective contextStates subjectStates cid userRoleType Nothing []) perspectives) >>=
+  (traverse (serialisePerspective contextStates subjectStates cid userRoleType Nothing Nothing) perspectives) >>=
     (filterA sendToClient)
   where
     sendToClient :: SerialisedPerspective' -> AssumptionTracking Boolean
@@ -123,9 +123,9 @@ serialisePerspective ::
   ContextInstance ->
   RoleType ->
   Maybe PropertyVerbs ->
-  Array RoleVerb ->
+  Maybe (Array RoleVerb) ->
   Perspective ->
-  AssumptionTracking SerialisedPerspective'
+  AssumptionTracking SerialisedPerspective' 
 serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs' roleVerbs' p@(Perspective {id, object, isEnumerated, displayName, roleTypes, roleVerbs, propertyVerbs, actions}) = do
   -- All properties available on the object of the perspective.
   (allProps :: Array PropertyType) <- lift $ allProperties (roleInContext2Role <$> (unsafePartial domain2roleType $ range object))
@@ -173,10 +173,11 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     , roleType: roletype2string <$> head roleTypes
     , contextInstance: cid
     , roleKind
-    , verbs: show <$> (if null roleVerbs'
-      then concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))
-      -- else combine the verbs from all active states.
-      else (intersect roleVerbs' $ concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))))
+    , verbs: show <$> case roleVerbs' of
+        -- No restrictions
+        Nothing -> concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates)))
+        -- else combine the verbs from all active states.
+        Just verbs -> (intersect verbs $ concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates))))
     , properties: fromFoldable ((\r@({id:propId}) -> Tuple propId r) <$> serialisedProps)
     , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
