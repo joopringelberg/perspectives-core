@@ -1241,6 +1241,7 @@ selfOnly = do
 -- |   view <ident> [ ( <propertyVerb>{, <propertyVerb>}+ )]
 -- |   |
 -- |   props [(<ident> {, <ident>}+) ] [ verbs ( <propertyVerb>{, <propertyVerb>}+ )]
+-- | The default has propertyVerbs = Universal and propsOrView = AllProperties!
 propertyVerbs :: IP PropertyVerbE
 propertyVerbs = basedOnView <|> basedOnProps
   where
@@ -1265,6 +1266,7 @@ propertyVerbs = basedOnView <|> basedOnProps
     -- props (Title)                 property Title, all verbs
     -- props (Title) verbs (Consult) property Title, verb Consult
     -- props verbs (Consult)         all properties, verb Consult
+    -- The default has propertyVerbs = Universal and propsOrView = AllProperties!
     basedOnProps :: IP PropertyVerbE
     basedOnProps = do
       -- | subject and object must be present.
@@ -1415,14 +1417,15 @@ widgetCommonFields = do
     setObject perspective
     if isIndented'
       then withPos do
-        mpropertyVerbs <- optionMaybe propertyVerbs
+        -- The default of parser propertyVerbs has propertyVerbs = Universal and propsOrView = AllProperties!
+        PropertyVerbE r <- propertyVerbs
         mroleVerbs <- optionMaybe roleVerbs
         end <- getPosition
         pure
           { title
           , perspective
-          , propsOrView: _.propsOrView <<< unwrap <$> mpropertyVerbs
-          , propertyVerbs: _.propertyVerbs <<< unwrap <$> mpropertyVerbs
+          , propsOrView: r.propsOrView
+          , propertyVerbs: r.propertyVerbs
           , roleVerbs: _.roleVerbs <<< unwrap <$> mroleVerbs
           , start
           , end}
@@ -1431,8 +1434,8 @@ widgetCommonFields = do
         pure
           { title
           , perspective
-          , propsOrView: Nothing
-          , propertyVerbs: Nothing
+          , propsOrView: AllProperties
+          , propertyVerbs: Universal
           , roleVerbs: Nothing
           , start
           , end}

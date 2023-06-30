@@ -55,7 +55,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutoma
 import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, isTypeUri, qualifyWith, startsWithSegments, typeUri2typeNameSpace)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
-import Perspectives.Parsing.Arc.AST (RoleIdentification(..), StateTransitionE(..), SegmentedPath)
+import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
@@ -95,7 +95,7 @@ import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (actionStates, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, unless, void, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree ::
   DomeinFileRecord ->
@@ -1384,29 +1384,26 @@ handleScreens screenEs = do
                     then pure unit
                     else throwError (UnauthorizedForRole "Auteur" subjectRoleType objectRoleType (maybe [] roleVerbList2Verbs roleVerbs))
                   case propsOrView, propertyVerbs of
-                    Just pOrV, Just pV -> do
+                    -- The modeller has provided no restrictions.
+                    AST.AllProperties, Universal -> pure
+                      { title:title'
+                      , perspectiveId
+                      , perspective: Nothing
+                      , propertyVerbs: Nothing
+                      , roleVerbs: maybe [] roleVerbList2Verbs roleVerbs
+                      , userRole: subjectRoleType
+                      }
+                    pOrV, pVerbs -> do
                       (propertyTypes :: ExplicitSet PropertyType) <- unsafePartial collectPropertyTypes pOrV perspective start'
-                      -- Check whether the specified View or Properties are within the users' perspective.
-                      -- Check whether the required Verbs are within the users' perspective for the specified properties.
-                      -- However, when no restriction has been given in the screen element, do not check.
-                      unless (propertyTypes == Universal)
-                        (void $ checkVerbsAndProps allProps propertyTypes (maybe [] expandVerbs propertyVerbs) pspve objectRoleType)
+                      checkVerbsAndProps allProps propertyTypes (expandVerbs pVerbs) pspve objectRoleType
                       pure
                         { title:title'
                         , perspectiveId
                         , perspective: Nothing
-                        , propertyVerbs: Just $ PropertyVerbs propertyTypes pV
+                        , propertyVerbs: Just $ PropertyVerbs propertyTypes pVerbs
                         , roleVerbs: maybe [] roleVerbList2Verbs roleVerbs
                         , userRole: subjectRoleType
                         }
-                    _, _ -> pure
-                          { title:title'
-                          , perspectiveId
-                          , perspective: Nothing
-                          , propertyVerbs: Nothing
-                          , roleVerbs: maybe [] roleVerbList2Verbs roleVerbs
-                          , userRole: subjectRoleType
-                          }
             checkVerbsAndProps :: Array PropertyType -> ExplicitSet PropertyType -> Array PropertyVerb -> Perspective -> RoleType -> PhaseThree Unit
             checkVerbsAndProps allProps requiredProps propertyVerbs perspective objectRoleType = for_ (expandPropSet allProps requiredProps)
               \requiredProp -> for propertyVerbs \requiredVerb ->
