@@ -95,7 +95,7 @@ import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (actionStates, automaticStates, contextAspectsClosure, enumeratedRoleContextType, isPerspectiveOnSelf, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, roleStates, statesPerProperty, string2RoleType)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, append, bind, discard, eq, flip, map, not, pure, show, unit, unless, void, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree ::
   DomeinFileRecord ->
@@ -1388,7 +1388,9 @@ handleScreens screenEs = do
                       (propertyTypes :: ExplicitSet PropertyType) <- unsafePartial collectPropertyTypes pOrV perspective start'
                       -- Check whether the specified View or Properties are within the users' perspective.
                       -- Check whether the required Verbs are within the users' perspective for the specified properties.
-                      checkVerbsAndProps allProps propertyTypes (maybe [] expandVerbs propertyVerbs) pspve objectRoleType
+                      -- However, when no restriction has been given in the screen element, do not check.
+                      unless (propertyTypes == Universal)
+                        (void $ checkVerbsAndProps allProps propertyTypes (maybe [] expandVerbs propertyVerbs) pspve objectRoleType)
                       pure
                         { title:title'
                         , perspectiveId
