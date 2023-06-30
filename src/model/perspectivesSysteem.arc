@@ -85,16 +85,6 @@ domain model://perspectives.domains#System
       -- property Id = callExternal util:RoleIdentifier() returns String
       indexed sys:Me
       view VolledigeNaam (FirstName, LastName)
-      action UploadCouchdb_old
-        callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#CouchdbManagement" )
-      action ReloadCouchdb
-        callEffect cdb:UpdateModel( "model://perspectives.domains#CouchdbManagement", false )
-      action UploadTestPublicRole
-        callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#TestPublicRole" )
-      action ReloadTestPublicRole
-        callEffect cdb:UpdateModel( "model://perspectives.domains#TestPublicRole", false )
-      action ReloadSystem
-        callEffect cdb:UpdateModel( "model://perspectives.domains#System", false )
       perspective on User
         only (CreateAndFill)
         props (LastName, FirstName) verbs (SetPropertyValue)
