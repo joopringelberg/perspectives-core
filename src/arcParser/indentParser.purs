@@ -101,12 +101,12 @@ getCurrentState = getArcParserState >>= pure <<< _.state
 
 getObject :: IP RoleIdentification
 getObject = getArcParserState >>= \{object} -> case object of
-  Nothing -> fail "No object is in scope."
+  Nothing -> fail "No object is in scope. "
   Just o -> pure o
 
 getSubject :: IP RoleIdentification
 getSubject = getArcParserState >>= \{subject} -> case subject of
-  Nothing -> fail "No subject is in scope."
+  Nothing -> fail "No subject is in scope. "
   Just s -> pure s
 
 inSubContext :: forall a. String -> IP a -> IP a
@@ -149,7 +149,7 @@ setLabel l newValue = do
     then void $ modifyArcParserState \s -> Record.set l (Just newValue) s
     else do
       -- log ("failing in setLabel with " <> reflectSymbol l)
-      fail (reflectSymbol l <> " is already specified in the context")
+      fail (reflectSymbol l <> " is already specified in the context. ")
 
 -- | Referring to the lexical analysis of the source text,
 -- | sets the current user (the user having a perspective).
@@ -196,7 +196,7 @@ setOnEntry stateId = do
   {onEntry} <- getArcParserState
   if isNothing onEntry
     then void $ modifyArcParserState \s -> s {onEntry = Just (Entry stateId)}
-    else fail "on entry is already specified"
+    else fail "on entry is already specified. "
 
 -- | Stores a fully qualified state identifier.
 setOnExit :: StateSpecification -> IP Unit
@@ -204,7 +204,7 @@ setOnExit stateId = do
   {onExit} <- getArcParserState
   if isNothing onExit
     then void $ modifyArcParserState \s -> s {onExit = Just (Exit stateId)}
-    else fail "on exit is already specified"
+    else fail "on exit is already specified. "
 
 -- | Apply a parser, keeping only the parsed result.
 runIndentParser :: forall a. String -> IP a -> Aff (Either ParseError a)
@@ -320,7 +320,7 @@ outdented' = do
   indentParserPosition <- get'
   -- The current position.
   parserPosition <- getPosition
-  if (sourceColumn parserPosition >= sourceColumn indentParserPosition) then fail "not outdented" else pure unit
+  if (sourceColumn parserPosition >= sourceColumn indentParserPosition) then fail "not outdented. " else pure unit
 
 -- | Parses only when the same or outdented with respect to the level of reference, but does not change internal state
 sameOrOutdented' :: IP Unit
@@ -330,7 +330,7 @@ sameOrOutdented' = do
   -- The current position.
   parserPosition <- getPosition
   -- fail when indented.
-  if (sourceColumn parserPosition > sourceColumn indentParserPosition) then fail "not the same or outdented" else pure unit
+  if (sourceColumn parserPosition > sourceColumn indentParserPosition) then fail "not the same or outdented. " else pure unit
 
 isNextLine :: IP Boolean
 isNextLine = do
@@ -352,11 +352,11 @@ nextLine :: IP Unit
 nextLine = do
     pos <- getPosition
     s   <- get'
-    if sourceLine pos > sourceLine s then pure unit else (eof <|> fail "not on the next line")
+    if sourceLine pos > sourceLine s then pure unit else (eof <|> fail "not on the next line. ")
 
 containsTab :: IP Boolean
 containsTab = do
   input <- gets \(ParseState input _ _) -> input
   case indexOf (Pattern "\t") input of
     Nothing -> pure true
-    Just pos -> fail $ "Tab found at string position " <> (show pos) <> ". Remove all tabs as they confuse the index computation, leading to errors in parsing your model."
+    Just pos -> fail $ "Tab found at string position " <> (show pos) <> ". Remove all tabs as they confuse the index computation, leading to errors in parsing your model. "

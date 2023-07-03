@@ -159,7 +159,7 @@ simpleStep = try
   -- VARIABLE MUST BE LAST!
   <|>
   Simple <$> (Variable <$> getPosition <*> lowerCaseName)
-  ) <?> "binding, binder, context, extern, this, modelname, contextType, roleTypes, specialisesRoleType, a valid variablename (lowercase only) or a number, boolean, string (between double quotes), date (between single quotes), email address or a monoid function (sum, product, minimum, maximum) or count"
+  ) <?> "binding, binder, context, extern, this, modelname, contextType, roleTypes, specialisesRoleType, a valid variablename (lowercase only) or a number, boolean, string (between double quotes), date (between single quotes), email address or a monoid function (sum, product, minimum, maximum) or count, "
 
 -- | Parses just the regular expression; not "matches", which is interpreted like ">>".
 -- | We expect an expression like this: "..."gimyu
@@ -181,13 +181,13 @@ sequenceFunction = (token.symbol "sum" *> pure AddF
   <|> token.symbol "count" *> pure CountF
   <|> token.symbol "first" *> pure FirstF
   ) <?> "sum, product, minimum,\
-\ maximum or count"
+\ maximum or count, "
 
 propertyRange :: IP String
 propertyRange = (reserved "Boolean" *> (pure "Boolean")
   <|> reserved "Number" *> (pure "Number")
   <|> reserved "String" *> (pure "String")
-  <|> reserved "DateTime" *> (pure "DateTime")) <?> "Boolean, Number, String or DateTime"
+  <|> reserved "DateTime" *> (pure "DateTime")) <?> "Boolean, Number, String or DateTime, "
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
 -- | Summary: the type must conform to YYYY-MM-DDTHH:mm:ss.sssZ, but time may be left out.
@@ -196,7 +196,7 @@ parseDate = try do
   s <- dateTimeLiteral
   (d :: JSDate) <- pure $ unsafePerformEffect $ parse s
   case toDateTime d of
-    Nothing -> fail "Not a date"
+    Nothing -> fail "Not a date, "
     (Just (dt :: DateTime)) -> pure dt
 
 parseJSDate :: IP JSDate
@@ -209,14 +209,14 @@ isUnaryKeyword kw = isJust $ elemIndex kw ["not", "exists", "filledBy", "fills",
 
 unaryStep :: IP Step
 unaryStep = do
-  keyword <- lookAhead reservedIdentifier <?> "not, exists, filledBy, fills or available."
+  keyword <- lookAhead reservedIdentifier <?> "not, exists, filledBy, fills or available. "
   case keyword of
     "not" -> (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step))))
     "exists" -> Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
     "filledBy" -> Unary <$> (FilledBy <$> getPosition <*> (reserved "filledBy" *> (defer \_ -> step)))
     "fills" -> Unary <$> (Fills <$> getPosition <*> (reserved "fills" *> (defer \_ -> step)))
     "available" -> Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step)))
-    s -> fail ("Expected not, exists, filledBy, fills or available, but found: '" <> s <> "'.")
+    s -> fail ("Expected not, exists, filledBy, fills or available, but found: '" <> s <> "'. ")
 
 operator :: IP Operator
 operator =
@@ -261,7 +261,7 @@ operator =
   -- NOTICE the trick here: we map "matches" to Compose, so we can use it as an infix operator while it
   -- builds on the result of the previous step.
   (Compose <$> (getPosition <* token.reserved "matches"))
-  ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, union, intersection, otherwise, filledBy"
+  ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, union, intersection, otherwise, filledBy. "
 
 operatorPrecedence :: Operator -> Int
 operatorPrecedence (Compose _) = 9
@@ -385,7 +385,7 @@ dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
   where
     go :: IP String
     go = do
-        chars <- between (char '\'') (char '\'' <?> "end of string") (many dateChar)
+        chars <- between (char '\'') (char '\'' <?> "end of string. ") (many dateChar)
         pure $ SCU.fromCharArray chars
 
     dateChar :: IP Char

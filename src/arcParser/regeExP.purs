@@ -44,7 +44,7 @@ instance decodeRegExP :: Decode RegExP where
     ({source, flags} :: RegExPRecord) <- read' f
     parseResult <- pure (regex source (RegexFlags flags))
     case parseResult of
-      Left e -> fail (ForeignError ("could not construct regex from source '" <> source <> "' and flags '" <> show flags <> "'."))
+      Left e -> fail (ForeignError ("could not construct regex from source '" <> source <> "' and flags '" <> show flags <> "'. "))
       Right r -> pure $ RegExP r
 
 type RegExPRecord = {source :: String, flags :: RegexFlagsRec}

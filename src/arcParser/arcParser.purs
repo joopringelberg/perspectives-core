@@ -198,7 +198,7 @@ contextE = withPos do
           case first, second of
             "on", "entry" -> CSQP <$> onEntryE
             "on", "exit" -> CSQP <$> onExitE
-            _, _ -> fail "Expected 'entry' or 'exit' after 'on'."
+            _, _ -> fail "Expected 'entry' or 'exit' after 'on', "
         _ -> do
           (Tuple first second) <- twoReservedWords
           case first, second of
@@ -207,8 +207,8 @@ contextE = withPos do
             _, _ -> case first of
               "" -> do
                 thisWord <- stringUntilNewline
-                fail ("Expected: domain, case, party, activity; or thing, user, context, external, state, on entry, on exit (but found '" <> thisWord <> "'.)")
-              otherwise -> fail ("Expected: domain, case, party, activity; or thing, user, context, external, state, on entry, on exit (but found '" <> otherwise <> "'.)")
+                fail ("Expected: domain, case, party, activity; or thing, user, context, external, state, on entry, on exit (but found '" <> thisWord <> "'), ")
+              otherwise -> fail ("Expected: domain, case, party, activity; or thing, user, context, external, state, on entry, on exit (but found '" <> otherwise <> "'), ")
 
     explicitSubjectState :: IP StateSpecification
     explicitSubjectState = do
@@ -238,7 +238,7 @@ contextE = withPos do
     contextKind = (reserved "domain" *> pure Domain
       <|> reserved "case" *> pure Case
       <|> reserved "party" *> pure Party
-      <|> reserved "activity" *> pure Activity) <?> "domain, case, party or activity"
+      <|> reserved "activity" *> pure Activity) <?> "domain, case, party or activity, "
 
     aspectRole :: IP ContextPart
     aspectRole = do
@@ -278,7 +278,7 @@ contextE = withPos do
       sameOrOutdented'
       if isModelUri modelName
         then pure $ PREFIX prefix modelName
-        else fail ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)")
+        else fail ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name), ")
     
     -- Returns one of a limited set of symbolic store names
     publicStore :: IP PublicStore
@@ -289,8 +289,8 @@ domain = do
   void containsTab
   r <- token.whiteSpace *> contextE
   case r of
-    (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
-    otherwise -> fail "Domain must be a context"
+    (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain', "
+    otherwise -> fail "Domain must be a context, "
 
 --------------------------------------------------------------------------------------------------
 -- ROLE
@@ -487,7 +487,7 @@ enumeratedRole_ uname knd pos = do
     -- | it will cause looping as long as it is used
     -- | both in userRoleE and thingRoleE. I do not understand why.
     roleAttributes :: IP (List RolePart)
-    roleAttributes = token.parens (((mandatory <|> functional <|> relational <|> unlinked) <?> "mandatory, functional/relational, unlinked.") `sepBy` token.symbol ",")
+    roleAttributes = token.parens (((mandatory <|> functional <|> relational <|> unlinked) <?> "mandatory, functional/relational, unlinked. ") `sepBy` token.symbol ",")
 
     mandatory :: IP RolePart
     mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute true)))
@@ -549,8 +549,8 @@ rolePart = do
     _, _ -> case first of
       "" -> do
         thisWord <- stringUntilNewline
-        fail ("Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view (but found '" <> thisWord <> "'.)")
-      otherwise -> fail ("Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view (but found '" <> otherwise <> "'.)")
+        fail ("Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view (but found '" <> thisWord <> "'), ")
+      otherwise -> fail ("Expected: perspective (on/of), in state, on (entry/exit), state, aspect, indexed, property, view (but found '" <> otherwise <> "'), ")
 
 -- | Combine the RolePart elements that result from "on entry", "on exit" and "state" into a root state for the role.
 -- | The elements we combine are: NotificationE, AutomaticEffectE and StateE.
@@ -648,7 +648,7 @@ propertyE = do
     -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
     -- a valid property attribute specification.
     propertyAttributes :: IP (List PropertyPart)
-    propertyAttributes = token.parens (((mandatory <|> functional <|> range) <?> "mandatory, relational or a range (Boolean, Number, String, DateTime, Email)") `sepBy` token.symbol ",")
+    propertyAttributes = token.parens (((mandatory <|> functional <|> range) <?> "mandatory, relational or a range (Boolean, Number, String, DateTime, Email), ") `sepBy` token.symbol ",")
         where
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
@@ -774,8 +774,8 @@ stateE = withPos do
         _, _ -> case first of
           "" -> do
             thisWord <- stringUntilNewline
-            fail ("Expected: on (entry/exit), perspective (on/of), state, action, on entry, on exit (but found '" <> thisWord <> "'.)")
-          otherwise -> fail ("Expected: on (entry/exit), perspective (on/of), state, action, on entry, on exit (but found '" <> otherwise <> "'.)")
+            fail ("Expected: on (entry/exit), perspective (on/of), state, action, on entry, on exit (but found '" <> thisWord <> "'.) ")
+          otherwise -> fail ("Expected: on (entry/exit), perspective (on/of), state, action, on entry, on exit (but found '" <> otherwise <> "'.) ")
 
 -- We need to use `try` because this parser will consume "perspective" from the
 -- expression "perspective of".
@@ -847,8 +847,8 @@ perspectivePart = do
     _, _ -> case first of
       "" -> do
         thisWord <- stringUntilNewline
-        fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly (but found '" <> thisWord <> "'.)")
-      otherwise -> fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly (but found '" <> otherwise <> "'.)")
+        fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly (but found '" <> thisWord <> "'.) ")
+      otherwise -> fail ("Expected: view, props, verbs, only, except, all, in, on, action, perspective, selfonly (but found '" <> otherwise <> "'.) ")
 
 -- | inState =
 -- |  in [{subject | object | context}] state [<ident>]
@@ -872,7 +872,7 @@ inState = do
     Just "context", _ -> ContextState <$> getCurrentContext <*> pure mstateId
     Nothing, Just stateId -> pure $ addSubState currentState stateId
     -- This case will never occur.
-    _, _ -> fail "This will never occur"
+    _, _ -> fail "This will never occur. "
   -- We can use withArcParserState here. It will concatenate the local
   -- state identifier to the state identifier provided by the surrounding context.
   -- The assumption being that we do not refer to states out of the context that the
@@ -897,8 +897,8 @@ inState = do
         _, _ -> case first of
           "" -> do
             thisWord <- stringUntilNewline
-            fail ("Expected: view, props, only, except, all roleverbs, perspective (on/of), action (but found '" <> thisWord <> "'.)")
-          otherwise -> fail ("Expected: view, props, only, except, all roleverbs, perspective (on/of), action (but found '" <> otherwise <> "'.)")
+            fail ("Expected: view, props, only, except, all roleverbs, perspective (on/of), action (but found '" <> thisWord <> "'), ")
+          otherwise -> fail ("Expected: view, props, only, except, all roleverbs, perspective (on/of), action (but found '" <> otherwise <> "'), ")
 
 inStateKeywords :: IP String
 inStateKeywords = reserved "in" *> reserved "state" *> pure "inState"
@@ -922,7 +922,7 @@ onEntryE :: IP (List StateQualifiedPart)
 onEntryE = do
   void $ onEntryKeywords
   stateSpec <- optionMaybe (reserved "of") >>= case _ of
-    Just _ -> (subjectState <|> objectState <|> contextState <|> subState) <?> "one of subject, object or context or a state name"
+    Just _ -> (subjectState <|> objectState <|> contextState <|> subState) <?> "one of subject, object or context or a state name, "
     Nothing -> getCurrentState
   protectOnEntry do
     setOnEntry stateSpec
@@ -935,7 +935,7 @@ subjectState :: IP StateSpecification
 subjectState = reserved "subject" *> reserved "state" *> do
   {subject} <- getArcParserState
   case subject of
-    Nothing -> fail "A subject is required for 'in state X of subject"
+    Nothing -> fail "A subject is required for 'in state X of subject', "
     Just s -> do
       msubState <- optionMaybe arcIdentifier
       pure $ SubjectState s msubState
@@ -944,7 +944,7 @@ objectState :: IP StateSpecification
 objectState = reserved "object" *> reserved "state" *> do
   {object} <- getArcParserState
   case object of
-    Nothing -> fail "An object is required for 'in state X of object'"
+    Nothing -> fail "An object is required for 'in state X of object', "
     Just s -> do
       msubState <- optionMaybe arcIdentifier
       pure $ ObjectState s msubState
@@ -962,7 +962,7 @@ onExitE :: IP (List StateQualifiedPart)
 onExitE = do
   void $ onExitKeywords
   stateSpec <- (optionMaybe (reserved "of") >>= case _ of
-    Just _ -> (subjectState <|> objectState <|> contextState <|> subState) <?> "one of subject, object or context or a state name"
+    Just _ -> (subjectState <|> objectState <|> contextState <|> subState) <?> "one of subject, object or context or a state name, "
     Nothing -> getCurrentState)
   protectOnExit do
     setOnExit stateSpec
@@ -974,7 +974,7 @@ stateTransitionPart = do
   case keyword of
     "do" -> automaticEffectE
     "notify" -> notificationE
-    _ -> fail "Expected: do, notify"
+    _ -> fail "Expected: do, notify, "
 
 -- | automaticEffect =
 -- |   do [for <Identifier>]
@@ -994,13 +994,13 @@ automaticEffectE = do
   endMoment <- optionMaybe (reserved "until" *> duration)
   repeats <- repeatsE
   case endMoment, repeats of
-    Just _, Never -> fail "`until` must be followed by `every`."
+    Just _, Never -> fail "`until` must be followed by `every`. "
     _, _ -> do
       isIndented >>= if _
         then do
           keyword <- scanIdentifier
           effect <- case keyword of
-            "letE" -> fail "letE does not allow assignment operators, so this will not have an effect. Did you mean 'letA'?"
+            "letE" -> fail "letE does not allow assignment operators, so this will not have an effect. Did you mean 'letA'? "
             "letA" -> Let <$> letWithAssignment
             _ -> Statements <<< fromFoldable <$> nestedBlock assignment
           end <- getPosition
@@ -1028,8 +1028,8 @@ automaticEffectE = do
                 , start
                 , end}
               Nothing, _, _ -> failWithPosition "A subject is required" (arcPosition2Position start)
-              _, Nothing, Nothing -> fail "A state transition is required"
-              _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
+              _, Nothing, Nothing -> fail "A state transition is required, "
+              _, Just _, Just _ -> fail "State transition inside state transition is not allowed, "
             Just ident -> case onEntry, onExit of
               -- We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
               -- is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
@@ -1053,8 +1053,8 @@ automaticEffectE = do
                 , repeats
                 , start
                 , end}
-              Nothing, Nothing -> fail "A state transition is required"
-              _, _ -> fail "State transition inside state transition is not allowed"
+              Nothing, Nothing -> fail "A state transition is required, "
+              _, _ -> fail "State transition inside state transition is not allowed, "
         else pure Nil
 
 -- [every N Milliseconds|Seconds|Minutes|Hours|Days [maximally N times]]
@@ -1079,7 +1079,7 @@ duration = do
     "Minutes" -> pure $ Minute interval
     "Hours" -> pure $ Hour interval
     "Days" -> pure $ Day interval
-    _ -> fail "Expected `Milliseconds`, `Seconds`, `Minutes`, `Hours` or `Days`."
+    _ -> fail "Expected `Milliseconds`, `Seconds`, `Minutes`, `Hours` or `Days`. "
 
 
 -- | notification =
@@ -1118,9 +1118,9 @@ notificationE = do
         , repeats: Never
         , start
         , end}
-      Nothing, _, _ -> fail "A subject is required"
-      _, Nothing, Nothing -> fail "A state transition is required"
-      _, Just _, Just _ -> fail "State transition inside state transition is not allowed"
+      Nothing, _, _ -> fail "A subject is required, "
+      _, Nothing, Nothing -> fail "A state transition is required, "
+      _, Just _, Just _ -> fail "State transition inside state transition is not allowed, "
     Just ident -> case onEntry, onExit of
       -- | We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
       -- | is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
@@ -1144,8 +1144,8 @@ notificationE = do
         , repeats: Never
         , start
         , end}
-      Nothing, Nothing -> fail "A state transition is required"
-      _, _ -> fail "State transition inside state transition is not allowed"
+      Nothing, Nothing -> fail "A state transition is required, "
+      _, _ -> fail "State transition inside state transition is not allowed, "
 
   where
     notificationLevel :: IP NotificationLevel
@@ -1153,7 +1153,7 @@ notificationE = do
       v <- token.identifier
       case v of
         "Alert" -> pure Alert
-        _ -> fail "Not a notification level"
+        _ -> fail "Not a notification levelm "
 
 roleAndPropertyDefaults :: IP (List StateQualifiedPart)
 roleAndPropertyDefaults = do
@@ -1167,9 +1167,9 @@ roleAndPropertyDefaults = do
       pure $ (R (RoleVerbE {subject: s, object: o, state, roleVerbs: All, start, end}) :
         P (PropertyVerbE {subject: s, object: o, state, propertyVerbs: Universal, propsOrView: AllProperties, start, end}) :
           Nil)
-    Nothing, Nothing -> fail "User role and object of perspective must be given"
-    Nothing, (Just _) -> fail "User role must be given"
-    (Just _), Nothing -> fail "Object of perspective must be given"
+    Nothing, Nothing -> fail "User role and object of perspective must be given, "
+    Nothing, (Just _) -> fail "User role must be given, "
+    (Just _), Nothing -> fail "Object of perspective must be given, "
 
 -- | roleVerbs =
 -- |  only ( <RoleVerb> {, <roleVerb>}+ )
@@ -1188,13 +1188,13 @@ roleVerbs = do
       end <- getPosition
       sameOrOutdented'
       pure $ RoleVerbE {subject: s, object: o, state, roleVerbs: rv, start, end}
-    Nothing, Nothing -> fail "User role and object of perspective must be given"
-    Nothing, (Just _) -> fail "User role must be given"
-    (Just _), Nothing -> fail "Object of perspective must be given"
+    Nothing, Nothing -> fail "User role and object of perspective must be given, "
+    Nothing, (Just _) -> fail "User role must be given, "
+    (Just _), Nothing -> fail "Object of perspective must be given, "
   where
     roleVerbList :: IP RoleVerbList
     roleVerbList
-     =  inclusive <|> exclusive <|> (reserved "all" *> reserved "roleverbs" *> pure All) <?> "only, except, all roleverbs"
+     =  inclusive <|> exclusive <|> (reserved "all" *> reserved "roleverbs" *> pure All) <?> "only, except, all roleverbs, "
       where
         inclusive :: IP RoleVerbList
         inclusive = do
@@ -1206,7 +1206,7 @@ roleVerbs = do
 
         lotsOfVerbs :: IP (List RoleVerb)
         lotsOfVerbs = do
-          token.parens (roleVerb `sepBy` token.symbol ",") <?> "a list of role verbs between parenthesis."
+          token.parens (roleVerb `sepBy` token.symbol ",") <?> "a list of role verbs between parenthesis, "
 
 roleVerb :: IP RoleVerb
 roleVerb = do
@@ -1220,7 +1220,7 @@ roleVerb = do
     "Fill" -> pure Fill
     "Unbind" -> pure Unbind
     "Move" -> pure Move
-    _ -> fail "Not a role verb"
+    _ -> fail "Not a role verb, "
 
 selfOnly :: IP SelfOnly
 selfOnly = do
@@ -1233,9 +1233,9 @@ selfOnly = do
       end <- getPosition
       sameOrOutdented'
       pure $ SelfOnly {subject: s, object: o, state, start, end}
-    Nothing, Nothing -> fail "User role and object of perspective must be given"
-    Nothing, (Just _) -> fail "User role must be given"
-    (Just _), Nothing -> fail "Object of perspective must be given"
+    Nothing, Nothing -> fail "User role and object of perspective must be given, "
+    Nothing, (Just _) -> fail "User role must be given, "
+    (Just _), Nothing -> fail "Object of perspective must be given, "
 
 -- | propertyVerbs =
 -- |   view <ident> [ ( <propertyVerb>{, <propertyVerb>}+ )]
@@ -1260,7 +1260,7 @@ propertyVerbs = basedOnView <|> basedOnProps
           end <- getPosition
           sameOrOutdented'
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: view, start, end}
-        _, _ -> fail "User role and object of perspective must be given"
+        _, _ -> fail "User role and object of perspective must be given, "
 
     -- props                         all properties, all verbs
     -- props (Title)                 property Title, all verbs
@@ -1280,7 +1280,7 @@ propertyVerbs = basedOnView <|> basedOnProps
           end <- getPosition
           sameOrOutdented'
           pure $ PropertyVerbE {subject: s, object: o, state, propertyVerbs: pv, propsOrView: props, start, end}
-        _, _ -> fail "User role and object of perspective must be given"
+        _, _ -> fail "User role and object of perspective must be given, "
 
     lotsOfVerbs :: IP (ExplicitSet PropertyVerb)
     lotsOfVerbs = PSet <<< fromFoldable <$> token.parens (propertyVerb `sepBy` token.symbol ",")
@@ -1300,7 +1300,7 @@ propertyVerb = do
     "AddPropertyValue" -> pure AddPropertyValue
     "SetPropertyValue" -> pure SetPropertyValue
     "Consult" -> pure Consult
-    _ -> fail "Not a property verb"
+    _ -> fail "Not a property verb, "
 
 -- | action =
 -- |   action <ident>
@@ -1316,7 +1316,7 @@ actionE = do
   id <- reserved "action" *> token.identifier
   {subject, state, object, currentContext} <- getArcParserState
   case subject, object of
-    Nothing, _ -> fail "User role is not specified"
+    Nothing, _ -> fail "User role is not specified, "
     Just s, Nothing -> do
       kw <- option "" (lookAhead reservedIdentifier)
       effect <- if kw == "letA"

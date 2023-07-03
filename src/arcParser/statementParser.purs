@@ -48,14 +48,14 @@ assignment = isPropertyAssignment >>= if _
 
 roleAssignment :: IP Assignment
 roleAssignment = do
-  keyword <- lookAhead reservedIdentifier <?> "Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete, callEffect or callDestructiveEffect "
+  keyword <- lookAhead reservedIdentifier <?> "Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete, callEffect or callDestructiveEffect. "
   case keyword of
     "remove" -> do
       (Tuple first second) <- twoReservedWords
       case first, second of
         "remove", "role" -> roleRemoval
         "remove", "context" -> contextRemoval
-        _, _ -> fail ("Expected 'role' or 'context' after 'remove'.")
+        _, _ -> fail ("Expected 'role' or 'context' after 'remove'. ")
     "move" -> move
     "bind" -> bind'
     "bind_" -> bind_
@@ -66,7 +66,7 @@ roleAssignment = do
       case first, second of
         "delete", "role" -> roleDeletion
         "delete", "context" -> contextDeletion
-        _, _ -> fail ("Expected 'role' or 'context' after 'delete'.")
+        _, _ -> fail ("Expected 'role' or 'context' after 'delete'. ")
     "callEffect" -> callEffect
     "callDestructiveEffect" -> callDestructiveEffect
     "create" -> do
@@ -74,13 +74,13 @@ roleAssignment = do
       case first, second of
         "create", "role" -> roleCreation
         "create", "context" -> createContext
-        _, _ -> fail ("Expected 'role' or 'context' after 'create'.")
+        _, _ -> fail ("Expected 'role' or 'context' after 'create'. ")
     "create_" -> do
       (Tuple first second) <- twoReservedWords
       case first, second of
         "create_", "context" -> createContext_
         _, _ -> fail ("Expected 'context' after 'create_'.")
-    s -> fail ("Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete, callDestructiveEffect or callEffect but found '" <> s <> "'.")
+    s -> fail ("Expected remove, create, create_, move, bind, bind_, unbind, unbind_, delete, callDestructiveEffect or callEffect but found '" <> s <> "'. ")
 
 roleRemoval :: IP Assignment
 roleRemoval = do
@@ -244,7 +244,7 @@ propertyAssignment = do
       parseFileName = do 
         f <- token.stringLiteral
         case match fileRegex f of 
-          Nothing -> fail ("The string '" <> f <> "' is not a valid file name!")
+          Nothing -> fail ("The string '" <> f <> "' is not a valid file name! ")
           Just _ -> pure f
 
       mimeRegex :: Regex
@@ -254,7 +254,7 @@ propertyAssignment = do
       parseMimeType = do 
         m <- token.stringLiteral
         case match mimeRegex m of
-          Nothing -> fail ("The string '" <> m <> "' is not a valid text MIME type")
+          Nothing -> fail ("The string '" <> m <> "' is not a valid text MIME type. ")
           Just _ -> pure m
 
 assignmentOperator :: IP AssignmentOperator
@@ -264,7 +264,7 @@ assignmentOperator =
   (AddTo <$> (getPosition <* token.reservedOp "=+"))
   <|>
   ((Set <$> (getPosition <* token.reservedOp "="))
-  ) <?> "=, =+, =-"
+  ) <?> "=, =+, =-. "
 
 roleDeletion :: IP Assignment
 roleDeletion = do
@@ -333,7 +333,7 @@ letWithAssignment = try $ withPos do
 
 letABinding :: IP LetABinding
 letABinding = do
-  varName <- (lowerCaseName <* token.reservedOp "<-") <?> "lower case name followed by <-"
+  varName <- (lowerCaseName <* token.reservedOp "<-") <?> "lower case name followed by <-, "
   (Tuple first second) <- twoReservedWords
   case first, second of
     "create", "role" -> Stat <$> pure varName <*> roleCreation
@@ -343,7 +343,7 @@ letABinding = do
       -- or indented to the left (outdented).
       me <- optionMaybe (try (step <* sameOrOutdented' ))
       case me of
-        Nothing -> fail "Expected `create role` or `create context` or a functional expression here."
+        Nothing -> fail "Expected `create role` or `create context` or a functional expression here. "
         Just e -> pure $ Expr (VarBinding varName e)
 
 

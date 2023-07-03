@@ -47,7 +47,7 @@ colon :: IP String
 colon = token.colon
 
 arcIdentifier :: IP String
-arcIdentifier = (qualifiedName <|> prefixedName <|> segmentedName) <?> "a capitalized name, a prefixed name, or a fully qualified name"
+arcIdentifier = (qualifiedName <|> prefixedName <|> segmentedName) <?> "a capitalized name, a prefixed name, or a fully qualified name, "
 
 -- Parses model://perspectives.domains#System
 qualifiedName :: IP String
@@ -99,7 +99,7 @@ lowerCaseName = try do
   pure $ fromCharArray (cons f r)
 
 lower ::  IP Char
-lower = satisfy (isLower <<< codePointFromChar) <?> "lowercase letter"
+lower = satisfy (isLower <<< codePointFromChar) <?> "lowercase letter, "
 
 boolean :: IP String
 boolean = token.symbol "true" <|> token.symbol "false"
@@ -109,7 +109,7 @@ email = try do
   chars <- many (satisfy (not <<< isSpace <<< codePointFromChar))
   if (test emailRegExp (fromCharArray chars))
     then whiteSpace *> pure (fromCharArray chars)
-    else fail "Not a valid email addres."
+    else fail "Not a valid email addres. "
   where
     -- See: https://regexlib.com/REDetails.aspx?regexp_id=26.
     emailRegExp :: Regex
@@ -125,4 +125,4 @@ pubParser = try do
   s <- pure (fromCharArray chars)
   if hasPublicResourceShape s
     then pure s
-    else fail "Not a valid public resource url." 
+    else fail "Not a valid public resource url. " 

@@ -61,7 +61,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.View (View(..)) as VIEW
-import Prelude (bind, discard, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
 
 -------------------
 traverseDomain :: ContextE -> PhaseTwo DomeinFile
@@ -322,7 +322,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       pure e
 
     -- SCREENE
-    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole
+    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole || kind == TI.Public
       then do
         screen' <- expandPrefix s
         void $ lift $ modify \st@{screens} -> st {screens = Cons screen' screens}
@@ -466,7 +466,7 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
       pure (CalculatedRole $ roleUnderConstruction {views = cons viewType views})
 
     -- SCREENE
-    handleParts e@(CalculatedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole
+    handleParts e@(CalculatedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole || kind == TI.Public
       then do
         void $ lift $ modify \st@{screens} -> st {screens = Cons s screens}
         pure e

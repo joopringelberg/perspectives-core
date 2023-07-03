@@ -218,14 +218,14 @@ reservedIdentifier = token.lexeme $ try go
         name <- ident
         if (isReservedPerspectivesName name)
            then pure name
-           else fail ("not a reserved word " <> show name <> "(or unexpected end of input)")
+           else fail ("not a reserved word " <> show name <> "(or unexpected end of input), ")
 
     isReservedPerspectivesName :: String -> Boolean
     isReservedPerspectivesName = isReservedName perspectDef
 
 
     ident :: StringPositionParser
-    ident = go' perspectDef <?> "identifier"
+    ident = go' perspectDef <?> "identifier, "
       where
         go' :: IndentLanguageDef -> StringPositionParser
         go' (LanguageDef languageDef) = do
