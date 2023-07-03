@@ -3,6 +3,8 @@ domain model://perspectives.domains#Couchdb --@1.0.0
 
 -- externalFunctions =
 --   [ Tuple "model://perspectives.domains#Couchdb$Models" {func: unsafeCoerce models, nArgs: 0}
+-- Downloads the model from its repository and adds it to the local installation. Creates an instance of role ModelsInUse, filled
+-- with the model's (Versioned)ModelManifest.
 --   , Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
 --   , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
 --   , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}

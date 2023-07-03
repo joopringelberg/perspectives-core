@@ -31,6 +31,9 @@ idProperty = "model://perspectives.domains#System$PerspectivesSystem$User$Id"
 modelsInUse :: String
 modelsInUse = "model://perspectives.domains#System$PerspectivesSystem$ModelsInUse"
 
+modelToRemove :: String
+modelToRemove = "model://perspectives.domains#System$PerspectivesSystem$ModelsInUse$ModelToRemove"
+
 connectedToAMQPBroker :: String
 connectedToAMQPBroker = "model://perspectives.domains#System$PerspectivesSystem$External$ConnectedToAMQPBroker"
 

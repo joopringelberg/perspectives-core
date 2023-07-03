@@ -49,9 +49,10 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
-import Prelude (Unit, bind, discard, identity, pure, unit, void, ($), (*>), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, discard, identity, map, pure, unit, void, ($), (*>), (<$>), (<<<), (<>), (>>=))
 
 storeDomeinFileInCache :: DomeinFileName -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
 storeDomeinFileInCache domeinFileName df= cacheEntity (DomeinFileId domeinFileName) df
@@ -112,7 +113,7 @@ retrieveDomeinFile modelUri = tryGetPerspectEntiteit (DomeinFileId $ unversioned
   -- Now retrieve the DomeinFile from a remote repository and store it in the local "models" database of this user.
   Nothing -> do 
     version <- case modelUriVersion modelUri of 
-      Nothing -> getVersionToInstall modelUri
+      Nothing -> map _.semver <$> getVersionToInstall modelUri
       Just v -> pure $ Just v
     modelToLoadAVar <- getModelToLoad
     liftAff $ put (LoadModel (DomeinFileId ((unversionedModelUri modelUri) <> (maybe "" ((<>) "@") version)))) modelToLoadAVar
@@ -136,7 +137,7 @@ retrieveDomeinFile modelUri = tryGetPerspectEntiteit (DomeinFileId $ unversioned
 -- | or it is the latest version.
 -- | If no manifest is found, the empty string is returned. This causes retrieveDomainFile to retrieve a versionless document!
 -- | This function must be able to run without any type information, as it is run on system install, too.
-getVersionToInstall :: ModelUri -> MonadPerspectives (Maybe String)
+getVersionToInstall :: ModelUri -> MonadPerspectives (Maybe {semver :: String, versionedModelManifest :: RoleInstance})
 getVersionToInstall modelUri = case unsafePartial modelUri2ManifestUrl modelUri of 
   -- Retrieve the property from the external role of the manifest that indicates the version we should install.
   -- To achieve this, we have an Enumerated property that reflects the version to install in the external role of the Manifest.
@@ -144,9 +145,9 @@ getVersionToInstall modelUri = case unsafePartial modelUri2ManifestUrl modelUri 
   {repositoryUrl, manifestName} -> do
     mRol <- tryGetDocument repositoryUrl (buitenRol manifestName)
     case mRol of 
-      Just (PerspectRol{properties}) -> case head $ maybe [] identity (lookup versionToInstall properties) of 
+      Just (PerspectRol{_id, properties}) -> case head $ maybe [] identity (lookup versionToInstall properties) of 
         Nothing -> pure Nothing
-        Just v -> pure $ Just $ unwrap v
+        Just v -> pure $ Just {semver: unwrap v, versionedModelManifest: _id}
       _ -> pure Nothing
 
 -- | A name not preceded or followed by a forward slash.

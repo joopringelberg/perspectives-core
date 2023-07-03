@@ -47,9 +47,9 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Foreign.Generic (Foreign, encodeJSON)
-import Foreign.Object (Object, empty, insert, lookup)
+import Foreign.Object (Object, empty, insert, lookup, singleton)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (PropertySerialization(..))
+import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
@@ -66,6 +66,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (getFirstMatch, isModelUri, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, newModelRegex, typeUri2LocalName_, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
@@ -214,9 +215,10 @@ isInitialLoad = true
 -- | Parameter `isUpdate` should be true iff the model has been added to the local installation before.
 addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
+  x :: (Maybe {semver :: String, versionedModelManifest :: RoleInstance}) <- lift $ getVersionToInstall modelname
   version <- case modelUriVersion modelname of
     Just v -> pure $ Just v
-    Nothing -> lift $ getVersionToInstall modelname
+    Nothing -> pure $ _.semver <$> x
   {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl ((unversionedModelUri modelname) <> (maybe "" ((<>) "@") version))
   df@(DomeinFile
   { _id
@@ -297,6 +299,20 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
 
       -- And now add to the context.
       void $ addRoleInstanceToContext (ContextInstance cid) (EnumeratedRoleType DEP.installer) (Tuple (identifier installerRole) Nothing)
+
+      if unversionedModelname == DEP.systemModelName
+        then pure unit
+        else do
+          mySystem <- lift getMySystem
+          -- When we update a model M, we search all ModelsInUse for inverted queries that apply to M, and reapply them.
+          -- Therefore, the model we load here on demand should be in 
+          -- Create a role instance filled with the VersionedModelManifest.
+          -- Add the modelname as the value of the property ModelToRemove.
+          void $ createAndAddRoleInstance (EnumeratedRoleType DEP.modelsInUse) mySystem
+            (RolSerialization 
+              { id: Nothing
+              , properties: PropertySerialization (singleton DEP.modelToRemove [modelname])
+              , binding: unwrap <<< _.versionedModelManifest <$> x})
 
       -- Add new dependencies.
       for_ referredModels \dfid -> do

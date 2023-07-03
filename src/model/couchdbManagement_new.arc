@@ -525,13 +525,8 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Versions
         props (Versions$Version, VersionedModelManifest$External$Description, VersionedModelURI) verbs (Consult)
         action StartUsing
-          letA
-            bm <- create role ModelsInUse in sys:MySystem
-          in
-            callEffect cdb:AddModelToLocalStore( VersionedModelURI )
-            bind_ origin >> binding to bm
-            -- We need this to be able to remove.
-            ModelToRemove = VersionedModelURI for bm
+          -- This method also adds an instance of ModelsInUse and adds the VersionedModelURI to property ModelToRemove.
+          callEffect cdb:AddModelToLocalStore( VersionedModelURI )
         action UpdateModel
           letA
             -- Notice that because Versions is a published role, there are no backlinks to roles it fills.
