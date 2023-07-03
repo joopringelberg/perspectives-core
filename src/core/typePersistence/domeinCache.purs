@@ -38,7 +38,7 @@ import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (DomeinFileName, ModelUri, buitenRol, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, unversionedModelUri)
+import Perspectives.Identifiers (DomeinFileName, ModelUri, buitenRol, deconstructBuitenRol, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.ModelDependencies (versionToInstall)
 import Perspectives.Persistence.API (addAttachment, getAttachment, tryGetDocument)
@@ -49,7 +49,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Prelude (Unit, bind, discard, identity, map, pure, unit, void, ($), (*>), (<$>), (<<<), (<>), (>>=))
@@ -132,11 +132,12 @@ retrieveDomeinFile modelUri = tryGetPerspectEntiteit (DomeinFileId $ unversioned
       _ -> throwError (error $ "Wrong communication from the forked model loading process!")
   Just df -> pure df
 
--- | Retrieve a string that is a Semantic Version Number.
--- | It is either the version number designated by the Author of the model to be installed,
+-- | Retrieves a string that is a Semantic Version Number. Also returns the external role of the VersionedModelManifest.
+-- | The version is either the version number designated by the Author of the model to be installed,
 -- | or it is the latest version.
 -- | If no manifest is found, the empty string is returned. This causes retrieveDomainFile to retrieve a versionless document!
 -- | This function must be able to run without any type information, as it is run on system install, too.
+-- | The modelURI should not include a version.
 getVersionToInstall :: ModelUri -> MonadPerspectives (Maybe {semver :: String, versionedModelManifest :: RoleInstance})
 getVersionToInstall modelUri = case unsafePartial modelUri2ManifestUrl modelUri of 
   -- Retrieve the property from the external role of the manifest that indicates the version we should install.
@@ -147,8 +148,12 @@ getVersionToInstall modelUri = case unsafePartial modelUri2ManifestUrl modelUri 
     case mRol of 
       Just (PerspectRol{_id, properties}) -> case head $ maybe [] identity (lookup versionToInstall properties) of 
         Nothing -> pure Nothing
-        Just v -> pure $ Just {semver: unwrap v, versionedModelManifest: _id}
+        -- TODO dit klopt niet, want dit is de externe rol van het ModelManifest zelf. We willen het VersionedModelManifest.
+        Just v -> pure $ Just {semver: unwrap v, versionedModelManifest: makeVersionedModelManifest (unwrap v) _id}
       _ -> pure Nothing
+  where
+    makeVersionedModelManifest :: String -> RoleInstance -> RoleInstance
+    makeVersionedModelManifest semver (RoleInstance modelManifest) = RoleInstance $ buitenRol ((deconstructBuitenRol modelManifest) <> "@" <> semver)
 
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String

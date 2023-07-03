@@ -633,7 +633,7 @@ domain model://perspectives.domains#CouchdbManagement
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (External$Version, Description, IsRecommended) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
+        props (External$Version, Description, IsRecommended, VersionedModelManifest$External$LocalModelName) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
 
 
     user ActiveUser = extern >> binder Versions >> context >> ActiveUser

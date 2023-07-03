@@ -103,8 +103,6 @@ domain model://perspectives.domains#System
         props (FirstName, LastName) verbs (Consult)
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
-      perspective on Models
-        props (Manifests$LocalModelName, Description) verbs (Consult)
       -- Notice that these roles are filled with the public version of VersionedModelManifest$External.
       -- We can actually only show properties that are in that perspective.
       perspective on ModelsInUse
@@ -166,8 +164,6 @@ domain model://perspectives.domains#System
     context Repositories (relational) filledBy ManifestCollection
 
     context AllRepositories = BaseRepository union Repositories
-
-    context Models = filter AllRepositories >> binding >> context >> Manifests with not IsLibrary
 
     context ModelsInUse (relational) filledBy sys:VersionedModelManifest
       property ModelToRemove (String)

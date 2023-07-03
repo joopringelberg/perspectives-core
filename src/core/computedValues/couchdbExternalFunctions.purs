@@ -215,11 +215,14 @@ isInitialLoad = true
 -- | Parameter `isUpdate` should be true iff the model has been added to the local installation before.
 addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
-  x :: (Maybe {semver :: String, versionedModelManifest :: RoleInstance}) <- lift $ getVersionToInstall modelname
+  unversionedModelname <- pure $ unversionedModelUri modelname
+  x :: (Maybe {semver :: String, versionedModelManifest :: RoleInstance}) <- lift $ getVersionToInstall unversionedModelname
   version <- case modelUriVersion modelname of
     Just v -> pure $ Just v
     Nothing -> pure $ _.semver <$> x
-  {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl ((unversionedModelUri modelname) <> (maybe "" ((<>) "@") version))
+  -- If we can find a version at all, this is it.
+  versionedModelName <- pure (unversionedModelname <> (maybe "" ((<>) "@") version))
+  {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl versionedModelName
   df@(DomeinFile
   { _id
   -- , indexedRoles
@@ -236,8 +239,6 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
 
   -- Copy the attachment
   lift $ addA repositoryUrl documentName revision
-
-  unversionedModelname <- pure $ unversionedModelUri modelname
 
   if isInitialLoad'
     then do
@@ -307,11 +308,11 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
           -- When we update a model M, we search all ModelsInUse for inverted queries that apply to M, and reapply them.
           -- Therefore, the model we load here on demand should be in 
           -- Create a role instance filled with the VersionedModelManifest.
-          -- Add the modelname as the value of the property ModelToRemove.
+          -- Add the versionedModelName as the value of the property ModelToRemove.
           void $ createAndAddRoleInstance (EnumeratedRoleType DEP.modelsInUse) mySystem
             (RolSerialization 
               { id: Nothing
-              , properties: PropertySerialization (singleton DEP.modelToRemove [modelname])
+              , properties: PropertySerialization (singleton DEP.modelToRemove [versionedModelName])
               , binding: unwrap <<< _.versionedModelManifest <$> x})
 
       -- Add new dependencies.
