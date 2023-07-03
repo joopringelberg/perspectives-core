@@ -246,12 +246,22 @@ domain model://perspectives.domains#CouchdbManagement
 
     -- The instance of CouchdbServer is published in the cw_servers_and_repositories database.
     public Visitor at extern >> ServerUrl + "cw_servers_and_repositories/" = sys:Me
+      perspective on External
+        props (Name) verbs (Consult)
       perspective on PublicRepositories
-        props (Repositories$NameSpace) verbs (Consult)
+        props (Repositories$NameSpace, IsPublic) verbs (Consult)
       
       -- Perspective on Admin in order to be able to sign up as an Account.
       perspective on Admin
         props (FirstName, LastName) verbs (Consult)
+      
+      screen "Couchdb Server"
+        row
+          form "This server" External
+        row 
+          table "Public Repositories" PublicRepositories
+            props (Repositories$NameSpace) verbs (Consult)
+
 
     context PublicRepositories = filter Repositories with IsPublic
 
@@ -457,6 +467,14 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on extern
         props (NameSpace_, NameSpace) verbs (Consult)
 
+      screen "Repository"
+        row
+          form "Repository information" External
+            props (NameSpace) verbs (Consult)
+        row
+          table "Manifests" Manifests
+
+
     -- This role is in the public Visitor perspective. These are all models that
     -- are stored in this Repository.
     context Manifests filledBy ModelManifest
@@ -515,6 +533,12 @@ domain model://perspectives.domains#CouchdbManagement
         props (FirstName, LastName) verbs (Consult)
       action CreateVersion
         create role Versions
+      
+      screen "Model Manifest"
+        row 
+          form "This Manifest" External
+        row
+          table "Available Versions" Versions
     
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
     public Visitor at extern >> PublicUrl = sys:Me
@@ -539,6 +563,13 @@ domain model://perspectives.domains#CouchdbManagement
           --   "You updated to version {VersionedModelURI}."
         action UpdateModelWithDependencies
           callEffect cdb:UpdateModel( VersionedModelURI, true )
+      
+      screen "Model Manifest"
+        row 
+          form "This Manifest" External
+            props (ModelManifest$External$Description, VersionToInstall) verbs (Consult)
+        row
+          table "Model versions" Versions
 
     -- In order to add this model to one's installation, one should become an ActiveUser of the Manifest.
     -- BUT HOW?
@@ -633,7 +664,16 @@ domain model://perspectives.domains#CouchdbManagement
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (External$Version, Description, IsRecommended, VersionedModelManifest$External$LocalModelName) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
+        props (External$Version, Description, IsRecommended) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
+      perspective on Manifest
+        props (ModelURI) verbs (Consult) 
+      screen "Model version"
+        row
+          form "This version" External
+        row
+          form "All versions" Manifest 
+
+    context Manifest = extern >> binder Versions >> context >> extern
 
 
     user ActiveUser = extern >> binder Versions >> context >> ActiveUser

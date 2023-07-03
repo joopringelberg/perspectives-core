@@ -111,7 +111,7 @@ domain model://perspectives.domains#System
       perspective on BaseRepository
         props (Domain) verbs (Consult)
       perspective on Repositories
-        verbs (CreateAndFill, Remove)
+        only (CreateAndFill, Remove)
         props (Domain) verbs (Consult)
       perspective on PendingInvitations
         view ForInvitee verbs (Consult)
@@ -123,11 +123,12 @@ domain model://perspectives.domains#System
           row
             form SystemCaches
         tab "Manage new models"
-          form BaseRepository
-          row
-            table Repositories
           row 
-            table ModelsInUse
+            form "Default (Base) Repository" BaseRepository
+          row 
+            table "Other repositories" Repositories
+          row 
+            table "Models in use" ModelsInUse
               props (VersionedModelManifest$External$LocalModelName, Version, Description) verbs (Consult)
         tab "Start contexts"
           row
