@@ -7,6 +7,7 @@ domain model://perspectives.domains#CouchdbManagement
   use cdb for model://perspectives.domains#Couchdb
   use util for model://perspectives.domains#Utilities
   use p for model://perspectives.domains#Parsing
+  use files for model://perspectives.domains#Files
 
   -------------------------------------------------------------------------------
   ---- SETTING UP
@@ -198,12 +199,14 @@ domain model://perspectives.domains#CouchdbManagement
 
       perspective on Repositories
         all roleverbs
-        props (AdminEndorses, IsPublic, AdminLastName) verbs (Consult)
-        props (IsPublic, Repositories$NameSpace) verbs (SetPropertyValue)
+        props (Repositories$NameSpace, AdminEndorses, IsPublic, AdminLastName) verbs (Consult)
+        props (IsPublic) verbs (SetPropertyValue)
         in object state WithoutExternalDatabase
           props (AdminEndorses) verbs (SetPropertyValue)
         in object state CreateDatabases
           props (IsPublic) verbs (SetPropertyValue)
+        in object state NoNameSpace
+          props (Repositories$NameSpace) verbs (SetPropertyValue)
         
         -- This is currently not very useful, because a Repositories instance will not enter state WithoutManifests 
         -- when its last Manifest is deleted. Negation by failure breaks on removing instances!
@@ -333,6 +336,8 @@ domain model://perspectives.domains#CouchdbManagement
 
       state WithoutExternalDatabase = (not exists NameSpace_) or not AdminEndorses
 
+      state NoNameSpace = not exists Repositories$NameSpace
+
         -- Ad Admin may exist already if the Repository is created by Accounts.
         -- state NoAdmin = AdminEndorses and not exists binding >> context >> Repository$Admin
         --   on entry
@@ -439,8 +444,9 @@ domain model://perspectives.domains#CouchdbManagement
       -- to both the cw_servers_and_repositories and to the Repository database.
       perspective on Manifests
         only (Create, Fill, Delete, Remove)
-        props (Manifests$LocalModelName) verbs (SetPropertyValue)
-        props (Description) verbs (Consult)
+        props (Description, Manifests$LocalModelName) verbs (Consult)
+        in object state NoLocalModelName
+          props (Manifests$LocalModelName) verbs (SetPropertyValue)
       
       perspective on Manifests >> binding >> context >> Author
         only (Create, Fill)
@@ -480,6 +486,7 @@ domain model://perspectives.domains#CouchdbManagement
     context Manifests filledBy ModelManifest
       aspect sys:ManifestCollection$Manifests
       -- Manifests$LocalModelName
+      state NoLocalModelName = not exists Manifests$LocalModelName
       state ReadyToMake = (exists Manifests$LocalModelName) and not exists binding
         on entry
           do for Admin
@@ -614,8 +621,9 @@ domain model://perspectives.domains#CouchdbManagement
       -- The Version property is registered on ModelManifest$Versions so we can use it to create a DNS URN for it (it must be a public resource)
       property ModelURI = binder Versions >> context >> extern >> ModelManifest$External$ModelURI
       property VersionedModelURI = VersionedModelManifest$External$ModelURI + "@" + External$Version
-      property ArcSource (mandatory, String)
-        minLength = 81 -- shows as a textarea
+      property ArcFile (File)
+        pattern = "text/arc" "Only .arc files (Perspectives Language source files) are allowed, so use `text//arc."
+      property ArcSource = callExternal files:FileText( ArcFile ) returns String
       property ArcFeedback (String)
         minLength = 81
       property ArcOK = ArcFeedback matches regexp "^OK"
@@ -651,8 +659,8 @@ domain model://perspectives.domains#CouchdbManagement
   
     user Author filledBy cm:ModelManifest$Author
       perspective on extern
-        props (DomeinFileName, Version, ArcOK) verbs (Consult)
-        props (ArcSource, ArcFeedback, Description, IsRecommended) verbs (SetPropertyValue)
+        props (DomeinFileName, Version, ArcOK, ArcSource) verbs (Consult)
+        props (ArcFile, ArcFeedback, Description, IsRecommended) verbs (SetPropertyValue)
 
         in object state ReadyToCompile
           action RestoreState

@@ -27,7 +27,7 @@ where
 import Data.Array (intercalate, null, uncons, unsnoc)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.String (Pattern(..), Replacement(..), indexOf, replaceAll, split, stripPrefix, splitAt, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), indexOf, replaceAll, split, splitAt, stripPrefix, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -293,6 +293,15 @@ hasLocalName qn ln = case typeUri2LocalName qn of
 -- | "Context" `isLocalNameOf` "model:Perspectives$Context"
 isLocalNameOf :: String -> String -> Boolean
 isLocalNameOf = flip hasLocalName
+
+-----------------------------------------------------------
+-- CONVERT A TYPE URI TO A STRING COMPATIBLE WITH COUCHDB FILE NAME RESTRICTIONS
+-- Allowed Characters: The document ID can be any string value, but it must not 
+-- contain control characters (e.g., null, tab, line feed) or the forward slash ("/") character. 
+-- Other than these, any printable UTF-8 character is generally allowed.
+-----------------------------------------------------------
+typeUri2couchdbFilename :: String -> String
+typeUri2couchdbFilename = replaceAll (Pattern "/") (Replacement "_")
 
 -----------------------------------------------------------
 -- CURIES

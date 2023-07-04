@@ -58,7 +58,7 @@ import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unre
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Fuzzysort (matchIndexedContextNames)
-import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2LocalName_, typeUri2ModelUri_)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2ModelUri_, typeUri2couchdbFilename)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getProperty, getRoleName, roleType, roleType_, siblings)
@@ -594,14 +594,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           Nothing -> pure $ RoleProp (RoleInstance subject) (EnumeratedPropertyType predicate)
           Just x -> pure x
         {database, documentName} <- resourceIdentifier2DocLocator (unwrap rid)
-        ma <- getAttachment database documentName (typeUri2LocalName_ predicate)
+        ma <- getAttachment database documentName (typeUri2couchdbFilename predicate)
         case ma of
-          Nothing -> sendResponse (Error corrId ("No file found for property " <> (typeUri2LocalName_ predicate) <> ".")) setter
+          Nothing -> sendResponse (Error corrId ("No file found for property " <> predicate <> ".")) setter
           -- NOTE that we force the Foreign value through the api. This MUST be handled correctly in the proxy!
           Just a -> do
+            -- We need the property value because it may contain a user-specified name for the file to download.
             mv <- rid ##> getProperty replacementProperty
             case mv of
-              Nothing -> sendResponse (Error corrId ("No file information found for property " <> (typeUri2LocalName_ predicate) <> ".")) setter
+              Nothing -> sendResponse (Error corrId ("No file information found for property " <> predicate <> ".")) setter
               Just (Value v) -> case parsePerspectivesFile v of
                 Left e -> sendResponse (Error corrId ("Could not parse the value of this property, because: " <> show e)) setter
                 Right rec -> do

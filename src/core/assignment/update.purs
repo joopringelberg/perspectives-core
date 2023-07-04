@@ -68,7 +68,7 @@ import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findMeRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
-import Perspectives.Identifiers (startsWithSegments, typeUri2LocalName_)
+import Perspectives.Identifiers (startsWithSegments, typeUri2LocalName_, typeUri2couchdbFilename)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty, roleType, roleType_)
 import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
@@ -517,6 +517,7 @@ saveFile r property arrayBuf mimeType = do
   usedVal <- case mval of 
     Nothing -> pure $ writePerspectivesFile
       { fileName: (typeUri2LocalName_ $ unwrap replacementProperty) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
+      , propertyType: replacementProperty
       , mimeType
       , database: Just dbLoc
       , roleFileName: Just documentName
@@ -524,6 +525,7 @@ saveFile r property arrayBuf mimeType = do
     Just val -> case parsePerspectivesFile $ unwrap val of
       Left e -> pure $ writePerspectivesFile
         { fileName: (typeUri2LocalName_ $ unwrap replacementProperty) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
+        , propertyType: replacementProperty
         , mimeType
         , database: Just dbLoc
         , roleFileName: Just documentName
@@ -533,7 +535,7 @@ saveFile r property arrayBuf mimeType = do
     Left e -> throwError $ error ("Could not parse '" <> usedVal <> "' trying to save file:" <> show e)
     Right rec -> do
       theFile <- liftEffect $ toFile (typeUri2LocalName_ (unwrap replacementProperty)) rec.mimeType arrayBuf
-      DeleteCouchdbDocument{ok, rev} <- lift $ addAttachment database documentName (rev roleInstance) (typeUri2LocalName_ (unwrap replacementProperty)) theFile (MediaType rec.mimeType)
+      DeleteCouchdbDocument{ok, rev} <- lift $ addAttachment database documentName (rev roleInstance) (typeUri2couchdbFilename (unwrap replacementProperty)) theFile (MediaType rec.mimeType)
       case ok of 
         Just true -> do
           -- The revision on the cached version is no longer valid.

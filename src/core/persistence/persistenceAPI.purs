@@ -34,6 +34,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (lift)
+import Control.Promise as Promise
 import Data.Array.NonEmpty (index)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -45,7 +46,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Effect (Effect)
-import Effect.Aff (catchError, error, throwError)
+import Effect.Aff (Aff, catchError, error, throwError)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn3, EffectFn4, EffectFn6, runEffectFn1, runEffectFn2, runEffectFn3, runEffectFn4)
@@ -587,3 +588,13 @@ foreign import toFileImpl :: EffectFn3
 
 toFile :: FileName -> MimeType -> Foreign -> Effect File
 toFile = runEffectFn3 toFileImpl
+
+fromBlob :: Foreign -> Aff String
+fromBlob = fromBlob_ >>> Promise.toAffE
+
+fromBlob_ :: Foreign -> Effect (Promise.Promise String)
+fromBlob_ = runEffectFn1 fromBlobImpl
+
+foreign import fromBlobImpl :: EffectFn1
+  Foreign
+  (Promise.Promise String)

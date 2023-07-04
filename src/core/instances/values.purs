@@ -44,6 +44,7 @@ import Foreign (ForeignError, MultipleErrors, readInt, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Prelude (bind, ($), pure, (<>), show, (<<<), (<$>), (<*>))
 import Simple.JSON (readJSON, writeJSON)
@@ -133,10 +134,11 @@ type MIME = String
 -- Use database and roleFileName to retrieve the role instance; 
 -- use the local name of the PFile property to retrieve the attachment.
 type PerspectivesFile = 
-  { fileName :: String                  -- The name associated with the file on creating or uploading it. Use only client side.
+  { fileName :: String                      -- The name associated with the file on creating or uploading it. Use only client side.
+  , propertyType :: EnumeratedPropertyType  -- The identifier of the attachment of the role instance.
   , mimeType :: MIME
-  , database :: Maybe String        -- The database where the role instance is stored. 
-  , roleFileName :: Maybe String    -- The name of the role instance document. 
+  , database :: Maybe String                -- The database where the role instance is stored. 
+  , roleFileName :: Maybe String            -- The name of the role instance document. 
   }
 
 parsePerspectivesFile :: String -> Either MultipleErrors PerspectivesFile

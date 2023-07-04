@@ -353,3 +353,9 @@ exports.toFileImpl = function( fileName, mimeType, arrayBuffer )
 {
   return new File( [arrayBuffer], fileName, {type: mimeType});
 }
+
+// Returns a promise for the text in the blob.
+exports.fromBlobImpl = function( blob )
+{
+  return blob.text()
+}

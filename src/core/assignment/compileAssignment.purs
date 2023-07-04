@@ -277,10 +277,10 @@ compileAssignment (BQD _ (QF.CreateFileF fileName mimeType qualifiedProperty) co
       -- Notice that the content is a string. It is eventually passed on to toFile as a Foreign value and 
       -- then passed on to the File constructor. This constructor accepts Strings just as well as ArrayBuffers.
       Just roleInstance, Just content -> do
-        setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, database: Nothing, roleFileName: Nothing}]
+        setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
         void $ saveFile roleInstance qualifiedProperty (unsafeToForeign content) mimeType
       Just roleInstance, Nothing -> do
-        setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, database: Nothing, roleFileName: Nothing}]
+        setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
         void $ saveFile roleInstance qualifiedProperty (unsafeToForeign "") mimeType
       Nothing, _ -> throwError (error $ "No role instance found to attach the file '" <> fileName <> "' to.")
 

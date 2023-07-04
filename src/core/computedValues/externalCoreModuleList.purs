@@ -40,7 +40,9 @@ coreModules =
   , "model://perspectives.domains#Parsing"
   , "model://perspectives.domains#Utilities"
   , "model://perspectives.domains#Sensor"
-  , "model://perspectives.domains#RabbitMQ" ]
+  , "model://perspectives.domains#RabbitMQ"
+  , "model://perspectives.domains#Files"
+  ]
 
 isExternalCoreModule :: String -> Boolean
 isExternalCoreModule n = isJust (elemIndex n coreModules)
