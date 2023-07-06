@@ -142,9 +142,9 @@ compileFunction (SQD dom (DataTypeGetter ModelNameF) _ _ _) = case dom of
 
 compileFunction (SQD _ (TypeGetter TypeOfContextF) _ _ _) = pure $ unsafeCoerce contextType
 
-compileFunction (SQD _ (TypeConstant qname) RoleKind _ _) = pure (pure <<< const qname)
+compileFunction (SQD _ (RoleTypeConstant qname) RoleKind _ _) = pure $ unsafeCoerce ((pure <<< const qname) :: String ~~> RoleType)
 
-compileFunction (SQD _ (TypeConstant qname) ContextKind _ _) = pure (pure <<< const qname)
+compileFunction (SQD _ (ContextTypeConstant qname) ContextKind _ _) = pure $ unsafeCoerce ((pure <<< const qname) :: String ~~> ContextType)
 
 compileFunction (SQD _ (TypeGetter RoleTypesF) _ _ _) = pure $ unsafeCoerce (liftToInstanceLevel allRoleTypesInContext)
 

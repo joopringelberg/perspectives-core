@@ -429,7 +429,7 @@ compileSimpleStep currentDomain s@(RoleTypeIndividual pos typeName) = do
   typeCandidates <- lift $ lift (nameSpace ###= qualifyRoleInDomain typeName )
   case length typeCandidates, head typeCandidates of 
     0, _ -> throwError $ UnknownRole pos typeName
-    1, Just qualifiedType -> pure $ SQD currentDomain (QF.TypeConstant $ roletype2string qualifiedType) RoleKind True True
+    1, Just qualifiedType -> pure $ SQD currentDomain (QF.RoleTypeConstant qualifiedType) RoleKind True True
     _, _ -> throwError $ NotUniquelyIdentifying pos typeName (map roletype2string typeCandidates)
 
 compileSimpleStep currentDomain s@(ContextTypeIndividual pos typeName) = do
@@ -437,7 +437,7 @@ compileSimpleStep currentDomain s@(ContextTypeIndividual pos typeName) = do
   typeCandidates <- lift $ lift (nameSpace ###= qualifyContextInDomain typeName )
   case length typeCandidates, head typeCandidates of 
     0, _ -> throwError $ UnknownContext pos typeName
-    1, Just qualifiedType -> pure $ SQD currentDomain (QF.TypeConstant $ unwrap qualifiedType) ContextKind True True
+    1, Just qualifiedType -> pure $ SQD currentDomain (QF.ContextTypeConstant qualifiedType) ContextKind True True
     _, _ -> throwError $ NotUniquelyIdentifying pos typeName (map unwrap typeCandidates)
 
 compileSimpleStep currentDomain s@(RoleTypes pos) = do

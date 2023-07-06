@@ -34,7 +34,7 @@ import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Ord, class Show, map)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
@@ -262,7 +262,8 @@ data QueryFunction
   | WithFrame
 
   | TypeGetter FunctionName
-  | TypeConstant String
+  | RoleTypeConstant RoleType
+  | ContextTypeConstant ContextType
 
   | UnaryCombinator FunctionName
   -- | NaryCombinator FunctionName (Array QueryFunction)
