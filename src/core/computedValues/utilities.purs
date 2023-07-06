@@ -24,22 +24,40 @@
 
 module Perspectives.Extern.Utilities where
 
+import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (head)
+import Data.Array (head, singleton)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), Replacement(..))
 import Data.String (replace) as String
 import Data.Tuple (Tuple(..))
+import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
+import Effect.Random (randomInt)
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
+import Perspectives.Instances.Values (parseInt)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Prelude (pure, ($))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Prelude (pure, show, ($), (<<<), (>>=), bind)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO: verander naar echte gegenereerde identifiers.
 genSym :: RoleInstance -> MonadPerspectivesQuery String
 genSym _ = pure "geheim"
+
+-- | Returns a random number in the closed interval [l;u].
+random :: Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery Value
+random lower_ upper_ _ = ArrayT case head lower_, head upper_ of
+  Just l, Just u -> do 
+    lowerBound <- try $ liftAff $ parseInt l
+    upperBound <- try $ liftAff $ parseInt u
+    case lowerBound, upperBound of 
+      Right lower, Right upper -> (liftEffect (randomInt lower upper)) >>= pure <<< singleton <<< Value <<< show
+      _, _ -> pure []
+  _, _ -> pure []
 
 roleIdentifier :: RoleInstance -> MonadPerspectivesQuery String
 roleIdentifier (RoleInstance id) = pure id
@@ -64,4 +82,5 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Utilities$ContextIdentifier" {func: unsafeCoerce contextIdentifier, nArgs: 0}
   , Tuple "model://perspectives.domains#Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0}
   , Tuple "model://perspectives.domains#Utilities$Replace" {func: unsafeCoerce replace, nArgs: 2}
+  , Tuple "model://perspectives.domains#Utilities$Random" {func: unsafeCoerce random, nArgs: 2}
   ]

@@ -262,6 +262,7 @@ data QueryFunction
   | WithFrame
 
   | TypeGetter FunctionName
+  | TypeConstant String
 
   | UnaryCombinator FunctionName
   -- | NaryCombinator FunctionName (Array QueryFunction)
@@ -290,8 +291,8 @@ data QueryFunction
   | AddPropertyValue EnumeratedPropertyType
   | RemovePropertyValue EnumeratedPropertyType
   | SetPropertyValue EnumeratedPropertyType
-  -- CreateFileF fileName mimemType property
-  | CreateFileF String String EnumeratedPropertyType
+  -- CreateFileF mimmeType property
+  | CreateFileF String EnumeratedPropertyType
   | ExternalEffectFullFunction String
   | ExternalDestructiveFunction String
   | ForeignEffectFullFunction String

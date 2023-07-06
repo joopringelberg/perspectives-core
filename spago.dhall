@@ -14,6 +14,7 @@ to generate this file without the comments in this block.
 , dependencies =
   [ "aff"
   , "aff-coroutines"
+  , "aff-promise"
   , "affjax"
   , "apitypes"
   , "argonaut"
@@ -61,6 +62,7 @@ to generate this file without the comments in this block.
   , "perspectives-utilities"
   , "prelude"
   , "profunctor-lenses"
+  , "random"
   , "record"
   , "serializablenonemptyarray"
   , "simple-json"

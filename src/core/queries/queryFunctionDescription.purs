@@ -382,6 +382,8 @@ sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))
 -- sumOfDomains (RDOM a _) (RDOM b _) = Just (RDOM (SUM [a, b]) Nothing)
 sumOfDomains (CDOM a) (CDOM b) = Just (CDOM (SUM [a, b]))
 sumOfDomains (VDOM r1 _) (VDOM r2 _) = if r1 == r2 then Just $ VDOM r1 Nothing else Nothing
+sumOfDomains RoleKind RoleKind = Just RoleKind
+sumOfDomains ContextKind ContextKind = Just ContextKind
 sumOfDomains _ _ = Nothing
 
 productOfDomains :: Domain -> Domain -> Maybe Domain

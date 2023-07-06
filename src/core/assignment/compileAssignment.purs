@@ -31,7 +31,7 @@ import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, concat, filter, filterA, head, length, singleton, union, unsafeIndex)
+import Data.Array (catMaybes, concat, filter, filterA, head, index, length, singleton, union, unsafeIndex)
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
@@ -267,22 +267,26 @@ compileAssignment (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQf
     (values :: Array Value) <- lift (contextId ##= valueGetter)
     setProperty roles qualifiedProperty values
 
-compileAssignment (BQD _ (QF.CreateFileF fileName mimeType qualifiedProperty) contentQfd roleQfd _ _ _) = do
-  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
-  (contentGetter :: (ContextInstance ~~> Value)) <- context2propertyValue contentQfd
+compileAssignment (MQD _ (QF.CreateFileF mimeType qualifiedProperty) args _ _ _) = do
+  -- args = [filenameQfd, contentQfd, roleQfd]
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role (unsafePartial fromJust $ index args 2)
+  (contentGetter :: (ContextInstance ~~> Value)) <- context2propertyValue (unsafePartial fromJust $ index args 1)
+  (fileNameGetter :: (ContextInstance ~~> Value)) <- context2propertyValue (unsafePartial fromJust $ index args 0)
   pure \contextId -> do
     (roles :: Array RoleInstance) <- lift (contextId ##= roleGetter)
     (contents :: Array Value) <- lift (contextId ##= contentGetter)
-    case head roles, head contents of
+    (fileNames :: Array Value) <- lift (contextId ##= fileNameGetter)
+    case head roles, head contents, head fileNames of
       -- Notice that the content is a string. It is eventually passed on to toFile as a Foreign value and 
       -- then passed on to the File constructor. This constructor accepts Strings just as well as ArrayBuffers.
-      Just roleInstance, Just content -> do
+      Just roleInstance, Just content, Just (Value fileName) -> do
         setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
         void $ saveFile roleInstance qualifiedProperty (unsafeToForeign content) mimeType
-      Just roleInstance, Nothing -> do
+      Just roleInstance, Nothing, Just (Value fileName) -> do
         setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
         void $ saveFile roleInstance qualifiedProperty (unsafeToForeign "") mimeType
-      Nothing, _ -> throwError (error $ "No role instance found to attach the file '" <> fileName <> "' to.")
+      Nothing, _, Just (Value fileName) -> throwError (error $ "No role instance found to attach the file '" <> fileName <> "' to.")
+      _, _, _ -> throwError (error $ "some of the arguments to create file are missing.")
 
 -- Even though SequenceF is compiled in the QueryCompiler, we need to handle it here, too.
 -- In the QueryCompiler, the components will be variable bindings.

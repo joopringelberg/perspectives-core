@@ -220,7 +220,7 @@ propertyAssignment = do
       start <- getPosition
       reserved "create"
       reserved "file"
-      fileName <- parseFileName
+      fileNameExpression <- step
       mimeType <- reserved "as" *> parseMimeType
       propertyIdentifier <- reserved "in" *> arcIdentifier
       roleExpression <- optionMaybe (reserved "for" *> step)
@@ -230,7 +230,7 @@ propertyAssignment = do
       pure $ CreateFile
         { start
         , end
-        , fileName
+        , fileNameExpression
         , mimeType
         , propertyIdentifier
         , roleExpression 
@@ -239,13 +239,6 @@ propertyAssignment = do
       where 
       fileRegex :: Regex
       fileRegex = unsafeRegex "^[^\\./]+\\.[^\\./]+$" noFlags
-
-      parseFileName :: IP String
-      parseFileName = do 
-        f <- token.stringLiteral
-        case match fileRegex f of 
-          Nothing -> fail ("The string '" <> f <> "' is not a valid file name! ")
-          Just _ -> pure f
 
       mimeRegex :: Regex
       mimeRegex = unsafeRegex "^[^\\./]+/[^\\./]+$" noFlags

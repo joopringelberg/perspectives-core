@@ -301,7 +301,9 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           (VDOM r _) -> throwError $ WrongPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty r
           otherwise -> throwError $ NotAPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty
         pure $ BQD originDomain fname valueQfd roleQfd originDomain True True
-      CreateFile f@{roleExpression, contentExpression, propertyIdentifier, mimeType, fileName} -> do
+      CreateFile f@{roleExpression, contentExpression, propertyIdentifier, mimeType, fileNameExpression} -> do
+        filenameQfd <- compileExpression originDomain fileNameExpression
+        -- Check that it returns a string!
         contentQfd <- compileExpression originDomain contentExpression
         (roleQfd :: QueryFunctionDescription) <- case roleExpression of
                   Nothing -> pure $ SQD originDomain (QF.DataTypeGetter QF.IdentityF) originDomain True True
@@ -311,7 +313,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                       (RDOM _) -> pure qfd
                       otherwise -> throwError $ NotARoleDomain (range qfd) (startOf e) (endOf e)
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
-        pure $ BQD originDomain (QF.CreateFileF fileName mimeType qualifiedProperty) contentQfd roleQfd originDomain True False
+        pure $ MQD originDomain (QF.CreateFileF mimeType qualifiedProperty) [filenameQfd, contentQfd, roleQfd] originDomain True False
 
       ExternalEffect f@{start, end, effectName, arguments} -> do
         case (typeUri2ModelUri effectName) of

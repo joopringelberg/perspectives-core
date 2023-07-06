@@ -117,6 +117,11 @@ simpleStep :: IP Step
 simpleStep = try
   (Simple <$> (ArcIdentifier <$> getPosition <*> arcIdentifier)
   <|>
+  -- token brackets seems not to restore parser state when it fails, hence 'try'.
+  Simple <$> (ContextTypeIndividual <$> getPosition <*> try (token.brackets ((reserved "context") *> arcIdentifier)))
+  <|>
+  Simple <$> (RoleTypeIndividual <$> getPosition <*> try (token.brackets ((reserved "role") *> arcIdentifier)))
+  <|>
   Simple <$> (Binding <$> (getPosition <* reserved "binding") <*> (optionMaybe (reserved "in" *> arcIdentifier)))
   <|>
   Simple <$> (Binder <$> (getPosition <* reserved "binder") <*> arcIdentifier <*> (optionMaybe (reserved "in" *> arcIdentifier)))
@@ -303,6 +308,8 @@ startOf stp = case stp of
 
   where
     startOfSimple (ArcIdentifier p _) = p
+    startOfSimple (RoleTypeIndividual p _) = p
+    startOfSimple (ContextTypeIndividual p _) = p
     startOfSimple (Value p _ _) = p
     startOfSimple (PublicRole p _) = p
     startOfSimple (PublicContext p _) = p
@@ -343,6 +350,8 @@ endOf stp = case stp of
 
   where
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
+    endOfSimple (RoleTypeIndividual (ArcPosition{line, column}) id) = ArcPosition{line, column: column + 6 + length id}
+    endOfSimple (ContextTypeIndividual (ArcPosition{line, column}) id) = ArcPosition{line, column: column + 9 + length id}
     endOfSimple (Value (ArcPosition{line, column}) _ v) = ArcPosition({line, column: column + length v + 1})
     endOfSimple (PublicRole (ArcPosition{line, column}) url) =  ArcPosition({line, column: column + length url + 1})
     endOfSimple (PublicContext (ArcPosition{line, column}) url) =  ArcPosition({line, column: column + length url + 1})

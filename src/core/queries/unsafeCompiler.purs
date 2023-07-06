@@ -75,7 +75,7 @@ import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (>>>), (||), (==))
+import Prelude (class Eq, class Ord, bind, const, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (>>>), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -141,6 +141,10 @@ compileFunction (SQD dom (DataTypeGetter ModelNameF) _ _ _) = case dom of
   _ -> throwError (error $ "UnsaveCompiler: cannot retrieve modelname from " <> show dom)
 
 compileFunction (SQD _ (TypeGetter TypeOfContextF) _ _ _) = pure $ unsafeCoerce contextType
+
+compileFunction (SQD _ (TypeConstant qname) RoleKind _ _) = pure (pure <<< const qname)
+
+compileFunction (SQD _ (TypeConstant qname) ContextKind _ _) = pure (pure <<< const qname)
 
 compileFunction (SQD _ (TypeGetter RoleTypesF) _ _ _) = pure $ unsafeCoerce (liftToInstanceLevel allRoleTypesInContext)
 

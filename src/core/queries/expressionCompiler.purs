@@ -42,6 +42,7 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (keys, lookup)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes ((###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
@@ -53,7 +54,7 @@ import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, getsDF, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
@@ -73,7 +74,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as RTI
-import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
+import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, show, unit, void, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 
 ------------------------------------------------------------------------------------
@@ -422,6 +423,22 @@ compileSimpleStep currentDomain s@(TypeOfContext pos) = do
     (CDOM (r :: ADT ContextType)) -> do
       pure $ SQD currentDomain (QF.TypeGetter TypeOfContextF) ContextKind True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
+compileSimpleStep currentDomain s@(RoleTypeIndividual pos typeName) = do
+  nameSpace <- getsDF _.namespace
+  typeCandidates <- lift $ lift (nameSpace ###= qualifyRoleInDomain typeName )
+  case length typeCandidates, head typeCandidates of 
+    0, _ -> throwError $ UnknownRole pos typeName
+    1, Just qualifiedType -> pure $ SQD currentDomain (QF.TypeConstant $ roletype2string qualifiedType) RoleKind True True
+    _, _ -> throwError $ NotUniquelyIdentifying pos typeName (map roletype2string typeCandidates)
+
+compileSimpleStep currentDomain s@(ContextTypeIndividual pos typeName) = do
+  nameSpace <- getsDF _.namespace
+  typeCandidates <- lift $ lift (nameSpace ###= qualifyContextInDomain typeName )
+  case length typeCandidates, head typeCandidates of 
+    0, _ -> throwError $ UnknownContext pos typeName
+    1, Just qualifiedType -> pure $ SQD currentDomain (QF.TypeConstant $ unwrap qualifiedType) ContextKind True True
+    _, _ -> throwError $ NotUniquelyIdentifying pos typeName (map unwrap typeCandidates)
 
 compileSimpleStep currentDomain s@(RoleTypes pos) = do
   case currentDomain of

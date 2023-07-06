@@ -134,9 +134,11 @@ instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
     eroleExpression <- traverse expandPrefix roleExpression
     evalueExpression <- expandPrefix valueExpression
     pure $ PropertyAssignment r {valueExpression = evalueExpression, roleExpression = eroleExpression}
-  expandPrefix (CreateFile r@{roleExpression}) = do
+  expandPrefix (CreateFile r@{roleExpression, fileNameExpression, contentExpression}) = do
     eRoleExpression <- traverse expandPrefix roleExpression
-    pure $ CreateFile r {roleExpression = eRoleExpression}
+    eContentExpression <- expandPrefix contentExpression
+    eFileNameExpression <- expandPrefix fileNameExpression
+    pure $ CreateFile r {roleExpression = eRoleExpression, fileNameExpression = eFileNameExpression, contentExpression = eContentExpression}
   expandPrefix (ExternalEffect r@{effectName, arguments}) = do
     eeffectName <- expandNamespace effectName
     earguments <- traverse expandPrefix arguments

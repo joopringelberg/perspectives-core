@@ -56,7 +56,7 @@ data Assignment =
   | CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
   | CreateContext (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe Step, roleTypeIdentifier :: Maybe String, contextExpression :: Maybe Step))
   | CreateContext_ (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe Step, roleExpression :: Step))
-  | CreateFile (WithTextRange (fileName :: String, mimeType :: String, propertyIdentifier :: String, roleExpression :: Maybe Step, contentExpression :: Step))
+  | CreateFile (WithTextRange (fileNameExpression :: Step, mimeType :: String, propertyIdentifier :: String, roleExpression :: Maybe Step, contentExpression :: Step))
   | Move (WithTextRange (roleExpression :: Step, contextExpression :: Maybe Step))
   | Bind (WithTextRange (bindingExpression :: Step, roleIdentifier :: String, contextExpression :: Maybe Step))
   | Bind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
@@ -159,7 +159,7 @@ instance prettyPrintAssignment :: PrettyPrint Assignment where
     in
       "CreateContext " <> contextTypeIdentifier <> boundTo <> " in " <> context
   prettyPrint' t (CreateContext_ {contextTypeIdentifier, roleExpression}) = "CreateContext_ " <> contextTypeIdentifier <> " bound to " <> prettyPrint' t roleExpression
-  prettyPrint' t (CreateFile {fileName, mimeType, roleExpression, contentExpression}) = "CreateFile " <> fileName <> " as " <> mimeType <> if isNothing roleExpression then "" else prettyPrint' t roleExpression <> "\n" <> t <> "  " <> prettyPrint' (t <> "  ") contentExpression
+  prettyPrint' t (CreateFile {fileNameExpression, mimeType, roleExpression, contentExpression}) = "CreateFile " <> prettyPrint' t fileNameExpression <> " as " <> mimeType <> if isNothing roleExpression then "" else prettyPrint' t roleExpression <> "\n" <> t <> "  " <> prettyPrint' (t <> "  ") contentExpression
   prettyPrint' t (Move {roleExpression, contextExpression}) = "Move " <> prettyPrint' t roleExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
   prettyPrint' t (Bind {bindingExpression, contextExpression}) = "Bind " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") contextExpression
   prettyPrint' t (Bind_ {bindingExpression, binderExpression}) = "Bind_ " <> prettyPrint' t bindingExpression <> "\n" <> t <> prettyPrint' (t <> "  ") binderExpression

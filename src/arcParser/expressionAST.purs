@@ -20,77 +20,20 @@
 
 -- END LICENSE
 
--- | An Abstract Syntax Tree data model for Perspectives expressions. The expression grammar is below.
--- |
--- | step = simpleStep | unaryStep | compoundStep | let*
--- |
--- | simpleStep = ArcIdentifier
--- |
--- | | binding
--- |
--- | | binder
--- |
--- | | context
--- |
--- | | extern
--- |
--- | | Value
--- |
--- | | variable
--- |
--- | | this
--- |
--- | | >>= SequenceFunction
--- |
--- | unaryStep =
--- |    'not' step
--- |  | 'createRole' ArcIdentifier
--- |  | 'createContext' ArcIdentifier
--- |  | 'exists' step
--- |
--- | compoundStep =
--- |    'filter' step 'with' step
--- |  | step operator step
--- |  | 'bind_' step 'in' step
--- |
--- | operator = '>>' | '==' | '<' | '>' | '<=' | '>=' | 'and' | 'or' | '+' | '-' | '*' | '/'
--- |
--- | assignment = ArcIdentifier AssignmentOperator step
--- |
--- | AssignmentOperator = '=' | '=+' | '=-'
--- |
--- | RoleName = ArcIdentifier
--- |
--- | PropertyName = ArcIdentifier
--- |
--- | Value = number | boolean | string | date
--- |
--- | SequenceFunction = 'sum' | 'count' | 'product' | 'minimum' | 'maximum'
--- |
--- |
--- | let* = 'let*' binding+ 'in' body
--- |
--- | binding = variable '<-' step
--- |
--- | body = step | assignment+
--- |
--- | variable = lowerCaseName
-
-
 module Perspectives.Parsing.Arc.Expression.AST where
 
 import Prelude
 
+import Data.Eq.Generic (genericEq)
 import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
-import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.QueryFunction (FunctionName) as QF
-import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
@@ -99,6 +42,8 @@ data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | PureLet Pu
 
 data SimpleStep =
   ArcIdentifier ArcPosition String
+  | ContextTypeIndividual ArcPosition String
+  | RoleTypeIndividual ArcPosition String
   | Value ArcPosition Range String
   | CreateEnumeratedRole ArcPosition String
   -- Binding has an optional embedding context.
@@ -189,6 +134,9 @@ instance decodeSimpleStep :: Decode SimpleStep where
   decode = genericDecode defaultOptions
 instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (ArcIdentifier _ s) = "ArcIdentifier " <> s
+  
+  prettyPrint' t (ContextTypeIndividual _ s) = "ArcIdentifier " <> s
+  prettyPrint' t (RoleTypeIndividual _ s) = "ArcIdentifier " <> s
   prettyPrint' t (CreateEnumeratedRole _ s) = "CreateEnumeratedRole " <> s
   prettyPrint' t (Binding _ embeddingContext) = "Binding " <> (case embeddingContext of
     Nothing -> ""

@@ -101,6 +101,9 @@ domain model://perspectives.domains#System
         props (Name) verbs (Consult)
       perspective on Contacts
         props (FirstName, LastName) verbs (Consult)
+      perspective on OutgoingInvitations
+        only (CreateAndFill)
+        props (InviterLastName) verbs (Consult)
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
       -- Notice that these roles are filled with the public version of VersionedModelManifest$External.
@@ -114,7 +117,7 @@ domain model://perspectives.domains#System
         only (CreateAndFill, Remove)
         props (Domain) verbs (Consult)
       perspective on PendingInvitations
-        view ForInvitee verbs (Consult)
+        props (InviterLastName, Message) verbs (Consult)
       perspective on SystemCaches
         defaults
 
@@ -140,6 +143,8 @@ domain model://perspectives.domains#System
               props (FirstName, LastName) verbs (SetPropertyValue)
           row 
             table Contacts
+          row 
+            table "Invitations I have created" OutgoingInvitations
         tab "Invitations"
           row
             table PendingInvitations
@@ -159,6 +164,8 @@ domain model://perspectives.domains#System
         props (IndexedRoles$Name) verbs (SetPropertyValue)
       perspective on BaseRepository
         only (CreateAndFill)
+
+    context OutgoingInvitations (relational) filledBy Invitation
 
     context BaseRepository filledBy ManifestCollection
 
@@ -189,40 +196,6 @@ domain model://perspectives.domains#System
     -- StartContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     -- These are the 'apps' of Perspectives.
     context StartContexts (relational) filledBy sys:RootContext
-
-    -- This will become obsolete when we start using model:CouchdbManagement.
-    -- context ModelsInUse (relational) filledBy Model
-    --   property PerformUpdate (Boolean)
-    --   property IncludingDependencies (Boolean)
-    --   property HasBeenInstalled (Boolean)
-    --   --on exit
-    --     --notify User
-    --       --"Model {origin >> binding >> ModelIdentification} has been removed completely."
-    --   state Update = PerformUpdate
-    --     on entry
-    --       do for User
-    --         callEffect cdb:UpdateModel( ModelIdentification, IncludingDependencies )
-    --         PerformUpdate = false
-    --         -- Updating without dependencies is the default.
-    --         IncludingDependencies = false
-    --       notify User
-    --         "Model {ModelIdentification} has been updated."
-    --   state NotInStartContexts = (not HasBeenInstalled) and exists (binding >> context >> IndexedContext >> filter binding with not exists binder StartContexts)
-    --     -- Create an entry in StartContexts if its model has been taken in use.
-    --     on entry
-    --       do for User
-    --         bind binding >> context >> IndexedContext >> binding to StartContexts
-    --         HasBeenInstalled = true
-    --       notify User
-    --         "{ binding >> ModelIdentification } added!"
-    --   state Dangles = (not exists binding >> context >> IndexedContext >> binding) and HasBeenInstalled
-    --     -- If the user has removed the App, this automatic action will clear away the corresponding entry in ModelsInuse.
-    --     -- We also remove the Model itself (the entry to the functionality).
-    --     on entry
-    --       do for User
-    --         remove context origin
-    --         callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelIdentification )
-    --   view ModelInUsePresentation (Description, Name, PerformUpdate)
 
     context PendingInvitations = callExternal cdb:PendingInvitations() returns sys:Invitation$External
 
@@ -317,32 +290,67 @@ domain model://perspectives.domains#System
     user RootUser filledBy sys:PerspectivesSystem$User
 
   case Invitation
-    external
-      property IWantToInviteAnUnconnectedUser (Boolean)
-      property SerialisedInvitation (String)
-      property Message (String)
-      property InviterLastName = context >> Inviter >> LastName
-      state InviteUnconnectedUser = IWantToInviteAnUnconnectedUser and exists Message
-        on entry
-          do for Inviter
-            SerialisedInvitation = callExternal ser:SerialiseFor( filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee ) returns String
+    state NoInviter = not exists Inviter
 
-      view ForInvitee (InviterLastName, Message)
+    external
+      property SerialisedInvitation (File)
+      property Message (String)
+      property ConfirmationCode (Number)
+      property Confirmation (Number)
+        minInclusive = 100000
+        maxInclusive = 999999
+      property InviterLastName = context >> Inviter >> LastName
+      state Message = exists Message
+      state Invitation = exists SerialisedInvitation
+      state Checks = Confirmation == ConfirmationCode
+        on entry
+          notify Inviter
+            "The confirmation code you entered is correct!"
 
     user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
       perspective on Invitee
         props (FirstName, LastName) verbs (Consult)
+      perspective on External
+        props (Message, ConfirmationCode, SerialisedInvitation) verbs (SetPropertyValue)
+        in object state Message
+          action CreateInvitation
+            letA
+              text <- callExternal ser:SerialiseFor( ((filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee) orElse [role model://perspectives.domains#System$Invitation$Invitee])) returns String
+            in
+              create file ("invitation_of_" + InviterLastName + ".json") as "text/json" in SerialisedInvitation for origin
+                text
+              ConfirmationCode = callExternal util:Random(100000, 999999) returns Number
+        in object state Invitation
+          props (Confirmation) verbs (SetPropertyValue)
+      
+      screen "Invite someone"
+        row 
+          form External
+            props (Message, SerialisedInvitation) verbs (SetPropertyValue)
+            -- props (SerialisedInvitation) verbs (Consult)
+        row
+          form "Invitee" Invitee
 
     user Invitee (mandatory) filledBy Guest
       perspective on Inviter
         props (FirstName, LastName) verbs (Consult)
       perspective on extern
-        view ForInvitee verbs (Consult)
+        props (InviterLastName, Message, ConfirmationCode) verbs (Consult)
+      screen "Invitation"
+        row 
+          form "You are invited by:" Inviter
+        row
+          form "Message and confirmation code" External
+            props (Message, ConfirmationCode) verbs (Consult)
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user Guest = filter sys:Me with not fills (currentcontext >> Inviter)
       perspective on Invitee
         only (Fill, Create)
+      perspective on Inviter
+        in context state NoInviter
+          only (CreateAndFill)
+          props (FirstName, LastName) verbs (Consult)
 
   -- To be used as Aspect in model:CouchdbManagement$Repository
   case ManifestCollection

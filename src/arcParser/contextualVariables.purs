@@ -132,8 +132,10 @@ assignmentContainsReference varName (PropertyAssignment {valueExpression, roleEx
   ||
   maybe false (stepContainsVariableReference varName) roleExpression
 
-assignmentContainsReference varName (CreateFile {roleExpression, contentExpression}) = 
+assignmentContainsReference varName (CreateFile {roleExpression, contentExpression, fileNameExpression}) = 
   stepContainsVariableReference varName contentExpression
+  ||
+  stepContainsVariableReference varName fileNameExpression
   ||
   maybe false (stepContainsVariableReference varName) roleExpression
 
