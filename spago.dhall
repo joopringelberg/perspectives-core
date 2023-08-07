@@ -18,6 +18,8 @@ to generate this file without the comments in this block.
   , "affjax"
   , "apitypes"
   , "argonaut"
+  , "arraybuffer"
+  , "arraybuffer-builder"
   , "arrays"
   , "avar"
   , "avar-monadask"
@@ -67,6 +69,7 @@ to generate this file without the comments in this block.
   , "serializablenonemptyarray"
   , "simple-json"
   , "strings"
+  , "subtlecrypto"
   , "tailrec"
   , "test-unit"
   , "transformers"
@@ -74,6 +77,7 @@ to generate this file without the comments in this block.
   , "unicode"
   , "unsafe-coerce"
   , "variant"
+  , "web-encoding"
   , "yargs"
   ]
 , packages = ./packages.dhall
