@@ -70,7 +70,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on CouchdbServers
         only (CreateAndFill, Remove, Delete)
         props (Name) verbs (Consult)
-        props (Url, CouchdbServers$CouchdbPort, AdminPassword, Name) verbs (SetPropertyValue)
+        props (Url, CouchdbServers$CouchdbPort, AdminUserName, AdminPassword, Name) verbs (SetPropertyValue)
 
       -- Manager needs this action so he can set the Url before the CouchdbServer$Visitor tries to publish.
       action CreateServer
@@ -94,16 +94,16 @@ domain model://perspectives.domains#CouchdbManagement
         pattern = "^https://[^\\/]+\\/$" "An url with the https scheme, ending on a slash"
       property CouchdbPort (mandatory, String)
         pattern = "^\\d{1,5}$" "A port number written as a string, consisting of up to 5 digits, maximally 65535."
-      -- The Password of Manager (and therefore CouchdbServer$Admin) for Url.
-      -- The username of this account at Url should be PerspectivesSystem$User (the ID).
+      -- The Password and UserName of Manager (and therefore CouchdbServer$Admin) for Url.
       property AdminPassword (mandatory, String)
+      property AdminUserName (mandatory, String)
 
       -- Add credentials to Perspectives State (not to the Couchdb_).
       -- This means that the PDR can now authenticate on behalf of the Admin with Couchdb_.
       state AddCredentials = (exists Url) and exists AdminPassword
         on entry
           do for Manager
-            callEffect cdb:AddCredentials( Url, AdminPassword)
+            callEffect cdb:AddCredentials( Url, AdminUserName, AdminPassword )
 
         state CreateServer = exists Url -- This might be replaced by 'true'.
           on entry
@@ -115,18 +115,21 @@ domain model://perspectives.domains#CouchdbManagement
                 couchdburl <- "http://localhost:" + CouchdbServers$CouchdbPort + "/"
               in 
                 callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories" )
-                callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories_write" )
-                callEffect cdb:ReplicateContinuously( Url, couchdburl, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
+                callEffect cdb:MakeDatabaseWriteProtected( Url, "cw_servers_and_repositories" )
                 callEffect cdb:MakeDatabasePublic( Url, "cw_servers_and_repositories" )
+                --callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories_write" )
+                --callEffect cdb:ReplicateContinuously( Url, couchdburl, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
                 -- As the databases are now ready, we can create and publish the CouchdbServer.
                 create_ context CouchdbServer bound to origin
 
       state NoAdmin = (exists binding) and not exists binding >> context >> CouchdbServer$Admin
         on entry
           do for Manager
+            -- Tie these credentials to the CouchdbServer$Admin role.
             bind context >> Manager to Admin in binding >> context
             AuthorizedDomain = Url for  binding >> context >> Admin
             Password = AdminPassword for binding >> context >> Admin
+            SpecificUserName = AdminUserName for binding >> context >> Admin
 
   -------------------------------------------------------------------------------
   ---- COUCHDBSERVER
@@ -184,8 +187,9 @@ domain model://perspectives.domains#CouchdbManagement
     user Admin filledBy CouchdbManagementApp$Manager 
       -- As acc:Body$Admin, has full perspective on Accounts.
       -- These properties come from sys:WithCredentials
-      -- WithCredentials$UserName - CALCULATED, computes the ID of the PerspectivesSystem$User.
+      -- WithCredentials$UserName - CALCULATED, either the SpecificUserName or the ID of the PerspectivesSystem$User.
       -- The next two properties are set on creating the admin (state CouchdbServerApp$CouchdbServers$NoAdmin)
+      -- WithCredentials$SpecificUserName
       -- WithCredentials$Password
       -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Admin
@@ -231,20 +235,22 @@ domain model://perspectives.domains#CouchdbManagement
 
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       -- WithCredentials$Password
+      -- WithCredentials$SpecificUserName
       -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Accounts
+      -- TODO. Is dit nodig? 
       on entry
         do for Admin
           letA
             serverurl <- context >> extern >> ServerUrl
           in
-            callEffect cdb:MakeMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+            callEffect cdb:MakeWritingMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
       on exit
         do for Admin
           letA
             serverurl <- context >> extern >> ServerUrl
           in
-            callEffect cdb:RemoveAsMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+            callEffect cdb:RemoveAsWritingMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
 
 
     -- The instance of CouchdbServer is published in the cw_servers_and_repositories database.
@@ -297,37 +303,39 @@ domain model://perspectives.domains#CouchdbManagement
               baseurl <- context >> extern >> ServerUrl
               couchdburl <- "http://localhost:" + context >> extern >> CouchdbPort + "/"
               readmodels <- "models_" + NameSpace_
-              writemodels <- "models_" + NameSpace_ + "_write"
+              -- writemodels <- "models_" + NameSpace_ + "_write"
               readinstances <- "cw_" + NameSpace_
-              writeinstances <- "cw_" + NameSpace_ + "_write"
+              -- writeinstances <- "cw_" + NameSpace_ + "_write"
             in 
               -- models
               callEffect cdb:CreateCouchdbDatabase( baseurl, readmodels )
+              callEffect cdb:MakeDatabaseWriteProtected( Url, readmodels )
               callEffect cdb:MakeDatabasePublic( baseurl, readmodels )
-              callEffect cdb:CreateCouchdbDatabase( baseurl, writemodels )
-              callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writemodels, readmodels )
+              -- callEffect cdb:CreateCouchdbDatabase( baseurl, writemodels )
+              -- callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writemodels, readmodels )
               -- instances
               callEffect cdb:CreateCouchdbDatabase( baseurl, readinstances )
               callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
-              callEffect cdb:CreateCouchdbDatabase( baseurl, writeinstances )
-              callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writeinstances, readinstances )
+              callEffect cdb:MakeDatabaseWriteProtected( Url, readinstances )
+              -- callEffect cdb:CreateCouchdbDatabase( baseurl, writeinstances )
+              -- callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writeinstances, readinstances )
         on exit
           do for Admin
             letA
               baseurl <- context >> extern >> ServerUrl
               readmodels <- "models_" + NameSpace_
-              writemodels <- "models_" + NameSpace_ + "_write"
+              -- writemodels <- "models_" + NameSpace_ + "_write"
               readinstances <- "cw_" + NameSpace_
-              writeinstances <- "cw_" + NameSpace_ + "_write"
+              -- writeinstances <- "cw_" + NameSpace_ + "_write"
             in 
               -- models
-              callEffect cdb:EndReplication( baseurl, writemodels, readmodels )
+              -- callEffect cdb:EndReplication( baseurl, writemodels, readmodels )
               callEffect cdb:DeleteCouchdbDatabase( baseurl, readmodels )
-              callEffect cdb:DeleteCouchdbDatabase( baseurl, writemodels )
+              -- callEffect cdb:DeleteCouchdbDatabase( baseurl, writemodels )
               -- instances
-              callEffect cdb:EndReplication( baseurl, writeinstances, readinstances )
+              -- callEffect cdb:EndReplication( baseurl, writeinstances, readinstances )
               callEffect cdb:DeleteCouchdbDatabase( baseurl, readinstances )
-              callEffect cdb:DeleteCouchdbDatabase( baseurl, writeinstances )
+              -- callEffect cdb:DeleteCouchdbDatabase( baseurl, writeinstances )
               -- remove role binding >> context >> Repository$Admin
 
       -- THIS STATE WILL NOT BE REVISITED WHEN ALL MANIFESTS ARE REMOVED,
@@ -368,28 +376,31 @@ domain model://perspectives.domains#CouchdbManagement
       -- The toplevel domain with at least one subdomain, such as perspectives.domains or professional.joopringelberg.nl.
       property NameSpace = binder Repositories >> Repositories$NameSpace
       property ReadModels = "models_" + NameSpace_
-      property WriteModels = "models_" + NameSpace_ + "_write"
+      -- property WriteModels = "models_" + NameSpace_ + "_write"
       property ReadInstances = "cw_" + NameSpace_
-      property WriteInstances = "cw_" + NameSpace_ + "_write"
+      -- property WriteInstances = "cw_" + NameSpace_ + "_write"
       -- The location of the CouchdbServer_. 
       property ServerUrl = binder Repositories >> context >> extern >> ServerUrl
       property RepositoryUrl = "https://" + NameSpace + "/"
       property AdminLastName = context >> Admin >> LastName
 
-    -- We need the ServerAdmin in this context in order to configure the local Admin.
+    -- We need the ServerAdmin in this context in order to configure the local Admin and to give Authors write access.
     user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin
       perspective on Admin
         only (Create, Fill, RemoveFiller, Remove)
-        props (FirstName, LastName) verbs (Consult)
-        props (AuthorizedDomain, Password) verbs (SetPropertyValue)
+        props (SpecificUserName, Password) verbs (SetPropertyValue)
+        props (FirstName, LastName, Password, UserName) verbs (Consult)
+        props (AuthorizedDomain) verbs (SetPropertyValue)
 
     -- The filler provides autentication on Couchdb_.
     -- Should also be able to give them read access to the repo,
     -- and to retract that again.
+    -- NOTE: later, not only CouchdbServer$Admin is allowed to fill this role.
     user Admin filledBy CouchdbServer$Admin
       aspect acc:Body$Admin
-        -- WithCredentials$UserName
-        -- We must use the next two properties to provide the autentication details to the PDR for the RepositoryUrl.
+        -- WithCredentials$SpecificUserName
+        -- We must use the next three properties to provide the autentication details to the PDR for the RepositoryUrl.
+        -- WithCredentials$UserName (either the SpecificUserName or the User identifier)
         -- WithCredentials$Password
         -- WithCredentials$AuthorizedDomain
         -- As Admin, has a full perspective on Accounts.
@@ -403,21 +414,20 @@ domain model://perspectives.domains#CouchdbManagement
             -- Only the CouchdbServer$Admin has a Create and Fill perspective on
             -- Repository$Admin. So when this state arises, we can be sure that
             -- the current user is, indeed, a CouchdbServer$Admin.
-            -- Hence the PDR will authenticate with Server Admin credentials.
+            -- Hence the PDR will authenticate with his credentials.
             -- Admin adds Manifests to Repository, so must be able to store Repository on behalf of the public Visitor.
             letA
               serverurl <- context >> extern >> ServerUrl
             in
               -- models
-              callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteModels, UserName )
+              -- callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteModels, UserName )
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ReadModels, UserName )
               -- instances
-              callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteInstances, UserName )
+              -- callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteInstances, UserName )
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ReadInstances, UserName )
-              -- Make autentication details available to the PDR
+              -- Make authentication details available to the PDR (in fact only useful when the filler of Admin is not CouchdbServer$Admin)
               AuthorizedDomain = context >> extern >> RepositoryUrl
-              Password = binding >> WithCredentials$Password
-              callEffect cdb:AddCredentials( AuthorizedDomain, Password)
+              callEffect cdb:AddCredentials( AuthorizedDomain, UserName, Password)
 
 
         on exit
@@ -426,10 +436,10 @@ domain model://perspectives.domains#CouchdbManagement
               serverurl <- context >> extern >> ServerUrl
             in
               -- models
-              callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> WriteModels, UserName )
+              -- callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> WriteModels, UserName )
               callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> ReadModels, UserName )
               -- instances
-              callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> WriteInstances, UserName )
+              -- callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> WriteInstances, UserName )
               callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> ReadInstances, UserName )
 
       on exit 
@@ -450,6 +460,9 @@ domain model://perspectives.domains#CouchdbManagement
       
       perspective on Manifests >> binding >> context >> Author
         only (Create, Fill)
+      
+      -- Moet in staat zijn om een instantie toe te voegen aan Accounts.
+      -- perspective on Accounts
 
       screen "Repository"
         tab "This repository"
@@ -461,7 +474,24 @@ domain model://perspectives.domains#CouchdbManagement
           row
             table Manifests
       
-    user Authors (relational) filledBy CouchdbServer$Admin
+    user Authors (relational) filledBy CouchdbServer$Account
+      state Filled = exists binding
+        on entry
+          do for ServerAdmin
+            letA
+              serverurl <- context >> extern >> ServerUrl
+            in
+              callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> ReadModels, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+              callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> ReadInstances, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+        on exit
+          do for ServerAdmin
+            letA
+              serverurl <- context >> extern >> ServerUrl
+            in
+              callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ReadModels, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+              callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ReadInstances, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+
+
     
     -- Levert een pattern match failure in Perspectives.Representation.Perspective (line 220, column 29 - line 220, column 51): CP
     user Accounts (relational, unlinked) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
@@ -551,6 +581,7 @@ domain model://perspectives.domains#CouchdbManagement
     public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
         props (LocalModelName, ModelManifest$External$Description, IsLibrary, VersionToInstall) verbs (Consult)
+      -- NOTA BENE: betekent dit niet dat instanties van ModelsInUse gepuliceerd worden?
       perspective on sys:MySystem >> ModelsInUse
         only (Fill, Remove)
       perspective on Versions
@@ -654,6 +685,7 @@ domain model://perspectives.domains#CouchdbManagement
       state ProcessArc = (exists ArcSource) and not exists ArcFeedback
         on entry
           do for Author
+            delete property SourcesChanged
             ArcFeedback = callExternal p:ParseAndCompileArc( ArcSource ) returns String
             SourcesChanged = true
   
@@ -672,6 +704,7 @@ domain model://perspectives.domains#CouchdbManagement
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
+        -- is ModelURI nog steeds een probleem?
         props (External$Version, Description, IsRecommended) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
       perspective on Manifest
         props (ModelURI) verbs (Consult) 

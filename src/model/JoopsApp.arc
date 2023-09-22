@@ -1,5 +1,6 @@
 domain model://joopringelberg.nl#JoopsModel
   use sys for model://perspectives.domains#System
+  use cdb for model://perspectives.domains#Couchdb
   use joop for model://joopringelberg.nl#JoopsModel
 
   -------------------------------------------------------------------------------
@@ -40,11 +41,22 @@ domain model://joopringelberg.nl#JoopsModel
   -------------------------------------------------------------------------------
   -- The INDEXED context joop:MyCouchdbApp, that is the starting point containing all CouchdbServers.
   -- There is NO PUBLIC PERSPECTIVE on this case.
-  -- The end user user (playing Manager) should have a Server Admin account for each CouchdbServer that is added to the App.
-  -- The credentials of each such Server Admin go into the CouchdbServer$Admin roles.
   case JoopsApp
     indexed joop:MyVersionOfJoopsApp
     aspect sys:RootContext
     external
       aspect sys:RootContext$External
+    
+    user Manager = sys:Me
+      action MakeTestDatabase
+        callEffect cdb:CreateCouchdbDatabase( "https://localhost:6984/", "testjoop" )
+        callEffect cdb:MakeDatabasePublic( "https://localhost:6984/", "testjoop" )
+        callEffect cdb:MakeDatabaseWriteProtected( "https://localhost:6984/", "testjoop" )
+      
+      action AddWritingMember
+        callEffect cdb:MakeWritingMemberOf( "https://localhost:6984/", "testjoop", "def:#pen$User" )
+      
+      action RemoveTestDatabase
+        callEffect cdb:RemoveAsWritingMemberOf( "https://localhost:6984/", "testjoop", "def:#pen$User" )
+        callEffect cdb:DeleteCouchdbDatabase( "https://localhost:6984/", "testjoop" )
     

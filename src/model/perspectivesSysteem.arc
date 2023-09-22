@@ -48,7 +48,8 @@ domain model://perspectives.domains#System
   user WithCredentials filledBy sys:PerspectivesSystem$User
     -- | The value of field systemIdentifier of the PouchdbUser object that is passed in to runPDR.
     -- | Currently, this is the raw username that is used to log into MyContexts, e.g. "dev1".
-    property UserName = callExternal util:SystemIdentifier() returns String
+    property UserName = SpecificUserName orElse callExternal util:SystemIdentifier() returns String
+    property SpecificUserName (String)
     property Password (String)
     property AuthorizedDomain (String)
 
@@ -102,7 +103,7 @@ domain model://perspectives.domains#System
       perspective on Contacts
         props (FirstName, LastName) verbs (Consult)
       perspective on OutgoingInvitations
-        only (CreateAndFill)
+        only (CreateAndFill, Remove)
         props (InviterLastName) verbs (Consult)
       perspective on External
         view ShowLibraries verbs (Consult, SetPropertyValue)
@@ -317,9 +318,9 @@ domain model://perspectives.domains#System
             letA
               text <- callExternal ser:SerialiseFor( ((filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee) orElse [role model://perspectives.domains#System$Invitation$Invitee])) returns String
             in
+              ConfirmationCode = callExternal util:Random(100000, 999999) returns Number
               create file ("invitation_of_" + InviterLastName + ".json") as "text/json" in SerialisedInvitation for origin
                 text
-              ConfirmationCode = callExternal util:Random(100000, 999999) returns Number
         in object state Invitation
           props (Confirmation) verbs (SetPropertyValue)
       
@@ -345,12 +346,24 @@ domain model://perspectives.domains#System
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user Guest = filter sys:Me with not fills (currentcontext >> Inviter)
+      perspective on extern
+        props (InviterLastName, Message) verbs (Consult)
       perspective on Invitee
         only (Fill, Create)
+        props (FirstName, LastName) verbs (Consult)
       perspective on Inviter
+        props (FirstName, LastName) verbs (Consult)
         in context state NoInviter
           only (CreateAndFill)
           props (FirstName, LastName) verbs (Consult)
+      screen "Invitation"
+        row 
+          form "You are invited by:" Inviter
+        row
+          form "Message from the inviter" External
+            props (Message) verbs (Consult)
+        row 
+          form "Accept by filling this role with yourself" Invitee
 
   -- To be used as Aspect in model:CouchdbManagement$Repository
   case ManifestCollection
