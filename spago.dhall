@@ -20,6 +20,7 @@ to generate this file without the comments in this block.
   , "argonaut"
   , "arraybuffer"
   , "arraybuffer-builder"
+  , "arraybuffer-types"
   , "arrays"
   , "avar"
   , "avar-monadask"
@@ -28,7 +29,6 @@ to generate this file without the comments in this block.
   , "control"
   , "coroutines"
   , "datetime"
-  , "debug"
   , "effect"
   , "either"
   , "enums"
@@ -76,9 +76,8 @@ to generate this file without the comments in this block.
   , "tuples"
   , "unicode"
   , "unsafe-coerce"
-  , "variant"
+  , "uint"
   , "web-encoding"
-  , "yargs"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/*.purs" ]

@@ -29,8 +29,8 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (gets)
 import Data.Maybe (Maybe(..))
-import Foreign.Object (lookup)
-import Perspectives.Persistence.Types (MonadPouchdb, Url)
+import Foreign.Object (Object, lookup)
+import Perspectives.Persistence.Types (Credential, MonadPouchdb, Url)
 
 -----------------------------------------------------------
 -- STATE UTILITIES
@@ -47,12 +47,12 @@ getSystemIdentifier = gets _.systemIdentifier
 getCouchdbBaseURL :: forall f. MonadPouchdb f (Maybe Url)
 getCouchdbBaseURL = gets _.couchdbUrl
 
-getCouchdbPassword :: forall f. MonadPouchdb f (Maybe String)
-getCouchdbPassword = do 
+getCouchdbCredentials :: forall f. MonadPouchdb f (Maybe Credential)
+getCouchdbCredentials = do 
   mcbUrl <- gets _.couchdbUrl
   case mcbUrl of 
     Just cbUrl -> do
-      credentials <- gets _.couchdbCredentials
+      credentials :: Object Credential <- gets _.couchdbCredentials
       pure $ lookup cbUrl credentials
     _ -> pure Nothing
 

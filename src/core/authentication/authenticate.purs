@@ -43,6 +43,7 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Persistence.Types (Password)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.Encoding.TextEncoder (encode, new)
 
@@ -66,7 +67,6 @@ pbkdf2_import :: ImportAlgorithm
 pbkdf2_import = unsafeCoerce "PBKDF2"
 
 -- Create a password 
-type Password = String
 createPassword :: Password -> Aff String
 createPassword password = do
   -- Generate a random salt

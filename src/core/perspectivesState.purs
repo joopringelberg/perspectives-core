@@ -34,6 +34,7 @@ import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, J
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser, Url)
+import Perspectives.Persistence.Types (Credential(..))
 import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 
 newPerspectivesState :: PouchdbUser -> Url -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> PerspectivesState
@@ -47,7 +48,7 @@ newPerspectivesState uinfo publicRepo transFlag transactionWithTiming modelToLoa
   , systemIdentifier: uinfo.systemIdentifier
   , couchdbUrl: uinfo.couchdbUrl 
   , couchdbCredentials: case uinfo.couchdbUrl, uinfo.password of 
-      Just url, Just password -> singleton url password
+      Just url, Just password -> singleton url (Credential uinfo.systemIdentifier password)
       _, _ -> empty
   , indexedRoles: empty
   , indexedContexts: empty
@@ -57,7 +58,6 @@ newPerspectivesState uinfo publicRepo transFlag transactionWithTiming modelToLoa
   , brokerService: Nothing
   , stompClient: Nothing
   , databases: empty
-  -- , couchdbUrl: Nothing -- For using Couchdb as backend for Pouchdb.
   , warnings: []
   , transactionFlag: transFlag
   , transactionWithTiming

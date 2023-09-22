@@ -69,8 +69,8 @@ import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), Replic
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Identifiers (deconstructUserName, endsWithSegments)
 import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication, requestAuthentication)
-import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
-import Perspectives.Persistence.Types (DatabaseName, Url, MonadPouchdb)
+import Perspectives.Persistence.State (getCouchdbCredentials, getSystemIdentifier)
+import Perspectives.Persistence.Types (Credential(..), DatabaseName, MonadPouchdb, Url)
 import Simple.JSON (writeJSON)
 
 -- | This module contains functions to write and read documents on Couchdb endpoints that Pouchdb prohibits:
@@ -134,10 +134,10 @@ ensureSecurityDocument base db = do
 replicateContinuously :: forall f. Url -> DatabaseName -> Url -> Url -> Maybe SelectorObject -> MonadPouchdb f Unit
 replicateContinuously couchdbUrl name source target selector = do
   usr <- getSystemIdentifier
-  mpwd <- getCouchdbPassword
+  mpwd <- getCouchdbCredentials
   case mpwd of 
     Nothing -> throwError (error $ "replicateContinuously: no password found for user " <> usr <> " in " <> couchdbUrl)
-    Just pwd -> do 
+    Just (Credential username pwd) -> do 
       bvalue <- pure (btoa (usr <> ":" <> pwd))
       case bvalue of
         Left _ -> pure unit

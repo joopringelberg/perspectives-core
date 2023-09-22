@@ -40,7 +40,8 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesExtraState)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Persistence.API (MonadPouchdb, deleteDocument)
-import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
+import Perspectives.Persistence.State (getCouchdbCredentials)
+import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
@@ -87,15 +88,14 @@ incomingPost url = do
 -- | Returns a Url in the format http://user:password@{domain}:{port}/
 getCouchdbBaseURLWithCredentials :: forall f . String -> MonadPouchdb f String
 getCouchdbBaseURLWithCredentials url = do
-  user <- getSystemIdentifier
-  mpassword <- getCouchdbPassword
-  case mpassword of 
-    Just password -> do 
+  mcredential :: Maybe Credential <- getCouchdbCredentials
+  case mcredential of 
+    Just (Credential username password) -> do 
       case match domainRegex url of
         Nothing -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
         Just matches | length matches < 3 -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
         Just matches -> case (unsafePartial (fromJust (index matches 1))), (unsafePartial (fromJust (index matches 2))) of
-          Just scheme, Just domain -> pure $ scheme <> user <> ":" <> password <> "@" <> url <> "/"
+          Just scheme, Just domain -> pure $ scheme <> username <> ":" <> password <> "@" <> url <> "/"
           _, _ -> throwError (error $ "getCouchdbBaseURLWithCredentials: couchdbHost not well-formed: " <> url)
     Nothing -> throwError (error $ "getCouchdbBaseURLWithCredentials: no password for " <> url)
   where

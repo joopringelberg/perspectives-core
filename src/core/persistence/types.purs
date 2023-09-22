@@ -29,7 +29,7 @@ import Control.Alt ((<|>))
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ReaderT, runReaderT)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe, maybe)
 import Effect.AVar (AVar)
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (new)
@@ -64,14 +64,15 @@ type PouchdbState f =
   -- The keys are the URLs of CouchdbServers
   -- The values are passwords.
   -- Each account is in the name of the systemIdentifier.
-  , couchdbCredentials :: Object String
-
-  -- TODO. De volgende drie kunnen weg zodra Perspectives.Persistence.API alles heeft overgenomen:
-  -- , couchdbPassword :: String
-  -- , couchdbHost :: String
-  -- , couchdbPort :: Int
+  -- TODO: de values moeten een combinatie van username en paswoord worden!
+  , couchdbCredentials :: Object Credential
   | f}
 
+data Credential = Credential UserName Password
+
+-- | We need a Semigroup instance, but there is no real application for appending.
+instance Semigroup Credential where
+  append c1 c2 = c1
 
 -- TODO. Te verwijderen zodra Perspectives.Persistence.API alles heeft overgenomen.
 -- We do not need the UserName value in the core, as long as we have the systemIdentifier.
@@ -109,7 +110,7 @@ runMonadPouchdb userName password systemId couchdbUrl mp = do
   (rf :: AVar (PouchdbState ())) <- new $
     { systemIdentifier: systemId
     , couchdbUrl
-    , couchdbCredentials: singleton systemId password
+    , couchdbCredentials: maybe empty ((flip singleton) (Credential systemId password)) couchdbUrl
     , databases: empty
     -- compat
     -- , couchdbPassword: password

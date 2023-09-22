@@ -178,6 +178,9 @@ accountHolderQueueName = "model://perspectives.domains#BrokerServices$BrokerCont
 userWithCredentials :: String
 userWithCredentials = "model://perspectives.domains#System$WithCredentials"
 
+userWithCredentialsUsername :: String
+userWithCredentialsUsername = "model://perspectives.domains#System$WithCredentials$UserName"
+
 userWithCredentialsPassword :: String
 userWithCredentialsPassword = "model://perspectives.domains#System$WithCredentials$Password"
 

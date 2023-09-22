@@ -57,12 +57,13 @@ import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (isModelUri)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
-import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword)
+import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, getViewOnDatabase, includeDocs)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
+import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
 import Perspectives.PerspectivesState (newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
@@ -521,13 +522,14 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
 retrieveAllCredentials :: MonadPerspectives Unit
 retrieveAllCredentials = do
   (roleInstances :: Array RoleInstance) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/credentialsView" (Nothing :: Maybe String)
-  rows <- foldM
+  rows :: Array (Tuple String Credential) <- foldM
     (\rows' roleId -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsPassword))) >>= 
       handlePerspectRolError' "retrieveAllCredentials_Password" rows'
         \pw -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsAuthorizedDomain))) >>=
           handlePerspectRolError' "retrieveAllCredentials_AuthorizedDomain" rows' 
-            (\authorizedDomain -> pure $ cons (Tuple (unwrap authorizedDomain) (unwrap pw)) rows')
-        )
+            (\authorizedDomain ->  (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsUsername))) >>=
+              handlePerspectRolError' "retrieveAllCredentials_Username" rows' 
+                (\username -> pure $ cons (Tuple (unwrap authorizedDomain) (Credential (unwrap username) (unwrap pw))) rows')))
     []
     roleInstances
   modify \s@{couchdbCredentials} -> s {couchdbCredentials = couchdbCredentials <> fromFoldable rows}

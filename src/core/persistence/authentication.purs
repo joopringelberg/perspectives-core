@@ -45,7 +45,7 @@ import Perspectives.Couchdb (onAccepted_)
 import Perspectives.ErrorLogging (logError)
 import Perspectives.Identifiers (url2Authority)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Persistence.Types (MonadPouchdb)
+import Perspectives.Persistence.Types (Credential(..), MonadPouchdb, Password, Url, UserName)
 import Perspectives.ResourceIdentifiers (databaseLocation)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -76,14 +76,14 @@ ensureAuthentication authSource a = catchJust
 requestAuthentication :: forall f. AuthoritySource -> MonadPouchdb f Unit
 requestAuthentication authSource = do
   mauthority <- authSource2Authority authSource
-  usr <- getSystemIdentifier
   case mauthority of 
     Just authority -> do
-      mpwd <- getCredentials authority
-      case mpwd of 
-        Just pwd -> do
+      mcredential <- getCredentials authority
+      case mcredential of 
+        Just (Credential username password) -> do
           (rq :: (AJ.Request String)) <- defaultPerspectRequest
-          res <- liftAff $ AJ.request $ rq {method = Left POST, url = (authority <> "_session"), content = Just $ RequestBody.json (fromObject (fromFoldable [Tuple "name" (unsafeCoerce usr), Tuple "password" (unsafeCoerce pwd)]))}
+          res <- liftAff $ AJ.request $ rq {method = Left POST, url = (authority <> "_session"), content = Just $ RequestBody.json 
+            (fromObject (fromFoldable [Tuple "name" (unsafeCoerce username), Tuple "password" (unsafeCoerce password)]))}
           onAccepted_
             (\response _ -> throwError (error $ "Failure in requestAuthentication. " <> "HTTP statuscode " <> show response.status))
             res
@@ -116,12 +116,10 @@ defaultPerspectRequest = pure
 }
 
 -- | Looks up the credentials for a given Authority.
-getCredentials :: forall f. Authority -> MonadPouchdb f (Maybe String)
+getCredentials :: forall f. Authority -> MonadPouchdb f (Maybe Credential)
 getCredentials authority = do 
   credentials <- gets _.couchdbCredentials
   pure $ lookup authority credentials
 
-type Url = String
-type Password = String
-addCredentials :: forall f. Url -> Password -> MonadPouchdb f Unit
-addCredentials url password = modify \s@{couchdbCredentials} -> s { couchdbCredentials = insert url password couchdbCredentials }
+addCredentials :: forall f. Url -> UserName -> Password -> MonadPouchdb f Unit
+addCredentials url username password = modify \s@{couchdbCredentials} -> s { couchdbCredentials = insert url (Credential username password) couchdbCredentials }

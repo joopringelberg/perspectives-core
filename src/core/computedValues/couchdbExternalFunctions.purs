@@ -96,6 +96,7 @@ import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
+import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
@@ -615,9 +616,6 @@ deleteDocument url_ _ = case head url_ of
     Just {database, document} -> lift $ void $ Persistence.deleteDocument database document Nothing
   _ -> pure unit
 
-type UserName = String
-type Password = String
-
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts.
 -- | Execution of this function requires the user to have a SERVERADMIN account.
 createUser :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -741,10 +739,10 @@ resetPassword databaseUrls userNames passwords _ = case head databaseUrls, head 
 
 -- | Add credentials to the current session. Once persisted in the User's local storage, they will be retrieved on each session.
 -- | Notice that this function causes a change in PerspectivesState but not in the Perspectives Universe.
-addCredentials :: Array Url -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
-addCredentials urls passwords _ = case head urls, head passwords of 
-  Just url, Just password -> lift $ Authentication.addCredentials url password
-  _, _ -> pure unit
+addCredentials :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
+addCredentials urls usernames passwords _ = case head urls, head usernames, head passwords of 
+  Just url, Just username, Just password -> lift $ Authentication.addCredentials url username password
+  _, _, _ -> pure unit
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.

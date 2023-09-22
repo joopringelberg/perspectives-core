@@ -16,6 +16,7 @@ import Perspectives.Couchdb (designDocumentViews)
 import Perspectives.Extern.Couchdb (createUser, uploadToRepository)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Persistence.API (tryGetDocument_)
+import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName)
 import Perspectives.PerspectivesState (domeinCache)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
@@ -60,7 +61,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     liftAff $ assert "There should be some models" (length models > 0)
 
   test "upload model://perspectives.domains#Serialise to repository from files" $ runP do
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     errs <- loadCompileAndCacheArcFile' "serialise" modelDirectory
     if null errs
       then do
@@ -70,7 +71,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are instance- or model errors for model:Serialise: " <> show errs) false
 
   test "upload model://perspectives.domains#Sensor to repository from files" $ runP do
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     errs <- loadCompileAndCacheArcFile' "sensor" modelDirectory
     if null errs
       then do
@@ -81,7 +82,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   test "upload model://perspectives.domains#Couchdb to repository from files" $ runP do
     -- Add a password for "https://localhost:6984/"
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     errs <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
     if null errs
       then do
@@ -90,7 +91,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are instance- or model errors for perspectives.domains#Couchdb: " <> show errs) false
 
   test "upload model://perspectives.domains#Utilities to repository from files" $ runP do
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     errs <- loadCompileAndCacheArcFile' "utilities" modelDirectory
     if null errs
       then do
@@ -100,7 +101,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   test "upload model://perspectives.domains#System to repository from files" $ runP do
     -- Add a password for "https://localhost:6984/"
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
@@ -119,7 +120,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#Parsing: " <> show errs) false
 
   test "upload model://perspectives.domains#TestPublicRole to repository from files" $ runP do
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
@@ -133,7 +134,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#TestPublicRole: " <> show errs) false
 
   test "upload model://perspectives.domains#TestFields to repository from files" $ runP do
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
@@ -146,7 +147,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#TestFields: " <> show errs) false
 
   test "upload model:perspectives.domains#BodiesWithAccounts to repository from files (without testuser)" $ runP do
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
@@ -159,7 +160,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are instance- or model errors for model://perspectives.domains#BodiesWithAccounts: " <> show errs) false
 
   testOnly "upload model://perspectives.domains#CouchdbManagement_new to repository from files (without testuser)" $ runP do
-    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" "geheim" couchdbCredentials}
+    modify \s@({couchdbCredentials}) -> s {couchdbCredentials = insert "https://localhost:6984/" (Credential "joopdev" "geheim") couchdbCredentials}
     addAllExternalFunctions
     _ <- loadCompileAndCacheArcFile' "couchdb" modelDirectory
     _ <- loadCompileAndCacheArcFile' "serialise" modelDirectory
@@ -243,7 +244,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 --     liftAff $ assert "There should be two users" (length users == 2)
 -- )
 
-  -- Run account "test" with password "geheim"
+  -- Run account "test" with password (Credential "joopdev" "geheim")
   -- PROBLEMEN: de test slaagt, maar een database wordt niet gemaakt.
   -- log statement in createDatabaseImpl vuurt.
   -- test "createDatabase" $ runP do
@@ -252,7 +253,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
   --     (\e -> logShow e)
   --   liftAff $ assert "Just testing" true
 
-  -- Run account "test" with password "geheim"
+  -- Run account "test" with password (Credential "joopdev" "geheim")
   test "createUser" $ runP do
     void $ runMonadPerspectivesTransaction $ catchError
       (createUser ["https://localhost:6984/"] ["pipo1"] ["geheim"] (RoleInstance "ignored"))
