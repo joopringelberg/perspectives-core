@@ -80,7 +80,7 @@ createChannelContext couchdbUrl channelName = case splitCouchdbUrl couchdbUrl of
               Tuple addressHost [host]
             , Tuple addressPort [(show port)]
             ]
-          , binding: Just "usr:Me" })
+          , binding: Just "sys:Me" })
          )]
       , externeProperties: PropertySerialization $ fromFoldable [Tuple channelDatabase [channelName]]
       }

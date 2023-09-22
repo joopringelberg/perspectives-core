@@ -174,11 +174,6 @@ removeEntiteit_ entId entiteit =
         -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
         {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
         void $ deleteDocument database documentName (Just rev)
-
-        -- Returns either the local database name or a URL.
-        -- dbName <- writeDbName entId
-        -- -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
-        -- void $ deleteDocument dbName (couchdbResourceIdentifier $ unwrap entId) (Just rev)
         pure entiteit
 
 tryRemoveEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives Unit

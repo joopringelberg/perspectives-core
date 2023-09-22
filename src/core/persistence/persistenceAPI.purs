@@ -480,6 +480,21 @@ foreign import getAttachmentImpl :: EffectFn3
   Foreign
 
 -----------------------------------------------------------
+-- DESIGN DOCUMENT
+-----------------------------------------------------------
+newtype DesignDocument = DesignDocument
+  { _id :: String
+  , _rev :: Maybe String
+  , views :: Object View
+  , validate_doc_update :: Maybe String
+}
+
+instance decodeDesignDocument :: Decode DesignDocument where
+  decode = (map DesignDocument) <<< readImpl <<< unsafeFromForeign
+instance encodeDesignDocument :: Encode DesignDocument where
+  encode (DesignDocument d) = write d
+
+-----------------------------------------------------------
 -- ADDVIEWTODATABASE
 -----------------------------------------------------------
 addViewToDatabase :: forall f. DatabaseName -> DocumentName -> ViewName -> View -> MonadPouchdb f Revision_
@@ -494,22 +509,12 @@ type View =
   , reduce :: Maybe String
 }
 
-newtype DesignDocument = DesignDocument
-  { _id :: String
-  , _rev :: Maybe String
-  , views :: Object View
-}
-
-instance decodeDesignDocument :: Decode DesignDocument where
-  decode = (map DesignDocument) <<< readImpl <<< unsafeFromForeign
-instance encodeDesignDocument :: Encode DesignDocument where
-  encode (DesignDocument d) = write d
-
 defaultDesignDocumentWithViewsSection :: String -> DesignDocument
 defaultDesignDocumentWithViewsSection n = DesignDocument
   { _id: "_design/" <> n
   , _rev: Nothing
   , views: empty
+  , validate_doc_update: Nothing
 }
 
 addView :: DesignDocument -> ViewName -> View -> DesignDocument

@@ -48,7 +48,7 @@ expandDefaultNamespaces n = do
 expandDefaultNamespaces_ :: OBJ.Object String -> OBJ.Object String -> String -> String
 expandDefaultNamespaces_ indexedNames namespaces n = expandIndexedNames indexedNames (expandNamespaces namespaces n)
 
--- | Replace model:System$Me by "model:User$<guid>$User_0001".
+-- | Replace model:System$Me by "def:#<guid>$User".
 expandIndexedNames :: OBJ.Object String -> String -> String
 expandIndexedNames defaults expandedName =
   case OBJ.lookup expandedName defaults of
@@ -70,7 +70,6 @@ defaultNamespaces :: OBJ.Object String
 defaultNamespaces = OBJ.fromFoldable
   [ Tuple "cdb" "model://perspectives.domains/Couchdb"
   , Tuple "sys" "model://perspectives.domains#System"
-  , Tuple "usr" "model:User"
   , Tuple "ser" "model://perspectives.domains/Serialise"
   , Tuple "p" "model://perspectives.domains/Parsing"
   , Tuple "util" "model://perspectives.domains/Utilities"
@@ -90,7 +89,7 @@ defaultIndexedNames = do
 lookupIndexedRole :: String -> MonadPerspectives (Maybe RoleInstance)
 lookupIndexedRole iname = gets _.indexedRoles >>= pure <<< OBJ.lookup iname
 
--- | Look up a fully qualified indexed name, e.g. model:User$MySystem
+-- | Look up a fully qualified indexed name, e.g. maps "sys:Me" to "def:#<GUID>$User".
 lookupIndexedContext :: String -> MonadPerspectives (Maybe ContextInstance)
 lookupIndexedContext iname = gets _.indexedContexts >>= pure <<< OBJ.lookup iname
 

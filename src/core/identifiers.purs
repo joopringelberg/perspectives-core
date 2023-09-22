@@ -126,10 +126,6 @@ modelUri2ManifestUrl s = let
     { repositoryUrl: "https://" <> secondLevel <> "." <> toplevel <> "/cw_" <> intercalate "_" namespaceParts
     , manifestName: (intercalate "_" namespaceParts) <> "-" <>  localModelName}
 
-modelUri2ManifestWriteUrl :: Partial => String -> {repositoryUrl :: String, manifestName :: String}
-modelUri2ManifestWriteUrl s = case modelUri2ManifestUrl s of
-  rec -> rec { repositoryUrl = rec.repositoryUrl <> "_write"}
-
 -----------------------------------------------------------
 -- MODEL URI TO REPOSITORY URL
 -- The DomeinFile is served from this Repository Url.
@@ -389,7 +385,7 @@ getSecondMatch regex s = case match regex s of
 -----------------------------------------------------------
 -- | Matches all segments of the name (the string after the first "$")
 userNameRegEx :: Regex
-userNameRegEx = unsafeRegex "^model:User\\$(.*)\\$.*" noFlags
+userNameRegEx = unsafeRegex "^def:#(.*)\\$User" noFlags
 
 -- Used in module Perspectives.Persistence.CouchdbFunctions
 -- Will probably be OBSOLETE now since we have new resource identifiers.

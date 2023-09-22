@@ -39,6 +39,7 @@ import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
+import Data.String (Replacement(..), replace, Pattern(..))
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -74,9 +75,10 @@ import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInverted
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, addDocument, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, splitRepositoryFileUrl, tryGetDocument_, withDatabase)
+import Perspectives.Persistence.API (MonadPouchdb, addAttachment, addDocument, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, splitRepositoryFileUrl, tryGetDocument_, withDatabase, DesignDocument(..))
 import Perspectives.Persistence.API (deleteDocument) as Persistence
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
+import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePathSegments, removeRoleFromUser)
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
@@ -198,6 +200,7 @@ updateModel arrWithModelName arrWithDependencies versions = case head arrWithMod
 -- | Retrieve the model(s) from the modelName(s) and add them to the local couchdb installation.
 -- | Load the dependencies first.
 -- | This function is applied with `callEffect`. Accordingly, it will get the ContextInstance of the Action as second parameter.
+-- | Requires the right to write to the Repository database (SERVERADMIN, DATABASEADMIN, WRITINGMEMBER)
 addModelToLocalStore_ :: Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
 addModelToLocalStore_ modelNames _ = for_ modelNames (addModelToLocalStore' <<< DomeinFileId)
 
@@ -569,6 +572,7 @@ type Url = String
 -- | The RoleInstance is an instance of CouchdbServer$Repositories.
 -- | Fails silently if either the url or the name is missing.
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
+-- | Execution of this function requires the user to have a SERVERADMIN account.
 createCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 createCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
@@ -576,6 +580,7 @@ createCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, hea
   _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
+-- | Execution of this function requires the user to have a SERVERADMIN account.
 deleteCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 deleteCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
   -- NOTE: misschien moet er een slash tussen
@@ -614,18 +619,21 @@ type UserName = String
 type Password = String
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts.
+-- | Execution of this function requires the user to have a SERVERADMIN account.
 createUser :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
 createUser databaseUrls userNames passwords _ = case head databaseUrls, head userNames, head passwords of
   Just databaseurl, Just userName, Just password -> lift $ CDB.createUser databaseurl userName password []
   _, _, _ -> pure unit
 
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts.
+-- | Execution of this function requires the user to have a SERVERADMIN account.
 deleteUser :: Array Url -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 deleteUser databaseUrls userNames _ = case head databaseUrls, head userNames of
   Just databaseurl, Just userName -> lift $ void $ CDB.deleteUser databaseurl userName
   _, _ -> pure unit
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+-- | Execution of this function requires the user to have a DATABASEADMIN or SERVERADMIN account.
 updateSecurityDocument :: (String -> SecurityDocument -> SecurityDocument) -> Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 updateSecurityDocument updater databaseUrls databaseNames userNames _ = case head databaseUrls, head databaseNames, head userNames of
   Just databaseUrl, Just databaseName, Just userName -> lift $ do
@@ -634,18 +642,22 @@ updateSecurityDocument updater databaseUrls databaseNames userNames _ = case hea
   _, _, _ -> pure unit
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+-- | Execution of this function requires the user to have a DATABASEADMIN or SERVERADMIN account.
 makeAdminOfDb :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 makeAdminOfDb = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {admins = {names: Just $ maybe [userName] (ARR.union [userName]) r.admins.names, roles: r.admins.roles}}
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+-- | Execution of this function requires the user to have a DATABASEADMIN or SERVERADMIN account.
 removeAsAdminFromDb :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 removeAsAdminFromDb = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {admins = {names: ARR.delete userName <$> r.admins.names, roles: r.admins.roles}}
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+-- | Execution of this function requires the user to have a DATABASEADMIN or SERVERADMIN account.
 makeMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 makeMemberOf = updateSecurityDocument \userName (SecurityDocument r) -> SecurityDocument r {members = {names: Just (maybe [userName] (ARR.union [userName]) r.members.names), roles: r.members.roles}}
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+-- | Execution of this function requires the user to have a DATABASEADMIN or SERVERADMIN account.
 removeAsMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
 removeAsMemberOf = updateSecurityDocument 
   \userName (SecurityDocument r) -> 
@@ -654,8 +666,26 @@ removeAsMemberOf = updateSecurityDocument
         { names: ARR.delete userName <$> r.members.names
         , roles: r.admins.roles}}
 
--- | Any user can read the documents (and write them too, though we will restrict this using Apache)
--- | This involves removing both the `names` and the `roles` field from the members section.
+-- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+-- | Execution of this function requires the user to have a SERVERADMIN account.
+-- | Adds the database name as role name to the user document.
+makeWritingMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
+makeWritingMemberOf databaseUrls databaseNames userNames _ = case head databaseUrls, head databaseNames, head userNames of
+  Just databaseUrl, Just databaseName, Just userName -> lift $ addRoleToUser databaseUrl userName databaseName
+  _, _, _ -> pure unit
+
+-- | The RoleInstance is an instance of model:CouchdbManagement$Repository$Admin
+-- | Execution of this function requires the user to have a SERVERADMIN account.
+-- | Removes the database name as role name from the user document.
+removeAsWritingMemberOf :: Array Url -> Array DatabaseName -> Array UserName -> RoleInstance -> MonadPerspectivesTransaction Unit
+removeAsWritingMemberOf databaseUrls databaseNames userNames _ = case head databaseUrls, head databaseNames, head userNames of
+  Just databaseUrl, Just databaseName, Just userName -> lift $ removeRoleFromUser databaseUrl userName databaseName
+  _, _, _ -> pure unit
+
+-- | Any user can read the documents (and write them too, though we can restrict this by applying makeDatabaseWriteProtected).
+-- | This involves removing both the `names` and the `roles` field from the members section (the admin section need not be changed).
+-- | First execution of this function requires the user to have SERVERADMIN account.
+-- | After that, a DATABASEADMIN may change it.
 makeDatabasePublic :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 makeDatabasePublic databaseUrls databaseNames roleId = lift $
   case head databaseUrls, head databaseNames of
@@ -668,6 +698,40 @@ makeDatabasePublic databaseUrls databaseNames roleId = lift $
           { names: Just []
           , roles: []}})
     _, _ -> pure unit
+
+-- | Only users who have a role that equals the name of the database can create, update or delete documents in it.
+-- | This involves adding a validate_doc_update function.
+-- | Execution of this function requires the user to have a DATABASEADMIN or SERVERADMIN account.
+makeDatabaseWriteProtected :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+makeDatabaseWriteProtected databaseUrls databaseNames roleId = lift $
+  case head databaseUrls, head databaseNames of
+    Just databaseUrl, Just databaseName -> void $ ensureDesignDoc (databaseUrl `concatenatePathSegments` databaseName) "writeprotection" (replace (Pattern "$$DATABASENAME$$") (Replacement databaseName) validate_doc_update)
+    _, _ -> pure unit
+
+  where  
+  -- This is a special version of ensureDesignDoc, created to add a validate_doc_update function.
+  ensureDesignDoc :: forall f. DatabaseName -> DocumentName -> String -> MonadPouchdb f Revision_
+  ensureDesignDoc dbName docname functionText = do
+    (mddoc :: Maybe DesignDocument) <- tryGetDocument_ dbName ("_design/" <> docname)
+    case mddoc of
+      Nothing -> addDocument_ dbName 
+        (DesignDocument
+          { _id: "_design/" <> docname
+          , _rev: Nothing
+          , views: empty
+          , validate_doc_update: Just functionText
+          })
+        ("_design/" <> docname)
+      Just (DesignDocument ddoc) -> addDocument_ 
+        dbName 
+        (DesignDocument ddoc {validate_doc_update = Just functionText})
+        ("_design/" <> docname)
+
+type DocumentName = String
+
+-- | Import the update function as a String.
+-- | Customize for a given database by replacing the string $$DATABASENAME$$ with the actual database name.
+foreign import validate_doc_update :: String
 
 -- | The RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Accounts
 resetPassword :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -686,24 +750,37 @@ addCredentials urls passwords _ = case head urls, head passwords of
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore_, nArgs: 1}
-  , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
-  , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
-  , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
-  , Tuple "model://perspectives.domains#Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
-  , Tuple "model://perspectives.domains#Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
-  , Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
+  [ 
+  -- SERVERADMIN
+    Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2}
   , Tuple "model://perspectives.domains#Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2}
-  , Tuple "model://perspectives.domains#Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 4}
-  , Tuple "model://perspectives.domains#Couchdb$EndReplication" {func: unsafeCoerce endReplication, nArgs: 3}
-  , Tuple "model://perspectives.domains#Couchdb$DeleteDocument" {func: unsafeCoerce deleteDocument, nArgs: 1}
   , Tuple "model://perspectives.domains#Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3}
   , Tuple "model://perspectives.domains#Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2}
+  , Tuple "model://perspectives.domains#Couchdb$ResetPassword" {func: unsafeCoerce resetPassword, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$MakeWritingMemberOf" {func: unsafeCoerce makeWritingMemberOf, nArgs: 3}
+  , Tuple "model://perspectives.domains#Couchdb$RemoveAsWritingMemberOf" {func: unsafeCoerce removeAsWritingMemberOf, nArgs: 3}
+  -- DATABASEADMIN
   , Tuple "model://perspectives.domains#Couchdb$MakeDatabasePublic" {func: unsafeCoerce makeDatabasePublic, nArgs: 2}
+  , Tuple "model://perspectives.domains#Couchdb$MakeDatabaseWriteProtected" {func: unsafeCoerce makeDatabaseWriteProtected, nArgs: 2}  
   , Tuple "model://perspectives.domains#Couchdb$MakeAdminOfDb" {func: unsafeCoerce makeAdminOfDb, nArgs: 3}
   , Tuple "model://perspectives.domains#Couchdb$RemoveAsAdminFromDb" {func: unsafeCoerce removeAsAdminFromDb, nArgs: 3}
   , Tuple "model://perspectives.domains#Couchdb$MakeMemberOf" {func: unsafeCoerce makeMemberOf, nArgs: 3}
   , Tuple "model://perspectives.domains#Couchdb$RemoveAsMemberOf" {func: unsafeCoerce removeAsMemberOf, nArgs: 3}
-  , Tuple "model://perspectives.domains#Couchdb$ResetPassword" {func: unsafeCoerce resetPassword, nArgs: 3}
+  -- WRITINGMEMBER
+  , Tuple "model://perspectives.domains#Couchdb$DeleteDocument" {func: unsafeCoerce deleteDocument, nArgs: 1}
+  -- Requires writing to the _replicator database
+  , Tuple "model://perspectives.domains#Couchdb$ReplicateContinuously" {func: unsafeCoerce replicateContinuously, nArgs: 4}
+  , Tuple "model://perspectives.domains#Couchdb$EndReplication" {func: unsafeCoerce endReplication, nArgs: 3}
+  -- Requires writing to the users model database.
+  , Tuple "model://perspectives.domains#Couchdb$AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore_, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$RemoveModelFromLocalStore" {func: unsafeCoerce removeModelFromLocalStore, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$UpdateModel" {func: unsafeCoerce updateModel, nArgs: 2}
+
+  -- These functions require read access to the users instances databases.
+  , Tuple "model://perspectives.domains#Couchdb$RoleInstances" {func: unsafeCoerce roleInstancesFromCouchdb, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$ContextInstances" {func: unsafeCoerce contextInstancesFromCouchdb, nArgs: 1}
+  , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0}
+  -- This requires no access to Couchdb.
   , Tuple "model://perspectives.domains#Couchdb$AddCredentials" {func: unsafeCoerce addCredentials, nArgs: 2}
+
   ]

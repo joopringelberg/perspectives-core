@@ -22,18 +22,19 @@
 
 
 module Perspectives.Persistence.CouchdbFunctions
-
-( setSecurityDocument
-, replicateContinuously
-, endReplication
-, createUser
-, deleteUser
-, ensureSecurityDocument
-, setPassword
-, user2couchdbuser
-)
-
-where
+  ( addRoleToUser
+  , concatenatePathSegments
+  , createUser
+  , deleteUser
+  , endReplication
+  , ensureSecurityDocument
+  , removeRoleFromUser
+  , replicateContinuously
+  , setPassword
+  , setSecurityDocument
+  , user2couchdbuser
+  )
+  where
 
 import Prelude
 
@@ -46,12 +47,13 @@ import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except (runExcept)
 import Data.Argonaut (fromObject, fromString, fromArray, Json)
-import Data.Array (find)
+import Data.Array (difference, find, union)
 import Data.Either (Either(..))
+import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Map (insert, fromFoldable) as MAP
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Data.String (toLower)
 import Data.String.Base64 (btoa)
 import Data.Tuple (Tuple(..))
@@ -59,13 +61,13 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (Error, error)
 import Foreign (MultipleErrors)
 import Foreign.Class (class Decode, decode)
-import Foreign.Generic (decodeJSON)
+import Foreign.Generic (decodeJSON, defaultOptions, genericDecode)
 import Foreign.JSON (parseJSON)
 import Foreign.Object (fromFoldable, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted', onAccepted_)
 import Perspectives.Couchdb.Revision (class Revision)
-import Perspectives.Identifiers (deconstructUserName)
+import Perspectives.Identifiers (deconstructUserName, endsWithSegments)
 import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication, requestAuthentication)
 import Perspectives.Persistence.State (getCouchdbPassword, getSystemIdentifier)
 import Perspectives.Persistence.Types (DatabaseName, Url, MonadPouchdb)
@@ -167,6 +169,33 @@ endReplication :: forall f. Url -> DatabaseName -> DatabaseName -> MonadPouchdb 
 endReplication couchdbUrl source target = deleteDocument (couchdbUrl <> "_replicator/" <> source <> "_" <> target) Nothing
 
 -----------------------------------------------------------
+-- USERBDOCUMENT
+-----------------------------------------------------------
+
+newtype UserDocument = UserDocument
+  { _id :: String
+  , _rev :: Maybe String
+  , name :: String
+  , password_scheme :: String
+  , iterations :: Int
+  , derived_key :: String
+  , salt :: String
+  , roles :: Array String
+  , type :: String
+  }
+
+derive instance Generic UserDocument _
+
+derive instance Newtype UserDocument _
+
+instance Decode UserDocument where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+instance Revision UserDocument where
+  rev = _._rev <<< unwrap
+  changeRevision _ d = d
+
+-----------------------------------------------------------
 -- CREATE USER
 -----------------------------------------------------------
 -- NOTE. These functions may be redundant, as I believe we can manage documents
@@ -178,7 +207,8 @@ createUser :: forall f. Url -> User -> Password -> Array Role -> MonadPouchdb f 
 createUser base user password roles = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
   (content :: Json) <- pure (fromObject (fromFoldable
-    [ Tuple "name" (fromString $ user2couchdbuser user)
+    [ Tuple "_id" (fromString $ "org.couchdb.user:" <> user2couchdbuser user)
+    , Tuple "name" (fromString $ user2couchdbuser user)
     , Tuple "password" (fromString password)
     , Tuple "roles" (fromArray (fromString <$> roles))
     , Tuple "type" (fromString "user")]))
@@ -186,6 +216,40 @@ createUser base user password roles = ensureAuthentication (Authority base) \_ -
   onAccepted res [StatusCode 200, StatusCode 201] "createUser" (\_ -> pure unit)
 
 type Role = String
+
+-----------------------------------------------------------
+-- GET USER
+-----------------------------------------------------------
+getUserDocument :: forall f. Url -> User -> MonadPouchdb f UserDocument
+getUserDocument base user = getDocumentFromUrl (base <> "_users/org.couchdb.user:" <> user2couchdbuser user)
+
+-----------------------------------------------------------
+-- ADD OR REMOVE ROLE
+-----------------------------------------------------------
+-- | Add a role to a user document.
+addRoleToUser :: forall f. Url -> User -> Role -> MonadPouchdb f Unit
+addRoleToUser base user role = do
+  rq <- defaultPerspectRequest
+  -- Request the user document
+  UserDocument urecord@{roles} <- getUserDocument base user
+  res <- liftAff $ AJ.request $ rq 
+    { method = Left PUT
+    , url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user )
+    , content = Just $ RequestBody.string $ writeJSON (urecord {roles = union [role] roles})
+    }
+  onAccepted res [StatusCode 200, StatusCode 201] "createUser" (\_ -> pure unit)
+
+removeRoleFromUser :: forall f. Url -> User -> Role -> MonadPouchdb f Unit
+removeRoleFromUser base user role = do
+  rq <- defaultPerspectRequest
+  -- Request the user document
+  UserDocument urecord@{roles} <- getUserDocument base user
+  res <- liftAff $ AJ.request $ rq 
+    { method = Left PUT
+    , url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user )
+    , content = Just $ RequestBody.string $ writeJSON (urecord {roles = difference roles [role]})
+    }
+  onAccepted res [StatusCode 200, StatusCode 201] "createUser" (\_ -> pure unit)
 
 -----------------------------------------------------------
 -- DELETE USER
@@ -338,3 +402,12 @@ databaseStatusCodes = MAP.fromFoldable
 -- | Transforms a canonical user identification in Perspectives to an acceptable user name in Couchdb.
 user2couchdbuser :: String -> String
 user2couchdbuser = unsafePartial fromJust <<< deconstructUserName
+
+-----------------------------------------------------------
+-- concatenatePathSegments
+-----------------------------------------------------------
+-- | Safely concatenate two segments of a path (ensuring both are separated by a forward slash.)
+concatenatePathSegments :: String -> String -> String
+concatenatePathSegments s1 s2 = if endsWithSegments s1 "/" 
+  then s1 <> s2
+  else s1 <> "/" <> s2
