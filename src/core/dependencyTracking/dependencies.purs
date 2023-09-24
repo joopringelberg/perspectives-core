@@ -68,7 +68,7 @@ lookupActiveSupportedEffect = show >>> GLS.peek activeSupportedEffects
 activeSupportedEffects :: ActiveSupportedEffects
 activeSupportedEffects = GLS.new unit
 
--- | Register the ApiEffect and the TrackedObjectsGetter with the CorrelationIdentifier and run it once.
+-- | Unless `onlyOnce` equals true, egister the ApiEffect and the TrackedObjectsGetter with the CorrelationIdentifier and run it once.
 -- | Running means: compute the result of the TrackedObjectsGetter, add the computed Assumptions to
 -- | the SupportedEffect and push the resulting values into the ApiEffect.
 -- | As a result:
@@ -101,7 +101,7 @@ registerSupportedEffect corrId ef q arg onlyOnce = do
           (moldSupports :: Maybe SupportedEffect) <- pure $ GLS.peek activeSupportedEffects (show corrId)
           -- The original request may be retracted by the client.
           case moldSupports of
-            Nothing -> pure unit
+            Nothing -> liftEffect $ ef (Result corrId (map unwrap result))
             Just x -> do
               (oldSupports :: Array Assumption) <- pure x.assumptions
               -- (oldSupports :: Array Assumption) <- pure <<< unsafePartial $ (fromJust moldSupports).assumptions
@@ -112,7 +112,7 @@ registerSupportedEffect corrId ef q arg onlyOnce = do
               -- destructively deregister the correlationIdentifier from vanished assumptions
               {no: vanished} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex assumptions) oldSupports
               for_ vanished (deregisterDependency corrId)
-              -- Re-run the effect
+              -- (Re-)run the effect
               liftEffect $ ef (Result corrId (map unwrap result))
               pure unit
         else do
