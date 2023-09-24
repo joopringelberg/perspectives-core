@@ -629,14 +629,16 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             maction <- (map $ getAction actionName) <$> (findPerspective authoringRole (\(Perspective{id})-> pure $ id `eq` perspectiveId))
             mauthoringRoleInstance <- (ContextInstance object) ##> getMeInRoleAndContext authoringRole
             case mauthoringRoleInstance, maction of
-              Just author, Just (Just (ACTION.Action action)) -> void $ runMonadPerspectivesTransaction authoringRole
-                do
-                  oldFrame <- lift $ pushFrame
-                  lift $ addBinding "currentcontext" [object]
-                  lift $ addBinding "currentactor" [unwrap author]
-                  updater <- lift $ compileAssignmentFromRole action
-                  updater (RoleInstance predicate)
-                  lift $ restoreFrame oldFrame
+              Just author, Just (Just (ACTION.Action action)) -> do
+                void $ runMonadPerspectivesTransaction authoringRole
+                  do
+                    oldFrame <- lift $ pushFrame
+                    lift $ addBinding "currentcontext" [object]
+                    lift $ addBinding "currentactor" [unwrap author]
+                    updater <- lift $ compileAssignmentFromRole action
+                    updater (RoleInstance predicate)
+                    lift $ restoreFrame oldFrame
+                sendResponse (Result corrId ["true"]) setter
               _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show authoringRole <> "', perspectiveId '" <> perspectiveId <> "' and action name '" <> actionName <> "'.") setter
             )
       (\e -> sendResponse (Error corrId (show e)) setter)
@@ -653,14 +655,16 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         maction <- getContextAction predicate userRoleType
         muserRoleInstance <- (ContextInstance object) ##> getMeInRoleAndContext userRoleType
         case muserRoleInstance, maction of
-          Just user, Just (ACTION.Action action) -> void $ runMonadPerspectivesTransaction userRoleType
-            do
-              oldFrame <- lift $ pushFrame
-              lift $ addBinding "currentcontext" [object]
-              lift $ addBinding "currentactor" [unwrap user]
-              updater <- lift $ compileAssignment action
-              updater (ContextInstance object)
-              lift $ restoreFrame oldFrame
+          Just user, Just (ACTION.Action action) -> do 
+            void $ runMonadPerspectivesTransaction userRoleType
+              do
+                oldFrame <- lift $ pushFrame
+                lift $ addBinding "currentcontext" [object]
+                lift $ addBinding "currentactor" [unwrap user]
+                updater <- lift $ compileAssignment action
+                updater (ContextInstance object)
+                lift $ restoreFrame oldFrame
+            sendResponse (Result corrId ["true"]) setter
           _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show userRoleType <>
             "' and action name '" <> predicate <> "'.") setter
         )
@@ -675,7 +679,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           Nothing -> sendResponse (Error corrId ("Cannot find a role type with name '" <> object <> "' in the context of the external role '" <> subject <> "'.")) setter
           Just roleType -> do
             ctxt <- (RoleInstance subject) ##>> context
-            void $ runMonadPerspectivesTransaction authoringRole (setPreferredUserRoleType ctxt [roleType]))
+            void $ runMonadPerspectivesTransaction authoringRole (setPreferredUserRoleType ctxt [roleType])
+            sendResponse (Result corrId ["true"]) setter)
       \e -> sendResponse (Error corrId (show e)) setter
 
     Api.Unsubscribe -> unregisterSupportedEffect corrId
