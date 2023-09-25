@@ -225,10 +225,9 @@ isEmptyTransaction (Transaction tr) =
 -- | Finally, a resource identified by the Remote scheme is stored in a database 
 -- | through a REST interface. Because Pouchdb doesn't support the notion of a read-only 
 -- | database, we separate a writing endpoint from a reading endpoint.
-data StorageScheme = Default DbName | Local DbName | Remote Url WriteUrl
+data StorageScheme = Default DbName | Local DbName | Remote Url
 
 type DbName = String
-type WriteUrl = String
 type Url = String
 
 derive instance Generic StorageScheme _

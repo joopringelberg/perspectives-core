@@ -41,7 +41,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (removeFromRepository_)
 import Perspectives.Extern.Couchdb (uploadToRepository_) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelUrl, modelUri2ModelWriteUrl)
+import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelUrl)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
@@ -94,7 +94,7 @@ removeFromRepository ::
   Array RoleInstance -> MonadPerspectivesTransaction Unit
 removeFromRepository modelUris _ = case head modelUris of
   Just modelUri -> if isModelUri modelUri
-    then void $ lift $ removeFromRepository_ (unsafePartial modelUri2ModelWriteUrl modelUri)
+    then void $ lift $ removeFromRepository_ (unsafePartial modelUri2ModelUrl modelUri)
     else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> modelUri)
   _ -> logPerspectivesError $ Custom ("removeFromRepository lacks the ModelURI argument.")
 

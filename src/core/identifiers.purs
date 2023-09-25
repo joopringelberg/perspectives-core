@@ -106,10 +106,6 @@ modelUri2ModelUrl s = let
     { repositoryUrl: "https://" <> secondLevel <> "." <> toplevel <> "/models_" <> intercalate "_" namespaceParts
     , documentName: (intercalate "_" namespaceParts) <> "-" <>  localModelName <> ".json"}
 
-modelUri2ModelWriteUrl :: Partial => String -> {repositoryUrl :: String, documentName :: String}
-modelUri2ModelWriteUrl s = case modelUri2ModelUrl s of
-  rec -> rec { repositoryUrl = rec.repositoryUrl <> "_write"}
-
 -----------------------------------------------------------
 -- MODEL URI TO MANIFEST URL
 -- The Manifest is served from this Repository Url.

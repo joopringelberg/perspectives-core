@@ -42,8 +42,7 @@ import Perspectives.Identifiers (isUrl, modelUri2ModelUrl)
 import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
 import Perspectives.Representation.TypeIdentifiers (ResourceType)
-import Perspectives.Sync.Transaction (StorageScheme(..), WriteUrl, Url, DbName) as TRANS
-import Perspectives.Sync.Transaction (StorageScheme)
+import Perspectives.Sync.Transaction (StorageScheme(..), Url, DbName) as TRANS
 
 {------------------------------------------------------------
 ------------------------------------------------------------
@@ -140,8 +139,8 @@ type LocalModelName = String
 data DecomposedResourceIdentifier = 
     Default TRANS.DbName Guid 
   | Local TRANS.DbName Guid 
-  | Remote TRANS.Url TRANS.WriteUrl Guid
-  | Public TRANS.Url TRANS.WriteUrl Guid
+  | Remote TRANS.Url Guid
+  | Public TRANS.Url Guid
   | Model TRANS.DbName LocalModelName
 
 -- | Match a string of word characters, separated by ":" from an arbitrary string.
@@ -175,12 +174,12 @@ parseResourceIdentifier resId =
         "rem" -> case match publicResourceUrlRegex rest of
           Nothing -> throwError (error $ "Cannot parse this as a Remote resource identifier: " <> resId)
           Just remMatches -> case index remMatches 1, index remMatches 2 of 
-            Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") (url <> "_write/") g
+            Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") g
             _, _ -> throwError (error $ "Cannot parse this as a Remote resource identifier: " <> resId)
         "pub" -> case match publicResourceUrlRegex rest of
           Nothing -> throwError (error $ "Cannot parse this as a Public resource identifier: " <> resId)
           Just remMatches -> case index remMatches 1, index remMatches 2 of 
-            Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") (url <> "_write/") g
+            Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") g
             _, _ -> throwError (error $ "Cannot parse this as a Public resource identifier: " <> resId)
         "model" -> do
           sysId <- getSystemIdentifier
@@ -201,8 +200,8 @@ guid = parseResourceIdentifier >=> pure <<< guid_
 guid_ :: DecomposedResourceIdentifier -> Guid
 guid_ (Default _ g) = g
 guid_ (Local _ g) = g
-guid_ (Remote _ _ g) = g
-guid_ (Public _ _ g) = g
+guid_ (Remote _ g) = g
+guid_ (Public _ g) = g
 guid_ (Model _ g) = g
 
 -----------------------------------------------------------
@@ -217,8 +216,8 @@ pouchdbDatabaseName = parseResourceIdentifier >=> pure <<< pouchdbDatabaseName_
 pouchdbDatabaseName_ :: DecomposedResourceIdentifier -> TRANS.DbName
 pouchdbDatabaseName_ (Default dbName _) = dbName
 pouchdbDatabaseName_ (Local dbName _) = dbName
-pouchdbDatabaseName_ (Remote dbName _ _) = dbName
-pouchdbDatabaseName_ (Public dbName _ _) = dbName
+pouchdbDatabaseName_ (Remote dbName _) = dbName
+pouchdbDatabaseName_ (Public dbName _) = dbName
 pouchdbDatabaseName_ (Model dbName _) = dbName
 
 -----------------------------------------------------------
@@ -232,28 +231,11 @@ databaseLocation s = do
     Default dbName _ -> unsafePartial $ addBase dbName
     Local dbName _ -> unsafePartial $ addBase dbName
     Model dbName _ -> unsafePartial $ addBase dbName
-    Remote url _ _ -> pure url
-    Public url _ _ -> pure url
+    Remote url _ -> pure url
+    Public url _ -> pure url
   where 
   addBase :: Partial => String -> MonadPouchdb f String
   addBase dbname = ((flip append) dbname) <<< fromJust <$> getCouchdbBaseURL
-
------------------------------------------------------------
--- THE DATABASE PART (POSSIBLY A URL) OF A RESOURCE IDENTIFIER TO WRITE TO
------------------------------------------------------------
--- | Notice that what is returned in the Default and Local case is not an Url at all, but just a local 
--- | Couchdb database name.
-writeUrl_ :: DecomposedResourceIdentifier -> TRANS.WriteUrl
-writeUrl_ (Default dbName _) = dbName
-writeUrl_ (Local dbName _) = dbName
-writeUrl_ (Remote _ dbName _) = dbName
-writeUrl_ (Public _ dbName _) = dbName
-writeUrl_ (Model dbName _) = dbName
-
--- | Pouchdb constructs a database accessor object from the identifier returned from 
--- | this ResourceIdentifier, that can be written to.
-writeUrl :: ResourceIdentifier -> MonadPerspectives TRANS.WriteUrl
-writeUrl = parseResourceIdentifier >=> pure <<< writeUrl_
 
 -----------------------------------------------------------
 -- DOCUMENT LOCATORS
@@ -275,7 +257,7 @@ resourceIdentifier2DocLocator resId = do
 resourceIdentifier2WriteDocLocator :: ResourceIdentifier -> MonadPerspectives DocLocator
 resourceIdentifier2WriteDocLocator resId = do
   decomposed <- parseResourceIdentifier resId
-  pure  { database: writeUrl_ decomposed
+  pure  { database: pouchdbDatabaseName_ decomposed
         , documentName: guid_ decomposed }
 
 -----------------------------------------------------------
@@ -297,7 +279,7 @@ createResourceIdentifier' ctype g = do
     Nothing -> pure $ createDefaultIdentifier g
     Just (TRANS.Default _) -> pure $ createDefaultIdentifier g
     Just (TRANS.Local dbName) -> pure $ createLocalIdentifier dbName g
-    Just (TRANS.Remote url _) -> pure $ createRemoteIdentifier url g
+    Just (TRANS.Remote url) -> pure $ createRemoteIdentifier url g
 
 createDefaultIdentifier :: String -> ResourceIdentifier
 createDefaultIdentifier g = "def:#" <> g
@@ -324,14 +306,14 @@ createPublicIdentifier url s = if isInPublicScheme s
 -- | If no preference is available, use the Public scheme if the given identifier has the form of 
 -- | an URL; make it a Default scheme otherwise
 -- | This function will never create a resource identifier with the model: scheme.
-addSchemeToResourceIdentifier :: Map ResourceType StorageScheme -> ResourceType -> String -> ResourceIdentifier
+addSchemeToResourceIdentifier :: Map ResourceType TRANS.StorageScheme -> ResourceType -> String -> ResourceIdentifier
 addSchemeToResourceIdentifier map t s = case lookup t map of
   Nothing -> if isUrl s
     then addPublicScheme s
     else createDefaultIdentifier s
   Just (TRANS.Default _) -> createDefaultIdentifier s
   Just (TRANS.Local dbName) -> createLocalIdentifier dbName s
-  Just (TRANS.Remote url _) -> createRemoteIdentifier url s
+  Just (TRANS.Remote url) -> createRemoteIdentifier url s
   
 
 -----------------------------------------------------------

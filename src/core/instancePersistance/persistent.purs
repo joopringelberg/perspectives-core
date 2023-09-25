@@ -36,7 +36,6 @@
 module Perspectives.Persistent
   ( class Persistent
   , dbLocalName
-  , writeDbName
   , entitiesDatabaseName
   , entityExists
   , fetchEntiteit
@@ -81,40 +80,20 @@ import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
-import Perspectives.ResourceIdentifiers (pouchdbDatabaseName, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, writeUrl)
+import Perspectives.ResourceIdentifiers (pouchdbDatabaseName, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   -- | Either a local database name, or a URL that identifies a database to read from, in some Couchdb installation on the internet.
   dbLocalName :: i -> MP String
-  -- | Either a local database name, or a URL that identifies a database to write to, in some Couchdb installation on the internet.
-  writeDbName :: i -> MP String
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
   dbLocalName (ContextInstance id) = pouchdbDatabaseName id
-  -- dbLocalName id = if isUrl (unwrap id) 
-  --   then pure $ unsafePartial publicResourceIdentifier2repository_ (unwrap id)
-  --   else do
-  --     sysId <- getSystemIdentifier
-  --     pure $ sysId <> "_entities"
-  writeDbName (ContextInstance id) = writeUrl id
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
   dbLocalName (RoleInstance id) = pouchdbDatabaseName id
-  -- dbLocalName id = if isUrl (unwrap id) 
-  --   then pure $ unsafePartial publicResourceIdentifier2repository_ (unwrap id)
-  --   else do
-  --     sysId <- getSystemIdentifier
-  --     pure $ sysId <> "_entities"
-  writeDbName (RoleInstance id) = writeUrl id
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
   dbLocalName (DomeinFileId id) = pouchdbDatabaseName id
-  -- dbLocalName _ = do
-  --   sysId <- getSystemIdentifier
-  --   pure $ sysId <> "_models"
-  -- -- When saving a DomeinFile through Persistent, we only save it in the local models database.
-  -- -- It's only through uploadToRepository that we write to remote and public databases (Repositories).
-  writeDbName (DomeinFileId id) = writeUrl id
 
 getPerspectEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
@@ -244,8 +223,6 @@ saveEntiteit' entId mentiteit = ensureAuthentication (Resource $ unwrap entId) $
   {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
   (rev :: Revision_) <- addDocument database entiteit documentName
   
-  -- Returns either the local database name or a URL.
-  -- dbName <- writeDbName entId
   -- -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
   -- (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
   entiteit' <- pure (changeRevision rev entiteit)
