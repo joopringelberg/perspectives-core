@@ -523,8 +523,6 @@ uploadToRepository dfId@(DomeinFileId domeinFileName) = do
     else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> domeinFileName)
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
--- | In this function we handle the difference between the database that we read from (provided as the value of 
--- | the argument `url`), and the database that we write to (ending on "_write").
 uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
 uploadToRepository_ splitName df = do 
   -- Get the attachment info
@@ -536,7 +534,7 @@ uploadToRepository_ splitName df = do
       _attachments
   -- Get the revision (if any) from the remote database, so we can overwrite.
   (mVersion :: Maybe String) <- retrieveDocumentVersion splitName.repositoryUrl splitName.documentName
-  (newRev :: Revision_) <- addDocument (splitName.repositoryUrl <> "_write") (changeRevision mVersion df) splitName.documentName
+  (newRev :: Revision_) <- addDocument splitName.repositoryUrl (changeRevision mVersion df) splitName.documentName
   -- Now add the attachments.
   void $ execStateT (go splitName.repositoryUrl splitName.documentName attachments) newRev
 
@@ -548,7 +546,7 @@ uploadToRepository_ splitName df = do
       Nothing -> pure unit
       Just attachment -> do
         newRev <- get
-        DeleteCouchdbDocument {rev} <- lift $ addAttachment (documentUrl <> "_write") documentName newRev attName attachment mimetype
+        DeleteCouchdbDocument {rev} <- lift $ addAttachment documentUrl documentName newRev attName attachment mimetype
         put rev
 
 removeFromRepository_ :: {repositoryUrl :: String, documentName :: String} -> MonadPerspectives Boolean
