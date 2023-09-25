@@ -309,14 +309,14 @@ domain model://perspectives.domains#CouchdbManagement
             in 
               -- models
               callEffect cdb:CreateCouchdbDatabase( baseurl, readmodels )
-              callEffect cdb:MakeDatabaseWriteProtected( Url, readmodels )
+              callEffect cdb:MakeDatabaseWriteProtected( baseurl, readmodels )
               callEffect cdb:MakeDatabasePublic( baseurl, readmodels )
               -- callEffect cdb:CreateCouchdbDatabase( baseurl, writemodels )
               -- callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writemodels, readmodels )
               -- instances
               callEffect cdb:CreateCouchdbDatabase( baseurl, readinstances )
               callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
-              callEffect cdb:MakeDatabaseWriteProtected( Url, readinstances )
+              callEffect cdb:MakeDatabaseWriteProtected( baseurl, readinstances )
               -- callEffect cdb:CreateCouchdbDatabase( baseurl, writeinstances )
               -- callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writeinstances, readinstances )
         on exit
@@ -474,7 +474,7 @@ domain model://perspectives.domains#CouchdbManagement
           row
             table Manifests
       
-    user Authors (relational) filledBy CouchdbServer$Account
+    user Authors (relational) filledBy CouchdbServer$Accounts
       state Filled = exists binding
         on entry
           do for ServerAdmin
