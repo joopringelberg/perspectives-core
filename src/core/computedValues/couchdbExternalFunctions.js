@@ -38,6 +38,6 @@ exports.validate_doc_update = (function (newDoc, oldDoc, userCtx, secObj)
   {
     return true;
   }  
-  throw( {forbidden : "no changes or deletes!"});
+  throw( {forbidden : "unauthorized. no changes or deletes!"});
 }
 ).toString();
