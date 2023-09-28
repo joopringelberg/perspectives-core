@@ -398,17 +398,17 @@ compileSimpleStep currentDomain s@(Binder pos binderName membeddingContext) = do
         -- role (binder).
         Nothing -> do
           EnumeratedRole{context} <- lift2 $ getEnumeratedRole qBinderType
-          pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType context) (RDOM (ST $ RoleInContext{context, role: qBinderType})) True False
+          pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType context) (RDOM (ST $ RoleInContext{context, role: qBinderType})) False False
         Just context -> if isTypeUri context
-          then pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder (ContextType context) ) True False
+          then pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder (ContextType context) ) False False
           -- Try to qualify the name within the Domain.
           else do
             {namespace} <- lift $ gets _.dfr
             (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context namespace
             case head qnames of
               Nothing -> throwError $ UnknownContext pos context
-              (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder qn) True False
-              otherwise -> throwError $ NotUniquelyIdentifying pos context (map unwrap qnames)
+              (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.GetRoleBindersF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder qn) False False
+              otherwise -> throwError $ NotUniquelyIdentifying pos context (map unwrap qnames) 
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Context pos) = do
