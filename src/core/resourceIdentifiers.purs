@@ -28,7 +28,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.NonEmpty (index)
 import Data.Map (Map, lookup)
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.String (drop)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
@@ -224,18 +224,18 @@ pouchdbDatabaseName_ (Model dbName _) = dbName
 -- THE DATABASE LOCATION (POSSIBLY A URL) OF A RESOURCE IDENTIFIER TO READ FROM
 -----------------------------------------------------------
 -- | Returns an URL for all databases except for IndexedDB.
-databaseLocation :: forall f. ResourceIdentifier -> MonadPouchdb f TRANS.Url
+databaseLocation :: forall f. ResourceIdentifier -> MonadPouchdb f (Maybe TRANS.Url)
 databaseLocation s = do
   r <- parseResourceIdentifier s 
   case r of 
-    Default dbName _ -> unsafePartial $ addBase dbName
-    Local dbName _ -> unsafePartial $ addBase dbName
-    Model dbName _ -> unsafePartial $ addBase dbName
-    Remote url _ -> pure url
-    Public url _ -> pure url
+    Default dbName _ -> addBase dbName
+    Local dbName _ -> addBase dbName
+    Model dbName _ -> addBase dbName
+    Remote url _ -> pure $ Just url
+    Public url _ -> pure $ Just url
   where 
-  addBase :: Partial => String -> MonadPouchdb f String
-  addBase dbname = ((flip append) dbname) <<< fromJust <$> getCouchdbBaseURL
+  addBase :: String -> MonadPouchdb f (Maybe String)
+  addBase dbname = (map ((flip append) dbname)) <$> getCouchdbBaseURL
 
 -----------------------------------------------------------
 -- DOCUMENT LOCATORS

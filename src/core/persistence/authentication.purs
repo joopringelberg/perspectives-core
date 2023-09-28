@@ -96,7 +96,7 @@ requestAuthentication authSource = do
   where 
 
   authSource2Authority :: AuthoritySource -> MonadPouchdb f (Maybe Authority)
-  authSource2Authority (Resource s) = Just <$> databaseLocation s
+  authSource2Authority (Resource s) = databaseLocation s
   authSource2Authority (Authority s) = pure $ Just s
   authSource2Authority (Url s) = pure $ url2Authority s
 

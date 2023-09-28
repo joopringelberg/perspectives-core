@@ -519,7 +519,7 @@ saveFile r property arrayBuf mimeType = do
       { fileName: (typeUri2LocalName_ $ unwrap replacementProperty) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
       , propertyType: replacementProperty
       , mimeType
-      , database: Just dbLoc
+      , database: dbLoc
       , roleFileName: Just documentName
       }
     Just val -> case parsePerspectivesFile $ unwrap val of
@@ -527,10 +527,10 @@ saveFile r property arrayBuf mimeType = do
         { fileName: (typeUri2LocalName_ $ unwrap replacementProperty) -- As the property value is unavailable, we'll use the local prop name as client side name, too.
         , propertyType: replacementProperty
         , mimeType
-        , database: Just dbLoc
+        , database: dbLoc
         , roleFileName: Just documentName
         }
-      Right rec ->  pure $ writePerspectivesFile $ rec {database = Just dbLoc, roleFileName = Just documentName}
+      Right rec ->  pure $ writePerspectivesFile $ rec {database = dbLoc, roleFileName = Just documentName}
   case parsePerspectivesFile usedVal of
     Left e -> throwError $ error ("Could not parse '" <> usedVal <> "' trying to save file:" <> show e)
     Right rec -> do
