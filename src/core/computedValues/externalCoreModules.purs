@@ -43,6 +43,7 @@ import Prelude (class Monad, Unit, discard, pure, unit, ($))
 
 type ExternalFunctions = Array (Tuple String HiddenFunctionDescription)
 
+-- NOTICE the dependency between this enumeration of modules and the enumeration of their namespaces in module Perspectives.Names.
 coreModules :: Object ExternalFunctions
 coreModules = fromFoldable
   [ Tuple "model://perspectives.domains#Couchdb" ExternalCouchdb.externalFunctions

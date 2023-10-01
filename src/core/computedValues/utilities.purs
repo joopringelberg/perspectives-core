@@ -31,17 +31,33 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), Replacement(..))
 import Data.String (replace) as String
+import Data.String.Regex (regex, replace) as REGEX
+import Data.String.Regex.Flags (noFlags)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
+import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
+import Perspectives.Identifiers (getFirstMatch)
+import Perspectives.Instances.ObjectGetters (context, contextType, roleType)
 import Perspectives.Instances.Values (parseInt)
+import Perspectives.Parsing.Arc.Expression (step)
+import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
+import Perspectives.Parsing.Messages (MultiplePerspectivesErrors)
 import Perspectives.Persistence.State (getSystemIdentifier)
+import Perspectives.Query.ExpandPrefix (expandPrefix)
+import Perspectives.Query.ExpressionCompiler (compileExpression)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..))
+import Perspectives.Query.UnsafeCompiler (compileFunction)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Prelude (pure, show, ($), (<<<), (>>=), bind)
+import Prelude (class Show, bind, pure, show, ($), (<<<), (<>), (>=>), (>>=))
+import Text.Parsing.Parser (ParseError)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO: verander naar echte gegenereerde identifiers.
@@ -73,6 +89,74 @@ replace patterns replacements value = case head patterns, head replacements of
   Just pattern, Just replacement -> pure $ String.replace (Pattern pattern) (Replacement replacement) value
   _, _ -> pure value
 
+replaceR :: Array String -> Array String -> String -> MonadPerspectivesQuery String
+replaceR patterns replacements value = case head patterns, head replacements of
+  Just regexString, Just replacement -> do
+    theRegex <- pure $ REGEX.regex regexString noFlags
+    case theRegex of
+      Left e -> pure value
+      Right r -> pure $ REGEX.replace r replacement value
+  _, _ -> pure value
+
+selectR :: Array String -> String -> MonadPerspectivesQuery String
+selectR patterns value = ArrayT case head patterns of
+  Just regexString -> case REGEX.regex regexString noFlags of
+    Left e -> pure []
+    Right r -> case getFirstMatch r value of
+      Nothing -> pure []
+      Just s -> pure [s]
+  Nothing -> pure []
+
+type Epoch = String
+
+-- | See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat for the values of Locale and 
+-- | the shape that the options can have.
+
+-- | E.g. "En-US" or "nl-NL"
+type Locale = String
+-- | E.g. {weekday: "long", year: "numeric", month: "long", day: "numeric"}. See: https://tc39.es/ecma402/#sec-createdatetimeformat.
+type FormatOptions = String
+
+formatDateTime :: Epoch -> Locale -> FormatOptions -> RoleInstance -> MonadPerspectivesQuery String
+formatDateTime epoch locale options _ = liftEffect $ runEffectFn3 formatDateTimeImpl epoch locale options
+
+foreign import formatDateTimeImpl :: EffectFn3 Epoch Locale FormatOptions String
+
+data EvaluationResult = Success (Array String) | PE ParseError | PSPE MultiplePerspectivesErrors
+
+instance Show EvaluationResult where
+  show (Success values) = "result#" <> show values
+  show (PE parseError) = "error#" <> show parseError
+  show (PSPE errs) = "error#" <> show errs
+
+-- | Evaluate the expression and apply it to the role instance.
+-- | The result is a (series of) error message(s) that will start with "error#" or a valid result in string form preceded by "result#".
+evalExpression :: String -> RoleInstance -> MonadPerspectivesQuery String
+evalExpression expr roleId@(RoleInstance id) = do 
+  rt <- roleType roleId
+  ct <- (context >=> contextType) roleId
+  (r :: Either ParseError Step) <- liftAff $ runIndentParser expr step 
+  case r of 
+    Left e -> pure $ show (PE e)
+    Right (parseTree :: Step) -> do 
+      s <- liftAff $ evalPhaseTwo' (expandPrefix parseTree)
+      case s of 
+        Left e -> pure $ show (PSPE e)
+        Right parseTree' -> do 
+          (t :: Either MultiplePerspectivesErrors QueryFunctionDescription) <- lift $ lift $ evalPhaseTwo' 
+            (compileExpression (RDOM $ ST $ RoleInContext {context: ct, role: rt}) parseTree')
+          case t of 
+            Left errs -> pure $ show (PSPE errs)
+            Right qfd -> do 
+              calculator <- lift $ lift $ compileFunction qfd
+              result <- calculator id
+              pure $ "result#" <> result
+
+evalExpression_ :: Array String -> RoleInstance -> MonadPerspectivesQuery String
+evalExpression_ exprArray roleId = ArrayT case head exprArray of 
+  Just expr -> runArrayT $ evalExpression expr roleId
+  _ -> pure []
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -82,5 +166,9 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Utilities$ContextIdentifier" {func: unsafeCoerce contextIdentifier, nArgs: 0}
   , Tuple "model://perspectives.domains#Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0}
   , Tuple "model://perspectives.domains#Utilities$Replace" {func: unsafeCoerce replace, nArgs: 2}
+  , Tuple "model://perspectives.domains#Utilities$ReplaceR" {func: unsafeCoerce replaceR, nArgs: 2}
+  , Tuple "model://perspectives.domains#Utilities$SelectR" {func: unsafeCoerce selectR, nArgs: 1}
   , Tuple "model://perspectives.domains#Utilities$Random" {func: unsafeCoerce random, nArgs: 2}
+  , Tuple "model://perspectives.domains#Utilities$FormatDateDime" {func: unsafeCoerce formatDateTime, nArgs: 3}
+  , Tuple "model://perspectives.domains#Utilities$EvalExpression" {func: unsafeCoerce evalExpression_, nArgs: 1}
   ]

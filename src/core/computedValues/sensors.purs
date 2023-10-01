@@ -29,6 +29,7 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, singleton)
+import Data.JSDate (now)
 import Data.Map (Map, fromFoldable, lookup)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
@@ -61,7 +62,12 @@ sensorFunctions = fromFoldable
   [ Tuple (Tuple "contextcache" "size") (unsafePartial cacheSize)
   , Tuple (Tuple "rolecache" "size") (unsafePartial cacheSize)
   , Tuple (Tuple "domaincache" "size") (unsafePartial cacheSize)
+  , Tuple (Tuple "clock" "now") (unsafePartial currentDate)
   ]
+
+currentDate :: Partial => SensorFunction
+currentDate device sensor = case device, sensor of
+  "clock", "now" -> liftEffect (unsafeCoerce now)
 
 cacheSize :: Partial => SensorFunction
 cacheSize device sensor = case device, sensor of 

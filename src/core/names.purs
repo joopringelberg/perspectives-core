@@ -68,11 +68,16 @@ expandNamespaces namespaces s = if isTypeUri s then s else
 
 defaultNamespaces :: OBJ.Object String
 defaultNamespaces = OBJ.fromFoldable
-  [ Tuple "cdb" "model://perspectives.domains/Couchdb"
-  , Tuple "sys" "model://perspectives.domains#System"
-  , Tuple "ser" "model://perspectives.domains/Serialise"
-  , Tuple "p" "model://perspectives.domains/Parsing"
-  , Tuple "util" "model://perspectives.domains/Utilities"
+  [ Tuple "sys" "model://perspectives.domains#System"
+  , Tuple "cm" "model://perspectives.domains#CouchdbManagement"
+  -- External core modules: this depends on the list in module Perspectives.External.CoreModules.
+  , Tuple "cdb" "model://perspectives.domains#Couchdb"
+  , Tuple "ser" "model://perspectives.domains#Serialise"
+  , Tuple "parse" "model://perspectives.domains#Parsing"
+  , Tuple "util" "model://perspectives.domains#Utilities"
+  , Tuple "sens" "model://perspectives.domains#Sensor"
+  , Tuple "rabbit" "model://perspectives.domains#RabbitMQ"
+  , Tuple "files" "model://perspectives.domains#Files"
   ]
 
 defaultIndexedNames :: MonadPerspectives (OBJ.Object String)
@@ -92,15 +97,6 @@ lookupIndexedRole iname = gets _.indexedRoles >>= pure <<< OBJ.lookup iname
 -- | Look up a fully qualified indexed name, e.g. maps "sys:Me" to "def:#<GUID>$User".
 lookupIndexedContext :: String -> MonadPerspectives (Maybe ContextInstance)
 lookupIndexedContext iname = gets _.indexedContexts >>= pure <<< OBJ.lookup iname
-
------------------------------------------------------------
--- CONVENIENCE NAMESPACE PREFIX FUNCIONS
------------------------------------------------------------
-q :: String -> String
-q ln = "model:QueryAst$" <> ln
-
-psp :: String -> String
-psp ln = "model:Perspectives$" <> ln
 
 -----------------------------------------------------------
 -- SYSTEM AND USER
