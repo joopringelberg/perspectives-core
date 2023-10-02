@@ -54,7 +54,7 @@ import Perspectives.Instances.Combinators (available_, exists, filter, logicalAn
 import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, makeBoolean, roleModelName, roleType, roleType_)
-import Perspectives.Instances.Values (parseBool, parseDate, parseInt)
+import Perspectives.Instances.Values (decodeDate, parseBool, parseInt)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
@@ -345,8 +345,7 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
 compileFunction (BQD dom (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
-  -- NOTE. We now order the string representations of the values. This is OK
-  -- for PString, PNumber, PDate and PBool.
+  -- NOTE. We transform the string representation of Value to types that can be compared according to their Range types.
   -- Check for each new type added to Range in Perspectives.Representation.Range.
   pure $ order dom f1' f2' g
 
@@ -524,9 +523,10 @@ order (VDOM ran _) a b f c = ArrayT do
   case head as, head bs of
     Just a', Just b' -> case ran of
       RAN.PString -> pure [show $ fString a' b']
+      
       RAN.PNumber -> singleton <<< show <$> (fInt <$> (parseInt a') <*> (parseInt b'))
       RAN.PBool ->  singleton <<< show <$> (fBool <$> parseBool a' <*> parseBool b')
-      RAN.PDate -> singleton <<< show <$> (fDate <$> parseDate a' <*> parseDate b')
+      RAN.PDate -> singleton <<< show <$> (fDate <$> (decodeDate a') <*> decodeDate b')
       -- Compare email addresses as strings.
       RAN.PEmail -> pure [show $ fString a' b']
       RAN.PFile -> pure [show $ fString a' b']

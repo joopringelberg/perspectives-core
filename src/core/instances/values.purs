@@ -46,7 +46,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
-import Prelude (bind, ($), pure, (<>), show, (<<<), (<$>), (<*>))
+import Prelude (bind, pure, show, ($), (<$>), (<*>), (<<<), (<>))
 import Simple.JSON (readJSON, writeJSON)
 
 -- TODO. We gebruiken hier Error, het javascript error type. Liever zou ik een
@@ -59,6 +59,12 @@ parseDate s = do
   case toDateTime d of
     Nothing -> throwError $ error "Not a date"
     (Just (dt :: DateTime)) -> pure dt
+
+-- | Decode a date from the Epoch format in which it is stored in Couchdb.
+decodeDate :: forall m. MonadError Error m => String -> m DateTime
+decodeDate s = case runExcept (decode $unsafeToForeign s) of
+  Left e -> throwError $ error "Not a date"
+  Right (SerializableDateTime dt) -> pure dt
 
 foreign import parseInt__ :: EffectFn1 String Int
 
