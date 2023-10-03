@@ -1,4 +1,4 @@
-exports.formatDateTimeImpl = function( datetime, locale, options)
+exports.formatDateTimeImpl = function( epoch, locale, options)
 {
-  return new Intl.DateTimeFormat(locale, options).format( datetime );
+  return new Intl.DateTimeFormat(locale, JSON.parse(options)).format( new Date( epoch ) );
 }

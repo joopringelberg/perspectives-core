@@ -22,11 +22,15 @@
 
 module Perspectives.Sync.DateTime where
 
+import Control.Monad.Error.Class (throwError)
 import Data.DateTime (DateTime(..), Time(..), day, month, year)
 import Data.DateTime.Instant (fromDateTime, instant, toDateTime, unInstant)
-import Data.Maybe (fromJust)
+import Data.List.NonEmpty (singleton)
+import Data.Maybe (Maybe(..), fromJust)
+import Data.Number (fromString)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Time.Duration (Milliseconds(..))
+import Foreign (ForeignError(..))
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (class PrettyPrint)
@@ -40,7 +44,7 @@ newtype SerializableDateTime = SerializableDateTime DateTime
 
 instance encodeSerializableDateTime :: Encode SerializableDateTime where
   encode (SerializableDateTime d) = case unInstant (fromDateTime d) of
-    (Milliseconds n) -> encode n
+    (Milliseconds n) -> encode (show n)
 
 instance showSerializableDateTime :: Show SerializableDateTime where
   -- show (SerializableDateTime d) = replace (Pattern " ") (Replacement "_") (show d)
@@ -48,7 +52,9 @@ instance showSerializableDateTime :: Show SerializableDateTime where
   show (SerializableDateTime (DateTime d (Time hour minute second millisecond))) = replace (Pattern " ") (Replacement "_") ((show $ year d) <> (show $ month d) <> (show $ day d) <> "T" <> (show hour) <> (show minute) <> (show second) <> (show millisecond))
 
 instance decodeSerializableDateTime :: Decode SerializableDateTime where
-  decode d = decode d >>= \m -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds m)
+  decode d = decode d >>= \m -> case fromString m of
+    Nothing -> throwError (singleton $ ForeignError "Expected a string to convert to an int.")
+    Just n -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds n)
 
 instance prettyPrintSerializableDateTime :: PrettyPrint SerializableDateTime where
   prettyPrint' t = show

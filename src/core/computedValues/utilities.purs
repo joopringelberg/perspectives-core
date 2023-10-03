@@ -107,8 +107,6 @@ selectR patterns value = ArrayT case head patterns of
       Just s -> pure [s]
   Nothing -> pure []
 
-type Epoch = String
-
 -- | See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat for the values of Locale and 
 -- | the shape that the options can have.
 
@@ -117,10 +115,17 @@ type Locale = String
 -- | E.g. {weekday: "long", year: "numeric", month: "long", day: "numeric"}. See: https://tc39.es/ecma402/#sec-createdatetimeformat.
 type FormatOptions = String
 
-formatDateTime :: Epoch -> Locale -> FormatOptions -> RoleInstance -> MonadPerspectivesQuery String
-formatDateTime epoch locale options _ = liftEffect $ runEffectFn3 formatDateTimeImpl epoch locale options
+formatDateTime_ :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery String
+formatDateTime_ dts locales optionss _ = ArrayT $ case head dts, head locales, head optionss of
+  Just dt, Just locale, Just options -> do
+    epoch <- parseInt dt
+    runArrayT $ formatDateTime epoch locale options
+  _, _, _ -> pure []
 
-foreign import formatDateTimeImpl :: EffectFn3 Epoch Locale FormatOptions String
+formatDateTime :: Int -> Locale -> FormatOptions -> MonadPerspectivesQuery String
+formatDateTime dt locale options = liftEffect $ runEffectFn3 formatDateTimeImpl dt locale options
+
+foreign import formatDateTimeImpl :: EffectFn3 Int Locale FormatOptions String
 
 data EvaluationResult = Success (Array String) | PE ParseError | PSPE MultiplePerspectivesErrors
 
@@ -169,6 +174,6 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Utilities$ReplaceR" {func: unsafeCoerce replaceR, nArgs: 2}
   , Tuple "model://perspectives.domains#Utilities$SelectR" {func: unsafeCoerce selectR, nArgs: 1}
   , Tuple "model://perspectives.domains#Utilities$Random" {func: unsafeCoerce random, nArgs: 2}
-  , Tuple "model://perspectives.domains#Utilities$FormatDateDime" {func: unsafeCoerce formatDateTime, nArgs: 3}
+  , Tuple "model://perspectives.domains#Utilities$FormatDateTime" {func: unsafeCoerce formatDateTime_, nArgs: 3}
   , Tuple "model://perspectives.domains#Utilities$EvalExpression" {func: unsafeCoerce evalExpression_, nArgs: 1}
   ]
