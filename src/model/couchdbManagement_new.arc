@@ -8,6 +8,7 @@ domain model://perspectives.domains#CouchdbManagement
   use util for model://perspectives.domains#Utilities
   use p for model://perspectives.domains#Parsing
   use files for model://perspectives.domains#Files
+  use sensor for model://perspectives.domains#Sensor
 
   -------------------------------------------------------------------------------
   ---- SETTING UP
@@ -534,7 +535,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- Notice that we have to register the LocalModelName on the filled context role in the collection,
       -- so we can create ModelManifest with a user-defined name. 
       -- Here we repeat that name so we can conveniently use it within ModelManifest.
-      property LocalModelName = binder Manifests >> Manifests$LocalModelName
+      property LocalModelName = binder Manifests >> Manifests$LocalModelName >>= first 
       -- The Model URI (the 'logical name' of the model), e.g. model://perspectives.domains#System.
       property ModelURI = "model://" + context >> Repository >> Repository$External$NameSpace + "#" + LocalModelName
       -- The location of the CouchdbServer_. 
@@ -556,7 +557,7 @@ domain model://perspectives.domains#CouchdbManagement
         delete context bound to Versions
 
     -- The external role of the Repository.
-    context Repository = extern >> binder Manifests >> context >> extern
+    context Repository = extern >> binder Manifests >> context >> extern >>= first
 
     user Author filledBy Repository$Authors, Repository$Admin
       perspective on extern
@@ -576,6 +577,7 @@ domain model://perspectives.domains#CouchdbManagement
           form "This Manifest" External
         row
           table "Available Versions" Versions
+            only (Remove)
     
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
     public Visitor at extern >> PublicUrl = sys:Me
@@ -599,6 +601,8 @@ domain model://perspectives.domains#CouchdbManagement
             bind_ origin >> binding to basicmodel
           -- notify Visitor
           --   "You updated to version {VersionedModelURI}."
+        -- Update imported models first.
+        -- NOTE: the registration of imported models is not updated! I.e. their ModelsInUse roles will still be bound to old versions.
         action UpdateModelWithDependencies
           callEffect cdb:UpdateModel( VersionedModelURI, true )
       
@@ -641,6 +645,7 @@ domain model://perspectives.domains#CouchdbManagement
         do for Author
           callEffect p:UploadToRepository( extern >> VersionedModelManifest$External$VersionedModelURI, extern >> ArcSource )
           SourcesChanged = false for extern
+          LastChangeDT = (callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime) for extern
         notify Author
           "Version {extern >> External$Version} has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace}."
 
@@ -663,12 +668,16 @@ domain model://perspectives.domains#CouchdbManagement
       property PublicUrl = binder Versions >> context >> extern >> PublicUrl
       -- Only one VersionedModelManifest can be the recommended version at a time.
       property IsRecommended (Boolean)
+      -- The (Javascript) DateTime value of the last upload.
+      property LastChangeDT (DateTime)
+      -- The readable date and time of the last upload.
+      property LastUpload = callExternal util:FormatDateTime( LastChangeDT, "nl-NL", "{\"dateStyle\": \"short\", \"timeStyle\": \"short\"}" ) returns String
 
       state BecomesRecommended = IsRecommended
         on entry
           do for Author
             letA
-              previousversion <- binder Versions >> context >> extern >> VersionToInstall
+              previousversion <- binder Versions >> context >> extern >> VersionToInstall >>= first
             in
               -- no other version can be recommended
               IsRecommended = false for filter binder Versions >> context >> Versions with Versions$Version == previousversion
@@ -688,10 +697,11 @@ domain model://perspectives.domains#CouchdbManagement
             delete property SourcesChanged
             ArcFeedback = callExternal p:ParseAndCompileArc( ArcSource ) returns String
             SourcesChanged = true
-  
+    
+
     user Author filledBy cm:ModelManifest$Author
       perspective on extern
-        props (DomeinFileName, Version, ArcOK, ArcSource) verbs (Consult)
+        props (DomeinFileName, Version, ArcOK, ArcSource, LastUpload) verbs (Consult)
         props (ArcFile, ArcFeedback, Description, IsRecommended) verbs (SetPropertyValue)
 
         in object state ReadyToCompile
@@ -699,7 +709,7 @@ domain model://perspectives.domains#CouchdbManagement
             ArcFeedback = "Explicitly restoring state"
           action CompileArc
             delete property ArcFeedback
-      perspective on extern >> binder Versions >> context >> extern
+      perspective on Manifest
         props (VersionToInstall) verbs (SetPropertyValue)
     
     public Visitor at (extern >> PublicUrl) = sys:Me
@@ -714,7 +724,7 @@ domain model://perspectives.domains#CouchdbManagement
         row
           form "All versions" Manifest 
 
-    context Manifest = extern >> binder Versions >> context >> extern
+    context Manifest = extern >> binder Versions >> context >> extern >>= first
 
 
     user ActiveUser = extern >> binder Versions >> context >> ActiveUser
