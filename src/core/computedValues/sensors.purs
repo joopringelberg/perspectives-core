@@ -29,20 +29,27 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, singleton)
-import Data.JSDate (now)
 import Data.Map (Map, fromFoldable, lookup)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Effect.Now (nowDateTime)
+import Foreign.Generic (encode)
 import LRUCache (size)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Unsafe.Coerce (unsafeCoerce)
 
--- | This module gives access to various `devices` with `sensors` that can be read to yield a numerical value.
+-- | This module gives access to various `devices` with `sensors` that can be read to yield a value.
+-- | These values must all be returned as Strings in MonadPerspectivesQuery. 
+-- | However, on applying a sensor function using callExternal, one must specify a Range result type and this
+-- | need not be PString. 
+-- | All arguments are provided as (Arrays of) String. If another type is required, the sensor function must
+-- | transform it from String!
 -- | Each device-sensor combination maps to a specific reading function implementation.
 -- | Access all these functions with a single external function in the `model:Sensor`` namespace: ReadSensor.
 
@@ -52,7 +59,7 @@ type Device = String
 -- | A sensor is like a dial or gauge that can be read, yielding a numerical value.
 type Sensor = String
 
-type SensorFunction = Device -> Sensor -> MonadPerspectives Int
+type SensorFunction = Device -> Sensor -> MonadPerspectives String
 
 -- | A Map holding all implmented SensorFunctions, identified by the combination of Device and Sensor.
 type DeviceSensorMap = Map (Tuple Device Sensor) SensorFunction
@@ -67,10 +74,12 @@ sensorFunctions = fromFoldable
 
 currentDate :: Partial => SensorFunction
 currentDate device sensor = case device, sensor of
-  "clock", "now" -> liftEffect (unsafeCoerce now)
+  "clock", "now" ->do 
+    dt <- liftEffect (unsafeCoerce nowDateTime)
+    pure $ unsafeCoerce $ encode (SerializableDateTime dt)
 
 cacheSize :: Partial => SensorFunction
-cacheSize device sensor = case device, sensor of 
+cacheSize device sensor = show <$> case device, sensor of 
   "contextcache", "size" -> do
     cache <- gets _.contextInstances
     liftEffect $ size cache
@@ -86,13 +95,12 @@ readSensor :: Array Device -> Array Sensor -> RoleInstance -> MonadPerspectivesQ
 readSensor device' sensor' _ = case head device', head sensor' of
   Just device, Just sensor -> ArrayT case lookup (Tuple device sensor) sensorFunctions of
     Nothing -> pure []
-    Just f -> lift $ singleton <<< show <$> f device sensor
+    Just f -> lift $ singleton <$> f device sensor
   _, _ -> ArrayT $ pure []
-
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ Tuple "model://perspectives.domains#Sensor$ReadSensor" {func: unsafeCoerce readSensor, nArgs: 2}
-]
+  ]
