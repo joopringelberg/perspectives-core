@@ -1,9 +1,9 @@
 -- Copyright Joop Ringelberg and Cor Baars, 2021
 -- A model to test smart field controls.
 
-domain model://perspectives.domains#TestFields --@1.0.0
+domain model://joopringelberg.nl#TestFields --@1.0.0
   use sys for model://perspectives.domains#System
-  use tf for model://perspectives.domains#TestFields
+  use tf for model://joopringelberg.nl#TestFields
 
   state ReadyToInstall = exists sys:PerspectivesSystem$Installer
     on entry
@@ -40,13 +40,13 @@ domain model://perspectives.domains#TestFields --@1.0.0
       screen "Test screen"
         tab "Test"
           row
-            column
-              form TestRole
-                props (Text, WeekDay) verbs (Consult)
-                only (Create)
-              table "MyTable" TestTable
-                view Limited verbs (Consult)
-                only (Remove)
+            form TestRole
+              props (Text, WeekDay, ADateTime) verbs (SetPropertyValue)
+              only (Create)
+          row
+            table "MyTable" TestTable
+              view Limited verbs (Consult)
+              only (Remove)
             --graph TestTable
               --y = ANumber
           --row
