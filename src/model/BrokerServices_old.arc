@@ -104,7 +104,7 @@ domain model://perspectives.domains#BrokerServices
     aspect sys:Invitation
     state NoAdministrator = not exists Administrator
       on entry
-        do for Guest
+        do for sys:Invitation$Guest
           bind extern >> binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
     state NoAccountHolder = (exists Administrator) and (not exists AccountHolder)
       on entry
@@ -119,7 +119,6 @@ domain model://perspectives.domains#BrokerServices
       property LastNameOfAccountHolder = context >> AccountHolder >> LastName
 
       view ForAccountHolder (Url, Exchange)
-      view ForAdministrator (IWantToInviteAnUnconnectedUser, Message, SerialisedInvitation)
       view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
 
     user AccountHolder filledBy sys:PerspectivesSystem$User
@@ -153,15 +152,6 @@ domain model://perspectives.domains#BrokerServices
 
       perspective on AccountHolder
         all roleverbs
-        props (AccountName, QueueName, AccountPassword) verbs (Consult, SetPropertyValue)
-        props (LastName, FirstName) verbs (Consult)
-      perspective on extern
-        view External$ForAdministrator verbs (Consult, SetPropertyValue)
+        props (AccountName, QueueName, AccountPassword) verbs (SetPropertyValue)
 
     aspect user sys:Invitation$Guest
-
-    user Guest = sys:Me
-      perspective on Administrator
-        only (Fill, Create)
-      perspective on AccountHolder
-        only (Fill)

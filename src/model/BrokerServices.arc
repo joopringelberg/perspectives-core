@@ -74,7 +74,7 @@ domain model://perspectives.domains#BrokerServices
 
     user Administrator filledBy sys:PerspectivesSystem$User
       property AdminUserName (String)
-      property (AdminPassword) (string)
+      property AdminPassword (String)
       -- property RegistryTopic (String)
       -- property GuestRolePassword (String)
 
@@ -163,7 +163,7 @@ domain model://perspectives.domains#BrokerServices
               context >> extern >> binder model:BrokerServices$BrokerService$Accounts >> context >> extern >> Url,
               context >> Administrator >> AdminUserName,
               context >> Administrator >> AdminPassword,
-              QueueName
+              QueueName,
               binding >> callExternal util:RoleIdentifier() returns String
             )
             IWantToInviteAnUnconnectedUser = true for context >> extern
@@ -191,19 +191,18 @@ domain model://perspectives.domains#BrokerServices
       perspective on BrokerContract$Administrator
         props (LastName) verbs (Consult)
       perspective on Invitations
-        only CreateAndFill
+        only (CreateAndFill)
         props (FirstNameOfAccountHolder, LastNameOfAccountHolder) verbs (Consult)
         in object state IsPrepared
           props (Message) verbs (SetPropertyValue)
           props (SerialisedInvitation) verbs (Consult)
 
       action CreateInvitation
-        do
-          let 
-            inv <- create context BrokerContract bound to Invitations
-          in
-            bind inv to Accounts in extern >> binder model:BrokerServices$BrokerService$Accounts >> context
-            bind Administrator to Administrator in inv
+        letA
+          inv <- create context BrokerContract bound to Invitations
+        in
+          bind inv to Accounts in extern >> binder model:BrokerServices$BrokerService$Accounts >> context
+          bind Administrator to Administrator in inv
             
       screen "Broker Contract"
         column
@@ -225,7 +224,7 @@ domain model://perspectives.domains#BrokerServices
         view External$ForAdministrator verbs (Consult, SetPropertyValue)
       perspective on Invitations
         -- This is merely to make sure Administrator is sent all Invitations.
-        props (Name) verbs Consult
+        props (Name) verbs (Consult)
 
     aspect user sys:Invitation$Guest
 
