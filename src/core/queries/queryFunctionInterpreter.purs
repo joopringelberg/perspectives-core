@@ -39,7 +39,7 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (empty, join, void)
-import Data.Array (elemIndex, head, length, null, union, unsafeIndex)
+import Data.Array (elemIndex, head, index, length, null, union, unsafeIndex)
 import Data.List (List(..))
 import Data.List.NonEmpty (fromList, tail)
 import Data.List.Types (List, NonEmptyList)
@@ -282,27 +282,33 @@ interpret (MQD dom fun args ran _ _) a = do
     otherwise -> throwError (error $ "Unknown function construction: " <> show fun)
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argValues :: Array DependencyPath) <- traverse (flip interpret a) args
+  (nrOfParameters :: Int) <- pure $ unsafePartial (fromJust $ lookupHiddenFunctionNArgs functionName)
+  -- Notice that the number of parameters given ignores the default argument (context or role) that the function is applied to anyway.
+  -- If we do have an extra argument value, supply it as the last argument instead of r.
+  (lastArgument :: String) <- case index argValues nrOfParameters of
+    Nothing -> pure $ toString a
+    Just v -> pure $ toString v
   case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
     0 -> do
-      r <- (unsafe1argFunction f) (toString a)
+      r <- (unsafe1argFunction f) lastArgument
       pure a {head = domain2Dependency ran r}
     1 -> do
       r <- (unsafe2argFunction f)
         [ ( toString (first argValues))]
-        (toString a)
+        lastArgument
       pure a {head = domain2Dependency ran r}
     2 -> do
       r <- (unsafe3argFunction f)
         [ ( toString (first argValues))]
         [ ( toString (second argValues))]
-        (toString a)
+        lastArgument
       pure a {head = domain2Dependency ran r}
     3 -> do
       r <- (unsafe4argFunction f)
         [ ( toString (first argValues))]
         [ ( toString (second argValues))]
         [ ( toString (third argValues))]
-        (toString a)
+        lastArgument
       pure a {head = domain2Dependency ran r}
     4 -> do
       r <- (unsafe5argFunction f)
@@ -310,7 +316,7 @@ interpret (MQD dom fun args ran _ _) a = do
         [ ( toString (second argValues))]
         [ ( toString (third argValues))]
         [ ( toString (fourth argValues))]
-        (toString a)
+        lastArgument
       pure a {head = domain2Dependency ran r}
     5 -> do
       r <- (unsafe6argFunction f)
@@ -319,7 +325,7 @@ interpret (MQD dom fun args ran _ _) a = do
         [ ( toString (third argValues))]
         [ ( toString (fourth argValues))]
         [ ( toString (fifth argValues))]
-        (toString a)
+        lastArgument
       pure a {head = domain2Dependency ran r}
     otherwise -> throwError (error "Too many arguments for external core module: maximum is 4")
 

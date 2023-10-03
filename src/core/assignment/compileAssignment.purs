@@ -329,43 +329,49 @@ compileAssignment (UQD _ (BindResultFromCreatingAssignment varName) f1 _ _ _) = 
 compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (unsafeCoerce compileFunction) args
-  pure (\c -> do
+  pure (\(c :: ContextInstance) -> do
     (values :: Array (Array String)) <- lift $ traverse (\g -> c ##= g) argFunctions
+    (nrOfParameters :: Int) <- pure $ unsafePartial (fromJust $ lookupHiddenFunctionNArgs functionName)
+    -- Notice that the number of parameters given ignores the default argument (context or role) that the function is applied to anyway.
+    -- If we do have an extra argument value, supply it as the last argument instead of r.
+    (lastArgument :: ContextInstance) <- case index values nrOfParameters of
+      Nothing -> pure c
+      Just v -> pure $ ContextInstance (unsafePartial (unsafeIndex v 0))
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
-      0 -> (unsafeCoerce f :: ContextInstance -> MPT Unit) c
+      0 -> (unsafeCoerce f :: ContextInstance -> MPT Unit) lastArgument
       1 -> (unsafeCoerce f :: (Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
-        c
+        lastArgument
       2 -> (unsafeCoerce f :: (Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
-        c
+        lastArgument
       3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
-        c
+        lastArgument
       4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
         (unsafePartial (unsafeIndex values 3))
-        c
+        lastArgument
       5 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
         (unsafePartial (unsafeIndex values 3))
         (unsafePartial (unsafeIndex values 4))
-        c
-      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
+        lastArgument
+      6 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> Array String -> ContextInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
         (unsafePartial (unsafeIndex values 3))
         (unsafePartial (unsafeIndex values 4))
         (unsafePartial (unsafeIndex values 5))
-        c
+        lastArgument
       _ -> throwError (error "Too many arguments for external core module: maximum is 6")
     )
 

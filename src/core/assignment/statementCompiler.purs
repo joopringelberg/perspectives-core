@@ -60,7 +60,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, show, unit, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>), (>=>), (>>=))
+import Prelude (bind, discard, pure, show, unit, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>), (>=>), (>>=), (||), (-))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -323,7 +323,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
               mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs effectName
               case mexpectedNrOfArgs of
                 Nothing -> throwError (UnknownExternalFunction start end effectName)
-                Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
+                Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
                   then do
                     -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
                     -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
@@ -340,7 +340,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
               mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs effectName
               case mexpectedNrOfArgs of
                 Nothing -> throwError (UnknownExternalFunction start end effectName)
-                Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
+                Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
                   then do
                     -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
                     -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.

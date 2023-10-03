@@ -79,7 +79,7 @@ import Perspectives.Types.ObjectGetters (computesDatabaseQueryRole, hasContextAs
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Deletes, from all contexts, the role instance.
-compileAssignmentFromRole :: QueryFunctionDescription -> MP (Updater RoleInstance)
+compileAssignmentFromRole :: QueryFunctionDescription -> MP (Updater RoleInstance) 
 compileAssignmentFromRole (UQD _ QF.RemoveRole rle _ _ mry) = do
   roleGetter <- role2role rle
   pure \roleId -> do
@@ -337,34 +337,40 @@ compileAssignmentFromRole (MQD dom (ExternalEffectFullFunction functionName) arg
   (argFunctions :: Array (RoleInstance ~~> String)) <- traverse (unsafeCoerce compileFunction) args
   pure (\c -> do
     (values :: Array (Array String)) <- lift $ traverse (\g -> c ##= g) argFunctions
+    (nrOfParameters :: Int) <- pure $ unsafePartial (fromJust $ lookupHiddenFunctionNArgs functionName)
+    -- Notice that the number of parameters given ignores the default argument (context or role) that the function is applied to anyway.
+    -- If we do have an extra argument value, supply it as the last argument instead of r.
+    (lastArgument :: RoleInstance) <- case index values nrOfParameters of
+      Nothing -> pure c
+      Just v -> pure $ RoleInstance (unsafePartial (unsafeIndex v 0))
     case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
-      0 -> (unsafeCoerce f :: RoleInstance -> MPT Unit) c
+      0 -> (unsafeCoerce f :: RoleInstance -> MPT Unit) lastArgument
       1 -> (unsafeCoerce f :: (Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
-        c
+        lastArgument
       2 -> (unsafeCoerce f :: (Array String -> Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
-        c
+        lastArgument
       3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
-        c
+        lastArgument
       4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
         (unsafePartial (unsafeIndex values 3))
-        c
+        lastArgument
       5 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
         (unsafePartial (unsafeIndex values 3))
         (unsafePartial (unsafeIndex values 4))
-        c
-      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
+        lastArgument
+      6 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> Array String -> Array String -> RoleInstance -> MPT Unit))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 1))
         (unsafePartial (unsafeIndex values 2))
