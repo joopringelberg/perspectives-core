@@ -25,9 +25,10 @@ module Perspectives.External.HiddenFunctionCache where
 import Data.Maybe (Maybe)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, peek, poke, new)
 import Perspectives.HiddenFunction (HiddenFunction)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
 import Prelude ((<$>), unit)
 
-type HiddenFunctionDescription = {func :: HiddenFunction, nArgs :: Int}
+type HiddenFunctionDescription = {func :: HiddenFunction, nArgs :: Int, isFunctional :: ThreeValuedLogic}
 
 type HiddenFunctionCache = GLStrMap HiddenFunctionDescription
 
@@ -40,5 +41,8 @@ lookupHiddenFunction name = _.func <$> peek hiddenFunctionCache name
 lookupHiddenFunctionNArgs :: String -> Maybe Int
 lookupHiddenFunctionNArgs name = _.nArgs <$> peek hiddenFunctionCache name
 
-hiddenFunctionInsert :: String -> HiddenFunction -> Int -> HiddenFunctionCache
-hiddenFunctionInsert name func nArgs = poke hiddenFunctionCache name {func, nArgs}
+lookupHiddenFunctionCardinality :: String -> Maybe ThreeValuedLogic
+lookupHiddenFunctionCardinality name = _.isFunctional <$> peek hiddenFunctionCache name
+
+hiddenFunctionInsert :: String -> HiddenFunction -> Int -> ThreeValuedLogic -> HiddenFunctionCache
+hiddenFunctionInsert name func nArgs isFunctional = poke hiddenFunctionCache name {func, nArgs, isFunctional}

@@ -66,7 +66,7 @@ addAllExternalFunctions = do
   addExternalFunctions File.externalFunctions
 
 addExternalFunctions :: forall m. Monad m => Array (Tuple String HiddenFunctionDescription) -> m Unit
-addExternalFunctions externalFunctions = for_ externalFunctions \(Tuple n f) -> pure $ hiddenFunctionInsert n f.func f.nArgs
+addExternalFunctions externalFunctions = for_ externalFunctions \(Tuple n f) -> pure $ hiddenFunctionInsert n f.func f.nArgs f.isFunctional
 
 addExternalFunctionForModule :: forall m. Monad m => String -> m Unit
 addExternalFunctionForModule moduleName =

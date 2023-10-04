@@ -331,7 +331,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 
     handleParts roleName e@(EnumeratedRole roleUnderConstruction@{}) (PublicUrl calc) = do 
       expandedCalc <- expandPrefix calc
-      pure $ EnumeratedRole (roleUnderConstruction {publicUrl = Just $ S expandedCalc})
+      pure $ EnumeratedRole (roleUnderConstruction {publicUrl = Just $ S expandedCalc true})
 
 
     -- We we add roleName as another disjunct of a sum type.
@@ -364,7 +364,7 @@ traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = d
   subStateIds <- for subStates (toStateIdentifier <<< \(StateE{id:id'}) -> id')
   stateId <- toStateIdentifier id
   expandedCondition <- expandPrefix condition
-  state <- pure $ constructState stateId (S expandedCondition) stateFulObect (ARR.fromFoldable subStateIds)
+  state <- pure $ constructState stateId (S expandedCondition false) stateFulObect (ARR.fromFoldable subStateIds)
   -- Postpone all stateParts because there may be forward references to user and subject.
   parts <- traverse expandPrefix stateParts
   void $ lift $ modify \s@{postponedStateQualifiedParts} -> s {postponedStateQualifiedParts = postponedStateQualifiedParts <> parts}
@@ -452,7 +452,7 @@ traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) rolePar
     -- CALCULATION
     handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) = do
       expandedCalc <- expandPrefix calc
-      pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc})
+      pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc false})
 
     -- PERSPECTIVE
     handleParts crole (SQP stateQualifiedParts) = do
@@ -488,7 +488,7 @@ traversePropertyE r ns = if isCalculatedProperty r
   where
     isCalculatedProperty :: PropertyE -> Boolean
     isCalculatedProperty (PropertyE {propertyParts}) = (isJust (findIndex (case _ of
-        (Calculation' _) -> true
+        (Calculation' _ _) -> true
         otherwise -> false) propertyParts))
 
 traverseEnumeratedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
@@ -522,7 +522,7 @@ traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
   (CalculatedProperty property@{calculation}) <- pure $ defaultCalculatedProperty (ns <> "$" <> id) id ns pos
   calculation' <- case head propertyParts of
     -- TODO: fish out the actually parsed calculation and use that!
-    (Just (Calculation' c)) -> expandPrefix c >>= pure <<< S
+    (Just (Calculation' c b)) -> expandPrefix c >>= pure <<< \calc -> S calc b
     otherwise -> pure calculation
   property' <- pure $ Property.C $ CalculatedProperty (property {calculation = calculation'})
   modifyDF (\df -> addPropertyToDomeinFile property' df)

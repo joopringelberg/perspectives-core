@@ -639,7 +639,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Right pr@(PE (PropertyE{propertyParts}))) -> do
         (assert "Property should have a calculation"
           (isJust (findIndex (case _ of
-            (Calculation' _) -> true
+            (Calculation' _ _) -> true
             otherwise -> false) propertyParts)))
       otherwise -> assert "Property should have parts" false
 
@@ -650,7 +650,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Right pr@(PE (PropertyE{propertyParts}))) -> do
         (assert "Property should have a calculation"
           (isJust (findIndex (case _ of
-            (Calculation' _) -> true
+            (Calculation' _ _) -> true
             otherwise -> false) propertyParts)))
       otherwise -> assert "Property should have parts" false
 

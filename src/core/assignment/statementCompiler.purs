@@ -36,7 +36,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
-import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionCardinality, lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (areLastSegmentsOf, buitenRol, typeUri2ModelUri, endsWithSegments, isExternalRole, isTypeUri)
 import Perspectives.Instances.Combinators (filter')
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
@@ -325,10 +325,11 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                 Nothing -> throwError (UnknownExternalFunction start end effectName)
                 Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
                   then do
+                    isFunctional <- pure $ unsafePartial $ fromJust $ lookupHiddenFunctionCardinality effectName
                     -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
                     -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
                     compiledArguments <- traverse (\s -> compileExpression originDomain s) arguments
-                    pure $ MQD originDomain (QF.ExternalEffectFullFunction effectName) compiledArguments originDomain Unknown Unknown
+                    pure $ MQD originDomain (QF.ExternalEffectFullFunction effectName) compiledArguments originDomain isFunctional Unknown
                   else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
             -- TODO: behandel hier Foreign functions.
             else throwError (UnknownExternalFunction start end effectName)
@@ -342,10 +343,11 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                 Nothing -> throwError (UnknownExternalFunction start end effectName)
                 Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
                   then do
+                    isFunctional <- pure $ unsafePartial $ fromJust $ lookupHiddenFunctionCardinality effectName
                     -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
                     -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
                     compiledArguments <- traverse (\s -> compileExpression originDomain s) arguments
-                    pure $ MQD originDomain (QF.ExternalDestructiveFunction effectName) compiledArguments originDomain Unknown Unknown
+                    pure $ MQD originDomain (QF.ExternalDestructiveFunction effectName) compiledArguments originDomain isFunctional Unknown
                   else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
             -- TODO: behandel hier Foreign functions.
             else throwError (UnknownExternalFunction start end effectName)

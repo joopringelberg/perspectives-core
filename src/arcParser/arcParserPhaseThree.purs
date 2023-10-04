@@ -387,7 +387,7 @@ compileCalculatedRoles = do
             Q _ -> pure unit
             -- Compiles the parsed expression and stores the modified CalculatedRole in
             -- the DomeinCache.
-            S stp -> void $ compileAndSaveRole (CDOM $ ST context) stp cr
+            S stp _-> void $ compileAndSaveRole (CDOM $ ST context) stp cr
 
 compileCalculatedProperties :: PhaseThree Unit
 compileCalculatedProperties = do
@@ -417,7 +417,8 @@ compileCalculatedProperties = do
             -- That must be lexically embedded in an EnumeratedRole definition,
             -- which in turn is lexically embedded in a Context definition.
             -- Hence we can use the context type for the RoleInContext.
-            S stp -> void $ compileAndSaveProperty (RDOM (ST $ QT.RoleInContext{context,role})) stp cp
+            -- Gebruik hier het extra stuk van S om de range functioneel te maken, indien van toepassing.
+            S stp isFunctional -> void $ compileAndSaveProperty (RDOM (ST $ QT.RoleInContext{context,role})) stp cp isFunctional
 
 
 compilePublicUrls :: PhaseThree Unit
@@ -446,7 +447,7 @@ compilePublicUrls = do
             Just (Q _) -> pure unit
             -- Compiles the parsed expression and stores the modified CalculatedRole in
             -- the DomeinCache.
-            Just (S stp) -> do
+            Just (S stp isFunctional) -> do
               expressionWithEnvironment <- pure $ addContextualBindingsToExpression
                 [ makeIdentityStep "currentcontext" (startOf stp)
                 , makeIdentityStep "origin" (startOf stp)
@@ -638,7 +639,7 @@ handlePostponedStateQualifiedParts = do
               (\(sr@{automaticOnEntry, automaticOnExit, query}) -> do
                 query' <- case query of
                   Q q -> pure $ Q q
-                  S stp -> do
+                  S stp _ -> do
                     -- This is the state query (condition). It can belong to either a role- or a context state.
                     -- A context state may have:
                     --    * origin, for which we may specify an identity step.
@@ -729,7 +730,7 @@ handlePostponedStateQualifiedParts = do
                   -- Compile the query if we've not done it before.
                   query' <- case query of
                     Q q -> pure $ Q q
-                    S stp -> do
+                    S stp _ -> do
                       expressionWithEnvironment <- pure $ addContextualBindingsToExpression
                         [ computeCurrentContext (transition2stateSpec transition) start
                         , computeOrigin (transition2stateSpec transition) start]
@@ -754,7 +755,7 @@ handlePostponedStateQualifiedParts = do
               compilePart :: Sentence.SentencePart -> PhaseThree Sentence.SentencePart
               compilePart hr@(Sentence.HR _) = pure hr
               compilePart cp@(Sentence.CP (Q _)) = pure cp
-              compilePart (Sentence.CP (S stp)) = do
+              compilePart (Sentence.CP (S stp _)) = do
                 expressionWithEnvironment <- pure $ addContextualBindingsToExpression
                   [ computeOrigin (transition2stateSpec transition) start
                   , computeCurrentContext (transition2stateSpec transition) start
@@ -1546,7 +1547,7 @@ compileStateQueries = do
           -- Compile the query if we've not done it before.
           compiledQuery <- case query of
             Q q -> pure $ Q q
-            S stp -> do
+            S stp _ -> do
               -- currentContext <- case stateFulObject of
               --   Cnt ctype -> pure ctype
               --   Srole rtype -> lift2 ((getEnumeratedRole >=> pure <<< contextOfRepresentation) rtype)

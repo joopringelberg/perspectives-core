@@ -58,7 +58,7 @@ defaultCalculatedProperty id dn role pos = CalculatedProperty
   { _id: CalculatedPropertyType id
   , _rev: Nothing
   , displayName: dn
-  , calculation: S $ Simple $ Identity $ ArcPosition{column: 0, line: 0}
+  , calculation: S (Simple $ Identity $ ArcPosition{column: 0, line: 0}) false
   , role: EnumeratedRoleType role
   , pos: pos}
 

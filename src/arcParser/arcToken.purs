@@ -87,6 +87,7 @@ perspectDef = LanguageDef
                   , "property"
                   , "mandatory"
                   , "relational"
+                  , "functional"
                   , "unlinked"
                   , "not"
                   , "Number"

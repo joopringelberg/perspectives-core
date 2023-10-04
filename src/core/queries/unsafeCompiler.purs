@@ -60,7 +60,7 @@ import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookup
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType, range, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
@@ -352,12 +352,12 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
 
   pure $ unsafeCoerce $ compare f1' f2' (unsafePartial $ compareFunction g)
 
-compileFunction (BQD dom (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do
+compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   -- NOTE. We transform the string representation of Value to types that can be compared according to their Range types.
   -- Check for each new type added to Range in Perspectives.Representation.Range.
-  pure $ order dom f1' f2' g
+  pure $ order (range f1) f1' f2' g
 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | g `eq` AndF = do
   (f1' :: String ~~> Value) <- unsafeCoerce $ compileFunction f1

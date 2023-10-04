@@ -34,6 +34,7 @@ import Perspectives.AMQP.RabbitMQManagement (AdminPassword, AdminUserName, Broke
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectivesTransaction)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Prelude (Unit, pure, unit, ($), bind)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -110,9 +111,9 @@ deleteAMQPaccount url_ nodeName_ adminUserName_ adminPassword_ accountName_ _ = 
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#RabbitMQ$CreateAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6}
-  , Tuple "model://perspectives.domains#RabbitMQ$PrepareAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6}
-  , Tuple "model://perspectives.domains#RabbitMQ$SetBindingKey" {func: unsafeCoerce setPassword, nArgs: 5}
-  , Tuple "model://perspectives.domains#RabbitMQ$SetPassword" {func: unsafeCoerce setPassword, nArgs: 6}
-  , Tuple "model://perspectives.domains#RabbitMQ$DeleteAMQPaccount" {func: unsafeCoerce deleteAMQPaccount, nArgs: 5}
+  [ Tuple "model://perspectives.domains#RabbitMQ$CreateAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6, isFunctional: True}
+  , Tuple "model://perspectives.domains#RabbitMQ$PrepareAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6, isFunctional: True}
+  , Tuple "model://perspectives.domains#RabbitMQ$SetBindingKey" {func: unsafeCoerce setPassword, nArgs: 5, isFunctional: True}
+  , Tuple "model://perspectives.domains#RabbitMQ$SetPassword" {func: unsafeCoerce setPassword, nArgs: 6, isFunctional: True}
+  , Tuple "model://perspectives.domains#RabbitMQ$DeleteAMQPaccount" {func: unsafeCoerce deleteAMQPaccount, nArgs: 5, isFunctional: True}
   ]

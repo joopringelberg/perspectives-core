@@ -18,6 +18,7 @@ import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (typeUri2couchdbFilename)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.Persistence.API (fromBlob, getAttachment)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 fileText :: Array String -> String -> MonadPerspectivesQuery String
@@ -40,5 +41,5 @@ fileText fileInfo_ _ = ArrayT case head fileInfo_ of
 
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Files$FileText" {func: unsafeCoerce fileText, nArgs: 1}
+  [ Tuple "model://perspectives.domains#Files$FileText" {func: unsafeCoerce fileText, nArgs: 1, isFunctional: True}
   ]

@@ -225,6 +225,15 @@ propertyOfRange qfd = case range qfd of
   otherwise -> Nothing
 
 -----------------------------------------------------------------------------------------
+---- MAKE FUNCTIONAL
+-----------------------------------------------------------------------------------------
+setCardinality :: QueryFunctionDescription -> ThreeValuedLogic -> QueryFunctionDescription
+setCardinality (SQD dom f ran fun man) c = (SQD dom f ran c man)
+setCardinality (UQD dom f qfd ran fun man) c = (UQD dom f qfd ran c man)
+setCardinality (BQD dom f qfd1 qfd2 ran fun man) c = (BQD dom f qfd1 qfd2 ran c man)
+setCardinality (MQD dom f qfds ran fun man) c = (MQD dom f qfds ran c man) 
+
+-----------------------------------------------------------------------------------------
 ---- REPLACE DOMAIN, RANGE
 -----------------------------------------------------------------------------------------
 replaceDomain :: QueryFunctionDescription -> Domain -> QueryFunctionDescription
@@ -412,7 +421,8 @@ equalDomainKinds RoleKind RoleKind = true
 equalDomainKinds _ _ = false
 
 -----------------------
-data Calculation = S Step | Q QueryFunctionDescription
+-- Stop in S of de berekening als functioneel beschouwd kan worden.
+data Calculation = S Step Boolean | Q QueryFunctionDescription
 
 derive instance genericRepCalculation :: Generic Calculation _
 instance encodeCalculation :: Encode Calculation where

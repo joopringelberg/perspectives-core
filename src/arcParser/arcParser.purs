@@ -617,14 +617,20 @@ propertyE = do
   (calculatedProperty pos uname) <|> (enumeratedProperty pos uname)
   where
     calculatedProperty :: ArcPosition -> String -> IP RolePart
-    calculatedProperty pos uname = do
+    calculatedProperty pos uname = try do
+      isFunctional <- option false functional
       token.reservedOp "="
       calc <- step
       pure $ PE $ PropertyE
         { id: uname
         , range: Nothing
-        , propertyParts: Cons (Calculation' calc) Nil, pos: pos
+        , propertyParts: Cons (Calculation' calc isFunctional) Nil, pos: pos
         , propertyFacets: Nil}
+      where
+          -- | Calculated properties are by default relational.
+          functional :: IP Boolean
+          functional = (token.parens (reserved "functional")) *> (pure true)
+
 
     -- | This parser always succeeds, either with or without consuming part of the input stream.
     enumeratedProperty :: ArcPosition -> String -> IP RolePart
@@ -1346,7 +1352,7 @@ sentenceE = do
       pure $ HR $ trim $ fromCharArray $ fromFoldable chars
 
     exprPart :: IP SentencePart
-    exprPart = CP <<< S <$> between (token.symbol "{") (token.symbol "}") step
+    exprPart = CP <<< flip S false <$> between (token.symbol "{") (token.symbol "}") step
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name

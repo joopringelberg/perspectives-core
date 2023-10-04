@@ -47,7 +47,7 @@ compileSentence xToString (Sentence parts) = do
     case _ of
       HR s -> pure \_ -> pure [s]
       CP c -> case c of
-        S step -> throwError (error $ "Sentence parts must be compiled, but found " <> show step)
+        S step _ -> throwError (error $ "Sentence parts must be compiled, but found " <> show step)
         Q calc -> xToString calc >>= pure <<< flip evalMonadPerspectivesQuery
     parts
   pure \roleId ->

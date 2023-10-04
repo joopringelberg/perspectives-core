@@ -125,7 +125,8 @@ newtype PropertyE = PropertyE
 data PropertyPart =
     FunctionalAttribute' Boolean
   | MandatoryAttribute' Boolean
-  | Calculation' Step
+  -- The Boolean indicates whether the calculation can be considered to be functional.
+  | Calculation' Step Boolean
   | Ran Range
 
 data PropertyFacet =

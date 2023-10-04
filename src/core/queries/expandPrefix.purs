@@ -31,7 +31,7 @@ import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), 
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
-import Prelude (bind, pure, ($), (<$>), (<*>), (<<<), (>>=))
+import Prelude (bind, flip, pure, ($), (<$>), (<*>), (<<<), (>>=))
 
 class ContainsPrefixes s where
   expandPrefix :: s -> PhaseTwo s
@@ -238,7 +238,7 @@ instance containsPrefixesStateE :: ContainsPrefixes StateE where
     pure (StateE r {condition = condition', stateParts = stateParts', subStates = subStates'})
 
 instance containsPrefixesCalculation :: ContainsPrefixes Calculation where
-  expandPrefix (S stp) = S <$> expandPrefix stp
+  expandPrefix (S stp isFunctional) = flip S isFunctional <$> expandPrefix stp
   expandPrefix q@(Q _) = pure q
 
 instance containsPrefixesScreenE :: ContainsPrefixes ScreenE where

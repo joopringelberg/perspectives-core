@@ -46,7 +46,7 @@ import Perspectives.CoreTypes ((###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
-import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionCardinality, lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (typeUri2ModelUri, endsWithSegments, isExternalRole, isTypeUri)
 import Perspectives.Instances.ObjectGetters (contextType_, roleType_)
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, makeContextStep, makeIdentityStep, stepContainsVariableReference)
@@ -57,7 +57,7 @@ import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQuerie
 import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, getsDF, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -75,7 +75,7 @@ import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as RTI
 import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
-import Prelude (bind, discard, eq, map, pure, show, unit, void, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||), (-))
+import Prelude (bind, discard, eq, map, pure, show, unit, void, ($), (&&), (-), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -101,7 +101,7 @@ makeRoleGetter currentDomain rt@(CR ct) = do
     crole@(CalculatedRole{calculation}) <- lift2 $ getCalculatedRole ct
     case calculation of
       Q qfd -> lift2 $ roleADT crole
-      S step -> compileAndSaveRole currentDomain step crole
+      S step isFunctional -> compileAndSaveRole currentDomain step crole
   isF <- lift2 $ roleTypeIsFunctional rt
   isM <- lift2 $ roleTypeIsMandatory rt
   pure $ SQD currentDomain (QF.RolGetter rt) (RDOM adt) (bool2threeValued isF) (bool2threeValued isM)
@@ -210,15 +210,15 @@ makePropertyGetter currentDomain pt = do
       cprop@(CalculatedProperty{calculation}) <- lift2 $ getCalculatedProperty cp
       case calculation of
         Q qfd -> pure (range qfd)
-        S step -> compileAndSaveProperty currentDomain step cprop
+        S step isFunctional -> compileAndSaveProperty currentDomain step cprop isFunctional
   isF <- lift2 $ PROP.propertyTypeIsFunctional pt
   isM <- lift2 $ PROP.propertyTypeIsMandatory pt
   pure $ SQD currentDomain (QF.PropertyGetter pt) ran (bool2threeValued isF) (bool2threeValued isM)
 
 -- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
 -- | Saves it in the DomainCache.
-compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> PhaseThree QT.Range
-compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role, pos}) = withFrame do
+compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> Boolean -> PhaseThree QT.Range
+compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role, pos}) considerFunctional = withFrame do
   loops <- isBeingCalculated (Prop _id)
   if loops
     then throwError $ (RecursiveDefinition $ loopErrorMessage (Prop _id) pos pos) 
@@ -234,10 +234,13 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role, pos}) = withF
         , makeIdentityStep "origin" (startOf step)
         ]
         step
-      compiledExpression <- compileExpression dom expressionWithEnvironment
+      (compiledExpression :: QueryFunctionDescription) <- compileExpression dom expressionWithEnvironment
+      compiledExpression' <- if considerFunctional
+        then pure $ setCardinality compiledExpression True
+        else pure compiledExpression
       -- Save the result in DomeinCache.
-      lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ typeUri2ModelUri (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression})
-      pure $ range compiledExpression
+      lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ typeUri2ModelUri (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression'})
+      pure $ range compiledExpression'
       where
         roleKind :: Partial => EnumeratedRoleType -> PhaseThree RTI.RoleKind
         roleKind (EnumeratedRoleType s) = gets _.dfr >>= \{enumeratedRoles} -> pure $ _.kindOfRole $ unwrap $ fromJust (lookup s enumeratedRoles)
@@ -581,9 +584,6 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
   case operator of
     Filter pos -> do
       f1 <- compileStep currentDomain left
-      -- TODO. #18 Add a way to ensure that the left term of the criterium is a functional expression.
-      -- The criterium is applied to a single instance each time. Therefore, its left term is, by definition, functional.
-      -- We have no way of handling this, currently.
       f2 <- compileStep (range f1) right
       -- f1 is the source to be filtered, f2 is the criterium.
       case range f2 of
@@ -712,7 +712,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       if ((range left') `eq` (range right'))
         then if (pessimistic $ functional left') && (pessimistic $ functional right')
           then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM PBool Nothing) (isFunctionalFunction functionName) True
-          else throwError $ CardinalitiesDoNotMatch (pessimistic $ functional left') (pessimistic $ functional right') pos
+          else throwError $ ExpressionsShouldBeFunctional (pessimistic $ functional left') (pessimistic $ functional right') pos
         else throwError $ TypesCannotBeCompared pos (range left') (range right')
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
@@ -722,7 +722,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         if  allowed rc1 && allowed rc2
           then if (pessimistic $ functional left') && (pessimistic $ functional right')
             then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
-            else throwError $ CardinalitiesDoNotMatch (pessimistic $ functional left') (pessimistic $ functional right') pos
+            else throwError $ ExpressionsShouldBeFunctional (pessimistic $ functional left') (pessimistic $ functional right') pos
           else throwError $ WrongTypeForOperator pos allowedRangeConstructors d1
       l, r -> throwError $ TypesCannotBeCompared pos l r
       where
@@ -782,18 +782,20 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
           in case mexpectedNrOfArgs of
             Nothing -> throwError (UnknownExternalFunction start end functionName)
             Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
-              then case mapToRange computedType of
-                -- Collect property instances.
-                Just r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) Unknown Unknown
-                Nothing -> (lift $ lift $ typeExists (ContextType computedType)) >>= if _
-                  -- Collect Context instances.
-                  then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (ST (ContextType computedType))) Unknown Unknown
+              then do 
+                isFunctional <- pure $ unsafePartial $ fromJust $ lookupHiddenFunctionCardinality functionName
+                case mapToRange computedType of
+                  -- Collect property instances.
+                  Just r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) isFunctional Unknown
+                  Nothing -> (lift $ lift $ typeExists (ContextType computedType)) >>= if _
+                    -- Collect Context instances.
+                    then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (ST (ContextType computedType))) isFunctional Unknown
 
-                  -- Collect role instances. Having no other information, we conjecture these instances to have their
-                  -- role type in their lexical context.
-                  else do
-                    context <- lift2 $ enumeratedRoleContextType (EnumeratedRoleType computedType)
-                    pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST $ RoleInContext {context, role: EnumeratedRoleType computedType})) Unknown Unknown
+                    -- Collect role instances. Having no other information, we conjecture these instances to have their
+                    -- role type in their lexical context.
+                    else do
+                      context <- lift2 $ enumeratedRoleContextType (EnumeratedRoleType computedType)
+                      pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST $ RoleInContext {context, role: EnumeratedRoleType computedType})) isFunctional Unknown
               else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
       else do
         compiledArgs <- traverse (compileStep currentDomain) arguments

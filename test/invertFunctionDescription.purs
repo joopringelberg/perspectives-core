@@ -60,7 +60,7 @@ theSuite = suite "Test.Query.Inversion" do
   --       then do
   --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase5$Self_bot$ChangeARole")
   --         case condition of
-  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           S _ _ -> liftAff $ assert "Condition should have been compiled." false
   --           Q qfd -> do
   --             -- log $ prettyPrint qfd
   --             -- the condition is variable-free.
@@ -98,7 +98,7 @@ theSuite = suite "Test.Query.Inversion" do
                   case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
                     Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
                     (Just (CalculatedProperty{calculation})) -> case calculation of
-                      S _ -> assert "The calculation should have been compiled!" false
+                      S _ _ -> assert "The calculation should have been compiled!" false
                       Q c -> do
                         inv <- invertFD c
                         assert "The inversion of a Constant should be Nothing" (null inv)
@@ -122,7 +122,7 @@ theSuite = suite "Test.Query.Inversion" do
                   case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
                     Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
                     (Just (CalculatedProperty{calculation})) -> case calculation of
-                      S _ -> assert "The calculation should have been compiled!" false
+                      S _ _ -> assert "The calculation should have been compiled!" false
                       Q c -> do
                         paths <- invertFD c
                         -- log $ intercalate "\n" (prettyPrint <$> paths)
@@ -156,7 +156,7 @@ theSuite = suite "Test.Query.Inversion" do
                   case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
                     Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
                     (Just (CalculatedProperty{calculation})) -> case calculation of
-                      S _ -> assert "The calculation should have been compiled!" false
+                      S _ _ -> assert "The calculation should have been compiled!" false
                       Q c -> do
                         paths <- invertFD c
                         -- log $ intercalate "\n" (prettyPrint <$> paths)
@@ -194,7 +194,7 @@ theSuite = suite "Test.Query.Inversion" do
                   case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
                     Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
                     (Just (CalculatedProperty{calculation})) -> case calculation of
-                      S _ -> assert "The calculation should have been compiled!" false
+                      S _ _ -> assert "The calculation should have been compiled!" false
                       Q c -> do
                         -- log (prettyPrint c)
                         paths <- invertFD c
@@ -208,7 +208,7 @@ theSuite = suite "Test.Query.Inversion" do
   --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase1$Self_bot$ChangeARole")
   --         -- logShow condition
   --         case condition of
-  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           S _ _ -> liftAff $ assert "Condition should have been compiled." false
   --           Q qfd -> do
   --             affectedContextQueries <- liftAff $ invertFD qfd
   --             -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
@@ -229,7 +229,7 @@ theSuite = suite "Test.Query.Inversion" do
   --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase2$Self_bot$ChangeARole")
   --         -- logShow condition
   --         case condition of
-  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           S _ _ -> liftAff $ assert "Condition should have been compiled." false
   --           Q qfd -> do
   --             affectedContextQueries <- liftAff $ invertFD qfd
   --             -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
@@ -253,7 +253,7 @@ theSuite = suite "Test.Query.Inversion" do
   --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase3$Self_bot$ChangeARole")
   --         -- logShow condition
   --         case condition of
-  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           S _ _ -> liftAff $ assert "Condition should have been compiled." false
   --           Q qfd -> do
   --             affectedContextQueries <- liftAff $ invertFD qfd
   --             -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
@@ -270,7 +270,7 @@ theSuite = suite "Test.Query.Inversion" do
   --         (Action{condition}) <- getAction (ActionType "model:Test$TestCase4$Self_bot$ChangeARole")
   --         -- logShow condition
   --         case condition of
-  --           S _ -> liftAff $ assert "Condition should have been compiled." false
+  --           S _ _ -> liftAff $ assert "Condition should have been compiled." false
   --           Q qfd -> do
   --             affectedContextQueries <- liftAff $ invertFD qfd
   --             -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)

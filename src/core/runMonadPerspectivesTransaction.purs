@@ -135,7 +135,7 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
                 urlComputer <- lift $ context2propertyValue qfd
                 (Value url) <- lift (ctxt ##>> urlComputer)
                 expandDeltas publicRoleTransaction url
-              Just (S _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
+              Just (S _ _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
 
       -- Those deltas for public roles aren't sent anywhere but executed
       -- right here. Notice that no changes to local state will result from executing such a transaction.

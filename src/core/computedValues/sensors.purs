@@ -41,6 +41,7 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -102,5 +103,5 @@ readSensor device' sensor' _ = case head device', head sensor' of
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Sensor$ReadSensor" {func: unsafeCoerce readSensor, nArgs: 2}
+  [ Tuple "model://perspectives.domains#Sensor$ReadSensor" {func: unsafeCoerce readSensor, nArgs: 2, isFunctional: True}
   ]

@@ -51,6 +51,7 @@ import Perspectives.Persistence.API (createDatabase)
 import Perspectives.Persistence.State (getCouchdbBaseURL, withCouchdbUrl)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value, externalRole)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, setChannelReplication)
@@ -199,8 +200,8 @@ addConnectedPartnerToChannel userArr channelArr cid = do
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1}
-  , Tuple "model://perspectives.domains#Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0}
-  , Tuple "model://perspectives.domains#Serialise$AddConnectedPartnerToChannel" {func: unsafeCoerce addConnectedPartnerToChannel, nArgs: 2}
-  , Tuple "model://perspectives.domains#Serialise$CreateCopyOfChannelDatabase" {func: unsafeCoerce createCopyOfChannelDatabase, nArgs: 1}
+  [ Tuple "model://perspectives.domains#Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1, isFunctional: True}
+  , Tuple "model://perspectives.domains#Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0, isFunctional: True}
+  , Tuple "model://perspectives.domains#Serialise$AddConnectedPartnerToChannel" {func: unsafeCoerce addConnectedPartnerToChannel, nArgs: 2, isFunctional: True}
+  , Tuple "model://perspectives.domains#Serialise$CreateCopyOfChannelDatabase" {func: unsafeCoerce createCopyOfChannelDatabase, nArgs: 1, isFunctional: True}
   ]
