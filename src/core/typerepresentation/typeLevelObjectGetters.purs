@@ -443,6 +443,9 @@ commonTypesInRoleADT = ArrayT <$> reduce (runArrayT <<< roleAspectsClosure)
 allTypesInRoleADT :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
 allTypesInRoleADT = ArrayT <<< pure <<< allLeavesInADT >=> roleAspectsClosure
 
+allTypesInContextADT :: ADT ContextType ~~~> ContextType
+allTypesInContextADT = ArrayT <<< pure <<< allLeavesInADT >=> contextAspectsClosure
+
 --------------------------------------------------------------------------------------------------
 ---- EQUALSORGENERALISESROLEADT, EQUALSORSPECIALISESROLEADT, GENERALISESROLEADT, SPECIALISEDROLEADT,
 ---- SPECIALISESROLETYPE, SPECIALISESROLETYPE_

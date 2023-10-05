@@ -34,7 +34,7 @@ import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Ord, class Show, map)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
@@ -86,6 +86,7 @@ data FunctionName =
   | TypeOfContextF
   | RoleTypesF
   | SpecialisesRoleTypeF
+  | IsInStateF
 
   | FirstF
 
@@ -141,6 +142,7 @@ instance showFunctionName :: Show FunctionName where
     show TypeOfContextF = "TypeOfContextF"
     show RoleTypesF = "RoleTypesF"
     show SpecialisesRoleTypeF = "SpecialisesRoleTypeF"
+    show IsInStateF = "IsInStateF"
     show FirstF = "first"
 
 instance writeForeignFunctionName :: WriteForeign FunctionName where
@@ -191,6 +193,7 @@ isFunctionalFunction fn = case fn of
   TypeOfContextF -> True
   RoleTypesF -> False
   SpecialisesRoleTypeF -> True
+  IsInStateF -> True
   FirstF -> True
 
 -- | False if the function can return an empty result.
@@ -236,6 +239,7 @@ isMandatoryFunction fn = case fn of
   TypeOfContextF -> True
   RoleTypesF -> True
   SpecialisesRoleTypeF -> True
+  IsInStateF -> False
   FirstF -> False
 
 ---------------------------------------------------------------------------------------

@@ -263,6 +263,7 @@ qualifyStateNames = (lift $ State.gets _.dfr) >>= qualifyStateNames'
       qid <- if isTypeUri (unwrap id)
         then pure $ unwrap id
         -- Note that the validity of this depends on the unqualfied name being a reference to a role!
+        -- TODO What about context states?
         else qualifyLocalRoleName arcParserStartPosition (unwrap id) >>= pure <<< roletype2string
       pure $ State sr {id = StateIdentifier qid}) >>=
         \qstates -> modifyDF (\df -> df {states = qstates})

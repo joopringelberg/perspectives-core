@@ -34,7 +34,7 @@ import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.Except (lift)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets)
-import Data.Array (elemIndex, filter, foldM, fromFoldable, head, length, null, uncons)
+import Data.Array (elemIndex, filter, foldM, foldMap, fromFoldable, head, length, null, uncons)
 import Data.Either (Either(..))
 import Data.Map (Map, empty, singleton)
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -47,7 +47,7 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionCardinality, lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (typeUri2ModelUri, endsWithSegments, isExternalRole, isTypeUri)
+import Perspectives.Identifiers (endsWithSegments, isExternalRole, isTypeUri, qualifyWith, typeUri2ModelUri)
 import Perspectives.Instances.ObjectGetters (contextType_, roleType_)
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, makeContextStep, makeIdentityStep, stepContainsVariableReference)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
@@ -62,7 +62,7 @@ import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.PersistentType (StateIdentifier, getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (adtIsFunctional, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, roleADT, roleTypeIsFunctional, roleTypeIsMandatory)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -74,7 +74,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as RTI
-import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
+import Perspectives.Types.ObjectGetters (allTypesInContextADT, allTypesInRoleADT, enumeratedRoleContextType, isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, show, unit, void, ($), (&&), (-), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 ------------------------------------------------------------------------------------
@@ -295,6 +295,8 @@ compileAndDistributeStep dom stp users stateIdentifiers = do
 ------------------------------------------------------------------------------------
 ------ COMPILING STEPS
 ------------------------------------------------------------------------------------
+-- | IMPORTANT. This function should only be called when all Calculated roles and Properties are compiled and 
+-- | when StateIdentifiers are qualified.
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
 compileStep currentDomain (Unary st) = compileUnaryStep currentDomain st
@@ -465,6 +467,45 @@ compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
             otherwise -> throwError $ NotUniquelyIdentifying pos roleName (map unwrap qnames)
       pure $ SQD currentDomain (QF.DataTypeGetterWithParameter SpecialisesRoleTypeF (unwrap qRoleName)) (VDOM PBool Nothing) (isFunctionalFunction SpecialisesRoleTypeF) False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
+compileSimpleStep currentDomain s@(IsInState pos stateName) = do
+  -- If the domain is a SUM, the stateName must belong to at least one of the members.
+  -- (if the same (local) name has been defined on multiple members, we'll throw an error. This will be rare)
+  -- Example: (Male | Female) and state Pregnant. Obviously, semantically, Males will never be pregnant but who cares?
+  -- If the domain is a PRODUCT, the same reasoning holds.
+  -- Example: (AccountHolder & Patient) and state Solvent. 
+  qualifiedStateName <- case currentDomain of
+    -- Get all RoleTypes in the ADT
+    RDOM adt -> do 
+      (allRoles :: Array EnumeratedRoleType) <- lift $ lift ((roleInContext2Role <$> adt) ###= allTypesInRoleADT)
+      f (unwrap <$> allRoles)
+    -- Get all ContextTypes in the ADT.
+    CDOM adt -> do 
+      (allContexts :: Array ContextType) <- lift $ lift (adt ###= allTypesInContextADT)
+      f (unwrap <$> allContexts)
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+  pure $ SQD currentDomain (QF.DataTypeGetterWithParameter IsInStateF (unwrap qualifiedStateName)) (VDOM PBool Nothing) (isFunctionalFunction IsInStateF) False
+
+  where
+    -- If the combination of namespace and stateName occurs in the states in the DomeinFileRecord, return it.
+    -- Otherwise find the StateIdentifier in the DomeinFileRecord that ends on the stateName.
+    f :: Array String -> PhaseThree StateIdentifier
+    f namespaces = if isTypeUri stateName
+        then pure $ StateIdentifier stateName
+        else do
+          -- If we can find state names that equal the composition of a namespace and the stateName, we're done.
+          states <- lift (_.states <$> gets _.dfr)
+          allMatchingStateNames <- pure $ foldMap (\ns -> case lookup (qualifyWith ns stateName) states of
+            Nothing -> []
+            Just _ -> [(qualifyWith ns stateName)] ) namespaces
+          case length allMatchingStateNames of
+            -- Otherwise we'll have to find state names whose suffix equals the stateName.
+            0 -> case (filter (\_id -> _id `endsWithSegments` stateName) (keys states)) of
+              none | length none == 0 -> throwError $ UnknownState pos stateName
+              single | length single == 1 -> pure $ StateIdentifier $ unsafePartial $ fromJust (head single)
+              multiple -> throwError $ NotUniquelyIdentifying pos stateName (keys states)
+            1 -> pure $ StateIdentifier $ unsafePartial $ fromJust (head allMatchingStateNames)
+            _ -> throwError $ NotUniquelyIdentifying pos stateName allMatchingStateNames
 
 compileSimpleStep currentDomain s@(RegEx pos (reg :: RegExP)) = do
   case currentDomain of

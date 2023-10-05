@@ -160,6 +160,8 @@ simpleStep = try
   <|>
   Simple <$> (SpecialisesRoleType <$> (getPosition <* reserved "specialisesRoleType") <*> arcIdentifier)
   <|>
+  Simple <$> (IsInState <$> (getPosition <* reserved "isInState") <*> arcIdentifier)
+  <|>
   Simple <$> (RegEx <$> (getPosition <* reserved "regexp") <*> regexExpression)
   -- VARIABLE MUST BE LAST!
   <|>
@@ -327,6 +329,7 @@ startOf stp = case stp of
     startOfSimple (TypeOfContext p) = p
     startOfSimple (RoleTypes p) = p
     startOfSimple (SpecialisesRoleType p _) = p
+    startOfSimple (IsInState p _) = p
     
     startOfSimple (TypeTimeOnlyContext p _) = p
     startOfSimple (TypeTimeOnlyEnumeratedRole p _ _) = p
@@ -369,6 +372,7 @@ endOf stp = case stp of
     endOfSimple (TypeOfContext (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}
     endOfSimple (RoleTypes (ArcPosition{line, column})) = ArcPosition{line, column: column + 9}
     endOfSimple (SpecialisesRoleType (ArcPosition{line, column}) ident) = ArcPosition{line, column: column + 19 + length ident}
+    endOfSimple (IsInState (ArcPosition{line, column}) ident) = ArcPosition{line, column: column + 9 + length ident}
     
     endOfSimple (TypeTimeOnlyContext p _) = p
     endOfSimple (TypeTimeOnlyEnumeratedRole p _ _) = p

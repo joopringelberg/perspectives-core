@@ -61,6 +61,7 @@ data SimpleStep =
   | TypeOfContext ArcPosition
   | RoleTypes ArcPosition
   | SpecialisesRoleType ArcPosition String
+  | IsInState ArcPosition String
   | RegEx ArcPosition RegExP
 
   | PublicRole ArcPosition String
@@ -155,6 +156,7 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (RoleTypes _) = "RoleTypes"
   prettyPrint' t (TypeOfContext _) = "TypeOfContext"
   prettyPrint' t (SpecialisesRoleType _ s) = "SpecialisesRoleType " <> s
+  prettyPrint' t (IsInState _ s) = "IsInState " <> s
   prettyPrint' t (TypeTimeOnlyContext _ s) = "TypeTimeOnlyContext " <> s
   prettyPrint' t (TypeTimeOnlyEnumeratedRole _ r c) = "TypeTimeOnlyEnumeratedRole " <> r <> " " <> c
   prettyPrint' t (TypeTimeOnlyCalculatedRole _ s) = "TypeTimeOnlyCalculatedRole " <> s
