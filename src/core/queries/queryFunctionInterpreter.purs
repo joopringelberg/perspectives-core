@@ -290,16 +290,6 @@ interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = Array
   -- Notice by the domain and range that we assume functions that are Monoids.
   -- Notice the strangeness of compiling a binary expression into an SQD description.
   SQD dom (UnaryCombinator fname) (VDOM rangeType _) _ _-> case fname of
-    -- we can count anything and the result is a number.
-    CountF -> do
-      (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
-      -- Now count the results in a and return that. We add the Dependency that holds the count to the path and it becomes the new head.
-      -- For a sequence function, there is no single path that leads to the result. We consider the result to be the main path.
-      -- All other paths (both main and supporting) of the result paths are combined in the supporting paths.
-      pure [{ head: (V (show fname) (Value $ show $ length result))
-            , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
-            , supportingPaths: concat (allPaths <$> result)
-            }]
     
     AddF -> do
       (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
@@ -351,14 +341,27 @@ interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = Array
                 , mainPath: Just $ singleton (V (show fname) (Value $ show (minimum strs)))
                 , supportingPaths: concat (allPaths <$> result)
                 }]
-    
+
+    _ -> throwError (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
+
+  SQD dom (UnaryCombinator fname) _ _ _-> unsafePartial case fname of
+    -- we can count anything and the result is a number.
+    CountF -> do
+      (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
+      -- Now count the results in a and return that. We add the Dependency that holds the count to the path and it becomes the new head.
+      -- For a sequence function, there is no single path that leads to the result. We consider the result to be the main path.
+      -- All other paths (both main and supporting) of the result paths are combined in the supporting paths.
+      pure [{ head: (V (show fname) (Value $ show $ length result))
+            , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
+            , supportingPaths: concat (allPaths <$> result)
+            }]    
+    -- We can also try to take the first element of a sequence of whatever type.
     FirstF -> do
       (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
       case head result of
         Nothing -> pure []
         Just h -> pure [h]
 
-    _ -> throwError (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
   _ -> throwError $ (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
 
 -----------------------------------------------------------
