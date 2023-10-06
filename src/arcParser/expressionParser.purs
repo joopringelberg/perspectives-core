@@ -146,8 +146,6 @@ simpleStep = try
   <|>
   Simple <$> (PublicContext <$> getPosition <*> (reserved "publiccontext" *> pubParser))
   <|>
-  Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> arcIdentifier))
-  <|>
   Simple <$> (SequenceFunction <$> getPosition <*> sequenceFunction)
   <|>
   Simple <$> (Identity <$> getPosition <* reserved "this")
@@ -320,7 +318,6 @@ startOf stp = case stp of
     startOfSimple (Context p) = p
     startOfSimple (Extern p) = p
     startOfSimple (IndexedName p) = p
-    startOfSimple (CreateEnumeratedRole p _) = p
     startOfSimple (SequenceFunction p _) = p
     startOfSimple (Identity p) = p
     startOfSimple (Modelname p) = p
@@ -363,7 +360,6 @@ endOf stp = case stp of
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (IndexedName (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}
-    endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length (show fname)}
     endOfSimple (Identity (ArcPosition{line, column})) = ArcPosition{line, column: column + 4}
     endOfSimple (Modelname (ArcPosition{line, column})) = ArcPosition{line, column: column + 9}

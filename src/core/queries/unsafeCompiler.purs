@@ -53,7 +53,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, makeBoolean, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, makeBoolean, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (decodeDate, parseBool, parseInt)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
@@ -63,15 +63,16 @@ import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVa
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType, range, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole, getPerspectType, getState)
 import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
 import Perspectives.Representation.Class.Property (getProperType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..)) as RAN
+import Perspectives.Representation.State (State(..), StateFulObject(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
@@ -85,8 +86,6 @@ compileFunction :: QueryFunctionDescription -> MP (String ~~> String)
 compileFunction (SQD _ (RolGetter (ENR (EnumeratedRoleType r))) _ _ _) = if isExternalRole r
   then pure $ unsafeCoerce $ externalRole
   else pure $ unsafeCoerce $ getEnumeratedRoleInstances (EnumeratedRoleType r)
-
-compileFunction (SQD _ (DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF roleTypeName) _ _ _) = pure $ unsafeCoerce $ getUnlinkedRoleInstances (EnumeratedRoleType roleTypeName)
 
 compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
@@ -409,6 +408,13 @@ compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ 
   case functionName of
     BindingF -> pure $ unsafeCoerce bindingInContext (ContextType parameter)
     SpecialisesRoleTypeF -> pure $ unsafeCoerce (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)))
+    IsInStateF -> do 
+      (State {stateFulObject}) <- getState (StateIdentifier parameter)
+      case stateFulObject of 
+        Cnt ct -> pure $ \contextId -> lift $ lift $ getActiveStates_ (ContextInstance contextId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
+        Orole rt -> pure $ \roleId -> lift $ lift $ getActiveRoleStates_ (RoleInstance roleId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
+        Srole rt -> pure $ \roleId -> lift $ lift $ getActiveRoleStates_ (RoleInstance roleId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
+    GetRoleInstancesForContextFromDatabaseF -> pure $ unsafeCoerce $ getUnlinkedRoleInstances (EnumeratedRoleType parameter)
 
     _ -> throwError (error $ "Unknown function for DataTypeGetterWithParameter: " <> show functionName)
 

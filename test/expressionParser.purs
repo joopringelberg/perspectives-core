@@ -64,16 +64,6 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           (Unary (LogicalNot (ArcPosition{column: 1, line: 1}) _)) -> true
           otherwise -> false
 
-  test "UnaryStep: create" do
-    (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "createRole MyRole" simpleStep
-    case r of
-      (Left e) -> assert (show e) false
-      (Right id) -> do
-        -- logShow id
-        assert "'create MyRole' should be parsed as a the unary step Create" case id of
-          (Simple (CreateEnumeratedRole (ArcPosition{column: 1, line: 1}) "MyRole")) -> true
-          otherwise -> false
-
   test "FilterStep" do
     (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "filter MyRole with ItsBooleanProp" step
     case r of

@@ -57,6 +57,7 @@ to generate this file without the comments in this block.
   , "node-process"
   , "now"
   , "nullable"
+  , "numbers"
   , "ordered-collections"
   , "parsing"
   , "partial"
@@ -74,9 +75,9 @@ to generate this file without the comments in this block.
   , "test-unit"
   , "transformers"
   , "tuples"
+  , "uint"
   , "unicode"
   , "unsafe-coerce"
-  , "uint"
   , "web-encoding"
   ]
 , packages = ./packages.dhall

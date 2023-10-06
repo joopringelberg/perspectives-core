@@ -57,7 +57,7 @@ import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQuerie
 import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, getsDF, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), adtContext2AdtRoleInContext, context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -534,36 +534,6 @@ compileSimpleStep currentDomain s@(IndexedName pos) = do
     (CDOM c) -> pure $ SQD currentDomain (QF.DataTypeGetter IndexedContextName) (VDOM PString Nothing) True False
     (RDOM r) -> pure $ SQD currentDomain (QF.DataTypeGetter IndexedRoleName) (VDOM PString Nothing) True False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
-
--- compileSimpleStep currentDomain (CreateContext pos ident) = do
---   -- If `ident` is not qualified, try to qualify it in the Domain.
---   (qcontextType :: ContextType) <- if isTypeUri ident
---     then pure $ ContextType ident
---     -- Try to qualify the name within the Domain.
---     else do
---       {_id:namespace} <- lift $ gets _.dfr
---       (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain ident (unsafePartial $ fromJust $ (typeUri2ModelUri namespace))
---       case head qnames of
---         Nothing -> throwError $ UnknownContext pos ident
---         (Just qn) | length qnames == 1 -> pure qn
---         otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
---   pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateContextF (unwrap qcontextType)) (CDOM (ST qcontextType)) True True
-
-compileSimpleStep currentDomain s@(CreateEnumeratedRole pos ident) = case currentDomain of
-  (CDOM contextADT) -> do
-    -- If `ident` is not qualified, try to qualify it in the Domain.
-    (qroleType :: EnumeratedRoleType) <- if isTypeUri ident
-      then pure $ EnumeratedRoleType ident
-      -- Try to qualify the name within the Domain.
-      else do
-        {namespace} <- lift $ gets _.dfr
-        (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain ident namespace
-        case head qnames of
-          Nothing -> throwError $ UnknownRole pos ident
-          (Just qn) | length qnames == 1 -> pure qn
-          otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
-    pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateRoleF (unwrap qroleType)) (RDOM (adtContext2AdtRoleInContext contextADT qroleType)) True True
-  otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain (Identity _) = do
   isFunctional <- case currentDomain of

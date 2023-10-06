@@ -45,7 +45,6 @@ data SimpleStep =
   | ContextTypeIndividual ArcPosition String
   | RoleTypeIndividual ArcPosition String
   | Value ArcPosition Range String
-  | CreateEnumeratedRole ArcPosition String
   -- Binding has an optional embedding context.
   | Binding ArcPosition (Maybe String)
   -- Binder has an optional embedding context.
@@ -138,7 +137,6 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   
   prettyPrint' t (ContextTypeIndividual _ s) = "ArcIdentifier " <> s
   prettyPrint' t (RoleTypeIndividual _ s) = "ArcIdentifier " <> s
-  prettyPrint' t (CreateEnumeratedRole _ s) = "CreateEnumeratedRole " <> s
   prettyPrint' t (Binding _ embeddingContext) = "Binding " <> (case embeddingContext of
     Nothing -> ""
     Just ec -> ec)

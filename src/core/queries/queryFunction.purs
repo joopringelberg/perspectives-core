@@ -63,8 +63,6 @@ data FunctionName =
   | UnionF
   | IntersectionF
   | OrElseF
-  | CreateContextF      -- TODO
-  | CreateRoleF         -- TODO
   | GetRoleInstancesForContextFromDatabaseF
   | EqualsF
   | NotEqualsF
@@ -78,10 +76,10 @@ data FunctionName =
   | MultiplyF
   | AndF
   | OrF
-  | CountF              -- TODO
-  | MinimumF            -- TODO
-  | MaximumF            -- TODO
-  | AvailableF           -- TODO
+  | CountF
+  | MinimumF
+  | MaximumF
+  | AvailableF
 
   | TypeOfContextF
   | RoleTypesF
@@ -120,8 +118,6 @@ instance showFunctionName :: Show FunctionName where
     show UnionF = "union"
     show IntersectionF = "intersection"
     show OrElseF = "otherwise"
-    show CreateContextF = "createContext"
-    show CreateRoleF = "createRole"
     show GetRoleInstancesForContextFromDatabaseF = "GetRoleInstancesForContextFromDatabaseF"
     show EqualsF = "="
     show NotEqualsF = "/="
@@ -171,8 +167,6 @@ isFunctionalFunction fn = case fn of
   UnionF -> False
   IntersectionF -> False
   OrElseF -> False
-  CreateContextF -> True
-  CreateRoleF -> True
   GetRoleInstancesForContextFromDatabaseF -> False
   EqualsF -> True
   NotEqualsF -> True
@@ -217,8 +211,6 @@ isMandatoryFunction fn = case fn of
   UnionF -> False
   IntersectionF -> False
   OrElseF -> False
-  CreateContextF -> True
-  CreateRoleF -> True
   GetRoleInstancesForContextFromDatabaseF -> False
   EqualsF -> True
   NotEqualsF -> True
