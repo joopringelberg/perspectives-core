@@ -284,85 +284,87 @@ interpretBQD (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g
         }]
     _, _ -> pure []
   
-interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = ArrayT case f2 of
-  -- f2 results from the expression that follows `>>=` (must have been: "sum", "product", etc.).
-  -- This was parsed as `SequenceFunction f` and is now compiled as `UnaryCombinator f` in an SQD.
-  -- Notice by the domain and range that we assume functions that are Monoids.
-  -- Notice the strangeness of compiling a binary expression into an SQD description.
-  SQD dom (UnaryCombinator fname) (VDOM rangeType _) _ _-> case fname of
-    
-    AddF -> do
-      (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
-      -- We can safely assume the heads of the paths can be added up, but we do have to know whether they are Integers or Strings.
-      unsafePartial $ case rangeType of
-        PNumber -> do
-          (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
-          sum <- pure (foldl (\cumulator nr -> cumulator + nr) 0 nrs)
-          pure [{ head: (V (show fname) (Value $ show sum))
+interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = ArrayT
+  case f2 of
+    -- f2 results from the expression that follows `>>=` (must have been: "sum", "product", etc.).
+    -- This was parsed as `SequenceFunction f` and is now compiled as `UnaryCombinator f` in an SQD.
+    -- Notice by the domain and range that we assume functions that are Monoids.
+    -- Notice the strangeness of compiling a binary expression into an SQD description.
+    SQD dom (UnaryCombinator fname) _ _ _-> do 
+      case fname of
+        -- we can count anything and the result is a number.
+        CountF -> do
+          (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
+          -- Now count the results in a and return that. We add the Dependency that holds the count to the path and it becomes the new head.
+          -- For a sequence function, there is no single path that leads to the result. We consider the result to be the main path.
+          -- All other paths (both main and supporting) of the result paths are combined in the supporting paths.
+          pure [{ head: (V (show fname) (Value $ show $ length result))
                 , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
                 , supportingPaths: concat (allPaths <$> result)
-                }]
-        PString -> do
-          (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
-          sum <- pure (foldl (\cumulator nr -> cumulator <> nr) "" strs)
-          pure [{ head: (V (show fname) (Value $ show sum))
-                , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
-                , supportingPaths: concat (allPaths <$> result)
-                }]
-    
-    MaximumF -> do
-      (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
-      unsafePartial case rangeType of 
-        PNumber -> do
-          (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
-          pure [{ head: (V (show fname) (Value $ show (maximum nrs)))
-                , mainPath: Just $ singleton (V (show fname) (Value $ show (maximum nrs)))
-                , supportingPaths: concat (allPaths <$> result)
-                }]
-        PString -> do
-          (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
-          pure [{ head: (V (show fname) (Value $ show (maximum strs)))
-                , mainPath: Just $ singleton (V (show fname) (Value $ show (maximum strs)))
-                , supportingPaths: concat (allPaths <$> result)
-                }]
+                }]    
+        -- We can also try to take the first element of a sequence of whatever type.
+        FirstF -> do
+          (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
+          case head result of
+            Nothing -> pure []
+            Just h -> pure [h]
+        _ -> case ran of
+          (VDOM rangeType _) -> 
+            case fname of
+              AddF -> do
+                (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
+                -- We can safely assume the heads of the paths can be added up, but we do have to know whether they are Integers or Strings.
+                unsafePartial $ case rangeType of
+                  PNumber -> do
+                    (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
+                    sum <- pure (foldl (\cumulator nr -> cumulator + nr) 0 nrs)
+                    pure [{ head: (V (show fname) (Value $ show sum))
+                          , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
+                          , supportingPaths: concat (allPaths <$> result)
+                          }]
+                  PString -> do
+                    (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
+                    sum <- pure (foldl (\cumulator nr -> cumulator <> nr) "" strs)
+                    pure [{ head: (V (show fname) (Value $ show sum))
+                          , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
+                          , supportingPaths: concat (allPaths <$> result)
+                          }]
+              
+              MaximumF -> do
+                (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
+                unsafePartial case rangeType of 
+                  PNumber -> do
+                    (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
+                    pure [{ head: (V (show fname) (Value $ show (maximum nrs)))
+                          , mainPath: Just $ singleton (V (show fname) (Value $ show (maximum nrs)))
+                          , supportingPaths: concat (allPaths <$> result)
+                          }]
+                  PString -> do
+                    (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
+                    pure [{ head: (V (show fname) (Value $ show (maximum strs)))
+                          , mainPath: Just $ singleton (V (show fname) (Value $ show (maximum strs)))
+                          , supportingPaths: concat (allPaths <$> result)
+                          }]
 
-    MinimumF -> do
-      (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
-      unsafePartial case rangeType of 
-        PNumber -> do
-          (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
-          pure [{ head: (V (show fname) (Value $ show (minimum nrs)))
-                , mainPath: Just $ singleton (V (show fname) (Value $ show (minimum nrs)))
-                , supportingPaths: concat (allPaths <$> result)
-                }]
-        PString -> do
-          (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
-          pure [{ head: (V (show fname) (Value $ show (minimum strs)))
-                , mainPath: Just $ singleton (V (show fname) (Value $ show (minimum strs)))
-                , supportingPaths: concat (allPaths <$> result)
-                }]
+              MinimumF -> do
+                (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
+                unsafePartial case rangeType of 
+                  PNumber -> do
+                    (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
+                    pure [{ head: (V (show fname) (Value $ show (minimum nrs)))
+                          , mainPath: Just $ singleton (V (show fname) (Value $ show (minimum nrs)))
+                          , supportingPaths: concat (allPaths <$> result)
+                          }]
+                  PString -> do
+                    (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
+                    pure [{ head: (V (show fname) (Value $ show (minimum strs)))
+                          , mainPath: Just $ singleton (V (show fname) (Value $ show (minimum strs)))
+                          , supportingPaths: concat (allPaths <$> result)
+                          }]
 
-    _ -> throwError (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
-
-  SQD dom (UnaryCombinator fname) _ _ _-> unsafePartial case fname of
-    -- we can count anything and the result is a number.
-    CountF -> do
-      (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
-      -- Now count the results in a and return that. We add the Dependency that holds the count to the path and it becomes the new head.
-      -- For a sequence function, there is no single path that leads to the result. We consider the result to be the main path.
-      -- All other paths (both main and supporting) of the result paths are combined in the supporting paths.
-      pure [{ head: (V (show fname) (Value $ show $ length result))
-            , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
-            , supportingPaths: concat (allPaths <$> result)
-            }]    
-    -- We can also try to take the first element of a sequence of whatever type.
-    FirstF -> do
-      (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
-      case head result of
-        Nothing -> pure []
-        Just h -> pure [h]
-
-  _ -> throwError $ (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
+              _ -> throwError (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
+          _ -> throwError $ (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
+    _ -> throwError $ (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
 
 -----------------------------------------------------------
 -- MQD
