@@ -1035,7 +1035,8 @@ automaticEffectE = do
                 , end}
               Nothing, _, _ -> failWithPosition "A subject is required" (arcPosition2Position start)
               _, Nothing, Nothing -> fail "A state transition is required, "
-              _, Just _, Just _ -> fail "State transition inside state transition is not allowed, "
+              
+              _, Just entry, Just exit -> fail ("State transition inside state transition is not allowed: " <> show entry <> show exit <> ", ")
             Just ident -> case onEntry, onExit of
               -- We cannot establish, at this point, whether the string that identifies the role we carry out the effect for
               -- is calculated or enumerated. Hence we arbitrarily choose enumerated and fix it in PhaseThree.
@@ -1060,7 +1061,7 @@ automaticEffectE = do
                 , start
                 , end}
               Nothing, Nothing -> fail "A state transition is required, "
-              _, _ -> fail "State transition inside state transition is not allowed, "
+              entry, exit -> fail ("State transition inside state transition is not allowed: " <> show entry <> show exit <> ", ")
         else pure Nil
 
 -- [every N Milliseconds|Seconds|Minutes|Hours|Days [maximally N times]]

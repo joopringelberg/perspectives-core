@@ -39,7 +39,7 @@ import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<>), (>>=))
 import Text.Parsing.Indent (indented', withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (lookAhead, manyTill, option, optionMaybe, try, (<?>))
+import Text.Parsing.Parser.Combinators (lookAhead, manyTill, option, optionMaybe, (<?>))
 
 assignment :: IP Assignment
 assignment = isPropertyAssignment >>= if _
@@ -315,7 +315,7 @@ callDestructiveEffect = do
 
 -- | A let with assignments: letA <binding>+ in <assignment>+.
 letWithAssignment :: IP LetStep
-letWithAssignment = try $ withPos do
+letWithAssignment = withPos do
   start <- getPosition
   -- bindings <- reserved "letA" *> nestedBlock letABinding
   bindings <- reserved "letA" *> withPos (manyTill letABinding outdented')
@@ -334,7 +334,7 @@ letABinding = do
     _, _ -> do 
       -- We must parse the entire expression. So after parsing the position is either equal to the starting position,
       -- or indented to the left (outdented).
-      me <- optionMaybe (try (step <* sameOrOutdented' ))
+      me <- optionMaybe (step <* sameOrOutdented' )
       case me of
         Nothing -> fail "Expected `create role` or `create context` or a functional expression here. "
         Just e -> pure $ Expr (VarBinding varName e)

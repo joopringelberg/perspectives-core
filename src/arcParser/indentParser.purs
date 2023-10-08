@@ -330,7 +330,7 @@ sameOrOutdented' = do
   -- The current position.
   parserPosition <- getPosition
   -- fail when indented.
-  if (sourceColumn parserPosition > sourceColumn indentParserPosition) then fail "not the same or outdented. " else pure unit
+  if (sourceColumn parserPosition > sourceColumn indentParserPosition) then fail "Expected the line to end at this position and then continue in the same column on the next line, or indented. Maybe could not parse the rest of the line? At " else pure unit
 
 isNextLine :: IP Boolean
 isNextLine = do

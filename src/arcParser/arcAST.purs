@@ -27,8 +27,8 @@ import Prelude
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
-import Data.Maybe (Maybe)
-import Data.Newtype (class Newtype)
+import Data.Maybe (Maybe, maybe)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple)
 import Foreign.Class (class Decode, class Encode)
@@ -43,7 +43,7 @@ import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.ExplicitSet (ExplicitSet)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.Sentence (Sentence)
-import Perspectives.Representation.TypeIdentifiers (ContextType, RoleKind, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, RoleKind, RoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
@@ -285,7 +285,9 @@ data RoleIdentification =
 
 derive instance genericRoleIdentification :: Generic RoleIdentification _
 instance eqRoleIdentification :: Eq RoleIdentification where eq = genericEq
-instance showRoleIdentification :: Show RoleIdentification where show = genericShow
+instance showRoleIdentification :: Show RoleIdentification where 
+  show (ExplicitRole _ rt _) = roletype2string rt 
+  show (ImplicitRole _ s) = "a query"
 instance prettyPrintRoleIdentification :: PrettyPrint RoleIdentification where
   prettyPrint' tab (ExplicitRole ct rt pos) = tab <> "ExplicitRole " <> show ct <> " " <> show rt
   prettyPrint' tab (ImplicitRole ct step) = tab <> "ImplicitRole " <> show ct <> "\n" <> (prettyPrint' (tab <> "  ") step)
@@ -307,8 +309,13 @@ type SegmentedPath = String
 
 derive instance genericStateSpecification :: Generic StateSpecification _
 instance eqStateSpecification :: Eq StateSpecification where eq = genericEq
-instance showStateSpecification :: Show StateSpecification where show = genericShow
+instance showStateSpecification :: Show StateSpecification where 
+  show (ContextState ctype mpath) = "context state " <> unwrap ctype <> showPath mpath
+  show (SubjectState r mpath) = "subject state " <> show r <> showPath mpath
+  show (ObjectState r mpath) = "subject state " <> show r <> showPath mpath
 
+showPath :: Maybe String -> String
+showPath = maybe "" (append "$")
 --------------------------------------------------------------------------------
 ---- SCREEN
 --------------------------------------------------------------------------------
