@@ -55,7 +55,7 @@ step_ :: Boolean -> IP Step
 step_ parenthesised = do
   start <- getPosition
   left <- (token.parens (step_ true)) <|> leftSide
-  mop <- optionMaybe (try operator)
+  mop <- optionMaybe operator
   case mop of
     Nothing -> pure left
     (Just op) -> do
@@ -426,7 +426,7 @@ pureLetStep = do
   pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
 
 computationStep :: IP Step
-computationStep = try do
+computationStep = do
   start <- getPosition
   functionName <- reserved "callExternal" *> arcIdentifier
   arguments <- token.symbol "(" *>

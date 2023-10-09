@@ -255,7 +255,7 @@ contextE = withPos do
 
 
     contextAspectE :: IP ContextPart
-    contextAspectE = try do
+    contextAspectE = do 
       void $ reserved "aspect"
       pos <-getPosition
       aspect <- qualifiedName <|> prefixedName
@@ -617,7 +617,7 @@ propertyE = do
   (calculatedProperty pos uname) <|> (enumeratedProperty pos uname)
   where
     calculatedProperty :: ArcPosition -> String -> IP RolePart
-    calculatedProperty pos uname = try do
+    calculatedProperty pos uname = do
       isFunctional <- option false functional
       token.reservedOp "="
       calc <- step
@@ -629,7 +629,7 @@ propertyE = do
       where
           -- | Calculated properties are by default relational.
           functional :: IP Boolean
-          functional = (token.parens (reserved "functional")) *> (pure true)
+          functional = (try $ token.parens (reserved "functional")) *> (pure true)
 
 
     -- | This parser always succeeds, either with or without consuming part of the input stream.
