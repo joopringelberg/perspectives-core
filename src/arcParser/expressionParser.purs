@@ -114,8 +114,21 @@ step_ parenthesised = do
         _ -> simpleStep
 
 simpleStep :: IP Step
-simpleStep = try
-  (Simple <$> (ArcIdentifier <$> getPosition <*> arcIdentifier)
+simpleStep = do 
+  r <- simpleStep'
+  case r of 
+    id@(Simple (ArcIdentifier _ _)) -> do 
+      followedByParen <- optionMaybe (lookAhead (token.symbol "("))
+      case followedByParen of
+        Just _ -> fail "Did you mean to use `callExternal`, `callEffect` or `callDestructiveEffect`?"
+        Nothing -> pure id
+    other -> pure other
+
+
+simpleStep' :: IP Step
+simpleStep' = 
+  (
+  (Simple <$> (ArcIdentifier <$> getPosition <*> arcIdentifier))
   <|>
   -- token brackets seems not to restore parser state when it fails, hence 'try'.
   Simple <$> (ContextTypeIndividual <$> getPosition <*> try (token.brackets ((reserved "context") *> arcIdentifier)))
